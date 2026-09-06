@@ -106,25 +106,41 @@
             <input type="checkbox" id="host-incremental-export">
             <span>增量导出模式</span>
           </label>
+          <label class="checkbox-group" title="自动过滤酒馆原生默认背景图、默认主题等静态资源，仅打包用户个人导入的增量资产">
+            <input type="checkbox" id="host-prune-builtin" checked>
+            <span>剔除酒馆原生重复资产</span>
+          </label>
         </div>
       </div>
 
       <!-- 宿主直出目标与控制 -->
       <div class="host-export-controls">
-        <div class="target-select-group">
-          <label for="host-target-select">一步直出格式:</label>
-          <select id="host-target-select" class="select-input">
-            <option value="native" selected>当前宿主原生格式</option>
-            <option value="st">SillyTavern (ST 摊平)</option>
-            <option value="l">Luker (带清单)</option>
-            <option value="tt">TauriTavern (TT 布局)</option>
-            <option value="pt">PureTavern (PT 兼容)</option>
-          </select>
+        <div style="display: flex; gap: 16px; flex-wrap: wrap; align-items: center;">
+          <div class="target-select-group">
+            <label for="host-target-select">一步直出格式:</label>
+            <select id="host-target-select" class="select-input">
+              <option value="native" selected>当前宿主原生格式</option>
+              <option value="st">SillyTavern (ST 摊平)</option>
+              <option value="l">Luker (带清单)</option>
+              <option value="tt">TauriTavern (TT 布局)</option>
+              <option value="pt">PureTavern (PT 兼容)</option>
+            </select>
+          </div>
+
+          <div class="split-select-group" style="display: flex; align-items: center; gap: 8px; font-size: 0.85rem;">
+            <label for="host-split-select" style="color: var(--text-muted); font-weight: 500;">智能分包限制:</label>
+            <select id="host-split-select" class="select-input">
+              <option value="none">不分卷 (单包完整导出)</option>
+              <option value="100" selected>100 MB (云酒馆推荐 / 独立分卷)</option>
+              <option value="50">50 MB (高限制容器环境)</option>
+              <option value="200">200 MB (宽松上限)</option>
+            </select>
+          </div>
         </div>
 
         <div class="host-filename-preview-row" id="host-filename-preview-row">
           <span class="preview-label">📦 导出文件名预览:</span>
-          <code class="preview-code" id="host-filename-preview">st-default-user-2026-09-06.zip</code>
+          <code class="preview-code" id="host-filename-preview">st-default-user-part1-2026-09-06.zip</code>
         </div>
 
         <div class="host-action-buttons">
@@ -203,22 +219,73 @@
           </select>
         </div>
 
+        <div class="split-select-group">
+          <label for="split-select">智能分包:</label>
+          <select id="split-select" class="select-input">
+            <option value="none">不分卷 (单包导出)</option>
+            <option value="100" selected>100 MB (云酒馆推荐 / 独立分卷)</option>
+            <option value="50">50 MB (高限制容器环境)</option>
+            <option value="200">200 MB (宽松上限)</option>
+          </select>
+        </div>
+
         <div class="filename-input-group">
           <div class="filename-top-row">
             <label for="filename-template-input">自定义包名:</label>
             <div class="placeholder-chips" id="placeholder-chips">
-              <button type="button" class="btn-chip" data-insert="{source}" title="插入源包名称">+ {source}</button>
+              <button type="button" class="btn-chip" data-insert="{part}" title="插入分卷序号 (如 part1, part2)">+ {part}</button>
+              <button type="button" class="btn-chip" data-insert="{user}" title="插入用户名">+ {user}</button>
+              <button type="button" class="btn-chip" data-insert="{date}" title="插入年月日">+ {date}</button>
+              <button type="button" class="btn-chip" data-insert="{category}" title="插入类目标识">+ {category}</button>
+              <button type="button" class="btn-chip" data-insert="{mode}" title="插入打包模式">+ {mode}</button>
               <button type="button" class="btn-chip" data-insert="{target}" title="插入目标平台代码">+ {target}</button>
-              <button type="button" class="btn-chip" data-insert="{date}" title="插入时间戳">+ {date}</button>
-              <button type="button" class="btn-chip" data-insert="{handle}" title="插入用户标识">+ {handle}</button>
             </div>
           </div>
-          <input type="text" id="filename-template-input" class="text-input" placeholder="{source}-to-{target}-{date}.zip" value="{source}-to-{target}-{date}.zip">
-          <div class="filename-preview-box" id="filename-preview-box">
-            <span class="preview-label">实时生成预览:</span>
-            <code class="preview-code" id="filename-preview">{source}-to-{target}-{date}.zip</code>
+          <input type="text" id="filename-template-input" class="text-input" placeholder="{target}_{user}_{part}_{date}.zip" value="{target}_{user}_{part}_{date}.zip">
+          <div style="display: flex; gap: 8px; align-items: center; margin-top: 3px; font-size: 0.76rem; color: #a6adc8;">
+            <span>预设模板:</span>
+            <button type="button" class="btn-tpl-preset" data-tpl="{target}_{user}_{part}_{date}.zip" style="background: transparent; border: none; color: #f59e0b; cursor: pointer; text-decoration: underline; padding: 0;">📦 分卷标准</button> |
+            <button type="button" class="btn-tpl-preset" data-tpl="{target}_core_{user}_{date}.zip" style="background: transparent; border: none; color: #f59e0b; cursor: pointer; text-decoration: underline; padding: 0;">🛡️ 核心备份</button> |
+            <button type="button" class="btn-tpl-preset" data-tpl="{target}_full_{user}_{date}.zip" style="background: transparent; border: none; color: #f59e0b; cursor: pointer; text-decoration: underline; padding: 0;">💾 全量备份</button>
           </div>
-          <span class="filename-guide">点击标签可快速插入变量，生成时自动替换并过滤非法字符</span>
+          <div class="filename-preview-box" id="filename-preview-box" style="margin-top: 5px;">
+            <span class="preview-label">实时生成预览:</span>
+            <code class="preview-code" id="filename-preview">pt_default-user_part1_2026-09-06.zip</code>
+          </div>
+          <span class="filename-guide">点击药丸标签可快速插入变量，生成时自动替换并过滤非法字符</span>
+        </div>
+
+        <!-- 扩展插件处理模式 (防 408 超时与体积优化) -->
+        <div class="extension-mode-section" style="width: 100%; margin: 8px 0 12px 0;">
+          <div style="font-size: 0.88rem; font-weight: bold; margin-bottom: 8px; color: #cdd6f4; display: flex; align-items: center; gap: 6px;">
+            <span>🧩</span> 扩展打包模式:
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px;">
+            <label style="display: flex; gap: 10px; padding: 10px 14px; background: rgba(137, 180, 250, 0.08); border: 1px solid rgba(137, 180, 250, 0.3); border-radius: 8px; cursor: pointer; align-items: flex-start;">
+              <input type="radio" name="extension-mode" value="manifest" checked style="margin-top: 3px; cursor: pointer;">
+              <div>
+                <strong style="color: #89b4fa; font-size: 0.9rem;">⚡ 轻量清单模式 (推荐)</strong>
+                <p style="margin: 3px 0 0 0; font-size: 0.78rem; color: #a6adc8; line-height: 1.35;">
+                  体积缩减 99%，彻底防止 408 上传超时。仅导出扩展元数据清单，导入时由酒馆安装器以 <code>depth: 1</code> 浅克隆自动拉取。
+                </p>
+              </div>
+            </label>
+            <label style="display: flex; gap: 10px; padding: 10px 14px; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 8px; cursor: pointer; align-items: flex-start;">
+              <input type="radio" name="extension-mode" value="full" style="margin-top: 3px; cursor: pointer;">
+              <div>
+                <strong style="color: #cdd6f4; font-size: 0.9rem;">📦 完整离线包</strong>
+                <p style="margin: 3px 0 0 0; font-size: 0.78rem; color: #a6adc8; line-height: 1.35;">
+                  打包扩展实体代码与浅层 Git 结构，已过滤 node_modules、测试与构建冗余，适合完全无外网离线环境。
+                </p>
+              </div>
+            </label>
+          </div>
+          <div style="margin-top: 8px; display: flex; align-items: center; gap: 8px; font-size: 0.82rem; color: #7f849c;">
+            <label class="checkbox-group" title="保留构建配置文件（如 webpack.config.js, vite.config.js, tsconfig.json 等）">
+              <input type="checkbox" id="keep-dev-files-check">
+              <span>保留构建配置 (webpack / vite / tsconfig 等)</span>
+            </label>
+          </div>
         </div>
 
         <div class="advanced-switches-group">
@@ -237,6 +304,10 @@
           <label class="checkbox-group" title="增量合并模式：当包内存在相同文件时仅更新较新文件">
             <input type="checkbox" id="incremental-mode-check">
             <span>增量合并模式</span>
+          </label>
+          <label class="checkbox-group" title="自动识别并剔除 SillyTavern 与 Luker 系统自带的默认背景图、默认主题等静态资源，仅保留个人资产">
+            <input type="checkbox" id="prune-builtin-check" checked>
+            <span>剔除酒馆原生重复资产</span>
           </label>
         </div>
 
