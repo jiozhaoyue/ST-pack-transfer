@@ -32,6 +32,9 @@ buildTargetBackupEvidence({ mode, targetRef, artifact?, userConfirmed? }) -> bac
 describeBackupEvidence(backup) -> { level, label, machineVerified, userAttested }                              // src/core/migration-target.js
 describeConflictState(conflicts) -> { state, label, showsNoConflict, showsUnknown }                            // src/core/migration-target.js
 describeTargetWriteCapability(cell) -> { status, autoWriteConfirmed, guidance }                                // src/core/migration-target.js
+buildRestoreVerification(scopeRef, restoreResult) -> VerificationEvidence[]                                   // src/core/migration-verification.js
+summarizeVerification(verification) -> { total, machineVerified, userAttested, byStatus, coverage }           // src/core/migration-verification.js
+selectRetryCandidates({ items, plan, evidence }) -> { candidates, rejected, gateAllowed, gateReasons }        // src/core/migration-verification.js
 ```
 
 **S3 目标预检与备份契约（2026-10-13）**：目标预检/备份证据落在**独立纯模块** `src/core/migration-target.js`
@@ -126,6 +129,12 @@ MigrationOutcome 使用以下显示分类，不替换 TaskManager 的运行状�
 `coverage`（full / sampled / unknown）/ `status`（confirmed / accepted-exclusion / failed / unknown）。
 `index.js` 恢复后按 outcome 显示文案；现状**无目标侧读回核对**，`automatic` 证据只到「宿主确认写入」，
 **不得**表述为「目标数据已逐条核对」。重试候选只收 `assessRetry` 放行的项（未知写入态不自动重试）。
+
+**2026-10-13（S4 剩余项）**：核对证据构造抽到**纯模块** `src/core/migration-verification.js`
+（`buildRestoreVerification` 原为 `index.js` 内联、不可单测）；`summarizeVerification` 按
+`method`/`status` 汇总，供界面**分别呈现**机器核对与人工确认；`selectRetryCandidates` 实现
+**双重门**（逐项 `assessRetry` + 整体重新过写入门，重试不绕门）。**自动全量读回核对**与
+**自动重发执行**仍受宿主能力阻断（无「列用户文件」端点 / 无部分重试 UI）——判定层就绪，执行待接。
 
 用户取消、上传超时或连接断开后，如果宿主可能已经写入，标 needs-verification；不得自动宣布回滚。
 原生手动导入结束后也需要用户按清单确认，不因点击“我已导入”就伪造底层文件一致性证明。

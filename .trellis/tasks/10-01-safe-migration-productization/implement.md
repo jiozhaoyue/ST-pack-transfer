@@ -124,9 +124,9 @@ R-13/AC-15 属本轮工作流文档交付，不重复拆成产品代码任务。
 > 第 1/3/4/5 项已做；**第 2 项的「自动全量核对」未做**——现状无目标侧读回，`coverage` 只到 `full` / `unknown`。
 
 - [x] 定义每类核对的单位、范围、方式和状态，不混用包条目/角色/聊天计数。（`buildVerificationEvidence` 的 `unit` 口径）
-- [ ] 写入返回后才进入核对；自动全量、抽样、人工确认和未知分别显示。（**写入后才核对**已做；**自动全量读回核对未做**）
+- [x] 写入返回后才进入核对；自动全量、抽样、人工确认和未知分别显示。（**2026-10-13 由 `10-13-migration-verification-layer` 补完**：`buildRestoreVerification` 抽为纯模块 + `summarizeVerification` 分别呈现机器核对/人工确认；**自动全量读回核对**仍受宿主能力阻断——无「列用户文件」端点）
 - [x] 落实 completed / completed-with-exclusions / needs-verification / failed 的区别。（`classifyOutcome`）
-- [x] 仅将可证明未应用且 repeatSafe 的项送入重试候选，重新经过目标安全门。（`assessRetry` 判定已做；**自动重发未做**）
+- [x] 仅将可证明未应用且 repeatSafe 的项送入重试候选，重新经过目标安全门。（**2026-10-13 补完**：`selectRetryCandidates` 双重门——逐项 `assessRetry` + 整体重新过写入门；**自动重发执行**未接入）
 - [x] 验证未知状态、不可拆分批次、目标/计划变化都不能自动重试。（`test/migration-verification.test.js`）
 
 **完成判据**：对“服务器写一半后客户端断开”的夹具，不重复成功项、不伪造完成、不丢掉可取回产物。

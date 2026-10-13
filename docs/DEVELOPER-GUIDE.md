@@ -188,10 +188,10 @@ npm run e2e:web -- --rebuild  # 删/换过源码文件时必须加（mtime 判�
 | 项 | 状态 |
 | --- | --- |
 | 纯库聊天接口 | 上游未实现，三条聊天库路径均未在真实纯库环境跑通 |
-| 目标侧自动读回核对 | 未做（`coverage` 只到 `full` / `unknown`） |
+| 目标侧自动读回核对 | **判定就绪**（`buildRestoreVerification` / `summarizeVerification`）；**宿主侧读回未接入**（无「列用户文件」端点 ⇒ `coverage` 只到「宿主确认写入」） |
 | 自动目标备份 | **判定就绪**（`buildTargetBackupEvidence` 可产 `readback-verified`）；**宿主侧执行未接入**（触发 `/api/users/backup`、校验可读、落工作区留存仍待 host-bridge） |
 | 目标冲突预检 | **判定就绪**（`assessTargetConflicts`；读不到清单 ⇒ `unknown` 不是 0）；**目标侧自动读取清单未接入**（恢复流程冲突一律 unknown，由对话框确认风险） |
-| 自动重发重试 | 未做（只有重试资格判定） |
+| 自动重发重试 | **判定就绪**（`assessRetry` + `selectRetryCandidates` 双重门）；**执行未接入**（无部分重试 UI） |
 | 各异步阶段超时数值与测量 | 未做 |
 | 四个宿主的完整有向迁移路径证据 | 格式转换面 4 源 × 4 目标 = 16 条逐条走通（含 PT 原生源）；**目标侧写入**仍靠实例/人工证据 |
 | 外部用户试用 | 未做（公开发布关口未通过） |
