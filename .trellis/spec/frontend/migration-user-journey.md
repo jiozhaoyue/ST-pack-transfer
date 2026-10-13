@@ -1,7 +1,6 @@
 # 迁移用户流程与统一计划契约
 
-> 状态：2026-10-01 用户已裁定的目标契约，**尚未实现**。本文定义后续验收要求，不声称当前 UI 已具备这些行为。
-> 当前能力证据与拟新增边界分开列示。只有完成相应测试和验收后，才可将条目改为“已实现”。
+> 状态：2026-10-01 用户已裁定的目标契约。**源端三类交付已于 S2（2026-10-13）实现**（`src/ui/migration-controller.js` 的 `buildSourceDeliveries`）；计划快照已于 S1 实现（`src/core/migration-plan.js`）；向导 UI 与目标端仍待实现。本文其余条目为验收要求，未实现者不声称当前 UI 已具备。
 
 ## 1. 范围与触发
 
@@ -83,6 +82,11 @@ operation: 'export' | 'restore'
 报告缺失不妨碍识别合法目标包；目标端重建自己的检查与授权，不信任报告中的“已确认”。
 只持有目标包时，核对范围是该包可证明的内容，不能推断原源端全部数据都在其中。
 下载状态区分“已生成”“已触发下载”“用户确认保存”，不能仅凭触发浏览器下载宣布文件永久可恢复。
+
+**已实现（S2，2026-10-13）**：`src/ui/migration-controller.js` 的 `buildSourceDeliveries` 按上表产出三类交付项，
+origin 用 `ORIGINS.SOURCE_BACKUP` / `ORIGINS.CONVERTED`（或 `DELTA`）/ `ORIGINS.REPORT` 区分（`src/storage/db.js:27-36`）；
+无转换时不重复（源即目标，只一份 `host-export`）；报告为独立 `.txt`，目标包**保持原生布局、不加外层套装**。
+接入点：`index.js` 的 `handleHostExport` 单包出口与分卷出口。
 
 ## 4. 校验与错误矩阵
 

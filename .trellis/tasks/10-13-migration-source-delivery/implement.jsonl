@@ -1,0 +1,6 @@
+{"file": ".trellis/spec/frontend/migration-user-journey.md", "reason": "源端交付角色与向导语义的契约来源"}
+{"file": ".trellis/spec/frontend/migration-compatibility-and-release.md", "reason": "交付关口与三类产物边界"}
+{"file": ".trellis/spec/frontend/migration-safety-and-evidence.md", "reason": "S1 已实现的计划快照契约"}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "既有质量门与控制消费约定"}
+{"file": ".trellis/spec/frontend/directory-structure.md", "reason": "src/ui 与 src/core 分层边界"}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "纯逻辑层无 DOM 约定"}

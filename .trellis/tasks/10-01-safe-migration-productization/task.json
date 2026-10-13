@@ -19,7 +19,8 @@
   "pr_url": null,
   "subtasks": [],
   "children": [
-    "10-13-migration-plan-and-write-gate"
+    "10-13-migration-plan-and-write-gate",
+    "10-13-migration-source-delivery"
   ],
   "parent": null,
   "relatedFiles": [],

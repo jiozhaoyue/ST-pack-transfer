@@ -30,6 +30,8 @@ export const ORIGINS = Object.freeze({
   CONVERTED: 'converted',
   DELTA: 'delta',
   SPLIT_PART: 'split-part',
+  SOURCE_BACKUP: 'source-backup',
+  REPORT: 'report',
 });
 
 /**

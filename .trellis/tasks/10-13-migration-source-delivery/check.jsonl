@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/frontend/migration-user-journey.md", "reason": "校验源端交付角色与命名"}
+{"file": ".trellis/spec/frontend/migration-compatibility-and-release.md", "reason": "校验交付关口与无外层套装"}
+{"file": ".trellis/spec/frontend/migration-safety-and-evidence.md", "reason": "校验计划快照契约一致"}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "校验质量门"}
