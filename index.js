@@ -42,7 +42,8 @@ import { renderUsageDashboard } from './src/ui/usage-dashboard.js';
 import { exportLibraryToPack, injectLibraryChatsIntoSource, importRestoredChatsIntoLibrary } from './src/ui/chat-store-inject.js';
 import { getChatStoreProbe, probeChatStore } from './src/ui/chat-store-bridge.js';
 import { resolveFilename, previewFilename, DEFAULT_FILENAME_TEMPLATE, namedBlob } from './src/core/filename-template.js';
-import { buildSourceDeliveries } from './src/ui/migration-controller.js';
+import { buildSourceDeliveries, guardedRestore, buildTargetEvidence } from './src/ui/migration-controller.js';
+import { createMigrationPlan } from './src/core/migration-plan.js';
 import {
   detectHost,
   verifyHostPlatform,
@@ -1962,6 +1963,54 @@ async function main(appRoot) {
   }
 
   // 7. 还原确认模态弹窗逻辑
+
+  /** S3：重置「已备份目标数据」勾选（对话框每次打开都从未勾选开始，避免静默通过）。 */
+  function resetRestoreBackupCheck() {
+    const el = document.getElementById('restore-backup-confirmed');
+    if (el) el.checked = false;
+  }
+
+  /** S3：构造目标写入的 plan + evidence（目标端写入只看 targetWrite 与 evidence）。 */
+  function buildRestoreGateContext() {
+    const el = document.getElementById('restore-backup-confirmed');
+    const backupConfirmed = Boolean(el && el.checked);
+    const plan = createMigrationPlan({
+      source: { layout: 'l' },
+      target: { layout: hostLayoutCode(host.platform) },
+      requestedSelection: {},
+    });
+    const evidence = buildTargetEvidence({
+      platform: host.platform,
+      handle: currentHostHandle,
+      planTargetRef: `${host.platform}@${currentHostHandle}`,
+      backupConfirmed,
+      planRevision: plan.revision,
+      inFlight: isRestoreInFlight(),
+    });
+    return { plan, evidence };
+  }
+
+  /** S3：门禁拒绝码 → 人类可读文案。 */
+  function restoreGateReasonsText(reasons) {
+    const MAP = {
+      'no-target-backup': '未确认已备份目标数据',
+      'confirmation-stale': '计划已过期',
+      'confirmation-invalid': '当前操作未确认',
+      'target-changed': '目标身份与计划不一致',
+      'restore-in-flight': '已有写入在途',
+      'target-write-unsupported': '目标宿主不支持自动写入',
+      'permission-unknown': '权限未知',
+      'permission-denied': '权限被拒绝',
+    };
+    return reasons.map((r) => MAP[r] || r).join('、');
+  }
+
+  /** S3：报告门禁拒绝（零写入）。 */
+  function reportRestoreGateRefusal(reasons) {
+    logger.warn(`目标写入被安全门拒绝（零写入）: ${reasons.join(', ')}`);
+    void alertDialog(`写入被安全门拒绝：${restoreGateReasonsText(reasons)}。\n请先完成目标备份并勾选确认，或改用宿主原生导入方式。`);
+  }
+
   function openRestoreModal(archiveFile) {
     if (!host.isPlugin) {
       void alertDialog('还原/写入功能仅在作为 SillyTavern 或 Luker 扩展插件运行且已登录时可用。');
@@ -1973,6 +2022,7 @@ async function main(appRoot) {
     }
     pendingRestoreBatch = null;
     pendingRestoreFile = archiveFile;
+    resetRestoreBackupCheck();
     if (restoreModalDesc) {
       restoreModalDesc.innerHTML = `即将把数据包 <strong>「${escapeHtml(archiveFile.name)}」</strong> (${escapeHtml(formatBytes(archiveFile.size))}) 恢复写入到当前酒馆宿主 (${escapeHtml(host.platform.toUpperCase())})，请选择恢复模式：`;
     }
@@ -2003,6 +2053,7 @@ async function main(appRoot) {
     }
     pendingRestoreFile = null;
     pendingRestoreBatch = items;
+    resetRestoreBackupCheck();
     const totalBytes = items.reduce((sum, it) => sum + (it.blob?.size || 0), 0);
     if (restoreModalDesc) {
       restoreModalDesc.innerHTML = `即将把 <strong>${escapeHtml(String(items.length))} 项</strong>产物`
@@ -2109,9 +2160,17 @@ async function main(appRoot) {
       pendingRestoreBatch = null;
       if (restoreModalOverlay) restoreModalOverlay.style.display = 'none';
 
+      // S3：目标写入安全门（门禁不过 ⇒ restoreFn 一次都不调用，零写入）
+      const gateCtx = buildRestoreGateContext();
+
       // 批量：整批交给编排状态机（模式在开批前选一次，逐项结果与失败原因均可见）
       if (batchItems) {
-        await runBatchRestore(batchItems, mode);
+        const { wrote, reasons } = await guardedRestore({
+          plan: gateCtx.plan,
+          evidence: gateCtx.evidence,
+          restoreFn: () => runBatchRestore(batchItems, mode),
+        });
+        if (!wrote) reportRestoreGateRefusal(reasons);
         return;
       }
 
@@ -2122,13 +2181,24 @@ async function main(appRoot) {
         view.setProgress(15, `正在恢复写入数据包至宿主 (${mode === 'merge' ? '合并写入' : '覆盖写入'})...`);
         logger.info(`向宿主发起数据包恢复请求: ${fileToRestore.name}, 模式: ${mode}`);
 
-        // `restoreToHost` 的同步段会置位在途标志，故先拿到 promise 再刷新，
-        // 待导出区才会渲染出「取消恢复」入口（审计 R-01：大包上传此前无法中途取消）
-        const restorePromise = restoreToHost(fileToRestore.blob, {
-          mode, platform: host.platform, timeoutMs: UPLOAD_TIMEOUT_MS,
+        // S3：先过安全门（门禁不过 ⇒ restoreToHost 一次都不调用）
+        const { wrote, reasons, result: restoreResult } = await guardedRestore({
+          plan: gateCtx.plan,
+          evidence: gateCtx.evidence,
+          // `restoreToHost` 的同步段会置位在途标志，故先拿到 promise 再刷新，
+          // 待导出区才会渲染出「取消恢复」入口（审计 R-01：大包上传此前无法中途取消）
+          restoreFn: () => {
+            const p = restoreToHost(fileToRestore.blob, {
+              mode, platform: host.platform, timeoutMs: UPLOAD_TIMEOUT_MS,
+            });
+            refreshExportQueueUI();
+            return p;
+          },
         });
-        refreshExportQueueUI();
-        const restoreResult = await restorePromise;
+        if (!wrote) {
+          reportRestoreGateRefusal(reasons);
+          return;
+        }
         // 三态区分（审计 R-15：响应体不可解析时不得谎报成功）
         if (restoreResult && restoreResult.unconfirmed) {
           view.setProgress(100, `请求已发出，但结果未确认`);

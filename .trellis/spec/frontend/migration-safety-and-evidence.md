@@ -25,7 +25,15 @@ getRestoreCapability() -> 'unknown' | 'available' | 'unsupported'
 createMigrationPlan(input) -> MigrationPlan                    // src/core/migration-plan.js
 evaluateWriteGate(plan, evidence) -> { allowed: boolean, reasons: string[] }   // src/core/migration-evidence.js
 assessRetry(itemEvidence) -> { allowed: boolean, reason: string }             // src/core/migration-evidence.js
+guardedRestore({ plan, evidence, restoreFn }) -> { wrote, reasons, result? }  // src/ui/migration-controller.js
+buildTargetEvidence({ platform, handle, planTargetRef, backupConfirmed, planRevision, inFlight, permission? }) -> evidence  // src/ui/migration-controller.js
 ```
+
+**S3 写入路径契约（2026-10-13）**：`guardedRestore` 是目标写入的**唯一门禁编排**——
+先 `evaluateWriteGate`，**门禁不过时 `restoreFn` 一次都不调用**（零写入）。
+`index.js` 的恢复路径（单条 `btnConfirmRestore` 与批量 `runBatchRestore`）**都**经它，**不得**保留绕过门禁的第二入口。
+备份证据由恢复对话框的「我已备份目标数据」勾选驱动（`#restore-backup-confirmed` → `backup.level` 为 `user-attested` 或 `none`），
+对话框每次打开都**重置为未勾选**（避免静默通过）。自动目标备份（`readback-verified`）仍未实现。
 
 `MigrationPlan` 为**深度冻结**快照，含 `revision` / `requested` / `effective` / `capabilities`。
 `requested` **一律**来自显式传入的选择快照，**不读** `src/ui/category-filter.js` 的模块级 `currentSelection`

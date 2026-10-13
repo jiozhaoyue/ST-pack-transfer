@@ -1,0 +1,6 @@
+{"file": ".trellis/spec/frontend/migration-safety-and-evidence.md", "reason": "写入门与重试契约的唯一来源"}
+{"file": ".trellis/spec/frontend/migration-user-journey.md", "reason": "目标端流程与确认绑定语义"}
+{"file": ".trellis/spec/frontend/migration-compatibility-and-release.md", "reason": "不支持自动写入时的原生导入指引"}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "既有质量门"}
+{"file": ".trellis/spec/frontend/dom-write-scope.md", "reason": "宿主 DOM 写入作用域（模板改动）"}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "纯逻辑层无 DOM 约定"}

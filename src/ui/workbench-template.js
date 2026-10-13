@@ -333,6 +333,10 @@ export function getWorkbenchHtml({ isModal = false, isDrawer = false, isStandalo
             <div class="radio-text"><strong>覆盖写入</strong></div>
           </label>
         </div>
+        <label class="checkbox_label flex-container" id="restore-backup-label">
+          <input type="checkbox" id="restore-backup-confirmed">
+          <div class="radio-text">我已备份目标数据（写入前保底，未备份将拒绝写入）</div>
+        </label>
         <div class="flex-container" style="justify-content: flex-end; gap: 8px;">
           <button type="button" class="menu_button" id="btn-cancel-restore">取消</button>
           <button type="button" class="menu_button menu_button_icon btn-accent" id="btn-confirm-restore">

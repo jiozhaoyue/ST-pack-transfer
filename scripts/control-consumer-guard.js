@@ -89,6 +89,7 @@ export const CONTROL_CONSUMERS = Object.freeze({
   'tc-discard': 'task-controls.js:50 — click 丢弃断点',
 
   // ── 恢复模态 ──
+  'restore-backup-confirmed': 'index.js buildRestoreGateContext() — .checked 目标备份声明（S3 写入门禁的 backup 证据）',
   'name:restore-mode': 'index.js — querySelector(:checked).value 合并写入/覆盖写入',
   'btn-cancel-restore': 'index.js:1167 — click 取消恢复',
   'btn-confirm-restore': 'index.js:1174 — click 确认恢复写入',

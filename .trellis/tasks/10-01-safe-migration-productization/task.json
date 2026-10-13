@@ -20,7 +20,8 @@
   "subtasks": [],
   "children": [
     "10-13-migration-plan-and-write-gate",
-    "10-13-migration-source-delivery"
+    "10-13-migration-source-delivery",
+    "10-13-migration-target-write-gate"
   ],
   "parent": null,
   "relatedFiles": [],
