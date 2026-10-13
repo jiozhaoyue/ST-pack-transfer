@@ -167,33 +167,48 @@ export class Report {
   }
 
   toHuman() {
-    const json = this.toJSON();
-    const lines = [];
-    lines.push(`转换报告: ${json.sourceLayout} -> ${json.target}`);
-    lines.push('模块            复制   丢弃   合成   字节');
-    for (const [name, m] of Object.entries(json.modules)) {
-      lines.push(
-        `${name.padEnd(14)} ${String(m.copied).padStart(6)} ${String(m.dropped).padStart(6)} ${String(m.synthesized).padStart(6)} ${String(m.bytes).padStart(10)}`,
-      );
-    }
-    lines.push(
-      `合计            ${String(json.totals.copied).padStart(6)} ${String(json.totals.dropped).padStart(6)} ${String(json.totals.synthesized).padStart(6)}`,
-    );
-    if (json.totals.droppedBytes > 0) {
-      lines.push(`已剔除字节合计: ${json.totals.droppedBytes}`);
-    }
-    if (json.dropped.length > 0) {
-      lines.push(`丢弃清单 (${json.dropped.length}):`);
-      for (const item of json.dropped) {
-        lines.push(`  - ${item.path}  [${item.reason}]`);
-      }
-    }
-    if (json.warnings.length > 0) {
-      lines.push(`警告 (${json.warnings.length}):`);
-      for (const warning of json.warnings) {
-        lines.push(`  ! ${warning}`);
-      }
-    }
-    return lines.join('\n');
+    return reportToHuman(this.toJSON());
   }
+}
+
+/**
+ * 把 `Report#toJSON()` 的**纯对象**渲染成人类可读文本。
+ *
+ * 为什么单独成函数（而不是只留 `Report#toHuman`）：转换跑在 Worker 里，回主线程的是
+ * `toJSON()` 的结构化克隆 —— **原型与方法不会跟着过来**（`worker-client.js:159` 明确返回
+ * `reportInstance.toJSON()`）。故主线程拿到的 `report` 永远是**纯对象**，只能靠这个纯函数渲染。
+ * 2026-10-13 实测回归：宿主拉取路径在转换完成后调 `conversionReport.toHuman()` ⇒
+ * `TypeError: conversionReport.toHuman is not a function` ⇒ **产物永不入待导出区**（`f30e68a` 引入）。
+ *
+ * @param {ReturnType<Report['toJSON']>} json
+ * @returns {string}
+ */
+export function reportToHuman(json) {
+  const lines = [];
+  lines.push(`转换报告: ${json.sourceLayout} -> ${json.target}`);
+  lines.push('模块            复制   丢弃   合成   字节');
+  for (const [name, m] of Object.entries(json.modules)) {
+    lines.push(
+      `${name.padEnd(14)} ${String(m.copied).padStart(6)} ${String(m.dropped).padStart(6)} ${String(m.synthesized).padStart(6)} ${String(m.bytes).padStart(10)}`,
+    );
+  }
+  lines.push(
+    `合计            ${String(json.totals.copied).padStart(6)} ${String(json.totals.dropped).padStart(6)} ${String(json.totals.synthesized).padStart(6)}`,
+  );
+  if (json.totals.droppedBytes > 0) {
+    lines.push(`已剔除字节合计: ${json.totals.droppedBytes}`);
+  }
+  if (json.dropped.length > 0) {
+    lines.push(`丢弃清单 (${json.dropped.length}):`);
+    for (const item of json.dropped) {
+      lines.push(`  - ${item.path}  [${item.reason}]`);
+    }
+  }
+  if (json.warnings.length > 0) {
+    lines.push(`警告 (${json.warnings.length}):`);
+    for (const warning of json.warnings) {
+      lines.push(`  ! ${warning}`);
+    }
+  }
+  return lines.join('\n');
 }
