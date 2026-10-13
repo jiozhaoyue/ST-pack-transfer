@@ -8,6 +8,7 @@
  */
 
 import { runConversionTask, runPlanTask } from './src/core/worker-client.js';
+import { reportToHuman } from './src/core/report.js';
 import { logger } from './src/core/logger.js';
 import { setupLogConsole } from './src/ui/log-console.js';
 import { escapeHtml, trustedStaticMarkup } from './src/ui/escape.js';
@@ -1858,7 +1859,7 @@ async function main(appRoot) {
         for (const it of buildSourceDeliveries({
           source: { blob: rawBackupBlob, name: `${host.platform}-${currentHostHandle}.zip`, layout: hostLayoutCode(host.platform) },
           target: null,
-          report: conversionReport ? { text: conversionReport.toHuman() } : null,
+          report: conversionReport ? { text: reportToHuman(conversionReport) } : null,
           hasTransform: true,
         })) {
           exportQueue.enqueue({
@@ -1890,7 +1891,7 @@ async function main(appRoot) {
             layout: targetLayout,
             origin: isDeltaPatch ? ORIGINS.DELTA : ORIGINS.CONVERTED,
           },
-        report: conversionReport ? { text: conversionReport.toHuman() } : null,
+        report: conversionReport ? { text: reportToHuman(conversionReport) } : null,
         hasTransform: !sourceIsTarget,
       });
       for (const it of deliveries) {
