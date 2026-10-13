@@ -7,6 +7,8 @@
  * 旧 v1 记录在 onupgradeneeded 中按 role 映射 origin，升级无损。
  */
 
+import { SESSION_SCHEMA_VERSION } from '../core/migration-session.js';
+
 const DB_NAME = 'st_zip_converter_db';
 const DB_VERSION = 2;
 
@@ -334,27 +336,49 @@ export async function getStorageQuota() {
 }
 
 /**
- * 保存工作区状态（当前正在处理的文件、目标平台、类目选择与排除列表）
+ * 构造要落盘的 `active_session` 记录（**纯函数**，供单测直接验证版本签名）。
+ *
+ * `schemaVersion` 强制为当前值，且**位于展开之后**——调用方传入同名字段也无法覆盖，
+ * 避免"旧会话对象带着自己的 schemaVersion 被原样存回去"。
+ *
+ * @param {object} state
+ * @param {number} [updatedAt=Date.now()]
+ * @returns {object}
+ */
+export function buildWorkspaceRecord(state, updatedAt = Date.now()) {
+  return {
+    key: 'active_session',
+    ...state,
+    schemaVersion: SESSION_SCHEMA_VERSION,
+    updatedAt,
+  };
+}
+
+/**
+ * 保存工作区状态（当前正在处理的文件、目标平台、类目选择与排除列表）。
+ *
+ * 写入时**强制带上当前会话版本签名**（`SESSION_SCHEMA_VERSION`）——这是 U-1（2026-10-13）
+ * 「禁止兼容旧数据」的写入侧：没有签名的记录下一次读取即被判为不兼容。
+ *
+ * 覆盖前仍把现有 `active_session` 备份为 `active_session_prev`：那是**不丢用户数据**，
+ * 与「兼容旧格式」是两件事（备份保留，格式照样作废）。
+ *
  * @param {object} state
  */
 export async function saveWorkspaceState(state) {
   if (!isStorageSupported()) return;
-  // S5：保存前把现有 active_session 备份为 active_session_prev（旧记录可回读，R-10；不升 DB_VERSION、不清库）
   const existing = await loadWorkspaceState();
   if (existing) {
     await runTransaction(STORES.WORKSPACE, 'readwrite',
       (store) => store.put({ ...existing, key: 'active_session_prev' }));
   }
-  const record = {
-    key: 'active_session',
-    ...state,
-    updatedAt: Date.now(),
-  };
-  return runTransaction(STORES.WORKSPACE, 'readwrite', (store) => store.put(record));
+  return runTransaction(STORES.WORKSPACE, 'readwrite', (store) => store.put(buildWorkspaceRecord(state)));
 }
 
 /**
- * 加载工作区状态
+ * 加载工作区状态。**原样返回**——不迁移、不清除、不补齐字段。
+ * 兼容判定是上层的事（`classifySessionCompatibility`），本层不替用户做「猜着兼容」。
+ *
  * @returns {Promise<object|null>}
  */
 export async function loadWorkspaceState() {

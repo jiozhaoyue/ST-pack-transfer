@@ -3,6 +3,7 @@ import { convert } from './transform.js';
 import { generatePlan } from './plan-preview.js';
 import { zipIo, readZipEntryManifest } from './zip-io.js';
 import { logger } from './logger.js';
+import { createConverterWorker } from './worker-factory.js';
 
 /**
  * 协作式暂停的**有界等待**上限（`L1-MR-7`）。
@@ -17,15 +18,26 @@ const PAUSE_FINALIZE_TIMEOUT_MS = 30000;
 let workerInstance = null;
 let messageIdCounter = 0;
 
+/**
+ * file:// 单文件离线产物标记（`scripts/build-offline.mjs` 注入）。
+ *
+ * 离线产物里 Worker **必须**走主线程降级，且必须是**确定**的而不是"碰运气等它失败"：
+ * ① `file://` 下 module worker 被 CORS 拒；
+ * ② IIFE 单文件产物里 `new URL('./converter-worker.js', import.meta.url)` 无 `import.meta` 可解析。
+ * 两条都让 Worker 路径不可用，所以这里**显式**关掉，避免依赖运行期异常。
+ */
+function isOfflineBuild() {
+  return typeof globalThis !== 'undefined' && globalThis.__ST_ZIP_OFFLINE__ === true;
+}
+
 function supportsWebWorker() {
+  if (isOfflineBuild()) return false;
   return typeof window !== 'undefined' && typeof Worker !== 'undefined';
 }
 
 function getWorker() {
   if (!workerInstance && supportsWebWorker()) {
-    workerInstance = new Worker(new URL('./converter-worker.js', import.meta.url), {
-      type: 'module',
-    });
+    workerInstance = createConverterWorker();
   }
   return workerInstance;
 }
