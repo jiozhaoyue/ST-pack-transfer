@@ -502,6 +502,13 @@ async function main(appRoot) {
   const wizard = mountMigrationWizard({
     root,
     session: migrationSession,
+    onStepChange: (stepId) => {
+      // 用户回到「检查」步 ⇒ 他已看过新的读数，旧确认失效标记可以清掉
+      if (stepId === 'check') {
+        wizard.machine.clearStale();
+        syncWizardCheckPanel(latestPlan);
+      }
+    },
     onReopen: () => {
       // 「从源重开」：只重置视图与提示，**不动磁盘上的旧包/半成品文件**（U-1：作废的是会话状态）
       view.setProgress(0, '请重新选择源数据包');
@@ -1242,6 +1249,7 @@ async function main(appRoot) {
     }
     const count = plan.expectedOutputFiles ?? 0;
     const bytes = plan.expectedOutputBytes ?? 0;
+    const stale = Boolean(wizard.isStale && wizard.isStale());
     const exclusions = [];
     for (const [catKey, cat] of Object.entries(plan.categories || {})) {
       for (const item of (cat?.items || [])) {
@@ -1254,7 +1262,7 @@ async function main(appRoot) {
       }
     }
     wizard.setCheckPanel({
-      summary: `预计产出 ${count} 个条目 / ${formatBytes(bytes)}；排除 ${exclusions.length} 项。`,
+      summary: `${stale ? '⚠ 关键输入已变更，请重新确认下方读数。' : ''}预计产出 ${count} 个条目 / ${formatBytes(bytes)}；排除 ${exclusions.length} 项。`,
       exclusions,
     });
   }
@@ -1292,8 +1300,12 @@ async function main(appRoot) {
       });
 
       renderCategoryStats(plan);
+      const hadPlan = Boolean(latestPlan);
       latestPlan = plan;
       syncExportExtManifestButton();
+      // 关键输入（源/目标/范围）变更 ⇒ 上一次的「检查」读数与确认作废（R-05 / AC-04）。
+      // 首次出计划不算"变更"（否则用户一上传就见到失效警告）。
+      if (hadPlan && wizard) wizard.machine.markStale();
       // 向导侧：共享选择快照 + 刷新检查页（同一计划快照，不从 DOM 重拼）
       migrationSession.setSelection(selection);
       syncWizardCheckPanel(plan);
