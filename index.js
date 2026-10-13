@@ -46,7 +46,8 @@ import { resolveFilename, previewFilename, DEFAULT_FILENAME_TEMPLATE, namedBlob 
 import { buildSourceDeliveries, guardedRestore, buildTargetEvidence } from './src/ui/migration-controller.js';
 import { createMigrationPlan } from './src/core/migration-plan.js';
 import { assessTargetConflicts, describeConflictState, buildTargetBackupEvidence, describeBackupEvidence } from './src/core/migration-target.js';
-import { classifyOutcome, buildVerificationEvidence, MIGRATION_OUTCOMES } from './src/core/migration-evidence.js';
+import { classifyOutcome, MIGRATION_OUTCOMES } from './src/core/migration-evidence.js';
+import { buildRestoreVerification, summarizeVerification } from './src/core/migration-verification.js';
 import {
   detectHost,
   verifyHostPlatform,
@@ -2178,25 +2179,7 @@ async function main(appRoot) {
     void alertDialog(`写入被安全门拒绝：${restoreGateReasonsText(reasons)}。\n请先完成目标备份并勾选确认，或改用宿主原生导入方式。`);
   }
 
-  /** S4：由写入返回体构造核对证据（现状无目标侧读回，coverage 只到「宿主确认写入」）。 */
-  function buildRestoreVerification(scopeRef, restoreResult) {
-    if (restoreResult && restoreResult.unconfirmed) {
-      return [buildVerificationEvidence({
-        scopeRef, unit: 'archive-entry', method: 'automatic', coverage: 'unknown', status: 'unknown',
-        reason: '响应体不可解析，写入状态未知',
-      })];
-    }
-    if (restoreResult && restoreResult.nothingRestored) {
-      return [buildVerificationEvidence({
-        scopeRef, unit: 'archive-entry', method: 'automatic', coverage: 'full', status: 'failed',
-        reason: '宿主返回成功但未写入任何条目',
-      })];
-    }
-    return [buildVerificationEvidence({
-      scopeRef, unit: 'archive-entry', method: 'automatic', coverage: 'full', status: 'confirmed',
-      reason: '宿主确认写入（未逐条读回核对）',
-    })];
-  }
+  /** S4：由写入返回体构造核对证据（纯逻辑已抽至 src/core/migration-verification.js）。 */
 
   function openRestoreModal(archiveFile) {
     if (!host.isPlugin) {
@@ -2389,7 +2372,10 @@ async function main(appRoot) {
         // S4：核对结论（MigrationOutcome 四态）—— 不把「已写入未核对」说成「完成」
         const verification = buildRestoreVerification(fileToRestore.name, restoreResult);
         const outcome = classifyOutcome({ verification });
-        logger.info(`恢复核对结论: ${outcome}`);
+        const verifySummary = summarizeVerification(verification);
+        logger.info(`恢复核对结论: ${outcome}`
+          + `（机器核对 ${verifySummary.machineVerified} 项 / 人工确认 ${verifySummary.userAttested} 项，`
+          + `覆盖 ${verifySummary.coverage}）`);
         if (outcome === MIGRATION_OUTCOMES.NEEDS_VERIFICATION) {
           view.setProgress(100, '请求已发出，但写入状态未确认');
           logger.warn(`写入状态未确认（${restoreResult?.reason || '响应体不可解析'}）——`
