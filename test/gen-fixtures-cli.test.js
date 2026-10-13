@@ -47,7 +47,7 @@ describe('R-17 · fixtures/gen.js 入口守卫', () => {
     expect(stdout).toMatch(/generated fixture-tt\.zip/);
 
     const produced = readdirSync(outDir).sort();
-    expect(produced).toEqual(['fixture-l.zip', 'fixture-st.zip', 'fixture-tt.zip']);
+    expect(produced).toEqual(['fixture-l.zip', 'fixture-pt.zip', 'fixture-st.zip', 'fixture-tt.zip']);
     for (const name of produced) {
       expect(statSync(path.join(outDir, name)).size).toBeGreaterThan(0);
     }
@@ -70,6 +70,6 @@ describe('R-17 · fixtures/gen.js 入口守卫', () => {
     execFileSync(process.execPath, [GEN_JS], { cwd, encoding: 'utf8' });
 
     const produced = readdirSync(path.join(cwd, 'fixtures')).sort();
-    expect(produced).toEqual(['fixture-l.zip', 'fixture-st.zip', 'fixture-tt.zip']);
+    expect(produced).toEqual(['fixture-l.zip', 'fixture-pt.zip', 'fixture-st.zip', 'fixture-tt.zip']);
   });
 });

@@ -41,7 +41,8 @@ export const CAPABILITY_DIMENSIONS = Object.freeze([
 /** 能力三态：未知不是「可用」，也不是「不可用」。 */
 export const CAPABILITY_STATES = Object.freeze(['available', 'unavailable', 'unknown']);
 
-const VALID_LAYOUTS = Object.freeze(['st', 'l', 'tt', 'pt']);
+const VALID_SOURCE_LAYOUTS = Object.freeze(['st', 'l', 'tt', 'pt', 'pt-native']);
+const VALID_TARGET_LAYOUTS = Object.freeze(['st', 'l', 'tt', 'pt']);
 
 /** 递归冻结（对象/数组）；原始值原样返回。 */
 function deepFreeze(value) {
@@ -79,7 +80,7 @@ function normalizeCapabilityCell(cell) {
  */
 function normalizeCapabilities(capabilities) {
   const src = capabilities && typeof capabilities === 'object' ? capabilities : {};
-  const keys = new Set([...VALID_LAYOUTS, ...Object.keys(src)]);
+  const keys = new Set([...VALID_TARGET_LAYOUTS, ...Object.keys(src)]);
   const out = {};
   for (const key of keys) {
     out[key] = normalizeCapabilityCell(src[key]);
@@ -137,7 +138,7 @@ function mapEffective(basePlan) {
  * 生成不可变迁移计划快照。
  *
  * @param {object} input
- * @param {{layout: string, handle?: string}} input.source 源布局（`st|l|tt`；PT_NATIVE/UNKNOWN 不进入）
+ * @param {{layout: string, handle?: string}} input.source 源布局（`st|l|tt|pt|pt-native`；`unknown` 不进入）
  * @param {{layout: string}} input.target 目标布局（`st|l|tt|pt`）
  * @param {Record<string, boolean>} [input.requestedSelection] 10 标准类目请求意图（**显式快照**）
  * @param {string[]|Set<string>} [input.excludedPaths] 单项穿透排除
@@ -153,11 +154,11 @@ export function createMigrationPlan(input = {}) {
   }
   const sourceLayout = input.source?.layout;
   const targetLayout = input.target?.layout;
-  if (!VALID_LAYOUTS.includes(sourceLayout)) {
-    throw new Error(`createMigrationPlan: source.layout 必须是 ${VALID_LAYOUTS.join('|')} 之一（收到 ${sourceLayout}）`);
+  if (!VALID_SOURCE_LAYOUTS.includes(sourceLayout)) {
+    throw new Error(`createMigrationPlan: source.layout 必须是 ${VALID_SOURCE_LAYOUTS.join('|')} 之一（收到 ${sourceLayout}）`);
   }
-  if (!VALID_LAYOUTS.includes(targetLayout)) {
-    throw new Error(`createMigrationPlan: target.layout 必须是 ${VALID_LAYOUTS.join('|')} 之一（收到 ${targetLayout}）`);
+  if (!VALID_TARGET_LAYOUTS.includes(targetLayout)) {
+    throw new Error(`createMigrationPlan: target.layout 必须是 ${VALID_TARGET_LAYOUTS.join('|')} 之一（收到 ${targetLayout}）`);
   }
 
   // requested：只取标准类目布尔 + 显式穿透 + 特殊标志；不读任何 UI 模块级状态。

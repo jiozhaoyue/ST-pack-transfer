@@ -145,10 +145,15 @@ describe('createMigrationPlan（S1 统一迁移计划）', () => {
     }
   });
 
-  it('非法 source/target layout 抛错', () => {
+  it('非法 source/target layout 抛错（pt-native 现为合法源）', () => {
     expect(() => createMigrationPlan({ source: { layout: 'pt-native' }, target: { layout: 'tt' } }))
+      .not.toThrow();
+    expect(() => createMigrationPlan({ source: { layout: 'unknown' }, target: { layout: 'tt' } }))
       .toThrow(/source\.layout/);
     expect(() => createMigrationPlan({ source: { layout: 'st' }, target: { layout: 'unknown' } }))
+      .toThrow(/target\.layout/);
+    // pt-native 只能作源，不能作目标
+    expect(() => createMigrationPlan({ source: { layout: 'st' }, target: { layout: 'pt-native' } }))
       .toThrow(/target\.layout/);
   });
 

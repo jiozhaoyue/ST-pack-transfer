@@ -5,6 +5,7 @@
 
 import { zipIo } from './zip-io.js';
 import { detectFromReader, LAYOUTS } from './detect.js';
+import { createPtNativeHubReader } from './pt-archive.js';
 import { CATEGORIES, CATEGORY_LABELS, categoryOfHubPath, isBackupChatOrSnapshot } from './inspect.js';
 import {
   routeSource, targetEntryPath, TARGETS, isJunkOrDevFile, EXTENSION_MODES, parseJsonSafe,
@@ -131,7 +132,12 @@ export async function generatePlan(source, target, {
     await detector.close();
   }
 
-  const scanner = await io.openReader(source);
+  const scanner = detection.layout === LAYOUTS.PT_NATIVE
+    // PT 原生归档：条目是 PT 内部模块模型，先重建为 hub（ST 摊平）条目再按 ST 视角预测
+    // （与 `transform.js` 的 `convert` 同源；报告仍记 `pt-native`）。
+    ? await createPtNativeHubReader({ io, sourcePath: source, readBlobs: false })
+    : await io.openReader(source);
+  const routingLayout = detection.layout === LAYOUTS.PT_NATIVE ? LAYOUTS.ST : detection.layout;
 
   const categories = {};
   const allCategoryKeys = [
@@ -195,7 +201,7 @@ export async function generatePlan(source, target, {
       const size = entry.uncompressedSize || 0;
       totalSourceBytes += size;
 
-      const routed = routeSource(entry.fileName, detection.layout);
+      const routed = routeSource(entry.fileName, routingLayout);
       const category = classifyItemCategory(routed.hubPath, routed.kind);
 
       // 0. 扩展元数据解析（与 transform.js 主循环同源的解析规则）。
