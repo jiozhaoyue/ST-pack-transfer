@@ -38,6 +38,6 @@
 
 ## 5. 收口
 
-- [ ] 提交（显式 pathspec，校验暂存集合）+ 推送 origin。
-- [ ] 回填父任务 `10-01` 的 `implement.md`（S8/D-23 分片）与 PRD `AC-12` 注记。
-- [ ] 归档本子任务。
+- [x] 提交（显式 pathspec，校验暂存集合）+ 推送 origin —— commit `0218c84`，`origin/main...HEAD` = `0 0`。
+- [x] 回填父任务 `10-01` 的 `implement.md`（S8 分片）与 PRD `AC-12` 注记。
+- [x] 归档本子任务。
