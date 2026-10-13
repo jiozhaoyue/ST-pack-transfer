@@ -128,8 +128,18 @@ E2E 基础设施（guard 17 / smoke 36 / matrix 122）入库、PT 通道打通�
       —— **2026-10-13 回填**：新建 `.trellis/spec/guides/plugin-driven-pack-and-write-guards.md`
       （自包含、内联读数与 `file:line`），并在 `guides/index.md` 登记。
       另：`design.md` D2 已补「实测结论（用户裁定采纳）」小节
-- [ ] **AC-P7** 两个子任务均已 `task.py archive`
-- [ ] **AC-P8** 环境收尾符合 PR-2.5
+- [x] **AC-P7** 两个子任务均已 `task.py archive`
+      —— **2026-10-13 达成**：`09-27-plugin-defect-fixes`（早先归档）与
+      `09-27-plugin-driven-instance-sync`（本轮归档到 `.trellis/tasks/archive/2026-10/`）。
+      后者用 `--skip-branch-validation`：本仓工作流**直接在 `main` 上提交**（无 feature 分支/PR），
+      该开关的语义正是「从未有 PR 支撑的任务」，与实情相符（不是绕过校验）。
+- [x] **AC-P8** 环境收尾符合 PR-2.5
+      —— **2026-10-13 回填**：本轮**未启动任何实例**（`:8001`/`:8002`/`:8003`/`:8004`/`:8899`
+      在会话开始时**都已在运行**，全程保持原样）；会话结束时复核：**零遗留 Chrome 进程、
+      零遗留 E2E 运行器进程**，五个端口状态与开工时一致。
+      实例侧只做了两件事：① 四个插件目录 `git pull` 到工作区 HEAD（`c665ee7`，R-20 授权内）；
+      ② 只读拉取/转换（E2E 只连 Dev 白名单 `{8001,8003,8899}`）。
+      诊断探针 `test-results/probe-kv-422.cjs` 是一次性 scratch（`test-results/` 已 gitignore，不入库）。
 
 ## Constraints
 
