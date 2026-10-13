@@ -12,44 +12,82 @@ import { TaskManager } from '../src/core/task-manager.js';
 
 /**
  * 构造 mock Authority client：KV + blob（base64）内存实现。
+ *
+ * ⚠️ **形状逐条对齐真实 SDK**（`st-authority-sdk/client.js`，2026-10-13 读源取证）：
+ *  - `kv.set(key, value)` / `kv.get(key)` / `kv.delete(key)` —— **位置参数**，`get` 返回**已解包**的值；
+ *  - `blob.put({name, content, encoding, contentType})` → `{id, name, contentType, size}`；
+ *  - `blob.get(id)` → `{record, content, encoding:'base64'}`；`blob.delete(id)`。
+ *
+ * 为什么要把形状**钉进 mock**：旧 mock 用的是 `set({key,value})` / `get({key})` / `blob.get({name})`
+ * 这类**真实 SDK 里不存在的形状**，于是适配器把位置参数写成对象调用时**单测全绿**，
+ * 而真机上每一次 KV 调用都 422（`missing field \`value\``）——「mock 与真实 API 漂移」的教科书形态。
+ * 因此这里对参数**类型**加断言：谁把调用改回对象形状，这里立刻红。
+ *
  * @param {{failBlobPutAt?: number, failKvSetAt?: number, failKvGetAt?: number}} [inject] 故障注入：
  *   第 N 次 `blob.put` / `kv.set` / `kv.get` 起 reject（0 = 不注入）。可事后经 `_inject` 改写。
  */
 function mockClient(inject = {}) {
   const kv = new Map();
+  /** name → {id, name, content, encoding, contentType}（按名索引，便于用例按名断言） */
   const blobs = new Map();
+  /** id → name（真实 SDK 的 get/delete 只收 id） */
+  const blobsById = new Map();
   const state = {
     putCalls: 0, setCalls: 0, getCalls: 0,
     failBlobPutAt: 0, failKvSetAt: 0, failKvGetAt: 0,
     ...inject,
   };
   const bomb = (label) => Object.assign(new Error(`${label} 注入失败`), { injected: true });
+  const needStr = (v, label) => {
+    if (typeof v !== 'string') {
+      throw new Error(`${label} 收到 ${typeof v}，真实 SDK 收字符串 —— 调用形状与 SDK 不一致`);
+    }
+  };
+  let seq = 0;
   return {
     storage: {
       kv: {
-        set: async ({ key, value }) => {
+        set: async (key, value) => {
+          needStr(key, 'kv.set(key, value) 的 key');
+          if (value === undefined) throw new Error('kv.set 的 value 是 undefined —— 真实 SDK 是位置参数 set(key, value)');
           state.setCalls += 1;
           if (state.failKvSetAt && state.setCalls >= state.failKvSetAt) throw bomb('kv.set');
           kv.set(key, value);
         },
-        get: async ({ key }) => {
+        get: async (key) => {
+          needStr(key, 'kv.get(key) 的 key');
           state.getCalls += 1;
           if (state.failKvGetAt && state.getCalls >= state.failKvGetAt) throw bomb('kv.get');
-          return kv.has(key) ? { value: kv.get(key) } : null;
+          return kv.has(key) ? kv.get(key) : null; // 真实 SDK 返回 response.value（已解包）
+        },
+        delete: async (key) => {
+          needStr(key, 'kv.delete(key) 的 key');
+          kv.delete(key);
         },
       },
       blob: {
-        put: async ({ name, content, contentType }) => {
+        put: async (input) => {
+          if (!input || typeof input !== 'object') throw new Error('blob.put 收对象 {name, content, …}');
           state.putCalls += 1;
           if (state.failBlobPutAt && state.putCalls >= state.failBlobPutAt) throw bomb('blob.put');
-          blobs.set(name, { content, contentType });
-          return { id: `blob-${name}` };
+          const id = `blob-${++seq}`;
+          blobs.set(input.name, { id, ...input });
+          blobsById.set(id, input.name);
+          return { id, name: input.name, contentType: input.contentType, size: (input.content || '').length };
         },
-        get: async ({ name }) => {
-          const rec = blobs.get(name);
-          return rec ? { content: rec.content, contentType: rec.contentType } : null;
+        get: async (id) => {
+          needStr(id, 'blob.get(id) 的 id');
+          const name = blobsById.get(id);
+          const rec = name ? blobs.get(name) : null;
+          return rec
+            ? { record: { id, name }, content: rec.content, encoding: rec.encoding || 'base64' }
+            : null;
         },
-        delete: async ({ name }) => { blobs.delete(name); },
+        delete: async (id) => {
+          needStr(id, 'blob.delete(id) 的 id');
+          const name = blobsById.get(id);
+          if (name) { blobsById.delete(id); blobs.delete(name); }
+        },
       },
     },
     _kv: kv,
@@ -85,6 +123,54 @@ describe('authority-store 可选适配器', () => {
     expect(await adapter.load('fetch-1')).toBeNull();
     // 不存在的清单返回 null（与 task-manager ADAPTER 约定一致）
     expect(await adapter.load('nope')).toBeNull();
+  });
+
+  it('⭐ 断点清单超 Authority KV 上限（128 KB）⇒ 剥掉冗余台账再存，指针与游标保留', async () => {
+    // 依据：core `constants.rs` 的 `MAX_KV_VALUE_BYTES = 128 * 1024`；超限服务端 400。
+    // 台账是**冗余校验**（跳过门是「半成品里真有这条字节」）⇒ 剥掉不影响正确性，只是少了
+    // 跨会话的冗余校验；**绝不能**因为超限就把断点整份丢掉或让暂停失败。
+    const client = mockClient();
+    __setAuthorityClientForTest(client);
+    const adapter = await createCheckpointAdapter();
+
+    const entries = Array.from({ length: 8000 }, (_, i) =>
+      [`chats/C/bulk-${String(i).padStart(5, '0')}.jsonl`, i]);
+    const manifest = {
+      partialOpfsName: 'convert-1.partial.zip',
+      target: 'st',
+      partialEntries: entries.map(([name, crc32]) => ({ name, crc32 })),
+      doneEntries: Object.fromEntries(entries),
+      totalEntries: 8000,
+    };
+    expect(JSON.stringify(manifest).length).toBeGreaterThan(128 * 1024); // 前置门：确实超限
+
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      await adapter.save('convert-1', manifest);
+    } finally {
+      warn.mockRestore();
+    }
+
+    const got = await adapter.load('convert-1');
+    expect(got.partialOpfsName).toBe('convert-1.partial.zip'); // 指针在 ⇒ 续传能定位半成品
+    expect(got.target).toBe('st');
+    expect(got.partialEntries).toBeUndefined();                // 台账被剥
+    expect(got.doneEntries).toBeUndefined();
+  });
+
+  it('小断点清单**原样**存储（不因大小护栏而改变既有形状）', async () => {
+    const client = mockClient();
+    __setAuthorityClientForTest(client);
+    const adapter = await createCheckpointAdapter();
+    const manifest = {
+      partialOpfsName: 'convert-2.partial.zip',
+      target: 'l',
+      partialEntries: [{ name: 'a.txt', crc32: 7 }],
+      doneEntries: { 'a.txt': 7 },
+      totalEntries: 1,
+    };
+    await adapter.save('convert-2', manifest);
+    expect(await adapter.load('convert-2')).toEqual(manifest);
   });
 
   it('大 blob 分块写入并完整重组', { timeout: 30000 }, async () => {
