@@ -58,9 +58,24 @@ module.exports = {
     // 切到高级：全量展示；切回向导：视图码回位
     t.eq('W14 可切到高级视图', await common.useAdvancedView(page), 'advanced');
     t.eq('W15 高级视图下「目标」区块同时可见', await page.isVisible('#target-select'), true);
+
+    // 关键输入变更 ⇒ 旧「检查」读数作废（R-05 / AC-04）。高级视图下检查页始终可见，故这里可观测。
+    await page.selectOption('#target-select', 'tt');
+    const warned = await page.waitForFunction(
+      () => ((document.getElementById('wizard-check-summary') || {}).textContent || '').includes('⚠'),
+      null, { timeout: 15_000 },
+    ).then(() => true).catch(() => false);
+    t.ok('W15b 改目标后检查页出现「关键输入已变更」失效提示', warned,
+      await page.$eval('#wizard-check-summary', (el) => el.textContent.trim()).catch(() => ''));
+
     await page.click('#btn-wb-view-toggle');
     t.eq('W16 可切回向导视图', await viewOf(page), 'wizard');
     t.eq('W17 切回后仍停在「检查」步（视图切换不重置步骤）', await stepOf(page), 'check');
+    await page.click('#wizard-rail [data-wb-step="scope"]');
+    await page.click('#wizard-rail [data-wb-step="check"]');
+    const cleared = await page.$eval('#wizard-check-summary', (el) => el.textContent.trim());
+    t.ok('W17b 重新进入「检查」步后失效提示清除（用户已看过新读数）',
+      !cleared.includes('⚠'), cleared);
 
     t.eq('W18 全程零页面错误', rec.pageErrors.length, 0, JSON.stringify(rec.pageErrors.slice(0, 3)));
   },

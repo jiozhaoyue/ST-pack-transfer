@@ -201,7 +201,7 @@ TaskManager.start(id, label, { resumable, totalBytes }) -> control
 本仓 package.json 未定义 lint/typecheck 命令，不虚构 npm run lint 或 typecheck 的通过结果。
 
 **2026-10-13 实测读数**：`npm test` 718 passed / 2 skipped / 71 文件（基线 669，零回退）；
-五守卫 + `npm run build` + `npm run build:offline` 全绿；`npm run e2e:web` **400 项断言全绿**
+五守卫 + `npm run build` + `npm run build:offline` 全绿；`npm run e2e:web` **402 项断言全绿**
 （含新增 `wizard` 与 `offline-single-file` 两个 spec）。
 
 ## 7. 错误与正确做法

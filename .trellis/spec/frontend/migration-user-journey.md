@@ -77,6 +77,9 @@ CSS 决定显隐（**没有第二份模板**）。六步：`source → target �
 默认入口 = 向导，`#btn-wb-view-toggle` 切到既有高级全量展示；视图切换**不碰** `createMigrationSession()`，
 故选择/计划/任务不丢。键盘 `←/→/Home/End` 在步骤条内移动（`role="tablist"` + `aria-current="step"`）。
 检查步（④）的读数由 `index.js` 的 `syncWizardCheckPanel(plan)` 从**计划快照**灌入，不从 DOM 重拼。
+**关键输入失效**：`refreshPlan()` 在**已有过计划**时调用 `wizard.machine.markStale()`，
+检查页随即显示「⚠ 关键输入已变更，请重新确认下方读数」；用户重新进入「检查」步时
+（`onStepChange`）清除该标记并重渲染——即 §7 三条断言的界面侧落地。
 E2E：`e2e/standalone/specs/wizard.e2e.cjs`；测高级工作台的 spec 需显式 `common.useAdvancedView(page)`。
 
 ### 3.4 交付与结果

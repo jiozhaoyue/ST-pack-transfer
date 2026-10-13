@@ -134,11 +134,18 @@ export function unknownStepOwners(templateHtml) {
  * @param {HTMLElement} params.root 工作台根容器（`#app.app-container` / `.st-converter-drawer-app`）
  * @param {{getState: Function, setSelection: Function}} [params.session] 共享接缝（当前只读）
  * @param {(view: string) => void} [params.onViewChange]
+ * @param {(stepId: string) => void} [params.onStepChange] 步骤**真的变了**时回调（同值不触发）
  * @param {() => void} [params.onReopen]
  * @returns {{setView: Function, getView: Function, showGate: Function, hideGate: Function,
- *            setCheckPanel: Function, destroy: Function, machine: object}}
+ *            setCheckPanel: Function, goTo: Function, isStale: Function, destroy: Function, machine: object}}
  */
-export function mountMigrationWizard({ root, session = null, onViewChange = null, onReopen = null } = {}) {
+export function mountMigrationWizard({
+  root,
+  session = null,
+  onViewChange = null,
+  onStepChange = null,
+  onReopen = null,
+} = {}) {
   if (!root) return null;
 
   const machine = createWizardMachine();
@@ -191,9 +198,12 @@ export function mountMigrationWizard({ root, session = null, onViewChange = null
   };
 
   const goTo = (id) => {
+    const before = machine.getState().stepId;
     const ok = machine.goTo(id);
-    if (ok) apply();
-    return ok;
+    if (!ok) return false;
+    apply();
+    if (id !== before && typeof onStepChange === 'function') onStepChange(id);
+    return true;
   };
 
   const move = (delta) => {
@@ -293,6 +303,8 @@ export function mountMigrationWizard({ root, session = null, onViewChange = null
     hideGate,
     setCheckPanel,
     goTo,
+    /** 关键输入是否已变（④检查及其后的确认是否已作废）。 */
+    isStale: () => machine.getState().stale,
     destroy,
     machine,
     session,
