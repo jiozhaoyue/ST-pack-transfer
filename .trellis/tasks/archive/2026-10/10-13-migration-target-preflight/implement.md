@@ -36,6 +36,6 @@
 
 ## 6. 收口
 
-- [ ] 提交（显式 pathspec，校验暂存集合）+ 推送 origin。
-- [ ] 回填父任务 `10-01` 的 `implement.md` S3 勾选。
-- [ ] 归档本子任务。
+- [x] 提交（显式 pathspec，校验暂存集合）+ 推送 origin —— commit `57246a7`，`origin/main...HEAD` = `0 0`。
+- [x] 回填父任务 `10-01` 的 `implement.md` S3 勾选。
+- [x] 归档本子任务。
