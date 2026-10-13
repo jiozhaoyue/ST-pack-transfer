@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { mkdtemp, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
@@ -18,6 +18,15 @@ import { generatePlan, ACTIONS } from '../src/core/plan-preview.js';
 import { getWorkbenchHtml } from '../src/ui/workbench-template.js';
 import { CONTROL_CONSUMERS } from '../scripts/control-consumer-guard.js';
 import { stEntries } from '../fixtures/gen.js';
+
+/**
+ * 本文件的多个用例要**真跑一次转换**（造 zip → convert → 读产物），单条 3–5 s。
+ * 全量并发跑时（`npm test` 同时开多个文件）会顶到 vitest 的 5 s 默认上限而**假红**
+ * （2026-10-13 实测 `git-mode.test.js` 一条 5103 ms 超时；单跑 28/28 全绿 ~ms 级）。
+ * 与本仓既有做法一致（`test/authority-store.test.js` 的重型用例亦显式给 30 s）：
+ * 给本文件一个**够用的显式上限**，让「超时」重新只表示**真挂住**。
+ */
+vi.setConfig({ testTimeout: 30_000 });
 
 /**
  * gitMode（扩展 Git 历史瘦身）验收。

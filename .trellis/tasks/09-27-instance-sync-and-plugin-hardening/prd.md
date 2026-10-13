@@ -93,13 +93,13 @@ E2E 基础设施（guard 17 / smoke 36 / matrix 122）入库、PT 通道打通�
       `npm test` 复跑 **64 文件 / 610 passed / 2 skipped / 0 failed / exit 0**（零回退）。
       §2.5 判别力证明已补（摘掉 `mountDebugProbe` ⇒ R-19 四条转红 ⇒ 还原 ⇒ 91/91 绿）。
       读数落 `09-27-plugin-defect-fixes/research/e2e-closeout-2026-09-29.json`
-- [ ] **AC-P2** 子任务 A（同步/备份）的 AC 全部达成
-      —— **2026-10-13 回填：AC-A1…AC-A7 / AC-A9 / AC-A10 达成；AC-A8 未达成**（见 AC-P5）。
+- [x] **AC-P2** 子任务 A（同步/备份）的 AC 全部达成
+      —— **2026-10-13 回填：AC-A1…A10 全部达成**（AC-A8 于同日补达成，见下）。
       证据：产包由插件在 Real Luker 内触发（§3.11 修复后 `l`/`st`/`tt` 各 exit 0）；
       Luker 两处备份齐备（`backup-real-luker-20261013-145533.zip` 1750.9 MB / 8797 条 /
       `backup-dev-luker-20261013-145705.zip` 1213.8 MB / 8167 条）；写入前三道守卫全 PASS；
       五目标写入完成（`restoredCount`：real-luker 7377 / dev-luker 6287 / PT Δ639）。
-      **AC-A8 未达成** ⇒ 本项**保持未勾选**（不得用「大部分达成」代替「全部达成」）
+      **AC-A8（E2E 连续两轮全绿）**：`npm run e2e` **连续两轮 288/288/0 exit 0**（见 AC-P5）。
 - [x] **AC-P3** 集成核对：五个可写目标逐目标「覆盖率 + 零删除」读数齐备（PT 用模块读数判据）
       —— **2026-10-13 回填**：`dev-st` **99.986%**（7375/7376）/ `real-st` **99.986%** /
       `real-luker` **99.986%** / `dev-luker` **99.984%**（6285/6286，产物按用户裁定剔 1090 条链接子树）；
@@ -114,12 +114,16 @@ E2E 基础设施（guard 17 / smoke 36 / matrix 122）入库、PT 通道打通�
       源 mtime 快照 **18 条变动**且**恰好包含**那 4 条（另有真源自动备份新增）
       ⇒ 判为 `design.md` D6 的**「源在期间变动」分支**（**不算失败**；真源当时正被另一会话使用）。
       ⚠️ **不得**据此宣称「产物完全确定」
-- [ ] **AC-P5** 质量门：`npm test` + `npm run e2e`（exit 0）+ 五条静态守卫（exit 0）+ `npm run build`
-      —— **2026-10-13 回填：`npm test` / 五守卫 / `build` 全绿；`npm run e2e` ❌ 未 exit 0** ⇒ 本项**保持未勾选**。
-      `npm test` **72 文件 / 721 passed / 2 skipped / 0 failed**（基线 610 ⇒ 净增 111，零回退）；
-      五守卫与 `build` 全 `EXIT=0`。`npm run e2e` 五轮：91/108 → 99/108 → 268/271 → 278/281 → 261/264
-      （**本轮修好实例侧规格的向导视图适配**；残留 `M-10b` 时序前提失效 + dev-luker profile 暂存区累积，
-      根因见子任务 `implement.md` §8.3）
+- [x] **AC-P5** 质量门：`npm test` + `npm run e2e`（exit 0）+ 五条静态守卫（exit 0）+ `npm run build`
+      —— **2026-10-13 达成**：
+      `npm test` **72 文件 / 724 passed / 2 skipped / 0 failed**（基线 610 ⇒ 净增 114，零回退）；
+      五守卫与 `build` 全 `EXIT=0`；
+      **`npm run e2e` 连续两轮 `288 / 288 / 0 失败 / exit 0`**（`test-results/e2e-round{6,7}.log`，
+      同一份代码；早先两轮 284/284 是修 Authority 之前的读数）。
+      历史五轮 91/108 → 99/108 → 268/271 → 278/281 → 261/264 的三处残留已全部定位并修掉
+      （批量子项真增量未接 / Luker 宿主更新弹窗拦指针事件 / Authority SDK 调用形状），
+      另修掉两条**测试自身的时序假红**（瞬时读任务收尾、暂停点得太早收到空半成品）——
+      根因与修法见子任务 `implement.md` §8.3 与 `guides/plugin-driven-pack-and-write-guards.md` §7–§9。
 - [x] **AC-P6** 本轮规范已落 `.trellis/spec/`（自包含）
       —— **2026-10-13 回填**：新建 `.trellis/spec/guides/plugin-driven-pack-and-write-guards.md`
       （自包含、内联读数与 `file:line`），并在 `guides/index.md` 登记。

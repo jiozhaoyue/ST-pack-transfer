@@ -36,7 +36,7 @@ const DRAWER_ID = 'st_zip_converter_settings';
 /** 现场生成夹具（进程内缓存，多个 spec 共用） */
 let fixturesPromise = null;
 /** 暂停窗口夹具的文件名（改名即可让本地缓存失效 —— 见 ensurePauseFixture 的事故记录） */
-const PAUSE_FIXTURE = 'fixture-pause-many-st.zip';
+const PAUSE_FIXTURE = 'fixture-pause-bulk-st.zip';
 
 function ensureFixtures() {
   if (!fixturesPromise) {
@@ -477,11 +477,16 @@ async function ensureLargeFixture() {
  * **上传进持久化 profile 的 IndexedDB**，`resetWorkspace` 又只删 `active_session`、**不删文件**
  * ⇒ 跨轮次累积几百 MB，页面加载时 `listStoredFiles()` 要读出全部记录，宿主 UI 慢到
  * `openWorkbench` 的有界窗口之外（**实测第 5 轮 dev-st 的「首个」openWorkbench 即失败**：菜单项为空）。
- * 现版 = **1500 × 3 KB ≈ 4.5 MB**：条目数主导耗时（转换仍需数秒），profile 负担降到 1/10。
  * 配套 `pruneOwnFixtures()` 兜底清掉历史遗留的大夹具。
+ *
+ * ⚠️ **2026-10-13 加宽到 6000 条**（原 1500 × 3 KB ≈ 4.5 MB）：1500 条的窗口**仍然太窄** ——
+ * 实测一整轮 `npm run e2e` 里 `M-10b 批次中途可暂停` 转红，日志显示暂停请求到达时
+ * **整批（含大包）已经跑完**（`[2/2] …成功` 之后才 `任务已请求暂停`）⇒ 点暂停这一下被延迟到
+ * 窗口之外。窗口宽度 = **条目数 × 每条目耗时**，故**加条目数**（字节反而不必加）：
+ * 现版 = **6000 × 1 KB ≈ 6 MB**，窗口约 4×，profile 负担与旧版同量级。
  */
 async function ensurePauseFixture() {
-  return ensureBigFixture(PAUSE_FIXTURE, 1500, 3 * 1024 * 1024, 'pausebulk', 3 * 1024);
+  return ensureBigFixture(PAUSE_FIXTURE, 6000, 3 * 1024 * 1024, 'pausebulk', 1024);
 }
 
 /**
@@ -910,8 +915,17 @@ module.exports = {
       return { exists: Boolean(root), hidden: root ? root.hidden : null };
     });
     t.ok('M-7 任务控制条存在（#task-controls）', tcInit.exists);
-    t.ok('M-7 无活动任务时控制条**隐藏**（状态机初态）', tcInit.hidden === true,
-      `hidden=${tcInit.hidden}`);
+    // ⚠️ **有界等待任务收尾，不读瞬时值**（2026-10-13 实测过一次假红）：
+    // 上一个转换任务的收尾是**异步**的 —— `exportQueue.enqueue` 先入队并触发 rAF 渲染，
+    // `taskManager.complete` / `taskControls.hide()` / `workbenchBusy = false` 在其后的 await 链里完成
+    // ⇒ 「队列出现新行」**不等于**「任务已收尾」。瞬时读会在负载高时偶发 `hidden=false`。
+    // 等它 settle 才判：**真·有活动任务**时这里照样会超时转红，判别力不丢。
+    const tcSettled = await page.waitForFunction(() => {
+      const root = document.getElementById('task-controls');
+      return Boolean(root) && root.hidden === true;
+    }, null, { timeout: 15_000 }).then(() => true).catch(() => false);
+    t.ok('M-7 无活动任务时控制条**隐藏**（状态机初态；有界等待任务收尾）', tcSettled,
+      `等待 15s 仍可见 —— 初读 ${JSON.stringify(tcInit)}`);
 
     // —— R-19 只读探针：三态必须可被页面外读取（否则 E2E 断言不了真正的三态）——
     const probe = await page.evaluate(() => {
@@ -952,6 +966,13 @@ module.exports = {
     // ⚠️ 本 spec **不主动点该按钮**：`postRestoreWithFallback` 会真的 POST 到实例，
     // 而「候选端点全部 404」是 OQ-1 的既有结论、不是本 spec 要重验的事；
     // 一旦某个候选端点实际存在，就会对实例产生**真实写入** —— 风险不对等，故只验非破坏性的可见性契约。
+    // ⚠️ 同 M-7：`applyActionAvailability()` 在 `taskControls.hide()` **之后**、同一 `finally` 里执行
+    // ⇒ 控制条已隐藏时，按钮上可能还挂着**上一任务期间**算出的 `disabled=true`。
+    // 先有界等它求值完（按钮变可用），再读快照；真被禁用（宿主不支持恢复）时会等到超时、断言照红。
+    await page.waitForFunction(() => {
+      const btn = document.getElementById('btn-restore-luker');
+      return Boolean(btn) && btn.disabled === false;
+    }, null, { timeout: 15_000 }).catch(() => {});
     const restoreUi = await page.evaluate(() => {
       const btn = document.getElementById('btn-restore-luker');
       if (!btn) return { present: false };
@@ -1084,7 +1105,7 @@ module.exports = {
       tcHiddenAfterConvert);
 
     // ============ M-7b 真实 pause → resume 续传（R-16 的核心验收面）============
-    // 用**暂停窗口夹具**（`ensurePauseFixture`：1500 条 × 3 KB ≈ 4.5 MB）：
+    // 用**暂停窗口夹具**（`ensurePauseFixture`：6000 条 × 1 KB ≈ 6 MB）：
     // 6 MB / 48 条目的旧版转换在数百毫秒内结束，等控制条出现的往返里就完了
     // ⇒ pause 会点在已隐藏的按钮上（**假红或假绿**）。
     // ⚠️ 暂停窗口靠的是**条目数**（每条目都要过 crc + 写盘 + 进度往返），**不是字节数**；
@@ -1093,7 +1114,7 @@ module.exports = {
     //    故此处的阈值必须与 `ensurePauseFixture` 的 `minBytes`（3 MB）**同源**，
     //    不得再写旧的 40 MB —— 那会让本断言在正确实现下**恒假**。
     const pausePath = await ensurePauseFixture();
-    t.ok('M-7b 暂停窗口夹具已生成（> 3 MB / 1500 条目，确定性高熵 ⇒ 转换需数秒）',
+    t.ok('M-7b 暂停窗口夹具已生成（> 3 MB / 6000 条目，确定性高熵 ⇒ 转换需数秒）',
       fs.statSync(pausePath).size > 3 * 1024 * 1024,
       `${(fs.statSync(pausePath).size / 1048576).toFixed(1)} MB`);
 
@@ -1143,6 +1164,23 @@ module.exports = {
     t.ok('M-7b 转换期间控制条**可见**（running 态 —— 转换已注册 TaskManager）', tcRunning);
 
     t.log('  · M-7b 等待暂停后出现「继续」...');
+    // ①b **等真的开始写条目**再点暂停（2026-10-13 加，与 M-10b 同一根因）：
+    //     只等「控制条可见」会点得太早 —— 那一刻 Worker 刚起跑、产物里还没有任何条目，
+    //     暂停收出的是**空半成品** ⇒ 续传「跳过 0 项」⇒ 本断言转红。
+    //     判据取 `#status-label` 的 `正在转换写入 [cur/total]:` 且 `cur ≥ 1`（单包 `onProgress` 的原文）。
+    let wroteEntries = false;
+    try {
+      await page.waitForFunction(() => {
+        const el = document.getElementById('status-label');
+        if (!el) return false;
+        const m = /正在转换写入\s*\[(\d+)\//.exec(el.textContent.trim());
+        return Boolean(m) && Number(m[1]) >= 1;
+      }, null, { timeout: 30_000 });
+      wroteEntries = true;
+    } catch { wroteEntries = false; }
+    t.ok('M-7b 【前置门】转换已开始写条目（否则暂停只会收到**空半成品**，续传无从跳过）',
+      wroteEntries, '等待 30s 未见 [cur/total] 逐条目进度');
+
     // ② 暂停 ⇒ 出现「继续」（running → paused）
     await clickTaskControl(page, 'tc-pause');
     let pausedVisible = false;
@@ -1307,6 +1345,24 @@ module.exports = {
     } catch { firstItemDone = false; }
     t.ok('M-10 批次第 0 个子项已完成（队列 +1）', firstItemDone);
 
+    // ②b **等第 1 个子项真的开始写条目**再点暂停（2026-10-13 加，修一条真实的假红）。
+    //     只等「队列 +1」是不够的：第 1 个子项的 Worker 起跑有启动开销（建 writer / 打开源包 /
+    //     解析计划），那一刻点暂停会收出一个**空半成品**——实测日志
+    //     `[转换] 已保留半成品 convert-batch-….partial.zip（**0 条**）` ⇒ 续传「跳过 0 项」⇒ 断言转红。
+    //     判据取 `#status-label` 出现 `[2/2] ` 前缀：那是批量 `onProgress` 写出的**逐条目进度**
+    //     （`index.js` 的 `view.setProgress(basePct + itemPct, '[i/n] 源 -> 条目')`），
+    //     出现即证明第 1 个子项真的在往产物里写东西。
+    let item2Writing = false;
+    try {
+      await page.waitForFunction(() => {
+        const el = document.getElementById('status-label');
+        return Boolean(el) && /^\[2\/2\]\s/.test(el.textContent.trim());
+      }, null, { timeout: 30_000 });
+      item2Writing = true;
+    } catch { item2Writing = false; }
+    t.ok('M-10b 【前置门】第 1 个子项已开始写条目（否则暂停只会收到**空半成品**，续传无从跳过）',
+      item2Writing, '等待 30s 未见 [2/2] 进度');
+
     await clickTaskControl(page, 'tc-pause');
     let batchPaused = false;
     try {
@@ -1344,6 +1400,12 @@ module.exports = {
     const batchLogText = await readLogText(page);
     const batchResumedMatch = /沿用断点跳过\s*(\d+)\s*项/.exec(batchLogText);
     t.log(`  · M-10b 日志尾部：${JSON.stringify(batchLogText.slice(-240))}`);
+    // 诊断用（小面板、全文不长）：续传相关的每一行都打出来 —— 断言转红时能一眼看出
+    // 「有没有半成品」「跳过几项」到底卡在哪一步，不必再去猜（2026-10-13 加）。
+    t.log(`  · M-10b 续传相关行：${JSON.stringify(
+      batchLogText.split('\n').map((l) => l.trim())
+        .filter((l) => /续传|半成品|跳过|批量转换/.test(l)),
+    )}`);
     t.ok('M-10b 批次续传**真的跳过了条目**（日志含「沿用断点跳过 N 项」）',
       Boolean(batchResumedMatch), `日志尾部=${JSON.stringify(batchLogText.slice(-240))}`);
 

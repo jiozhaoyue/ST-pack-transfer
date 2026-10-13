@@ -30,7 +30,10 @@ const FIXTURE_NAMES = Object.freeze([
   'fixture-l.zip',
   'fixture-tt.zip',
   'fixture-pause-st.zip',
+  // 暂停窗口夹具的两个世代名（2026-10-13 由 1500 条加宽到 6000 条并改名；
+  // 旧名一并列出，让**历史轮次**遗留的记录也能被清掉）
   'fixture-pause-many-st.zip',
+  'fixture-pause-bulk-st.zip',
   'fixture-large-st.zip',
 ]);
 
