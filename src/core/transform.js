@@ -1,6 +1,7 @@
 import { NullZipWriter } from './null-writer.js';
 import { Report } from './report.js';
 import { detectFromReader, LAYOUTS } from './detect.js';
+import { createPtNativeHubReader } from './pt-archive.js';
 import { zipIo } from './zip-io.js';
 import { logger } from './logger.js';
 import { categoryOfHubPath, isBackupChatOrSnapshot } from './inspect.js';
@@ -360,14 +361,28 @@ export async function convert(sourcePath, targetPath, {
     await detector.close();
   }
   const report = new Report(detection.layout, target);
-  if (detection.layout === LAYOUTS.PT_NATIVE) {
-    throw new Error('PT 原生归档(sha256 清单)暂不支持,请先从 PT 导出 TT 迁移包');
-  }
   if (detection.layout === LAYOUTS.UNKNOWN) {
     throw new Error('无法识别源包布局(无 manifest.json / data/ 根 / 摊平用户目录标记)');
   }
 
-  const reader = await io.openReader(sourcePath);
+  // PT 原生归档（`D-23` / R-11）：条目是 PT 内部模块模型
+  // （`modules/<moduleId>/{records,blobs}/<collection>/<id>.{json,bin}`），**不是**用户目录路径
+  // ⇒ 先按模块语义**重建**为 hub（ST 摊平）条目，再走同一条目标适配管线。
+  // 重建后条目已是 hub 视角，故路由按 ST 处理（`routingLayout`）；报告仍如实记 `pt-native`。
+  const isPtNative = detection.layout === LAYOUTS.PT_NATIVE;
+  const routingLayout = isPtNative ? LAYOUTS.ST : detection.layout;
+
+  let reader;
+  if (isPtNative) {
+    reader = await createPtNativeHubReader({
+      io,
+      sourcePath,
+      onWarning: (message) => report.warn(message),
+      readBlobs: !dryRun,
+    });
+  } else {
+    reader = await io.openReader(sourcePath);
+  }
   // writer 可被**重建**：半成品搬运失败时可能已写入部分字节，必须换一个干净的（见下方 catch）。
   let writer = dryRun ? new NullZipWriter() : await io.createWriter(targetPath, { level: compressionLevel });
   const totalEntries = reader.totalEntries ?? 0;
@@ -387,7 +402,13 @@ export async function convert(sourcePath, targetPath, {
   //    就是同一条产物路径）⇒ 2026-09-28 实测由此误跳过了 2 个用户级扩展条目
   //    （该场景本应落到后文「与第三方同名时保留第三方副本」的分支，却被本门提前 continue 掉）。
   const appendedNames = new Set();
-  if (appendFrom && !dryRun) {
+  // PT 原生源不支持断点续传：重建条目没有可与半成品对齐的源 crc32，半成品无法按源条目做同源校验
+  // ⇒ 显式作废半成品并完整重做（安全降级，绝不产出残缺包；见 `L0-11` 降级须留日志）。
+  if (isPtNative && appendFrom && !dryRun) {
+    logger.warn('[convert] PT 原生归档源不支持断点续传：作废半成品并完整重做');
+    onDiscardPartial?.();
+  }
+  if (appendFrom && !dryRun && !isPtNative) {
     const partialEntries = [];
     let readable = true;
     try {
@@ -450,15 +471,20 @@ export async function convert(sourcePath, targetPath, {
   // 需要知道源里已有哪些 third-party 目录名,同名时保留第三方副本。
   const thirdPartyFolders = new Set();
   if (target === TARGETS.PT) {
-    const scanner = await io.openReader(sourcePath);
-    try {
-      for await (const entry of scanner.entries()) {
-        const name = thirdPartyFolderOf(entry.fileName, detection.layout);
-        if (name) thirdPartyFolders.add(name);
-        entry.skip();
+    if (isPtNative) {
+      // 重建条目的第三方扩展目录名由重建器在记录趟直接给出（源条目是 modules/… 无法路由）。
+      for (const name of reader.thirdPartyFolders) thirdPartyFolders.add(name);
+    } else {
+      const scanner = await io.openReader(sourcePath);
+      try {
+        for await (const entry of scanner.entries()) {
+          const name = thirdPartyFolderOf(entry.fileName, detection.layout);
+          if (name) thirdPartyFolders.add(name);
+          entry.skip();
+        }
+      } finally {
+        await scanner.close();
       }
-    } finally {
-      await scanner.close();
     }
   }
 
@@ -488,7 +514,7 @@ export async function convert(sourcePath, targetPath, {
       // 根子是台账记的是「已读到」而非「已写下」。现在以**半成品的字节事实**为准：
       // 半成品里没有这条就照常写出 ⇒ 台账在而字节不在时，行为退化为「完整重做」而不是「静默残缺」。
       if (entry.crc32 != null) {
-        const skipHub = routeSource(entry.fileName, detection.layout).hubPath;
+        const skipHub = routeSource(entry.fileName, routingLayout).hubPath;
         const skipOut = targetEntryPath(skipHub, target);
         if (appendedNames.has(skipOut)) {
           const doneCrc = resumedCrc?.get(entry.fileName) ?? resumedCrc?.get(skipHub);
@@ -501,7 +527,7 @@ export async function convert(sourcePath, targetPath, {
         }
       }
 
-      let routed = routeSource(entry.fileName, detection.layout);
+      let routed = routeSource(entry.fileName, routingLayout);
 
       // 酒馆原生固定资产智能过滤 (剔除系统自带默认背景、默认主题等重复素材)
       if (pruneBuiltinAssets && isTavernBuiltinAsset(routed.hubPath)) {

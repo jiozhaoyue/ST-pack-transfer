@@ -43,6 +43,7 @@ st-zip-converter/
 │   │   ├── logger.js            # 结构化日志单例（级别过滤 / 环形缓冲 / 事件订阅 / 文本导出）
 │   │   ├── null-writer.js       # dry-run 用的空写器（同接口、不落盘、不持资源）
 │   │   ├── plan-preview.js      # 完全扫描与动作预测（ACTIONS / ACTION_LABELS / SPECIAL_*）
+│   │   ├── pt-archive.js        # PT 原生归档 → hub 重建（manifest 校验 / 模块语义逆映射）
 │   │   ├── report.js            # 转换报告（每模块复制/丢弃/合成计数 + 警告清单）
 │   │   ├── splitter.js          # 智能分包引擎（每个分卷都是独立合法 Zip，非 .z01 裸分片）
 │   │   ├── task-manager.js      # 长任务纯状态机（running|paused|aborted|done|failed），持久化经 adapter 注入

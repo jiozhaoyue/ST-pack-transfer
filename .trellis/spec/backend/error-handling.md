@@ -21,8 +21,9 @@
 |---|---|---|
 | 入口校验 | `target` 不在 `TARGETS`（`st|l|tt|pt`） | `convert: target 必须是 st\|l\|tt\|pt 之一` |
 | 入口校验 | `io` 缺少 `openReader` / `createWriter` | `convert: 必须提供有效的 io 适配器 (openReader/createWriter)` |
-| 检测后 | 源包是 PT 原生归档（per-file `sha256` / `moduleId` 清单） | `PT 原生归档(sha256 清单)暂不支持,请先从 PT 导出 TT 迁移包` |
 | 检测后 | 布局无法识别（无 `manifest.json` / 无 `data/` 根 / 非摊平用户目录） | `无法识别源包布局(无 manifest.json / data/ 根 / 摊平用户目录标记)` |
+| PT 重建 | PT 原生归档 `schemaVersion` 非 1 | `不支持的 PT 归档版本: <v>（本工具支持 1）` |
+| PT 重建 | 条目内容与 manifest 的 `sha256` 不符 | `PT 归档条目校验失败（内容与 manifest 不符）: <path>` |
 | 条目边界 | `options.signal.aborted` | 抛 `DOMException('转换任务已被中止/暂停', 'AbortError')` |
 
 其他抛出点：`host-bridge.js` 的 `getCsrfToken()` 在宿主返回非 2xx 时抛 `获取 CSRF token 失败: <status>`；`/api/users/backup`、`/api/users/restore` 的失败经各自调用点的 `catch` 记入日志。

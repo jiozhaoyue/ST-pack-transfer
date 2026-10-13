@@ -7,8 +7,8 @@
  * 而「四宿主互通」的真正命题是 **4 源布局 × 4 目标布局** 的有向路径**逐条**走通
  * （`10-01` 的 `R-01` / `AC-12`：不以代表路径替代）。
  *
- * 本 spec 把**可自动化**的那部分做实：3 个真实源布局（ST 摊平 / Luker 摊平+manifest / TT `data/`）
- * × 4 个目标布局 = **12 条有向路径**，每条都断言：
+ * 本 spec 把**可自动化**的那部分做实：4 个真实源布局（ST 摊平 / Luker 摊平+manifest /
+ * TT `data/` / PT 原生归档）× 4 个目标布局 = **16 条有向路径**，每条都断言：
  *   ① 产物是合法 zip 且非空（**前置门** —— 否则后面的否命题在空包上恒真）；
  *   ② 目标落位规则（必须有 / 必须没有的前缀，取自 `tavern-datapack-formats.md` 的〔仓内〕条）；
  *   ③ **数据真的搬过去了**：聊天条目数与角色卡条目数与源包**逐条对上**（不是"只剩合成物"）。
@@ -40,11 +40,14 @@ const TARGET_RULES = {
   pt: { label: 'PureTavern', mustHave: ['data/default-user/characters/', 'data/default-user/chats/'], mustNotHave: [] },
 };
 
-/** 三个**真实**源布局（`fixtures/gen.js` 的三份确定性产物） */
+/** 四个**真实**源布局（`fixtures/gen.js` 的四份确定性产物） */
 const SOURCES = [
   { key: 'st', fixture: 'fixture-st.zip', label: 'ST 摊平' },
   { key: 'l', fixture: 'fixture-l.zip', label: 'Luker 摊平+manifest' },
   { key: 'tt', fixture: 'fixture-tt.zip', label: 'TT data/' },
+  // PT 原生归档：源包条目是 PT 内部模块模型（`modules/…`），其「应有条目数」以**重建后**的
+  // hub 为准（1 条 jsonl 聊天 + 1 张角色卡 PNG），故不能按原始 `modules/…` 名字直接数。
+  { key: 'pt', fixture: 'fixture-pt.zip', label: 'PT 原生归档', expect: { chats: 1, chars: 1 } },
 ];
 
 const TARGETS = ['st', 'l', 'tt', 'pt'];
@@ -98,7 +101,7 @@ async function convertAllTargets(ctx, fixturePath) {
 }
 
 module.exports = {
-  name: '跨宿主有向路径矩阵（3 源 × 4 目标 = 12 条 · 四端互通的可自动化面）',
+  name: '跨宿主有向路径矩阵（4 源 × 4 目标 = 16 条 · 四端互通的可自动化面）',
   async run(t, h, ctx) {
     const fixtures = await common.ensureFixtures(ctx.fixtureDir);
 
@@ -106,7 +109,9 @@ module.exports = {
     const sourceCounts = {};
     for (const s of SOURCES) {
       const zip = await common.readZip(fixtures[s.fixture]);
-      sourceCounts[s.key] = { chats: countChats(zip.names), chars: countChars(zip.names), total: zip.names.length };
+      sourceCounts[s.key] = s.expect
+        ? { ...s.expect, total: zip.names.length }
+        : { chats: countChats(zip.names), chars: countChars(zip.names), total: zip.names.length };
       t.ge(`S-${s.key}.0 【前置门】源包 ${s.label} 有聊天条目（否则"搬运"无从谈起）`,
         sourceCounts[s.key].chats, 1, JSON.stringify(zip.names.slice(0, 6)));
       t.ge(`S-${s.key}.0b 【前置门】源包 ${s.label} 有角色卡条目`,
@@ -158,10 +163,10 @@ module.exports = {
 
     t.log('  · 有向路径矩阵：');
     for (const line of matrix) t.log(`      ${line}`);
-    t.eq('C-ALL 12 条有向路径**逐条**走通（不以代表路径替代）', pathsOk, 12,
-      `走通 ${pathsOk}/12：${JSON.stringify(matrix)}`);
+    t.eq('C-ALL 16 条有向路径**逐条**走通（不以代表路径替代）', pathsOk, 16,
+      `走通 ${pathsOk}/16：${JSON.stringify(matrix)}`);
 
-    t.eq('Z1 全流程零未捕获页面异常（12 条路径各自上下文的合计）', allPageErrors.length, 0,
+    t.eq('Z1 全流程零未捕获页面异常（16 条路径各自上下文的合计）', allPageErrors.length, 0,
       JSON.stringify(allPageErrors.slice(0, 2)));
   },
 };

@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { createHash } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 import { zipIo } from '../src/core/zip-io.js';
 
@@ -121,6 +122,129 @@ export function ttEntries() {
   ];
 }
 
+/**
+ * PureTavern 官方原生归档夹具：条目是 PT 内部模块模型
+ * `modules/<moduleId>/{records,blobs}/<collection>/<id>.{json,bin}`（非用户目录路径），
+ * 供「PT 原生归档 → hub 重建」的往返断言。逐条映射证据见
+ * `.trellis/spec/guides/tavern-datapack-formats.md`。
+ */
+export function ptEntries() {
+  const CARD = {
+    spec: 'chara_card_v2',
+    spec_version: '2.0',
+    data: { name: 'Fixture Character', description: 'fixture only', first_mes: 'hi' },
+  };
+  const SESSION_HEADER = {
+    user_name: 'You',
+    character_name: 'Fixture Character',
+    create_date: '2026-09-01',
+  };
+  const MESSAGES = [
+    { name: 'You', is_user: true, mes: 'hello' },
+    { name: 'Fixture Character', is_user: false, mes: 'world' },
+  ];
+
+  const files = [
+    ['modules/characters/records/cards/c1.json', json({
+      id: 'c1',
+      avatarFile: 'Fixture Character.png',
+      card: CARD,
+      createdAt: '2026-09-01T00:00:00.000Z',
+      updatedAt: '2026-09-01T00:00:00.000Z',
+    })],
+    ['modules/characters/blobs/avatars/Fixture%20Character.png.bin', pngBytes('card')],
+    ['modules/chats/records/sessions/s1.json', json({
+      id: 's1',
+      ownerId: 'c1',
+      ownerAlias: 'Fixture Character.png',
+      characterName: 'Fixture Character',
+      legacyFileName: '2026-09-01.jsonl',
+      header: SESSION_HEADER,
+      chatMetadata: {},
+      messageCount: MESSAGES.length,
+    })],
+    ['modules/chats/records/messages/s1.json', json(MESSAGES)],
+    ['modules/world-books/records/books/w1.json', json({
+      id: 'w1',
+      legacyFileId: 'fixture-world',
+      name: 'Fixture World',
+      document: { entries: { '0': { uid: 0, key: ['fixture'], content: 'fixture lore' } } },
+    })],
+    ['modules/presets/records/documents/openai%3Ap1.json', json({
+      id: 'p1',
+      type: 'openai',
+      name: 'fixture-preset',
+      value: { temperature: 1.0, fixture: true },
+    })],
+    ['modules/settings/records/documents/current.json', json({
+      firstRun: false,
+      font_scale: 1,
+      fixtureMarker: 'st-settings',
+    })],
+    ['modules/secrets/records/store/current.json', json({
+      secrets: { api_key_openai: 'fixture-secret-do-not-leak', api_key_anthropic: 'fixture-secret-2' },
+    })],
+    ['modules/assets/records/index/a1.json', json({
+      id: 'a1',
+      collection: 'user-avatars',
+      legacyPath: '/User Avatars/fixture-avatar.png',
+      filename: 'fixture-avatar.png',
+      mimeType: 'image/png',
+    })],
+    ['modules/assets/blobs/user-avatars/a1.bin', pngBytes('avatar')],
+  ];
+
+  return [['manifest.json', json(ptManifest(files))], ...files];
+}
+
+/** 由条目清单构建合法的 PT manifest（含逐条目 sha256）。 */
+function ptManifest(files) {
+  const modules = new Map();
+  const descriptors = files.map(([entryPath, data]) => {
+    const match = /^modules\/([^/]+)\/(records|blobs)\/([^/]+)\/([^/]+)\.(json|bin)$/.exec(entryPath);
+    const moduleId = decodeURIComponent(match[1]);
+    const collection = decodeURIComponent(match[3]);
+    const id = decodeURIComponent(match[4]);
+    const entry = modules.get(moduleId) || { moduleId, records: 0, blobs: 0 };
+    if (match[2] === 'blobs') entry.blobs += 1; else entry.records += 1;
+    modules.set(moduleId, entry);
+    return {
+      path: entryPath,
+      moduleId,
+      kind: match[2] === 'blobs' ? 'blob' : 'record',
+      collection,
+      id,
+      size: data.byteLength,
+      sha256: sha256Hex(data),
+      updatedAt: '2026-09-01T00:00:00.000Z',
+    };
+  });
+  return {
+    format: 'pure-tavern-archive',
+    schemaVersion: 1,
+    archiveId: 'fixture-pt-archive',
+    createdAt: '2026-09-01T00:00:00.000Z',
+    appVersion: '0.1.0',
+    upstreamVersion: '1.12.0',
+    includeSecrets: true,
+    modules: [...modules.values()].map((m) => ({
+      moduleId: m.moduleId,
+      displayName: m.moduleId,
+      dataVersion: 1,
+      sensitive: false,
+      recordCount: m.records,
+      blobCount: m.blobs,
+      totalBytes: 0,
+    })),
+    files: descriptors,
+  };
+}
+
+function sha256Hex(data) {
+  // fixtures 只在 Node 下生成（gen-fixtures CLI / 单测）。
+  return createHash('sha256').update(data).digest('hex');
+}
+
 export async function generateAll(outDir) {
   const { mkdirSync } = await import('node:fs');
   mkdirSync(outDir, { recursive: true });
@@ -129,6 +253,7 @@ export async function generateAll(outDir) {
     ['fixture-st.zip', stEntries()],
     ['fixture-l.zip', lEntries()],
     ['fixture-tt.zip', ttEntries()],
+    ['fixture-pt.zip', ptEntries()],
   ];
   for (const [fileName, entries] of packs) {
     const outPath = path.join(outDir, fileName);

@@ -21,9 +21,10 @@
 - **TT**〔仓内 `detect.js:11-13,72`〕:`data/` 根,用户数据在 `data/default-user/`,
   TT 私有在 `data/_tauritavern/`(extension-sources / mcp / skills / window-state)
   + `data/_cache` / `_css` / `_errors`。
-- **PT**〔仓内 `detect.js:65-68`〕:自家归档(根 manifest 带 `format` 或 `files[].moduleId`)
-  判定为 `LAYOUTS.PT_NATIVE`,**v1 不支持** —— `convert()` 直接抛错要求改导 TT 迁移包;
-  PT 目标的产物走 TT 布局(`data/default-user/`)。
+- **PT**〔仓内 `detect.js:7,53-57`〕:自家归档(根 manifest 带 `format:'pure-tavern-archive'`
+  或 `files[].moduleId`)判定为 `LAYOUTS.PT_NATIVE`。**2026-10-13 起支持作为源转换**
+  —— 由 `src/core/pt-archive.js` 重建为 hub(ST 摊平)条目,再走同一目标适配管线
+  (见下文「PT 原生归档重建」)。PT 目标的产物走 TT 布局(`data/default-user/`)。
 
 ## 导入语义(最易踩的坑)
 
@@ -63,6 +64,41 @@
   (`_convert/extensions-manifest.json`、`_convert/INSTALL.md`、`_convert/meta.json`),
   官方 Content 下载索引 `extensions-index.json` 在包根(`transform.js` 尾部合成块 `emitSynthesized`)。
 - secrets 任何方向不剥离(用户硬性要求),产物含 API 密钥属预期。
+
+## PT 原生归档重建 (2026-10-13 · `10-01` R-11 / `D-23`)
+
+PT 原生归档的条目**不是用户目录路径**,而是 PT 内部模块模型
+`modules/<moduleId>/{records,blobs}/<collection>/<id>.{json,bin}`
+〔PT 源 `import-export/application/archive-participant-registry.ts` 的 `archivePath()`〕。
+故转换到 ST/L/TT 布局必须按模块语义**反向重建**。仓内实现:`src/core/pt-archive.js`。
+
+**映射的权威证据**是 PT 自己的迁移导入器
+`features/import-export/tauri-tavern/application/tauri-tavern-import.ts`
+(ST/TT 文件 → PT 记录/blob),本仓实现其**逆映射**。逐条落位:
+
+| PT 模块 / collection | 记录 / blob 内容 | hub(ST 摊平)落位 |
+| --- | --- | --- |
+| `characters` / `avatars`(blob) | **带卡 PNG 原字节**(TT 导入存原图;运行期 `writePngCard` 已嵌卡) | `characters/<id>`(id 即 `<名>.png`) |
+| `chats` / `sessions`+`messages`(record) | 会话头 + 消息数组 | `chats/<ownerAlias 去 .png>/<legacyFileName>`(jsonl) |
+| `world-books` / `books`(record) | `document` = 整本世界书 | `worlds/<legacyFileId>.json` |
+| `presets` / `documents`(record) | `{type,name,value}` | `<ST 预设目录>/<name>.json` |
+| `settings`/`secrets`/`stats`(record,id=`current`) | 单例文档 | `settings.json` / `secrets.json` / `stats.json` |
+| `assets` / `index`(record)+blob | `legacyPath` = 原 ST 路径 | `<legacyPath 去前导斜杠>`;扩展包(`/scripts/extensions/third-party/…`)→ `extensions/third-party/<名>/…` |
+| `assets` / `background-folders`(record) | 背景虚拟分组 | 合入 `image-metadata.json` |
+
+**读两趟**(zip 读游标不可倒回):先读**记录**(语义索引,`chats/messages` 只登记不驻留),
+再读**大块**(blob 与 messages),逐条 `read()` 后立即 yield ⇒ 峰值 ≈ 单条目。
+
+**有损点(如实告知,勿当无损)**:① 角色卡 PNG 的卡块已由 PT 拆解进 `cards` 记录,重建直接
+用 `avatars` blob(自带卡),但**运行期 PT 角色的头像可能已被 `processAvatar` 重编码**
+(原图仅存于 `raw-cards`);② 聊天 jsonl 重序列化丢原始空白/尾随换行;③ 预设 `metadata`
+与 `aliases`/`path-aliases` 等内部索引不重建;④ **PT 原生源不支持断点续传**(重建条目无源 crc32)。
+
+**校验**:`parsePtManifest` 校验 format/schemaVersion/结构/路径安全/唯一性;重建时逐条目
+校验 `sha256`,不符即抛错(**绝不产出残缺包**)。版本不符抛「不支持的 PT 归档版本」。
+
+**证据面**:`e2e/standalone/specs/cross-host.e2e.cjs` 的 `pt→{st,l,tt,pt}` **4 条出边**
+(4 源 × 4 目标 = 16 条);夹具 `fixtures/gen.js` 的 `fixture-pt.zip`。
 
 ## 增量与分包扩展规范 (Sessions 12-14)
 

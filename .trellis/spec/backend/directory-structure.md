@@ -37,6 +37,7 @@ st-zip-converter/
 │   │   ├── logger.js           # 结构化日志单例（级别过滤 + 1000 条环形缓冲 + 订阅）
 │   │   ├── null-writer.js      # dry-run 空写入器（只预测不落盘）
 │   │   ├── plan-preview.js     # 完全扫描动作预测（generatePlan / ACTIONS）
+│   │   ├── pt-archive.js       # PT 原生归档 → hub 重建（manifest 校验 / 模块语义逆映射）
 │   │   ├── report.js           # 转换报告（Report 类 / MODULES / classifyModule）
 │   │   ├── splitter.js         # 智能分卷（每片独立合法 zip，默认阈值 100MB）
 │   │   ├── task-manager.js     # 长任务纯状态机（持久化 adapter 注入）

@@ -313,8 +313,9 @@ taskControls.hide()           // ← 控制条隐藏
 `R-01` / `AC-12` 要求**四宿主间 12 条有向迁移路径逐条**有证据，且**不以代表路径替代**。
 可自动化的那一半做成 `e2e/standalone/specs/cross-host.e2e.cjs`：
 
-- **3 个真实源布局**（`fixtures/gen.js` 的 `fixture-st.zip` 摊平 / `fixture-l.zip` 摊平+manifest /
-  `fixture-tt.zip` `data/`）× **4 个目标**（`st`/`l`/`tt`/`pt`）= **12 条有向路径**；
+- **4 个真实源布局**（`fixtures/gen.js` 的 `fixture-st.zip` 摊平 / `fixture-l.zip` 摊平+manifest /
+  `fixture-tt.zip` `data/` / `fixture-pt.zip` PT 原生归档）× **4 个目标**（`st`/`l`/`tt`/`pt`）
+  = **16 条有向路径**；
 - 每条断言：① 产物合法且非空（**前置门**）；② 目标落位规则（必须有 / 必须没有的前缀）；
   ③ **数据一条不少**——聊天与角色卡的**条目数与源包逐条对上**（跨布局只改路径，不丢条目）；
 - 每个源**新开一个 context**（`#file-input` 换源包的坑，见 `perf.e2e.cjs` 的 `measureFresh`）。
@@ -324,8 +325,9 @@ taskControls.hide()           // ← 控制条隐藏
 TT 无浏览器端口（人工交付）、PT 人工导入。故本 spec 是**格式转换 + 交付**层面的证据；
 目标侧写入的证据在实例侧与人工记录里，**两者不得互相顶替**。
 
-**PT 作为「源」是已知阻断（登记，不掩盖）**：`detect.js:6/55-57` 能**识别** PT 原生归档
-（manifest 带 per-file `moduleId`）但 **v1 不支持转换**（`D-23` 已裁定「首版补齐」但实现未定）。
-故有向路径的**源**只取三种**可读**布局（`st` / `l` / `tt`），**目标**取全部四端
-⇒ **3 × 4 = 12**。PT 的 3 条**出边**（`pt→st` / `pt→l` / `pt→tt`）当前**不可自动化**，
-逐条登记为阻断（`AC-12` 允许「无法自动化的形态逐条记录人工证据」，但**不允许**用代表路径替代）。
+**PT 作为「源」已打通（2026-10-13 · `D-23` / R-11）**：`src/core/pt-archive.js` 把 PT 原生归档
+（`modules/<id>/{records,blobs}/…`）**重建**为 hub(ST 摊平)条目（映射证据见
+`tavern-datapack-formats.md` §「PT 原生归档重建」），故源取**四种可读布局**
+（`st` / `l` / `tt` / `pt`）× 四端目标 ⇒ **4 × 4 = 16**。PT 的 4 条出边
+（`pt→st` / `pt→l` / `pt→tt` / `pt→pt`）**逐条走通**并断言聊天/角色卡条目数与源包一条不差。
+仍**不可自动化**的只有**目标侧写入**（见上段），两者不得互相顶替。

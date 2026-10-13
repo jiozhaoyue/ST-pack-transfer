@@ -12,7 +12,7 @@
    - **SillyTavern (ST)**：zip 根摊平用户目录，**无** `manifest.json`。
    - **Luker (L)**：同为摊平布局，但带 `manifest.json`（`schemaVersion` + `selection`）。
    - **TauriTavern (TT)**：`data/` 根，用户文件在 `data/default-user/`（或其他 handle）下，系统文件在 `data/_tauritavern/`。
-   - **PureTavern (PT)**：接受 TT 兼容布局；PT **原生归档**（manifest 带 per-file `moduleId` / `sha256`）识别为 `pt-native`，当前**明确拒绝转换**并提示改导 TT 迁移包。
+   - **PureTavern (PT)**：接受 TT 兼容布局；PT **原生归档**（manifest 带 per-file `moduleId` / `sha256`）识别为 `pt-native`，自 2026-10-13 起由 `src/core/pt-archive.js` **重建为 hub** 后照常转换（映射与有损点见 `guides/tavern-datapack-formats.md` §「PT 原生归档重建」）。
    布局判定实现见 `src/core/detect.js`（`LAYOUTS` / `detectFromReader`）。
 2. **浏览器暂存（IndexedDB）**——工作区缓存，不是事实源。
 3. **可选 Authority 后端**——纯增强层，不可用时静默降级。
