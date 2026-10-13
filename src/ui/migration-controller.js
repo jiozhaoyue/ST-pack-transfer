@@ -12,6 +12,7 @@
  */
 
 import { ORIGINS } from '../storage/db.js';
+import { evaluateWriteGate } from '../core/migration-evidence.js';
 
 /** 去掉 `.zip` 后缀，供拼接用途标识。 */
 function stripZipExt(name) {
@@ -78,4 +79,63 @@ export function buildSourceDeliveries({ source, target = null, report = null, ha
   }
 
   return items;
+}
+
+/**
+ * 目标写入的**门禁编排**（S3）：先过 `evaluateWriteGate`，再决定是否写入。
+ *
+ * 关键不变量：门禁不过时 `restoreFn` **一次都不调用**（零写入）。
+ * `restoreFn` 由调用方注入（`() => restoreToHost(...)`），故可在 Node 用端口替身直测。
+ * 门禁不吞异常：`restoreFn` 抛错原样上抛。
+ *
+ * @param {object} params
+ * @param {object} params.plan `createMigrationPlan` 产出的冻结快照
+ * @param {object} params.evidence `buildTargetEvidence` 产出的证据
+ * @param {() => Promise<any>} params.restoreFn 实际写入动作
+ * @returns {Promise<{wrote: boolean, reasons: string[], result?: any}>}
+ */
+export async function guardedRestore({ plan, evidence, restoreFn }) {
+  const gate = evaluateWriteGate(plan, evidence);
+  if (!gate.allowed) {
+    return { wrote: false, reasons: gate.reasons };
+  }
+  const result = await restoreFn();
+  return { wrote: true, result, reasons: [] };
+}
+
+/**
+ * 构造目标写入的 evidence（S3）。**纯函数**：不 import host-bridge，`inFlight` 由调用方求值后传入。
+ *
+ * 字段对齐 `.trellis/spec/frontend/migration-safety-and-evidence.md` §3.1。
+ *
+ * @param {object} params
+ * @param {string} params.platform 宿主平台码
+ * @param {string} params.handle 当前用户 handle
+ * @param {string} params.planTargetRef 计划生成时的目标身份
+ * @param {boolean} params.backupConfirmed 用户是否声明「已备份目标数据」
+ * @param {number|string} params.planRevision 当前计划 revision
+ * @param {boolean} params.inFlight 是否已有同一写操作在途
+ * @param {'granted'|'denied'|'unknown'} [params.permission='granted'] 权限态
+ */
+export function buildTargetEvidence({
+  platform,
+  handle,
+  planTargetRef,
+  backupConfirmed,
+  planRevision,
+  inFlight,
+  permission = 'granted',
+}) {
+  const targetRef = `${platform}@${handle}`;
+  return {
+    planRevision,
+    targetRef,
+    planTargetRef,
+    permission,
+    confirmation: { valid: true },
+    backup: backupConfirmed
+      ? { level: 'user-attested', targetRef, scope: 'matches-write', retention: 'confirmed' }
+      : { level: 'none' },
+    inFlight: Boolean(inFlight),
+  };
 }
