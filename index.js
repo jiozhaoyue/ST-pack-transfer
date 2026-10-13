@@ -44,6 +44,7 @@ import { getChatStoreProbe, probeChatStore } from './src/ui/chat-store-bridge.js
 import { resolveFilename, previewFilename, DEFAULT_FILENAME_TEMPLATE, namedBlob } from './src/core/filename-template.js';
 import { buildSourceDeliveries, guardedRestore, buildTargetEvidence } from './src/ui/migration-controller.js';
 import { createMigrationPlan } from './src/core/migration-plan.js';
+import { classifyOutcome, buildVerificationEvidence, MIGRATION_OUTCOMES } from './src/core/migration-evidence.js';
 import {
   detectHost,
   verifyHostPlatform,
@@ -2011,6 +2012,26 @@ async function main(appRoot) {
     void alertDialog(`写入被安全门拒绝：${restoreGateReasonsText(reasons)}。\n请先完成目标备份并勾选确认，或改用宿主原生导入方式。`);
   }
 
+  /** S4：由写入返回体构造核对证据（现状无目标侧读回，coverage 只到「宿主确认写入」）。 */
+  function buildRestoreVerification(scopeRef, restoreResult) {
+    if (restoreResult && restoreResult.unconfirmed) {
+      return [buildVerificationEvidence({
+        scopeRef, unit: 'archive-entry', method: 'automatic', coverage: 'unknown', status: 'unknown',
+        reason: '响应体不可解析，写入状态未知',
+      })];
+    }
+    if (restoreResult && restoreResult.nothingRestored) {
+      return [buildVerificationEvidence({
+        scopeRef, unit: 'archive-entry', method: 'automatic', coverage: 'full', status: 'failed',
+        reason: '宿主返回成功但未写入任何条目',
+      })];
+    }
+    return [buildVerificationEvidence({
+      scopeRef, unit: 'archive-entry', method: 'automatic', coverage: 'full', status: 'confirmed',
+      reason: '宿主确认写入（未逐条读回核对）',
+    })];
+  }
+
   function openRestoreModal(archiveFile) {
     if (!host.isPlugin) {
       void alertDialog('还原/写入功能仅在作为 SillyTavern 或 Luker 扩展插件运行且已登录时可用。');
@@ -2199,20 +2220,23 @@ async function main(appRoot) {
           reportRestoreGateRefusal(reasons);
           return;
         }
-        // 三态区分（审计 R-15：响应体不可解析时不得谎报成功）
-        if (restoreResult && restoreResult.unconfirmed) {
-          view.setProgress(100, `请求已发出，但结果未确认`);
-          logger.warn(`恢复请求已发出，但响应体不可解析（${restoreResult.reason || '未知原因'}）——`
+        // S4：核对结论（MigrationOutcome 四态）—— 不把「已写入未核对」说成「完成」
+        const verification = buildRestoreVerification(fileToRestore.name, restoreResult);
+        const outcome = classifyOutcome({ verification });
+        logger.info(`恢复核对结论: ${outcome}`);
+        if (outcome === MIGRATION_OUTCOMES.NEEDS_VERIFICATION) {
+          view.setProgress(100, '请求已发出，但写入状态未确认');
+          logger.warn(`写入状态未确认（${restoreResult?.reason || '响应体不可解析'}）——`
             + '宿主可能仍在处理，请稍后核对数据。');
-          void alertDialog('恢复请求已发出，但未能确认结果。\n宿主可能仍在处理，请稍后核对数据。');
-        } else if (restoreResult && restoreResult.nothingRestored) {
+          void alertDialog('写入状态未确认。\n宿主可能仍在处理，请稍后核对数据，勿直接重发。');
+        } else if (outcome === MIGRATION_OUTCOMES.FAILED) {
           // 宿主返回 200 但一个条目都没写：如实报告，不得说「成功」
           view.setProgress(100, '宿主未写入任何条目');
           logger.warn('宿主返回成功但 restoredCount=0——请核对包的类目是否被宿主接受');
           void alertDialog('宿主未写入任何条目。\n请核对数据包内容是否包含宿主支持的类目。');
         } else {
-          view.setProgress(100, `恭喜！数据包已成功恢复写入到当前酒馆用户！`);
-          logger.success(`恢复完成！宿主酒馆数据已更新。`);
+          view.setProgress(100, '数据包已写入并获宿主确认');
+          logger.success('恢复完成：宿主已确认写入（本轮未逐条读回核对目标数据）。');
           // 纯库模式适配：把包里的聊天录入库（否则纯库读库不读盘 ⇒ 用户看不到它们）
           try {
             const imported = await importRestoredChatsIntoLibrary(fileToRestore.blob);
