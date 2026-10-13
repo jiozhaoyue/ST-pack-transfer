@@ -23,7 +23,7 @@ const fs = require('fs');
 const path = require('path');
 
 const { getInstance } = require('./lib/instances.cjs');
-const { openInstance } = require('./lib/harness.cjs');
+const { openInstance, reportBlockingPopups } = require('./lib/harness.cjs');
 const { assertDevTarget } = require('./lib/guard.cjs');
 
 const SPEC_DIR = path.join(__dirname, 'specs');
@@ -139,6 +139,9 @@ async function main() {
       } catch (e) {
         ok(`${label}${id ? ` @ ${id}` : ''} 未抛异常`, false, (e && e.message) || String(e));
         if (e && e.stack) log(`    ${String(e.stack).split('\n').slice(1, 4).join('\n    ')}`);
+        // 抛错时**一定**把页面上打开的 <dialog> 报出来：宿主/第三方模态会拦指针事件，
+        // 表现就是 Playwright 点按超时 —— 不打出来的话「红灯来自别人」这件事不可判。
+        if (h && h.page) await reportBlockingPopups(h.page, id || 'spec').catch(() => {});
       } finally {
         if (h) await h.close().catch(() => {});
       }

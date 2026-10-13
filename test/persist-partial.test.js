@@ -114,6 +114,38 @@ describe('persistPartial（半成品持久化 + 暂停态断点）', () => {
     }
   });
 
+  it('⭐ buildCheckpoint：批量路径可写**自己的断点形状**，不被覆盖成单包形状', async () => {
+    // 为什么必须给这条通道：批量断点是 `{kind:'batch', itemIndex, outputs, itemIds…}`。
+    // 若 persistPartial 无脑写单包形状（`{partialOpfsName,target,partialEntries,totalEntries}`），
+    // 批次续传就**读不到 itemIndex / outputs** ⇒ 断点作废、整批重跑（静默退化）。
+    const { deps } = makeDeps();
+    const seen = [];
+    const res = await persistPartial({
+      ...base(),
+      setPauseCheckpoint: async (m) => { seen.push(m); return true; },
+      buildCheckpoint: ({ name, partialEntries }) => ({
+        kind: 'batch',
+        itemIndex: 1,
+        outputs: [{ index: 0, name: 'a.zip' }],
+        partialOpfsName: name,
+        partialEntries,
+      }),
+      deps,
+    });
+
+    expect(res.ok).toBe(true);
+    expect(seen).toHaveLength(1);
+    expect(seen[0]).toEqual({
+      kind: 'batch',
+      itemIndex: 1,
+      outputs: [{ index: 0, name: 'a.zip' }],
+      partialOpfsName: 'convert-123.partial.zip',
+      partialEntries: [{ name: 'a.txt', crc32: 7 }, { name: 'b.png', crc32: 9 }],
+    });
+    // 默认形状的字段**不得**混进来（否则续传侧会按单包分支解读）
+    expect(seen[0].target).toBeUndefined();
+  });
+
   it('hasRoomForPartial：拿不到 estimate 时**放行**（量不出来 ≠ 没空间，不得静默退化）', async () => {
     expect(await hasRoomForPartial(1000, null)).toBe(true);
     expect(await hasRoomForPartial(1000, {})).toBe(true);

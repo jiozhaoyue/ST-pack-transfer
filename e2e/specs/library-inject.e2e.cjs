@@ -24,6 +24,7 @@
  */
 
 const { isPluginRef, useAdvancedView } = require('../lib/harness.cjs');
+const { pruneFixtures } = require('../lib/fixture-prune.cjs');
 
 /** 桩供给方：两条可导出聊天 + 一条隐藏容器（都被源包"缺"⇒ 应全部被导出） */
 const STUB = ({ chats }) => {
@@ -152,6 +153,10 @@ module.exports = {
       await import(genUrl).then((m) => m.generateAll(FIXTURE_DIR));
     }
     t.ok('I3b 实例侧夹具存在（复用 `fixtures/gen.js` 产物）', fsx.existsSync(fixturePath), fixturePath);
+    // 上传前清掉本仓 E2E 自己在过往轮次留在 profile 里的夹具记录（`#file-input` 是「总是入库」
+    // ⇒ 同名夹具每轮再入一条 ⇒ 累积到几十条后列表过长、目标行不可点）。见 `e2e/lib/fixture-prune.cjs`。
+    const prunedLib = await pruneFixtures(page);
+    t.log(`  · 清理本仓 E2E 夹具记录 ${prunedLib} 条（-1 = 存储未就绪，不阻断）`);
     await page.setInputFiles('#file-input', fixturePath);
     const planReady = await page.waitForFunction(() => {
       const bar = document.getElementById('plan-summary-bar');

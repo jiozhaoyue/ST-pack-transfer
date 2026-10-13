@@ -15,6 +15,7 @@ const path = require('path');
 const fs = require('fs');
 const { pathToFileURL } = require('url');
 const { useAdvancedView } = require('../lib/harness.cjs');
+const { pruneFixtures } = require('../lib/fixture-prune.cjs');
 
 const DRAWER_ID = 'st_zip_converter_settings';
 const FIXTURE_DIR = path.resolve(__dirname, '..', '..', 'test-results', 'fixtures');
@@ -128,6 +129,11 @@ module.exports = {
       await import(genUrl).then((m) => m.generateAll(FIXTURE_DIR));
     }
     t.ok('P9 PT 用例夹具就绪', fs.existsSync(fixturePath), fixturePath);
+
+    // 上传前清掉本仓 E2E 在过往轮次留在 profile 里的夹具记录（`#file-input` 是「总是入库」
+    // ⇒ 同名夹具每轮再入一条 ⇒ 累积后列表过长）。见 `e2e/lib/fixture-prune.cjs`。
+    const prunedPt = await pruneFixtures(page);
+    t.log(`  · 清理本仓 E2E 夹具记录 ${prunedPt} 条（-1 = 存储未就绪，不阻断）`);
 
     // 前置门：控件真的可见（否则后面的 select/click 只会以超时告终，红得没信息量）
     const controlsVisible = await page.evaluate(() => {

@@ -27,6 +27,7 @@ const fs = require('fs');
 const path = require('path');
 const { pathToFileURL } = require('url');
 const { useAdvancedView } = require('../lib/harness.cjs');
+const { pruneFixtures } = require('../lib/fixture-prune.cjs');
 
 const SLUG = 'st-zip-converter';
 const FIXTURE_DIR = path.resolve(__dirname, '../../test-results/fixtures');
@@ -484,41 +485,21 @@ async function ensurePauseFixture() {
 }
 
 /**
- * 清理**本 spec 自己**在过往轮次留下的夹具记录。
+ * 清理**本 spec 自己**在过往轮次留下的夹具记录（实现见 `e2e/lib/fixture-prune.cjs`）。
  *
  * 为什么必须做：E2E 用**持久化 profile**，而 `resetWorkspace` 只删 `workspace` 的
  * `active_session`、**不删 `files`** ⇒ 本 spec 上传的夹具会跨轮次累积（见 `ensurePauseFixture`
  * 里那段事故记录：48 MB × 若干轮 = 页面加载慢到 openWorkbench 失败）。
  *
- * 只删**本 spec 生成的**夹具（按名精确匹配，不碰别的记录），并且必须在
- * `resetWorkspace` 的 reload **之前**调用 —— 让那次 reload 本身就是干净的。
+ * ⚠️ **2026-10-13 修正**：旧版只删三个**大**夹具，漏了 `fixture-st.zip` ——
+ * 而累积与夹具大小无关、只与**上传次数**有关（实测 dev-st 暂存区 56 项**全是** `fixture-st.zip`）。
+ * 现按**上传面**列全（`FIXTURE_NAMES`），并抽到 `e2e/lib/fixture-prune.cjs` 供各 spec 共用。
+ *
+ * 必须在 `resetWorkspace` 的 reload **之前**调用 —— 让那次 reload 本身就是干净的。
  * @returns {Promise<number>} 删除条数；-1 表示存储不可用（不阻断用例）
  */
 async function pruneOwnFixtures(page) {
-  return page.evaluate(async (names) => new Promise((resolve) => {
-    let req;
-    try { req = window.indexedDB.open('st_zip_converter_db'); } catch { resolve(-1); return; }
-    req.onerror = () => resolve(-1);
-    req.onsuccess = () => {
-      const db = req.result;
-      try {
-        const tx = db.transaction('files', 'readwrite');
-        const store = tx.objectStore('files');
-        let removed = 0;
-        const cur = store.openCursor();
-        cur.onsuccess = () => {
-          const c = cur.result;
-          if (!c) return;
-          const rec = c.value || {};
-          if (names.includes(rec.name)) { c.delete(); removed += 1; }
-          c.continue();
-        };
-        tx.oncomplete = () => resolve(removed);
-        tx.onerror = () => resolve(-1);
-        tx.onabort = () => resolve(-1);
-      } catch { resolve(-1); }
-    };
-  }), [PAUSE_FIXTURE, 'fixture-pause-st.zip', 'fixture-large-st.zip']);
+  return pruneFixtures(page);
 }
 
 /**

@@ -55,47 +55,80 @@ async function reportBlockingPopups(page, instanceId) {
 }
 
 /**
- * **处置**一个**已知的第三方**模态弹窗：ChatFilesys 的「入库提醒」（`.chatfilesys-import-prompt`，**类名**）。
+ * **处置**已知的、**非被测对象**的模态弹窗（它们都会拦全页指针事件，把 Playwright 的点按
+ * 变成 30 s 超时，而报错看起来毫无头绪）。当前两条：
  *
- * WHY（2026-09-29 实测）：dev-st 上打开任何**尚未入库**的聊天时，ChatFilesys 会弹这条
- * `<dialog open class="popup popup--animation-fast">`（内含 `.chatfilesys-import-prompt`，
- * 按钮「纯库 / 双写 / 不入库 / 确定 / 取消」）并**拦截全页指针事件** ⇒ 矩阵在
- * 第一次点 `#btn-convert` 时超时（`<dialog …> intercepts pointer events`）而**整段假红**。
- * dev-luker 不发生，因为它的 `import_prompt.never = true`（已静音）——
- * **同一份代码、两个宿主、一绿一红**，这正是「红灯来自别人」的教科书形态。
+ * 1. **ChatFilesys 的「入库提醒」**（`.chatfilesys-import-prompt`，**类名**）。
+ *    WHY（2026-09-29 实测）：dev-st 上打开任何**尚未入库**的聊天时弹出，
+ *    按钮「纯库 / 双写 / 不入库 / 确定 / 取消」⇒ 矩阵第一次点 `#btn-convert` 超时。
+ *    处置取「**不入库**」——三个选项里唯一**不产生副作用**的。
+ * 2. **Luker 宿主的「有可用更新」**（`<dialog class="popup wide_dialogue_popup left_aligned_dialogue_popup">`）。
+ *    WHY（2026-10-13 实测）：dev-luker 上弹出「检测到 Luker 有可用更新…立即更新 / 稍后」，
+ *    在 `page.check` / `page.click` 上超时。处置取「**稍后**」——不触发更新。
+ *    ⚠️ 这条此前一直被误判为「profile 暂存区累积」；真因由 `run.cjs` 抛错时的 `<dialog>` 转储定位
+ *    ——「红灯来自别人」这件事**必须能被一眼看见**，否则会照着错因修好几轮。
  *
  * 与宿主的 splash 弹窗（见 `goto()`）**同类**：都不是被测对象，却都会拦指针事件。
  *
  * 为什么装 **init script + MutationObserver** 而不是「goto 之后点一下」：
- * 2026-09-29 实测**按需点击抓不到** —— 该弹窗是**宿主把聊天载进来之后**才出现的，
+ * 2026-09-29 实测**按需点击抓不到** —— 这些弹窗是**宿主把内容载进来之后**才出现的，
  * 比 `goto()` 返回晚（第一次实现因此在 goto 里 `count() === 0` 直接空过，矩阵照样假红）。
  * 观察者挂在页面里，**任何时候弹出都能收拾**，且零等待（不对每个页面白付超时）。
  *
- * 处置动作取「**不入库**」——语义是「这次就照常走聊天文件」（**不写库、不改任何数据**），
- * 是三个选项里唯一**不产生副作用**的；**不勾**「这个聊天不再提醒 / 全部不再提醒」
- * （那会**留下持久设置**，等于偷偷改实例状态）。
- *
- * 边界：仅当 `.chatfilesys-import-prompt` 存在时才动它；未装 ChatFilesys / 已静音 / 已在库时
- * 是**零操作**。将来若有 spec 要断言这条弹窗，需在此加开关（现行 spec 无一断言它，已 grep 确认）。
+ * 边界：**只点安全按钮**，绝不点「立即更新」「不再提醒」这类会改变实例状态的按钮；
+ * 未装对应扩展 / 没弹窗时是**零操作**。将来若有 spec 要断言某条弹窗，需在此加开关。
  *
  * @param {object} ctx Playwright 持久化上下文
  */
 async function installChatFilesysPromptGuard(ctx) {
   await ctx.addInitScript(() => {
     window.__szcDismissedCfPrompt = 0;
-    const dismiss = () => {
-      // ⚠️ 实测两点（2026-09-29，两次都踩过）：
-      //  ① `chatfilesys-import-prompt` 是**类名不是 id**（按 id 找恒为空 → 守卫静默空过）；
-      //  ② 它的按钮是宿主的 `.menu_button` **div**，不是 `<button>`（只查 button 得到空集）。
-      const box = document.querySelector('.chatfilesys-import-prompt');
-      if (!box) return;
-      const root = box.closest('dialog') || box;
-      const btn = Array.from(root.querySelectorAll('button, .menu_button'))
-        .find((b) => (b.textContent || '').trim() === '不入库');
-      if (!btn) return;                       // 找不到就**不猜按钮**，留给 reportBlockingPopups 告警
-      btn.click();
-      window.__szcDismissedCfPrompt += 1;
+    window.__szcDismissedHostPopup = 0;
+
+    /**
+     * 已知的**非被测对象**弹窗：每条给「候选根 + 安全按钮文案（+ 可选文案判据）」。
+     *
+     * 「安全按钮」= 该弹窗里**唯一不产生副作用**的那一个（不写库 / 不更新 / 不落持久设置）。
+     * 绝不点「立即更新」「全部不再提醒」这类会**改变实例状态**的按钮。
+     */
+    const KNOWN = [
+      {
+        key: '__szcDismissedCfPrompt',
+        // ChatFilesys「入库提醒」。① 先按类名找（最快）；② 类名漂了就按按钮文案认
+        //    ——「不入库」是这条弹窗**独有**的选项，别的弹窗不会有。
+        roots: () => {
+          const box = document.querySelector('.chatfilesys-import-prompt');
+          const byClass = box ? (box.closest('dialog') || box) : null;
+          if (byClass) return [byClass];
+          return Array.from(document.querySelectorAll('dialog[open]'));
+        },
+        btn: '不入库',
+      },
+      {
+        key: '__szcDismissedHostPopup',
+        // **Luker 宿主**的「检测到 Luker 有可用更新…立即更新 / 稍后」。
+        // 2026-10-13 dev-luker 实测：这条 `<dialog class="popup wide_dialogue_popup
+        // left_aligned_dialogue_popup">` 在插件工作台之外弹出、**拦全页指针事件**
+        // ⇒ 矩阵在 `page.check` / `page.click` 上 30 s 超时（此前一直被误判为
+        // 「profile 暂存区累积」——真因由 `run.cjs` 抛错时的 `<dialog>` 转储一次定位）。
+        // 点「稍后」= 本次不更新，**不触发任何更新动作**。
+        roots: () => Array.from(document.querySelectorAll('dialog[open]')),
+        btn: '稍后',
+        textMust: /有可用更新/,
+      },
+    ];
+
+    const clickSafe = (rule) => {
+      for (const root of rule.roots()) {
+        if (!root) continue;
+        if (rule.textMust && !rule.textMust.test(root.textContent || '')) continue;
+        // ⚠️ 按钮是宿主的 `.menu_button` **div**，不是 `<button>`（只查 button 得到空集）。
+        const btn = Array.from(root.querySelectorAll('button, .menu_button'))
+          .find((b) => (b.textContent || '').trim() === rule.btn);
+        if (btn) { btn.click(); window[rule.key] += 1; return; }
+      }
     };
+    const dismiss = () => { for (const rule of KNOWN) clickSafe(rule); };
     const start = () => {
       dismiss();                              // 页面加载时就已存在的情况
       new MutationObserver(dismiss).observe(document.documentElement, {
@@ -201,10 +234,17 @@ async function openInstance(inst) {
           + ' —— 后续点击可能被它拦截（规范 §11.7 宿主冷启动窗口）\n');
       }
       // splash 之后看一眼页内守卫收拾了几个拦路弹窗（详见 installChatFilesysPromptGuard）
-      const dimmed = await page.evaluate(() => window.__szcDismissedCfPrompt || 0).catch(() => 0);
-      if (dimmed) {
-        process.stdout.write(`  · ℹ ${inst.id}: 已自动关闭 ChatFilesys「入库提醒」× ${dimmed}`
+      const dimmed = await page.evaluate(() => ({
+        cf: window.__szcDismissedCfPrompt || 0,
+        host: window.__szcDismissedHostPopup || 0,
+      })).catch(() => ({ cf: 0, host: 0 }));
+      if (dimmed.cf) {
+        process.stdout.write(`  · ℹ ${inst.id}: 已自动关闭 ChatFilesys「入库提醒」× ${dimmed.cf}`
           + '（点「不入库」；不写库、不勾「不再提醒」，实例状态零改动）\n');
+      }
+      if (dimmed.host) {
+        process.stdout.write(`  · ℹ ${inst.id}: 已自动关闭宿主弹窗（Luker「有可用更新」等）× ${dimmed.host}`
+          + '（点「稍后」；**不触发更新**、不勾「不再提醒」）\n');
       }
       await reportBlockingPopups(page, inst.id);
       return page;
@@ -253,4 +293,4 @@ async function useAdvancedView(page) {
   return read();
 }
 
-module.exports = { openInstance, isPluginRef, PLUGIN_SLUG, useAdvancedView };
+module.exports = { openInstance, isPluginRef, PLUGIN_SLUG, useAdvancedView, reportBlockingPopups };
