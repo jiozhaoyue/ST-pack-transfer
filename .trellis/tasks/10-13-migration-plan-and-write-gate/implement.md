@@ -42,8 +42,8 @@
 
 ## 6 提交与推送
 
-- [ ] **6.1** 显式 pathspec 提交；`git diff --staged --name-only` 恰等于本片集合。
-- [ ] **6.2** 推送 origin（不推 upstream）。
+- [x] **6.1** 显式 pathspec 提交；`git diff --staged --name-only` 恰等于本片集合（28 文件）。
+- [x] **6.2** 已推送 origin（`167796d..cb9840b`，不推 upstream）。
 
 ## 回退点
 
