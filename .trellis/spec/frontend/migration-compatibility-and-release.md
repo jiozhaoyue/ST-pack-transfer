@@ -1,6 +1,6 @@
 # 迁移兼容、渐进交付与验收契约
 
-> 状态：2026-10-01 用户已裁定的目标契约，**尚未实现**。用户授权的是规划文档，不是实现或发版。
+> 状态：2026-10-01 用户已裁定的目标契约。**旧状态保留与共享状态接缝已于 S5 第一步（2026-10-13）实现**；默认入口切换、向导 UI 与 file:// 离线仍待实现。用户授权的是规划文档，不是发版。
 > 本页仅规定该产品化功能的验收，不把新的实例验证前提强加给全仓所有日常测试。
 
 ## 1. 范围与触发
@@ -47,6 +47,12 @@ TaskManager.start(id, label, { resumable, totalBytes }) -> control
 - 旧断点支持当前契约时才继续；不兼容则说明原因、保留旧产物并从源安全重开，禁止假装续传成功。
 - 不能将“已读取条目”当成“已写入产物”；继续遵守 [断点不变量](./resume-checkpoint-invariant.md)。
 - 浏览器存储不可用或空间不足时，明确暂存风险和保存/重新选源路径；不静默删除旧数据腾空间。
+
+**已实现（S5 第一步，2026-10-13）**：
+- `src/storage/db.js` 的 `saveWorkspaceState` 在覆盖前把现有 `active_session` 备份为 `active_session_prev`（**不升 `DB_VERSION`、不清库**）。
+- `src/core/migration-session.js` 的 `normalizeLegacySession` 归一旧记录（**不丢原字段**）、`isResumableSession` 判别可否续跑
+  （版本不可识别 / 缺断点 / 无半成品线索 ⇒ 不可续跑 + 原因，**不猜着续跑**）。
+- `src/ui/migration-controller.js` 的 `createMigrationSession` 提供向导与工作台**共享**的选择/任务接缝（`10-01/design.md` §3.1：单一用户意图）。
 
 ### 3.2 单一核心与回退
 

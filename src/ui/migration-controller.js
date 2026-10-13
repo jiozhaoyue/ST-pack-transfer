@@ -139,3 +139,25 @@ export function buildTargetEvidence({
     inFlight: Boolean(inFlight),
   };
 }
+
+/**
+ * 向导与高级工作台**共享**的选择/任务状态接缝（S5 第一步）。
+ *
+ * 存在理由（`10-01/design.md` §3.1）：向导与工作台必须共享同一份「用户意图」，
+ * **不得各持一份配置**。本接缝是纯逻辑（无 DOM），故可在 Node 直接测。
+ *
+ * @returns {{getState: () => object, setSelection: (s: object) => void, setTask: (id: string|null) => void, setPlan: (p: object|null) => void}}
+ */
+export function createMigrationSession() {
+  let state = { selection: {}, taskId: null, plan: null };
+  return {
+    getState: () => ({
+      selection: { ...state.selection },
+      taskId: state.taskId,
+      plan: state.plan,
+    }),
+    setSelection: (selection) => { state = { ...state, selection: { ...(selection || {}) } }; },
+    setTask: (taskId) => { state = { ...state, taskId: taskId ?? null }; },
+    setPlan: (plan) => { state = { ...state, plan: plan ?? null }; },
+  };
+}

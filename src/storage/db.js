@@ -339,6 +339,12 @@ export async function getStorageQuota() {
  */
 export async function saveWorkspaceState(state) {
   if (!isStorageSupported()) return;
+  // S5：保存前把现有 active_session 备份为 active_session_prev（旧记录可回读，R-10；不升 DB_VERSION、不清库）
+  const existing = await loadWorkspaceState();
+  if (existing) {
+    await runTransaction(STORES.WORKSPACE, 'readwrite',
+      (store) => store.put({ ...existing, key: 'active_session_prev' }));
+  }
   const record = {
     key: 'active_session',
     ...state,

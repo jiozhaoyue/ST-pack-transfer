@@ -132,12 +132,15 @@ R-13/AC-15 属本轮工作流文档交付，不重复拆成产品代码任务。
 **拟修改**：index.js 装配、src/ui/workbench-template.js、style.css、src/storage/db.js 的会话兼容边界。
 **拟新增测试**：test/migration-legacy.test.js；保留 test/single-template-source.test.js、db-origin.test.js、convert-resume*.test.js。
 
-- [ ] 旧状态夹具先验证：旧包、旧半成品、旧会话可读；新保存失败不覆盖旧 active_session。
-- [ ] 实现最小旧会话保留/判别，不先升级 DB_VERSION，不清库。
-- [ ] 向导与高级工作台切换时共享选择与任务，不重新挂第二套执行监听器。
-- [ ] 按宿主官方支持位置装配复杂 UI，设置只保留入口/偏好；同步模板节点守卫与控制消费守卫。
-- [ ] 验证键盘焦点、手机关键按钮可达、空态与禁用原因，进度 rAF 合帧。
-- [ ] 最后切默认入口；如果回退，旧入口和新旧用户文件都仍可用。
+> **2026-10-13：S5 分步进行，第一步（旧资料兼容 + 共享状态接缝）由子任务 `10-13-migration-legacy-shared-state` 实施完成**。
+> 第 4/5/6 项（向导 UI / 可访问性 / 默认入口切换）留 S5 第二步。
+
+- [x] 旧状态夹具先验证：旧包、旧半成品、旧会话可读；新保存失败不覆盖旧 active_session。（`saveWorkspaceState` 备份旧记录到 `active_session_prev`）
+- [x] 实现最小旧会话保留/判别，不先升级 DB_VERSION，不清库。（`normalizeLegacySession` / `isResumableSession`；`DB_VERSION` 仍为 2）
+- [ ] 向导与高级工作台切换时共享选择与任务，不重新挂第二套执行监听器。（**共享接缝** `createMigrationSession` 已建；**向导 UI 与监听器验证留第二步**）
+- [ ] 按宿主官方支持位置装配复杂 UI，设置只保留入口/偏好；同步模板节点守卫与控制消费守卫。（留第二步）
+- [ ] 验证键盘焦点、手机关键按钮可达、空态与禁用原因，进度 rAF 合帧。（留第二步）
+- [ ] 最后切默认入口；如果回退，旧入口和新旧用户文件都仍可用。（留第二步）
 
 **完成判据**：升级不会丢资料；无法续跑的旧任务有明确安全重开路径；三形态核心不分叉。
 

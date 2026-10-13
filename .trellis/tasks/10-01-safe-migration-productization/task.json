@@ -22,7 +22,8 @@
     "10-13-migration-plan-and-write-gate",
     "10-13-migration-source-delivery",
     "10-13-migration-target-write-gate",
-    "10-13-migration-verification-retry"
+    "10-13-migration-verification-retry",
+    "10-13-migration-legacy-shared-state"
   ],
   "parent": null,
   "relatedFiles": [],

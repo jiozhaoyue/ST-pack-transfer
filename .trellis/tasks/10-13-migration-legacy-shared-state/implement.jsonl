@@ -1,0 +1,5 @@
+{"file": ".trellis/spec/frontend/migration-compatibility-and-release.md", "reason": "旧资料保留与兼容契约的唯一来源"}
+{"file": ".trellis/spec/frontend/migration-user-journey.md", "reason": "统一计划与共享状态语义"}
+{"file": ".trellis/spec/frontend/state-management.md", "reason": "工作区/断点持久化边界"}
+{"file": ".trellis/spec/backend/database-guidelines.md", "reason": "IndexedDB 存储约定"}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "纯逻辑层无 DOM 约定"}
