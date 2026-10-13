@@ -21,26 +21,56 @@ const { putArtifact, __setAuthorityClientForTest } = await import('../src/storag
 // fire-and-forget 镜像链为异步微任务，断言前用宏任务清空
 const flushAsync = () => new Promise((r) => setTimeout(r, 10));
 
-/** 构造 mock Authority client：KV + blob 内存实现 */
+/**
+ * 构造 mock Authority client：KV + blob 内存实现。
+ *
+ * ⚠️ 形状**逐条对齐真实 SDK**（`st-authority-sdk/client.js`）：`kv.set/get/delete` 是**位置参数**，
+ * `kv.get` 返回**已解包**的值；`blob.put` 收对象、`blob.get/delete` 收 **id**。
+ * 与 `test/authority-store.test.js` 的 mock 同源理由：形状漂移会让「对象调用」在单测里假绿
+ * （2026-10-13 实测的 422 就是这样被掩盖的）。`_blobs` 仍按**名**索引，便于用例按名断言。
+ */
 function mockClient() {
   const kv = new Map();
-  const blobs = new Map();
+  const blobs = new Map();          // name → { id, name, content, encoding, contentType }
+  const blobsById = new Map();      // id → name
+  let seq = 0;
+  const needStr = (v, label) => {
+    if (typeof v !== 'string') {
+      throw new Error(`${label} 收到 ${typeof v}，真实 SDK 收字符串 —— 调用形状与 SDK 不一致`);
+    }
+  };
   return {
     storage: {
       kv: {
-        set: async ({ key, value }) => { kv.set(key, value); },
-        get: async ({ key }) => (kv.has(key) ? { value: kv.get(key) } : null),
+        set: async (key, value) => {
+          needStr(key, 'kv.set(key, value) 的 key');
+          if (value === undefined) throw new Error('kv.set 的 value 是 undefined —— 真实 SDK 是位置参数');
+          kv.set(key, value);
+        },
+        get: async (key) => {
+          needStr(key, 'kv.get(key) 的 key');
+          return kv.has(key) ? kv.get(key) : null; // 已解包
+        },
+        delete: async (key) => { needStr(key, 'kv.delete(key) 的 key'); kv.delete(key); },
       },
       blob: {
-        put: async ({ name, content, contentType }) => {
-          blobs.set(name, { content, contentType });
-          return { id: `blob-${name}` };
+        put: async (input) => {
+          const id = `blob-${++seq}`;
+          blobs.set(input.name, { id, ...input });
+          blobsById.set(id, input.name);
+          return { id, name: input.name, contentType: input.contentType, size: (input.content || '').length };
         },
-        get: async ({ name }) => {
-          const rec = blobs.get(name);
-          return rec ? { content: rec.content } : null;
+        get: async (id) => {
+          needStr(id, 'blob.get(id) 的 id');
+          const name = blobsById.get(id);
+          const rec = name ? blobs.get(name) : null;
+          return rec ? { record: { id, name }, content: rec.content, encoding: rec.encoding || 'base64' } : null;
         },
-        delete: async ({ name }) => { blobs.delete(name); },
+        delete: async (id) => {
+          needStr(id, 'blob.delete(id) 的 id');
+          const name = blobsById.get(id);
+          if (name) { blobsById.delete(id); blobs.delete(name); }
+        },
       },
     },
     _kv: kv,

@@ -190,3 +190,96 @@ S5 第二步起，插件**默认入口是迁移向导**（根容器 `data-wb-vie
 - 修法：`e2e/lib/harness.cjs` 新增并导出 `useAdvancedView(page)`，各规格在**打开抽屉之后、可见性验收之前**调用。
   实现用**页内 `btn.click()`**（不做命中测试，免疫 splash / 第三方模态 `<dialog>` 拦截指针事件），
   视图根按 `document.querySelector('[data-wb-view]')` 定位（抽屉态不是 `#app`）。
+
+---
+
+## 7. 批量子项的真增量续传（R6b，2026-10-13 落地）
+
+**不变量与单包路径**逐字同源（见 `frontend/state-management.md` §8）：
+> 跳过一个条目的**充分条件** = 半成品里真有它的字节。
+
+此前**批量子项没有接这条路径**：`index.js` 的 `handleBatchConvert` 调 `runConversionTask` 时
+**只传了** `signal` / `resumeCrcMap`，缺 `appendFrom` / `finalizeOnAbort` / `onPaused`
+⇒ ① 暂停时**不产半成品**；② 续传时**无字节可跳**（台账 `doneEntries` 对新子项恒为空）。
+用户可见后果是「批量暂停 → 继续」= **整批重做**（正确但慢），而 `M-10b` 的
+「续传真的跳过条目」断言**恒红**。
+
+修法（`index.js`）：
+
+| 位置 | 改动 |
+| --- | --- |
+| `persistPartial` 签名 | 新增 `buildCheckpoint({name, partialEntries})`（`index.js:197/246`）——**批量必须传它** |
+| 批次断点形状 | `buildBatchManifest` 增加 `partialOpfsName` / `partialEntries`（`index.js:904-905`） |
+| 子项续传入口 | 仅当 `i === startIndex` 时读断点的半成品（`index.js:952-974`） |
+| 子项转换参数 | 补 `appendFrom` + `finalizeOnAbort: true` + `onPaused`（`index.js:997-1016`） |
+| 子项完成 | 清掉该子项半成品（否则**下一子项**会误以为可续 ⇒ 缺条目） |
+
+**为什么 `buildCheckpoint` 是必需的（不是可选美化）**：`persistPartial` 的默认形状是
+**单包**断点 `{partialOpfsName,target,partialEntries,totalEntries}`。批次断点是
+`{kind:'batch',itemIndex,outputs,itemIds,…}`。若让默认形状落盘，批次续传就**读不到
+`itemIndex` / `outputs`** ⇒ `batchResumeVerdict` 判「断点作废」⇒ 静默重跑整批。
+单测：`test/persist-partial.test.js` 的「buildCheckpoint：批量路径可写自己的断点形状」。
+
+**跨子项复用半成品 = 缺条目**：不同源包几乎必然含同名条目（`settings.json`、`characters/X.png`）。
+半成品归属**游标指向的那个子项**，与 `doneEntries` 同域；每个子项开始/结束时重建。
+
+---
+
+## 8. 实例侧 E2E 的「红灯来自别人」——两类，都**必须能被一眼看见**
+
+实例侧 E2E 跑在**别人写的宿主**上，红灯的来源常不在本插件。2026-10-13 一次收口里
+两处残留红**都不是本插件缺陷**，且**第一处的归因错了整整几轮**。
+
+### 8.1 宿主/第三方模态弹窗拦全页指针事件
+
+`<dialog open>` 一旦弹出，Playwright 的 `page.click` / `page.check` 会**重试到 30 s 超时**，
+报错只有一句 `intercepts pointer events`，**看起来毫无头绪**。
+
+已知两条（`e2e/lib/harness.cjs` 的 `installChatFilesysPromptGuard`，现为**规则表**）：
+
+| 弹窗 | 识别 | 安全按钮 | 首次实测 |
+| --- | --- | --- | --- |
+| ChatFilesys「入库提醒」 | `.chatfilesys-import-prompt`（**类名会漂** ⇒ 回退按按钮文案认） | 「不入库」 | 2026-09-29 dev-st |
+| **Luker「检测到 Luker 有可用更新」** | `dialog[open]` 且文案含「有可用更新」 | 「稍后」 | **2026-10-13 dev-luker** |
+
+**纪律**：只点**唯一不产生副作用**的那个按钮（不入库 / 稍后）；**绝不**点「立即更新」
+「不再提醒」这类会改变实例状态的按钮。守卫用 **init script + MutationObserver**——
+这些弹窗**晚于 `goto()` 返回**（宿主把内容载进来之后才弹），"goto 之后点一下"抓不到。
+
+**归因教训**：Luker 那条此前被记成「profile 暂存区累积到 58 项」，据此修了两轮都没绿。
+真因是 `e2e/run.cjs` 的 **catch 里加了一次 `<dialog>` 转储**（`reportBlockingPopups`）——
+**一次定位**。⇒ **凡是点按超时，先转储页面上打开的 `<dialog>`**，再谈归因。
+
+### 8.2 持久化 profile 的夹具累积（清理名单必须按**上传面**列全）
+
+`#file-input` 是「**总是入库**，仅在尚无源包时采纳为当前源」⇒ 同一份夹具**每轮再入一条**
+（新 id），`files` store 只增不减。累积到几十条后宿主 UI 变慢、目标行不可点。
+
+**陷阱**：早先的清理只删**大**夹具（`fixture-pause-*` / `fixture-large-*`），
+而累积**与夹具大小无关、只与上传次数有关**——实测 dev-st 暂存区 **56 项全是** `fixture-st.zip`。
+⇒ 清理名单必须覆盖**所有会被上传的**夹具名（`e2e/lib/fixture-prune.cjs` 的 `FIXTURE_NAMES`），
+且 `matrix` / `library-inject` / `pt-load` 三处**共用同一份**。
+
+---
+
+## 9. 跨宿主「四端互通」的可自动化证据面
+
+`R-01` / `AC-12` 要求**四宿主间 12 条有向迁移路径逐条**有证据，且**不以代表路径替代**。
+可自动化的那一半做成 `e2e/standalone/specs/cross-host.e2e.cjs`：
+
+- **3 个真实源布局**（`fixtures/gen.js` 的 `fixture-st.zip` 摊平 / `fixture-l.zip` 摊平+manifest /
+  `fixture-tt.zip` `data/`）× **4 个目标**（`st`/`l`/`tt`/`pt`）= **12 条有向路径**；
+- 每条断言：① 产物合法且非空（**前置门**）；② 目标落位规则（必须有 / 必须没有的前缀）；
+  ③ **数据一条不少**——聊天与角色卡的**条目数与源包逐条对上**（跨布局只改路径，不丢条目）；
+- 每个源**新开一个 context**（`#file-input` 换源包的坑，见 `perf.e2e.cjs` 的 `measureFresh`）。
+- 实测：**71/71**，12 条路径逐条 OK（`st→st` 12 条 / 跨布局 10–11 条 / chats=1 / chars=1）。
+
+**不可自动化的那一半（不得冒充）**：目标侧**写入**——ST 恢复端点 404（`targetWrite=unavailable`）、
+TT 无浏览器端口（人工交付）、PT 人工导入。故本 spec 是**格式转换 + 交付**层面的证据；
+目标侧写入的证据在实例侧与人工记录里，**两者不得互相顶替**。
+
+**PT 作为「源」是已知阻断（登记，不掩盖）**：`detect.js:6/55-57` 能**识别** PT 原生归档
+（manifest 带 per-file `moduleId`）但 **v1 不支持转换**（`D-23` 已裁定「首版补齐」但实现未定）。
+故有向路径的**源**只取三种**可读**布局（`st` / `l` / `tt`），**目标**取全部四端
+⇒ **3 × 4 = 12**。PT 的 3 条**出边**（`pt→st` / `pt→l` / `pt→tt`）当前**不可自动化**，
+逐条登记为阻断（`AC-12` 允许「无法自动化的形态逐条记录人工证据」，但**不允许**用代表路径替代）。

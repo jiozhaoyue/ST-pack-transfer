@@ -58,18 +58,72 @@ export function isAuthorityAvailable() {
 }
 
 // ===== KV 基础封装 =====
+//
+// ⚠️ **签名是位置参数，不是对象**（2026-10-13 实测取证，本仓曾整体调错）：
+// `st-authority-sdk/client.js` 里 `kv.get/set/delete` 的定义是
+// `get: async (key)` / `set: async (key, value)` / `delete: async (key)`。
+// 早先本文件按 `set({ key, value })` 调用 ⇒ `key` 收到一个对象、`value` 是 `undefined`
+// ⇒ 请求体里**没有 `value`** ⇒ 服务端 serde 报
+// `missing field \`value\`` / HTTP **422** `validation_error`，**每一次 KV 调用都失败**。
+// 单测没抓到是因为 `authority-store.test.js` 注入的是**自写 mock**（形状与真 SDK 不一致）
+// ——「mock 与真实 API 漂移」的教科书形态（`L1-MR-5`：API 事实以官方实现为准）。
+
+/** Authority KV 单值上限：core `crates/authority-core/src/constants.rs` 的 `MAX_KV_VALUE_BYTES` */
+const KV_VALUE_LIMIT = 128 * 1024;
 
 async function kvSet(client, key, value) {
-  await client.storage.kv.set({ key, value });
+  await client.storage.kv.set(key, value);
 }
 
 async function kvGet(client, key) {
-  const res = await client.storage.kv.get({ key });
-  // SDK 返回形状未在 README 固化：兼容 { value } / 直接值 / { data }
-  if (res === null || res === undefined) return null;
-  if (typeof res === 'object' && 'value' in res) return res.value ?? null;
-  if (typeof res === 'object' && 'data' in res) return res.data ?? null;
-  return res;
+  // SDK 已解包：`get(key)` 返回 `response.value`（`client.js` 的 kv.get）。
+  // 只对**单键** `{value}` 形状再做一次兼容解包（防 SDK 版本回退成包装形态）；
+  // 多键对象（本仓的清单）**原样返回** —— 否则业务字段名恰为 `value` 时会被误剥。
+  const res = await client.storage.kv.get(key);
+  if (res && typeof res === 'object' && !Array.isArray(res)
+    && Object.keys(res).length === 1 && 'value' in res) return res.value ?? null;
+  return res ?? null;
+}
+
+async function kvDelete(client, key) {
+  await client.storage.kv.delete(key);
+}
+
+/**
+ * 剥掉断点清单里的**冗余条目台账**，只留续传必需的指针与游标。
+ *
+ * 为什么可以剥：跳过一个条目的充分条件是「**半成品里真有它的字节**」
+ * （`transform.js` 的 `appendedNames`），台账只是**冗余校验**
+ * （见 `.trellis/spec/frontend/state-management.md` §8）⇒ 丢了它只会让
+ * 「跨会话续传」少一层校验、退化为完整重做，**不会漏条目**。
+ * @param {object} manifest
+ * @returns {object}
+ */
+function slimCheckpoint(manifest) {
+  if (!manifest || typeof manifest !== 'object') return manifest;
+  const out = { ...manifest };
+  delete out.doneEntries;
+  delete out.partialEntries;
+  return out;
+}
+
+/** 把清单序列化到 Authority KV；超上限时按上述理由精简，仍超则**跳过持久化**并留日志 */
+async function kvSetCheckpoint(client, key, manifest) {
+  const json = JSON.stringify(manifest);
+  if (json && json.length > KV_VALUE_LIMIT) {
+    const slimJson = JSON.stringify(slimCheckpoint(manifest));
+    if (slimJson && slimJson.length <= KV_VALUE_LIMIT) {
+      console.warn(`[authority-store] 断点清单 ${json.length} B 超 Authority KV 上限 ${KV_VALUE_LIMIT} B`
+        + ` ⇒ 剥掉条目台账后存 ${slimJson.length} B（续传仍由半成品字节判定，不漏条目）`);
+      await kvSet(client, key, slimCheckpoint(manifest));
+      return;
+    }
+    // 精简后仍超 ⇒ 不写（写也必被 400 拒），内存断点保留；**必须留痕**，否则是静默降级
+    console.warn(`[authority-store] 断点清单 ${json.length} B 精简后仍超 Authority KV 上限`
+      + ` ⇒ 本次跳过 Authority 持久化（内存断点仍可用于本会话续传）`);
+    return;
+  }
+  await kvSet(client, key, manifest);
 }
 
 // ===== 断点 checkpoint（TaskManager adapter 接缝）=====
@@ -84,13 +138,13 @@ export async function createCheckpointAdapter() {
   if (!client) return null;
   return {
     async save(id, manifest) {
-      await kvSet(client, KV_CHECKPOINT_PREFIX + id, manifest);
+      await kvSetCheckpoint(client, KV_CHECKPOINT_PREFIX + id, manifest);
     },
     async load(id) {
       return await kvGet(client, KV_CHECKPOINT_PREFIX + id);
     },
     async remove(id) {
-      await client.storage.kv.set({ key: KV_CHECKPOINT_PREFIX + id, value: null });
+      await kvDelete(client, KV_CHECKPOINT_PREFIX + id);
     },
   };
 }
@@ -132,7 +186,8 @@ async function deleteParts(client, parts) {
   if (!Array.isArray(parts) || typeof client?.storage?.blob?.delete !== 'function') return;
   for (const part of parts) {
     try {
-      await client.storage.blob.delete({ id: part.id, name: part.name });
+      // ⚠️ 位置参数：`blob.delete(id)`（不是 `delete({id, name})`）—— 同 KV 的签名坑
+      await client.storage.blob.delete(part.id);
     } catch { /* 单块删除失败不阻断 */ }
   }
 }
@@ -264,7 +319,8 @@ export async function getArtifact(name) {
   if (!manifest || !Array.isArray(manifest.parts)) return null;
   const chunkBlobs = [];
   for (const part of manifest.parts) {
-    const got = await client.storage.blob.get({ id: part.id, name: part.name });
+    // ⚠️ 位置参数：`blob.get(id)`（不是 `get({id, name})`）；返回 `{record, content, encoding:'base64'}`
+    const got = await client.storage.blob.get(part.id);
     // 兼容多种返回形状：base64 字符串 / { content } / ArrayBuffer|Uint8Array / Blob
     let chunkBytes = null;
     if (typeof got === 'string') {
@@ -319,6 +375,6 @@ export async function deleteArtifact(name) {
   if (!client) return false;
   const manifest = await kvGet(client, KV_MANIFEST_PREFIX + name);
   await deleteParts(client, manifest?.parts);
-  await client.storage.kv.set({ key: KV_MANIFEST_PREFIX + name, value: null });
+  await kvDelete(client, KV_MANIFEST_PREFIX + name);
   return true;
 }

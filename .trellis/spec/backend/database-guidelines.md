@@ -118,6 +118,47 @@ deleteArtifact(name)                  → Promise<boolean>
 - `kv.get`（读旧清单）reject：本批块全部回滚，清单未改动，解除注入后旧产物仍可读。
 - `getArtifact` 兼容返回形状：base64 字符串 / `{ content }` / ArrayBuffer / Uint8Array / Blob。
 
+#### 2.2 SDK 调用形状与 KV 容量上限（**2026-10-13 实测，此前整体调错**）
+
+> 触发场景：任何改动 `src/storage/authority-store.js` 的 KV / blob 调用。
+
+**真实 SDK 的签名是位置参数**（取证：`st-authority-sdk/client.js`）：
+
+| 调用 | 正确形状 | 返回 |
+| --- | --- | --- |
+| `storage.kv.set` | `set(key, value)` —— **位置参数** | — |
+| `storage.kv.get` | `get(key)` | **已解包**的值（`response.value`） |
+| `storage.kv.delete` | `delete(key)` | — |
+| `storage.blob.put` | `put({name, content, encoding, contentType})` | `{id, name, contentType, size, updatedAt}` |
+| `storage.blob.get` | `get(id)` | `{record, content, encoding:'base64'}` |
+| `storage.blob.delete` | `delete(id)` | — |
+
+**事故（本仓实际发生）**：适配器曾按 `set({ key, value })` / `get({ key })` / `blob.get({ id, name })`
+这类**对象形状**调用。位置参数被当成一个对象塞进 `key`，`value` 恒为 `undefined`
+⇒ 请求体**没有 `value`** ⇒ 服务端 serde 报
+`Failed to deserialize the JSON body into the target type: missing field \`value\``
+/ HTTP **422** `validation_error` ⇒ **每一次 KV / blob 调用都失败**（Authority 增强层实际从未生效）。
+`npm run e2e` 的 dev-luker 段日志里能看到这条 422 —— 但只有把日志**完整**打出来才看得到
+（E2E 只打尾部，靠 `e2e/run.cjs` 抛错时的 `<dialog>`/日志转储才定位到）。
+
+**为什么单测没抓到**：`test/authority-store.test.js` / `test/durable-mirror.test.js` 注入的是
+**自写 mock**，而旧 mock 恰好也用了同一套**不存在的形状** ⇒ 双方一起错、单测全绿。
+现 mock 已**逐条对齐真实 SDK**，并对参数**类型**加断言（非字符串 key / `undefined` value 立即抛）
+⇒ 判别力已证：把适配器改回对象形状，**13 项里 11 项转红**。
+
+**KV 容量上限**：Authority core 的 `MAX_KV_VALUE_BYTES = 128 * 1024`
+（`crates/authority-core/src/constants.rs`），超限返回 400 `KV value exceeds … bytes`。
+断点清单里的**条目台账**（`doneEntries` / `partialEntries`）在大包上会超过它
+（8000 条 × ~60 B ≈ 480 KB）。处置（`kvSetCheckpoint`）：**超限时剥掉台账再存**
+（台账是**冗余校验**——跳过门是「半成品里真有这条字节」，见 `frontend/state-management.md` §8
+⇒ 剥掉只损失跨会话的冗余校验，**不会漏条目**）；精简后仍超则**跳过持久化并留日志**
+（内存断点保留；静默跳过同样是缺陷）。
+
+**Good / Bad**
+
+- Good：`kv.set(key, value)` 位置参数；断点超限先剥台账、留一行可观测日志。
+- Bad：`kv.set({key, value})`（真机 422，单测假绿）；超限时把整个断点丢掉且不记日志（静默降级）。
+
 ### 3. Secrets Preservation（不可协商）
 - `secrets.json`（API 密钥）**任何方向、任何目标都不得被剥离、过滤或改写**。
 - 唯一例外：用户在类目勾选中**主动取消** `secrets`——此时产物不含该条目，并在报告 `filtered` 中留痕（`test/filter.test.js` 把关）。
