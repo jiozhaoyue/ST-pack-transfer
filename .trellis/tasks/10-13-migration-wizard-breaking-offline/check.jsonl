@@ -1,0 +1,6 @@
+{"file": ".trellis/spec/frontend/migration-user-journey.md", "reason": "向导默认入口与计划契约（本片 B2 的目标规范）"}
+{"file": ".trellis/spec/frontend/migration-safety-and-evidence.md", "reason": "写入门禁与证据契约（向导消费）"}
+{"file": ".trellis/spec/frontend/migration-compatibility-and-release.md", "reason": "兼容/发布契约（本片 B1 按 U-1 改写）"}
+{"file": ".trellis/spec/frontend/state-management.md", "reason": "断点不变量与状态管理（会话状态）"}
+{"file": ".trellis/spec/frontend/dom-write-scope.md", "reason": "宿主 DOM 写入作用域纪律"}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "质量门槛与守卫"}

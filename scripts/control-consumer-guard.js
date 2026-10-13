@@ -32,6 +32,13 @@ const CONTROL_TAGS = ['button', 'input', 'select', 'textarea'];
  * 否则写一条 `group:.menu_button` 就能绕过整张表。
  */
 export const CONTROL_CONSUMERS = Object.freeze({
+  // ── 向导外壳（S5 第二步）──
+  'btn-wb-view-toggle': 'migration-wizard.js mountMigrationWizard — click 在向导/高级视图间切换（只改 root.dataset.wbView）',
+  'group:.wb-step-btn': 'migration-wizard.js mountMigrationWizard — 事件委托读 dataset.wbStep 跳步；键盘 ←/→/Home/End 同步走同一 goTo',
+  'btn-wizard-prev': 'migration-wizard.js mountMigrationWizard — click 上一步（两端自动 disabled）',
+  'btn-wizard-next': 'migration-wizard.js mountMigrationWizard — click 下一步（两端自动 disabled）',
+  'btn-wizard-reopen': 'migration-wizard.js mountMigrationWizard — click 关闭不兼容门并回到第一步（U-1 从源重开）',
+
   // ── 抽屉/模态态框架 ──
   'btn-close-converter-modal': 'index.js openConverterModal() — click 关闭模态工作台',
   'btn-storage-inspector': 'index.js setupStorageInspectorButton() — click 唤起宿主原生存储面板',

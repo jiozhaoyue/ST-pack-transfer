@@ -39,6 +39,10 @@ export const REQUIRED_TEMPLATE_IDS = [
   'btn-host-tree-selectall',
   'btn-restore-luker',
   'btn-select-base-zip',
+  'btn-wb-view-toggle',
+  'btn-wizard-next',
+  'btn-wizard-prev',
+  'btn-wizard-reopen',
   'category-panel',
   'compression-select',
   'drop-main-text',
@@ -69,6 +73,15 @@ export const REQUIRED_TEMPLATE_IDS = [
   'stash-list',
   'target-select',
   'usage-dashboard',
+  'wizard-check-exclusions',
+  'wizard-check-panel',
+  'wizard-check-summary',
+  'wizard-chrome',
+  'wizard-gate',
+  'wizard-gate-reason',
+  'wizard-gate-title',
+  'wizard-rail',
+  'wizard-step-counter',
 ];
 
 function lineOf(text, index) {

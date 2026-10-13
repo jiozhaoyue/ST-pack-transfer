@@ -78,6 +78,8 @@ import { UPLOAD_TIMEOUT_MS } from './src/ui/fetch-bounds.js';
 import { setupFileDrop } from './src/ui/file-drop.js';
 import { createViewController } from './src/ui/view.js';
 import { getWorkbenchHtml } from './src/ui/workbench-template.js';
+import { mountMigrationWizard } from './src/ui/migration-wizard.js';
+import { createMigrationSession } from './src/ui/migration-controller.js';
 import { splitArchiveEntries, normalizeSplitMb } from './src/core/splitter.js';
 import { zipIo } from './src/core/zip-io.js';
 
@@ -492,6 +494,19 @@ async function main(appRoot) {
   const host = detectHost();
   const view = createViewController();
   setupDrawerToggles(root);
+
+  // ── 迁移向导（S5 第二步：默认入口）────────────────────────────────────────
+  // 向导与高级工作台**共享**同一份用户意图（`migration-user-journey.md` §3.3），
+  // 故这里只建一个 session 实例；视图切换只改根容器的 `data-wb-view`，不碰 session。
+  const migrationSession = createMigrationSession();
+  const wizard = mountMigrationWizard({
+    root,
+    session: migrationSession,
+    onReopen: () => {
+      // 「从源重开」：只重置视图与提示，**不动磁盘上的旧包/半成品文件**（U-1：作废的是会话状态）
+      view.setProgress(0, '请重新选择源数据包');
+    },
+  });
 
   // 初始化底部实时日志抽屉（块二底部挂载点）
   const logConsole = setupLogConsole(document.getElementById('log-console-mount') || root);
@@ -1211,10 +1226,46 @@ async function main(appRoot) {
   }
 
   // 2. 调度完全扫描与动作预测规划
+  /**
+   * 把当前计划快照灌进向导的检查页（步骤④）。
+   *
+   * 数据源是**计划快照**（`runPlanTask` 的产物），不是 DOM 现场 —— 这正是
+   * `migration-user-journey.md` §7「计划构造一次，执行与结果消费同一计划快照」的界面侧。
+   *
+   * @param {object|null} plan
+   */
+  function syncWizardCheckPanel(plan) {
+    if (!wizard) return;
+    if (!plan) {
+      wizard.setCheckPanel({ summary: '尚无计划：请先选择源数据包。', exclusions: [] });
+      return;
+    }
+    const count = plan.expectedOutputFiles ?? 0;
+    const bytes = plan.expectedOutputBytes ?? 0;
+    const exclusions = [];
+    for (const [catKey, cat] of Object.entries(plan.categories || {})) {
+      for (const item of (cat?.items || [])) {
+        if (item && item.selected === false) {
+          exclusions.push({
+            label: `${catKey} · ${item.sourcePath ?? item.hubPath ?? '(未知路径)'}`,
+            reason: item.reason || '已排除',
+          });
+        }
+      }
+    }
+    wizard.setCheckPanel({
+      summary: `预计产出 ${count} 个条目 / ${formatBytes(bytes)}；排除 ${exclusions.length} 项。`,
+      exclusions,
+    });
+  }
+
   async function refreshPlan() {
     // 折叠区摘要与「是否已有源包」无关，须在早退前刷新
     updateFoldSummaries();
-    if (!currentFile || isPlanning) return;
+    if (!currentFile || isPlanning) {
+      if (!currentFile) syncWizardCheckPanel(null);
+      return;
+    }
     isPlanning = true;
 
     try {
@@ -1243,6 +1294,9 @@ async function main(appRoot) {
       renderCategoryStats(plan);
       latestPlan = plan;
       syncExportExtManifestButton();
+      // 向导侧：共享选择快照 + 刷新检查页（同一计划快照，不从 DOM 重拼）
+      migrationSession.setSelection(selection);
+      syncWizardCheckPanel(plan);
 
       // 持久化当前工作区状态
       if (currentFileId) {
@@ -2603,7 +2657,14 @@ async function main(appRoot) {
     try {
       await updateWorkspaceUI();
       const savedState = await loadWorkspaceState();
-      if (savedState && savedState.fileId) {
+      // U-1（2026-10-13 · 用户裁定「禁止兼容旧数据，任何即使没改也要强制不兼容」）：
+      // 旧会话**一律显式拒绝**——不归一、不补齐字段、不猜着恢复。
+      // 作废的是**会话状态**；磁盘上的包与半成品文件不删不动（见 migration-session.js）。
+      const gateVerdict = wizard ? wizard.showGate(savedState) : { blocked: false, message: '' };
+      if (gateVerdict.blocked) {
+        logger.warn(`旧工作区会话已作废：${gateVerdict.message}`);
+      }
+      if (savedState && !gateVerdict.blocked && savedState.fileId) {
         const fileRecord = await getFile(savedState.fileId);
         if (fileRecord && fileRecord.blob) {
           // ⚠️ 同上：`File.name` 只读 ⇒ 不能赋值（见 `namedBlob` 注释）。

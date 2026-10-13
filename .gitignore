@@ -20,6 +20,8 @@ out/
 tmp/
 coverage/
 .nyc_output/
+# file:// 单文件离线产物（构建产物，不入库；由 npm run build:offline 生成）
+dist-offline/
 # E2E 产物（trace / 截图 / 实例日志 / pid）——含实例侧真实数据风险，严禁入库（L1-MR-14）
 test-results/
 # Playwright 持久化 profile（含 Cookies / Session Storage / 缓存，严禁入库 —— L1-MR-14）

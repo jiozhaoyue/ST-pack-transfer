@@ -133,14 +133,16 @@ R-13/AC-15 属本轮工作流文档交付，不重复拆成产品代码任务。
 **拟新增测试**：test/migration-legacy.test.js；保留 test/single-template-source.test.js、db-origin.test.js、convert-resume*.test.js。
 
 > **2026-10-13：S5 分步进行，第一步（旧资料兼容 + 共享状态接缝）由子任务 `10-13-migration-legacy-shared-state` 实施完成**。
-> 第 4/5/6 项（向导 UI / 可访问性 / 默认入口切换）留 S5 第二步。
+> **第二步（向导 UI + 默认入口 + 可访问性）由子任务 `10-13-migration-wizard-breaking-offline` 实施完成**（commit 见该任务）。
+> ⚠ 第一步的「旧资料兼容」已被用户裁定 **U-1（2026-10-13）推翻**：旧会话一律**强制作废**，
+> `normalizeLegacySession` 已删除，改由 `classifySessionCompatibility` 硬拒绝。见 `migration-compatibility-and-release.md` §3.1。
 
 - [x] 旧状态夹具先验证：旧包、旧半成品、旧会话可读；新保存失败不覆盖旧 active_session。（`saveWorkspaceState` 备份旧记录到 `active_session_prev`）
-- [x] 实现最小旧会话保留/判别，不先升级 DB_VERSION，不清库。（`normalizeLegacySession` / `isResumableSession`；`DB_VERSION` 仍为 2）
-- [ ] 向导与高级工作台切换时共享选择与任务，不重新挂第二套执行监听器。（**共享接缝** `createMigrationSession` 已建；**向导 UI 与监听器验证留第二步**）
-- [ ] 按宿主官方支持位置装配复杂 UI，设置只保留入口/偏好；同步模板节点守卫与控制消费守卫。（留第二步）
-- [ ] 验证键盘焦点、手机关键按钮可达、空态与禁用原因，进度 rAF 合帧。（留第二步）
-- [ ] 最后切默认入口；如果回退，旧入口和新旧用户文件都仍可用。（留第二步）
+- [x] 实现最小旧会话保留/判别，不先升级 DB_VERSION，不清库。（~~`normalizeLegacySession`~~ → **U-1 后改为 `classifySessionCompatibility` 硬拒绝 + `readSessionRecord` 只读**；`DB_VERSION` 仍为 2，`SESSION_SCHEMA_VERSION=2`）
+- [x] 向导与高级工作台切换时共享选择与任务，不重新挂第二套执行监听器。（`createMigrationSession` 共享接缝 + 视图切换只改 `data-wb-view`）
+- [x] 按宿主官方支持位置装配复杂 UI，设置只保留入口/偏好；同步模板节点守卫与控制消费守卫。（向导骨架进 `workbench-template.js` 单一模板源；`REQUIRED_TEMPLATE_IDS` 与 `CONTROL_CONSUMERS` 同步）
+- [x] 验证键盘焦点、手机关键按钮可达、空态与禁用原因，进度 rAF 合帧。（步骤条 `role="tablist"` + `aria-current` + `←/→/Home/End`；两端自动 disabled；进度沿用既有 rAF 路径）
+- [x] 最后切默认入口；如果回退，旧入口和新旧用户文件都仍可用。（默认 `data-wb-view="wizard"`；`#btn-wb-view-toggle` 回高级；旧**文件**资产不删——注意 U-1 后旧**会话状态**不再可用）
 
 **完成判据**：升级不会丢资料；无法续跑的旧任务有明确安全重开路径；三形态核心不分叉。
 
@@ -149,11 +151,15 @@ R-13/AC-15 属本轮工作流文档交付，不重复拆成产品代码任务。
 **拟新增**：e2e/specs/migration.e2e.cjs；必要的隔离合成夹具与验收报告。
 **拟修改**：README.md 的能力/限制/使用说明（后续独立授权范围，不在本轮改）。
 
-- [ ] 跑全量单测、五守卫和构建；相对实施前新基线零回退，不能沿用历史测试数字。
-- [ ] 核实 Dev 端口、插件版本、夹具隔离，再验证每条拟宣称支持的路径；无法自动化的形态单列人工证据。
-- [ ] 用户本人只得到任务目标而非操作脚本，在无 AI 指导下完成迁移，记录卡点并处理阻塞。
-- [ ] 将“内部验收通过”与“公开发布就绪”分开；后者必须补未参与开发者的外部试用。
-- [ ] README 不把包转换、写入返回、自动核对、人工确认和离线能力混为一谈。
+> **2026-10-13：本片部分实施**（子任务 `10-13-migration-wizard-breaking-offline`）。
+> 已完成「全量单测 + 五守卫 + 构建 + 独立 Web E2E」；**真人验收与外部试用未做**。
+> 新增开发者向功能文档 `docs/DEVELOPER-GUIDE.md`（含破坏性变更登记与已知限制）。
+
+- [x] 跑全量单测、五守卫和构建；相对实施前新基线零回退，不能沿用历史测试数字。（基线 669 → **718 passed**；五守卫 + `build` + `build:offline` 全绿）
+- [x] 核实 Dev 端口、插件版本、夹具隔离，再验证每条拟宣称支持的路径；无法自动化的形态单列人工证据。（本轮**只跑独立 Web 形态** `e2e:web` 400/400；未连任何实例，实例侧证据仍缺）
+- [ ] 用户本人只得到任务目标而非操作脚本，在无 AI 指导下完成迁移，记录卡点并处理阻塞。（**未做**）
+- [ ] 将“内部验收通过”与“公开发布就绪”分开；后者必须补未参与开发者的外部试用。（**未做**；已在 `docs/DEVELOPER-GUIDE.md` §6 如实登记）
+- [x] README 不把包转换、写入返回、自动核对、人工确认和离线能力混为一谈。（开发者文档 §6 逐项列出「未做」清单；README 未新增宣称）
 
 **完成判据**：计划中的每条公开承诺都能定位到相应证据，而不是只看测试总数。
 
@@ -161,10 +167,13 @@ R-13/AC-15 属本轮工作流文档交付，不重复拆成产品代码任务。
 
 **拟评估/修改**：vite.config.js、现有构建脚本、独立入口装配；e2e/standalone/ 下的 file:// 专用用例。
 
-- [ ] 用现有依赖验证自包含构建、Worker 和本地字体/样式在 file:// 下的可行路径；需要新依赖则先列版本与理由获准。
-- [ ] 从同一核心/模板生成产物，不手工维护第二份业务 HTML/JS。
-- [ ] 完全阻断外部网络，实际选择包、转换并领取结果。
-- [ ] 对比插件/HTTP 与 file:// 产物语义，禁止只有提示页也标通过。
+> **2026-10-13：本片由子任务 `10-13-migration-wizard-breaking-offline` 实施完成**。
+> 产出 `npm run build:offline` → `dist-offline/st-zip-converter-offline.html`（单文件、IIFE、零外部请求）。
+
+- [x] 用现有依赖验证自包含构建、Worker 和本地字体/样式在 file:// 下的可行路径；需要新依赖则先列版本与理由获准。（**零新依赖**：Vite `build.lib` IIFE + `assetsInlineLimit` 内联字体 + 构建期 alias 换掉 Worker 构造）
+- [x] 从同一核心/模板生成产物，不手工维护第二份业务 HTML/JS。（入口 `scripts/offline/entry.js` 只 import 既有 `index.js` / `style.css` / FA CSS；模板仍是 `getWorkbenchHtml()`）
+- [x] 完全阻断外部网络，实际选择包、转换并领取结果。（E2E 断言：零外部 `http(s)` 请求 + 完成一次真实转换 + 产物落盘读回 10 个条目）
+- [x] 对比插件/HTTP 与 file:// 产物语义，禁止只有提示页也标通过。（`file-protocol.e2e.cjs` 仍钉住 HTTP 产物在 file:// 下的边界；`offline-single-file.e2e.cjs` 钉住离线产物真可用）
 
 **完成判据**：真正双击运行；此片没有完成前，第一阶段文案不得声称其已可用。
 

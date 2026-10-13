@@ -48,6 +48,7 @@ module.exports = {
   async run(t, h, ctx) {
     const { page, rec } = h;
     t.ok('K1 工作台就绪', Boolean(await ctx.waitForReady(page)));
+    t.eq('K1b 切到高级视图（本 spec 测高级工作台）', await common.useAdvancedView(page), 'advanced');
 
     const fixtures = await common.ensureFixtures(ctx.fixtureDir);
     await page.setInputFiles('#file-input', fixtures['fixture-st.zip']);

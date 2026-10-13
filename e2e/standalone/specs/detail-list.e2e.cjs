@@ -40,6 +40,7 @@ module.exports = {
   async run(t, h, ctx) {
     const { page, rec } = h;
     t.ok('D1 工作台就绪', Boolean(await ctx.waitForReady(page)));
+    t.eq('D1b 切到高级视图（本 spec 测高级工作台）', await common.useAdvancedView(page), 'advanced');
 
     await page.setInputFiles('#file-input', await buildFixture(ctx.fixtureDir));
     t.ok('D2 计划就绪', await common.waitForPlan(page));

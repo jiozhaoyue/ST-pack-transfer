@@ -64,6 +64,7 @@ module.exports = {
   async run(t, h, ctx) {
     const { page, rec } = h;
     t.ok('F1 工作台就绪', Boolean(await ctx.waitForReady(page)));
+    t.eq('F1b 切到高级视图（本 spec 测高级工作台）', await common.useAdvancedView(page), 'advanced');
 
     const fixtures = await common.ensureFixtures(ctx.fixtureDir);
     await page.setInputFiles('#file-input', fixtures['fixture-st.zip']);
@@ -117,6 +118,8 @@ module.exports = {
     // 跨重载：产物是**临时**条目（ephemeral），重载后待导出区应清空；库里的那条仍在
     await page.reload({ waitUntil: 'domcontentloaded' });
     t.ok('F13 重载后工作台重新就绪', Boolean(await ctx.waitForReady(page)));
+    // 重载后视图码回到默认（向导）⇒ 本 spec 继续走高级视图，需再切一次
+    t.eq('F13b 重载后再次切到高级视图', await common.useAdvancedView(page), 'advanced');
     await page.waitForTimeout(800);
     const queueAfterReload = await page.$$eval('.eq-name', (els) => els.length).catch(() => null);
     t.eq('F14 重载后待导出区为空（临时产物不跨重载 —— 与「存工作区」的分界）',

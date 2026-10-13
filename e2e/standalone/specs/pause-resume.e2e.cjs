@@ -70,6 +70,7 @@ module.exports = {
     FIXTURE_DIR = ctx.fixtureDir;
     const { page, rec } = h;
     t.ok('R1 工作台就绪', Boolean(await ctx.waitForReady(page)));
+    t.eq('R1b 切到高级视图（本 spec 测高级工作台）', await common.useAdvancedView(page), 'advanced');
 
     const fixture = await ensurePauseFixture();
     const source = await common.readZip(fixture);

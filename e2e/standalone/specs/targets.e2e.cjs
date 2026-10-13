@@ -52,6 +52,7 @@ module.exports = {
     const { page, rec } = h;
 
     t.ok('T1 工作台就绪', Boolean(await ctx.waitForReady(page)));
+    t.eq('T1b 切到高级视图（本 spec 测高级工作台）', await common.useAdvancedView(page), 'advanced');
 
     const fixtures = await common.ensureFixtures(ctx.fixtureDir);
     const sourcePath = fixtures['fixture-st.zip'];

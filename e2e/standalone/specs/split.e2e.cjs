@@ -52,6 +52,7 @@ module.exports = {
 
     const badge = await ctx.waitForReady(page);
     t.ok('G1 工作台就绪', Boolean(badge), `badge=${badge}`);
+    t.eq('G1b 切到高级视图（本 spec 测高级工作台）', await common.useAdvancedView(page), 'advanced');
 
     const fixture = await ensureLargeFixture();
     const size = fs.statSync(fixture).size;

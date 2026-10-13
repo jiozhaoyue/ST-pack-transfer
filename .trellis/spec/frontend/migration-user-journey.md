@@ -1,6 +1,6 @@
 # 迁移用户流程与统一计划契约
 
-> 状态：2026-10-01 用户已裁定的目标契约。**源端三类交付已于 S2（2026-10-13）实现**（`src/ui/migration-controller.js` 的 `buildSourceDeliveries`）；计划快照已于 S1 实现（`src/core/migration-plan.js`）；向导 UI 与目标端仍待实现。本文其余条目为验收要求，未实现者不声称当前 UI 已具备。
+> 状态：2026-10-01 用户已裁定的目标契约。**源端三类交付已于 S2（2026-10-13）实现**（`src/ui/migration-controller.js` 的 `buildSourceDeliveries`）；计划快照已于 S1 实现（`src/core/migration-plan.js`）；**向导与默认入口已于 S5 第二步（2026-10-13）实现**（`src/ui/migration-wizard.js`）。本文其余条目为验收要求，未实现者不声称当前 UI 已具备。
 
 ## 1. 范围与触发
 
@@ -70,6 +70,14 @@ operation: 'export' | 'restore'
 向导不能直观表达的已启用高级项应显示摘要，不得用“简化 UI”为由静默关闭。
 设置页仅放入口和设置；复杂宿主界面使用官方支持的 Popup 等入口，差异留在 host-bridge，不自造全站浮层。
 不复制独立页面业务模板，不泄漏宿主 CSS，不引 CDN。
+
+**已实现（S5 第二步，2026-10-13）**：`src/ui/migration-wizard.js` 的 `mountMigrationWizard()` 把既有工作台
+DOM 作为**渐进披露外壳**——模板给区块打 `data-wb-step="<id>"`，根容器写 `data-wb-view` / `data-wb-step`，
+CSS 决定显隐（**没有第二份模板**）。六步：`source → target → scope → check → run → verify`；
+默认入口 = 向导，`#btn-wb-view-toggle` 切到既有高级全量展示；视图切换**不碰** `createMigrationSession()`，
+故选择/计划/任务不丢。键盘 `←/→/Home/End` 在步骤条内移动（`role="tablist"` + `aria-current="step"`）。
+检查步（④）的读数由 `index.js` 的 `syncWizardCheckPanel(plan)` 从**计划快照**灌入，不从 DOM 重拼。
+E2E：`e2e/standalone/specs/wizard.e2e.cjs`；测高级工作台的 spec 需显式 `common.useAdvancedView(page)`。
 
 ### 3.4 交付与结果
 

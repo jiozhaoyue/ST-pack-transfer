@@ -43,6 +43,36 @@ export function getWorkbenchHtml({ isModal = false, isDrawer = false, isStandalo
     </header>
     ` : ''}
 
+    <!-- ═══ 块零：向导外壳（步骤条 / 视图开关 / 不兼容门）═══
+         向导不是第二份 UI：它只切换根容器上的 data-wb-view / data-wb-step，
+         显隐由 style.css 的 .wb-wizard 段决定（见 src/ui/migration-wizard.js 顶部注释）。 -->
+    <div class="wb-wizard" id="wizard-chrome">
+      <div class="wb-view-switch">
+        <span class="wb-view-title"><i class="fa-solid fa-compass"></i> 迁移向导</span>
+        <button type="button" class="menu_button btn-tool" id="btn-wb-view-toggle" aria-pressed="false">高级模式</button>
+      </div>
+      <nav class="wb-step-rail" id="wizard-rail" aria-label="迁移步骤" role="tablist">
+        <button type="button" class="menu_button wb-step-btn" data-wb-step="source" role="tab">1 来源</button>
+        <button type="button" class="menu_button wb-step-btn" data-wb-step="target" role="tab">2 目标</button>
+        <button type="button" class="menu_button wb-step-btn" data-wb-step="scope" role="tab">3 范围</button>
+        <button type="button" class="menu_button wb-step-btn" data-wb-step="check" role="tab">4 检查</button>
+        <button type="button" class="menu_button wb-step-btn" data-wb-step="run" role="tab">5 执行</button>
+        <button type="button" class="menu_button wb-step-btn" data-wb-step="verify" role="tab">6 核对</button>
+      </nav>
+      <div class="wb-step-nav">
+        <button type="button" class="menu_button" id="btn-wizard-prev"><i class="fa-solid fa-chevron-left"></i> 上一步</button>
+        <span class="wb-step-counter" id="wizard-step-counter" aria-live="polite"></span>
+        <button type="button" class="menu_button btn-accent" id="btn-wizard-next">下一步 <i class="fa-solid fa-chevron-right"></i></button>
+      </div>
+    </div>
+
+    <!-- 不兼容门：旧会话一律显式拒绝（U-1「禁止兼容旧数据」的界面消费点） -->
+    <div class="wb-gate" id="wizard-gate" hidden>
+      <h2 class="wb-gate-title" id="wizard-gate-title" tabindex="-1"></h2>
+      <p class="wb-gate-reason" id="wizard-gate-reason"></p>
+      <button type="button" class="menu_button btn-accent" id="btn-wizard-reopen">从源重开</button>
+    </div>
+
     <!-- ═══ 块一：状态 · 源包 · 产物 ═══ -->
     <div class="wb-block wb-block-status">
       ${isDrawer ? `
@@ -55,7 +85,7 @@ export function getWorkbenchHtml({ isModal = false, isDrawer = false, isStandalo
       ` : ''}
       <div class="quota-bars" id="usage-dashboard"><!-- 配额条 (usage-dashboard.js) --></div>
 
-      <div class="zone-card">
+      <div class="zone-card" data-wb-step="source">
         <div class="zone-title"><i class="fa-solid fa-inbox"></i> 上传暂存区</div>
         <div class="dropzone dropzone-inline" id="dropzone">
           <input type="file" id="file-input" accept=".zip" multiple style="display: none;">
@@ -66,7 +96,7 @@ export function getWorkbenchHtml({ isModal = false, isDrawer = false, isStandalo
         <div id="stash-batch-bar" hidden></div>
       </div>
 
-      <div class="zone-card">
+      <div class="zone-card" data-wb-step="verify">
         <div class="zone-title"><i class="fa-solid fa-file-export"></i> 待导出区</div>
         <div id="export-queue-panel"></div>
       </div>
@@ -76,7 +106,7 @@ export function getWorkbenchHtml({ isModal = false, isDrawer = false, isStandalo
     <div class="wb-block wb-block-controls">
 
       <!-- [G] 内容范围（常驻） -->
-      <div class="category-panel" id="category-panel" style="display: none;">
+      <div class="category-panel" id="category-panel" data-wb-step="scope" style="display: none;">
         <div class="flex-container justifySpaceBetween alignItemsCenter" style="margin-bottom: 6px;">
           <span class="category-title"><i class="fa-solid fa-list-check"></i> 内容范围</span>
           <span class="category-sub-summary" id="category-summary-badge"></span>
@@ -109,7 +139,7 @@ export function getWorkbenchHtml({ isModal = false, isDrawer = false, isStandalo
       </div>
 
       <!-- [F] 输出目标（常驻三联） -->
-      <div class="output-row">
+      <div class="output-row" data-wb-step="target">
         <label class="output-field">
           <small>目标平台</small>
           <select id="target-select" class="text_pole">
@@ -135,7 +165,7 @@ export function getWorkbenchHtml({ isModal = false, isDrawer = false, isStandalo
       </div>
 
       <!-- [H] 垃圾清理（默认清理，折叠） -->
-      <div class="inline-drawer wb-fold" id="fold-cleanup">
+      <div class="inline-drawer wb-fold" id="fold-cleanup" data-wb-step="scope">
         <div class="inline-drawer-toggle inline-drawer-header">
           <b><i class="fa-solid fa-broom"></i> 垃圾清理</b>
           <span class="wb-fold-summary" id="fold-summary-cleanup"></span>
@@ -164,7 +194,7 @@ export function getWorkbenchHtml({ isModal = false, isDrawer = false, isStandalo
       </div>
 
       <!-- [I] 扩展打包（折叠） -->
-      <div class="inline-drawer wb-fold" id="fold-extension">
+      <div class="inline-drawer wb-fold" id="fold-extension" data-wb-step="scope">
         <div class="inline-drawer-toggle inline-drawer-header">
           <b><i class="fa-solid fa-puzzle-piece"></i> 扩展打包</b>
           <span class="wb-fold-summary" id="fold-summary-extension"></span>
@@ -211,7 +241,7 @@ export function getWorkbenchHtml({ isModal = false, isDrawer = false, isStandalo
       </div>
 
       <!-- [J] 增量与差量（折叠） -->
-      <div class="inline-drawer wb-fold" id="fold-incremental">
+      <div class="inline-drawer wb-fold" id="fold-incremental" data-wb-step="scope">
         <div class="inline-drawer-toggle inline-drawer-header">
           <b><i class="fa-solid fa-code-compare"></i> 增量与差量</b>
           <span class="wb-fold-summary" id="fold-summary-incremental"></span>
@@ -240,7 +270,7 @@ export function getWorkbenchHtml({ isModal = false, isDrawer = false, isStandalo
       </div>
 
       <!-- [K] 包名（折叠） -->
-      <div class="inline-drawer wb-fold" id="fold-filename">
+      <div class="inline-drawer wb-fold" id="fold-filename" data-wb-step="target">
         <div class="inline-drawer-toggle inline-drawer-header">
           <b><i class="fa-solid fa-tag"></i> 包名</b>
           <span class="wb-fold-summary" id="fold-summary-filename"></span>
@@ -254,8 +284,15 @@ export function getWorkbenchHtml({ isModal = false, isDrawer = false, isStandalo
         </div>
       </div>
 
+      <!-- [L] 检查页（向导步骤④）：执行前集中说明范围、排除项与风险（R-05） -->
+      <div class="wb-check-panel" id="wizard-check-panel" data-wb-step="check">
+        <div class="wb-check-title"><i class="fa-solid fa-clipboard-check"></i> 执行前检查</div>
+        <p class="wb-check-summary" id="wizard-check-summary"></p>
+        <ul class="wb-check-exclusions" id="wizard-check-exclusions"></ul>
+      </div>
+
       <!-- [E] 动作（常驻） -->
-      <div class="action-row">
+      <div class="action-row" data-wb-step="run">
         <button type="button" class="menu_button menu_button_icon flex1" id="btn-host-fetch" style="display: none;">
           <i class="fa-solid fa-server"></i> <span>从宿主拉取</span>
         </button>
@@ -273,7 +310,7 @@ export function getWorkbenchHtml({ isModal = false, isDrawer = false, isStandalo
       </div>
 
       <!-- [D] 执行反馈（常驻） -->
-      <div class="progress-container" id="progress-container">
+      <div class="progress-container" id="progress-container" data-wb-step="run">
         <div class="progress-bar-bg">
           <div class="progress-bar-fill" id="progress-bar-fill"></div>
         </div>
@@ -289,7 +326,7 @@ export function getWorkbenchHtml({ isModal = false, isDrawer = false, isStandalo
         </div>
       </div>
 
-      <div class="report-panel" id="report-panel" hidden>
+      <div class="report-panel" id="report-panel" data-wb-step="verify" hidden>
         <div class="module-grid" id="module-grid">
           <div class="module-item"><span class="count" id="count-chars">0</span><span class="label">角色卡</span></div>
           <div class="module-item"><span class="count" id="count-chats">0</span><span class="label">聊天记录</span></div>

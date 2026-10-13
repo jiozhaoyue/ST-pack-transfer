@@ -34,6 +34,7 @@ module.exports = {
   name: '同源双页签并发转换（浏览器侧并发）',
   async run(t, h, ctx) {
     t.ok('C1 首个页签就绪', Boolean(await ctx.waitForReady(h.page)));
+    t.eq('C1b 首签切到高级视图（本 spec 测高级工作台）', await common.useAdvancedView(h.page), 'advanced');
 
     // 第二个页签：**同一个 context 里再开一个 page**（= 真正的「双页签」：
     // 同源、共享 IndexedDB 工作区）。⚠️ 不能另开 context —— 那是独立存储分区，
@@ -45,6 +46,7 @@ module.exports = {
     try {
       await page2.goto(ctx.baseUrl, { waitUntil: 'domcontentloaded' });
       t.ok('C2 第二个页签就绪（同源共享存储）', Boolean(await waitForReady(page2)));
+      t.eq('C2b 第二签切到高级视图', await common.useAdvancedView(page2), 'advanced');
 
       const fixtures = await common.ensureFixtures(ctx.fixtureDir);
       // 两个页签各自喂**不同的**源包（便于按产物内容区分谁是谁）

@@ -112,6 +112,7 @@ async function measureFresh(ctx, fixturePath, {
   try {
     await h.goto();
     if (!(await waitForReady(h.page))) return { ok: false, reason: 'not-ready' };
+    await common.useAdvancedView(h.page);
     await h.page.selectOption('#target-select', target);
     await h.page.selectOption('#compression-select', String(level));
     const t0 = Date.now();
@@ -153,6 +154,7 @@ module.exports = {
     FIXTURE_DIR = ctx.fixtureDir;
     const { page, rec } = h;
     t.ok('P1 工作台就绪', Boolean(await ctx.waitForReady(page)));
+    t.eq('P1b 切到高级视图（本 spec 测高级工作台）', await common.useAdvancedView(page), 'advanced');
 
     // ============ ① 压缩策略：Store 直存 vs Deflate（确定性判据）============
     const routing = await ensureRoutingFixture();

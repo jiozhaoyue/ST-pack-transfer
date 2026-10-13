@@ -51,6 +51,7 @@ module.exports = {
 
     // ============ ① 无库：按钮必须不可见 ============
     t.ok('E1 工作台就绪（无库形态）', Boolean(await ctx.waitForReady(page)));
+    t.eq('E1b 切到高级视图（`#btn-library-export` 在执行步）', await common.useAdvancedView(page), 'advanced');
     const noLib = await page.evaluate(() => {
       const el = document.getElementById('btn-library-export');
       if (!el) return { present: false };
@@ -68,6 +69,7 @@ module.exports = {
       await h2.page.addInitScript(STUB, { chats: LIB_CHATS });
       await h2.page.goto(ctx.baseUrl, { waitUntil: 'domcontentloaded' });
       t.ok('E4 工作台就绪（有库形态）', Boolean(await waitForReady(h2.page)));
+      t.eq('E4b 切到高级视图', await common.useAdvancedView(h2.page), 'advanced');
 
       const visible = await waitVisible(h2.page, '#btn-library-export');
       t.ok('E5 检测到聊天库且其提供导出能力 ⇒ 按钮**可见**', visible);

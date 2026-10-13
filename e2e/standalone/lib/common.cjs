@@ -33,9 +33,28 @@ function ensureFixtures(fixtureDir) {
   return fixturesPromise;
 }
 
+/**
+ * 切到「高级工作台」视图（S5 第二步起，默认入口是迁移向导）。
+ *
+ * **为什么必须显式调用**：向导一次只披露当前步的区块，非当前步的控件是 `display:none`
+ * ⇒ 直接点高级工作台控件（`#target-select` / `#category-panel` / 折叠区…）会必然超时。
+ * 让每个 spec 自己声明「我测的是高级视图」，比在夹具里悄悄替你切视图更诚实——
+ * 否则「向导是默认入口」这条契约就没人测得到了。
+ *
+ * @param {object} page
+ * @returns {Promise<string>} 切换后的视图码（期望 `advanced`）
+ */
+async function useAdvancedView(page) {
+  const view = () => page.evaluate(() => (document.getElementById('app') || {}).dataset?.wbView || '');
+  if ((await view()) === 'advanced') return 'advanced';
+  await page.click('#btn-wb-view-toggle');
+  await page.waitForFunction(() => document.getElementById('app')?.dataset?.wbView === 'advanced',
+    null, { timeout: 10_000 }).catch(() => {});
+  return view();
+}
+
 /** 等计划摘要条出现且文本非空 */
-async function waitForPlan(page, timeout = 60_000) {
-  try {
+async function waitForPlan(page, timeout = 60_000) {  try {
     await page.waitForFunction(() => {
       const bar = document.getElementById('plan-summary-bar');
       const est = document.getElementById('output-estimate-text');
@@ -189,6 +208,7 @@ module.exports = {
   REPO_ROOT,
   loadZipIo,
   ensureFixtures,
+  useAdvancedView,
   waitForPlan,
   readCategory,
   readReportCount,

@@ -2740,3 +2740,160 @@
   border-radius: 6px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
 }
+
+/* ==========================================================================
+   迁移向导外壳（S5 第二步）
+   向导不是第二份 UI：它只改根容器上的 data-wb-view / data-wb-step，
+   显隐由本节的选择器决定。高级视图（data-wb-view="advanced"）保持既有全量展示。
+   ========================================================================== */
+#app.app-container .wb-wizard, .st-converter-drawer-app .wb-wizard {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 10px;
+  margin-bottom: 8px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+}
+
+#app.app-container .wb-view-switch, .st-converter-drawer-app .wb-view-switch {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+#app.app-container .wb-view-title, .st-converter-drawer-app .wb-view-title {
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+#app.app-container .wb-step-rail, .st-converter-drawer-app .wb-step-rail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+#app.app-container .wb-step-btn, .st-converter-drawer-app .wb-step-btn {
+  flex: 1 1 auto;
+  opacity: 0.75;
+}
+
+#app.app-container .wb-step-btn[aria-current="step"], .st-converter-drawer-app .wb-step-btn[aria-current="step"] {
+  opacity: 1;
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+#app.app-container .wb-step-btn:focus-visible, .st-converter-drawer-app .wb-step-btn:focus-visible,
+#app.app-container .wb-view-switch button:focus-visible, .st-converter-drawer-app .wb-view-switch button:focus-visible,
+#app.app-container .wb-step-nav button:focus-visible, .st-converter-drawer-app .wb-step-nav button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+#app.app-container .wb-step-nav, .st-converter-drawer-app .wb-step-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+#app.app-container .wb-step-counter, .st-converter-drawer-app .wb-step-counter {
+  flex: 1;
+  text-align: center;
+  color: var(--text-em);
+  font-size: 0.9em;
+}
+
+/* 不兼容门（U-1：旧会话显式拒绝） */
+#app.app-container .wb-gate, .st-converter-drawer-app .wb-gate {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-focus);
+  border-radius: 8px;
+}
+
+#app.app-container .wb-gate-title, .st-converter-drawer-app .wb-gate-title {
+  margin: 0;
+  font-size: 1em;
+  color: var(--text-em);
+}
+
+#app.app-container .wb-gate-reason, .st-converter-drawer-app .wb-gate-reason {
+  margin: 0;
+  color: var(--text-main);
+}
+
+/* 检查页（步骤④） */
+#app.app-container .wb-check-panel, .st-converter-drawer-app .wb-check-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+}
+
+#app.app-container .wb-check-title, .st-converter-drawer-app .wb-check-title {
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+#app.app-container .wb-check-summary, .st-converter-drawer-app .wb-check-summary {
+  margin: 0;
+  color: var(--text-em);
+}
+
+#app.app-container .wb-check-exclusions, .st-converter-drawer-app .wb-check-exclusions {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--text-main);
+}
+
+/* 高级视图：收起步骤条与翻页（保留视图开关本身） */
+#app.app-container[data-wb-view="advanced"] .wb-step-rail, .st-converter-drawer-app[data-wb-view="advanced"] .wb-step-rail,
+#app.app-container[data-wb-view="advanced"] .wb-step-nav, .st-converter-drawer-app[data-wb-view="advanced"] .wb-step-nav {
+  display: none;
+}
+
+/* 向导视图：一次只显示当前步的区块（无 data-wb-step 的区块始终可见）。
+   ⚠ 必须限定在 `.wb-block` 内：步骤条自己的按钮也带 `data-wb-step`（值＝步骤 id），
+   若用裸 `[data-wb-step]` 后代选择器，它们会被**自己的披露规则**隐藏掉
+   （2026-10-13 实测：步骤条 6 个按钮全部 display:none，向导无法导航）。 */
+#app.app-container[data-wb-view="wizard"][data-wb-step="source"] .wb-block [data-wb-step]:not([data-wb-step="source"]),
+.st-converter-drawer-app[data-wb-view="wizard"][data-wb-step="source"] .wb-block [data-wb-step]:not([data-wb-step="source"]) {
+  display: none;
+}
+
+#app.app-container[data-wb-view="wizard"][data-wb-step="target"] .wb-block [data-wb-step]:not([data-wb-step="target"]),
+.st-converter-drawer-app[data-wb-view="wizard"][data-wb-step="target"] .wb-block [data-wb-step]:not([data-wb-step="target"]) {
+  display: none;
+}
+
+#app.app-container[data-wb-view="wizard"][data-wb-step="scope"] .wb-block [data-wb-step]:not([data-wb-step="scope"]),
+.st-converter-drawer-app[data-wb-view="wizard"][data-wb-step="scope"] .wb-block [data-wb-step]:not([data-wb-step="scope"]) {
+  display: none;
+}
+
+#app.app-container[data-wb-view="wizard"][data-wb-step="check"] .wb-block [data-wb-step]:not([data-wb-step="check"]),
+.st-converter-drawer-app[data-wb-view="wizard"][data-wb-step="check"] .wb-block [data-wb-step]:not([data-wb-step="check"]) {
+  display: none;
+}
+
+#app.app-container[data-wb-view="wizard"][data-wb-step="run"] .wb-block [data-wb-step]:not([data-wb-step="run"]),
+.st-converter-drawer-app[data-wb-view="wizard"][data-wb-step="run"] .wb-block [data-wb-step]:not([data-wb-step="run"]) {
+  display: none;
+}
+
+#app.app-container[data-wb-view="wizard"][data-wb-step="verify"] .wb-block [data-wb-step]:not([data-wb-step="verify"]),
+.st-converter-drawer-app[data-wb-view="wizard"][data-wb-step="verify"] .wb-block [data-wb-step]:not([data-wb-step="verify"]) {
+  display: none;
+}
