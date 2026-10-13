@@ -194,11 +194,15 @@ export async function hasRoomForPartial(bytes, nav = (typeof navigator !== 'unde
  * @param {string} p.target 目标布局（诊断用；真正的续传判据是名字 + 内容能对上）
  * @param {number} p.totalBytes
  * @param {function} p.setPauseCheckpoint `TaskManager.start()` 返回的暂停态写入句柄
+ * @param {function} [p.buildCheckpoint] 自定义断点形状（收到 `{name, partialEntries}`，返回要写入的清单）。
+ *   缺省写**单包形状**；批量路径必须传它 —— 否则会把 `kind:'batch'` 的批次清单覆盖成单包形状，
+ *   批次续传读不到 `itemIndex` / `outputs` ⇒ 静默重跑整批（或误判断点作废）。
  * @param {object} [p.deps] 仅测试注入（默认用真实 OPFS 助手与真实配额探测）
  * @returns {Promise<{ok: boolean, name?: string, reason?: string}>}
  */
 export async function persistPartial({
-  partialBlob, manifest, partialError = null, taskId, target, totalBytes, setPauseCheckpoint, deps = {},
+  partialBlob, manifest, partialError = null, taskId, target, totalBytes, setPauseCheckpoint,
+  buildCheckpoint = null, deps = {},
 }) {
   const {
     opfsTmpHandle: getHandle = opfsTmpHandle,
@@ -239,7 +243,10 @@ export async function persistPartial({
   }
 
   const partialEntries = Array.isArray(manifest) ? manifest : [];
-  await setPauseCheckpoint({ partialOpfsName: name, target, partialEntries, totalEntries: totalBytes });
+  const checkpoint = typeof buildCheckpoint === 'function'
+    ? buildCheckpoint({ name, partialEntries })
+    : { partialOpfsName: name, target, partialEntries, totalEntries: totalBytes };
+  await setPauseCheckpoint(checkpoint);
   logger.info(`[转换] 已保留半成品 ${name}（${partialEntries.length} 条）—— 续传将原样搬运它，不重压缩、不丢条目`);
   return { ok: true, name };
 }
@@ -868,7 +875,7 @@ async function main(appRoot) {
       }
     }
 
-    const { signal, onCheckpoint } = taskManager.start(taskId, '批量转换', { resumable: true, totalBytes: 0 });
+    const { signal, onCheckpoint, setPauseCheckpoint } = taskManager.start(taskId, '批量转换', { resumable: true, totalBytes: 0 });
     taskControls.showRunning(taskId, { totalBytes: 0 });
     const outputs = resumeCheckpoint ? [...(resumeCheckpoint.outputs ?? [])] : [];
     // 断点游标：**下一个待处理**子项下标（不是"已完成个数"，避免 off-by-one 歧义）。
@@ -876,9 +883,15 @@ async function main(appRoot) {
     let nextIndex = startIndex;
     // 当前子项的条目断点（每个子项**重建**，见 seedEntriesFor）
     let doneEntries = new Map();
+    // 当前子项的**半成品**（真增量续传 R6b）：条目清单是「产物里真有这些字节」的真源，
+    // 与单包路径同形。每个子项开始时重建，子项完成/放弃时清空。
+    let currentPartial = { name: null, entries: [] };
     /**
      * 批量断点清单的组装（**必须完整** —— 它会被原样存成 `task.checkpoint`，见
      * `createCheckpointThrottle` 的注释）。缺任何一个字段都会让续传读不到而静默降级。
+     *
+     * `partialOpfsName` / `partialEntries` 属于**游标指向的那个子项**（与 `doneEntries` 同域）——
+     * 跨子项复用半成品会让下一个子项**错误跳过**同名条目 ⇒ 产物缺条目。
      */
     const buildBatchManifest = (doneObject, { totalEntries = 0 } = {}) => ({
       kind: 'batch',
@@ -888,6 +901,8 @@ async function main(appRoot) {
       itemIds: [...itemIds],
       totalItems,
       totalEntries,
+      partialOpfsName: currentPartial.name,
+      partialEntries: currentPartial.entries,
     });
     const makeBatchThrottle = () => createCheckpointThrottle(onCheckpoint, doneEntries, {
       buildManifest: buildBatchManifest,
@@ -930,7 +945,33 @@ async function main(appRoot) {
           const pruneBuiltinCheck = document.getElementById('prune-builtin-check');
 
           // 每个子项重置条目断点（跨子项复用 crc 清单会因同名条目错误跳过 ⇒ 产物缺条目）
-          doneEntries = seedEntriesFor({ checkpoint: resumeCheckpoint, index: i, startIndex });
+          //
+          // 真增量续传（R6b）：仅当**续传的就是这一项**且断点带着半成品时，才把它的字节搬进来。
+          // 判据与单包路径**同源** —— 跳过一个条目的充分条件是「半成品里真有它的字节」
+          // （`transform.js` 的 `appendedNames`），台账只作冗余校验。
+          const resumeThisItem = Boolean(resumeCheckpoint) && i === startIndex;
+          const partialOpfsName = resumeThisItem ? (resumeCheckpoint.partialOpfsName || null) : null;
+          let appendFrom = null;
+          if (partialOpfsName) {
+            try {
+              const handle = await opfsTmpHandle(partialOpfsName, false);
+              appendFrom = handle ? await opfsHandleToFile(handle) : null;
+            } catch (err) {
+              logger.warn(`[批量转换] 子项半成品读取失败（该子项将完整重做）: ${err?.message ?? err}`);
+              appendFrom = null;
+            }
+            if (appendFrom) {
+              opfsCleanupId = taskId;
+              opfsCleanupName = partialOpfsName;
+            } else {
+              logger.warn('[批量转换] 断点指向的子项半成品已不存在 ⇒ 该子项完整重做（产物完整，只是不再增量）');
+            }
+          }
+          doneEntries = (appendFrom && Array.isArray(resumeCheckpoint.partialEntries))
+            ? new Map(resumeCheckpoint.partialEntries
+              .filter((e) => e && typeof e.name === 'string').map((e) => [e.name, e.crc32]))
+            : seedEntriesFor({ checkpoint: resumeCheckpoint, index: i, startIndex });
+          currentPartial = { name: appendFrom ? partialOpfsName : null, entries: [] };
           nextIndex = i; // 游标指向「正在处理的这一项」（尚未完成）
           maybeCheckpoint = makeBatchThrottle();
           trackProgress = attachConversionProgress({ doneEntries, maybeCheckpoint });
@@ -953,6 +994,27 @@ async function main(appRoot) {
               pruneBuiltinAssets: pruneBuiltinCheck ? pruneBuiltinCheck.checked : true,
               signal,
               resumeCrcMap: doneEntries,
+              appendFrom,            // 同源半成品（null ⇒ 该子项完整重做）
+              finalizeOnAbort: true, // 中止时把已写部分收成**合法半成品**，交 onPaused 持久化
+            },
+            onPaused: async ({ partialBlob, manifest, partialError }) => {
+              if (partialBlob) {
+                currentPartial = {
+                  name: partialNameFor(taskId),
+                  entries: Array.isArray(manifest) ? manifest : [],
+                };
+              }
+              // 断点必须保持 `kind:'batch'` 形状（见 persistPartial 的 buildCheckpoint 注释）
+              await persistPartial({
+                partialBlob, manifest, partialError, taskId, target, totalBytes: 0, setPauseCheckpoint,
+                buildCheckpoint: () => buildBatchManifest(Object.fromEntries(doneEntries), {
+                  totalEntries: currentPartial.entries.length,
+                }),
+              });
+              if (partialBlob) {
+                opfsCleanupId = taskId;
+                opfsCleanupName = currentPartial.name;
+              }
             },
             onProgress: (cur, tot, name, crc32) => {
               trackProgress(cur, tot, name, crc32);
@@ -961,6 +1023,13 @@ async function main(appRoot) {
               view.setProgress(basePct + itemPct, `[${i + 1}/${totalCount}] ${currentBlob.name} -> ${name}`);
             },
           });
+
+          // 子项完成 ⇒ 半成品使命完成：留着只会占配额，且会让**下一子项**误以为可续。
+          if (currentPartial.name) {
+            opfsTmpCleanup(currentPartial.name);
+            if (opfsCleanupId === taskId) { opfsCleanupId = null; opfsCleanupName = null; }
+          }
+          currentPartial = { name: null, entries: [] };
 
           exportQueue.enqueue({
             name: outputFilename,
