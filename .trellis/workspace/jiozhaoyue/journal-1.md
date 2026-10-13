@@ -2225,3 +2225,40 @@ R6b 批量子项真增量**未做**（批量路径**正确性已达成**，只�
 - S4 剩余（自动全量读回核对 / 自动重发）与 S6（真人验收 / 外部试用）仍未做。
 
 > ⚠️ 本日志仍超 2000 行软上限；拆分归档应另开任务。
+
+---
+
+## Session 39（2026-10-13 深夜）· 核对证据构造与重试候选（S4 剩余项）
+
+**承接**：`10-01` 的 S4 两个未勾项。建子任务 `10-13-migration-verification-layer` 并自主实施、归档。
+
+### 做出来的东西
+
+| # | 内容 | 性质 |
+| --- | --- | --- |
+| 1 | 新建纯模块 `src/core/migration-verification.js`：`buildRestoreVerification`（从 index.js 抽出）/ `summarizeVerification` / `selectRetryCandidates` | 抽取 + 补判定层 |
+| 2 | `index.js` 删内联函数改 import；成功分支用 `summarizeVerification` 输出「机器核对 N / 人工确认 M，覆盖 X」 | 接线 |
+| 3 | `test/migration-verification.test.js` 加 3 组（含 `selectRetryCandidates` 的**判别力**：门不过 ⇒ 候选为空） | 测试 |
+
+### 模块化（用户本轮强调）
+
+- 把 `index.js` 里**不可单测的内联纯逻辑**抽出为独立纯模块——这正是「不耦合 / 代码质量」的落点。
+- `selectRetryCandidates` 实现 **双重门**：逐项 `assessRetry`（证据）+ 整体 `evaluateWriteGate`（重试不绕门）；
+  无可重试项时**不请求**写入门（省判定且不误导）。
+
+### 读数
+
+| 项 | 读数 |
+| --- | --- |
+| `npm test` | 759 → **768 passed / 2 skipped / 0 failed**（零回退） |
+| 五守卫 + build + build:offline | 全绿 |
+| 独立形态 E2E | **496/496**（`--rebuild`） |
+| 终态 | commit `6487c7c` + 归档，已推送，`main == origin/main` |
+
+### 如实登记的残留
+
+- **自动全量读回核对**与**自动重发执行**仍受宿主能力阻断（无「列用户文件」端点 / 无部分重试 UI）
+  —— 判定层就绪，执行待接 host-bridge。
+- 网络：本轮 push 多次 `send-pack: unexpected disconnect`，最终以 `http.version=HTTP/1.1` 成功。
+
+> ⚠️ 本日志仍超 2000 行软上限；拆分归档应另开任务。
