@@ -34,6 +34,7 @@ S2/S3 在契约稳定后可独立推进，但本轮没有并发代理或实施�
 | S5 | 默认向导整合、旧资料兼容和渐进切换 | S4 | R-08/09/10；AC-01/09/10/11 |
 | S6 | 用户内部验收、公开发布前外部试用与说明同步 | S5 | R-12；AC-12/13 |
 | S7 | 真正的同源 file:// 离线产物 | S6；独立技术验证 | R-11；AC-14 |
+| S8 | PT 原生归档作为源（校验 + 重建为 hub） | S0 | R-11；AC-12 |
 
 R-13/AC-15 属本轮工作流文档交付，不重复拆成产品代码任务。
 
@@ -165,9 +166,7 @@ R-13/AC-15 属本轮工作流文档交付，不重复拆成产品代码任务。
 
 **完成判据**：计划中的每条公开承诺都能定位到相应证据，而不是只看测试总数。
 
-## 9. S7：真正的双击离线交付（后续独立任务）
-
-**拟评估/修改**：vite.config.js、现有构建脚本、独立入口装配；e2e/standalone/ 下的 file:// 专用用例。
+## 9. S7：真正的双击离线交付（后续独立任务）**拟评估/修改**：vite.config.js、现有构建脚本、独立入口装配；e2e/standalone/ 下的 file:// 专用用例。
 
 > **2026-10-13：本片由子任务 `10-13-migration-wizard-breaking-offline` 实施完成**。
 > 产出 `npm run build:offline` → `dist-offline/st-zip-converter-offline.html`（单文件、IIFE、零外部请求）。
@@ -178,6 +177,19 @@ R-13/AC-15 属本轮工作流文档交付，不重复拆成产品代码任务。
 - [x] 对比插件/HTTP 与 file:// 产物语义，禁止只有提示页也标通过。（`file-protocol.e2e.cjs` 仍钉住 HTTP 产物在 file:// 下的边界；`offline-single-file.e2e.cjs` 钉住离线产物真可用）
 
 **完成判据**：真正双击运行；此片没有完成前，第一阶段文案不得声称其已可用。
+
+## 9b. S8：PT 原生归档作为源（`D-23` / R-11）
+
+> **2026-10-13：本片由子任务 `10-13-pt-native-source` 实施完成**（commit 见该任务）。
+
+- [x] 校验 PT manifest（format / schemaVersion / 结构 / 路径安全 / 唯一性）+ 逐条目 sha256（不符即抛错，绝不产出残缺包）。
+- [x] 重建为 hub（ST 摊平）：characters（avatars blob 即带卡 PNG）/ chats（sessions+messages→jsonl）/ world-books / presets / settings / secrets / stats / assets / 扩展包 / image-metadata。两趟读取保流式。
+- [x] `convert()` 与 `generatePlan()` 对 `pt-native` 源先重建再按 ST 视角路由；`migration-plan` 接受 `pt-native` 作源（不可作目标）。
+- [x] 证据面：`cross-host.e2e.cjs` 3 源×4 目标 → **4 源×4 目标 = 16 条**（`pt→st/l/tt/pt` 逐条走通）；夹具 `fixture-pt.zip`；单测含 sha256 负例。
+- [x] 有损点如实登记（角色卡用自带卡 blob / 聊天 jsonl 重序列化 / 预设 metadata / **PT 源无断点续传**）。
+- [x] 读数：`npm test` 724 → **734 passed**（零回退）；独立形态 E2E 473 → **496 全绿**；五守卫 + build + build:offline 全绿。
+
+**完成判据**：`AC-12` 的「PT 作为源」不再阻断；目标侧**写入**证据仍归实例/人工（本片只覆盖格式转换 + 交付）。
 
 ## 10. 验证命令与执行纪律
 
