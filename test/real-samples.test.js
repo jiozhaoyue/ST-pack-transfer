@@ -20,6 +20,10 @@ const REAL = {
 const has = (p) => existsSync(p);
 const hasAll = (...paths) => paths.every(has);
 
+// 这些用例要读真实样本（约 1GB 的 L 导出）的中央目录，满载并行时单次可超默认 5s 上限
+// ⇒ 显式给足超时（这是 I/O 边界，不是逻辑变慢；单跑约 5s，并行下会翻倍）。
+const REAL_ZIP_TIMEOUT = 30_000;
+
 async function listPaths(zipPath) {
   const reader = await zipIo.openReader(zipPath);
   const paths = [];
@@ -84,14 +88,14 @@ describe.skipIf(!hasAll(REAL.lToL, REAL.ttToL))('真实产物 → L 恢复目标
     const misses = (await listPaths(zipPath)).filter((name) => name !== 'manifest.json' && !lResolves(name));
     // 汇总前 10 条,便于定位映射缺口
     expect(misses.slice(0, 10), `${misses.length} 个条目 L 恢复时不会落地`).toEqual([]);
-  });
+  }, REAL_ZIP_TIMEOUT);
 });
 
 describe.skipIf(!hasAll(REAL.lToPt, REAL.reportLToPt))('真实产物 → PT 导入路由镜像', () => {
   it('real-l-to-pt.zip:每个条目都落进 PT 三个可识别根之一', async () => {
     const unsupported = (await listPaths(REAL.lToPt)).filter((name) => classifyPtEntry(name) === 'unsupported');
     expect(unsupported.slice(0, 10), `${unsupported.length} 个条目会被 PT 丢弃`).toEqual([]);
-  });
+  }, REAL_ZIP_TIMEOUT);
 
   it('real-l-to-pt.zip:每个第三方扩展都有来源记录,或转换报告已按 PT 规则警告', async () => {
     const paths = await listPaths(REAL.lToPt);
@@ -114,7 +118,7 @@ describe.skipIf(!hasAll(REAL.lToPt, REAL.reportLToPt))('真实产物 → PT 导�
     );
     const unhandled = [...folders].filter((folder) => !recorded.has(folder) && !warned.has(folder));
     expect(unhandled, `以下扩展既无来源记录也无警告,PT 会静默跳过: ${unhandled.join(', ')}`).toEqual([]);
-  });
+  }, REAL_ZIP_TIMEOUT);
 
   it('real-l-to-pt.zip:用户级 extensions 全部迁移或冲突丢弃,并出具迁移摘要', async () => {
     const paths = await listPaths(REAL.lToPt);
@@ -133,12 +137,12 @@ describe.skipIf(!hasAll(REAL.lToPt, REAL.reportLToPt))('真实产物 → PT 导�
         ).toBe(true);
       }
     }
-  });
+  }, REAL_ZIP_TIMEOUT);
 });
 
 describe.skipIf(!hasAll(REAL.ttToPt, REAL.reportTtToPt))('真实产物 → PT(TT 源)镜像', () => {
   it('real-tt-to-pt.zip:每个条目都落进 PT 三个可识别根之一', async () => {
     const unsupported = (await listPaths(REAL.ttToPt)).filter((name) => classifyPtEntry(name) === 'unsupported');
     expect(unsupported.slice(0, 10), `${unsupported.length} 个条目会被 PT 丢弃`).toEqual([]);
-  });
+  }, REAL_ZIP_TIMEOUT);
 });

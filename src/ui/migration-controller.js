@@ -106,16 +106,24 @@ export async function guardedRestore({ plan, evidence, restoreFn }) {
 /**
  * 构造目标写入的 evidence（S3）。**纯函数**：不 import host-bridge，`inFlight` 由调用方求值后传入。
  *
+ * 备份证据两种来源（优先级从高到低）：
+ *   ① `backup` —— 已由 `buildTargetBackupEvidence`（`src/core/migration-target.js`）构造的完整证据
+ *      （可含 `readback-verified` 自动备份）；
+ *   ② `backupConfirmed` —— 旧布尔入口，回落到 `user-attested` 或 `none`（向后兼容）。
+ *
  * 字段对齐 `.trellis/spec/frontend/migration-safety-and-evidence.md` §3.1。
  *
  * @param {object} params
  * @param {string} params.platform 宿主平台码
  * @param {string} params.handle 当前用户 handle
  * @param {string} params.planTargetRef 计划生成时的目标身份
- * @param {boolean} params.backupConfirmed 用户是否声明「已备份目标数据」
+ * @param {boolean} [params.backupConfirmed] 用户是否声明「已备份目标数据」（`backup` 缺省时使用）
  * @param {number|string} params.planRevision 当前计划 revision
  * @param {boolean} params.inFlight 是否已有同一写操作在途
  * @param {'granted'|'denied'|'unknown'} [params.permission='granted'] 权限态
+ * @param {object|null} [params.backup] 已构造的备份证据（优先于 `backupConfirmed`）
+ * @param {{state: string}|null} [params.conflicts] 目标冲突评估（`assessTargetConflicts` 产出）
+ * @param {boolean} [params.conflictAcknowledged] 用户是否已确认「冲突未知」风险
  */
 export function buildTargetEvidence({
   platform,
@@ -125,17 +133,23 @@ export function buildTargetEvidence({
   planRevision,
   inFlight,
   permission = 'granted',
+  backup = null,
+  conflicts = null,
+  conflictAcknowledged = false,
 }) {
   const targetRef = `${platform}@${handle}`;
+  const backupEvidence = backup
+    || (backupConfirmed
+      ? { level: 'user-attested', targetRef, scope: 'matches-write', retention: 'confirmed' }
+      : { level: 'none' });
   return {
     planRevision,
     targetRef,
     planTargetRef,
     permission,
-    confirmation: { valid: true },
-    backup: backupConfirmed
-      ? { level: 'user-attested', targetRef, scope: 'matches-write', retention: 'confirmed' }
-      : { level: 'none' },
+    confirmation: { valid: true, acknowledged: { conflictUnknown: Boolean(conflictAcknowledged) } },
+    backup: backupEvidence,
+    conflicts,
     inFlight: Boolean(inFlight),
   };
 }

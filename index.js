@@ -45,6 +45,7 @@ import { getChatStoreProbe, probeChatStore } from './src/ui/chat-store-bridge.js
 import { resolveFilename, previewFilename, DEFAULT_FILENAME_TEMPLATE, namedBlob } from './src/core/filename-template.js';
 import { buildSourceDeliveries, guardedRestore, buildTargetEvidence } from './src/ui/migration-controller.js';
 import { createMigrationPlan } from './src/core/migration-plan.js';
+import { assessTargetConflicts, describeConflictState, buildTargetBackupEvidence, describeBackupEvidence } from './src/core/migration-target.js';
 import { classifyOutcome, buildVerificationEvidence, MIGRATION_OUTCOMES } from './src/core/migration-evidence.js';
 import {
   detectHost,
@@ -2101,28 +2102,56 @@ async function main(appRoot) {
 
   // 7. 还原确认模态弹窗逻辑
 
-  /** S3：重置「已备份目标数据」勾选（对话框每次打开都从未勾选开始，避免静默通过）。 */
+  /** S3：重置「已备份目标数据」与「冲突未知确认」勾选（对话框每次打开都从未勾选开始，避免静默通过）。 */
   function resetRestoreBackupCheck() {
     const el = document.getElementById('restore-backup-confirmed');
     if (el) el.checked = false;
+    const ack = document.getElementById('restore-conflict-ack');
+    if (ack) ack.checked = false;
+    const label = document.getElementById('restore-conflict-text');
+    if (label) label.textContent = describeConflictState(assessTargetConflicts({ targetManifest: null })).label;
+    refreshRestoreBackupDesc();
   }
+
+  /** S3：按勾选状态**如实**显示备份证据级别（人工确认 ≠ 机器核对，`spec §3.3`）。 */
+  function refreshRestoreBackupDesc() {
+    const el = document.getElementById('restore-backup-confirmed');
+    const desc = document.getElementById('restore-backup-desc');
+    if (!desc) return;
+    desc.textContent = describeBackupEvidence(buildTargetBackupEvidence({
+      mode: 'manual',
+      userConfirmed: Boolean(el && el.checked),
+    })).label;
+  }
+  const restoreBackupCheckEl = document.getElementById('restore-backup-confirmed');
+  if (restoreBackupCheckEl) restoreBackupCheckEl.addEventListener('change', refreshRestoreBackupDesc);
 
   /** S3：构造目标写入的 plan + evidence（目标端写入只看 targetWrite 与 evidence）。 */
   function buildRestoreGateContext() {
-    const el = document.getElementById('restore-backup-confirmed');
-    const backupConfirmed = Boolean(el && el.checked);
+    const backupEl = document.getElementById('restore-backup-confirmed');
+    const ackEl = document.getElementById('restore-conflict-ack');
+    const targetRef = `${host.platform}@${currentHostHandle}`;
     const plan = createMigrationPlan({
       source: { layout: 'l' },
       target: { layout: hostLayoutCode(host.platform) },
       requestedSelection: {},
     });
+    // 恢复流程读不到目标现有清单（宿主无「列用户文件」端点）⇒ 冲突一律 `unknown`，
+    // 由用户在对话框显式确认风险（`assessTargetConflicts` 对 `targetManifest:null` 返回 unknown）。
+    const conflicts = assessTargetConflicts({ targetManifest: null });
     const evidence = buildTargetEvidence({
       platform: host.platform,
       handle: currentHostHandle,
-      planTargetRef: `${host.platform}@${currentHostHandle}`,
-      backupConfirmed,
+      planTargetRef: targetRef,
       planRevision: plan.revision,
       inFlight: isRestoreInFlight(),
+      backup: buildTargetBackupEvidence({
+        mode: 'manual',
+        targetRef,
+        userConfirmed: Boolean(backupEl && backupEl.checked),
+      }),
+      conflicts,
+      conflictAcknowledged: Boolean(ackEl && ackEl.checked),
     });
     return { plan, evidence };
   }
@@ -2138,6 +2167,7 @@ async function main(appRoot) {
       'target-write-unsupported': '目标宿主不支持自动写入',
       'permission-unknown': '权限未知',
       'permission-denied': '权限被拒绝',
+      'conflict-unknown-unacknowledged': '未确认「冲突状态未知」风险',
     };
     return reasons.map((r) => MAP[r] || r).join('、');
   }
