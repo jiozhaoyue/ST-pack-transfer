@@ -27,6 +27,11 @@
 | [State Management](./state-management.md) | 内存 Blob 生命周期、TaskManager 断点续传、rAF 合帧 | 就绪 |
 | [Quality Guidelines](./quality-guidelines.md) | 验证矩阵、守卫命令、转义层契约、10 条禁止模式、纯逻辑可单测约定 | 就绪（2026-09-26 刷新） |
 | [Type Safety](./type-safety.md) | JSDoc 契约、运行时目标守卫、manifest 校验 | 就绪 |
+| [迁移用户流程](./migration-user-journey.md) | 默认完整迁移、双端向导、统一计划与独立交付 | 已裁定目标契约（2026-10-01；尚未实现） |
+| [迁移安全与证据](./migration-safety-and-evidence.md) | 目标备份、写入门、完成判定与安全重试 | 已裁定目标契约（2026-10-01；尚未实现） |
+| [迁移兼容与验收](./migration-compatibility-and-release.md) | 旧资料保留、渐进重构、真人验收与离线排期 | 已裁定目标契约（2026-10-01；尚未实现） |
+
+> 上述三份“迁移”文档是经用户批准记录的**后续目标契约**，不是当前实现事实；其中拟新增签名、测试和验收均有状态标注。不得据此宣称产品已完成迁移向导或双击离线交付。
 
 > 现行质量门槛：`npm test` 全绿（当前 **64 个测试文件 / 610 passed / 2 skipped**，零回归），
 > 外加**五条**静态守卫 `npm run check:css-scope`、`npm run check:dom-injection`、

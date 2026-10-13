@@ -1,0 +1,7 @@
+{"file": ".trellis/spec/frontend/migration-safety-and-evidence.md", "reason": "S1 判定的授权、备份、核对与重试契约来源"}
+{"file": ".trellis/spec/frontend/migration-user-journey.md", "reason": "统一计划、默认选择与向导语义的契约来源"}
+{"file": ".trellis/spec/frontend/migration-compatibility-and-release.md", "reason": "旧资料保留与交付关口边界"}
+{"file": ".trellis/spec/frontend/resume-checkpoint-invariant.md", "reason": "断点完成条目必须在产物中的不变量，重试边界不得违背"}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "既有质量门与控制消费约定"}
+{"file": ".trellis/spec/frontend/state-management.md", "reason": "任务状态机与暂停/续传语义，MigrationOutcome 不另建状态机"}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "src/core 纯逻辑层的质量与无 DOM 约定"}

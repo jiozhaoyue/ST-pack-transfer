@@ -202,6 +202,7 @@ Preserve existing task fields and artifacts. If the correct status cannot be det
 
 [workflow-state:planning]
 Load `trellis-brainstorm`; stay in planning.
+本项目规划问答（用户于 2026-10-01 授权）：使用平台交互工具，每轮可问 2–3 个关联决策；存在前置依赖时逐层追问。不得用空答案、超时或推荐选项代替用户授权。详见 Phase 1.1 的项目约定。
 Lightweight: `prd.md` can be enough. Complex: finish `prd.md`, `design.md`, and `implement.md`; ask for review before `task.py start`.
 Multi-deliverable scope: consider a parent task plus independently verifiable child tasks; dependencies must be written in child artifacts, not implied by tree position.
 Sub-agent mode: curate `implement.jsonl` and `check.jsonl` as spec/research manifests before start.
@@ -215,6 +216,7 @@ Sub-agent mode: curate `implement.jsonl` and `check.jsonl` as spec/research mani
 
 [workflow-state:planning-inline]
 Load `trellis-brainstorm`; stay in planning.
+本项目规划问答（用户于 2026-10-01 授权）：使用平台交互工具，每轮可问 2–3 个关联决策；存在前置依赖时逐层追问。不得用空答案、超时或推荐选项代替用户授权。详见 Phase 1.1 的项目约定。
 Lightweight: `prd.md` can be enough. Complex: finish `prd.md`, `design.md`, and `implement.md`; ask for review before `task.py start`.
 Multi-deliverable scope: consider a parent task plus independently verifiable child tasks; dependencies must be written in child artifacts, not implied by tree position.
 Inline mode: skip jsonl curation; Phase 2 reads artifacts/specs via `trellis-before-dev`.
@@ -342,8 +344,17 @@ Skip when `python ./.trellis/scripts/task.py current --source` already points to
 
 Load the `trellis-brainstorm` skill and explore requirements interactively with the user per the skill's guidance.
 
+本项目规划问答约定（2026-10-01 用户裁定，适用于后续任务）：
+
+- 需求访谈使用平台可用的交互式问答工具；每轮可合并 2–3 个关联决策，不强制每轮仅一题。
+- 有前置依赖的决策须逐层推进；只有一个有效问题时不凑数，不把互不相关的问题塞进一组。
+- 每题给出推荐与代价；代码、配置或历史能回答的事实先检索，不转嫁给用户。
+- 每组答案及时记录进任务 PRD/裁定记录；空答案、取消、超时都不代表同意，不自动采用推荐。
+- 此项覆盖本项目访谈中通用技能的“每轮只问一题”默认值；不改写全局技能或其他仓的规则。
+- 仅请求规划不等于实施授权；多题问答不放宽计划评审、危险操作确认或 task.py start 门禁。
+
 The brainstorm skill will guide you to:
-- Ask one question at a time
+- 按上述项目约定组织关联问题与依赖顺序
 - Prefer researching over asking the user
 - Prefer offering options over open-ended questions
 - Update `prd.md` immediately after each user answer

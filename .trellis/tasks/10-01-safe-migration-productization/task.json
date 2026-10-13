@@ -1,0 +1,28 @@
+{
+  "id": "safe-migration-productization",
+  "name": "safe-migration-productization",
+  "title": "安全迁移产品化：普通用户跨宿主向导与可验证交付",
+  "description": "仅规划：保留核心渐进重构，完整自用迁移默认全选，两端手动中转，备份前置、目标核对与安全重试；先插件向导后双击离线交付",
+  "status": "planning",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "jiozhaoyue",
+  "assignee": "jiozhaoyue",
+  "createdAt": "2026-10-01",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "10-13-migration-plan-and-write-gate"
+  ],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {}
+}

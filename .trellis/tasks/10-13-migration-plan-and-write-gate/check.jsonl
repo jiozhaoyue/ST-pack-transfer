@@ -1,0 +1,6 @@
+{"file": ".trellis/spec/frontend/migration-safety-and-evidence.md", "reason": "校验判定矩阵与规范条文是否一致"}
+{"file": ".trellis/spec/frontend/migration-user-journey.md", "reason": "校验计划快照与默认选择口径"}
+{"file": ".trellis/spec/frontend/migration-compatibility-and-release.md", "reason": "校验兼容与交付边界"}
+{"file": ".trellis/spec/frontend/resume-checkpoint-invariant.md", "reason": "校验重试边界未破坏断点不变量"}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "校验质量门"}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "校验 src/core 无 DOM 依赖"}

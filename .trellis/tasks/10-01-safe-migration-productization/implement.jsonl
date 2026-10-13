@@ -1,0 +1,7 @@
+{"file": ".trellis/spec/frontend/index.md", "reason": "区分现有实现与迁移目标契约"}
+{"file": ".trellis/spec/frontend/migration-user-journey.md", "reason": "迁移产品化已裁定契约与验收边界"}
+{"file": ".trellis/spec/frontend/migration-safety-and-evidence.md", "reason": "迁移产品化已裁定契约与验收边界"}
+{"file": ".trellis/spec/frontend/migration-compatibility-and-release.md", "reason": "迁移产品化已裁定契约与验收边界"}
+{"file": ".trellis/spec/frontend/resume-checkpoint-invariant.md", "reason": "保持断点完成条目已写入产物的不变量"}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "既有质量门、控制消费和错误处理约定"}
+{"file": ".trellis/tasks/10-01-safe-migration-productization/research/planning-evidence.md", "reason": "授权、复用与真实能力证据边界"}
