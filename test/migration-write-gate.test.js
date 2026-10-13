@@ -137,6 +137,31 @@ describe('evaluateWriteGate（S1 写入安全门）', () => {
     // 无备份 ⇒ 仍拒绝
     expect(evaluateWriteGate(plan, okEvidence(plan, { backup: { level: 'none' } })).allowed).toBe(false);
   });
+
+  it('AC5 冲突未知且未确认 ⇒ 拒绝（无目标清单不是 0 冲突）', () => {
+    const plan = makePlan();
+    const unacked = evaluateWriteGate(plan, okEvidence(plan, { conflicts: { state: 'unknown' } }));
+    expect(unacked.allowed).toBe(false);
+    expect(unacked.reasons).toContain(GATE_REASONS.CONFLICT_UNKNOWN_UNACKNOWLEDGED);
+  });
+
+  it('AC5 冲突未知但已显式确认风险 ⇒ 放行；冲突已读清单 ⇒ 不触发该门', () => {
+    const plan = makePlan();
+    const acked = evaluateWriteGate(plan, okEvidence(plan, {
+      conflicts: { state: 'unknown' },
+      confirmation: { valid: true, acknowledged: { conflictUnknown: true } },
+    }));
+    expect(acked.allowed).toBe(true);
+    // known 状态不需要该确认
+    const known = evaluateWriteGate(plan, okEvidence(plan, { conflicts: { state: 'known', conflictCount: 0 } }));
+    expect(known.reasons).not.toContain(GATE_REASONS.CONFLICT_UNKNOWN_UNACKNOWLEDGED);
+  });
+
+  it('未提供 conflicts ⇒ 该门不生效（既有调用零变化）', () => {
+    const plan = makePlan();
+    expect(evaluateWriteGate(plan, okEvidence(plan)).reasons)
+      .not.toContain(GATE_REASONS.CONFLICT_UNKNOWN_UNACKNOWLEDGED);
+  });
 });
 
 describe('assessRetry（S1 重试资格判定）', () => {

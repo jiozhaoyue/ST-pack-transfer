@@ -1,7 +1,7 @@
 import { describe, expect, it, beforeEach } from 'vitest';
 import { guardedRestore, buildTargetEvidence } from '../src/ui/migration-controller.js';
 import { createMigrationPlan, STANDARD_CATEGORIES, __resetRevisionCounter } from '../src/core/migration-plan.js';
-import { GATE_REASONS } from '../src/core/migration-evidence.js';
+import { GATE_REASONS, evaluateWriteGate } from '../src/core/migration-evidence.js';
 
 function makePlan() {
   return createMigrationPlan({
@@ -148,5 +148,32 @@ describe('buildTargetEvidence（S3 证据构造）', () => {
       backupConfirmed: true, planRevision: 1, inFlight: false, permission: 'denied',
     });
     expect(ev.permission).toBe('denied');
+  });
+
+  it('S3 传入已构造的 backup 证据（可含 readback-verified）优先于 backupConfirmed', () => {
+    const ev = buildTargetEvidence({
+      platform: 'luker', handle: 'u1', planTargetRef: 'luker@u1',
+      backupConfirmed: false, planRevision: 1, inFlight: false,
+      backup: { level: 'readback-verified', targetRef: 'luker@u1', scope: 'matches-write', retention: 'confirmed' },
+    });
+    expect(ev.backup.level).toBe('readback-verified');
+  });
+
+  it('S3 冲突未知 + 未确认 ⇒ 门禁拒绝；确认后放行', () => {
+    const plan = makePlan();
+    const base = {
+      platform: 'luker', handle: 'u1', planTargetRef: 'luker@u1',
+      backupConfirmed: true, planRevision: plan.revision, inFlight: false,
+      conflicts: { state: 'unknown' },
+    };
+    const unacked = buildTargetEvidence(base);
+    expect(unacked.conflicts.state).toBe('unknown');
+    expect(unacked.confirmation.acknowledged.conflictUnknown).toBe(false);
+    expect(evaluateWriteGate(plan, unacked).reasons)
+      .toContain(GATE_REASONS.CONFLICT_UNKNOWN_UNACKNOWLEDGED);
+
+    const acked = buildTargetEvidence({ ...base, conflictAcknowledged: true });
+    expect(acked.confirmation.acknowledged.conflictUnknown).toBe(true);
+    expect(evaluateWriteGate(plan, acked).allowed).toBe(true);
   });
 });

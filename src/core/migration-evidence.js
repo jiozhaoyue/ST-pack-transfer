@@ -25,6 +25,7 @@ export const GATE_REASONS = Object.freeze({
   TARGET_WRITE_UNSUPPORTED: 'target-write-unsupported',
   PERMISSION_UNKNOWN: 'permission-unknown',
   PERMISSION_DENIED: 'permission-denied',
+  CONFLICT_UNKNOWN_UNACKNOWLEDGED: 'conflict-unknown-unacknowledged',
 });
 
 /** 重试拒绝/放行码（对齐 spec §3.4）。 */
@@ -52,6 +53,8 @@ export const RETRY_REASONS = Object.freeze({
  * @param {{level?: 'none'|'user-attested'|'readback-verified', targetRef?: string,
  *          scope?: 'matches-write'|'partial'|'unknown',
  *          retention?: 'confirmed'|'unconfirmed'}} [evidence.backup] 目标备份证据
+ * @param {{state?: 'known'|'unknown'}} [evidence.conflicts] 目标冲突评估（`assessTargetConflicts` 产出）；
+ *   **提供且为 `unknown` 时**要求 `confirmation.acknowledged.conflictUnknown===true`（spec §4）
  * @param {boolean} [evidence.inFlight] 是否已有同一写操作在途
  * @returns {{allowed: boolean, reasons: string[]}}
  */
@@ -112,6 +115,15 @@ export function evaluateWriteGate(plan, evidence = {}) {
     }
     if (backup.retention !== 'confirmed') {
       reasons.push(GATE_REASONS.BACKUP_RETENTION_UNCONFIRMED);
+    }
+  }
+
+  // 8. 冲突状态**未知**时必须明确确认风险（spec §4：无目标清单 ⇒ 冲突为 unknown，不是 0）。
+  //    仅在调用方提供了 `conflicts` 时生效 —— 未提供表示本次流程不做目标预检，不改变既有契约。
+  if (ev.conflicts && ev.conflicts.state === 'unknown') {
+    const ack = ev.confirmation && ev.confirmation.acknowledged;
+    if (!(ack && ack.conflictUnknown === true)) {
+      reasons.push(GATE_REASONS.CONFLICT_UNKNOWN_UNACKNOWLEDGED);
     }
   }
 

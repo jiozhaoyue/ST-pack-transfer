@@ -26,14 +26,33 @@ createMigrationPlan(input) -> MigrationPlan                    // src/core/migra
 evaluateWriteGate(plan, evidence) -> { allowed: boolean, reasons: string[] }   // src/core/migration-evidence.js
 assessRetry(itemEvidence) -> { allowed: boolean, reason: string }             // src/core/migration-evidence.js
 guardedRestore({ plan, evidence, restoreFn }) -> { wrote, reasons, result? }  // src/ui/migration-controller.js
-buildTargetEvidence({ platform, handle, planTargetRef, backupConfirmed, planRevision, inFlight, permission? }) -> evidence  // src/ui/migration-controller.js
+buildTargetEvidence({ platform, handle, planTargetRef, backupConfirmed, planRevision, inFlight, permission?, backup?, conflicts?, conflictAcknowledged? }) -> evidence  // src/ui/migration-controller.js
+assessTargetConflicts({ targetManifest, incomingPaths }) -> { state, conflictCount, newCount, conflicts }   // src/core/migration-target.js
+buildTargetBackupEvidence({ mode, targetRef, artifact?, userConfirmed? }) -> backup                            // src/core/migration-target.js
+describeBackupEvidence(backup) -> { level, label, machineVerified, userAttested }                              // src/core/migration-target.js
+describeConflictState(conflicts) -> { state, label, showsNoConflict, showsUnknown }                            // src/core/migration-target.js
+describeTargetWriteCapability(cell) -> { status, autoWriteConfirmed, guidance }                                // src/core/migration-target.js
 ```
+
+**S3 目标预检与备份契约（2026-10-13）**：目标预检/备份证据落在**独立纯模块** `src/core/migration-target.js`
+（不耦合 `migration-evidence.js` 的门禁与 `host-bridge.js` 的宿主调用）。
+`assessTargetConflicts` **读不到目标清单时返回 `state:'unknown'` 且 `conflictCount:null`**——
+调用方**不得**把 `null` 当 0；`describeConflictState` 对 `unknown` **不显示「无冲突」**。
+`buildTargetBackupEvidence` 走**自动优先 / 手动保底**：`auto` 仅在「可读 + 范围 `matches-write` +
+已留存」三者齐备才 `readback-verified`；`manual` 仅在用户确认时 `user-attested`，**绝不**升级为
+`readback-verified`。写入门禁新增 `conflict-unknown-unacknowledged`：**提供 `evidence.conflicts`
+且为 `unknown` 时**要求 `confirmation.acknowledged.conflictUnknown===true`（未提供 `conflicts` 则该门不生效，
+既有调用零变化）。宿主侧自动备份**执行**（调用 `/api/users/backup` 并落工作区）仍属 `host-bridge` 职责，
+本片只交付纯判定与呈现。
 
 **S3 写入路径契约（2026-10-13）**：`guardedRestore` 是目标写入的**唯一门禁编排**——
 先 `evaluateWriteGate`，**门禁不过时 `restoreFn` 一次都不调用**（零写入）。
 `index.js` 的恢复路径（单条 `btnConfirmRestore` 与批量 `runBatchRestore`）**都**经它，**不得**保留绕过门禁的第二入口。
 备份证据由恢复对话框的「我已备份目标数据」勾选驱动（`#restore-backup-confirmed` → `backup.level` 为 `user-attested` 或 `none`），
-对话框每次打开都**重置为未勾选**（避免静默通过）。自动目标备份（`readback-verified`）仍未实现。
+对话框每次打开都**重置为未勾选**（避免静默通过）。
+**2026-10-13（S3 剩余项）**：`buildTargetBackupEvidence` 已支持 `auto` 路径产出 `readback-verified`（纯判定就绪），
+但**宿主侧自动备份执行**（触发 `/api/users/backup`、校验可读、落工作区留存）仍待接入 `host-bridge`；
+恢复对话框现同时要求「冲突状态未知」风险确认（`#restore-conflict-ack`，见 §3.2）。
 
 `MigrationPlan` 为**深度冻结**快照，含 `revision` / `requested` / `effective` / `capabilities`。
 `requested` **一律**来自显式传入的选择快照，**不读** `src/ui/category-filter.js` 的模块级 `currentSelection`
@@ -75,6 +94,12 @@ evidence 只在本地运行流程中构造，不能直接信任导入 JSON/旧�
 读得到目标清单时按真实语义比较；读不到时显示 unknown，并让用户明确了解同名可能更新。
 不能将“源包有 100 条”推导成“新增 100 条”；也不能把不可访问目标列为 0 冲突。
 任何无法保证源码/链接边界的写入路径都不得作为支持的自动通道；不以强制覆盖绕过 .git/objects 等保护。
+
+**已实现（S3，2026-10-13）**：`src/core/migration-target.js` 的 `assessTargetConflicts` 按上条比较
+（路径经 NFKC + 分隔符 + 大小写归一）；读不到清单 ⇒ `state:'unknown'`、`conflictCount:null`。
+`describeConflictState` 保证 `unknown` **不显示成「无冲突」**。写入门禁对 `conflicts.state==='unknown'`
+要求显式风险确认（`conflict-unknown-unacknowledged`）。恢复流程读不到目标清单（宿主无「列用户文件」端点）
+⇒ 冲突一律 `unknown`，由对话框确认。**目标侧自动读取清单**（如宿主提供）仍待接入。
 
 ### 3.3 核对证据与完成语义
 

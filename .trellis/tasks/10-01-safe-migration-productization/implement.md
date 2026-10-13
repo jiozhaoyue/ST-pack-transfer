@@ -103,11 +103,12 @@ R-13/AC-15 属本轮工作流文档交付，不重复拆成产品代码任务。
 **拟测试**：test/migration-write-gate.test.js 的集成断言；现有 restore-chain/batch/manifest/probe 测试。
 
 > **2026-10-13：本片由子任务 `10-13-migration-target-write-gate` 实施「写入门禁」核心**。
-> 已完成第 1、4、5 项与第 2、3 项的**部分**（目标身份 + 手动声明保底）；**自动目标备份与冲突预检留后续**。
+> 已完成第 1、4、5 项与第 2、3 项的**部分**（目标身份 + 手动声明保底）；
+> **剩余项由子任务 `10-13-migration-target-preflight` 于 2026-10-13 补完**（见下）。
 
 - [x] 用记录请求次数的端口替身验证无备份/过期确认/目标变化/权限未知时零写入。（`test/migration-target-gate.test.js`，9 用例）
-- [ ] 先完成目标身份、有效范围、冲突未知与自动写能力判定；不支持时给原生指引。（目标身份已做；**冲突未知与自动写能力判定留后续**——ST 无恢复能力仍由既有 `RESTORE_UNSUPPORTED` 兜底）
-- [ ] 接入自动优先、手动声明保底的备份证据，不把源备份或临时 Blob 当成目标保底。（**手动声明**已做；**自动备份留后续**）
+- [x] 先完成目标身份、有效范围、冲突未知与自动写能力判定；不支持时给原生指引。（**2026-10-13 由 `10-13-migration-target-preflight` 补完**：`src/core/migration-target.js` 的 `assessTargetConflicts`（读不到清单 ⇒ `unknown`，**不是 0**）+ `describeTargetWriteCapability`（原生指引）；门禁加 `conflict-unknown-unacknowledged`）
+- [x] 接入自动优先、手动声明保底的备份证据，不把源备份或临时 Blob 当成目标保底。（**2026-10-13 补完**：`buildTargetBackupEvidence` 自动路径仅三条件齐备才 `readback-verified`、手动仅 `user-attested` 且**永不**冒充；`describeBackupEvidence` 分别呈现。**宿主侧自动备份执行**（触发 `/api/users/backup` 并落工作区）仍待接入 host-bridge）
 - [x] 确认后只执行受支持的 merge；保留目标独有文件和空目录。（沿用既有 `merge` 语义）
 - [x] 双击、切换账户、取消和超时都进入明确状态，不把中断当作回滚。（门禁加 `inFlight` 拦双击；既有取消/超时状态保留）
 

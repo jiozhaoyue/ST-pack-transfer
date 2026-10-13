@@ -25,7 +25,8 @@
     "10-13-migration-verification-retry",
     "10-13-migration-legacy-shared-state",
     "10-13-migration-wizard-breaking-offline",
-    "10-13-pt-native-source"
+    "10-13-pt-native-source",
+    "10-13-migration-target-preflight"
   ],
   "parent": null,
   "relatedFiles": [],

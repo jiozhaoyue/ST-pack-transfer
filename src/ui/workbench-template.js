@@ -374,6 +374,11 @@ export function getWorkbenchHtml({ isModal = false, isDrawer = false, isStandalo
           <input type="checkbox" id="restore-backup-confirmed">
           <div class="radio-text">我已备份目标数据（写入前保底，未备份将拒绝写入）</div>
         </label>
+        <label class="checkbox_label flex-container" id="restore-conflict-label">
+          <input type="checkbox" id="restore-conflict-ack">
+          <div class="radio-text" id="restore-conflict-text">无法读取目标清单：同名条目可能被更新（冲突状态未知，不是 0 冲突）</div>
+        </label>
+        <div class="modal-desc" id="restore-backup-desc"></div>
         <div class="flex-container" style="justify-content: flex-end; gap: 8px;">
           <button type="button" class="menu_button" id="btn-cancel-restore">取消</button>
           <button type="button" class="menu_button menu_button_icon btn-accent" id="btn-confirm-restore">
