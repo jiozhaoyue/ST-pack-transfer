@@ -28,6 +28,7 @@ import {
   loadWorkspaceState,
   isStorageSupported,
   listStoredFiles,
+  ORIGINS,
 } from './src/storage/db.js';
 import { generateDeltaArchive } from './src/core/delta.js';
 import { buildExtensionManifest } from './src/core/extension-manifest.js';
@@ -41,6 +42,7 @@ import { renderUsageDashboard } from './src/ui/usage-dashboard.js';
 import { exportLibraryToPack, injectLibraryChatsIntoSource, importRestoredChatsIntoLibrary } from './src/ui/chat-store-inject.js';
 import { getChatStoreProbe, probeChatStore } from './src/ui/chat-store-bridge.js';
 import { resolveFilename, previewFilename, DEFAULT_FILENAME_TEMPLATE, namedBlob } from './src/core/filename-template.js';
+import { buildSourceDeliveries } from './src/ui/migration-controller.js';
 import {
   detectHost,
   verifyHostPlatform,
@@ -1698,6 +1700,8 @@ async function main(appRoot) {
         || hasPartialSelection
         || hasFileExclusions;
 
+      // 提升到块外：供下方三类交付构建（源备份/目标包/报告）引用（S2）
+      let conversionReport = null;
       if (needsTransform) {
         targetLayout = selectedTarget === 'native'
           ? hostLayoutCode(host.platform)
@@ -1729,6 +1733,7 @@ async function main(appRoot) {
         });
 
         finalBlob = resultBlob;
+        conversionReport = report;
         view.renderReport(report);
       } else if (hasFileExclusions || confirmedExcludedPaths.size > 0) {
         // 不转换时排除集也应同步到当前过滤器（保持树状态与产物一致）
@@ -1781,6 +1786,21 @@ async function main(appRoot) {
             ephemeral: true,
           });
         }
+        // S2：分卷之外仍交付「源备份（保底）+ 独立报告」（target 为分卷，已单独入队）
+        for (const it of buildSourceDeliveries({
+          source: { blob: rawBackupBlob, name: `${host.platform}-${currentHostHandle}.zip`, layout: hostLayoutCode(host.platform) },
+          target: null,
+          report: conversionReport ? { text: conversionReport.toHuman() } : null,
+          hasTransform: true,
+        })) {
+          exportQueue.enqueue({
+            name: it.name,
+            blob: it.blob,
+            targetLayout: it.targetLayout,
+            origin: it.origin,
+            ephemeral: true,
+          });
+        }
         refreshExportQueueUI();
         view.setProgress(100, `宿主数据已切分为 ${splitResult.totalParts} 个分卷，已进入待导出区统一处置！`);
         logger.success(`宿主导出分卷完成: 共 ${splitResult.totalParts} 个独立包 (${formatBytes(splitResult.totalBytes)})，可在待导出区批量下载或存入工作区`);
@@ -1788,15 +1808,32 @@ async function main(appRoot) {
         return;
       }
 
-      // 单包模式：统一进待导出区（增量补丁产物标记 delta 来源）
+      // 单包模式：三类交付（源备份保底 + 目标包 + 独立报告）统一进待导出区（S2）
       const isDeltaPatch = /_delta_patch\.zip$/i.test(finalFilename);
-      exportQueue.enqueue({
-        name: finalFilename,
-        blob: finalBlob,
-        targetLayout: targetLayout,
-        origin: isDeltaPatch ? 'delta' : 'host-export',
-        ephemeral: true,
+      const sourceIsTarget = !needsTransform && !isDeltaPatch;
+      const sourceName = `${host.platform}-${currentHostHandle}.zip`;
+      const deliveries = buildSourceDeliveries({
+        source: { blob: rawBackupBlob, name: sourceName, layout: hostLayoutCode(host.platform) },
+        target: sourceIsTarget
+          ? null
+          : {
+            blob: finalBlob,
+            name: finalFilename,
+            layout: targetLayout,
+            origin: isDeltaPatch ? ORIGINS.DELTA : ORIGINS.CONVERTED,
+          },
+        report: conversionReport ? { text: conversionReport.toHuman() } : null,
+        hasTransform: !sourceIsTarget,
       });
+      for (const it of deliveries) {
+        exportQueue.enqueue({
+          name: it.name,
+          blob: it.blob,
+          targetLayout: it.targetLayout,
+          origin: it.origin,
+          ephemeral: true,
+        });
+      }
       refreshExportQueueUI();
 
       view.setProgress(100, `宿主数据包已进入待导出区！`);
