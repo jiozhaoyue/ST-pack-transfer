@@ -155,3 +155,60 @@ export function assessRetry(itemEvidence = {}) {
   // 5. 其余（已证未应用但操作非幂等/不可拆分）⇒ 不自动重试。
   return { allowed: false, reason: RETRY_REASONS.NOT_REPEAT_SAFE };
 }
+
+/** 迁移核对结论（`MigrationOutcome`）——**不是**第二套运行状态机（`design.md` §3.1）。 */
+export const MIGRATION_OUTCOMES = Object.freeze({
+  COMPLETED: 'completed',
+  COMPLETED_WITH_EXCLUSIONS: 'completed-with-exclusions',
+  NEEDS_VERIFICATION: 'needs-verification',
+  FAILED: 'failed',
+});
+
+const VERIFICATION_UNITS = Object.freeze(['archive-entry', 'character', 'chat']);
+const VERIFICATION_METHODS = Object.freeze(['automatic', 'user-attested']);
+const VERIFICATION_COVERAGES = Object.freeze(['full', 'sampled', 'unknown']);
+const VERIFICATION_STATUSES = Object.freeze(['confirmed', 'accepted-exclusion', 'failed', 'unknown']);
+
+/**
+ * 归一一条核对证据（S4）。非法/缺失值按**保守默认**回落，不抛错、不猜。
+ *
+ * `unit` 是核对口径（archive-entry / character / chat）——**不同口径不得相加当覆盖率**（`spec §3.3`）。
+ *
+ * @param {object} [input]
+ * @param {string} [input.scopeRef] 该证据覆盖的范围引用
+ * @param {string} [input.unit] archive-entry / character / chat
+ * @param {string} [input.method] automatic / user-attested
+ * @param {string} [input.coverage] full / sampled / unknown
+ * @param {string} [input.status] confirmed / accepted-exclusion / failed / unknown
+ * @param {string} [input.reason]
+ */
+export function buildVerificationEvidence(input = {}) {
+  const src = input && typeof input === 'object' ? input : {};
+  return {
+    scopeRef: typeof src.scopeRef === 'string' ? src.scopeRef : '',
+    unit: VERIFICATION_UNITS.includes(src.unit) ? src.unit : 'archive-entry',
+    method: VERIFICATION_METHODS.includes(src.method) ? src.method : 'user-attested',
+    coverage: VERIFICATION_COVERAGES.includes(src.coverage) ? src.coverage : 'unknown',
+    status: VERIFICATION_STATUSES.includes(src.status) ? src.status : 'unknown',
+    reason: typeof src.reason === 'string' ? src.reason : '',
+  };
+}
+
+/**
+ * 按核对证据判出 `MigrationOutcome` 四态（S4）。**纯函数**。
+ *
+ * 优先级（`prd.md` R2）：`failed` > `needs-verification` > `completed-with-exclusions` > `completed`；
+ * **无证据 ⇒ `needs-verification`**（未知不是完成）。
+ *
+ * @param {{verification?: Array<object>}} [input]
+ * @returns {'completed'|'completed-with-exclusions'|'needs-verification'|'failed'}
+ */
+export function classifyOutcome({ verification } = {}) {
+  const list = Array.isArray(verification) ? verification : [];
+  if (list.length === 0) return MIGRATION_OUTCOMES.NEEDS_VERIFICATION;
+  if (list.some((v) => v && v.status === 'failed')) return MIGRATION_OUTCOMES.FAILED;
+  if (list.some((v) => !v || v.status === 'unknown')) return MIGRATION_OUTCOMES.NEEDS_VERIFICATION;
+  if (list.some((v) => v.status === 'accepted-exclusion')) return MIGRATION_OUTCOMES.COMPLETED_WITH_EXCLUSIONS;
+  if (list.every((v) => v.status === 'confirmed')) return MIGRATION_OUTCOMES.COMPLETED;
+  return MIGRATION_OUTCOMES.NEEDS_VERIFICATION;
+}

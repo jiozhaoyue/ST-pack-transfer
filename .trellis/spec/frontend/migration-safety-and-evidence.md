@@ -95,6 +95,13 @@ MigrationOutcome 使用以下显示分类，不替换 TaskManager 的运行状�
 | needs-verification | 已写入但存在未核对/未知状态；给出目标内具体检查步骤 |
 | failed | 当前流程无法完成；保留已成功项与可取回产物，不笼统显示“什么都没做” |
 
+**已实现（S4，2026-10-13）**：`src/core/migration-evidence.js` 的 `classifyOutcome({ verification })` 按上表优先级
+（`failed` > `needs-verification` > `completed-with-exclusions` > `completed`；**空证据 ⇒ `needs-verification`**）判出四态；
+`buildVerificationEvidence(input)` 归一 `scopeRef` / `unit`（archive-entry / character / chat）/ `method`（automatic / user-attested）/
+`coverage`（full / sampled / unknown）/ `status`（confirmed / accepted-exclusion / failed / unknown）。
+`index.js` 恢复后按 outcome 显示文案；现状**无目标侧读回核对**，`automatic` 证据只到「宿主确认写入」，
+**不得**表述为「目标数据已逐条核对」。重试候选只收 `assessRetry` 放行的项（未知写入态不自动重试）。
+
 用户取消、上传超时或连接断开后，如果宿主可能已经写入，标 needs-verification；不得自动宣布回滚。
 原生手动导入结束后也需要用户按清单确认，不因点击“我已导入”就伪造底层文件一致性证明。
 

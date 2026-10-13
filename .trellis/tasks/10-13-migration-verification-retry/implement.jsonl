@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/frontend/migration-safety-and-evidence.md", "reason": "核对证据与 MigrationOutcome 四态契约的唯一来源"}
+{"file": ".trellis/spec/frontend/migration-user-journey.md", "reason": "结果解释与交付角色语义"}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "既有质量门"}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "纯逻辑层无 DOM 约定"}
