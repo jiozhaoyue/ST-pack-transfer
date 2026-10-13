@@ -14,6 +14,7 @@
 const path = require('path');
 const fs = require('fs');
 const { pathToFileURL } = require('url');
+const { useAdvancedView } = require('../lib/harness.cjs');
 
 const DRAWER_ID = 'st_zip_converter_settings';
 const FIXTURE_DIR = path.resolve(__dirname, '..', '..', 'test-results', 'fixtures');
@@ -78,6 +79,11 @@ module.exports = {
       JSON.stringify(opened));
     t.eq('P4b 关键控件齐全（file-input / btn-convert / stash-list / export-queue-panel / task-controls 五项）',
       opened.controlIds, 5, JSON.stringify(opened));
+
+    // P4c **切到「高级工作台」视图**（S5 第二步起默认入口是迁移向导）
+    //      向导一次只披露当前步的区块 ⇒ 不切则 `#target-select` 恒 0×0，P9b 前置门必然红。
+    const viewAfter = await useAdvancedView(page);
+    t.eq('P4c 已切到高级工作台视图（否则高级控件恒不可见）', viewAfter, 'advanced', `view=${viewAfter}`);
 
     // 平台徽标：PT 上应给出一个**非模板初值**的判定（具体文案由 host-bridge 决定，不断言字面）
     const badge = await page.evaluate(() => {
@@ -224,6 +230,10 @@ module.exports = {
         if (content) content.style.display = 'block';
       }, DRAWER_ID);
       await page.waitForTimeout(300);
+      // ⚠️ 重载会把视图打回**向导默认入口** ⇒ 必须**再切一次**高级视图，
+      //    否则后面的 `#btn-convert` / `#split-input` 全是 `display:none`（2026-10-13 实测 P19 红）。
+      const viewAfterReload = await useAdvancedView(page);
+      t.eq('P16d 重载后已重新切到高级工作台视图', viewAfterReload, 'advanced', `view=${viewAfterReload}`);
       await page.setInputFiles('#file-input', splitFixture);
       const planReady2 = await page.waitForFunction(() => {
         const bar = document.getElementById('plan-summary-bar');

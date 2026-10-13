@@ -107,6 +107,37 @@ node scripts/instance-sync/produce-via-plugin.cjs \
 
 **读数落 `research/one-step-layout-<layout>.json`。**
 
+### D2 实测结论（2026-09-29 收口，用户裁定采纳 —— 本节即「生产链」的权威表述）
+
+| 目标 | 判定 | 读数 |
+| --- | --- | --- |
+| `st` | **IDENTICAL** —— 6563/6563 条逐条 `crc32` 全等 | `research/one-step-layout-st.json` |
+| `l` | **6561/6562 条全等**；唯一差异 = 根 `manifest.json` 的 `selection` 字段 | `research/one-step-layout-l.json` |
+| `tt` | 初次判 `DIFFERENT`（7 条，**源在期间变动伪影**）⇒ 同源重基线后 **IDENTICAL**（6597/6597） | `research/one-step-layout-tt.json` + `-tt-rebase.json`（为准） |
+
+**采纳**（§1.4 问 1）：生产链 = **插件三布局一步直出**；`build-packs.cjs` 退为**交叉核对装置**（**不删**）。
+
+**「等价」的准确措辞（带前提，务必照抄）**：一步直出与 `build-packs` **在取数口径相同时**字节级等价。
+两侧口径由 `selection` 决定 —— 插件**可以**要全局扩展（`globalExtensions:true`），而宿主原生备份这条路拿不到它们
+⇒ 若 selection 用模块默认（全 true），同步链交付的内容会比 `build-packs` 链路**多出全局扩展**
+（实测 323 条 `public/scripts/extensions/third-party/<扩展>/.git/...`）。**用户裁定「要」（问 5）**。
+
+**两条由此产生的义务**（本任务执行）：
+
+1. **§4.5**：那 323 条含 `.git/objects` ⇒ 写入前**必须**做只读冲突预检（`build-packs.cjs` 头部记有
+   `gitMode: keep` 撞只读属性致恢复中断在 85.161% 的前例）；
+2. **§9.1/§9.3**：把「两侧 selection 语义不同」写成**已登记差异**（插件记**有效值**，`build-packs` 记**默认值**）。
+
+**本任务实际的产包调用**（§3/§7 用它）：
+
+```bash
+node scripts/instance-sync/produce-via-plugin.cjs --source real-luker --layout <st|tt|l> --out <dir>
+```
+
+**源 = Real Luker（`:8004`，真源）**；不加 `--deselect`（要 `settings`，且 2026-10-13 实测**未出现**旧记录里的
+「浏览器路径停滞」—— 拉取 1094.7 MB / t+151.7 s 仍在正常推进）。⚠️ 旧记录那条「停滞」是用 **OPFS 体积**判的，
+`implement.md` §1.5② 已实测 OPFS 是**惰性落盘**、不能当进度表 ⇒ 该旧结论**不可作为证据**。
+
 ---
 
 ## D3 备份（**只 Luker 两处**，U-3）

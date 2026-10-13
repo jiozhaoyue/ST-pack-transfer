@@ -31,6 +31,7 @@ These guides help you **ask the right questions before coding**.
 > 运行器 `--instance` / `--url` 的区别）整段搬到新文件 `host-pull-and-runner-discipline.md`，
 > 并在本页登记；文内 §11.x 的交叉引用同步改名。**动它之前先拆**。
 
+| [Plugin Driven Pack And Write Guards](./plugin-driven-pack-and-write-guards.md) | **插件驱动产包链**（九步流程 · selection 清初态 · 按目标前缀挑产物 · OPFS 残留清理 · R-20 硬门禁 · 端口纪律分层）+ **写入前三道守卫**（链接子树 / 宿主源码禁改 / `.git/objects` 只读冲突）+ 可重跑性判据（mtime 快照配对）+ 覆盖率两个口径陷阱 + 实例侧 E2E 的**视图切换**适配 | 要让**插件在实例内产包**、要把数据**搬进别的实例**、要判「同步到底成没成」、或要写/改**实例侧** E2E 断言时 |
 | [Standalone Web And Cloud E2E](./standalone-web-and-cloud-e2e.md) | **独立 Web / 云子路径形态**的自动化：为何单开一套运行器（`npm run e2e:web`）、子路径为何是核心判据、四条「红灯来自断言自己」、两条已登记的既有事实（两个预设同集 · CDN 外链） | 要验无宿主形态、云/离线部署、独立形态的转换闭环，或要改 `e2e/standalone/**` 时 |
 
 ---

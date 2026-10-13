@@ -32,7 +32,22 @@ const crypto = require('crypto');
 
 const { getInstance } = require('../../e2e/lib/instances.cjs');
 const { acquireSession } = require('./lib/instance-session.cjs');
-const { assertNoLinksUnder } = require('./lib/link-guard.cjs');
+const { findLinkedRoots } = require('./lib/link-guard.cjs');
+const { getNodeIo } = require('./lib/node-zip-io.cjs');
+
+/** 只读枚举产物的条目名（判「产物到底会不会写进某个链接子树」用）。 */
+async function readEntryNames(packPath) {
+  const io = await getNodeIo();
+  const reader = await io.openReader(packPath);
+  const names = [];
+  for await (const e of reader.entries()) {
+    if (e.fileName.endsWith('/')) { e.skip(); continue; }
+    names.push(e.fileName.replace(/\\/g, '/'));
+    e.skip();
+  }
+  await reader.close();
+  return names;
+}
 
 const MB = (n) => (n / 1048576).toFixed(1);
 
@@ -200,19 +215,43 @@ function makeProgress(label) {
   console.log(`会话就绪：cookie ${session.cookieCount} 个、CSRF 已取（playwright ${session.playwright}）\n`);
 
   /**
-   * **链接子树前置门禁**（用户 2026-09-26 裁决「默认跳过链接子树」）。
+   * **链接子树前置门禁（2026-10-13 改为「产物感知」）**
    *
-   * restore 是**服务端一把写完**的，客户端没法逐条跳过 ⇒ 只能"发现即拒绝"，
-   * 除非显式 `--allow-links`。2026-09-26 实测教训：Dev Luker 的
-   * `extensions/ST-BgLoader` 是指向 `My-repo/ST-BgLoader` 的 junction，
-   * 上一次 restore 的 1090 条数据因此**穿透写进了那个仓的工作区**。
+   * 用户 2026-09-26 裁决「默认跳过链接子树」；restore 是**服务端一把写完**的，客户端没法逐条跳过
+   * ⇒ 只能「发现即拒绝」，除非显式 `--allow-links`。
+   * 2026-09-26 实测教训：Dev Luker 的 `extensions/ST-BgLoader` 是指向 `My-repo/ST-BgLoader` 的
+   * junction，上一次 restore 的 **1090 条**因此**穿透写进了那个仓的工作区**（`P-19`）。
+   *
+   * ⚠️ **旧实现过宽**：目标数据目录下**只要存在**链接就拒绝 —— 即使产物里根本没有那条子树的条目。
+   * 于是「先按前缀过滤产物、再灌入」这条**安全**路径被堵死（2026-10-13 实测踩到）。
+   * 新判据：**只有产物真的会写入该链接子树时才拒绝** —— 存在包内条目以 `<链接相对路径>/` 开头。
+   * 这样过滤过的产物可直接灌入，而穿透写入仍然被拦。
    */
-  const links = await assertNoLinksUnder({
-    rootDir: path.join(inst.dir, inst.userDir),
-    allowLinks: args.allowLinks,
-    label: `${inst.id} restore`,
-  });
-  if (links.length) console.log(`[链接子树] ${links.length} 个（已登记，见上）\n`);
+  const linkRoots = await findLinkedRoots(path.join(inst.dir, inst.userDir));
+  const blockedLinks = [];
+  const harmlessLinks = [];
+  if (linkRoots.length) {
+    const entryNames = await readEntryNames(packPath);
+    for (const l of linkRoots) {
+      const prefix = `${l.rel}/`;
+      const hits = entryNames.filter((n) => n.startsWith(prefix)).length;
+      if (hits > 0) blockedLinks.push({ ...l, hits });
+      else harmlessLinks.push({ ...l, hits: 0 });
+    }
+  }
+  for (const l of harmlessLinks) {
+    console.log(`[链接子树] 登记（**产物内无该子树条目 ⇒ 不穿透**）：${l.rel} → ${l.target || '(断链)'}`);
+  }
+  if (blockedLinks.length && !args.allowLinks) {
+    throw new Error(`[${inst.id} restore] 产物会写入 ${blockedLinks.length} 个**链接子树**：\n`
+      + blockedLinks.map((l) => `  - ${l.rel}（${l.hits} 条）→ ${l.target || '(断链)'}`).join('\n')
+      + '\n⇒ 拒绝启动本次写入（默认不穿透链接写进外部工作区）。\n'
+      + '   安全路径：先按前缀过滤产物（去掉这些子树）再灌入；'
+      + '确要穿透请显式加 `--allow-links`，并把这次偏离登记到任务残留里。');
+  }
+  if (blockedLinks.length && args.allowLinks) {
+    console.log(`[链接子树] ⚠️ --allow-links 已放行 ${blockedLinks.length} 个穿透写入（须如实登记）\n`);
+  }
 
   // —— 预检：probe 也要上传整个包，但它会报告引擎模式是否兼容 ——
   if (!args.skipProbe) {

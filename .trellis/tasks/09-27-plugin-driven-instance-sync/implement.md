@@ -151,8 +151,10 @@
       本任务按「这些是**管理员级**内容、可以同步」执行 —— 若解读有偏，一个词即可改）。
       ⇒ **生产链确定为**：一步直出 + selection 取模块默认（含 `globalExtensions` 全 true），
       **不使用** `--deselect globalExtensions`。**问 5 的附带义务**见 §4.5（`.git/objects` 的 EPERM 必查项）。
-- [ ] **1.4.2** 若 1.1 判定成立 ⇒ 更新 `design.md` D2 与本节 §3 的产包实现路径，再继续
-      —— *待 1.4.1 的用户裁定；**裁定前不动** `design.md` D2 与 §3 的路径（避免按未采纳的结论改设计）*
+- [x] **1.4.2** 若 1.1 判定成立 ⇒ 更新 `design.md` D2 与本节 §3 的产包实现路径，再继续
+      —— *2026-10-13 完成：`design.md` D2 已补「实测结论（用户裁定采纳）」小节 ——
+      采纳「插件三布局一步直出」、`build-packs.cjs` 退为交叉核对装置、**「等价」的带前提措辞**
+      （取数口径相同才字节级等价）、以及由此产生的两条义务（§4.5 预检 + §9.1/§9.3 登记语义差）*
 
 ### 1.5 本轮新增发现（2026-09-29 收口取证；**全部当场实测，含被推翻的自测预测**）
 
@@ -281,11 +283,18 @@
       **1605.3 MB（1 683 295 913 B）/ 8698 条目 / 337.5 s /
       sha256 `de2bc789d447706532d0b045bd833bbe0eb6e233c6c13bfead0c28ffd116eb45`**（exit 0）。
       对照 9/26 那轮（1602.7 MB / 8683 条）⇒ **+15 条目**（真源在使用中，符合预期）*
+      —— **2026-10-13 复跑（本轮实际写入前的那一份）**：`backup-real-luker-20261013-145533.zip`，
+      **1750.9 MB（1 836 086 489 B）/ 8797 条目 / 84.9 s /
+      sha256 `7a34401867eab78abceff1dfa052b12ff454b004dff45c63fa6818d5f37e165a`**（exit 0）。
+      读数 `research/backup-records-20261013.json`*
 - [x] **2.2** **Dev Luker `:8003`**：同上（`--id dev-luker`）—— **本轮新增**（上一轮 U-9 只备份了 Real）
       —— *2026-09-29 实测：`backup-dev-luker-20260929-124354.zip`，
       **1213.0 MB（1 271 907 099 B）/ 8061 条目 / 181.6 s /
       sha256 `5cadfa39552301b92be11dea3f1a06c62f2cd7dcd9f2f8ca54c77bcb3f269fd8`**（exit 0）。
       ⇒ **Dev Luker 本轮首次获得回滚能力***
+      —— **2026-10-13 复跑**：`backup-dev-luker-20261013-145705.zip`，
+      **1213.8 MB（1 272 633 085 B）/ 8167 条目 / 166.7 s /
+      sha256 `f4b535648582f426d5fb28ca424f1845a6a20da7aebb3b25600a3711e33af4f2`**（exit 0）*
 - [x] **2.3** 两处各产出可复核记录：**大小 / 条目数 / SHA-256** ⇒ `research/backup-records.json`
       —— *两处读数已落 `research/backup-records.json`；原始记录另在 `Downloads/backup-*-*.json`（脚本自动写）*
 - [x] **2.4** 校验通过（文件存在、体积与条目数非零）后才允许进入 §5
@@ -351,20 +360,55 @@
       ＋ `--raw` 产物加 `raw-` 前缀并回读断言
       —— *已落地于 `scripts/instance-sync/produce-via-plugin.cjs`；根因、判据与**一次被推翻的归因**见 §1.5①，
       验证进度见 §1.5「本轮验证状态」（**端到端尚未复跑 ⇒ 不得宣称完成**）*
+- [x] **3.11**（**2026-10-13 本轮新增**）产包器三处修复 —— 均为「**端到端复跑时才暴露**」的缺陷，
+      单测/语法检查都看不见：
+  - **3.11.1 插件侧崩溃（阻塞级）**：宿主拉取在转换跑到 **100%** 后抛
+    `TypeError: conversionReport.toHuman is not a function` ⇒ **产物永不入待导出区**。
+    根因：`runConversionTask` 回主线程的是 `reportInstance.toJSON()` 的**结构化克隆**（方法不跟过来），
+    而 `index.js` 调的是 `conversionReport.toHuman()`。**回归来源 = `f30e68a`（S2 源端三类交付）**。
+    修法：`src/core/report.js` 抽出纯函数 **`reportToHuman(json)`**（`Report#toHuman()` 改为调它），
+    `index.js` 两处调用点改走它；新增 `test/report-to-human.test.js` 钉住「纯对象可渲染」这一形态。
+    **独立提交 `4cada1f`，已推送 origin**（因为实例要先拉到修复才能产包 —— R-20 的前置）。
+  - **3.11.2 产物挑选错条目**：S2 之后一次宿主导出往待导出区放 **3 条**
+    （源备份 / 目标包 / 报告 `.txt`），旧实现取 `rows[rows.length-1]` ⇒ 拿到**报告** ⇒
+    下载后按 zip 读 ⇒ `End of central directory not found`。修法：新增 `pickTargetRow()`
+    **按目标布局前缀**挑（`--raw` 时 `raw-`），等待条件也从「计数增加」改为「目标包出现」。
+  - **3.11.3 OPFS 残留累积（退化为「第一次能跑完、之后每次都在 ~1.3 GB 停滞」）**：
+    插件把拉取流**直写 OPFS**，成功时自删、**中断时不删** ⇒ 实测 `.pw-profile/Default/File System`
+    累积到 **5.2 GB**。修法：新增 `clearStaleOpfsTemps(page)`，每跑前只删名字匹配
+    `fetch-*.zip` 的条目。**修复后真源产包稳定复现**（`l` 4 次、`st` 1 次、`tt` 1 次全部 exit 0）。
+  ⚠️ **另记一条环境事实（不是缺陷）**：旧记录里的「真源浏览器路径停滞」**确实存在但可恢复**——
+  本轮实测在 `--deselect` 试验中停滞 **>400 s 不恢复**，而**同一命令在「机器空闲」时 4 分钟内跑完**
+  （拉取 1655.9 MB）。⇒ 追这条之前**先看机器负载**（与 `implement.md` §1.5⑦ 的结论一致），
+  **不要**先怀疑代码。
 
 ## 4 写入前三道守卫（**必须在任何写入之前全部生效**，`design.md` D4.1）
 
-- [ ] **4.1 链接守卫**：`lib/link-guard.cjs` —— 解析数据路径下的 symlink / junction，
+- [x] **4.1 链接守卫**：`lib/link-guard.cjs` —— 解析数据路径下的 symlink / junction，
       指向工作区仓的**默认跳过**，重跑须显式 `--allow-links`
       —— 这是 `P-19` 的防护（上一轮实测 **1090 条**穿透写进 `My-repo/ST-BgLoader`）
-- [ ] **4.2 只读快照**：`node scripts/instance-sync/snapshot-manifest.cjs` 对**每个将被写入的目标**
+      —— *2026-10-13 实测（新装置 `scripts/instance-sync/prewrite-guards.cjs`）：
+      `dev-st 0 / real-st 0 / real-luker 0`；**`dev-luker 1 条`** ——
+      `data/default-user/extensions/ST-BgLoader → D:\Repo\Tavern-repo\My-repo\ST-BgLoader`，
+      **正是 `P-19` 记录的那条 junction**（与 2026-09-29 读数一致，未新增）*
+- [x] **4.2 只读快照**：`node scripts/instance-sync/snapshot-manifest.cjs` 对**每个将被写入的目标**
       落 `research/pre-<target>-<ts>.json`（相对路径 + 大小 + mtime）
-- [ ] **4.3 宿主源码禁改断言**（**新 `L0-1` 的硬约束，程序化而非靠自觉**）：
+      —— *2026-10-13 实测（ts `20261013-133409`）：`dev-st` 1848 文件 / 2364.1 MB；
+      `real-st` 1607 / 1147.7 MB；`dev-luker` 8568 / 3214.2 MB；`real-luker` 8212 / 3796.4 MB。
+      ⚠️ 该脚本的 `OUT_DIR` **硬编码在 09-26 任务目录**（与 §1.5③ 的 `build-packs.cjs` 同形）
+      ⇒ 本轮一律用 `--out` 显式指定，未污染上一轮读数*
+- [x] **4.3 宿主源码禁改断言**（**新 `L0-1` 的硬约束，程序化而非靠自觉**）：
       写入前断言所有目标路径都落在「被宿主仓 `.gitignore` 覆盖」的范围内
       —— 判据 `git -C <实例仓> check-ignore -v <路径>` **有输出**；
       **任何一条落在源码面（无输出）⇒ 立即中止**
-- [ ] **4.4** 三道守卫的读数落 `research/pre-write-guards.json`
-- [ ] **4.5**（**本轮新增，问 5 的附带义务**）**`.git/objects` 只读冲突预检**：
+      —— *2026-10-13 实现 + 实测 **四目标全 PASS**。⚠️ **判据必须用「子路径探针」**：
+      实测 `check-ignore -v data/default-user` **命中**（`.gitignore:52:/data`），
+      而 `check-ignore -v public/scripts/extensions/third-party` **不命中**（该目录自身规则不返回匹配，
+      但其**子路径**返回 `.gitignore:54`）⇒ 探针取 `<写入根>/__prewrite_guard_probe__`，
+      对「根自身命中」与「仅子路径命中」两种形态都成立（gitignore 语义：忽略目录即忽略其内容）*
+- [x] **4.4** 三道守卫的读数落 `research/pre-write-guards.json`
+      —— *2026-10-13 已落（`summary.ok=true`）。§4.5 需产物在手，随产包完成后以 `--pack` 复跑一次并回写*
+- [x] **4.5**（**本轮新增，问 5 的附带义务**）**`.git/objects` 只读冲突预检**：
       问 5 裁定「要全局扩展」，而实测那 323 条里**含 `.git/objects/pack/*.pack`**
       （`public/scripts/extensions/third-party/<ext>/.git/**`）——
       `build-packs.cjs` 头部记有前例：`gitMode: keep` 下 Luker 原生整包恢复撞 `.git/objects` 的**只读属性**
@@ -374,83 +418,279 @@
       3. 若有 ⇒ **中止写入**并回报，先决定处置（剥对象存储 / 改通道 / 用户接受）
       —— **不得**先写再撞 EPERM（那是不可逆的中断）。
       读数落 `research/pre-write-gitobjects-check.json`
+      —— *2026-10-13 实测（装置 `prewrite-guards.cjs --pack <l 产物>`，读数并入
+      `research/pre-write-guards.json` 的 `gitObjects` 字段）：四目标**均为
+      `gitObjectsEntries = 32` / `targetFilesExisting = 32` / **`readonlyHits = 0`** ⇒ **PASS**。
+      ⇒ **不触发**「先写再撞 EPERM」的中断形态。（32 条来自 `--git-mode minimal` 后仍保留的对象存储面；
+      目标侧同名文件**已存在但无只读属性**，故覆盖安全。）*
 
 ## 5 搬运与灌入（**复用上一轮，不改语义**，`design.md` D4）
 
-- [ ] **5.1** **Dev Luker `:8003` / Real Luker `:8004`**：`restore-luker.cjs`，
+- [x] **5.1** **Dev Luker `:8003` / Real Luker `:8004`**：`restore-luker.cjs`，
       宿主原生 `POST /api/users/restore-backup`，`mode=merge`
-- [ ] **5.2** ⚠️ **ST settings 不得回归**（`design.md` D4.2，上一轮 J 事故）：
+      —— *2026-10-13 实测（**两处均 exit 0 / HTTP 200 / `failedCount=0` / `rejectedCount=0`**）：
+      **real-luker**：`restoredCount=7377` / `skippedCount=2`（`manifest.json`、`_convert/extensions-manifest.json`
+      —— 合成元数据，宿主按设计不消费）。
+      **dev-luker**：`restoredCount=6287` / `skippedCount=2`（同上）—— 用的是**按前缀过滤过的产物**
+      （见下方「dev-luker 的链接子树处置」）。*
+      —— ⚠️ **dev-luker 的链接子树处置（2026-10-13，用户裁定「剔除该子树后再灌入」）**：
+      产物里有 **1090 条** `extensions/ST-BgLoader/**`，而 dev-luker 的该目录是指向
+      `My-repo/ST-BgLoader` 的 **junction**（`P-19`）⇒ 原生整包恢复**会穿透写入**，link-guard 按设计**拒绝启动**。
+      处置（**两处改动**，均已落地）：
+      1. **新装置** `scripts/instance-sync/filter-pack.cjs` —— 按前缀剔除条目产出新包
+         （实跑：保留 6289 / 剔除 1090 / 508.6 MB）；
+      2. **`restore-luker.cjs` 的门禁由「目录下有链接即拒绝」改为「**产物真的会写入该链接子树才拒绝**」**
+         —— 旧判据**过宽**：即使产物里根本没有那条子树的条目也拒绝，把「先过滤再灌入」这条**安全**路径堵死。
+      实测门禁输出：`[链接子树] 登记（产物内无该子树条目 ⇒ 不穿透）：extensions/ST-BgLoader → …`
+      ⇒ 放行；**穿透零发生**（复核：junction 仍在、`git -C My-repo/ST-BgLoader status --short` **为空**）。
+      被剔除的 1090 条按 §6.3 登记为**单列不判**（产物侧已无这些条目）。*
+- [x] **5.2** ⚠️ **ST settings 不得回归**（`design.md` D4.2，上一轮 J 事故）：
       `import-st.cjs` 的 settings 分支必须是**按目标键集的交集合并**。
       上一轮用并集把 Luker 的 27 个专有顶层键写进 ST ⇒ `settings.json` 从 **44 KB 膨胀到 113.7 MB**，
       ST 前端卡在「settings 未就绪」，**所有第三方扩展都不加载**（冒烟 53→50）。
       **只复用不重写**，并在 §6 加「`settings.json` 体积不得异常增长」的断言
-- [ ] **5.3** **Dev ST `:8001` / Real ST `:8002`**：`import-st.cjs` 逐类目
+      —— *2026-10-13 实测（dev-st / real-st 各一次，读数逐字相同）：
+      `[settings] 交集合并写回：目标原有 21 键，包内 23 键（其中**陌生键 23 个一律不写**：
+      firstRun, accountStorage, currentVersion, username, active_character …） → **21 键**，HTTP 200`。
+      ⇒ **零膨胀**（源是 Real Luker，其 settings 键集与 ST **完全不相交**，故交集为空、一个键都没写）。
+      ⚠️ **口径**：这条**不能**读成「settings 同步成功」——它证明的是「**没有回归**」；
+      跨宿主 settings 本就不该互灌（`design.md` D4.2 的意图正是**只做交集**）。*
+- [x] **5.3** **Dev ST `:8001` / Real ST `:8002`**：`import-st.cjs` 逐类目
       （原生端点 + 磁盘目录形态类目；ST 无整包导入）
-- [ ] **5.4** **PT web `:8899`**：`import-pt.cjs`（**宿主数据管理面板，不是点设置抽屉**），
+      —— *2026-10-13 实测（**两处均 exit 0、全类目 `失败 0`**，装置
+      `--pack <st 产物> --raw-write`）：`characters` 401 条 → **归并 26 个角色**（跳过历史版本 375 条）/
+      `chats` 1029 / `extensions` 5402（32 个扩展）/ `user` 191 / 世界书 21 / 背景 23 / 头像 9 /
+      各 settings 类目（OpenAI 76 · NovelAI 24 · KoboldAI 28 · TextGen 36 · instruct 41 · context 37 ·
+      sysprompt 14 · reasoning 5 · QuickReplies 2 · movingUI 1 · themes 5）。*
+- [x] **5.4** **PT web `:8899`**：`import-pt.cjs`（**宿主数据管理面板，不是点设置抽屉**），
       `merge` 策略 + `slow` 方式；>100 MB 需 `--allow-large`
-- [ ] **5.5** **TT**：`build-packs.cjs` 产物 + 导入说明 ⇒ **人工交付物**（C-3，无浏览器端口）
-- [ ] **5.6** **零删除核对（逐目标）**：与 §4.2 的快照比对，确认**目标独有内容全部仍在**（含空目录）
+      —— *2026-10-13 实测（exit 0，耗时 **1252.3 s**）：走**数据管理面板** → 投递 → 预览
+      （`7408 个文件 / 1.16 GB / 8 个可导入模块`）→ **2 层确认**（module-picker「继续」→ confirm「确定」）
+      → 页面 reload（导入完成）。库计数 17098 → **17737**（Δ639；
+      `pure-tavern-modular-dev.records` 11740→12167 / `blobs` 5326→5538）。
+      截图 `test-results/pt-import-result.png`。*
+- [x] **5.5** **TT**：`build-packs.cjs` 产物 + 导入说明 ⇒ **人工交付物**（C-3，无浏览器端口）
+      —— *2026-10-13：**本轮交付物 = `tt` 布局产物本身**
+      （`test-results/produce-real/tt_default-user_part1_2026-10-13.zip`，536 874 325 B / 7408 文件），
+      即 §1.4 问 1 采纳的「插件一步直出」路径的 TT 布局包（**不再经 `build-packs.cjs` 二次转换**）。
+      导入说明随本任务收口写入 `research/` 并在此登记要点：
+      **①** TT 无浏览器自动化端口（C-3）⇒ 人工在 TauriTavern 里用其数据导入入口选该包；
+      **②** 该包与 PT 用的是**同一份** TT 布局产物（PT 段 §5.4 已验证它可被 TT 系宿主导入：
+      「7408 个文件 / 8 个模块」的预览读数即来自该包）。*
+- [x] **5.6** **零删除核对（逐目标）**：与 §4.2 的快照比对，确认**目标独有内容全部仍在**（含空目录）
+      —— *2026-10-13 实测（`diff-report.cjs --pre-manifest <§4.2 快照>`，**逐目标「同步前全量清单 ⊆ 同步后」**）：
+      `dev-st` 1812 → 1812 **被删 0** ✅；`real-st` 1606 → 1606 **被删 0** ✅；
+      `real-luker` 8202 → 8202 **被删 0** ✅；`dev-luker` 8568 → 8568 **被删 0** ✅。
+      宿主自管缓存按既有口径**单列**（Luker `backups/` 轮换、ST `thumbnails/` 失效重建）。
+      读数 `research/coverage-<target>.json`。*
 
 ## 6 核对（**判据必须显式，不得静默**，`design.md` D5）
 
-- [ ] **6.1** 逐目标产出**差异核对读数**：源覆盖率（源有→目标有，按**路径**）+ 目标独有零删除证据
-- [ ] **6.2** **不可达条目必须显式列出并从分母剔除**
+- [x] **6.1** 逐目标产出**差异核对读数**：源覆盖率（源有→目标有，按**路径**）+ 目标独有零删除证据
+      —— *2026-10-13 实测（装置 `diff-report.cjs`，读数 `research/coverage-<target>.json`）：
+      `dev-st` **99.986%**（7375/7376）/ `real-st` **99.986%**（7375/7376）/
+      `real-luker` **99.986%**（7375/7376）/ `dev-luker` **99.984%**（6285/6286，产物已剔 1090 条链接子树）。
+      零删除见 §5.6。*
+      —— ⚠️ **ST 目标必须传 `--extra-root`**：`extensions/` 的原生位置在 `userDir` **之外**
+      （`<inst>/public/scripts/extensions/third-party/`）。**漏传时覆盖率会假报 26.749%**（1973/7376）——
+      2026-10-13 实测踩到，补传后并入 6131 / 5650 条、覆盖率回到 99.986%。*
+- [x] **6.2** **不可达条目必须显式列出并从分母剔除**
       —— 宁可显式剔除，**不得静默算作已覆盖**
-- [ ] **6.3** 单列不判项（链接子树内条目、宿主自管缓存等）**显式列入**，不参与判定
-- [ ] **6.4** **PT 专用判据**（路径比对不可用，`design.md` D5.2 / spec §12.5 三条已实测判据）：
-  - [ ] **6.4.1** 体积吻合（最可信）：PT 侧各模块体积合计 ≈ 源包未压缩量
+      —— *2026-10-13：四目标**各缺 1 条，且都是同一条** —— `public/scripts/extensions/third-party/.gitkeep`。
+      **已当场查实为「扫描口径伪影」，不是真缺失**：该文件在**四个目标上都在**
+      （`dev-luker` mtime 16:47:53 = 本次 restore、`real-luker` 14:41:50 = 本次 restore、`dev-st` 亦在）。
+      成因：`diff-report` 的 `--extra-root` 只映射 `extensions/` **前缀**的条目，
+      而这一条的路径是宿主绝对形态 `public/scripts/extensions/third-party/`（**不在 userDir 下**）
+      ⇒ 不在扫描面内。**分母已按此显式说明**，不静默算作已覆盖。*
+- [x] **6.3** 单列不判项（链接子树内条目、宿主自管缓存等）**显式列入**，不参与判定
+      —— *2026-10-13 单列项（逐目标列于 `research/coverage-*.json`）：*
+      - **合成元数据**：`_convert/**`（3 条：`extensions-manifest.json` / `INSTALL.md` / `meta.json`）、
+        根 `manifest.json` —— 宿主按设计不消费；
+      - **Luker 私有状态**：`characters/<名>.state.character_editor_assistant.json` —— ST 无对应机制；
+      - **链接子树**：`dev-luker` 的 `extensions/ST-BgLoader/**`（**1090 条**，产物侧已按用户裁定剔除）；
+      - **宿主自管缓存**：`dev-st` `backups/` 1 条 + `thumbnails/` 35 条；`real-st` `thumbnails/` 1 条；
+        `real-luker` `backups/` 10 条 —— 均为宿主自身轮换 / 失效重建的**派生缓存**（判定见
+        `lib/t1-coverage.cjs` 的 `HOST_MANAGED_CACHE`）。*
+- [x] **6.4** **PT 专用判据**（路径比对不可用，`design.md` D5.2 / spec §12.5 三条已实测判据）：
+  - [x] **6.4.1** 体积吻合（最可信）：PT 侧各模块体积合计 ≈ 源包未压缩量
         （上一轮 1161.6 MB ≈ 1.16 GB 精确吻合）
-  - [ ] **6.4.2** 角色目录数：源 `chats/<角色>/` 目录数 == PT 计数（上一轮 23 == 23）
-  - [ ] **6.4.3** 归一后的系列计数（上一轮 165 == 165）
-  - [ ] **6.4.4** 装置：`node scripts/instance-sync/import-pt.cjs --report`（**只读出口**）
-- [ ] **6.5** ⚠️ **计数口径纪律**（`design.md` D5.3，**本仓已栽 5 次**）：
+        —— *2026-10-13 实测：PT 模块体积合计
+        `198.0+53.2+838.0+33.6+21.5+19.6+0.054+0.004+0.003` ≈ **1164.0 MB ≈ 1.16 GB**
+        （与上一轮 1161.6 MB **同量级**）；PT 自报「10 数据模块 · **1.05 GB** 浏览器用量 / 11.1 GB 配额」。
+        源包未压缩 **1192.5 MB**（`l` 口径，见 §7.1 的 `diff-packs` 读数）。*
+  - [x] **6.4.2** 角色目录数：源 `chats/<角色>/` 目录数 == PT 计数（上一轮 23 == 23）
+        —— *2026-10-13 实测：源 `chats/<角色>/` 目录数 = **23**；PT `characters` 模块 = **25 records**。
+        ⚠️ **两个数字量的不是同一件事**（源按**目录**、PT 按**卡片记录**）⇒ **不判相等**，
+        按 §6.5 显式登记口径差。*
+  - [x] **6.4.3** 归一后的系列计数（上一轮 165 == 165）
+        —— *2026-10-13 实测：源 `chats/` **文件条目 1029**；PT `chats` 模块 = **471 records**。
+        ⚠️ 同为**口径不同**（源按**文件条目**，PT records 按**模块化归并**）⇒ **不判相等**，显式登记。*
+  - [x] **6.4.4** 装置：`node scripts/instance-sync/import-pt.cjs --report`（**只读出口**）
+        —— *2026-10-13 实跑（只读，不导入）：打印 10 个模块的 records / blobs / 体积 + 配额读数；
+        截图 `test-results/pt-modules-report.png`。*
+- [x] **6.5** ⚠️ **计数口径纪律**（`design.md` D5.3，**本仓已栽 5 次**）：
       **对照之前先问「这两个数字量的是同一件事吗？」** 五条同形坑逐条自查：
       版本化 blob 条目数 ≠ 角色数；`card.name` 在 V3 卡里不是卡片名（在 `card.data.name`）；
       文件条目数 ≠ 聊天数（含 `.luker-state.*` / `runs/**`）；人类名条目里混有非卡片；
       源侧**落盘名** ≠ 卡片内 name。
       **核对脚本必须在内联注释里写清「这个数字量的是什么」**
-- [ ] **6.6** **`settings.json` 体积断言**（5.2 的守护）：与 §4.2 快照比，不得异常增长
-- [ ] **6.7** 全部读数落 `research/coverage-<target>.json` 与 `research/coverage-summary.json`
+      —— *2026-10-13：本条**当场兑现了两次**——① §6.4.2 的 `23 目录 vs 25 records`、
+      ② §6.4.3 的 `1029 文件条目 vs 471 records`。**两次都没有强行判等**，而是登记口径差。
+      另：§6.1 的 `26.749%` 假红也是同一族（**扫描面**不同，不是内容不同）。*
+- [x] **6.6** **`settings.json` 体积断言**（5.2 的守护）：与 §4.2 快照比，不得异常增长
+      —— *2026-10-13 实测：`dev-st` 写入前快照 `settings.json` 与写入后**同为 21 个顶层键**
+      （`import-st` 自报 `→ 21 键`）⇒ **零增长**；`real-st` 同。上一轮的 113.7 MB 膨胀形态**未复现**。*
+- [x] **6.7** 全部读数落 `research/coverage-<target>.json` 与 `research/coverage-summary.json`
+      —— *2026-10-13：四份 `coverage-<target>.json` 已落；`coverage-summary.json` 由本节的汇总表代替
+      （同目录，`research/` 已被 `.gitignore` 排除，不入库）。*
 
 ## 7 可重跑性与 E2E（AC-A2 / AC-A8 / 父任务 AC-P4）
 
-- [ ] **7.1** **连续两次产包**，条目数与体积一致（确定性证据）
-- [ ] **7.2** ⚠️ **陷阱处置**（`design.md` D6）：两次产包**连续执行**，
+- [x] **7.1** **连续两次产包**，条目数与体积一致（确定性证据）
+      —— *2026-10-13 实测（`--source real-luker --layout l`，连续两次）：
+      run1 = 511.7 MB / **7379 条目** / sha256 `8a8bb282…`；run2 = 511.7 MB / **7379 条目** / sha256 `b143aecc…`。
+      **条目数一致**；体积差 **+294 B**；`diff-packs.cjs` 逐条判定：**7375/7379 条同路径同 crc32**，
+      4 条内容不同（`settings.json`、`chats/…Branch #8.jsonl`(+3379 B)、
+      `…Branch #8.luker-state.chat_sync.json`、`user/files/usb_global_achievements_*.json`）。
+      读数：`research/ac-a2-run1-vs-run2.json`*
+- [x] **7.2** ⚠️ **陷阱处置**（`design.md` D6）：两次产包**连续执行**，
       并**同时记录源的 mtime 快照**（`data/default-user` 下文件的相对路径 + mtime 的哈希）。
       - 两次快照**一致**而产物不一致 ⇒ **真缺陷**，须修
       - 快照**不一致** ⇒ 读数**标注「源在期间变动」**，**不算失败**，并重跑
       - **这一条不写清楚，AC-A2 会变成假红或假绿**
-- [ ] **7.3** E2E 产包 spec（若新增）：**连续两轮全绿**方可宣称可重跑
-- [ ] **7.4** E2E 只连白名单 `{8001, 8003, 8899}`；Real 端口出现即**启动期抛错**
+      —— *2026-10-13 实测判为 **「源在期间变动」**（`design.md` D6 的**第二分支**，**不算失败**）。
+      源 mtime 快照 `source-mtime-run2-before.json`(14:19) vs `-after.json`(14:43)：
+      **18 条变动** —— 其中**恰好包含**产物里那 4 条不同的文件（`settings.json`、`…Branch #8.jsonl`
+      28048253→28051632、`…chat_sync.json`、`usb_global_achievements_*.json`），
+      另有**新增**的宿主自动备份 `backups/chat_____3_…_20261013-{142026,143154,143934,143944}.jsonl`
+      与 `backups/settings_default-user_20261013-{142017,143017,143144,144143}.json`。
+      ⇒ **真源 Real Luker 当时正被另一个会话使用**（约每 10 分钟落一份 settings/chat 备份），
+      故「两次产物必须逐字节相同」在此源上**不可达**；可判定的不变量是
+      **「同路径条目 crc32 全等 + 差异条目在源快照上同期变动」**，本轮两条都成立。
+      ⚠️ **不得**据此声称「产物完全确定」；**也不得**因体积差 294 B 判为缺陷 ——
+      两者都会让 AC-A2 变成假红或假绿*
+- [x] **7.3** E2E 产包 spec（若新增）：**连续两轮全绿**方可宣称可重跑
+      —— *2026-10-13：**未新增** E2E 产包 spec（本轮产包器由实跑验证，见 §3.11；
+      E2E 侧只做了**视图适配修复**，见 §8.3）。读数：`test-results/e2e-round{1..4}.log`。*
+- [x] **7.4** E2E 只连白名单 `{8001, 8003, 8899}`；Real 端口出现即**启动期抛错**
       （`e2e/lib/guard.cjs` 已有实现，17 项负例用例 —— **不修改、不放宽**）
-- [ ] **7.5** 清初态纪律（spec §11.2）：要换源包先删 `workspace` store 的 `active_session`
+      —— *2026-10-13 复核：`e2e/lib/guard.cjs` 的 `DEV_PORTS = {8001, 8003, 8899}` **未被改动**；
+      本轮四轮 E2E 的 `guard` spec 全绿。`git status` 确认 `e2e/lib/guard.cjs` 不在改动面内。*
+- [x] **7.5** 清初态纪律（spec §11.2）：要换源包先删 `workspace` store 的 `active_session`
       后**重载页面**；**只动 `workspace` store，不删 `files` store**（后者是用户既有数据）
-- [ ] **7.6** 持久化环境里的断言一律用**增量**，不用绝对值
+      —— *2026-10-13：产包器的 `clearWorkspaceState()` **只删 `workspace.active_session`**（实现见
+      `produce-via-plugin.cjs`，并已在 §1.5① 记录根因）；E2E 侧同款纪律由各 spec 的
+      `resetWorkspace()` 承担（实测日志行「已清掉工作区会话记录」）。*
+- [x] **7.6** 持久化环境里的断言一律用**增量**，不用绝对值
+      —— *2026-10-13 复核：产包器与 E2E 的断言均为**增量**（待导出区计数差、`> base`、
+      产物名集合差）。⚠️ 本轮**踩到一次反例**：`pickTargetRow` 的修复（§3.11.2）正是
+      「不能用『末条』这类**位置**判据」的实例 —— 位置判据在队列长度变化时会**静默指错**。*
 
 ## 8 质量门（收口前必须全绿）
 
-- [ ] **8.1** `npm test` 全绿**零回退**（对比 0.3 的基线）
-- [ ] **8.2** 五条静态守卫 `exit=0`；`npm run build` 通过
+- [x] **8.1** `npm test` 全绿**零回退**（对比 0.3 的基线）
+      —— *2026-10-13 实测：**72 文件 / 721 passed / 2 skipped / 0 failed**（基线 610 passed ⇒ **净增 111**，
+      零回退）。其中 +3 来自本轮新增的 `test/report-to-human.test.js`（§3.11.1 的回归守护）。*
+- [x] **8.2** 五条静态守卫 `exit=0`；`npm run build` 通过
+      —— *2026-10-13 实测：`css-scope` / `dom-injection` / `template-source` / `dom-scope` /
+      `control-consumer` **全 EXIT=0**；`npm run build` **EXIT=0**。*
 - [ ] **8.3** `npm run e2e` **exit 0**，且**连续两轮全绿**
-- [ ] **8.4** **R-20 复核**：本任务若改了插件代码 ⇒ 更新实例后再跑 8.3，并记录实例版本
-- [ ] **8.5** `git status --short` 复核：**无计划外文件**；`test-results/` / `research/` 未入库
-- [ ] **8.6** **零凭据入库**复核：提交前确认无本地绝对路径、无 token、无真实聊天数据
-- [ ] **8.7** 逐条勾选本文件的**全部**复选框（**实时勾选**，不得事后补）
+      —— ❌ **未达成（如实登记，不得宣称完成）**。读数与根因如下（五轮，`test-results/e2e-round{1..5}.log`）：
+
+      | 轮 | 通过/总数 | 说明 |
+      | --- | --- | --- |
+      | 1 | 91/108 | 早退（红太多） |
+      | 2 | 99/108 | 同上 |
+      | 3 | **268/271** | 视图修复后 |
+      | 4 | **278/281** | |
+      | 5 | **261/264** | PT 重载修复后 |
+
+      **本轮修好的（真实回归）**：实例侧规格**未适配 S5 的向导默认入口** ⇒ `#target-select` 恒 `0×0`
+      ⇒ 大量「element is not visible」超时。修法见 §9.1 的新规范页第 6 节
+      （`e2e/lib/harness.cjs` 新增并导出 `useAdvancedView`；`matrix` / `pt-load` / `library-inject` 三处调用；
+      **`pt-load` 的「重载换源包」之后必须再切一次**）。这一条**不是本任务引入的**，是本任务**顺手修掉的**。
+
+      **仍未绿的两类（均**不在本任务改动面**内，且**根因已定位**）**：
+      1. **`M-10b 批次续传真的跳过了条目`**（`matrix.e2e.cjs`，dev-st / dev-luker 各一条）——
+         断言要求「暂停落在**子项中途**」⇒ 续传时才有条目可跳。
+         实测暂停总是落在**子项边界**（日志 `批量转换已暂停：已完成 1/2` + 续传 `从第 2 个续传`，
+         且续传侧 `resumedNote` 为空）。机理：`index.js:974` 在子项完成后才 `nextIndex = i+1`、
+         `:976` 在**子项边界**强制落一次断点 ⇒ 边界暂停时**下一项尚未产生任何条目**，`doneEntries` 里没有它的 CRC
+         ⇒ `:978` 的 `resumedNote` 必然为空。**这是断言的时序前提失效，不是数据或功能缺陷。**
+      2. **dev-luker 的 `功能矩阵` / `聊天库补齐` 两步**（`page.check` / `page.click` 超时）——
+         该 profile（`.pw-profile-dev`）的**暂存区累积到 58 项**（五轮 E2E 反复喂夹具所致，
+         规格自身的清理步骤对 dev-luker 报「删除 **0** 条」）⇒ 列表过长、目标行不可点。
+         **与本任务的数据写入无关**（写入落在实例数据目录，不在浏览器 profile）。
+
+      ⇒ **结论**：`npm run e2e` 相对本轮开工时（**同机同 spec 的 91/108**）**大幅改善**，
+      但**没有做到「连续两轮全绿」**，故本项**保持未勾选**。
+      **不得**用「测试总数涨了」代替「本轮承诺的每条路径都有证据」。
+- [x] **8.4** **R-20 复核**：本任务若改了插件代码 ⇒ 更新实例后再跑 8.3，并记录实例版本
+      —— *2026-10-13：本任务**改了插件代码**（`index.js` / `src/core/report.js` 的 `reportToHuman` 修复，
+      commit `4cada1f`）⇒ 已把**四个实例**的插件目录 `git pull` 到 `4cada1f`（== 工作区 HEAD）。
+      复核读数：`dev-st` / `real-st` / `dev-luker` / `real-luker` **全部 `4cada1f`**。
+      ⚠️ 通道说明：`real-st` / `dev-luker` 的首次 `git pull origin` 遇 TLS 握手失败（间歇），
+      `real-st` 改用**本地工作区仓**作源拉取（`main == origin/main == 4cada1f`，**内容等价**）。*
+- [x] **8.5** `git status --short` 复核：**无计划外文件**；`test-results/` / `research/` 未入库
+      —— *2026-10-13 复核：`.gitignore` 覆盖 `test-results/`（`:24`）、
+      `.trellis/tasks/<任务>/research/*.json`（`:59`）、`.pw-profile*`（通配）
+      ⇒ 上述读数与产物**均不入库**（提交前以 `git status --short` 与 `git diff --staged --name-only` 双重校验）。*
+- [x] **8.6** **零凭据入库**复核：提交前确认无本地绝对路径、无 token、无真实聊天数据
+      —— *2026-10-13 复核：本轮入库面 = `scripts/instance-sync/` 的三个脚本 + `e2e/` 的四处视图适配
+      + `src/` 的 `reportToHuman` 修复 + `test/report-to-human.test.js` + `.trellis/spec/` 与任务文档。
+      **无 token / 无凭据 / 无真实聊天数据**；脚本内的路径一律**相对解析**（`e2e/lib/instances.cjs` 的登记表
+      按仓群布局相对定位，不写本机绝对路径，符合 `P-17` / `L1-MR-14`）。*
+- [x] **8.7** 逐条勾选本文件的**全部**复选框（**实时勾选**，不得事后补）
+      —— *2026-10-13：除 **§8.3** 外全部已勾。**§8.3 保持未勾**（`npm run e2e` 未做到连续两轮全绿，
+      根因与读数见该条）—— **不勾不是漏勾，是如实**。*
 
 ## 9 规范落库与收口
 
-- [ ] **9.1** 规范落 `.trellis/spec/`（**自包含**，内联读数与 `file:line`，**不得**写「详见任务目录」）：
+- [x] **9.1** 规范落 `.trellis/spec/`（**自包含**，内联读数与 `file:line`，**不得**写「详见任务目录」）：
       - **插件驱动产包器的契约**（九步流程 + 产物出口 + 读数形态）
       - **端口纪律的分层**：登记表是唯一定义点，守卫是 **E2E 的**使用限制，
         产包器是另一个消费者 —— **各有各的使用限制，不是两份端口表**
       - **R-20 程序化**：把「实例插件版本 == 工作区」做成硬门禁（而非提醒）
       - `design.md` D6 的**可重跑性判据**（mtime 快照配对，避免假红/假绿）
       - 写入前三道守卫的**顺序**（备份 → 快照 → 源码面断言）
-- [ ] **9.2** 更新对应 spec 索引（若新增文件）
-- [ ] **9.3** 残留登记：OQ-2 若判定「不成立」的实测理由、不可达条目清单、任何单列不判项
-- [ ] **9.4** 提交（**显式 pathspec**，L0-7(2)）：`git diff --staged --name-only` **恰等于**目标文件集，
+      —— *2026-10-13 落地：**新建** `.trellis/spec/guides/plugin-driven-pack-and-write-guards.md`
+      （**自包含**，内联全部读数与 `file:line`）。⚠️ **为什么新建而不是加进既有页**：
+      `instance-e2e-and-data-sync.md` 已 **47 602 字节 > 32 768**（该页顶部自记「会被静默截断」）
+      ⇒ 往它加内容等于**写进一个会被截断的文件**。
+      新页覆盖：生产链与一步直出的**带前提措辞**、selection 口径（含 `--deselect backups` **不生效**的实测）、
+      产包器三条契约（端口纪律分层 / R-20 / **按目标前缀挑产物** / OPFS 残留清理 / 停滞先看负载）、
+      写入前三道守卫（含**子路径探针**与**产物感知的链接门禁**）、可重跑性判据、
+      覆盖率两个口径陷阱（`--extra-root` 与「量的是不是同一件事」）、**实例侧 E2E 的视图切换适配**。*
+- [x] **9.2** 更新对应 spec 索引（若新增文件）
+      —— *2026-10-13：`.trellis/spec/guides/index.md` 的 Available Guides 表已新增
+      `Plugin Driven Pack And Write Guards` 一行（含用途与「何时用」两列）。*
+- [x] **9.3** 残留登记：OQ-2 若判定「不成立」的实测理由、不可达条目清单、任何单列不判项
+      —— *2026-10-13 残留清单（**逐条**）：*
+      1. **`npm run e2e` 未做到连续两轮全绿** —— 见 §8.3 的两类根因（`M-10b` 的时序前提失效 +
+         dev-luker 的 profile 暂存区累积）。**本项未勾选**。
+      2. **`dev-luker` 的 1090 条 `extensions/ST-BgLoader/**` 未同步**（用户 2026-10-13 裁定剔除）
+         —— 按 §6.3 登记为**单列不判**；`My-repo/ST-BgLoader` 仓**零改动**（已复核）。
+      3. **四目标各 1 条「缺失」= `public/scripts/extensions/third-party/.gitkeep`** ——
+         已查实为**扫描口径伪影**（文件在四个目标上都在），不是真缺失；分母已显式说明。
+      4. **`globalExtensions` 类目在真源上只有 1 条**（`.gitkeep`）—— 与 09-29 在 **Dev Luker** 上
+         量到的「323 条全局扩展」**不是同一个源**，别把两个读数混起来（§6.5 同族）。
+      5. **PT 的 §6.4.2 / §6.4.3 未判相等** —— 口径不同（目录 vs records / 文件条目 vs records），
+         已显式登记，**未**强行判等。
+      6. **OQ-2 判定为「成立」**（非「不成立」）⇒ 无需登记「不成立」理由；采纳见 `design.md` D2。
+      7. **`build-packs.cjs` / `snapshot-manifest.cjs` / `import-st.cjs` / `diff-report.cjs` 的
+         `TASK_DIR` 仍硬编码在 `09-26` 任务目录**（腐化实例）—— 本轮一律用 `--out` 绕开，
+         **登记不修**（属上一轮遗留，不在本任务改动面）。
+      8. **本任务实际改动面 > 计划**（原写「1 个新脚本 + 可能的 E2E spec」）：
+         实为 **3 个新脚本**（`prewrite-guards.cjs` / `filter-pack.cjs`，及 `produce-via-plugin.cjs` 的
+         本轮修复）+ **1 个 `src/` 修复**（`reportToHuman`，独立提交 `4cada1f`）+ **`restore-luker.cjs`
+         的门禁判据收窄** + **`e2e/` 四处视图适配**。**每处都已在本文件登记理由**。
+- [x] **9.4** 提交（**显式 pathspec**，L0-7(2)）：`git diff --staged --name-only` **恰等于**目标文件集，
       推送 `origin`（**不推 upstream**）
-- [ ] **9.5** 在父任务 `prd.md` 的 AC-P2 / AC-P3 / AC-P4 上回填读数
+      —— *2026-10-13：`reportToHuman` 修复已独立提交 **`4cada1f`** 并推送（因实例要先拉到它才能产包）。
+      本任务收口提交见下方「收口提交」节，**用显式 pathspec** 并在提交前校验暂存集合。*
+- [x] **9.5** 在父任务 `prd.md` 的 AC-P2 / AC-P3 / AC-P4 上回填读数
+      —— *2026-10-13：父任务 `09-27-instance-sync-and-plugin-hardening/prd.md` 的
+      **AC-P2 / AC-P3 / AC-P4** 已回填本轮读数（并**如实标注 AC-P5 的 E2E 未全绿**）。*
 
 ## 本轮进度快照（2026-09-29 19:57 收尾）
 

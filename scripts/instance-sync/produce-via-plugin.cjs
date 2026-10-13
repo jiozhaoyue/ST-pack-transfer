@@ -383,6 +383,34 @@ async function clearWorkspaceState(page) {
 }
 
 /**
+ * 清理 OPFS 里**上一次失败运行**留下的临时包（`fetch-<ts>.zip`）。
+ *
+ * ## 为什么必须清（2026-10-13 实测，是本轮最难定位的一条）
+ *
+ * 插件把宿主拉取的流**直写 OPFS**，成功时自行删除（日志行 `OPFS 临时包已清理`）；
+ * 但**运行中断（停滞 / 被终止）时不会删** ⇒ 残留逐次累积 —— 实测
+ * `.pw-profile/Default/File System` 达 **5.2 GB**，内含多份 >100 MB 残留。
+ * 现象是**退化的**：第一次能跑完，**之后每次都在 ~1.3 GB 处停滞**（真源包 1.66 GB）。
+ *
+ * ⇒ 每次运行前先清干净，让每次起跑条件一致（这也是「可重跑性」的前提之一）。
+ *
+ * **只删名字匹配 `fetch-*.zip` 的条目**，不碰 OPFS 里其它任何内容。
+ */
+async function clearStaleOpfsTemps(page) {
+  return page.evaluate(async () => {
+    if (!navigator.storage || !navigator.storage.getDirectory) return { supported: false, removed: [] };
+    const root = await navigator.storage.getDirectory();
+    const removed = [];
+    for await (const [name, handle] of root.entries()) {
+      if (handle.kind === 'file' && /^fetch-.*\.zip$/i.test(name)) {
+        try { await root.removeEntry(name); removed.push(name); } catch { /* 被占用则跳过 */ }
+      }
+    }
+    return { supported: true, removed };
+  });
+}
+
+/**
  * 钉死 selection。
  *
  * ## 两种模式（**默认不喂夹具** —— 这一条是实测改出来的）
@@ -557,20 +585,47 @@ async function readFetchButton(page) {
   });
 }
 
-/** 待导出区条目读数（计数 + 末条的名字/来源/布局/体积文案） */
+/** 待导出区条目读数（计数 + **全部条目名** + 末条的名字/来源/布局/体积文案） */
 async function readQueue(page) {
   return page.evaluate(() => {
     const rows = Array.from(document.querySelectorAll('#export-queue-panel .export-queue-item'));
+    const nameOf = (r) => ((r.querySelector('.eq-name') || {}).textContent || '').trim();
     const last = rows[rows.length - 1];
     return {
       count: rows.length,
+      names: rows.map(nameOf),
       last: last ? {
-        name: (last.querySelector('.eq-name') || {}).textContent || null,
+        name: nameOf(last) || null,
         meta: (last.querySelector('.eq-meta') || {}).textContent || null,
         hasDownloadBtn: Boolean(last.querySelector('.eq-buttons button.download')),
       } : null,
     };
   });
+}
+
+/**
+ * 从待导出区条目名里挑出**目标包**。
+ *
+ * ⚠️ 为什么不能取「末条」（2026-10-13 实测回归）：S2 的「源端三类交付」（`f30e68a`）之后，
+ * 一次宿主导出会往待导出区放 **3 条** —— 源备份（`<宿主平台>-<handle>.zip`）、目标包
+ * （`<目标布局>_<user>_<part>_<date>.zip`）、独立报告（`<宿主平台>-<user>_报告.txt`）。
+ * 旧实现取 `rows[rows.length - 1]` ⇒ 拿到的是**报告 .txt** ⇒ 下载后按 zip 读 ⇒
+ * `End of central directory not found`（产物明明已经产出，却被判失败）。
+ *
+ * 判据用**目标布局前缀**（`--raw` 时为 `raw-`）：源备份名以宿主平台码开头（如 `luker-`），
+ * 与目标前缀（如 `l_`）不会撞车。
+ *
+ * @param {string[]} names
+ * @param {string} prefix
+ * @returns {string|null}
+ */
+function pickTargetRow(names, prefix) {
+  const zips = names.filter((n) => n.toLowerCase().endsWith('.zip'));
+  const byPrefix = zips.find((n) => n.startsWith(prefix));
+  if (byPrefix) return byPrefix;
+  // 回退：只有一个 zip ⇒ 就是它（`--raw` 下目标名可能不带前缀）
+  if (zips.length === 1) return zips[0];
+  return null;
 }
 
 /**
@@ -736,6 +791,10 @@ async function entryCountOf(filePath) {
     phases.splash = stamp();
     if (!splashGone) console.log('  · ⚠ splash 未在窗口内关闭 —— 页内 click 不受其影响，继续');
 
+    // ①c 清 OPFS 残留临时包（上一次中断留下的）—— 见 clearStaleOpfsTemps 的根因说明
+    const opfsClean = await clearStaleOpfsTemps(page).catch((e) => ({ supported: false, error: String(e && e.message) }));
+    console.log(`[produce] OPFS 残留清理：${JSON.stringify(opfsClean)}`);
+
     // ② 插件就绪（§11.8-1：宿主 DOM 就绪 ≠ 插件已注入；判据是 #env-badge 脱离模板初值）
     const pluginReady = await waitInPage(page, () => {
       const el = document.getElementById('env-badge');
@@ -857,33 +916,41 @@ async function entryCountOf(filePath) {
       b.click();
     });
 
-    // ⑦ 等产物入待导出区（计数增加）
-    const enqueued = await waitInPage(page, (base) => {
-      const rows = document.querySelectorAll('#export-queue-panel .export-queue-item');
-      return rows.length > base;
-    }, queueBefore.count, args.timeout, '产物进入待导出区');
+    // ⑦ 等**目标包**入待导出区。
+    //    ⚠️ 不能只看「计数增加」：S2 之后一次宿主导出会入 **3 条**（源备份 / 目标包 / 报告），
+    //    计数先涨的是源备份或报告 ⇒ 会拿到非目标包。判据改为**目标布局前缀**（见 `pickTargetRow`）。
+    const targetPrefix = args.raw ? 'raw-' : `${args.layout}_`;
+    const enqueued = await waitInPage(page, (arg) => {
+      const names = Array.from(document.querySelectorAll('#export-queue-panel .export-queue-item .eq-name'))
+        .map((n) => (n.textContent || '').trim());
+      const zips = names.filter((n) => n.toLowerCase().endsWith('.zip'));
+      return zips.some((n) => n.startsWith(arg.prefix)) || (arg.raw && zips.length === 1);
+    }, { prefix: targetPrefix, raw: args.raw }, args.timeout, '目标包进入待导出区');
     phases.enqueued = stamp();
     queueAfter = await readQueue(page);
     logTail = await readLog(page);
-    console.log(`[produce] 待导出区：${queueAfter.count} 条（新条目 ${JSON.stringify(queueAfter.last)}，t+${phases.enqueued}s）`);
-    if (!enqueued) throw new Error(`等不到产物入区。日志尾部：${JSON.stringify(logTail.slice(-400))}`);
+    console.log(`[produce] 待导出区：${queueAfter.count} 条 ${JSON.stringify(queueAfter.names)}（t+${phases.enqueued}s）`);
+    if (!enqueued) throw new Error(`等不到目标包入区。日志尾部：${JSON.stringify(logTail.slice(-400))}`);
 
-    const producedName = queueAfter.last && queueAfter.last.name ? queueAfter.last.name : `${args.source}-${args.layout}.zip`;
+    const producedName = pickTargetRow(queueAfter.names, targetPrefix);
+    if (!producedName) {
+      throw new Error(`待导出区里挑不出目标包（前缀 ${targetPrefix}）：${JSON.stringify(queueAfter.names)}`);
+    }
     const destPath = path.join(outDir, producedName);
     const partialPath = `${destPath}.partial`;
 
-    // ⑧ 点该条目的「下载」→ 捕获 Playwright download 事件
+    // ⑧ 点**该条**的「下载」→ 捕获 Playwright download 事件
     //    （重名则先移除旧的，避免"看起来下载成功、其实是上一轮的包"）
     if (fs.existsSync(destPath)) fs.rmSync(destPath);
     const dlPromise = page.waitForEvent('download', { timeout: args.timeout });
-    const clicked = await page.evaluate(() => {
+    const clicked = await page.evaluate((want) => {
       const rows = Array.from(document.querySelectorAll('#export-queue-panel .export-queue-item'));
-      const last = rows[rows.length - 1];
-      const btn = last && last.querySelector('.eq-buttons button.download');
+      const row = rows.find((r) => (((r.querySelector('.eq-name') || {}).textContent || '').trim()) === want);
+      const btn = row && row.querySelector('.eq-buttons button.download');
       if (!btn) return false;
       btn.click();
       return true;
-    });
+    }, producedName);
     if (!clicked) throw new Error('找不到末条的「下载」按钮（导出区渲染形态变了？）');
     const dl = await dlPromise;
     await dl.saveAs(partialPath);

@@ -23,7 +23,7 @@
  * 4. 全流程零本插件报错（拉取被中止也**不得**报成失败）。
  */
 
-const { isPluginRef } = require('../lib/harness.cjs');
+const { isPluginRef, useAdvancedView } = require('../lib/harness.cjs');
 
 /** 桩供给方：两条可导出聊天 + 一条隐藏容器（都被源包"缺"⇒ 应全部被导出） */
 const STUB = ({ chats }) => {
@@ -124,6 +124,9 @@ module.exports = {
       return { ok: true, app: Boolean(drawer.querySelector('.st-converter-drawer-app')) };
     });
     t.ok('I2 插件工作台抽屉可打开', opened.ok && opened.app, JSON.stringify(opened));
+    // I2b **切到「高级工作台」视图**（S5 第二步起默认入口是迁移向导；不切则 I3 的入口按钮恒不可见）
+    const viewAfter = await useAdvancedView(page);
+    t.eq('I2b 已切到高级工作台视图', viewAfter, 'advanced', `view=${viewAfter}`);
     t.ok('I3 宿主态下「从宿主拉取」入口可见',
       await page.evaluate(() => {
         const el = document.getElementById('btn-host-fetch');

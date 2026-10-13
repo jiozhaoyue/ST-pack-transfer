@@ -26,6 +26,7 @@ const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const { pathToFileURL } = require('url');
+const { useAdvancedView } = require('../lib/harness.cjs');
 
 const SLUG = 'st-zip-converter';
 const FIXTURE_DIR = path.resolve(__dirname, '../../test-results/fixtures');
@@ -351,6 +352,11 @@ async function openWorkbench(page) {
   const plugin = await openDrawer(page);
   out.pluginDrawer = plugin.ok;
   if (!plugin.ok) out.reason = plugin.reason;
+
+  // ②b **切到「高级工作台」视图**（S5 第二步起默认入口是迁移向导）
+  //     向导一次只披露当前步的区块 ⇒ 不切则 `#target-select` 恒 0×0，
+  //     下面第 ③ 步的可见性验收必然红（2026-10-13 实测 `npm run e2e` 17 项红即由此）。
+  if (out.pluginDrawer) out.view = await useAdvancedView(page);
 
   // 可见性验收：工作台第一个控件有真实尺寸（这是后面所有真实交互的前提）
   try {

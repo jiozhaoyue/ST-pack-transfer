@@ -94,10 +94,36 @@ E2E 基础设施（guard 17 / smoke 36 / matrix 122）入库、PT 通道打通�
       §2.5 判别力证明已补（摘掉 `mountDebugProbe` ⇒ R-19 四条转红 ⇒ 还原 ⇒ 91/91 绿）。
       读数落 `09-27-plugin-defect-fixes/research/e2e-closeout-2026-09-29.json`
 - [ ] **AC-P2** 子任务 A（同步/备份）的 AC 全部达成
-- [ ] **AC-P3** 集成核对：五个可写目标逐目标「覆盖率 + 零删除」读数齐备（PT 用模块读数判据）
-- [ ] **AC-P4** 插件产包**可重跑性**证据：同一源连续两次产包，条目数/体积一致
+      —— **2026-10-13 回填：AC-A1…AC-A7 / AC-A9 / AC-A10 达成；AC-A8 未达成**（见 AC-P5）。
+      证据：产包由插件在 Real Luker 内触发（§3.11 修复后 `l`/`st`/`tt` 各 exit 0）；
+      Luker 两处备份齐备（`backup-real-luker-20261013-145533.zip` 1750.9 MB / 8797 条 /
+      `backup-dev-luker-20261013-145705.zip` 1213.8 MB / 8167 条）；写入前三道守卫全 PASS；
+      五目标写入完成（`restoredCount`：real-luker 7377 / dev-luker 6287 / PT Δ639）。
+      **AC-A8 未达成** ⇒ 本项**保持未勾选**（不得用「大部分达成」代替「全部达成」）
+- [x] **AC-P3** 集成核对：五个可写目标逐目标「覆盖率 + 零删除」读数齐备（PT 用模块读数判据）
+      —— **2026-10-13 回填**：`dev-st` **99.986%**（7375/7376）/ `real-st` **99.986%** /
+      `real-luker` **99.986%** / `dev-luker` **99.984%**（6285/6286，产物按用户裁定剔 1090 条链接子树）；
+      **零删除四目标全 `被删 0`**（1812→1812 / 1606→1606 / 8202→8202 / 8568→8568）。
+      PT 用**模块读数判据**（路径比对不可用）：10 模块 / 体积合计 ≈ **1164 MB ≈ 1.16 GB** /
+      `chats` 471 records / `characters` 25 records（口径差已显式登记）。
+      四目标各 1 条「缺失」= `public/scripts/extensions/third-party/.gitkeep`，**查实为扫描口径伪影**
+      （文件在各目标上都在）。读数落子任务 `research/coverage-*.json`
+- [x] **AC-P4** 插件产包**可重跑性**证据：同一源连续两次产包，条目数/体积一致
+      —— **2026-10-13 回填**：`l` 连续两次 —— 均 **7379 条目**；体积 536 571 474 B vs 536 571 768 B（差 **+294 B**）；
+      `diff-packs.cjs` 逐条：**7375/7379 同路径同 `crc32`**，4 条内容不同。
+      源 mtime 快照 **18 条变动**且**恰好包含**那 4 条（另有真源自动备份新增）
+      ⇒ 判为 `design.md` D6 的**「源在期间变动」分支**（**不算失败**；真源当时正被另一会话使用）。
+      ⚠️ **不得**据此宣称「产物完全确定」
 - [ ] **AC-P5** 质量门：`npm test` + `npm run e2e`（exit 0）+ 五条静态守卫（exit 0）+ `npm run build`
-- [ ] **AC-P6** 本轮规范已落 `.trellis/spec/`（自包含）
+      —— **2026-10-13 回填：`npm test` / 五守卫 / `build` 全绿；`npm run e2e` ❌ 未 exit 0** ⇒ 本项**保持未勾选**。
+      `npm test` **72 文件 / 721 passed / 2 skipped / 0 failed**（基线 610 ⇒ 净增 111，零回退）；
+      五守卫与 `build` 全 `EXIT=0`。`npm run e2e` 五轮：91/108 → 99/108 → 268/271 → 278/281 → 261/264
+      （**本轮修好实例侧规格的向导视图适配**；残留 `M-10b` 时序前提失效 + dev-luker profile 暂存区累积，
+      根因见子任务 `implement.md` §8.3）
+- [x] **AC-P6** 本轮规范已落 `.trellis/spec/`（自包含）
+      —— **2026-10-13 回填**：新建 `.trellis/spec/guides/plugin-driven-pack-and-write-guards.md`
+      （自包含、内联读数与 `file:line`），并在 `guides/index.md` 登记。
+      另：`design.md` D2 已补「实测结论（用户裁定采纳）」小节
 - [ ] **AC-P7** 两个子任务均已 `task.py archive`
 - [ ] **AC-P8** 环境收尾符合 PR-2.5
 
