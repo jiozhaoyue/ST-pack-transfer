@@ -1,0 +1,2 @@
+{"file": ".trellis/spec/frontend/host-capabilities.md", "reason": "宿主对接与有界等待的既有取舍"}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "质量门槛：五守卫 + 单测 + E2E 零回退"}

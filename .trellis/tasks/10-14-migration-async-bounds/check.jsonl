@@ -1,0 +1,2 @@
+{"file": ".trellis/spec/frontend/host-capabilities.md", "reason": "核对有界等待与静默降级是否守规范"}
+{"file": ".trellis/spec/frontend/resume-checkpoint-invariant.md", "reason": "停滞清理不得破坏断点续传不变量"}
