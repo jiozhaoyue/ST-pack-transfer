@@ -47,6 +47,7 @@ import { buildSourceDeliveries, guardedRestore, buildTargetEvidence } from './sr
 import { createMigrationPlan } from './src/core/migration-plan.js';
 import { assessTargetConflicts, describeConflictState, buildTargetBackupEvidence, describeBackupEvidence } from './src/core/migration-target.js';
 import { assessInventoryConflicts } from './src/core/target-inventory.js';
+import { STAGE_LABELS, createStageRecorder } from './src/core/stage-timings.js';
 import { classifyOutcome, MIGRATION_OUTCOMES } from './src/core/migration-evidence.js';
 import { buildRestoreVerification, summarizeVerification } from './src/core/migration-verification.js';
 import {
@@ -1703,10 +1704,13 @@ async function main(appRoot) {
           + '若拉取缓慢，请清理酒馆内历史备份快照，或在下方勾选项中取消「系统设置」。');
       }
 
+      // 分段计时（S0）：阈值校准的唯一手段——把宿主侧三段真实耗时记下来（见 async-bounds.md）
+      const timings = createStageRecorder();
       const rawBackup = await fetchHostBackup(host.platform, endpointSelection, {
         taskId,
         signal,
         resumeCheckpoint,
+        timings,
         onPhase: async (phase, received, total, opfsName, currentBps) => {
           // 实测速度直显（bytes/s → MB/s），非估算
           const speedText = currentBps ? ` ${((currentBps / 1048576)).toFixed(1)} MB/s` : '';
@@ -1734,6 +1738,7 @@ async function main(appRoot) {
 
       // 统一源形态：OPFS 句柄 → File（zip.js 原生消费 File，零内存拷贝）
       const rawBackupIsOpfs = rawBackup && rawBackup.kind === 'opfs';
+      logger.info(`宿主导出分段耗时：${timings.summary()}`);
       opfsName = rawBackupIsOpfs ? rawBackup.name : null;
       let rawBackupBlob = rawBackupIsOpfs
         ? await opfsHandleToFile(rawBackup.handle)
@@ -1862,6 +1867,7 @@ async function main(appRoot) {
         logger.info(`进行直出格式与资产过滤处理: ${host.platform.toUpperCase()} -> ${targetLayout.toUpperCase()} (包含备份聊天: ${hostIncludeBackups}, 逐文件排除: ${confirmedExcludedPaths.size})`);
 
         const compressionLevel = compressionSelect ? parseInt(compressionSelect.value, 10) : 5;
+        timings.begin(STAGE_LABELS.CONVERT);
         const { report, resultBlob } = await runConversionTask({
           source: rawBackupBlob,
           target: targetLayout,
@@ -1887,6 +1893,8 @@ async function main(appRoot) {
         finalBlob = resultBlob;
         conversionReport = report;
         view.renderReport(report);
+        timings.end(STAGE_LABELS.CONVERT);
+        logger.info(`宿主导出分段耗时（含转换）：${timings.summary()}`);
       } else if (hasFileExclusions || confirmedExcludedPaths.size > 0) {
         // 不转换时排除集也应同步到当前过滤器（保持树状态与产物一致）
         setExcludedPaths(confirmedExcludedPaths);

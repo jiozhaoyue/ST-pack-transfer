@@ -177,3 +177,83 @@ function makeAbortError(label) {
   err.name = 'AbortError';
   return err;
 }
+
+/**
+ * **传输停滞**上限（毫秒）：两次字节到达之间的最大间隔。
+ *
+ * 与上面几个「总时长」超时**语义不同**，故不共用常量：
+ * - 它**不**限制总时长 —— 只要字节持续到达，慢速传输永远不会被它打断（AC-2）；
+ * - 它只收敛「连接不死、也不再来字节」这一种形态 —— 此前该形态会让
+ *   `reader.read()` **永久 pending**（`L1-MR-7` 禁止的无界等待），而 UI 上「卡住」
+ *   与「正在慢速传输」**看起来一样**，用户除了点取消别无他法。
+ *
+ * ⚠ **60 s 是判断值，不是实测值**。依据：一般请求的总时限 `DEFAULT_FETCH_TIMEOUT_MS`
+ * 已是 120 s，停滞守卫要求「两次字节之间」不超过它的一半 —— 比总时限宽松（不误杀慢速传输）、
+ * 比「永不超时」严（真挂死能收敛）。**真实校准需要获授权的实例测量**，见
+ * `.trellis/spec/frontend/async-bounds.md` 的「待实测校准」节。
+ *
+ * 调参唯一落点即此处；调用方也可逐次传 `timeoutMs` 覆盖，传 `0` 关闭守卫。
+ */
+export const DOWNLOAD_STALL_TIMEOUT_MS = 60_000;
+
+/**
+ * 带**停滞守卫**读一块流数据。
+ *
+ * 与 `fetchWithTimeout` 的取舍一致（`timeoutMs <= 0` 表示不设守卫），但守的是**间隔**而非**总时长**。
+ * 停滞时**必须**先 `reader.cancel()` 再抛错：否则底层流仍被锁住、`fetch` 的 body 不会释放，
+ * 等于把「无界等待」从 promise 挪到了流上。
+ *
+ * 抛 `TimeoutError`（**不是** `AbortError`）——用户主动取消与「宿主挂死」必须能区分，
+ * 否则 UI 会把前者说成后者（`fetch-bounds.js` 顶部的既有取舍）。
+ *
+ * @param {{read: () => Promise<{done: boolean, value?: any}>, cancel?: (reason?: any) => Promise<void>}} reader
+ * @param {{timeoutMs?: number, label?: string}} [opts] `timeoutMs <= 0` 表示不设守卫
+ * @returns {Promise<{done: boolean, value?: any}>}
+ * @throws {TimeoutError} 停滞超时
+ */
+export function readStreamChunkBounded(reader, { timeoutMs = DOWNLOAD_STALL_TIMEOUT_MS, label = '接收数据' } = {}) {
+  if (!(timeoutMs > 0)) return reader.read();
+
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    let timer = null;
+
+    const cleanup = () => {
+      if (timer !== null) {
+        clearTimeout(timer);
+        timer = null;
+      }
+    };
+
+    timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      // 先释放流再抛错：不 cancel 的话底层 body 仍被占用
+      Promise.resolve()
+        .then(() => reader.cancel?.(new Error(`${label}停滞`)))
+        .catch(() => {})
+        .finally(() => {
+          reject(new TimeoutError(
+            `${label}停滞超过 ${Math.round(timeoutMs / 1000)} 秒（宿主可能已挂起）`,
+            { label, timeoutMs },
+          ));
+        });
+    }, timeoutMs);
+
+    reader.read().then(
+      (chunk) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        resolve(chunk);
+      },
+      (err) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        reject(err);
+      },
+    );
+  });
+}

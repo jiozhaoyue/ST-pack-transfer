@@ -17,12 +17,15 @@ import {
 } from '../core/extension-manifest.js';
 import {
   DEFAULT_FETCH_TIMEOUT_MS,
+  DOWNLOAD_STALL_TIMEOUT_MS,
   SHORT_FETCH_TIMEOUT_MS,
   TimeoutError,
   UPLOAD_TIMEOUT_MS,
   fetchWithTimeout,
   readJsonBounded,
+  readStreamChunkBounded,
 } from './fetch-bounds.js';
+import { STAGE_LABELS } from '../core/stage-timings.js';
 
 /**
  * 恢复在途标志（并发互斥）。
@@ -720,11 +723,20 @@ export async function opfsHandleToFile(handle) {
  * @param {string} [options.taskId] 任务标识（OPFS 临时文件名，默认按时间戳）
  * @param {AbortSignal} [options.signal] 中止信号（透传 fetch 与 reader 循环）
  * @param {{receivedBytes?: number, totalBytes?: number, opfsName?: string|null}} [options.resumeCheckpoint] 断点清单
+ * @param {{begin: Function, end: Function}} [options.timings] 分段计时记录器（`createStageRecorder()`）；
+ *   不传即零行为变化。标记 `credentials` / `host-generate` / `transfer` 三段。
+ * @param {number} [options.stallTimeoutMs] 传输**停滞**上限（两次字节之间的最大间隔）；
+ *   默认 `DOWNLOAD_STALL_TIMEOUT_MS`，传 `0` 关闭守卫。
  * @returns {Promise<Blob|{kind:'opfs', name:string, size:number, handle:FileSystemFileHandle}>}
  */
-export async function fetchHostBackup(platform, selection = null, { onPhase, taskId, signal, resumeCheckpoint } = {}) {
+export async function fetchHostBackup(platform, selection = null, {
+  onPhase, taskId, signal, resumeCheckpoint,
+  timings = null, stallTimeoutMs = DOWNLOAD_STALL_TIMEOUT_MS,
+} = {}) {
   logger.info(`正在连接宿主 [${platform.toUpperCase()}] 获取授权凭证...`);
+  timings?.begin(STAGE_LABELS.CREDENTIALS);
   const [token, handle] = await Promise.all([getCsrfToken(), getHandle()]);
+  timings?.end(STAGE_LABELS.CREDENTIALS);
 
   const sel = selection ? { ...selection } : { ...FULL_SELECTION };
   const body = platform === 'luker'
@@ -733,6 +745,10 @@ export async function fetchHostBackup(platform, selection = null, { onPhase, tas
 
   logger.info(`向宿主发起数据包导出请求 (用户: ${handle})...`);
   onPhase?.('host-generating', 0, 0);
+
+  // 宿主打包阶段（TTFB 之前）**刻意不设停滞上限**：GB 级备份的生成耗时本就可能很长，
+  // 对它设固定阈值只会误杀正常导出。这一段只受用户取消影响（见 async-bounds.md）。
+  timings?.begin(STAGE_LABELS.HOST_GENERATE);
 
   // 续传：优先 Range 从断点接（追加写 OPFS 半成品）
   const resumeBytes = Math.max(0, resumeCheckpoint?.receivedBytes || 0);
@@ -808,6 +824,8 @@ export async function fetchHostBackup(platform, selection = null, { onPhase, tas
   try {
     if (response.body && typeof response.body.getReader === 'function') {
       onPhase?.('transferring', appendFromByte, transferTotal, opfsHandle ? opfsName : undefined);
+      timings?.end(STAGE_LABELS.HOST_GENERATE); // 首字节已到 ⇒ 打包阶段结束
+      timings?.begin(STAGE_LABELS.TRANSFER);
       const reader = response.body.getReader();
       const chunks = writable ? null : [];
       let received = appendFromByte;
@@ -816,7 +834,11 @@ export async function fetchHostBackup(platform, selection = null, { onPhase, tas
       let speedWindowBytes = 0;
       let speedWindowStart = performance.now();
       for (;;) {
-        const { done, value } = await reader.read();
+        // 停滞守卫：只守「两次字节之间的间隔」，不守总时长（见 async-bounds.md）
+        const { done, value } = await readStreamChunkBounded(reader, {
+          timeoutMs: stallTimeoutMs,
+          label: '接收宿主数据包',
+        });
         if (done) break;
         if (writable) {
           await writable.write(value);
@@ -846,6 +868,7 @@ export async function fetchHostBackup(platform, selection = null, { onPhase, tas
         }
         onPhase?.('transferring', received, transferTotal, opfsHandle ? opfsName : undefined, currentBps);
       }
+      timings?.end(STAGE_LABELS.TRANSFER); // 读完即闭合（两个 return 分支之前）
       if (writable) {
         await writable.close();
         const file = await opfsHandle.getFile();
@@ -855,7 +878,11 @@ export async function fetchHostBackup(platform, selection = null, { onPhase, tas
       }
       blob = new Blob(chunks, { type: 'application/zip' });
     } else {
+      // 响应体不可流式：整体读取（无法逐块检测停滞，故只记一段「传输」）
+      timings?.end(STAGE_LABELS.HOST_GENERATE);
+      timings?.begin(STAGE_LABELS.TRANSFER);
       blob = await response.blob();
+      timings?.end(STAGE_LABELS.TRANSFER);
       if (writable) {
         // 罕见：response.body 不可流式但 OPFS 可用——落盘后统一走句柄路径
         await writable.write(blob);

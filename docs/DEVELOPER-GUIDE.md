@@ -192,7 +192,7 @@ npm run e2e:web -- --rebuild  # 删/换过源码文件时必须加（mtime 判�
 | 自动目标备份 | **已接入（2026-10-14）**：恢复对话框「自动备份并预检目标」→ `fetchHostInventory()` 触发 `/api/users/backup` → 只读中央目录 → 入待导出区 **且** 落工作区（IndexedDB）⇒ `readback-verified`。三条件（可读 / 范围覆盖 / 已留存）缺一即降级 `none`，**不**回落 `user-attested` |
 | 目标冲突预检 | **已接入（2026-10-14）**：`src/core/target-inventory.js` 的 `alignInventories` 对齐守卫 + `assessInventoryConflicts`。只有对齐成立才报真实冲突数；**伪报「0 冲突」比报 unknown 更危险**，故截断 / 清单为空 / 缺标准根标记 / 顶层段不可比 一律降级 `unknown` |
 | 自动重发重试 | **判定就绪**（`assessRetry` + `selectRetryCandidates` 双重门）；**执行未接入**（无部分重试 UI） |
-| 各异步阶段超时数值与测量 | 未做 |
+| 各异步阶段超时数值与测量 | **边界已逐条取证 + 测量装置已就位（2026-10-14）**：`.trellis/spec/frontend/async-bounds.md`（10 阶段边界表，逐条 `file:line`）+ `src/core/stage-timings.js` 的 `createStageRecorder()`（已接线到宿主导出路径）。**传输停滞守卫**已补（`readStreamChunkBounded`，只守间隔不守总时长）。⚠ **数值本身仍是判断值**——本仓尚无真实耗时读数，全部标「待实测校准」，校准需获授权的实例 |
 | 四个宿主的完整有向迁移路径证据 | 格式转换面 4 源 × 4 目标 = 16 条逐条走通（含 PT 原生源）；**目标侧写入**仍靠实例/人工证据 |
 | 外部用户试用 | 未做（公开发布关口未通过） |
 | TT 自动化 | 无浏览器端口 ⇒ 人工交付 |
