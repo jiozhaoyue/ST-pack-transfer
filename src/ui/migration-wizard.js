@@ -125,6 +125,28 @@ export function unknownStepOwners(templateHtml) {
 }
 
 /**
+ * 把「默认不含的特殊类目」编成检查页的一行汇总（纯函数）。
+ *
+ * 存在原因（OQ-1 裁决的配套）：用户裁定「13 键为准」后，`backups` 进了默认范围，
+ * 但 `cache` / `appPrivate` 仍**默认不含**。差异必须**明说**——「不可默认漏掉数据」
+ * 的落点是「不静默丢」，不是「全都塞进去」。
+ *
+ * 只覆盖**特殊类目**：标准类目的排除是逐条的，已由 `plan.categories[*].items` 逐项呈现。
+ *
+ * @param {Array<{key: string, flag: string, reason?: string}>} [exclusions]
+ * @returns {string} 形如 `本次不含：cache（includeCache=false，…）· appPrivate（…）`；无排除时为空串
+ */
+export function formatSpecialExclusionSummary(exclusions = []) {
+  const list = Array.isArray(exclusions) ? exclusions.filter((e) => e && e.key) : [];
+  if (list.length === 0) return '';
+  const parts = list.map((e) => {
+    const tail = e.reason ? `，${e.reason}` : '';
+    return `${e.key}（${e.flag}=false${tail}）`;
+  });
+  return `本次不含：${parts.join(' · ')}`;
+}
+
+/**
  * DOM 装配。**这是本模块唯一允许碰 DOM 的地方。**
  *
  * 所有文本一律走 `textContent`（不用 `innerHTML`）——既避开注入面，也让

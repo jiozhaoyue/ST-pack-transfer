@@ -74,7 +74,19 @@ if (isAvailable) {
 `applyPreset`（`category-filter.js:388-415`）的 `safe` 预设会**取消 `secrets` 与 `chats`**。
 这是**用户主动点的快捷筛选**，不是默认值 —— 不得把它当默认（`R-03` / `D-07` 明确「不以脱敏子集取代默认值」）。
 
-## 6. 本片未做的事
+## 6. 本片未做的事（**2026-10-14 更正：两项均已落地**）
 
-- 未裁定「默认全选」以 `currentSelection` 还是 `FULL_SELECTION` 为准（这是 S1 判定契约的输入，需在 S1 PRD 固化）。
-- 未改任何代码；`currentSelection` 的污染机制仅**描述**，修复归 S1/S5。
+- ~~未裁定「默认全选」以 `currentSelection` 还是 `FULL_SELECTION` 为准（这是 S1 判定契约的输入，
+  需在 S1 PRD 固化）。~~ → **已裁定（2026-10-14，用户答 OQ-1）：以 `currentSelection` 的 13 键表为准。**
+  落地于子任务 `10-14-migration-selection-defaults`：新增唯一默认源
+  `src/core/selection-defaults.js`（`DEFAULT_SELECTION` / `STANDARD_SELECTION_KEYS` /
+  `buildEndpointSelection()` / `describeSpecialExclusions()`），三处默认（面板初值 / 端点缺省体 /
+  模板复选框）全部由它派生，双轨陷阱消除。
+- ~~未改任何代码；`currentSelection` 的污染机制仅**描述**，修复归 S1/S5。~~
+  → 默认值部分**已改**（见上）；**污染机制（§3 的「不可用类目写回 false」）仍未修**，
+  仍归 S1/S5。
+- **新增裁决留痕**：用户 2026-10-14 选择「13 键为准」时同时确认接受其代价——
+  `include-backups-check` 默认由**不勾变为勾上**，即默认导出会包含 `backups/` 历史快照
+  （Luker 上勾「系统设置」本就会隐含打包该目录，故这是把隐含行为显式化）。
+  `cache` / `appPrivate` **仍默认不含**（表里即 `false`），但检查页会**明说**它们不在本次范围内
+  （「不可默认漏掉数据」的落点是「不静默丢」，不是「全都塞进去」）。

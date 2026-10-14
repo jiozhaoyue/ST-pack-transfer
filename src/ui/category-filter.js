@@ -1,5 +1,6 @@
 import { CATEGORIES, CATEGORY_LABELS } from '../core/inspect.js';
 import { ACTION_LABELS, SPECIAL_CATEGORIES, SPECIAL_LABELS } from '../core/plan-preview.js';
+import { DEFAULT_SELECTION } from '../core/selection-defaults.js';
 import { actionTokenVar } from './action-colors.js';
 import { createCategoryDetailList } from './file-tree-picker.js';
 
@@ -19,21 +20,12 @@ const CATEGORY_ICONS = {
   [SPECIAL_CATEGORIES.APP_PRIVATE]: 'fa-solid fa-lock',
 };
 
-let currentSelection = {
-  characters: true,
-  chats: true,
-  lorebooks: true,
-  presets: true,
-  settings: true,
-  secrets: true,
-  assets: true,
-  extensions: true,
-  globalExtensions: true,
-  vectors: true,
-  backups: true,
-  cache: false,
-  appPrivate: false,
-};
+/**
+ * 当前勾选意图（requested）。**初值来自唯一默认源** `src/core/selection-defaults.js`——
+ * 用户 2026-10-14 裁定 OQ-1「13 键为准」后，这张表不再手写第二份，
+ * 否则会与端点缺省体、模板复选框默认三处漂移（`selection-semantics.md` §2/§4 的双轨陷阱）。
+ */
+let currentSelection = { ...DEFAULT_SELECTION };
 
 let currentExcludedPaths = new Set();
 let availableCategories = new Set();

@@ -48,6 +48,7 @@ import { createMigrationPlan } from './src/core/migration-plan.js';
 import { assessTargetConflicts, describeConflictState, buildTargetBackupEvidence, describeBackupEvidence } from './src/core/migration-target.js';
 import { assessInventoryConflicts } from './src/core/target-inventory.js';
 import { STAGE_LABELS, createStageRecorder } from './src/core/stage-timings.js';
+import { describeSpecialExclusions } from './src/core/selection-defaults.js';
 import { classifyOutcome, MIGRATION_OUTCOMES } from './src/core/migration-evidence.js';
 import { buildRestoreVerification, summarizeVerification } from './src/core/migration-verification.js';
 import {
@@ -84,7 +85,7 @@ import { UPLOAD_TIMEOUT_MS } from './src/ui/fetch-bounds.js';
 import { setupFileDrop } from './src/ui/file-drop.js';
 import { createViewController } from './src/ui/view.js';
 import { getWorkbenchHtml } from './src/ui/workbench-template.js';
-import { mountMigrationWizard } from './src/ui/migration-wizard.js';
+import { mountMigrationWizard, formatSpecialExclusionSummary } from './src/ui/migration-wizard.js';
 import { createMigrationSession } from './src/ui/migration-controller.js';
 import { splitArchiveEntries, normalizeSplitMb } from './src/core/splitter.js';
 import { zipIo, readZipEntryManifest } from './src/core/zip-io.js';
@@ -1335,6 +1336,12 @@ async function main(appRoot) {
     const count = plan.expectedOutputFiles ?? 0;
     const bytes = plan.expectedOutputBytes ?? 0;
     const stale = Boolean(wizard.isStale && wizard.isStale());
+    // OQ-1 配套：特殊类目「默认不含」的差异必须明说，不静默丢（读当前勾选，不是读默认表）
+    const specialSummary = formatSpecialExclusionSummary(describeSpecialExclusions({
+      backups: Boolean(includeBackupsCheck && includeBackupsCheck.checked),
+      cache: Boolean(includeCacheCheck && includeCacheCheck.checked),
+      appPrivate: Boolean(includePrivateCheck && includePrivateCheck.checked),
+    }));
     const exclusions = [];
     for (const [catKey, cat] of Object.entries(plan.categories || {})) {
       for (const item of (cat?.items || [])) {
@@ -1347,7 +1354,7 @@ async function main(appRoot) {
       }
     }
     wizard.setCheckPanel({
-      summary: `${stale ? '⚠ 关键输入已变更，请重新确认下方读数。' : ''}预计产出 ${count} 个条目 / ${formatBytes(bytes)}；排除 ${exclusions.length} 项。`,
+      summary: `${stale ? '⚠ 关键输入已变更，请重新确认下方读数。' : ''}预计产出 ${count} 个条目 / ${formatBytes(bytes)}；排除 ${exclusions.length} 项。${specialSummary ? ` ${specialSummary}` : ''}`,
       exclusions,
     });
   }

@@ -17,6 +17,7 @@ import {
   buildSessionGateVerdict,
   extractStepOwners,
   unknownStepOwners,
+  formatSpecialExclusionSummary,
 } from '../src/ui/migration-wizard.js';
 import { SESSION_SCHEMA_VERSION } from '../src/core/migration-session.js';
 
@@ -213,5 +214,33 @@ describe('WIZARD_VIEWS', () => {
   it('两视图码固定', () => {
     expect(WIZARD_VIEWS.WIZARD).toBe('wizard');
     expect(WIZARD_VIEWS.ADVANCED).toBe('advanced');
+  });
+});
+
+describe('formatSpecialExclusionSummary（检查页「本次不含」汇总 · OQ-1 配套）', () => {
+  it('列出特殊类目 + 载体参数名 + 理由', () => {
+    const s = formatSpecialExclusionSummary([
+      { key: 'cache', flag: 'includeCache', reason: '导入后会自动重建' },
+      { key: 'appPrivate', flag: 'includeAppPrivate', reason: '目标平台不消费' },
+    ]);
+    expect(s).toContain('本次不含：');
+    expect(s).toContain('cache（includeCache=false');
+    expect(s).toContain('appPrivate（includeAppPrivate=false');
+    expect(s).toContain('导入后会自动重建');
+  });
+
+  it('无排除 ⇒ 空串（不打印空标签）', () => {
+    expect(formatSpecialExclusionSummary([])).toBe('');
+    expect(formatSpecialExclusionSummary()).toBe('');
+    expect(formatSpecialExclusionSummary(null)).toBe('');
+  });
+
+  it('缺 reason 也不产生悬空分隔符', () => {
+    const s = formatSpecialExclusionSummary([{ key: 'cache', flag: 'includeCache' }]);
+    expect(s).toBe('本次不含：cache（includeCache=false）');
+  });
+
+  it('忽略缺 key 的畸形条目', () => {
+    expect(formatSpecialExclusionSummary([null, {}, { flag: 'x' }])).toBe('');
   });
 });

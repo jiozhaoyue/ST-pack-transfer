@@ -2386,3 +2386,62 @@ R6b 批量子项真增量**未做**（批量路径**正确性已达成**，只�
   与 S6 的真人验收 / 外部试用。按常驻指令，这两项不擅自拍板，本轮收口后一并向用户提问。
 
 > ⚠️ 本日志仍超 2000 行软上限；拆分归档应另开任务。
+
+---
+
+## Session 42（2026-10-14）· 默认选择口径统一（OQ-1 裁决落地）
+
+**承接**：用户在 Session 41 收口时对 OQ-1 的裁决——**「13 键为准（默认更全，推荐）」**。
+建子任务 `10-14-migration-selection-defaults`，自主实施、归档。
+
+### 裁决的实质后果：消除双轨陷阱
+
+`research/selection-semantics.md` §4 早已取证但一直没修的那个陷阱：
+`currentSelection.backups` 默认 `true`（**面板显示已勾选**），而真正决定产物的 `includeBackups`
+默认 `false`（**产物里没有备份条目**）——**用户看到「已勾选」却拿不到数据**。
+根因是三张默认表各写各的：面板 13 键字面量 / 端点 10 键字面量 / 模板三个复选框**均无 `checked`**。
+
+### 做出来的东西
+
+| # | 内容 | 性质 |
+| --- | --- | --- |
+| 1 | `src/core/selection-defaults.js`：`DEFAULT_SELECTION`(13) / `STANDARD_SELECTION_KEYS`(10) / `buildEndpointSelection()` / `describeSpecialExclusions()` | 唯一默认源 |
+| 2 | 三处默认改为同源派生（面板初值 / `FULL_SELECTION` / 模板三复选框 `checked`） | 消除双轨 |
+| 3 | `formatSpecialExclusionSummary()` + 检查页「本次不含」汇总行 | 口径可见 |
+| 4 | `test/selection-defaults.test.js`(8) + 向导测试 +4 | 测试 |
+
+**`FULL_SELECTION` 形状逐字节不变**（10 键 / 全 true / frozen），故既有 4 处调用零改动——
+端点的 `selection` 体本来就不认特殊类目（那三个走插件侧 `include*` 参数），本片不改这个既成事实。
+
+### 本片的读法（已写进 PRD 供核对）
+
+用户裁决的是「**以哪张表为准**」，不是「改表里的值」。故按字面落地：13 键表原样为准
+⇒ **`include-backups-check` 默认由不勾变为勾上**（默认导出会含 `backups/`），
+而 `cache` / `appPrivate` **仍默认不含**。
+「不可默认漏掉数据」的落点因此定在**「不静默丢」**而不是「全都塞进去」——
+检查页会明说「本次不含：cache（`includeCache=false`，…）· appPrivate（…）」。
+用户在选该项时已确认接受 backups 带来的体量代价（选项原文含该代价）。
+
+### 读数
+
+| 项 | 读数 |
+| --- | --- |
+| `npm test` | 801 → **813 passed / 2 skipped / 0 failed**（净增 12，80 文件） |
+| 五守卫 + build + build:offline | 全绿 |
+| 独立形态 E2E | **496/496**（`--rebuild`，exit 0） |
+
+### 同时交付：S6 真人验收目标卡
+
+`docs/USER-ACCEPTANCE-CARD.md`——用户裁定「我来走一遍，你记录卡点」后产出。
+**只写目标与判据、不写操作步骤**（步骤本身就是被检验的对象），含卡点记录格式与「不要做的事」
+（不许我指路、不许绕过界面、不许用 Real 实例）。
+
+### 残留
+
+- `renderCategoryStats()` 的「不可用类目写回 false」污染（§3）**仍未修**——归 S1/S5。
+- 默认产物变大**未经实机验证**；检查页汇总行**未在浏览器里肉眼确认**。
+- **阈值实测（用户已授权，只连 Dev）受阻**：四个实例端口 8001–8004 **全部未运行**，
+  且插件未部署进实例（按 `CLAUDE.md` 坑 #2 我不写实例目录）⇒ 无法采集分段耗时。
+  等实例起来后再做。
+
+> ⚠️ 本日志仍超 2000 行软上限；拆分归档应另开任务。

@@ -14,6 +14,11 @@
  *   保留：状态与错误反馈、placeholder、图标自身悬停名、状态读数摘要。
  */
 
+import { DEFAULT_SELECTION } from '../core/selection-defaults.js';
+
+/** 特殊类目复选框的 `checked` 由**唯一默认源**派生（用户 2026-10-14 裁定 OQ-1「13 键为准」）。 */
+const checkedAttr = (key) => (DEFAULT_SELECTION[key] ? ' checked' : '');
+
 /** 徽标组（抽屉态渲染在块一状态行，其余模式渲染在页头；两处只渲染一份，防重复 id） */
 const BADGES_HTML = `
       <span class="badge" id="env-badge">检测中...</span>
@@ -174,15 +179,15 @@ export function getWorkbenchHtml({ isModal = false, isDrawer = false, isStandalo
         <div class="inline-drawer-content" style="display: none;">
           <div class="wb-checks">
             <label class="checkbox_label flex-container">
-              <input type="checkbox" id="include-backups-check">
+              <input type="checkbox" id="include-backups-check"${checkedAttr('backups')}>
               <span>打包 backups/ 快照</span>
             </label>
             <label class="checkbox_label flex-container">
-              <input type="checkbox" id="include-cache-check">
+              <input type="checkbox" id="include-cache-check"${checkedAttr('cache')}>
               <span>打包派生缓存</span>
             </label>
             <label class="checkbox_label flex-container">
-              <input type="checkbox" id="include-private-check">
+              <input type="checkbox" id="include-private-check"${checkedAttr('appPrivate')}>
               <span>打包私有配置</span>
             </label>
             <label class="checkbox_label flex-container">
