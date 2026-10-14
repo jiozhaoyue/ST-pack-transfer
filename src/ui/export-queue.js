@@ -83,6 +83,7 @@ const ORIGIN_LABELS = {
   [ORIGINS.DELTA]: { text: '增量补丁', cls: 'origin-delta' },
   [ORIGINS.SPLIT_PART]: { text: '分卷', cls: 'origin-split' },
   [ORIGINS.SOURCE_BACKUP]: { text: '源备份', cls: 'origin-source-backup' },
+  [ORIGINS.TARGET_BACKUP]: { text: '目标保底备份', cls: 'origin-target-backup' },
   [ORIGINS.REPORT]: { text: '迁移报告', cls: 'origin-report' },
 };
 

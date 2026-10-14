@@ -188,9 +188,9 @@ npm run e2e:web -- --rebuild  # 删/换过源码文件时必须加（mtime 判�
 | 项 | 状态 |
 | --- | --- |
 | 纯库聊天接口 | 上游未实现，三条聊天库路径均未在真实纯库环境跑通 |
-| 目标侧自动读回核对 | **判定就绪**（`buildRestoreVerification` / `summarizeVerification`）；**宿主侧读回未接入**（无「列用户文件」端点 ⇒ `coverage` 只到「宿主确认写入」） |
-| 自动目标备份 | **判定就绪**（`buildTargetBackupEvidence` 可产 `readback-verified`）；**宿主侧执行未接入**（触发 `/api/users/backup`、校验可读、落工作区留存仍待 host-bridge） |
-| 目标冲突预检 | **判定就绪**（`assessTargetConflicts`；读不到清单 ⇒ `unknown` 不是 0）；**目标侧自动读取清单未接入**（恢复流程冲突一律 unknown，由对话框确认风险） |
+| 目标侧自动读回核对 | **判定就绪**（`buildRestoreVerification` / `summarizeVerification`）；**写入后**的宿主侧读回**仍未接入**（`coverage` 只到「宿主确认写入」）。⚠ 注意：读取宿主清单的**能力**已具备（见下两条），缺的是「写入之后再取一次并比对」的编排 |
+| 自动目标备份 | **已接入（2026-10-14）**：恢复对话框「自动备份并预检目标」→ `fetchHostInventory()` 触发 `/api/users/backup` → 只读中央目录 → 入待导出区 **且** 落工作区（IndexedDB）⇒ `readback-verified`。三条件（可读 / 范围覆盖 / 已留存）缺一即降级 `none`，**不**回落 `user-attested` |
+| 目标冲突预检 | **已接入（2026-10-14）**：`src/core/target-inventory.js` 的 `alignInventories` 对齐守卫 + `assessInventoryConflicts`。只有对齐成立才报真实冲突数；**伪报「0 冲突」比报 unknown 更危险**，故截断 / 清单为空 / 缺标准根标记 / 顶层段不可比 一律降级 `unknown` |
 | 自动重发重试 | **判定就绪**（`assessRetry` + `selectRetryCandidates` 双重门）；**执行未接入**（无部分重试 UI） |
 | 各异步阶段超时数值与测量 | 未做 |
 | 四个宿主的完整有向迁移路径证据 | 格式转换面 4 源 × 4 目标 = 16 条逐条走通（含 PT 原生源）；**目标侧写入**仍靠实例/人工证据 |

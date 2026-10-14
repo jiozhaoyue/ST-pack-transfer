@@ -4,7 +4,8 @@
  */
 
 import { logger } from '../core/logger.js';
-import { zipIo } from '../core/zip-io.js';
+import { zipIo, readZipEntryManifest } from '../core/zip-io.js';
+import { buildTargetManifest } from '../core/target-inventory.js';
 import * as zip from '../vendor/zip.js';
 import { getWorkbenchHtml } from './workbench-template.js';
 import { isSafeHttpUrl, trustedStaticMarkup } from './escape.js';
@@ -884,6 +885,54 @@ export async function fetchHostBackup(platform, selection = null, { onPhase, tas
   logger.success(`成功从宿主拉取数据包，大小: ${(blob.size / 1024 / 1024).toFixed(2)} MB`);
   await validateBackupShape(blob, platform);
   return blob;
+}
+
+/**
+ * 读取**当前宿主**的用户清单（目标预检用），并把该次导出作为**保底备份**交回调用方。
+ *
+ * 这是 `src/core/target-inventory.js` 的宿主执行层：判定与呈现全在纯模块里，本函数只负责
+ * 「取一份真清单」这一件事。做法是复用**既有**的全量导出通道：
+ *
+ *   `fetchHostBackup(platform, null, …)`（`selection=null` ⇒ `FULL_SELECTION`）
+ *     → 归一为 `File`（OPFS 路径经 `opfsHandleToFile`）
+ *     → `readZipEntryManifest`（**只读中央目录**，不解压、不读数据流）
+ *     → `buildTargetManifest`
+ *
+ * `selection` 必须走全量：`alignInventories` 的判据要求清单里至少有标准根标记（`characters` /
+ * `chats` / `settings.json` / `secrets.json`），带过滤的导出会让清单**看似完整实则缺项**
+ * （判为 `PARTIAL` ⇒ 降级 `unknown`，`target-inventory.js`）。
+ *
+ * **静默降级（`L0-11`）**：宿主不支持、请求失败、用户取消、包不可读 —— 一律返回
+ * `{ manifest: null, file: null, reason }`，**不抛**，调用方无需分支即可退回既有 `unknown` 行为。
+ *
+ * @param {object} [options]
+ * @param {'st'|'luker'} options.platform 宿主平台码（非插件态传空串亦可，将直接降级）
+ * @param {AbortSignal} [options.signal] 取消信号（归一为 `reason:'cancelled'`，同样不抛）
+ * @param {function(string, number, number, string=, number=): void} [options.onPhase] 导出阶段回调
+ * @param {string} [options.taskId] OPFS 临时文件标识
+ * @returns {Promise<{manifest: {paths: string[], count: number, truncated: boolean}|null,
+ *                    file: File|Blob|null, reason: string}>}
+ */
+export async function fetchHostInventory({ platform, signal = null, onPhase = null, taskId = null } = {}) {
+  if (!platform) {
+    return { manifest: null, file: null, reason: '当前宿主不支持读取用户清单' };
+  }
+  try {
+    const raw = await fetchHostBackup(platform, null, { onPhase, taskId, signal });
+    const file = raw && raw.kind === 'opfs' ? await opfsHandleToFile(raw.handle) : raw;
+    if (!file) {
+      return { manifest: null, file: null, reason: '宿主未返回可读数据包' };
+    }
+    const entries = await readZipEntryManifest(file);
+    const manifest = buildTargetManifest(entries);
+    logger.info(`目标预检：读取到宿主清单 ${manifest.count} 条`);
+    return { manifest, file, reason: '' };
+  } catch (err) {
+    const cancelled = err?.name === 'AbortError';
+    const reason = cancelled ? 'cancelled' : (err?.message || String(err));
+    logger.warn(`目标预检未能读取宿主清单（${reason}），本次按「冲突状态未知」处理`);
+    return { manifest: null, file: null, reason };
+  }
 }
 
 /**

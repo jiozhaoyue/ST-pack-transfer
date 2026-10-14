@@ -34,6 +34,7 @@ export const ORIGINS = Object.freeze({
   SPLIT_PART: 'split-part',
   SOURCE_BACKUP: 'source-backup',
   REPORT: 'report',
+  TARGET_BACKUP: 'target-backup',
 });
 
 /**
