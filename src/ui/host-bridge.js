@@ -26,6 +26,7 @@ import {
   readStreamChunkBounded,
 } from './fetch-bounds.js';
 import { STAGE_LABELS } from '../core/stage-timings.js';
+import { buildEndpointSelection } from '../core/selection-defaults.js';
 
 /**
  * 恢复在途标志（并发互斥）。
@@ -255,18 +256,14 @@ export function resolveTargetLayout(rawValue, platform, fallback = 'l') {
   return v;
 }
 
-export const FULL_SELECTION = Object.freeze({
-  settings: true,
-  secrets: true,
-  characters: true,
-  chats: true,
-  lorebooks: true,
-  presets: true,
-  assets: true,
-  extensions: true,
-  globalExtensions: true,
-  vectors: true,
-});
+/**
+ * 宿主导出端点的**缺省选择体**：只含 10 个标准类目、全 `true`。
+ *
+ * 由唯一默认源派生（`src/core/selection-defaults.js`）——形状与既往逐字节相同，
+ * 只是不再手写第二份字面量（用户 2026-10-14 裁定 OQ-1「13 键为准」后的统一）。
+ * 特殊类目（backups/cache/appPrivate）**不在**这里：它们走插件侧的 `include*` 参数，不走端点布尔。
+ */
+export const FULL_SELECTION = buildEndpointSelection();
 
 /**
  * 宿主平台代码 → `/api/users/backup` 是否支持 **selection 透传**。
