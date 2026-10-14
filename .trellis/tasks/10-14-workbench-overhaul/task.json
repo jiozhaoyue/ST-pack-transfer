@@ -1,0 +1,30 @@
+{
+  "id": "workbench-overhaul",
+  "name": "workbench-overhaul",
+  "title": "工作台 UI 全面重构与局域网互传",
+  "description": "父任务：统辖 UI 层全量重写、引导入口替代向导模式、局域网互传三个子交付；持需求全集、任务地图、跨子任务验收与最终集成复核。",
+  "status": "planning",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "jiozhaoyue",
+  "assignee": "jiozhaoyue",
+  "createdAt": "2026-10-14",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "10-14-ui-full-rewrite",
+    "10-14-onboarding-guide",
+    "10-14-lan-transfer"
+  ],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {}
+}

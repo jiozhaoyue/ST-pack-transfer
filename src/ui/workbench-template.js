@@ -1,17 +1,26 @@
 /**
- * 酒馆数据包互转工坊 - HTML 模板生成器（分区式 · 单一模板源）
+ * 酒馆数据包互转工坊 - HTML 模板生成器（单一模板源 · 单一视图）
  *
- * 三个入口共用本函数（L1-MR-10 单向化 · 2026-09-25）：
+ * 三个入口共用本函数（L1-MR-10 单向化）：
  *   · 独立 Web   ：index.html 空骨架 → bootstrap() 注入 getWorkbenchHtml({ isStandalone: true })
  *   · 插件抽屉态 ：mountSettingsDrawer() → getWorkbenchHtml({ isDrawer: true })
  *   · 模态态     ：openConverterModal() → getWorkbenchHtml({ isModal: true })
  *
- * 分区与披露级别（用户 2026-09-25 逐项裁决，见任务 09-25-ui-slim-native/prd.md）：
- *   A 状态 / B 源包 / C 产物 / E 动作 / F 输出目标 / G 内容范围 —— 首屏常驻
- *   H 垃圾清理 / I 扩展打包 / J 增量与差量 / K 包名 —— 宿主原生 inline-drawer 折叠
+ * 2026-10-14 重构：**删除迁移向导外壳**（六步步骤条 / 向导模式·高级模式切换 / 不兼容门）。
+ * 向导把同一份 DOM 用 `data-wb-step` 分段显隐，结果第 6 步是空的、第 3 步显示的不是范围
+ * 选择器；不兼容门因 CSS `display` 压过 `hidden` 变成全程可见的空壳框（且全仓无调用点）。
+ * 现在只有**一个视图**：区块按层级顺序排列，没有模式切换，没有步骤条。
  *
- * 文案约定：不出现解释性静态文案（描述段 / 括号补充 / 小字提示 / 教学性 tooltip）。
- *   保留：状态与错误反馈、placeholder、图标自身悬停名、状态读数摘要。
+ * 文案约定（用户 2026-10-14 死命令，逐条可判定）：
+ *   禁止括号说明、禁止分号、禁止长句说明、禁止并排铺开、禁止任何解释性文案。
+ *   保留：状态与错误反馈、placeholder、状态读数摘要。
+ *
+ * 控件约定：所有多选一一律用下拉枚举控件，不用并排 radio（用户裁定「禁止模式选择」）。
+ *   注：本行**不得**出现控件标签字面量——`check:control-consumer` 按源码正则提取控件，
+ *   注释里写标签会被当成无 id 的控件而误报（2026-10-14 实际踩到）。
+ *
+ * 配色约定：本文件不承载颜色；一切颜色由 style.css 从 `--SmartTheme*` 继承（用户裁定
+ * 「只用酒馆颜色」）。模板内禁止写 style 里的色值。
  */
 
 import { DEFAULT_SELECTION } from '../core/selection-defaults.js';
@@ -19,7 +28,7 @@ import { DEFAULT_SELECTION } from '../core/selection-defaults.js';
 /** 特殊类目复选框的 `checked` 由**唯一默认源**派生（用户 2026-10-14 裁定 OQ-1「13 键为准」）。 */
 const checkedAttr = (key) => (DEFAULT_SELECTION[key] ? ' checked' : '');
 
-/** 徽标组（抽屉态渲染在块一状态行，其余模式渲染在页头；两处只渲染一份，防重复 id） */
+/** 徽标组（抽屉态渲染在状态行，其余形态渲染在页头；两处只渲染一份，防重复 id） */
 const BADGES_HTML = `
       <span class="badge" id="env-badge">检测中...</span>
       <span class="badge badge-user" id="host-user-badge" style="display: none;">用户: 未登录</span>
@@ -43,110 +52,54 @@ export function getWorkbenchHtml({ isModal = false, isDrawer = false, isStandalo
       </div>
       <div class="header-badges">
         ${BADGES_HTML}
+        <button type="button" class="menu_button btn-tool" id="btn-guide"><i class="fa-solid fa-circle-question"></i> 引导</button>
         ${isModal ? '<button type="button" class="st-converter-modal-close-btn" id="btn-close-converter-modal" title="关闭工作台">&times;</button>' : ''}
       </div>
     </header>
     ` : ''}
 
-    <!-- ═══ 块零：向导外壳（步骤条 / 视图开关 / 不兼容门）═══
-         向导不是第二份 UI：它只切换根容器上的 data-wb-view / data-wb-step，
-         显隐由 style.css 的 .wb-wizard 段决定（见 src/ui/migration-wizard.js 顶部注释）。 -->
-    <div class="wb-wizard" id="wizard-chrome">
-      <div class="wb-view-switch">
-        <span class="wb-view-title"><i class="fa-solid fa-compass"></i> 迁移向导</span>
-        <button type="button" class="menu_button btn-tool" id="btn-wb-view-toggle" aria-pressed="false">高级模式</button>
-      </div>
-      <nav class="wb-step-rail" id="wizard-rail" aria-label="迁移步骤" role="tablist">
-        <button type="button" class="menu_button wb-step-btn" data-wb-step="source" role="tab">1 来源</button>
-        <button type="button" class="menu_button wb-step-btn" data-wb-step="target" role="tab">2 目标</button>
-        <button type="button" class="menu_button wb-step-btn" data-wb-step="scope" role="tab">3 范围</button>
-        <button type="button" class="menu_button wb-step-btn" data-wb-step="check" role="tab">4 检查</button>
-        <button type="button" class="menu_button wb-step-btn" data-wb-step="run" role="tab">5 执行</button>
-        <button type="button" class="menu_button wb-step-btn" data-wb-step="verify" role="tab">6 核对</button>
-      </nav>
-      <div class="wb-step-nav">
-        <button type="button" class="menu_button" id="btn-wizard-prev"><i class="fa-solid fa-chevron-left"></i> 上一步</button>
-        <span class="wb-step-counter" id="wizard-step-counter" aria-live="polite"></span>
-        <button type="button" class="menu_button btn-accent" id="btn-wizard-next">下一步 <i class="fa-solid fa-chevron-right"></i></button>
-      </div>
-    </div>
-
-    <!-- 不兼容门：旧会话一律显式拒绝（U-1「禁止兼容旧数据」的界面消费点） -->
-    <div class="wb-gate" id="wizard-gate" hidden>
-      <h2 class="wb-gate-title" id="wizard-gate-title" tabindex="-1"></h2>
-      <p class="wb-gate-reason" id="wizard-gate-reason"></p>
-      <button type="button" class="menu_button btn-accent" id="btn-wizard-reopen">从源重开</button>
-    </div>
-
-    <!-- ═══ 块一：状态 · 源包 · 产物 ═══ -->
-    <div class="wb-block wb-block-status">
+    <!-- ═══ 状态读数（配额）═══ -->
+    <div class="wb-status-line">
       ${isDrawer ? `
       <div class="status-row" id="status-row">
         ${BADGES_HTML}
         <button type="button" class="menu_button menu_button_icon wb-storage-btn" id="btn-storage-inspector" hidden>
           <i class="fa-solid fa-hard-drive"></i><span>存储</span>
         </button>
+        <button type="button" class="menu_button btn-tool" id="btn-guide"><i class="fa-solid fa-circle-question"></i> 引导</button>
       </div>
       ` : ''}
-      <div class="quota-bars" id="usage-dashboard"><!-- 配额条 (usage-dashboard.js) --></div>
-
-      <div class="zone-card" data-wb-step="source">
-        <div class="zone-title"><i class="fa-solid fa-inbox"></i> 上传暂存区</div>
-        <div class="dropzone dropzone-inline" id="dropzone">
-          <input type="file" id="file-input" accept=".zip" multiple style="display: none;">
-          <p class="main-text" id="drop-main-text"><i class="fa-solid fa-cloud-arrow-up"></i> 将酒馆 Zip 数据包拖到此处或点击选择</p>
-          <p class="sub-text" id="drop-sub-text"></p>
-        </div>
-        <div id="stash-list"><!-- 源包列表 (stash-list.js) --></div>
-        <div id="stash-batch-bar" hidden></div>
-      </div>
-
-      <div class="zone-card" data-wb-step="verify">
-        <div class="zone-title"><i class="fa-solid fa-file-export"></i> 待导出区</div>
-        <div id="export-queue-panel"></div>
-      </div>
+      <div class="quota-bars" id="usage-dashboard"></div>
     </div>
 
-    <!-- ═══ 块二：配置 · 执行 · 反馈 ═══ -->
-    <div class="wb-block wb-block-controls">
-
-      <!-- [G] 内容范围（常驻） -->
-      <div class="category-panel" id="category-panel" data-wb-step="scope" style="display: none;">
-        <div class="flex-container justifySpaceBetween alignItemsCenter" style="margin-bottom: 6px;">
-          <span class="category-title"><i class="fa-solid fa-list-check"></i> 内容范围</span>
-          <span class="category-sub-summary" id="category-summary-badge"></span>
+    <!-- ═══ 源包 ═══ -->
+    <section class="wb-sec">
+      <div class="wb-sec-head"><span class="wb-sec-title"><i class="fa-solid fa-inbox"></i> 源包</span></div>
+      <div class="wb-sec-body">
+        <div class="dropzone dropzone-inline" id="dropzone">
+          <input type="file" id="file-input" accept=".zip" multiple style="display: none;">
+          <p class="main-text" id="drop-main-text"><i class="fa-solid fa-cloud-arrow-up"></i> 选择数据包</p>
+          <p class="sub-text" id="drop-sub-text"></p>
         </div>
-        <div class="flex-container" style="gap: 4px; flex-wrap: wrap; margin-bottom: 8px;">
-          <button type="button" class="menu_button btn-tool" id="btn-select-all">全选</button>
-          <button type="button" class="menu_button btn-tool" id="btn-deselect-all">全不选</button>
-          <button type="button" class="menu_button btn-tool" id="btn-invert-select">反选</button>
-          <button type="button" class="menu_button btn-tool btn-quick" data-preset="chars">仅角色卡</button>
-          <button type="button" class="menu_button btn-tool btn-quick" data-preset="chats">仅聊天记录</button>
-          <button type="button" class="menu_button btn-tool btn-quick" data-preset="safe">安全脱敏</button>
-        </div>
-        <div class="plan-summary-bar" id="plan-summary-bar" style="display: none; margin-bottom: 8px;">
-          <div class="action-badges" id="action-stats-badges"></div>
-          <div class="output-estimate" id="output-estimate-text"></div>
-        </div>
-        <div class="category-grid" id="category-checkboxes"></div>
-        <div class="host-tree-confirm-bar" id="host-tree-confirm-bar" hidden>
-          <span class="htc-hint"><i class="fa-solid fa-list-check"></i> 统一文件树已就绪</span>
-          <div class="htc-actions">
-            <button type="button" class="menu_button btn-tool" id="btn-host-tree-selectall">全选</button>
-            <button type="button" class="menu_button menu_button_icon btn-accent" id="btn-host-tree-confirm">
-              <i class="fa-solid fa-check"></i> <span>继续转换</span>
-            </button>
-            <button type="button" class="menu_button" id="btn-host-tree-cancel">
-              <i class="fa-solid fa-ban"></i> <span>取消</span>
-            </button>
-          </div>
-        </div>
+        <div id="stash-list"></div>
+        <div id="stash-batch-bar" hidden></div>
       </div>
+    </section>
 
-      <!-- [F] 输出目标（常驻三联） -->
-      <div class="output-row" data-wb-step="target">
-        <label class="output-field">
-          <small>目标平台</small>
+    <!-- ═══ 产物 ═══ -->
+    <section class="wb-sec">
+      <div class="wb-sec-head"><span class="wb-sec-title"><i class="fa-solid fa-file-export"></i> 产物</span></div>
+      <div class="wb-sec-body">
+        <div id="export-queue-panel"></div>
+      </div>
+    </section>
+
+    <!-- ═══ 打包设置 ═══ -->
+    <section class="wb-sec">
+      <div class="wb-sec-head"><span class="wb-sec-title"><i class="fa-solid fa-sliders"></i> 打包</span></div>
+      <div class="wb-sec-body">
+        <label class="wb-field">
+          <span class="wb-field-key">目标平台</span>
           <select id="target-select" class="text_pole">
             <option value="st">SillyTavern</option>
             <option value="l">Luker</option>
@@ -154,25 +107,95 @@ export function getWorkbenchHtml({ isModal = false, isDrawer = false, isStandalo
             <option value="pt" selected>PureTavern</option>
           </select>
         </label>
-        <label class="output-field">
-          <small>压缩级别</small>
+        <label class="wb-field">
+          <span class="wb-field-key">压缩</span>
           <select id="compression-select" class="text_pole">
-            <option value="0">存储</option>
+            <option value="0">不压缩</option>
             <option value="1">快速</option>
             <option value="5" selected>标准</option>
             <option value="9">最大</option>
           </select>
         </label>
-        <label class="output-field">
-          <small>分卷 MB</small>
+        <label class="wb-field">
+          <span class="wb-field-key">扩展包</span>
+          <select id="extension-mode-select" class="text_pole">
+            <option value="manifest">只导出清单</option>
+            <option value="full" selected>完整扩展包</option>
+          </select>
+        </label>
+        <label class="wb-field">
+          <span class="wb-field-key">Git 历史</span>
+          <select id="git-mode-select" class="text_pole">
+            <option value="keep" selected>保留历史</option>
+            <option value="minimal">只留更新所需</option>
+            <option value="strip">不含历史</option>
+          </select>
+        </label>
+        <label class="wb-field">
+          <span class="wb-field-key">分卷</span>
           <input type="number" id="split-input" class="text_pole" min="1" step="1" inputmode="numeric" placeholder="不分卷">
         </label>
+        <label class="wb-field">
+          <span class="wb-field-key">包名</span>
+          <input type="text" id="filename-template-input" class="text_pole" placeholder="{target}_{user}_{part}_{date}.zip" value="{target}_{user}_{part}_{date}.zip">
+        </label>
+        <div class="filename-preview-box" id="filename-preview-box">
+          <code class="preview-code" id="filename-preview"></code>
+        </div>
+        <label class="checkbox_label flex-container">
+          <input type="checkbox" id="keep-dev-files-check">
+          <span>保留构建配置</span>
+        </label>
+        <div class="wb-actions">
+          <button type="button" id="btn-export-ext-manifest" class="menu_button menu_button_icon">
+            <i class="fa-solid fa-file-export"></i> <span>导出扩展清单</span>
+          </button>
+        </div>
       </div>
+    </section>
 
-      <!-- [H] 垃圾清理（默认清理，折叠） -->
-      <div class="inline-drawer wb-fold" id="fold-cleanup" data-wb-step="scope">
+    <!-- ═══ 内容范围 ═══ -->
+    <section class="wb-sec">
+      <div class="wb-sec-head">
+        <span class="wb-sec-title"><i class="fa-solid fa-list-check"></i> 内容</span>
+        <span class="category-sub-summary" id="category-summary-badge"></span>
+      </div>
+      <div class="wb-sec-body">
+        <div class="category-panel" id="category-panel">
+          <div class="wb-tool-row">
+            <button type="button" class="menu_button btn-tool" id="btn-select-all">全选</button>
+            <button type="button" class="menu_button btn-tool" id="btn-deselect-all">全不选</button>
+            <button type="button" class="menu_button btn-tool" id="btn-invert-select">反选</button>
+            <button type="button" class="menu_button btn-tool btn-quick" data-preset="chars">仅角色卡</button>
+            <button type="button" class="menu_button btn-tool btn-quick" data-preset="chats">仅聊天记录</button>
+            <button type="button" class="menu_button btn-tool btn-quick" data-preset="safe">安全脱敏</button>
+          </div>
+          <div class="category-grid" id="category-checkboxes"></div>
+          <div class="host-tree-confirm-bar" id="host-tree-confirm-bar" hidden>
+            <span class="htc-hint"><i class="fa-solid fa-list-check"></i> 统一文件树已就绪</span>
+            <div class="htc-actions">
+              <button type="button" class="menu_button btn-tool" id="btn-host-tree-selectall">全选</button>
+              <button type="button" class="menu_button menu_button_icon btn-accent" id="btn-host-tree-confirm">
+                <i class="fa-solid fa-check"></i> <span>继续转换</span>
+              </button>
+              <button type="button" class="menu_button" id="btn-host-tree-cancel">
+                <i class="fa-solid fa-ban"></i> <span>取消</span>
+              </button>
+            </div>
+          </div>
+        </div>
+        <div class="plan-summary-bar" id="plan-summary-bar" style="display: none;">
+          <div class="action-badges" id="action-stats-badges"></div>
+          <div class="output-estimate" id="output-estimate-text"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ 清理与差量（可选，紧凑折叠）═══ -->
+    <section class="wb-sec">
+      <div class="inline-drawer wb-fold" id="fold-cleanup">
         <div class="inline-drawer-toggle inline-drawer-header">
-          <b><i class="fa-solid fa-broom"></i> 垃圾清理</b>
+          <b><i class="fa-solid fa-broom"></i> 清理</b>
           <span class="wb-fold-summary" id="fold-summary-cleanup"></span>
           <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
         </div>
@@ -180,7 +203,7 @@ export function getWorkbenchHtml({ isModal = false, isDrawer = false, isStandalo
           <div class="wb-checks">
             <label class="checkbox_label flex-container">
               <input type="checkbox" id="include-backups-check"${checkedAttr('backups')}>
-              <span>打包 backups/ 快照</span>
+              <span>打包 backups 快照</span>
             </label>
             <label class="checkbox_label flex-container">
               <input type="checkbox" id="include-cache-check"${checkedAttr('cache')}>
@@ -192,63 +215,15 @@ export function getWorkbenchHtml({ isModal = false, isDrawer = false, isStandalo
             </label>
             <label class="checkbox_label flex-container">
               <input type="checkbox" id="prune-builtin-check" checked>
-              <span>剔除酒馆原生重复资产</span>
+              <span>清理原生重复资产</span>
             </label>
           </div>
         </div>
       </div>
 
-      <!-- [I] 扩展打包（折叠） -->
-      <div class="inline-drawer wb-fold" id="fold-extension" data-wb-step="scope">
+      <div class="inline-drawer wb-fold" id="fold-incremental">
         <div class="inline-drawer-toggle inline-drawer-header">
-          <b><i class="fa-solid fa-puzzle-piece"></i> 扩展打包</b>
-          <span class="wb-fold-summary" id="fold-summary-extension"></span>
-          <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
-        </div>
-        <div class="inline-drawer-content" style="display: none;">
-          <div class="ext-mode-row">
-            <label class="ext-mode-opt">
-              <input type="radio" name="extension-mode" value="manifest" checked>
-              <span>轻量清单</span>
-            </label>
-            <label class="ext-mode-opt">
-              <input type="radio" name="extension-mode" value="full">
-              <span>完整离线包</span>
-            </label>
-          </div>
-          <!-- Git 历史策略：仅在「完整离线包」下生效（轻量清单模式整体不打包 .git）。 -->
-          <div class="ext-mode-row">
-            <label class="ext-mode-opt" title="原样保留扩展的全部 .git（含历史 packfile）。包最大，但一键更新与本地状态完全不变。">
-              <input type="radio" name="git-mode" value="keep" checked>
-              <span>Git 原样</span>
-            </label>
-            <label class="ext-mode-opt" title="仅保留 Git 识别与更新所需元数据（config/HEAD/index/refs），对象存储全部剔除。包最小且仍可一键更新（首次更新会自动从源仓库补齐对象）；接收方必须能联网。">
-              <input type="radio" name="git-mode" value="minimal">
-              <span>Git 瘦身</span>
-            </label>
-            <label class="ext-mode-opt" title="完全剔除 .git 目录。包最小，但接收方彻底失去在线更新能力，只能重新 git clone。">
-              <input type="radio" name="git-mode" value="strip">
-              <span>Git 剔除</span>
-            </label>
-          </div>
-          <div class="wb-checks">
-            <label class="checkbox_label flex-container">
-              <input type="checkbox" id="keep-dev-files-check">
-              <span>保留构建配置</span>
-            </label>
-          </div>
-          <div class="wb-actions">
-            <button type="button" id="btn-export-ext-manifest" class="menu_button menu_button_icon">
-              <i class="fa-solid fa-file-export"></i> <span>导出扩展清单</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <!-- [J] 增量与差量（折叠） -->
-      <div class="inline-drawer wb-fold" id="fold-incremental" data-wb-step="scope">
-        <div class="inline-drawer-toggle inline-drawer-header">
-          <b><i class="fa-solid fa-code-compare"></i> 增量与差量</b>
+          <b><i class="fa-solid fa-code-compare"></i> 差量</b>
           <span class="wb-fold-summary" id="fold-summary-incremental"></span>
           <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
         </div>
@@ -260,135 +235,129 @@ export function getWorkbenchHtml({ isModal = false, isDrawer = false, isStandalo
             </label>
           </div>
           <div id="host-base-zip-section" class="base-zip-section" style="display: none;">
-            <div class="flex-container" style="gap: 6px; flex-wrap: wrap; margin-bottom: 6px;">
-              <input type="file" id="host-base-zip-input" accept=".zip" style="display: none;">
-              <button type="button" class="menu_button" id="btn-select-base-zip">
-                <i class="fa-solid fa-folder-open"></i> 选择基准 ZIP
-              </button>
-              <select id="host-base-archive-select" class="text_pole">
-                <option value="">从暂存区选取</option>
-              </select>
-            </div>
+            <input type="file" id="host-base-zip-input" accept=".zip" style="display: none;">
+            <button type="button" class="menu_button" id="btn-select-base-zip">
+              <i class="fa-solid fa-folder-open"></i> 选择基准 ZIP
+            </button>
+            <select id="host-base-archive-select" class="text_pole">
+              <option value="">从暂存区选取</option>
+            </select>
             <div id="host-base-zip-status" class="base-zip-status"></div>
           </div>
         </div>
       </div>
+    </section>
 
-      <!-- [K] 包名（折叠） -->
-      <div class="inline-drawer wb-fold" id="fold-filename" data-wb-step="target">
-        <div class="inline-drawer-toggle inline-drawer-header">
-          <b><i class="fa-solid fa-tag"></i> 包名</b>
-          <span class="wb-fold-summary" id="fold-summary-filename"></span>
-          <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
+    <!-- ═══ 检查 ═══ -->
+    <section class="wb-sec">
+      <div class="wb-sec-head"><span class="wb-sec-title"><i class="fa-solid fa-clipboard-check"></i> 检查</span></div>
+      <div class="wb-sec-body">
+        <div class="wb-check-panel" id="wizard-check-panel">
+          <p class="wb-check-summary" id="wizard-check-summary"></p>
+          <ul class="wb-check-exclusions" id="wizard-check-exclusions"></ul>
         </div>
-        <div class="inline-drawer-content" style="display: none;">
-          <input type="text" id="filename-template-input" class="text_pole" placeholder="{target}_{user}_{part}_{date}.zip" value="{target}_{user}_{part}_{date}.zip">
-          <div class="filename-preview-box" id="filename-preview-box">
-            <code class="preview-code" id="filename-preview"></code>
+      </div>
+    </section>
+
+    <!-- ═══ 执行 ═══ -->
+    <section class="wb-sec">
+      <div class="wb-sec-head"><span class="wb-sec-title"><i class="fa-solid fa-play"></i> 执行</span></div>
+      <div class="wb-sec-body">
+        <div class="action-row">
+          <button type="button" class="menu_button menu_button_icon flex1" id="btn-host-fetch" style="display: none;">
+            <i class="fa-solid fa-server"></i> <span>从宿主拉取</span>
+          </button>
+          <button type="button" class="menu_button menu_button_icon flex1" id="btn-library-export" style="display: none;" disabled>
+            <i class="fa-solid fa-database"></i> <span>从聊天库导出</span>
+          </button>
+          <button type="button" class="menu_button menu_button_icon flex1 btn-accent" id="btn-convert" disabled>
+            <i class="fa-solid fa-play"></i> <span>开始转换</span>
+          </button>
+          <button type="button" class="menu_button menu_button_icon flex1" id="btn-restore-luker" style="display: none;" disabled>
+            <i class="fa-solid fa-file-import"></i> <span>恢复到当前用户</span>
+          </button>
+        </div>
+        <button type="button" class="menu_button menu_button_icon" id="btn-lan-send">
+          <i class="fa-solid fa-tower-broadcast"></i> <span>发送到另一台设备</span>
+        </button>
+        <div class="progress-container" id="progress-container">
+          <div class="progress-bar-bg">
+            <div class="progress-bar-fill" id="progress-bar-fill"></div>
+          </div>
+          <div class="progress-text">
+            <span id="status-label">准备就绪</span>
+            <span id="progress-percent">0%</span>
+          </div>
+          <div class="task-controls" id="task-controls" hidden>
+            <button type="button" class="tc-btn" id="tc-pause" title="暂停"><i class="fa-solid fa-pause"></i> 暂停</button>
+            <button type="button" class="tc-btn tc-danger" id="tc-abort" title="中止"><i class="fa-solid fa-xmark"></i> 中止</button>
+            <button type="button" class="tc-btn" id="tc-resume" title="继续" hidden><i class="fa-solid fa-play"></i> 继续</button>
+            <button type="button" class="tc-btn tc-danger" id="tc-discard" title="丢弃" hidden><i class="fa-solid fa-trash"></i> 丢弃</button>
           </div>
         </div>
       </div>
+    </section>
 
-      <!-- [L] 检查页（向导步骤④）：执行前集中说明范围、排除项与风险（R-05） -->
-      <div class="wb-check-panel" id="wizard-check-panel" data-wb-step="check">
-        <div class="wb-check-title"><i class="fa-solid fa-clipboard-check"></i> 执行前检查</div>
-        <p class="wb-check-summary" id="wizard-check-summary"></p>
-        <ul class="wb-check-exclusions" id="wizard-check-exclusions"></ul>
-      </div>
-
-      <!-- [E] 动作（常驻） -->
-      <div class="action-row" data-wb-step="run">
-        <button type="button" class="menu_button menu_button_icon flex1" id="btn-host-fetch" style="display: none;">
-          <i class="fa-solid fa-server"></i> <span>从宿主拉取</span>
-        </button>
-        <!-- 纯库模式（聊天被收进数据库、磁盘无 jsonl）下的「把聊天导出来」——
-             仅在检测到聊天库且其提供导出能力时可见（可用性由 computeActionAvailability 统一求值）。 -->
-        <button type="button" class="menu_button menu_button_icon flex1" id="btn-library-export" style="display: none;" disabled>
-          <i class="fa-solid fa-database"></i> <span>从聊天库导出</span>
-        </button>
-        <button type="button" class="menu_button menu_button_icon flex1 btn-accent" id="btn-convert" disabled>
-          <i class="fa-solid fa-play"></i> <span>开始转换</span>
-        </button>
-        <button type="button" class="menu_button menu_button_icon flex1" id="btn-restore-luker" style="display: none;" disabled>
-          <i class="fa-solid fa-file-import"></i> <span>恢复到当前用户</span>
-        </button>
-      </div>
-
-      <!-- [D] 执行反馈（常驻） -->
-      <div class="progress-container" id="progress-container" data-wb-step="run">
-        <div class="progress-bar-bg">
-          <div class="progress-bar-fill" id="progress-bar-fill"></div>
-        </div>
-        <div class="progress-text">
-          <span id="status-label">准备就绪</span>
-          <span id="progress-percent">0%</span>
-        </div>
-        <div class="task-controls" id="task-controls" hidden>
-          <button type="button" class="tc-btn" id="tc-pause" title="暂停"><i class="fa-solid fa-pause"></i> 暂停</button>
-          <button type="button" class="tc-btn tc-danger" id="tc-abort" title="中止"><i class="fa-solid fa-xmark"></i> 中止</button>
-          <button type="button" class="tc-btn" id="tc-resume" title="继续" hidden><i class="fa-solid fa-play"></i> 继续</button>
-          <button type="button" class="tc-btn tc-danger" id="tc-discard" title="丢弃" hidden><i class="fa-solid fa-trash"></i> 丢弃</button>
-        </div>
-      </div>
-
-      <div class="report-panel" id="report-panel" data-wb-step="verify" hidden>
-        <div class="module-grid" id="module-grid">
-          <div class="module-item"><span class="count" id="count-chars">0</span><span class="label">角色卡</span></div>
-          <div class="module-item"><span class="count" id="count-chats">0</span><span class="label">聊天记录</span></div>
-          <div class="module-item"><span class="count" id="count-lorebooks">0</span><span class="label">世界书</span></div>
-          <div class="module-item"><span class="count" id="count-presets">0</span><span class="label">预设配置</span></div>
-          <div class="module-item"><span class="count" id="count-assets">0</span><span class="label">资产与头像</span></div>
-          <div class="module-item"><span class="count" id="count-extensions">0</span><span class="label">扩展</span></div>
-          <div class="module-item"><span class="count" id="count-settings">0</span><span class="label">系统设置</span></div>
-          <div class="module-item"><span class="count" id="count-secrets">0</span><span class="label">密钥</span></div>
-        </div>
-
-        <div class="inline-drawer wb-fold" id="fold-report-details">
-          <div class="inline-drawer-toggle inline-drawer-header">
-            <b><i class="fa-solid fa-list"></i> 报告详情</b>
-            <span class="wb-fold-summary" id="fold-summary-report"></span>
-            <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
+    <!-- ═══ 报告 ═══ -->
+    <section class="wb-sec">
+      <div class="wb-sec-head"><span class="wb-sec-title"><i class="fa-solid fa-chart-simple"></i> 报告</span></div>
+      <div class="wb-sec-body">
+        <div class="report-panel" id="report-panel" hidden>
+          <div class="module-grid" id="module-grid">
+            <div class="module-item"><span class="count" id="count-chars">0</span><span class="label">角色卡</span></div>
+            <div class="module-item"><span class="count" id="count-chats">0</span><span class="label">聊天记录</span></div>
+            <div class="module-item"><span class="count" id="count-lorebooks">0</span><span class="label">世界书</span></div>
+            <div class="module-item"><span class="count" id="count-presets">0</span><span class="label">预设配置</span></div>
+            <div class="module-item"><span class="count" id="count-assets">0</span><span class="label">资产与头像</span></div>
+            <div class="module-item"><span class="count" id="count-extensions">0</span><span class="label">扩展</span></div>
+            <div class="module-item"><span class="count" id="count-settings">0</span><span class="label">系统设置</span></div>
+            <div class="module-item"><span class="count" id="count-secrets">0</span><span class="label">密钥</span></div>
           </div>
-          <div class="inline-drawer-content" style="display: none;">
-            <pre id="discards-log"></pre>
-            <pre id="filtered-log"></pre>
-            <pre id="warnings-log"></pre>
+
+          <div class="inline-drawer wb-fold" id="fold-report-details">
+            <div class="inline-drawer-toggle inline-drawer-header">
+              <b><i class="fa-solid fa-list"></i> 详情</b>
+              <span class="wb-fold-summary" id="fold-summary-report"></span>
+              <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
+            </div>
+            <div class="inline-drawer-content" style="display: none;">
+              <pre id="discards-log"></pre>
+              <pre id="filtered-log"></pre>
+              <pre id="warnings-log"></pre>
+            </div>
           </div>
         </div>
       </div>
+    </section>
 
-      <!-- 日志控制台挂载点 -->
-      <div id="log-console-mount"></div>
-    </div>
+    <!-- 日志控制台挂载点 -->
+    <div id="log-console-mount"></div>
 
     <div class="restore-modal-overlay" id="restore-modal-overlay" style="display: none;">
       <div class="restore-modal-card">
         <h3 class="modal-title"><i class="fa-solid fa-triangle-exclamation"></i> 恢复至当前宿主</h3>
         <p class="modal-desc" id="restore-modal-desc"></p>
-        <div class="restore-mode-group">
-          <label class="checkbox_label flex-container">
-            <input type="radio" name="restore-mode" value="merge" checked>
-            <div class="radio-text"><strong>合并写入</strong></div>
-          </label>
-          <label class="checkbox_label flex-container">
-            <input type="radio" name="restore-mode" value="overwrite">
-            <div class="radio-text"><strong>覆盖写入</strong></div>
-          </label>
-        </div>
+        <label class="wb-field">
+          <span class="wb-field-key">写入方式</span>
+          <select id="restore-mode-select" class="text_pole">
+            <option value="merge" selected>合并写入</option>
+            <option value="overwrite">覆盖写入</option>
+          </select>
+        </label>
         <label class="checkbox_label flex-container" id="restore-backup-label">
           <input type="checkbox" id="restore-backup-confirmed">
-          <div class="radio-text">我已备份目标数据（写入前保底，未备份将拒绝写入）</div>
+          <span>我已备份目标数据</span>
         </label>
         <label class="checkbox_label flex-container" id="restore-conflict-label">
           <input type="checkbox" id="restore-conflict-ack">
-          <div class="radio-text" id="restore-conflict-text">无法读取目标清单：同名条目可能被更新（冲突状态未知，不是 0 冲突）</div>
+          <span id="restore-conflict-text"></span>
         </label>
         <div class="modal-desc" id="restore-backup-desc"></div>
-        <div class="flex-container" style="align-items: center; gap: 8px;">
+        <div class="wb-tool-row">
           <button type="button" class="menu_button" id="btn-target-preflight">自动备份并预检目标</button>
           <span class="modal-desc" id="restore-preflight-status"></span>
         </div>
-        <div class="flex-container" style="justify-content: flex-end; gap: 8px;">
+        <div class="wb-tool-row">
           <button type="button" class="menu_button" id="btn-cancel-restore">取消</button>
           <button type="button" class="menu_button menu_button_icon btn-accent" id="btn-confirm-restore">
             <i class="fa-solid fa-rotate"></i> <span>确认恢复</span>

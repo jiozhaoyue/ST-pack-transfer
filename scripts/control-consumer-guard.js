@@ -33,11 +33,8 @@ const CONTROL_TAGS = ['button', 'input', 'select', 'textarea'];
  */
 export const CONTROL_CONSUMERS = Object.freeze({
   // ── 向导外壳（S5 第二步）──
-  'btn-wb-view-toggle': 'migration-wizard.js mountMigrationWizard — click 在向导/高级视图间切换（只改 root.dataset.wbView）',
-  'group:.wb-step-btn': 'migration-wizard.js mountMigrationWizard — 事件委托读 dataset.wbStep 跳步；键盘 ←/→/Home/End 同步走同一 goTo',
-  'btn-wizard-prev': 'migration-wizard.js mountMigrationWizard — click 上一步（两端自动 disabled）',
-  'btn-wizard-next': 'migration-wizard.js mountMigrationWizard — click 下一步（两端自动 disabled）',
-  'btn-wizard-reopen': 'migration-wizard.js mountMigrationWizard — click 关闭不兼容门并回到第一步（U-1 从源重开）',
+  // ── 引导（2026-10-14：迁移向导外壳已删除，只留引导按钮 + 全屏引导）──
+  'btn-guide': 'onboarding-guide.js mountOnboardingGuide — click 打开全屏引导（首装自动打开）',
 
   // ── 抽屉/模态态框架 ──
   'btn-close-converter-modal': 'index.js openConverterModal() — click 关闭模态工作台',
@@ -68,10 +65,10 @@ export const CONTROL_CONSUMERS = Object.freeze({
   'include-private-check': 'index.js — .checked 是否打包私有配置',
   'prune-builtin-check': 'index.js — .checked 是否剔除酒馆原生重复资产',
 
-  // ── 扩展打包（I 区）──
-  'name:extension-mode': 'index.js getExtensionMode() — querySelector(:checked).value 轻量清单/完整离线包',
-  'name:git-mode': 'index.js getGitMode() — querySelector(:checked).value 转 transform 的 gitMode（keep|minimal|strip）；'
-    + '同步函数 syncGitModeAvailability() 读 extension-mode 决定本组是否 disabled',
+  // ── 扩展包与 Git 历史（2026-10-14：由并排 radio 改为两个独立枚举）──
+  'extension-mode-select': 'index.js getExtensionMode() — .value 只导出清单/完整扩展包',
+  'git-mode-select': 'index.js getGitMode() — .value 转 transform 的 gitMode（keep|minimal|strip）；'
+    + 'syncGitModeAvailability() 读 extension-mode-select 决定本项是否 disabled',
   'keep-dev-files-check': 'index.js getKeepDevFiles() — .checked 是否保留构建配置',
   'btn-export-ext-manifest': 'index.js:502 — click 导出只读扩展清单',
 
@@ -88,6 +85,7 @@ export const CONTROL_CONSUMERS = Object.freeze({
   'btn-host-fetch': 'index.js — click 从宿主拉取数据包',
   'btn-library-export': 'index.js handleLibraryExport() — click 把聊天库里的聊天导成一个数据包（纯库模式的导出出口；无库时该按钮不可见）',
   'btn-convert': 'index.js — click 开始转换',
+  'btn-lan-send': 'index.js — click 打开局域网互传面板（lan-transfer-panel.js open）',
 
   // ── 任务控制 ──
   'tc-pause': 'task-controls.js:47 — click 暂停任务',
@@ -99,7 +97,7 @@ export const CONTROL_CONSUMERS = Object.freeze({
   'restore-backup-confirmed': 'index.js buildRestoreGateContext() — .checked 目标备份声明（S3 写入门禁的 backup 证据）',
   'restore-conflict-ack': 'index.js buildRestoreGateContext() — .checked 「冲突状态未知」风险确认（S3 写入门禁的 conflicts 确认）',
   'btn-target-preflight': 'index.js handleTargetPreflight() — click 拉当前宿主清单做真实冲突预检 + 自动保底备份（S3 执行层）',
-  'name:restore-mode': 'index.js — querySelector(:checked).value 合并写入/覆盖写入',
+  'restore-mode-select': 'index.js — .value 合并写入/覆盖写入',
   'btn-cancel-restore': 'index.js:1167 — click 取消恢复',
   'btn-confirm-restore': 'index.js:1174 — click 确认恢复写入',
   'btn-restore-luker': 'index.js — click 恢复到当前用户（打开恢复模态）',

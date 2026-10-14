@@ -35,16 +35,18 @@ describe('SillyTavern 标准插件工程结构 (st-zip-converter)', () => {
     expect(code).toContain('mountSettingsDrawer');
   });
 
-  it('扩展打包模式与保留构建配置节点位于唯一模板源（index.html 仅为骨架，不再持有业务节点）', async () => {
+  it('扩展打包枚举与保留构建配置节点位于唯一模板源（index.html 仅为骨架，不再持有业务节点）', async () => {
     // 单一模板源（L1-MR-10 单向化）：业务节点只允许出现在 workbench-template.js
     const template = await readFile('src/ui/workbench-template.js', 'utf8');
-    expect(template).toContain('name="extension-mode" value="manifest"');
-    expect(template).toContain('name="extension-mode" value="full"');
+    // 2026-10-14：并排 radio 改为枚举（用户裁定「禁止模式选择」）
+    expect(template).toContain('id="extension-mode-select"');
+    expect(template).toContain('<option value="manifest">');
+    expect(template).toContain('<option value="full" selected>');
     expect(template).toContain('id="keep-dev-files-check"');
 
     // 反向断言：index.html 不得再出现这些业务节点（防回归成两份副本）
     const html = await readFile('index.html', 'utf8');
-    expect(html).not.toContain('name="extension-mode"');
+    expect(html).not.toContain('id="extension-mode-select"');
     expect(html).not.toContain('id="keep-dev-files-check"');
   });
 

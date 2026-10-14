@@ -101,7 +101,9 @@ describe('三入口渲染一致性（R8.2 · 独立态 / 插件抽屉态 / 模�
     expect(html).toContain('inline-drawer');
     // 折叠组件复用宿主原生结构，不得回退到 <details>
     expect(html).not.toContain('<details');
-    for (const id of ['fold-summary-cleanup', 'fold-summary-extension', 'fold-summary-incremental', 'fold-summary-filename']) {
+    // 2026-10-14：扩展打包与包名两个折叠区随单一视图重构删除（改为常驻枚举与常驻输入框），
+    // 保留的三个折叠区各自仍须带状态读数。
+    for (const id of ['fold-summary-cleanup', 'fold-summary-incremental', 'fold-summary-report']) {
       expect(html).toContain(`id="${id}"`);
     }
   });

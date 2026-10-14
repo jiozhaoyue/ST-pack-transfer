@@ -24,26 +24,28 @@ const FORBIDDEN_STANDALONE_CLASSES = ['menu_button', 'inline-drawer', 'text_pole
 
 /**
  * 必须由模板产出的业务节点 id
- * 来源：`index.js` 的 `getElementById()` 静态引用集，排除运行时动态创建者
- * （`app` 由骨架提供；`host-selection-mode-hint`、`st-converter-modal-overlay`
- * 由 `index.js` 运行时 `createElement` 创建）。
+ * 来源：`index.js` / `src/ui/*.js` 的 `getElementById()` / `querySelector('#…')` 静态引用集，
+ * 排除运行时动态创建者（`app` 由骨架提供；`host-selection-mode-hint`、
+ * `st-converter-modal-overlay` 由 `index.js` 运行时 `createElement` 创建）。
+ *
+ * 2026-10-14：迁移向导外壳整体删除，`btn-wb-view-toggle` / `wizard-rail` /
+ * `btn-wizard-*` / `wizard-step-counter` / `wizard-gate*` / `wizard-chrome` 一并移出。
+ * `wizard-check-*` 三个 id 保留（检查面板仍在，只是不再属于步骤④）。
  */
 export const REQUIRED_TEMPLATE_IDS = [
   'btn-cancel-restore',
   'btn-confirm-restore',
   'btn-convert',
   'btn-export-ext-manifest',
+  'btn-guide',
   'btn-host-fetch',
   'btn-host-tree-cancel',
   'btn-host-tree-confirm',
   'btn-host-tree-selectall',
+  'btn-lan-send',
   'btn-restore-luker',
   'btn-select-base-zip',
   'btn-target-preflight',
-  'btn-wb-view-toggle',
-  'btn-wizard-next',
-  'btn-wizard-prev',
-  'btn-wizard-reopen',
   'category-panel',
   'compression-select',
   'drop-main-text',
@@ -51,9 +53,11 @@ export const REQUIRED_TEMPLATE_IDS = [
   'dropzone',
   'env-badge',
   'export-queue-panel',
+  'extension-mode-select',
   'file-input',
   'filename-preview',
   'filename-template-input',
+  'git-mode-select',
   'host-base-archive-select',
   'host-base-zip-input',
   'host-base-zip-section',
@@ -67,6 +71,7 @@ export const REQUIRED_TEMPLATE_IDS = [
   'keep-dev-files-check',
   'log-console-mount',
   'prune-builtin-check',
+  'restore-mode-select',
   'restore-modal-desc',
   'restore-modal-overlay',
   'restore-preflight-status',
@@ -78,12 +83,6 @@ export const REQUIRED_TEMPLATE_IDS = [
   'wizard-check-exclusions',
   'wizard-check-panel',
   'wizard-check-summary',
-  'wizard-chrome',
-  'wizard-gate',
-  'wizard-gate-reason',
-  'wizard-gate-title',
-  'wizard-rail',
-  'wizard-step-counter',
 ];
 
 function lineOf(text, index) {

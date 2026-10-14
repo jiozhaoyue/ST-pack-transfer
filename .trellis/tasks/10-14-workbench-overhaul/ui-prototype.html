@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>工作台 UI 原型</title>
+<style>
+/* 原型专用：全部颜色只来自 --SmartTheme*，无宿主时用中性回退。无任何自造品牌色。 */
+:root {
+  --bg:        var(--SmartThemeBlurTintColor, #171717);
+  --bg2:       var(--SmartThemeChatTintColor, #171717);
+  --fg:        var(--SmartThemeBodyColor, #dcdcd2);
+  --fg-inv:    var(--SmartThemeBodyColorInverted, #23231f);
+  --em:        var(--SmartThemeEmColor, #919191);
+  --accent:    var(--SmartThemeQuoteColor, #e18a24);
+  --line:      var(--SmartThemeBorderColor, rgba(0,0,0,.5));
+  --shadow:    var(--SmartThemeShadowColor, rgba(0,0,0,.5));
+  --underline: var(--SmartThemeUnderlineColor, #bce7cf);
+  --radius: 6px;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; padding: 12px;
+  background: var(--bg); color: var(--fg);
+  font: 14px/1.45 -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+.wrap { max-width: 720px; margin: 0 auto; display: flex; flex-direction: column; gap: 6px; }
+
+/* ── 页头 ── */
+.head { display: flex; align-items: center; justify-content: space-between; padding: 2px 0 6px; }
+.brand { font-weight: 700; letter-spacing: .02em; }
+.tools { display: flex; align-items: center; gap: 6px; }
+.host {
+  border: 1px solid var(--line); border-radius: 999px;
+  padding: 1px 9px; font-size: 12px; color: var(--em);
+}
+.host.unknown { border-style: dashed; }
+
+/* ── 通用控件：全部继承宿主，无自造色 ── */
+button, select, input[type=text], input[type=number] {
+  font: inherit; color: var(--fg); background: transparent;
+  border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 6px 10px; width: 100%;
+}
+button { cursor: pointer; }
+button:hover { border-color: var(--accent); }
+button.primary { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+button.ghost { border-color: transparent; color: var(--em); width: auto; padding: 2px 6px; align-self: flex-start; }
+button.ghost:hover { color: var(--fg); border-color: transparent; }
+
+/* ── 分区：紧凑，无大间隔 ── */
+.sec { border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+.sec > .sec-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 7px 10px; background: var(--bg2); border-bottom: 1px solid var(--line);
+}
+.sec > .sec-head .t { font-weight: 600; }
+.sec > .sec-head .n { color: var(--em); font-size: 12px; }
+.sec > .sec-body { padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; }
+
+/* ── 列表（上传区 / 导出区都要有列表）── */
+.rows { display: flex; flex-direction: column; gap: 0; }
+.row {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 5px 0; border-bottom: 1px solid var(--line);
+}
+.row:last-child { border-bottom: 0; }
+.row .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row .meta { color: var(--em); font-size: 12px; white-space: nowrap; }
+
+/* ── 设置行：单列，不并排 ── */
+.field { display: flex; flex-direction: column; gap: 3px; }
+.field > .k { font-size: 12px; color: var(--em); }
+
+/* ── 复选组 ── */
+.checks { display: flex; flex-direction: column; gap: 4px; }
+.chk { display: flex; align-items: center; gap: 8px; }
+.chk input { width: auto; }
+
+/* ── 进度 ── */
+.bar { height: 4px; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; }
+.bar > i { display: block; height: 100%; width: 38%; background: var(--accent); }
+
+/* ── 报告 ── */
+.stats { display: flex; flex-direction: column; gap: 0; }
+.stat { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid var(--line); }
+.stat:last-child { border-bottom: 0; }
+.stat b { font-weight: 600; }
+
+/* ── 引导浮层（全屏）── */
+.guide {
+  position: fixed; inset: 0; background: var(--bg);
+  display: none; flex-direction: column; align-items: center; justify-content: center;
+  gap: 14px; padding: 24px; text-align: center;
+}
+.guide.on { display: flex; }
+.guide .dot { display: flex; gap: 6px; }
+.guide .dot i { width: 6px; height: 6px; border-radius: 50%; border: 1px solid var(--em); }
+.guide .dot i.on { background: var(--accent); border-color: var(--accent); }
+.guide .big { font-size: 20px; font-weight: 700; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="head">
+    <div class="brand">酒馆数据包互转工坊</div>
+    <div class="tools">
+      <span class="host unknown" id="host">unknown</span>
+      <button class="ghost" id="btn-guide">引导</button>
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-head"><span class="t">源包</span><span class="n" id="src-n">2</span></div>
+    <div class="sec-body">
+      <button id="btn-pick">选择数据包</button>
+      <div class="rows" id="src-list">
+        <div class="row"><span class="name">st_default-user_part1_2026-10-14.zip</span><span class="meta">412 MB</span></div>
+        <div class="row"><span class="name">luker_default-user_2026-10-13.zip</span><span class="meta">66 MB</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-head"><span class="t">产物</span><span class="n" id="out-n">1</span></div>
+    <div class="sec-body">
+      <div class="rows" id="out-list">
+        <div class="row"><span class="name">pt_default-user_part1_2026-10-14.zip</span><span class="meta">398 MB</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-head"><span class="t">打包</span></div>
+    <div class="sec-body">
+      <div class="field">
+        <span class="k">目标平台</span>
+        <select id="sel-target">
+          <option>SillyTavern</option><option>Luker</option>
+          <option>TauriTavern</option><option selected>PureTavern</option>
+        </select>
+      </div>
+      <div class="field">
+        <span class="k">压缩</span>
+        <select id="sel-zip">
+          <option>不压缩</option><option>快速</option><option selected>标准</option><option>最大</option>
+        </select>
+      </div>
+      <div class="field">
+        <span class="k">扩展包</span>
+        <select id="sel-ext">
+          <option>只导出清单</option>
+          <option selected>完整扩展包</option>
+        </select>
+      </div>
+      <div class="field">
+        <span class="k">Git 历史</span>
+        <select id="sel-git">
+          <option selected>保留历史</option>
+          <option>只留更新所需</option>
+          <option>不含历史</option>
+        </select>
+      </div>
+      <div class="field">
+        <span class="k">分卷</span>
+        <input type="number" id="in-split" placeholder="不分卷">
+      </div>
+      <div class="field">
+        <span class="k">包名</span>
+        <input type="text" id="in-name" value="{target}_{user}_{part}_{date}.zip">
+      </div>
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-head"><span class="t">内容</span><span class="n" id="cat-n">7 / 8</span></div>
+    <div class="sec-body">
+      <div class="checks" id="cats">
+        <label class="chk"><input type="checkbox" checked><span>角色卡</span></label>
+        <label class="chk"><input type="checkbox" checked><span>聊天记录</span></label>
+        <label class="chk"><input type="checkbox" checked><span>世界书</span></label>
+        <label class="chk"><input type="checkbox" checked><span>预设</span></label>
+        <label class="chk"><input type="checkbox" checked><span>主题与界面</span></label>
+        <label class="chk"><input type="checkbox" checked><span>素材与头像</span></label>
+        <label class="chk"><input type="checkbox" checked><span>设置</span></label>
+        <label class="chk"><input type="checkbox"><span>密钥</span></label>
+      </div>
+      <button class="ghost" id="btn-cat-all">全选</button>
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-head"><span class="t">执行</span><span class="n" id="run-n">准备就绪</span></div>
+    <div class="sec-body">
+      <div class="bar"><i></i></div>
+      <button class="primary" id="btn-run">开始转换</button>
+      <button id="btn-send">发送到另一台设备</button>
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-head"><span class="t">报告</span></div>
+    <div class="sec-body">
+      <div class="stats">
+        <div class="stat"><span>角色卡</span><b>128</b></div>
+        <div class="stat"><span>聊天记录</span><b>1437</b></div>
+        <div class="stat"><span>世界书</span><b>24</b></div>
+        <div class="stat"><span>预设</span><b>9</b></div>
+        <div class="stat"><span>素材与头像</span><b>312</b></div>
+        <div class="stat"><span>扩展</span><b>17</b></div>
+        <div class="stat"><span>设置</span><b>1</b></div>
+        <div class="stat"><span>密钥</span><b>0</b></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="guide" id="guide">
+  <div class="big" id="guide-title">选择数据包</div>
+  <div class="dot"><i class="on"></i><i></i><i></i><i></i></div>
+  <button id="btn-guide-next" style="width:auto">下一步</button>
+  <button class="ghost" id="btn-guide-exit">退出</button>
+</div>
+
+<script>
+// 宿主动态识别：先探前端全局，再问 /version；认不出兜底 unknown
+function detectHost() {
+  if (typeof window === 'undefined') return 'unknown';
+  if (globalThis.lukerContext) return 'Luker';
+  if (window.__TAURITAVERN__) return 'TauriTavern';
+  if (globalThis.__PURE_TAVERN__) return 'PureTavern';
+  if (globalThis.SillyTavern || document.querySelector('#extensionsMenu')) return 'SillyTavern';
+  return 'unknown';
+}
+document.getElementById('host').textContent = detectHost();
+
+const steps = ['选择数据包', '设置目标', '挑选内容', '开始转换', '核对报告'];
+let si = 0;
+const guide = document.getElementById('guide');
+document.getElementById('btn-guide').onclick = () => { si = 0; render(); guide.classList.add('on'); };
+document.getElementById('btn-guide-exit').onclick = () => guide.classList.remove('on');
+document.getElementById('btn-guide-next').onclick = () => {
+  si += 1;
+  if (si >= steps.length) { guide.classList.remove('on'); return; }
+  render();
+};
+function render() {
+  document.getElementById('guide-title').textContent = steps[si];
+  document.querySelectorAll('.guide .dot i').forEach((d, i) => d.classList.toggle('on', i === si));
+}
+</script>
+</body>
+</html>
