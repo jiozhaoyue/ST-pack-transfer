@@ -382,7 +382,7 @@ export function renderExportQueue({
     if (queue.items.length === 0) {
       const empty = document.createElement('div');
       empty.className = 'export-queue-empty';
-      empty.textContent = '暂无待导出产物：完成宿主拉取或转换后，产物会出现在这里统一处置';
+      empty.textContent = '无产物';
       containerEl.appendChild(empty);
       return;
     }

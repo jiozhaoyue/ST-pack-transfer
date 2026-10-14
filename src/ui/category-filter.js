@@ -89,13 +89,16 @@ export function setupCategoryFilter({ onSelectionChange } = {}) {
     btnInvertSelect.addEventListener('click', invertSelection);
   }
 
-  const quickButtons = panel.querySelectorAll('.btn-quick');
-  quickButtons.forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const preset = btn.dataset.preset;
-      applyPreset(preset);
+  // 2026-10-14：三个预设按钮（仅角色卡 / 仅聊天记录 / 安全脱敏）并为**一个枚举**
+  // （用户裁定「多选一用枚举」「禁止并排」）。选完立即套用并复位，避免留下一个「看起来还生效」的选中态。
+  const presetSelect = document.getElementById('category-preset-select');
+  if (presetSelect) {
+    presetSelect.addEventListener('change', () => {
+      const preset = presetSelect.value;
+      presetSelect.value = '';
+      if (preset) applyPreset(preset);
     });
-  });
+  }
 }
 
 /**

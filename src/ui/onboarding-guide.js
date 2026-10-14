@@ -66,6 +66,8 @@ export function mountOnboardingGuide({ root, onClose = null } = {}) {
 
   let index = 0;
   let open = false;
+  /** 本次引导**实际可用**的步骤（目标存在、有尺寸、未被禁用）。 */
+  let active = ONBOARDING_STEPS.slice();
 
   const overlay = document.createElement('div');
   overlay.className = 'wb-guide-overlay';
@@ -109,24 +111,42 @@ export function mountOnboardingGuide({ root, onClose = null } = {}) {
   overlay.append(ring, card);
   root.appendChild(overlay);
 
-  for (let i = 0; i < ONBOARDING_STEPS.length; i += 1) {
-    const dot = document.createElement('i');
-    dots.appendChild(dot);
-  }
+  // 圆点数量按**本次可用步骤**在 open() 时重建，不在此处按全量步骤预建。
 
   const targetOf = (step) => (step ? root.querySelector(step.selector) : null);
 
-  /** 把高亮环套到目标元素上。目标缺失或不可见时退化为「无环」——不假装指得到。 */
+  /**
+   * 该步是否值得走。**跳过不可用的目标**——原实现在空工作台上会把高亮环指到
+   * 一个禁用中的「开始转换」上，用户按提示做完也点不动（2026-10-14 实测）。
+   */
+  const isStepUsable = (step) => {
+    const el = targetOf(step);
+    if (!el) return false;
+    if (el.disabled) return false;
+    const r = el.getBoundingClientRect();
+    return r.width > 0 && r.height > 0;
+  };
+
+  /**
+   * 把高亮环套到目标元素上，并让说明卡片**贴着环**定位。
+   * 目标缺失或不可见时退化为「无环」——不假装指得到。
+   * 原实现把卡片固定在屏幕正中，环却在别处，看着像广告弹窗而不是帮助（2026-10-14 评审指出）。
+   */
   const placeRing = () => {
-    const el = targetOf(ONBOARDING_STEPS[index]);
+    const el = targetOf(active[index]);
     if (!el) {
       ring.hidden = true;
       return;
     }
-    const r = el.getBoundingClientRect();
+    let r = el.getBoundingClientRect();
     if (r.width <= 0 || r.height <= 0) {
       ring.hidden = true;
       return;
+    }
+    // 目标在视口外时先滚过去，再重新量
+    if (r.top < 0 || r.bottom > window.innerHeight) {
+      el.scrollIntoView({ block: 'center', behavior: 'auto' });
+      r = el.getBoundingClientRect();
     }
     const pad = 6;
     ring.hidden = false;
@@ -134,34 +154,45 @@ export function mountOnboardingGuide({ root, onClose = null } = {}) {
     ring.style.left = `${Math.max(0, r.left - pad)}px`;
     ring.style.width = `${r.width + pad * 2}px`;
     ring.style.height = `${r.height + pad * 2}px`;
-    // 目标在视口外时先滚过去，再重新定位
-    if (r.top < 0 || r.bottom > window.innerHeight) {
-      el.scrollIntoView({ block: 'center', behavior: 'auto' });
-      const r2 = el.getBoundingClientRect();
-      ring.style.top = `${Math.max(0, r2.top - pad)}px`;
-      ring.style.left = `${Math.max(0, r2.left - pad)}px`;
-      ring.style.width = `${r2.width + pad * 2}px`;
-      ring.style.height = `${r2.height + pad * 2}px`;
-    }
+
+    // 卡片优先落在环下方；下方放不下就翻到上方。
+    const cardRect = card.getBoundingClientRect();
+    const gap = 12;
+    const below = r.bottom + gap;
+    const top = below + cardRect.height <= window.innerHeight - 8
+      ? below
+      : Math.max(8, r.top - gap - cardRect.height);
+    card.style.position = 'fixed';
+    card.style.top = `${top}px`;
+    card.style.left = '50%';
+    card.style.transform = 'translateX(-50%)';
+    card.style.maxWidth = `min(320px, calc(100vw - 24px))`;
   };
 
   const render = () => {
-    const step = ONBOARDING_STEPS[index];
+    const step = active[index];
+    if (!step) return;
     title.textContent = step.title;
     [...dots.children].forEach((d, i) => d.classList.toggle('on', i === index));
     btnPrev.disabled = index === 0;
-    btnNext.textContent = index === ONBOARDING_STEPS.length - 1 ? '完成' : '下一步';
+    btnNext.textContent = index === active.length - 1 ? '完成' : '下一步';
     placeRing();
   };
 
   const goTo = (next) => {
-    if (!Number.isInteger(next) || next < 0 || next >= ONBOARDING_STEPS.length) return false;
+    if (!Number.isInteger(next) || next < 0 || next >= active.length) return false;
     index = next;
     render();
     return true;
   };
 
   const openGuide = () => {
+    // 每次打开重新求值：工作台状态变了，可用目标也跟着变。
+    active = ONBOARDING_STEPS.filter(isStepUsable);
+    // 一个可用目标都没有时**不弹空壳**（原实现会弹一个指不到任何东西的浮层）。
+    if (active.length === 0) return;
+    dots.textContent = '';
+    for (let i = 0; i < active.length; i += 1) dots.appendChild(document.createElement('i'));
     index = 0;
     open = true;
     overlay.hidden = false;
@@ -178,7 +209,7 @@ export function mountOnboardingGuide({ root, onClose = null } = {}) {
   };
 
   const onNext = () => {
-    if (index >= ONBOARDING_STEPS.length - 1) {
+    if (index >= active.length - 1) {
       closeGuide();
       return;
     }
