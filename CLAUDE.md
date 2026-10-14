@@ -9,7 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## 常用命令
 
 ```bash
-npm test                          # Vitest 全量（当前 734 passed / 2 skipped / 74 文件）
+npm test                          # Vitest 全量（当前 817 passed / 2 skipped / 81 文件）
 npx vitest run test/xxx.test.js   # 单文件
 npx vitest run -t "用例名"         # 单条用例
 npm run dev                       # vite 开发服务器，独立模式手测（http://127.0.0.1:3040；**不是** 5173）
@@ -76,6 +76,8 @@ npm run gen-fixtures              # 重新生成测试固件 fixtures/
 7. **`#file-input` 只在「尚无源包」时采纳新文件**：同一页面里再喂一个包**不会**换源包（只入库）。E2E 里"量第二个包"必须**另开上下文**，否则量到的是第一个包（2026-09-28 实测把 66 MB 用例量成了 12 MB 包的耗时，读数"308 MB/s"一眼假）。
 8. **改 `base` 要改构建脚本，不是 vite.config**：`npm run build` 是 `vite build --base=./`，**CLI 标志覆盖**配置里的 `base` —— 只改 `vite.config.js` 对产物毫无影响（实测过一次"无效实验"）。
 9. **运行器的 `dist` 新鲜度判据只看 mtime**：**看不见「删了源码文件」** ⇒ 凡涉及删/换文件的实验必须 `npm run e2e:web -- --rebuild`。
+10. **`[hidden]` 压不过同特异度的 `display`（2026-10-14 实测事故）**：`style.css` 给 `.wb-gate` 写了 `display:flex`，与插件内全局兜底 `#app.app-container [hidden]` **特异度相同**，源码顺序决定胜负 ⇒ 空壳框永远可见；而 `showGate()` 全仓无调用点 ⇒ 从不触发、永远显示、内容为空。**默认隐藏的容器若被写了 `display`，必须另写一条特异度更高的 `[hidden]` 覆盖规则**。同类：空容器占位（`#category-summary-badge` 空时是个空胶囊，用 `:empty{display:none}` 治）。
+11. **两个 UI 守卫按「文件源码正则」提取控件与文案** ⇒ **注释里不得出现控件标签字面量**（会被当成无 id 控件误报）；要断言**渲染结果**必须调用 `getWorkbenchHtml()`，读文件源码会把注释一并算进来（本轮「文案纪律」断言全误报过一次）。守卫只强制「声明存在」，**不验证声明为真**——死控件能通过。
 
 ## Trellis 任务流
 

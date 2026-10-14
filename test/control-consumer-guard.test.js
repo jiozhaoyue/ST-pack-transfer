@@ -64,16 +64,26 @@ describe('控件消费点守卫', () => {
     const template = await readFile(new URL('../src/ui/workbench-template.js', import.meta.url), 'utf8');
     const controls = extractControls(template);
 
-    // 2026-10-14：仓库已无 name 型单选组（三组并排 radio 全部改为带 id 的枚举）。
-    // name 型能力另用合成模板单独证明（下一条），此处只查 class 型与僵尸条目。
+    // 2026-10-14：仓库已无 name 型单选组（三组并排 radio 改为带 id 的枚举），
+    // 也已无 class 型分组按钮（三个预设按钮并为 `category-preset-select` 枚举）。
+    // 两条能力各自用**合成模板**单独证明（下两条），此处只查实况无僵尸条目。
     const groupOnly = controls.filter((c) => !c.id && !c.name);
-    expect(groupOnly.length).toBeGreaterThan(0);
     for (const c of groupOnly) {
       const hit = Object.keys(CONTROL_CONSUMERS).filter(
         (k) => k.startsWith('group:.') && c.classes.includes(k.slice('group:.'.length)),
       );
       expect(hit).toHaveLength(1);
     }
+  });
+
+  it('class 型分组按钮仍受守卫管辖（合成模板证明能力，不依赖仓库实况）', () => {
+    const synthetic = '<div>\n<button class="btn-grouped">x</button>\n</div>';
+    const table = { 'group:.btn-grouped': '某模块 — 事件委托读 dataset' };
+    expect(run(synthetic, table)).toEqual([]);
+
+    const missing = run(synthetic, {});
+    expect(missing).toHaveLength(1);
+    expect(missing[0].message).toContain('group:');
   });
 
   it('name 型单选组仍受守卫管辖（合成模板证明能力，不依赖仓库实况）', () => {

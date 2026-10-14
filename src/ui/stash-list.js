@@ -148,7 +148,7 @@ export async function renderStashList({
   if (files.length === 0) {
     const empty = document.createElement('div');
     empty.className = 'archive-empty';
-    empty.textContent = '暂无源包：拖入或上传 Zip 后出现在这里';
+    empty.textContent = '无源包';
     containerEl.appendChild(empty);
     return;
   }

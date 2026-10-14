@@ -47,7 +47,7 @@ export const CONTROL_CONSUMERS = Object.freeze({
   'btn-select-all': 'category-filter.js:84 — click 全选',
   'btn-deselect-all': 'category-filter.js:89 — click 全不选',
   'btn-invert-select': 'category-filter.js:94 — click 反选',
-  'group:.btn-quick': 'category-filter.js:99 — 事件委托读 dataset.preset（仅角色卡/仅聊天记录/安全脱敏）',
+  'category-preset-select': 'category-filter.js — change 读 .value 套用预设（仅角色卡/仅聊天记录/安全脱敏），套用后复位为「不套用」',
 
   // ── 统一文件树确认条 ──
   'btn-host-tree-selectall': 'index.js:308 — click 全选（走 categorySelectAll）',

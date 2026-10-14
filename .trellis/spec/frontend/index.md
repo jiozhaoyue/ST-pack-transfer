@@ -31,10 +31,11 @@
 | [迁移安全与证据](./migration-safety-and-evidence.md) | 目标备份、写入门、完成判定与安全重试 | 已裁定目标契约（2026-10-01）；**写入门 S3 / 核对四态 S4 已实现（2026-10-13）** |
 | [迁移兼容与验收](./migration-compatibility-and-release.md) | 旧会话**强制作废**、渐进重构、真人验收与 file:// 离线交付 | **§3.1 按用户裁定 U-1 改写为硬拒绝（2026-10-13）**；§3.5 向导与离线单文件已实现 |
 | [异步阶段超时/取消边界](./async-bounds.md) | **每个 `await` 的边界与取消路径**：阶段边界表（含 `file:line`）· 「总时长 vs 间隔」两种口径 · 三个**刻意不设上限**的阶段及其代价 · 停滞守卫契约 · **测量装置 `createStageRecorder`** 与**实测读数**（Dev ST：TTFB 141ms / 685MB 传输 60.1s / 块间最大间隔 651ms） | ✅ 就位（2026-10-14 新建 + **已取首批实测读数**；Luker / 慢速网络 / 上传方向仍未测） |
+| [工作台单一视图与局域网互传](./workbench-single-view.md) | **迁移向导外壳已整体删除**（六步步骤条 / 向导·高级模式切换 / 不兼容门）· `[hidden]` 与 `display` 的特异度事故 · **配色只用 `--SmartTheme*`** · 文案纪律（无说明、无黑话）· 控件纪律（枚举 / 单列 / 紧凑折叠）· 宿主动态识别四宿主判据 · **WebRTC 一次性取件码互传**与必须如实告知的两跳信令限制 | ✅ 就位（2026-10-14 新建；端到端实测 300 KB 字节级一致） |
 
 > 上述三份“迁移”文档是经用户批准记录的**后续目标契约**，不是当前实现事实；其中拟新增签名、测试和验收均有状态标注。不得据此宣称产品已完成迁移向导或双击离线交付。
 
-> 现行质量门槛：`npm test` 全绿（当前 **64 个测试文件 / 610 passed / 2 skipped**，零回归），
+> 现行质量门槛：`npm test` 全绿（当前 **81 个测试文件 / 817 passed / 2 skipped**，零回归），
 > 外加**五条**静态守卫 `npm run check:css-scope`、`npm run check:dom-injection`、
 > `npm run check:template-source`、`npm run check:control-consumer` 与 `npm run check:dom-scope`
 > （详见 quality-guidelines.md 与 dom-write-scope.md）。
