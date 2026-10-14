@@ -83,7 +83,14 @@ export async function renderUsageDashboard({ containerEl }) {
 
   fetchUserQuota().then((quota) => {
     // 渲染期间容器可能已被重建，校验仍在 DOM
-    if (!quota || !containerEl.isConnected || !containerEl.contains(userSection)) return;
+    if (!containerEl.isConnected || !containerEl.contains(userSection)) return;
+    // 2026-10-14 修复：非 Luker 宿主（ST / TT / PT / 独立态）与端点不可达时 `fetchUserQuota()`
+    // 返回 null，原实现直接 return ⇒ 这一行**永远停在「查询中...」**（实测截图可见）。
+    // 现在整行撤掉，不留假进行态。
+    if (!quota) {
+      userSection.remove();
+      return;
+    }
     const { usedBytes, quotaBytes, over } = quota;
     const pct = quotaBytes > 0 ? Math.min(100, (usedBytes / quotaBytes) * 100) : 0;
     const detail = quotaBytes == null

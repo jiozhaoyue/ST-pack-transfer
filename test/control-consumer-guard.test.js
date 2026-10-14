@@ -60,18 +60,12 @@ describe('控件消费点守卫', () => {
     expect(violations).toEqual([]);
   });
 
-  it('实况声明表无僵尸条目，且覆盖 name 型单选组与 class 型分组按钮', async () => {
+  it('实况声明表无僵尸条目，且 class 型分组按钮被覆盖', async () => {
     const template = await readFile(new URL('../src/ui/workbench-template.js', import.meta.url), 'utf8');
     const controls = extractControls(template);
 
-    // name 型（无 id）单选组必须被显式声明
-    const nameOnly = controls.filter((c) => !c.id && c.name);
-    expect(nameOnly.length).toBeGreaterThan(0);
-    for (const c of nameOnly) {
-      expect(CONTROL_CONSUMERS).toHaveProperty(`name:${c.name}`);
-    }
-
-    // class 型（无 id 无 name）必须由 group: 覆盖
+    // 2026-10-14：仓库已无 name 型单选组（三组并排 radio 全部改为带 id 的枚举）。
+    // name 型能力另用合成模板单独证明（下一条），此处只查 class 型与僵尸条目。
     const groupOnly = controls.filter((c) => !c.id && !c.name);
     expect(groupOnly.length).toBeGreaterThan(0);
     for (const c of groupOnly) {
@@ -80,6 +74,17 @@ describe('控件消费点守卫', () => {
       );
       expect(hit).toHaveLength(1);
     }
+  });
+
+  it('name 型单选组仍受守卫管辖（合成模板证明能力，不依赖仓库实况）', () => {
+    const synthetic = '<div>\n<input type="radio" name="mode-group" value="a">\n</div>';
+    // 声明表只放本合成模板里真实存在的键——放全表会被「僵尸条目」检查先拦下（与本用例无关的噪音）
+    const table = { 'name:mode-group': '某模块 — 读 :checked 取值' };
+    expect(run(synthetic, table)).toEqual([]);
+
+    const missing = run(synthetic, {});
+    expect(missing).toHaveLength(1);
+    expect(missing[0].control).toBe('name:mode-group');
   });
 
   it('合法模板无违规', () => {

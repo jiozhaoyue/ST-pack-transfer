@@ -7,9 +7,17 @@
 #app.app-container,
 .st-converter-drawer-app {
   /* ==========================================================================
-     宿主主题变量继承体系
-     插件模式：--SmartTheme* 变量直接继承宿主主题（严禁在此硬编码覆盖，09-07 教训）。
-     独立 Web 模式：宿主变量未定义时走回退值（中性深色，无品牌化金色）。
+     宿主主题变量继承体系（用户 2026-10-14 死命令：**只用酒馆颜色**）
+     插件模式：--SmartTheme* 变量直接继承宿主主题。
+     独立 Web 模式：宿主变量未定义时走**中性**回退值（无品牌化金色）。
+
+     2026-10-14 清理：原文件在此自建了一整套色板——四个平台品牌色
+     （--accent-st/luker/tt/pt）、六个动作色（--st-action-*）、三个状态色
+     （--warning/danger/success），全是硬编码字面量，而同一段第 11 行自己写着
+     「严禁在此硬编码覆盖」。现全部改为**映射到宿主已有令牌**：
+       · 强调类 → --SmartThemeQuoteColor（宿主引用色）
+       · 文本类 → --SmartThemeBodyColorInverted / --SmartThemeEmColor
+       · 状态类 → 宿主引用色与下划线色，危险动作另靠二次确认区分，不靠颜色（用户裁定 D-01）
      ========================================================================== */
 
   /* 基础背景层 */
@@ -23,42 +31,39 @@
   /* 边框体系 */
   --border-color: var(--SmartThemeBorderColor, rgba(255, 255, 255, 0.14));
   --border-subtle: color-mix(in srgb, var(--border-color) 50%, transparent);
-  --border-focus: var(--SmartThemeQuoteColor, #f59e0b);
+  --border-focus: var(--SmartThemeQuoteColor, #9a9a92);
 
-  /* 文本色彩（全部跟随主题，无写死色） */
+  /* 文本色彩（全部跟随主题，无写死品牌色） */
   --text-main: var(--SmartThemeBodyColorInverted, #f2f4f8);
-  --text-em: var(--SmartThemeEmColor, #f5c542);
+  --text-em: var(--SmartThemeEmColor, #dcdcd2);
   --text-gold: var(--text-em);
   --text-muted: color-mix(in srgb, var(--text-main) 62%, transparent);
   --text-sub: color-mix(in srgb, var(--text-main) 42%, transparent);
 
-  /* 强调色与各平台标识色 */
-  --accent: var(--SmartThemeQuoteColor, #f59e0b);
-  --accent-hover: color-mix(in srgb, var(--accent) 80%, #fff);
-  /* `@supports not (color-mix)` 分支专用的降级底色。字面量**只许出现在这里**，
-     不得再散落到规则内部（2026-09-25：原 `@supports` 块内直接写 `rgba(245,158,11,.24)`
-     与 `#f59e0b`，等于把同一份品牌色复制了两处）。 */
-  --accent-soft-fallback: rgba(245, 158, 11, 0.24);
-  --accent-st: #38bdf8;
-  --accent-luker: #c084fc;
-  --accent-tt: #fb7185;
-  --accent-pt: #34d399;
+  /* 强调色（宿主引用色是插件唯一可用的强调来源） */
+  --accent: var(--SmartThemeQuoteColor, #9a9a92);
+  --accent-hover: color-mix(in srgb, var(--accent) 80%, var(--text-main));
+  --accent-soft-fallback: color-mix(in srgb, var(--SmartThemeQuoteColor, #9a9a92) 24%, transparent);
 
-  /* 动作语义色（计划预览的动作徽标）。语义 token → 此处变量的映射在
-     `src/ui/action-colors.js`；`src/core/` **只给 token 不给颜色**（分层契约）。
-     这一块是插件里动作色板的**唯一来源**，规则内不得再写字面量。
-     `synth` 跟随宿主强调色，其余留字面量：宿主无官方「动作语义色」变量记载（L1-MR-5 不猜 API）。 */
-  --st-action-copy: #10b981;
-  --st-action-route: #3b82f6;
-  --st-action-migrate: #8b5cf6;
-  --st-action-synth: var(--SmartThemeQuoteColor, #f59e0b);
-  --st-action-drop: #ef4444;
-  --st-action-filter: #6b7280;
+  /* 平台标识色：**不再自造四个品牌色**，一律回落宿主强调色 */
+  --accent-st: var(--accent);
+  --accent-luker: var(--accent);
+  --accent-tt: var(--accent);
+  --accent-pt: var(--accent);
 
-  /* 状态色彩 */
-  --warning: #f59e0b;
-  --danger: #ef4444;
-  --success: #10b981;
+  /* 动作语义色（计划预览的动作徽标）：core 只给 token 不给颜色，此处统一映射宿主令牌。
+     区分度由徽标**文字**承担，不再靠自造色板。 */
+  --st-action-copy: var(--accent);
+  --st-action-route: var(--accent);
+  --st-action-migrate: var(--accent);
+  --st-action-synth: var(--accent);
+  --st-action-drop: var(--text-em);
+  --st-action-filter: var(--text-em);
+
+  /* 状态色彩：宿主无专用语义色变量，一律映射到宿主令牌 */
+  --warning: var(--accent);
+  --danger: var(--text-em);
+  --success: var(--SmartThemeUnderlineColor, #9a9a92);
 
   /* 圆角与字体 */
   --radius-sm: 6px;
@@ -68,7 +73,7 @@
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 
   /* 阴影 */
-  --shadow-card: 0 4px 20px -2px rgba(0, 0, 0, 0.4);
+  --shadow-card: 0 4px 20px -2px var(--SmartThemeShadowColor, rgba(0, 0, 0, 0.4));
   --shadow-glow: 0 0 14px color-mix(in srgb, var(--accent) 25%, transparent);
 }
 
@@ -857,6 +862,11 @@
   border: 1px solid color-mix(in srgb, var(--accent) 25%, transparent);
 }
 
+/* 空徽标不占位：原实现无内容时仍渲染成一个空胶囊（2026-10-14 截图可见的「▬」） */
+#app.app-container .category-sub-summary:empty, .st-converter-drawer-app .category-sub-summary:empty {
+  display: none;
+}
+
 #app.app-container .category-actions, .st-converter-drawer-app .category-actions {
   display: flex;
   align-items: center;
@@ -1502,44 +1512,6 @@
 #app.app-container .modal-desc, .st-converter-drawer-app .modal-desc {
   font-size: 0.85rem;
   color: var(--text-muted);
-}
-
-#app.app-container .restore-mode-group, .st-converter-drawer-app .restore-mode-group {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-#app.app-container .radio-label, .st-converter-drawer-app .radio-label {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 10px 12px;
-  background: rgba(14, 18, 26, 0.7);
-  border: 1px solid color-mix(in srgb, var(--accent) 20%, transparent);
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-}
-
-#app.app-container .radio-label:hover, .st-converter-drawer-app .radio-label:hover {
-  background: color-mix(in srgb, var(--accent) 8%, transparent);
-  border-color: var(--accent);
-}
-
-#app.app-container .radio-text, .st-converter-drawer-app .radio-text {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-#app.app-container .radio-text strong, .st-converter-drawer-app .radio-text strong {
-  font-size: 0.85rem;
-  color: var(--text-gold);
-}
-
-#app.app-container .radio-text span, .st-converter-drawer-app .radio-text span {
-  font-size: 0.75rem;
-  color: var(--text-sub);
 }
 
 #app.app-container .modal-buttons, .st-converter-drawer-app .modal-buttons {
@@ -2488,16 +2460,79 @@
 }
 
 /* ==========================================================================
-   两块式布局 (two-block)：块一 状态+数据包区 / 块二 进度+选项+执行
+   区块式布局（2026-10-14 单一视图）
+   原「两块式布局」的 `.wb-block` / `.zone-card` 卡片套卡片结构随重构删除：
+   现在每个区块是一张 `.wb-sec` 卡，标题栏 + 内容体，**卡内不再套卡**。
    ========================================================================== */
-#app.app-container .wb-block, .st-converter-drawer-app .wb-block {
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-lg);
-  padding: 14px 16px;
+#app.app-container .wb-sec, .st-converter-drawer-app .wb-sec {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  margin-bottom: 6px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+#app.app-container .wb-sec-head, .st-converter-drawer-app .wb-sec-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+#app.app-container .wb-sec-title, .st-converter-drawer-app .wb-sec-title {
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+#app.app-container .wb-sec-body, .st-converter-drawer-app .wb-sec-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+}
+
+/* 状态读数行（配额） */
+#app.app-container .wb-status-line, .st-converter-drawer-app .wb-status-line {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+/* 设置项：一律单列，禁止并排（用户 2026-10-14） */
+#app.app-container .wb-field, .st-converter-drawer-app .wb-field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+#app.app-container .wb-field-key, .st-converter-drawer-app .wb-field-key {
+  color: var(--text-muted);
+  font-size: 0.85em;
+}
+
+/* 工具按钮行（只放动作按钮，不放设置项） */
+#app.app-container .wb-tool-row, .st-converter-drawer-app .wb-tool-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+/* 折叠区在区块内紧凑成组：去掉各自的外边距与圆角，相邻项只留一条分隔线
+   （用户 2026-10-14：禁止折叠行之间那种大间隔）。 */
+#app.app-container .wb-sec .wb-fold, .st-converter-drawer-app .wb-sec .wb-fold {
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+}
+
+#app.app-container .wb-sec .wb-fold + .wb-fold, .st-converter-drawer-app .wb-sec .wb-fold + .wb-fold {
+  border-top: 1px solid var(--border-subtle);
 }
 
 #app.app-container .status-row, .st-converter-drawer-app .status-row {
@@ -2507,8 +2542,9 @@
   flex-wrap: wrap;
 }
 
-/* 进度条：块二顶部 sticky 吸顶，任务运行时始终可见 */
-#app.app-container .wb-block-controls .progress-container.active, .st-converter-drawer-app .wb-block-controls .progress-container.active {
+/* 进度条：执行区顶部 sticky 吸顶，任务运行时始终可见。
+   2026-10-14：原选择器挂 `.wb-block-controls`，该容器随单一视图重构删除，改挂 `.wb-sec`。 */
+#app.app-container .wb-sec .progress-container.active, .st-converter-drawer-app .wb-sec .progress-container.active {
   position: sticky;
   top: 0;
   z-index: 100;
@@ -2516,23 +2552,6 @@
   padding: 8px 4px;
   margin: -8px -4px;
   border-radius: var(--radius-sm);
-}
-
-#app.app-container .zone-card, .st-converter-drawer-app .zone-card {
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  padding: 10px 12px;
-  background: color-mix(in srgb, var(--bg-primary) 45%, transparent);
-}
-
-#app.app-container .zone-title, .st-converter-drawer-app .zone-title {
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--text-em);
-  margin-bottom: 8px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
 }
 
 #app.app-container .zone-hint, .st-converter-drawer-app .zone-hint {
@@ -2586,34 +2605,6 @@
   color: var(--danger);
 }
 
-#app.app-container .ext-mode-card, .st-converter-drawer-app .ext-mode-card {
-  display: flex;
-  gap: 8px;
-  padding: 8px 12px;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  align-items: flex-start;
-  background: color-mix(in srgb, var(--bg-primary) 40%, transparent);
-}
-
-#app.app-container .ext-mode-card:has(input:checked), .st-converter-drawer-app .ext-mode-card:has(input:checked) {
-  border-color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 10%, transparent);
-}
-
-#app.app-container .ext-mode-title, .st-converter-drawer-app .ext-mode-title {
-  color: var(--accent);
-  font-size: 0.85rem;
-}
-
-#app.app-container .ext-mode-desc, .st-converter-drawer-app .ext-mode-desc {
-  margin: 2px 0 0 0;
-  font-size: 0.74rem;
-  color: var(--text-muted);
-  line-height: 1.35;
-}
-
 #app.app-container .btn-tpl-preset, .st-converter-drawer-app .btn-tpl-preset {
   background: transparent;
   border: none;
@@ -2663,48 +2654,6 @@
   align-items: center;
 }
 
-/* 输出目标三联（目标平台 / 压缩级别 / 分卷 MB） */
-#app.app-container .output-row, .st-converter-drawer-app .output-row {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
-  gap: 8px;
-  margin: 10px 0;
-}
-
-#app.app-container .output-field, .st-converter-drawer-app .output-field {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-
-#app.app-container .output-field > small, .st-converter-drawer-app .output-field > small {
-  font-size: 0.72rem;
-  color: var(--text-sub);
-}
-
-/* 扩展打包：两个紧凑选项（替代原带大段描述的模式卡） */
-#app.app-container .ext-mode-row, .st-converter-drawer-app .ext-mode-row {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-
-#app.app-container .ext-mode-opt, .st-converter-drawer-app .ext-mode-opt {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 4px 10px;
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 0.82rem;
-}
-
-#app.app-container .ext-mode-opt:has(input:checked), .st-converter-drawer-app .ext-mode-opt:has(input:checked) {
-  border-color: var(--accent);
-  color: var(--accent);
-}
-
 /* 折叠区内的勾选与动作排布 */
 #app.app-container .wb-checks, .st-converter-drawer-app .wb-checks {
   display: flex;
@@ -2742,158 +2691,173 @@
 }
 
 /* ==========================================================================
-   迁移向导外壳（S5 第二步）
-   向导不是第二份 UI：它只改根容器上的 data-wb-view / data-wb-step，
-   显隐由本节的选择器决定。高级视图（data-wb-view="advanced"）保持既有全量展示。
+   全屏引导（2026-10-14 取代已删除的「迁移向导」）
+   引导层**高亮真实控件**，不复制界面；每步只有一个短标题。
+   ⚠ `[hidden]` 必须显式覆盖：本节的 `display: flex` 会压过 hidden 属性
+   （2026-10-14 实际踩过——`.wb-gate` 就是被这条规则坑成了永远可见的空壳框）。
    ========================================================================== */
-#app.app-container .wb-wizard, .st-converter-drawer-app .wb-wizard {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 8px 10px;
-  margin-bottom: 8px;
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-}
-
-#app.app-container .wb-view-switch, .st-converter-drawer-app .wb-view-switch {
+#app.app-container .wb-guide-overlay, .st-converter-drawer-app .wb-guide-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  justify-content: center;
+  background: color-mix(in srgb, var(--bg-primary) 74%, transparent);
 }
 
-#app.app-container .wb-view-title, .st-converter-drawer-app .wb-view-title {
+#app.app-container .wb-guide-overlay[hidden], .st-converter-drawer-app .wb-guide-overlay[hidden] {
+  display: none;
+}
+
+#app.app-container .wb-guide-ring, .st-converter-drawer-app .wb-guide-ring {
+  position: fixed;
+  z-index: 1;
+  pointer-events: none;
+  border: 2px solid var(--accent);
+  border-radius: var(--radius-sm);
+}
+
+#app.app-container .wb-guide-ring[hidden], .st-converter-drawer-app .wb-guide-ring[hidden] {
+  display: none;
+}
+
+#app.app-container .wb-guide-card, .st-converter-drawer-app .wb-guide-card {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 18px 22px;
+  max-width: 320px;
+  text-align: center;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+}
+
+#app.app-container .wb-guide-title, .st-converter-drawer-app .wb-guide-title {
+  font-size: 1.15em;
   font-weight: 600;
   color: var(--text-main);
 }
 
-#app.app-container .wb-step-rail, .st-converter-drawer-app .wb-step-rail {
+#app.app-container .wb-guide-dots, .st-converter-drawer-app .wb-guide-dots {
+  display: flex;
+  gap: 6px;
+}
+
+#app.app-container .wb-guide-dots i, .st-converter-drawer-app .wb-guide-dots i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  border: 1px solid var(--text-sub);
+}
+
+#app.app-container .wb-guide-dots i.on, .st-converter-drawer-app .wb-guide-dots i.on {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+#app.app-container .wb-guide-actions, .st-converter-drawer-app .wb-guide-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  justify-content: center;
+  gap: 6px;
 }
 
-#app.app-container .wb-step-btn, .st-converter-drawer-app .wb-step-btn {
-  flex: 1 1 auto;
-  opacity: 0.75;
-}
-
-#app.app-container .wb-step-btn[aria-current="step"], .st-converter-drawer-app .wb-step-btn[aria-current="step"] {
-  opacity: 1;
-  border-color: var(--accent);
-  color: var(--accent);
-  font-weight: 600;
-}
-
-#app.app-container .wb-step-btn:focus-visible, .st-converter-drawer-app .wb-step-btn:focus-visible,
-#app.app-container .wb-view-switch button:focus-visible, .st-converter-drawer-app .wb-view-switch button:focus-visible,
-#app.app-container .wb-step-nav button:focus-visible, .st-converter-drawer-app .wb-step-nav button:focus-visible {
+#app.app-container .wb-guide-actions button:focus-visible,
+.st-converter-drawer-app .wb-guide-actions button:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
-#app.app-container .wb-step-nav, .st-converter-drawer-app .wb-step-nav {
+/* ==========================================================================
+   局域网互传面板（2026-10-14）
+   发送与接收各占一节，同屏并列展示——**不做角色切换**（用户裁定「禁止模式选择」）。
+   ========================================================================== */
+#app.app-container .wb-lan-overlay, .st-converter-drawer-app .wb-lan-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9998;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  justify-content: center;
+  padding: 16px;
+  background: color-mix(in srgb, var(--bg-primary) 78%, transparent);
 }
 
-#app.app-container .wb-step-counter, .st-converter-drawer-app .wb-step-counter {
-  flex: 1;
-  text-align: center;
-  color: var(--text-em);
-  font-size: 0.9em;
+#app.app-container .wb-lan-overlay[hidden], .st-converter-drawer-app .wb-lan-overlay[hidden] {
+  display: none;
 }
 
-/* 不兼容门（U-1：旧会话显式拒绝） */
-#app.app-container .wb-gate, .st-converter-drawer-app .wb-gate {
+#app.app-container .wb-lan-card, .st-converter-drawer-app .wb-lan-card {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 10px 12px;
-  margin-bottom: 8px;
+  gap: 10px;
+  width: 100%;
+  max-width: 440px;
+  max-height: 90vh;
+  overflow: auto;
+  padding: 14px 16px;
   background: var(--bg-card);
-  border: 1px solid var(--border-focus);
-  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
 }
 
-#app.app-container .wb-gate-title, .st-converter-drawer-app .wb-gate-title {
-  margin: 0;
-  font-size: 1em;
-  color: var(--text-em);
-}
-
-#app.app-container .wb-gate-reason, .st-converter-drawer-app .wb-gate-reason {
-  margin: 0;
+#app.app-container .wb-lan-title, .st-converter-drawer-app .wb-lan-title {
+  font-weight: 600;
   color: var(--text-main);
 }
 
-/* 检查页（步骤④） */
-#app.app-container .wb-check-panel, .st-converter-drawer-app .wb-check-panel {
+#app.app-container .wb-lan-sec, .st-converter-drawer-app .wb-lan-sec {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding: 8px 10px;
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
+  padding: 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
 }
 
-#app.app-container .wb-check-title, .st-converter-drawer-app .wb-check-title {
+#app.app-container .wb-lan-sec-title, .st-converter-drawer-app .wb-lan-sec-title {
   font-weight: 600;
-  color: var(--text-main);
+  color: var(--text-em);
+}
+
+#app.app-container .wb-lan-code, .st-converter-drawer-app .wb-lan-code {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  word-break: break-all;
+  resize: vertical;
+}
+
+#app.app-container .wb-lan-note, .st-converter-drawer-app .wb-lan-note {
+  color: var(--text-em);
+  font-size: 0.85em;
+}
+
+#app.app-container .wb-lan-status, .st-converter-drawer-app .wb-lan-status {
+  color: var(--text-muted);
+  font-size: 0.85em;
+}
+
+/* 检查面板（原「步骤④」，现在只是「检查」区块里的读数，不再是步骤） */
+#app.app-container .wb-check-panel, .st-converter-drawer-app .wb-check-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 #app.app-container .wb-check-summary, .st-converter-drawer-app .wb-check-summary {
   margin: 0;
   color: var(--text-em);
+  font-size: 0.9em;
 }
 
 #app.app-container .wb-check-exclusions, .st-converter-drawer-app .wb-check-exclusions {
   margin: 0;
   padding-left: 18px;
   color: var(--text-main);
-}
-
-/* 高级视图：收起步骤条与翻页（保留视图开关本身） */
-#app.app-container[data-wb-view="advanced"] .wb-step-rail, .st-converter-drawer-app[data-wb-view="advanced"] .wb-step-rail,
-#app.app-container[data-wb-view="advanced"] .wb-step-nav, .st-converter-drawer-app[data-wb-view="advanced"] .wb-step-nav {
-  display: none;
-}
-
-/* 向导视图：一次只显示当前步的区块（无 data-wb-step 的区块始终可见）。
-   ⚠ 必须限定在 `.wb-block` 内：步骤条自己的按钮也带 `data-wb-step`（值＝步骤 id），
-   若用裸 `[data-wb-step]` 后代选择器，它们会被**自己的披露规则**隐藏掉
-   （2026-10-13 实测：步骤条 6 个按钮全部 display:none，向导无法导航）。 */
-#app.app-container[data-wb-view="wizard"][data-wb-step="source"] .wb-block [data-wb-step]:not([data-wb-step="source"]),
-.st-converter-drawer-app[data-wb-view="wizard"][data-wb-step="source"] .wb-block [data-wb-step]:not([data-wb-step="source"]) {
-  display: none;
-}
-
-#app.app-container[data-wb-view="wizard"][data-wb-step="target"] .wb-block [data-wb-step]:not([data-wb-step="target"]),
-.st-converter-drawer-app[data-wb-view="wizard"][data-wb-step="target"] .wb-block [data-wb-step]:not([data-wb-step="target"]) {
-  display: none;
-}
-
-#app.app-container[data-wb-view="wizard"][data-wb-step="scope"] .wb-block [data-wb-step]:not([data-wb-step="scope"]),
-.st-converter-drawer-app[data-wb-view="wizard"][data-wb-step="scope"] .wb-block [data-wb-step]:not([data-wb-step="scope"]) {
-  display: none;
-}
-
-#app.app-container[data-wb-view="wizard"][data-wb-step="check"] .wb-block [data-wb-step]:not([data-wb-step="check"]),
-.st-converter-drawer-app[data-wb-view="wizard"][data-wb-step="check"] .wb-block [data-wb-step]:not([data-wb-step="check"]) {
-  display: none;
-}
-
-#app.app-container[data-wb-view="wizard"][data-wb-step="run"] .wb-block [data-wb-step]:not([data-wb-step="run"]),
-.st-converter-drawer-app[data-wb-view="wizard"][data-wb-step="run"] .wb-block [data-wb-step]:not([data-wb-step="run"]) {
-  display: none;
-}
-
-#app.app-container[data-wb-view="wizard"][data-wb-step="verify"] .wb-block [data-wb-step]:not([data-wb-step="verify"]),
-.st-converter-drawer-app[data-wb-view="wizard"][data-wb-step="verify"] .wb-block [data-wb-step]:not([data-wb-step="verify"]) {
-  display: none;
+  font-size: 0.9em;
 }

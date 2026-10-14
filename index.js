@@ -85,7 +85,14 @@ import { UPLOAD_TIMEOUT_MS } from './src/ui/fetch-bounds.js';
 import { setupFileDrop } from './src/ui/file-drop.js';
 import { createViewController } from './src/ui/view.js';
 import { getWorkbenchHtml } from './src/ui/workbench-template.js';
-import { mountMigrationWizard, formatSpecialExclusionSummary } from './src/ui/migration-wizard.js';
+import {
+  createStaleFlag,
+  evaluateSavedSession,
+  writeCheckPanel,
+  formatSpecialExclusionSummary,
+} from './src/ui/workbench-session.js';
+import { setupOnboardingGuide } from './src/ui/onboarding-guide.js';
+import { mountLanTransferPanel } from './src/ui/lan-transfer-panel.js';
 import { createMigrationSession } from './src/ui/migration-controller.js';
 import { splitArchiveEntries, normalizeSplitMb } from './src/core/splitter.js';
 import { zipIo, readZipEntryManifest } from './src/core/zip-io.js';
@@ -509,25 +516,15 @@ async function main(appRoot) {
   const view = createViewController();
   setupDrawerToggles(root);
 
-  // ── 迁移向导（S5 第二步：默认入口）────────────────────────────────────────
-  // 向导与高级工作台**共享**同一份用户意图（`migration-user-journey.md` §3.3），
-  // 故这里只建一个 session 实例；视图切换只改根容器的 `data-wb-view`，不碰 session。
+  // ── 全屏引导（2026-10-14：取代已删除的迁移向导）────────────────────────────
+  // 首装（本机无完成标记）自动打开；页头「引导」按钮可随时重放。
+  setupOnboardingGuide(root);
+
+  // ── 会话状态与陈旧标记（2026-10-14：迁移向导外壳已删除，界面为单一视图）─────
+  // 原「六步步骤条 / 向导模式·高级模式切换 / 不兼容门」按用户裁定整体删除。
+  // 仍需保留的是：共享会话实例、计划陈旧标记、检查面板写入。
   const migrationSession = createMigrationSession();
-  const wizard = mountMigrationWizard({
-    root,
-    session: migrationSession,
-    onStepChange: (stepId) => {
-      // 用户回到「检查」步 ⇒ 他已看过新的读数，旧确认失效标记可以清掉
-      if (stepId === 'check') {
-        wizard.machine.clearStale();
-        syncWizardCheckPanel(latestPlan);
-      }
-    },
-    onReopen: () => {
-      // 「从源重开」：只重置视图与提示，**不动磁盘上的旧包/半成品文件**（U-1：作废的是会话状态）
-      view.setProgress(0, '请重新选择源数据包');
-    },
-  });
+  const staleFlag = createStaleFlag();
 
   // 初始化底部实时日志抽屉（块二底部挂载点）
   const logConsole = setupLogConsole(document.getElementById('log-console-mount') || root);
@@ -711,21 +708,23 @@ async function main(appRoot) {
   const btnTargetPreflight = document.getElementById('btn-target-preflight');
   const restorePreflightStatus = document.getElementById('restore-preflight-status');
 
+  // 2026-10-14：三组并排 radio 一律改为 `<select>` 枚举（用户裁定「禁止模式选择」）。
+  // 扩展包与 Git 历史**拆回两个枚举**（用户裁定）；后者仅在前者＝完整扩展包时可用。
   function getExtensionMode() {
-    const checked = document.querySelector('input[name="extension-mode"]:checked');
-    return checked ? checked.value : 'manifest';
+    const el = document.getElementById('extension-mode-select');
+    return el ? el.value : 'manifest';
   }
 
   /** Git 历史策略（keep|minimal|strip）。缺省 keep——与 PRD 裁决一致，保默认行为零变化。 */
   function getGitMode() {
-    const checked = document.querySelector('input[name="git-mode"]:checked');
-    return checked ? checked.value : 'keep';
+    const el = document.getElementById('git-mode-select');
+    return el ? el.value : 'keep';
   }
 
-  /** 轻量清单模式整体不打包 .git，故 Git 策略组联动禁用（各档代价说明在 label 的 title 属性）。 */
+  /** 只导出清单时整体不打包 .git，故 Git 历史枚举联动禁用。 */
   function syncGitModeAvailability() {
-    const disabled = getExtensionMode() !== 'full';
-    document.querySelectorAll('input[name="git-mode"]').forEach((el) => { el.disabled = disabled; });
+    const el = document.getElementById('git-mode-select');
+    if (el) el.disabled = getExtensionMode() !== 'full';
   }
 
   function getKeepDevFiles() {
@@ -757,14 +756,8 @@ async function main(appRoot) {
         : `已清理 ${cleared.length}/${items.length}`;
     }
 
-    const extEl = document.getElementById('fold-summary-extension');
-    if (extEl) {
-      // Git 策略只在「完整离线包」下生效，摘要必须同时体现这一点，避免用户以为勾了没反应。
-      const gitLabels = { keep: 'Git 原样', minimal: 'Git 瘦身', strip: 'Git 剔除' };
-      extEl.textContent = getExtensionMode() === 'full'
-        ? `完整离线包 · ${gitLabels[getGitMode()] || 'Git 原样'}`
-        : '轻量清单（不打包 .git）';
-    }
+    // 扩展包与 Git 历史已改为常驻枚举（原「扩展打包」折叠区删除）——枚举自身即读数，
+    // 不再需要折叠摘要。原摘要文案含「瘦身 / 剔除」等黑话，已按用户裁定废弃。
 
     // 增量与差量：仅「差量补丁」是生效项（原「增量合并」开关经取证确认从不生效，已于 T4 移除）。
     // 该区必选项是基准 ZIP，故状态读数必须体现基准是否已就绪——否则用户勾了也不知道能不能跑。
@@ -774,8 +767,7 @@ async function main(appRoot) {
       incEl.textContent = !deltaOn ? '' : (currentBaseZip ? '差量补丁 · 基准已就绪' : '差量补丁 · 缺基准');
     }
 
-    const fnEl = document.getElementById('fold-summary-filename');
-    if (fnEl) fnEl.textContent = filenameTemplateInput?.value || '';
+    // 包名已是常驻输入框 + 预览框（原「包名」折叠区删除），折叠摘要随之作废。
   }
 
   /**
@@ -795,22 +787,23 @@ async function main(appRoot) {
     });
   }
 
-  document.querySelectorAll('input[name="extension-mode"]').forEach((el) => {
-    el.addEventListener('change', () => {
-      // 选中态视觉由 CSS :has(input:checked) 处理，不再写内联色值（禁止硬编码颜色）
+  const extensionModeSelect = document.getElementById('extension-mode-select');
+  if (extensionModeSelect) {
+    extensionModeSelect.addEventListener('change', () => {
       syncGitModeAvailability();
       updateFoldSummaries();
       refreshPlan();
     });
-  });
+  }
 
-  document.querySelectorAll('input[name="git-mode"]').forEach((el) => {
-    el.addEventListener('change', () => {
+  const gitModeSelect = document.getElementById('git-mode-select');
+  if (gitModeSelect) {
+    gitModeSelect.addEventListener('change', () => {
       updateFoldSummaries();
       refreshPlan();
     });
-  });
-  // 初始联动：默认选中「轻量清单」，故 Git 策略组初始就是禁用态。
+  }
+  // 初始联动：默认选中「完整扩展包」，故 Git 历史枚举初始可用。
   syncGitModeAvailability();
 
   const keepDevFilesCheck = document.getElementById('keep-dev-files-check');
@@ -1328,14 +1321,13 @@ async function main(appRoot) {
    * @param {object|null} plan
    */
   function syncWizardCheckPanel(plan) {
-    if (!wizard) return;
     if (!plan) {
-      wizard.setCheckPanel({ summary: '尚无计划：请先选择源数据包。', exclusions: [] });
+      writeCheckPanel(root, { summary: '尚无计划 · 请先选择数据包', exclusions: [] });
       return;
     }
     const count = plan.expectedOutputFiles ?? 0;
     const bytes = plan.expectedOutputBytes ?? 0;
-    const stale = Boolean(wizard.isStale && wizard.isStale());
+    const stale = staleFlag.isStale();
     // OQ-1 配套：特殊类目「默认不含」的差异必须明说，不静默丢（读当前勾选，不是读默认表）
     const specialSummary = formatSpecialExclusionSummary(describeSpecialExclusions({
       backups: Boolean(includeBackupsCheck && includeBackupsCheck.checked),
@@ -1353,10 +1345,14 @@ async function main(appRoot) {
         }
       }
     }
-    wizard.setCheckPanel({
-      summary: `${stale ? '⚠ 关键输入已变更，请重新确认下方读数。' : ''}预计产出 ${count} 个条目 / ${formatBytes(bytes)}；排除 ${exclusions.length} 项。${specialSummary ? ` ${specialSummary}` : ''}`,
-      exclusions,
-    });
+    // 文案按用户裁定收敛：无分号、无括号说明、无长句。
+    const parts = [
+      stale ? '读数已过期' : '',
+      `预计产出 ${count} 个条目 · ${formatBytes(bytes)}`,
+      `排除 ${exclusions.length} 项`,
+      specialSummary,
+    ].filter(Boolean);
+    writeCheckPanel(root, { summary: parts.join(' · '), exclusions });
   }
 
   async function refreshPlan() {
@@ -1397,7 +1393,7 @@ async function main(appRoot) {
       syncExportExtManifestButton();
       // 关键输入（源/目标/范围）变更 ⇒ 上一次的「检查」读数与确认作废（R-05 / AC-04）。
       // 首次出计划不算"变更"（否则用户一上传就见到失效警告）。
-      if (hadPlan && wizard) wizard.machine.markStale();
+      if (hadPlan) staleFlag.mark();
       // 向导侧：共享选择快照 + 刷新检查页（同一计划快照，不从 DOM 重拼）
       migrationSession.setSelection(selection);
       syncWizardCheckPanel(plan);
@@ -2494,8 +2490,8 @@ async function main(appRoot) {
         void alertDialog('已有恢复任务正在进行，请等待其完成后再试');
         return;
       }
-      const modeRadio = document.querySelector('input[name="restore-mode"]:checked');
-      const mode = modeRadio ? modeRadio.value : 'merge';
+      const modeSelect = document.getElementById('restore-mode-select');
+      const mode = modeSelect ? modeSelect.value : 'merge';
 
       pendingRestoreBatch = null;
       if (restoreModalOverlay) restoreModalOverlay.style.display = 'none';
@@ -2919,7 +2915,23 @@ async function main(appRoot) {
   // 10. 页面启动时无损恢复工作区状态与初始化文件名预览
   updateFilenamePreview();
   updateFoldSummaries();
+  // 检查区初始读数：原实现在无源包时不调用，导致「检查」区块开局是空的（2026-10-14 截图可见）
+  syncWizardCheckPanel(null);
   setupStorageInspectorButton();
+
+  // ── 局域网互传（2026-10-14）：一次性取件码 + WebRTC 纯前端直连 ──
+  // 收到的包进**同一个产物出口**（待导出区），不另建事实源。
+  const lanPanel = mountLanTransferPanel({
+    root,
+    onReceive: (blob, name) => {
+      exportQueue.enqueue({ blob, name, origin: ORIGINS.UPLOAD, targetLayout: '' });
+      logger.info(`局域网互传已接收：${name} (${formatBytes(blob.size)})`);
+    },
+  });
+  const btnLanSend = document.getElementById('btn-lan-send');
+  if (btnLanSend && lanPanel) {
+    btnLanSend.addEventListener('click', () => lanPanel.open());
+  }
 
   if (isStorageSupported()) {
     try {
@@ -2928,11 +2940,13 @@ async function main(appRoot) {
       // U-1（2026-10-13 · 用户裁定「禁止兼容旧数据，任何即使没改也要强制不兼容」）：
       // 旧会话**一律显式拒绝**——不归一、不补齐字段、不猜着恢复。
       // 作废的是**会话状态**；磁盘上的包与半成品文件不删不动（见 migration-session.js）。
-      const gateVerdict = wizard ? wizard.showGate(savedState) : { blocked: false, message: '' };
-      if (gateVerdict.blocked) {
-        logger.warn(`旧工作区会话已作废：${gateVerdict.message}`);
+      // 2026-10-14：原「不兼容门」浮层控件已删除（全仓无调用点却永远显示为空框），
+      // 判定保留，提示降级为一条日志。
+      const sessionVerdict = evaluateSavedSession(savedState);
+      if (sessionVerdict.blocked) {
+        logger.warn(`旧工作区会话已作废：${sessionVerdict.message}`);
       }
-      if (savedState && !gateVerdict.blocked && savedState.fileId) {
+      if (savedState && !sessionVerdict.blocked && savedState.fileId) {
         const fileRecord = await getFile(savedState.fileId);
         if (fileRecord && fileRecord.blob) {
           // ⚠️ 同上：`File.name` 只读 ⇒ 不能赋值（见 `namedBlob` 注释）。
