@@ -108,7 +108,7 @@ R-13/AC-15 属本轮工作流文档交付，不重复拆成产品代码任务。
 
 - [x] 用记录请求次数的端口替身验证无备份/过期确认/目标变化/权限未知时零写入。（`test/migration-target-gate.test.js`，9 用例）
 - [x] 先完成目标身份、有效范围、冲突未知与自动写能力判定；不支持时给原生指引。（**2026-10-13 由 `10-13-migration-target-preflight` 补完**：`src/core/migration-target.js` 的 `assessTargetConflicts`（读不到清单 ⇒ `unknown`，**不是 0**）+ `describeTargetWriteCapability`（原生指引）；门禁加 `conflict-unknown-unacknowledged`）
-- [x] 接入自动优先、手动声明保底的备份证据，不把源备份或临时 Blob 当成目标保底。（**2026-10-13 补完**：`buildTargetBackupEvidence` 自动路径仅三条件齐备才 `readback-verified`、手动仅 `user-attested` 且**永不**冒充；`describeBackupEvidence` 分别呈现。**宿主侧自动备份执行**（触发 `/api/users/backup` 并落工作区）仍待接入 host-bridge）
+- [x] 接入自动优先、手动声明保底的备份证据，不把源备份或临时 Blob 当成目标保底。（**2026-10-13 补完判定层**：`buildTargetBackupEvidence` 自动路径仅三条件齐备才 `readback-verified`、手动仅 `user-attested` 且**永不**冒充；`describeBackupEvidence` 分别呈现。**2026-10-14 补完执行层**（子任务 `10-14-migration-target-inventory`）：`fetchHostInventory` 触发 `/api/users/backup` 只读中央目录 → 恢复对话框「自动备份并预检目标」→ 入待导出区 **且** `saveFile()` 落 IndexedDB 才置 `retained:true`（留存判据见规范 §3.1））
 - [x] 确认后只执行受支持的 merge；保留目标独有文件和空目录。（沿用既有 `merge` 语义）
 - [x] 双击、切换账户、取消和超时都进入明确状态，不把中断当作回滚。（门禁加 `inFlight` 拦双击；既有取消/超时状态保留）
 
@@ -124,7 +124,7 @@ R-13/AC-15 属本轮工作流文档交付，不重复拆成产品代码任务。
 > 第 1/3/4/5 项已做；**第 2 项的「自动全量核对」未做**——现状无目标侧读回，`coverage` 只到 `full` / `unknown`。
 
 - [x] 定义每类核对的单位、范围、方式和状态，不混用包条目/角色/聊天计数。（`buildVerificationEvidence` 的 `unit` 口径）
-- [x] 写入返回后才进入核对；自动全量、抽样、人工确认和未知分别显示。（**2026-10-13 由 `10-13-migration-verification-layer` 补完**：`buildRestoreVerification` 抽为纯模块 + `summarizeVerification` 分别呈现机器核对/人工确认；**自动全量读回核对**仍受宿主能力阻断——无「列用户文件」端点）
+- [x] 写入返回后才进入核对；自动全量、抽样、人工确认和未知分别显示。（**2026-10-13 由 `10-13-migration-verification-layer` 补完**：`buildRestoreVerification` 抽为纯模块 + `summarizeVerification` 分别呈现机器核对/人工确认。**2026-10-14 更正**：「无「列用户文件」端点」这一能力借口已不成立——`10-14-migration-target-inventory` 已能用 `fetchHostInventory` 读到宿主清单；缺的只是「写入之后再取一次并比对」的**编排**，归后续独立子任务）
 - [x] 落实 completed / completed-with-exclusions / needs-verification / failed 的区别。（`classifyOutcome`）
 - [x] 仅将可证明未应用且 repeatSafe 的项送入重试候选，重新经过目标安全门。（**2026-10-13 补完**：`selectRetryCandidates` 双重门——逐项 `assessRetry` + 整体重新过写入门；**自动重发执行**未接入）
 - [x] 验证未知状态、不可拆分批次、目标/计划变化都不能自动重试。（`test/migration-verification.test.js`）

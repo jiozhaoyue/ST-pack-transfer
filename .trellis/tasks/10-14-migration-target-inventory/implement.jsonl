@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/frontend/migration-safety-and-evidence.md", "reason": "本片直接改动的契约：§3.1 备份证据/留存判据、§3.2 冲突与预检（对齐守卫）、§3.3 核对语义"}
+{"file": ".trellis/spec/frontend/host-capabilities.md", "reason": "新增宿主调用点 fetchHostInventory 必须守的宿主对接规范"}
+{"file": ".trellis/spec/frontend/directory-structure.md", "reason": "src/core 纯逻辑与 src/ui 宿主差异的分层边界"}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "质量门槛：五守卫 + 单测 + E2E 零回退"}

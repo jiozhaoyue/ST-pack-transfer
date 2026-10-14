@@ -27,7 +27,8 @@
     "10-13-migration-wizard-breaking-offline",
     "10-13-pt-native-source",
     "10-13-migration-target-preflight",
-    "10-13-migration-verification-layer"
+    "10-13-migration-verification-layer",
+    "10-14-migration-target-inventory"
   ],
   "parent": null,
   "relatedFiles": [],

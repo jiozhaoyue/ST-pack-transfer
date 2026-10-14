@@ -1,0 +1,3 @@
+{"file": ".trellis/spec/frontend/migration-safety-and-evidence.md", "reason": "核对本片是否违反 §3.1/§3.2/§3.3 的证据与冲突语义"}
+{"file": ".trellis/spec/frontend/dom-write-scope.md", "reason": "恢复对话框新增控件与状态行的 DOM 写入作用域白名单"}
+{"file": ".trellis/spec/frontend/migration-user-journey.md", "reason": "确认失效（revision / targetRef 变化）与向导—工作台共享状态契约"}

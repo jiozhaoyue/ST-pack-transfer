@@ -2262,3 +2262,70 @@ R6b 批量子项真增量**未做**（批量路径**正确性已达成**，只�
 - 网络：本轮 push 多次 `send-pack: unexpected disconnect`，最终以 `http.version=HTTP/1.1` 成功。
 
 > ⚠️ 本日志仍超 2000 行软上限；拆分归档应另开任务。
+
+---
+
+## Session 40（2026-10-14）· 目标清单读取与自动保底备份（宿主侧执行层）
+
+**承接**：`10-01` 的「宿主侧执行层」缺口（自动备份执行 / 目标侧读取清单）。建子任务
+`10-14-migration-target-inventory`，自主实施、归档。
+
+### 关键发现：能力借口不成立
+
+此前三处文档都写「宿主无『列用户文件』端点 ⇒ 只能 unknown」。**这条是错的**：
+`fetchHostBackup(platform, null)` 触发的是 `POST /api/users/backup`（**只读导出**），
+`readZipEntryManifest` 又**只读中央目录**（不解压、不读数据流）—— 两段拼起来就是一份真清单。
+**不新增端点、不新增依赖。**
+
+### 做出来的东西
+
+| # | 内容 | 性质 |
+| --- | --- | --- |
+| 1 | `src/core/target-inventory.js`（纯模块）：`buildTargetManifest` / `alignInventories` / `assessInventoryConflicts` | 新判定层 |
+| 2 | `src/ui/host-bridge.js` 的 `fetchHostInventory({platform, signal, onPhase, taskId})` | 宿主接缝 |
+| 3 | 恢复对话框「自动备份并预检目标」→ 真实冲突 + `readback-verified` 备份证据 + 保底留存 | UI 接线 |
+| 4 | `ORIGINS.TARGET_BACKUP` + 徽标「目标保底备份」 | 存储/呈现 |
+| 5 | `test/target-inventory.test.js`(16) + `test/host-inventory.test.js`(6) | 测试 |
+
+### 本片最关键的不变量：对齐守卫
+
+**伪报「0 冲突 / 全部新增」比报 `unknown` 更危险**——前者会让用户跳过「同名可能被更新」的风险确认。
+故 `assessInventoryConflicts` **只在 `ALIGNMENT.ALIGNED` 时**才把清单交给 `assessTargetConflicts`。
+判据按序：截断 ⇒ `truncated`；目标清单为空 ⇒ `empty`；待写入为空 ⇒ `aligned`；缺**全部**标准根标记
+⇒ `partial`（多半是被选择过滤过的备份）；顶层段不可比 ⇒ `mismatch`；其余 ⇒ `aligned`。
+**判据 ⑤ 对新类目也保守降级**（无法区分「目标确实没有」与「清单不全」）。
+判别力负例显式钉住「守卫前 vs 守卫后」的读数差。
+
+### 复核中改掉的两处设计错
+
+1. **比较口径**：初版把两侧都经 `routeSource` 归一到 hub 路径。复核发现这会**藏掉真实差异**
+   （`extensions/third-party/X` 与 `extensions/X` 被抹成同一条，而宿主确实写到不同位置）
+   ⇒ 改为**原始条目名**比较（同经 `target-inventory.js` 的字符串归一）。副作用：`index.js`
+   不再 import `transform.js`，bundle 385.97 → **385.85 kB**。
+2. **失效判据**：初版打算用 plan `revision`。实查 `migration-plan.js:59,183` —— revision 是
+   **每次调用递增**的计数器，而门禁上下文每次现造计划 ⇒ **恒不相等、永远失效**。
+   ⇒ 改用「目标身份 + 待写入载荷指纹」两条。
+   （另修：`resetRestoreBackupCheck()` 未复原 `restore-conflict-ack` 的 `disabled`，
+   上一轮「确知无冲突」的禁用会漏进下一个对话框。）
+
+### 读数
+
+| 项 | 读数 |
+| --- | --- |
+| `npm test` | 基线 768 → **790 passed / 2 skipped / 0 failed**（净增 22，77 文件） |
+| 五守卫 + build + build:offline | 全绿 |
+| 独立形态 E2E | **496/496**（`--rebuild`，exit 0） |
+| 终态 | 见本轮 commit |
+
+### 如实登记的边界
+
+- **恢复对话框的 UI 接线无自动化覆盖**：独立形态 E2E 到不了该路径（`openRestoreModal` 在
+  `!host.isPlugin` 时直接返回）；按 `CLAUDE.md` 坑 #2 **未部署实例**。故 496/496 覆盖的是本片
+  **未触碰**的既有路径；本片自动化证据面 = 22 条新单测（纯判定 + 宿主接缝降级/成功路径）。
+- **未对真实宿主发起过 `/api/users/backup`**：成功路径用**流式响应替身 + 真 zip 字节**验证
+  （真 `readZipEntryManifest`、真 `buildTargetManifest`），真实清单规模 / `Content-Length` 形态 /
+  权限态仍是未知。
+- **写入后读回核对**（同机制、不同时机）仍未接线，留后续独立子任务。
+- `10-01` 剩余：S0 异步阶段超时数值与测量、S6 真人验收 / 外部试用（需用户本人）。
+
+> ⚠️ 本日志仍超 2000 行软上限；拆分归档应另开任务。

@@ -379,6 +379,10 @@ export function getWorkbenchHtml({ isModal = false, isDrawer = false, isStandalo
           <div class="radio-text" id="restore-conflict-text">无法读取目标清单：同名条目可能被更新（冲突状态未知，不是 0 冲突）</div>
         </label>
         <div class="modal-desc" id="restore-backup-desc"></div>
+        <div class="flex-container" style="align-items: center; gap: 8px;">
+          <button type="button" class="menu_button" id="btn-target-preflight">自动备份并预检目标</button>
+          <span class="modal-desc" id="restore-preflight-status"></span>
+        </div>
         <div class="flex-container" style="justify-content: flex-end; gap: 8px;">
           <button type="button" class="menu_button" id="btn-cancel-restore">取消</button>
           <button type="button" class="menu_button menu_button_icon btn-accent" id="btn-confirm-restore">

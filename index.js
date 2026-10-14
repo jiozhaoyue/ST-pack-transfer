@@ -46,12 +46,14 @@ import { resolveFilename, previewFilename, DEFAULT_FILENAME_TEMPLATE, namedBlob 
 import { buildSourceDeliveries, guardedRestore, buildTargetEvidence } from './src/ui/migration-controller.js';
 import { createMigrationPlan } from './src/core/migration-plan.js';
 import { assessTargetConflicts, describeConflictState, buildTargetBackupEvidence, describeBackupEvidence } from './src/core/migration-target.js';
+import { assessInventoryConflicts } from './src/core/target-inventory.js';
 import { classifyOutcome, MIGRATION_OUTCOMES } from './src/core/migration-evidence.js';
 import { buildRestoreVerification, summarizeVerification } from './src/core/migration-verification.js';
 import {
   detectHost,
   verifyHostPlatform,
   fetchHostBackup,
+  fetchHostInventory,
   restoreToHost,
   isRestoreInFlight,
   cancelRestoreInFlight,
@@ -84,7 +86,7 @@ import { getWorkbenchHtml } from './src/ui/workbench-template.js';
 import { mountMigrationWizard } from './src/ui/migration-wizard.js';
 import { createMigrationSession } from './src/ui/migration-controller.js';
 import { splitArchiveEntries, normalizeSplitMb } from './src/core/splitter.js';
-import { zipIo } from './src/core/zip-io.js';
+import { zipIo, readZipEntryManifest } from './src/core/zip-io.js';
 
 function formatTimestamp() {
   return new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
@@ -613,6 +615,14 @@ async function main(appRoot) {
   let pendingRestoreFile = null;
   /** 非 null 即批量恢复上下文（与 `pendingRestoreFile` 互斥，同一模态复用） */
   let pendingRestoreBatch = null;
+  /**
+   * S3 执行层：本次对话框内的目标预检结果（真实冲突 + 自动保底备份证据）。
+   *
+   * `null` = 未预检 ⇒ `buildRestoreGateContext()` 退回既有「冲突未知」行为（默认路径零变化）。
+   * 每次打开对话框由 `resetRestoreBackupCheck()` 清空；读取时经 `activeTargetPreflight()` 校验
+   * 目标身份 / 待写入包 / 目标布局三者未变，任一变化即**弃用**（`R-05` 确认失效语义）。
+   */
+  let pendingTargetPreflight = null;
   /** 当前批量恢复编排器（`createRestoreBatch` 实例） */
   let activeBatch = null;
   /** 批量恢复最近一次状态快照（供待导出区渲染） */
@@ -696,6 +706,8 @@ async function main(appRoot) {
   const restoreModalDesc = document.getElementById('restore-modal-desc');
   const btnCancelRestore = document.getElementById('btn-cancel-restore');
   const btnConfirmRestore = document.getElementById('btn-confirm-restore');
+  const btnTargetPreflight = document.getElementById('btn-target-preflight');
+  const restorePreflightStatus = document.getElementById('restore-preflight-status');
 
   function getExtensionMode() {
     const checked = document.querySelector('input[name="extension-mode"]:checked');
@@ -2105,12 +2117,17 @@ async function main(appRoot) {
 
   /** S3：重置「已备份目标数据」与「冲突未知确认」勾选（对话框每次打开都从未勾选开始，避免静默通过）。 */
   function resetRestoreBackupCheck() {
+    pendingTargetPreflight = null; // 上一轮预检结果不得跨对话框复用（不同包 / 不同目标）
     const el = document.getElementById('restore-backup-confirmed');
     if (el) el.checked = false;
     const ack = document.getElementById('restore-conflict-ack');
-    if (ack) ack.checked = false;
+    if (ack) {
+      ack.checked = false;
+      ack.disabled = false; // 上一轮预检可能因「确知无冲突」禁用了它，新对话框必须复原
+    }
     const label = document.getElementById('restore-conflict-text');
     if (label) label.textContent = describeConflictState(assessTargetConflicts({ targetManifest: null })).label;
+    if (restorePreflightStatus) restorePreflightStatus.textContent = '';
     refreshRestoreBackupDesc();
   }
 
@@ -2119,6 +2136,12 @@ async function main(appRoot) {
     const el = document.getElementById('restore-backup-confirmed');
     const desc = document.getElementById('restore-backup-desc');
     if (!desc) return;
+    // 已跑过自动预检 ⇒ 呈现机器证据；否则按手动勾选呈现（两条路径不互相冒充，spec §3.1）
+    const auto = activeTargetPreflight();
+    if (auto) {
+      desc.textContent = describeBackupEvidence(auto.backup).label;
+      return;
+    }
     desc.textContent = describeBackupEvidence(buildTargetBackupEvidence({
       mode: 'manual',
       userConfirmed: Boolean(el && el.checked),
@@ -2126,6 +2149,135 @@ async function main(appRoot) {
   }
   const restoreBackupCheckEl = document.getElementById('restore-backup-confirmed');
   if (restoreBackupCheckEl) restoreBackupCheckEl.addEventListener('change', refreshRestoreBackupDesc);
+
+  /** 当前待写入载荷（单包或整批），供预检读取条目。 */
+  function pendingRestoreBlobs() {
+    if (pendingRestoreBatch && pendingRestoreBatch.length > 0) {
+      return pendingRestoreBatch.map((it) => it.blob).filter(Boolean);
+    }
+    return pendingRestoreFile ? [pendingRestoreFile] : [];
+  }
+
+  /** 待写入载荷的**身份指纹**：换包 / 换批即变（预检结果据此失效）。 */
+  function pendingRestoreKey() {
+    if (pendingRestoreBatch && pendingRestoreBatch.length > 0) {
+      return `batch:${pendingRestoreBatch.map((it) => `${it.name}:${it.blob?.size ?? 0}`).join('|')}`;
+    }
+    const f = pendingRestoreFile;
+    return f ? `file:${f.name}:${f.size ?? 0}` : '';
+  }
+
+  /**
+   * 取**仍然有效**的预检结果。
+   *
+   * 失效判据（任一命中即弃用，回到「冲突未知」）：
+   *   ① 目标身份变了（切账户 / 切宿主）；② 待写入载荷换了。
+   * 这是 `R-05`「关键输入变化 ⇒ 旧确认作废」在预检结果上的落地。
+   */
+  function activeTargetPreflight() {
+    const pre = pendingTargetPreflight;
+    if (!pre) return null;
+    if (pre.targetRef !== `${host.platform}@${currentHostHandle}`) return null;
+    if (pre.sourceKey !== pendingRestoreKey()) return null;
+    return pre;
+  }
+
+  /**
+   * S3 执行层：拉当前宿主清单做**真实**冲突预检，并把该次导出留存为保底备份。
+   *
+   * 判定与呈现全在纯模块（`src/core/target-inventory.js` / `migration-target.js`）；
+   * 本函数只做「取清单 → 组装证据 → 刷界面」。宿主不支持 / 失败 / 取消一律**静默降级**：
+   * 预检结果保持 `null`，对话框退回既有「冲突未知」路径（`L0-11`）。
+   */
+  async function handleTargetPreflight() {
+    const blobs = pendingRestoreBlobs();
+    if (blobs.length === 0) return;
+    const status = (text) => { if (restorePreflightStatus) restorePreflightStatus.textContent = text; };
+    if (btnTargetPreflight) btnTargetPreflight.disabled = true;
+    status('正在读取待写入条目…');
+    try {
+      // 两侧都用**原始条目名**比较（同经 `target-inventory.js` 的归一）：
+      // 目标清单来自当前宿主自己的备份，待写入条目会被宿主按字面路径落盘，
+      // 故「宿主将写什么」与「宿主已有什么」在同一套词汇里，不需要再经布局归一
+      // （经 `routeSource` 反而会把 `extensions/third-party/X` 与 `extensions/X` 抹成同一条，
+      //  藏掉真实的路径差异）。
+      const incomingEntries = [];
+      for (const blob of blobs) {
+        const entries = await readZipEntryManifest(blob);
+        for (const entry of entries) incomingEntries.push(entry);
+      }
+
+      status('正在从宿主拉取目标清单…');
+      const { manifest, file, reason } = await fetchHostInventory({
+        platform: host.platform,
+        onPhase: (phase, received, total) => {
+          if (phase === 'host-generating') status('宿主正在生成备份…');
+          else if (phase === 'transferring' && total > 0) {
+            status(`正在接收目标备份 ${Math.round((received / total) * 100)}%…`);
+          }
+        },
+      });
+
+      if (!manifest) {
+        status(reason === 'cancelled'
+          ? '预检已取消（仍按「冲突状态未知」处理）'
+          : `预检失败：${reason}（仍按「冲突状态未知」处理）`);
+        return;
+      }
+
+      const conflicts = assessInventoryConflicts({ targetManifest: manifest, incomingPaths: incomingEntries });
+      const targetRef = `${host.platform}@${currentHostHandle}`;
+
+      // 留存：**入待导出区 + 落工作区（IndexedDB）**。仅内存 Blob 不算「已留存」（spec §3.1）。
+      let retained = false;
+      if (file) {
+        const backupName = `目标保底备份_${formatTimestamp()}.zip`;
+        exportQueue.enqueue({ blob: file, name: backupName, origin: ORIGINS.TARGET_BACKUP, targetLayout: '' });
+        try {
+          await saveFile({
+            name: backupName,
+            size: file.size,
+            blob: file,
+            layout: hostLayoutCode(host.platform),
+            role: 'source',
+            origin: ORIGINS.TARGET_BACKUP,
+          });
+          retained = true;
+        } catch (err) {
+          logger.warn(`目标保底备份落工作区失败（本次按「留存未确认」处理）: ${err?.message || err}`);
+        }
+      }
+
+      const backup = buildTargetBackupEvidence({
+        mode: 'auto',
+        targetRef,
+        artifact: { readable: true, scope: 'matches-write', retained },
+      });
+      pendingTargetPreflight = { conflicts, backup, targetRef, sourceKey: pendingRestoreKey() };
+
+      const conflictText = document.getElementById('restore-conflict-text');
+      if (conflictText) conflictText.textContent = describeConflictState(conflicts).label;
+      const ackEl = document.getElementById('restore-conflict-ack');
+      // 已确知无冲突 ⇒ 该确认项不再适用（勾选留着反而误导）；未知 / 有冲突 ⇒ 仍需用户确认
+      if (ackEl) {
+        const needsAck = conflicts.state !== 'known' || conflicts.conflictCount > 0;
+        if (!needsAck) ackEl.checked = false;
+        ackEl.disabled = !needsAck;
+      }
+      refreshRestoreBackupDesc();
+      status(conflicts.alignment === 'aligned'
+        ? `预检完成：${describeConflictState(conflicts).label}`
+        : `预检完成但无法比对（${conflicts.alignmentReason}）`);
+    } catch (err) {
+      logger.warn(`目标预检异常（按「冲突未知」处理）: ${err?.message || err}`);
+      status(`预检异常：${err?.message || err}（仍按「冲突状态未知」处理）`);
+    } finally {
+      if (btnTargetPreflight) btnTargetPreflight.disabled = false;
+    }
+  }
+  if (btnTargetPreflight) {
+    btnTargetPreflight.addEventListener('click', () => { void handleTargetPreflight(); });
+  }
 
   /** S3：构造目标写入的 plan + evidence（目标端写入只看 targetWrite 与 evidence）。 */
   function buildRestoreGateContext() {
@@ -2137,20 +2289,23 @@ async function main(appRoot) {
       target: { layout: hostLayoutCode(host.platform) },
       requestedSelection: {},
     });
-    // 恢复流程读不到目标现有清单（宿主无「列用户文件」端点）⇒ 冲突一律 `unknown`，
-    // 由用户在对话框显式确认风险（`assessTargetConflicts` 对 `targetManifest:null` 返回 unknown）。
-    const conflicts = assessTargetConflicts({ targetManifest: null });
+    // 已跑过有效预检 ⇒ 用**真实**冲突与机器备份证据；否则退回既有「读不到目标清单」路径。
+    const pre = activeTargetPreflight();
+    const conflicts = pre ? pre.conflicts : assessTargetConflicts({ targetManifest: null });
+    const backup = pre
+      ? pre.backup
+      : buildTargetBackupEvidence({
+        mode: 'manual',
+        targetRef,
+        userConfirmed: Boolean(backupEl && backupEl.checked),
+      });
     const evidence = buildTargetEvidence({
       platform: host.platform,
       handle: currentHostHandle,
       planTargetRef: targetRef,
       planRevision: plan.revision,
       inFlight: isRestoreInFlight(),
-      backup: buildTargetBackupEvidence({
-        mode: 'manual',
-        targetRef,
-        userConfirmed: Boolean(backupEl && backupEl.checked),
-      }),
+      backup,
       conflicts,
       conflictAcknowledged: Boolean(ackEl && ackEl.checked),
     });

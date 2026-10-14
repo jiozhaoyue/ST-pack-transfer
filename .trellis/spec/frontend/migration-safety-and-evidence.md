@@ -87,6 +87,10 @@ evidence 只在本地运行流程中构造，不能直接信任导入 JSON/旧�
 放行必须同时满足：当前目标/计划匹配、有明确权限、当前操作确认有效、无重复在途，且备份对本次写入范围适用并已确认留存。
 
 - 自动优先：验证备份可读、范围与本次写入的关系，并确认留存；不能把浏览器内的临时 Blob 当唯一备份。
+  **留存判据（2026-10-14 定）**：`retained === true` 当且仅当该备份**已落工作区（IndexedDB `files` store）**。
+  仅入待导出区（内存）、仅触发下载、仅写 OPFS `fetch-tmp/` 临时文件**都不算**留存。
+  ⇒ 自动证据的构造点是 `index.js` 的 `handleTargetPreflight()`：`fetchHostInventory` 拿到的 `file`
+  同时 ① 入待导出区（用户可见可领取）② `saveFile()` 落 IndexedDB；②成功才置 `retained:true`。
 - 自动不可用：引导原生备份，用户确认留存及适用范围，记录 user-attested；**不是**伪装成 readback-verified。
 - 无备份/已知缺少将被改写的数据/留存未确认：不执行写入，只能交付包与下一步说明。
 - 修改计划后确认必须重做；旧备份可在重新核对目标与覆盖范围后复用，不要求无意义地重复备份，但不得盲目沿用。
@@ -101,8 +105,40 @@ evidence 只在本地运行流程中构造，不能直接信任导入 JSON/旧�
 **已实现（S3，2026-10-13）**：`src/core/migration-target.js` 的 `assessTargetConflicts` 按上条比较
 （路径经 NFKC + 分隔符 + 大小写归一）；读不到清单 ⇒ `state:'unknown'`、`conflictCount:null`。
 `describeConflictState` 保证 `unknown` **不显示成「无冲突」**。写入门禁对 `conflicts.state==='unknown'`
-要求显式风险确认（`conflict-unknown-unacknowledged`）。恢复流程读不到目标清单（宿主无「列用户文件」端点）
-⇒ 冲突一律 `unknown`，由对话框确认。**目标侧自动读取清单**（如宿主提供）仍待接入。
+要求显式风险确认（`conflict-unknown-unacknowledged`）。
+
+**已接入（2026-10-14，子任务 `10-14-migration-target-inventory`）**：**目标侧自动读取清单**已落地，
+不再是「宿主无端点所以只能 unknown」。机制是复用**既有只读通道**，不新增端点、不新增依赖：
+
+```
+fetchHostBackup(platform, /* selection */ null)   # 全量导出，只读宿主
+  → opfsHandleToFile / Blob                       # 既有归一
+  → readZipEntryManifest()                        # 只读中央目录，不解压
+  → buildTargetManifest() → alignInventories() → assessTargetConflicts()
+```
+
+- **宿主接缝**：`src/ui/host-bridge.js` 的 `fetchHostInventory({platform, signal, onPhase, taskId})`。
+  宿主不支持 / 请求失败 / 用户取消 ⇒ 返回 `{manifest:null, file:null, reason}`，**不抛**
+  （`L0-11` 静默降级），对话框退回上一条的 `unknown` 路径。
+- **纯判定**：`src/core/target-inventory.js` 的 `buildTargetManifest` / `alignInventories` /
+  `assessInventoryConflicts`（`ALIGNMENT` 六态：`aligned` / `partial` / `mismatch` / `truncated` /
+  `empty` / `not-run`）。
+- **⚠ 对齐守卫是本条的关键不变量**：**伪报「0 冲突」比报 `unknown` 更危险**（前者会让用户跳过风险确认）。
+  故只有 `ALIGNMENT.ALIGNED` 才把清单交给 `assessTargetConflicts`；其余一律降级 `unknown`。判据按序：
+  ① 清单被上限截断 ⇒ `truncated`；② 目标清单为空 ⇒ `empty`；③ 待写入为空 ⇒ `aligned`（零写入即零冲突）；
+  ④ 目标清单缺**全部**标准根标记（`characters`/`chats`/`settings.json`/`secrets.json`）⇒ `partial`
+  （多半是被选择过滤过的备份）；⑤ 待写入的顶层段不在目标清单顶层段集合里 ⇒ `mismatch`；
+  ⑥ 其余 ⇒ `aligned`。**判据 ⑤ 对新类目也保守降级**——无法区分「目标确实没有」与「清单不全」时
+  宁可 `unknown`（用户仍可显式确认），不可伪报无冲突。
+- **归一口径**：两侧条目**都用原始条目名比较**，只经 `target-inventory.js` 的同一套字符串归一
+  （NFKC + 分隔符 + 小写 + 去目录条目）。**刻意不**再经 `routeSource` 布局归一：目标清单来自
+  当前宿主自己的备份，待写入条目会被宿主按**字面路径**落盘 —— 两者本就在同一套词汇里；
+  经 `routeSource` 反而会把 `extensions/third-party/X` 与 `extensions/X` 抹成同一条 hub 路径，
+  **藏掉真实的路径差异**。
+- **失效判据**（`R-05`）：预检结果在**目标身份**（`platform@handle`）或**待写入载荷指纹**变化时弃用；
+  每次打开对话框由 `resetRestoreBackupCheck()` 清空。**不得**用 plan `revision` 当判据 ——
+  `createMigrationPlan` 每次调用都递增 revision，而门禁上下文每次现造计划 ⇒ 恒不相等、永远失效。
+- **仍未接入**：**写入后**的读回核对（同机制、不同时机）——见 §3.3。
 
 ### 3.3 核对证据与完成语义
 
@@ -133,8 +169,14 @@ MigrationOutcome 使用以下显示分类，不替换 TaskManager 的运行状�
 **2026-10-13（S4 剩余项）**：核对证据构造抽到**纯模块** `src/core/migration-verification.js`
 （`buildRestoreVerification` 原为 `index.js` 内联、不可单测）；`summarizeVerification` 按
 `method`/`status` 汇总，供界面**分别呈现**机器核对与人工确认；`selectRetryCandidates` 实现
-**双重门**（逐项 `assessRetry` + 整体重新过写入门，重试不绕门）。**自动全量读回核对**与
-**自动重发执行**仍受宿主能力阻断（无「列用户文件」端点 / 无部分重试 UI）——判定层就绪，执行待接。
+**双重门**（逐项 `assessRetry` + 整体重新过写入门，重试不绕门）。**自动重发执行**仍受宿主能力阻断
+（无部分重试 UI）——判定层就绪，执行待接。
+
+**2026-10-14（`10-14-migration-target-inventory`）**：「目标侧读不到清单」这一**能力**借口已不成立——
+`fetchHostInventory()` 能读到宿主清单（见 §3.2）。但**写入后**的读回核对**仍未接线**：
+现状 `automatic` 证据只到「宿主确认写入」，**不得**表述为「目标数据已逐条核对」。
+读回核对是同一机制在**写入之后**再取一次清单并与「写入前清单 + 本次写入条目」比对，
+归后续独立子任务；本片只做**写入前**预检与保底。
 
 用户取消、上传超时或连接断开后，如果宿主可能已经写入，标 needs-verification；不得自动宣布回滚。
 原生手动导入结束后也需要用户按清单确认，不因点击“我已导入”就伪造底层文件一致性证明。
