@@ -427,7 +427,6 @@ describe('gitMode UI 契约', () => {
   // 且选项文案去黑话（用户裁定禁止「瘦身 / 剔除」）。
   const MODES = [
     ['独立态', { isStandalone: true }],
-    ['插件抽屉态', { isDrawer: true }],
     ['模态态', { isModal: true }],
   ];
 

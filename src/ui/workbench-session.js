@@ -87,7 +87,7 @@ export function formatSpecialExclusionSummary(exclusions = []) {
  * 全部走 `textContent` / `createElement`，不接受 HTML 字符串——既避开注入面，
  * 也让 `check:dom-injection` 无需豁免。
  *
- * @param {ParentNode} root 工作台根容器（`#app.app-container` / `.st-converter-drawer-app`）
+ * @param {ParentNode} root 工作台根容器（`#app.app-container`）
  * @param {{summary?: string, exclusions?: Array<{label: string, reason?: string}>}} [data]
  */
 export function writeCheckPanel(root, { summary = '', exclusions = [] } = {}) {

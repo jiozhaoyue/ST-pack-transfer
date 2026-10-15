@@ -5,7 +5,7 @@ import { checkCssScope } from '../scripts/css-scope.js';
 describe('CSS 宿主作用域守卫', () => {
   it('允许本插件自有根容器（含独立态 marker 与模态覆盖层）', () => {
     const css = `
-#app.app-container, .st-converter-drawer-app .menu_button { color: red; }
+#app.app-container, #st-converter-modal-overlay .menu_button { color: red; }
 #app.app-container.app-standalone { padding: 20px 12px; }
 #app.app-container.app-standalone::before { content: ""; }
 #st-converter-modal-overlay #app.app-container { max-width: 1080px; }
@@ -98,6 +98,8 @@ describe('CSS 宿主作用域守卫', () => {
     expect(css).not.toMatch(/^\s*\.app-container[\s,{]/m);
     expect(css).toMatch(/#app\.app-container\s*\{[^}]*padding: 12px 10px;/s);
     expect(css).toContain('#app.app-container .app-header');
-    expect(css).toContain('.st-converter-drawer-app .app-header');
+    // 2026-10-15：插件态改挂全屏模态后，`.st-converter-drawer-app` 前缀已从 style.css 消失，
+    // 该根也不再在白名单里——反向断言把它钉住，防「抽屉态」以任何形式回流。
+    expect(css).not.toContain('.st-converter-drawer-app');
   });
 });

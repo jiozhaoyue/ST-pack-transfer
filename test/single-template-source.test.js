@@ -80,10 +80,11 @@ describe('单一模板源守卫', () => {
   });
 });
 
-describe('三入口渲染一致性（R8.2 · 独立态 / 插件抽屉态 / 模态态）', () => {
+describe('双入口渲染一致性（R8.2 · 独立态 / 模态态）', () => {
+  // 2026-10-15：插件态改挂全屏模态后，「抽屉态」这一支已无调用点，随之删除。
+  // 现存两态：独立 Web 与插件态（同用模态模板），两者根容器都是 #app.app-container。
   const MODES = [
     ['独立态', { isStandalone: true }],
-    ['插件抽屉态', { isDrawer: true }],
     ['模态态', { isModal: true }],
   ];
 
@@ -108,11 +109,14 @@ describe('三入口渲染一致性（R8.2 · 独立态 / 插件抽屉态 / 模�
     }
   });
 
-  it('只有模态态带关闭按钮，抽屉态不出页头（三态的唯一合法分支差异）', () => {
+  it('只有模态态带关闭按钮（两态的唯一合法分支差异）', () => {
     expect(getWorkbenchHtml({ isModal: true })).toContain('id="btn-close-converter-modal"');
     expect(getWorkbenchHtml({ isStandalone: true })).not.toContain('id="btn-close-converter-modal"');
-    expect(getWorkbenchHtml({ isDrawer: true })).not.toContain('class="app-header"');
-    // 抽屉态独有的「存储」入口（宿主原生存储面板入口，独立态无此锚点）
-    expect(getWorkbenchHtml({ isDrawer: true })).toContain('id="btn-storage-inspector"');
+    // 页头两态都有（插件态要有关闭入口，独立态要有标题与徽标）
+    expect(getWorkbenchHtml({ isModal: true })).toContain('class="app-header"');
+    expect(getWorkbenchHtml({ isStandalone: true })).toContain('class="app-header"');
+    // 「存储」入口（宿主原生存储面板）两态都渲染，由 JS 按宿主可用性解除 hidden
+    expect(getWorkbenchHtml({ isModal: true })).toContain('id="btn-storage-inspector"');
+    expect(getWorkbenchHtml({ isStandalone: true })).toContain('id="btn-storage-inspector"');
   });
 });
