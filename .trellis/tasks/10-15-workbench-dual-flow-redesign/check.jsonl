@@ -1,0 +1,2 @@
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "验收判据：守卫命令与禁止模式清单"}
+{"file": ".trellis/spec/frontend/host-capabilities.md", "reason": "宿主能力面与死控件取证法，用于 AC-2.7 单行注入的可达性核对"}

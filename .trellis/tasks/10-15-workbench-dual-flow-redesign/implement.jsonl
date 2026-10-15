@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/frontend/workbench-single-view.md", "reason": "单一视图契约的续写对象：文案纪律/控件纪律/配色铁律/宿主识别四判据，本任务在同一契约上重构"}
+{"file": ".trellis/spec/frontend/directory-structure.md", "reason": "三形态入口与 src/** 分层，模块层落点与禁 DOM 依赖判据"}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "验证矩阵、五条守卫命令、10 条禁止模式"}
+{"file": ".trellis/spec/frontend/dom-write-scope.md", "reason": "改 host-bridge 注入体时必须遵守的宿主 DOM 写入作用域与锚点白名单"}

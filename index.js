@@ -1387,7 +1387,8 @@ async function main(appRoot) {
         },
       });
 
-      renderCategoryStats(plan);
+      // 真实扫描已到达 ⇒ 关闭「未扫描」占位态，徽标改显计划读数（category-filter.js:127）
+      renderCategoryStats(plan, { unscanned: false });
       const hadPlan = Boolean(latestPlan);
       latestPlan = plan;
       syncExportExtManifestButton();
@@ -1790,7 +1791,7 @@ async function main(appRoot) {
       }
 
       if (hostPlan) {
-        renderCategoryStats(hostPlan);
+        renderCategoryStats(hostPlan, { unscanned: false });
         logger.info(`统一文件树就绪: ${hostPlan.totalSourceFiles} 个文件，可展开类目明细逐文件勾选，确认后继续转换`);
       }
 
