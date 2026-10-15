@@ -41,7 +41,7 @@ module.exports = {
     const badge = await ctx.waitForReady(page);
     t.ok('A1 工作台就绪（`#env-badge` 脱离「检测中...」）', Boolean(badge), `badge=${badge}`);
     t.eq('A2 无宿主环境下判为「独立 Web 模式」', badge, '独立 Web 模式');
-    // 本 spec 逐条核对工作台**外壳与控件**，故走高级视图（向导会按步隐藏非当前步区块）
+    // 本 spec 逐条核对工作台**外壳与控件**（迁移向导已删除，工作台只有一个视图）
     t.eq('A3 切到高级视图（本 spec 测高级工作台外壳）', await common.useAdvancedView(page), 'advanced');
 
     const shell = await page.evaluate(() => ({

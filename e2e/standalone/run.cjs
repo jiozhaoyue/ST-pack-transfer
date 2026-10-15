@@ -87,8 +87,11 @@ function ok(label, cond, extra = '') {
 function makeT() {
   return {
     ok,
-    eq: (label, actual, expected) => ok(label, actual === expected,
-      `actual=${JSON.stringify(actual)} expected=${JSON.stringify(expected)}`),
+    // detail 为可选的**失败现场**（spec 里常写成第 4 个参数）——
+    // 只打印不含 `actual/expected` 的额外信息，便于一眼看到「错在哪一条」而不是只有数字。
+    eq: (label, actual, expected, detail) => ok(label, actual === expected,
+      `actual=${JSON.stringify(actual)} expected=${JSON.stringify(expected)}`
+      + (detail !== undefined && actual !== expected ? `  detail=${detail}` : '')),
     ge: (label, actual, min) => ok(label, Number(actual) >= min, `actual=${actual} 应 >= ${min}`),
     log,
   };

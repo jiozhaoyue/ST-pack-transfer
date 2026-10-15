@@ -36,27 +36,28 @@ const BADGES_HTML = `
 
 /**
  * 生成工作台 HTML
- * @param {{isModal?: boolean, isDrawer?: boolean, isStandalone?: boolean}} [opts]
+ * @param {{isModal?: boolean, isStandalone?: boolean}} [opts]
  * @returns {string}
  */
-export function getWorkbenchHtml({ isModal = false, isDrawer = false, isStandalone = false } = {}) {
-  // 独立态与模态态共用页头/页脚；抽屉态嵌在宿主设置侧栏内，不出页头
-  const chrome = !isDrawer;
+export function getWorkbenchHtml({ isModal = false, isStandalone = false } = {}) {
+  // 三种形态共用同一个页头/页脚：独立 Web 与插件态（全屏模态）的根都是 #app.app-container。
+  // 2026-10-15 起不再有「抽屉态」变体——插件态改挂全屏模态后，无页头的那一支已无调用点。
   void isStandalone;
 
   return `
-    ${chrome ? `
     <header class="app-header">
       <div class="title-group">
         <h1><i class="fa-solid fa-file-zipper"></i> 酒馆数据包互转工坊</h1>
       </div>
       <div class="header-badges">
         ${BADGES_HTML}
+        <button type="button" class="menu_button menu_button_icon wb-storage-btn" id="btn-storage-inspector" hidden>
+          <i class="fa-solid fa-hard-drive"></i><span>存储</span>
+        </button>
         <button type="button" class="menu_button btn-tool" id="btn-guide"><i class="fa-solid fa-circle-question"></i> 引导</button>
         ${isModal ? '<button type="button" class="st-converter-modal-close-btn" id="btn-close-converter-modal" title="关闭工作台">&times;</button>' : ''}
       </div>
     </header>
-    ` : ''}
 
     <!-- ═══ 外壳：模块由 workbench-shell.js 按「流程 × 阶段」摆进两栏 ═══
          模板里的顺序只是初始落点，运行时由 resolveLayout 重排，详见 design.md 第 2 节。
@@ -74,15 +75,6 @@ export function getWorkbenchHtml({ isModal = false, isDrawer = false, isStandalo
 
     <!-- ═══ 状态读数（配额）═══ -->
     <div class="wb-status-line" data-wb-module="quota">
-      ${isDrawer ? `
-      <div class="status-row" id="status-row">
-        ${BADGES_HTML}
-        <button type="button" class="menu_button menu_button_icon wb-storage-btn" id="btn-storage-inspector" hidden>
-          <i class="fa-solid fa-hard-drive"></i><span>存储</span>
-        </button>
-        <button type="button" class="menu_button btn-tool" id="btn-guide"><i class="fa-solid fa-circle-question"></i> 引导</button>
-      </div>
-      ` : ''}
       <div class="quota-bars" id="usage-dashboard"></div>
     </div>
 
@@ -399,10 +391,8 @@ export function getWorkbenchHtml({ isModal = false, isDrawer = false, isStandalo
       </div>
     </div>
 
-    ${chrome ? `
     <footer class="app-footer">
       <p><a href="https://github.com/jiozhaoyue/st-zip-converter" target="_blank" rel="noopener">GitHub</a></p>
     </footer>
-    ` : ''}
   `;
 }

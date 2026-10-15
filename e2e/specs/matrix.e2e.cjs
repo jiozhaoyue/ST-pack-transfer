@@ -26,12 +26,11 @@ const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const { pathToFileURL } = require('url');
-const { useAdvancedView } = require('../lib/harness.cjs');
 const { pruneFixtures } = require('../lib/fixture-prune.cjs');
+const { openWorkbenchModal } = require('../lib/workbench-entry.cjs');
 
 const SLUG = 'st-zip-converter';
 const FIXTURE_DIR = path.resolve(__dirname, '../../test-results/fixtures');
-const DRAWER_ID = 'st_zip_converter_settings';
 
 /** 现场生成夹具（进程内缓存，多个 spec 共用） */
 let fixturesPromise = null;
@@ -48,20 +47,16 @@ function ensureFixtures() {
 }
 
 /**
- * 打开扩展设置面板里的抽屉，让工作台真正渲染。
- * 抽屉态是**插件态唯一的常驻形态**，故矩阵一律在抽屉态下驱动。
+ * 打开插件工作台（插件态）。
+ *
+ * 2026-10-15 起插件态工作台挂在**全屏模态**里，入口是宿主扩展列表行上的「打开」；
+ * 旧路径（展开 `#st_zip_converter_settings` inline-drawer）已随抽屉一并删除。
+ * 打开逻辑收敛在 `e2e/lib/workbench-entry.cjs`，四个实例侧 spec 共用。
+ *
  * @returns 打开结果（失败时给出原因，供断言使用）
  */
 async function openDrawer(page) {
-  return page.evaluate((drawerId) => {
-    const drawer = document.getElementById(drawerId);
-    if (!drawer) return { ok: false, reason: '抽屉元素不存在（插件未挂载？）' };
-    const content = drawer.querySelector(':scope > .inline-drawer-content');
-    if (content) content.style.display = 'block';
-    const app = drawer.querySelector('.st-converter-drawer-app');
-    if (!app) return { ok: false, reason: '抽屉内无 .st-converter-drawer-app' };
-    return { ok: true };
-  }, DRAWER_ID);
+  return openWorkbenchModal(page);
 }
 
 /**
@@ -306,9 +301,9 @@ async function clearLog(page) {
  *
  * 路径：
  *   ① 打开**宿主扩展抽屉** `#extensions-settings-button`（见 `openHostExtensionsDrawer`）
- *   ② 展开插件自己的 `#st_zip_converter_settings` inline-drawer
- *      —— **这一步不可省**：宿主的扩展抽屉打开 ≠ 插件抽屉展开，
- *      不展开则抽屉内所有控件 `getBoundingClientRect()` 仍是 0×0，
+ *   ② 点宿主扩展行上的「打开」进全屏模态（`e2e/lib/workbench-entry.cjs`）
+ *      —— **这一步不可省**：宿主扩展抽屉打开 ≠ 工作台渲染，
+ *      不开则模态内所有控件 `getBoundingClientRect()` 仍是 0×0，
  *      Playwright 的 click / selectOption 会以「element is not visible」超时。
  *   ③ 可见性验收：工作台第一个控件 `#target-select` 必须有真实尺寸
  *      （这是后面所有真实交互的前提）。
@@ -349,15 +344,10 @@ async function openWorkbench(page) {
     : out.via;
   out.menuClick = openedHost && openedHost.why ? openedHost.why : '';
 
-  // ② 插件自己的 inline-drawer
+  // ② 插件工作台：点宿主扩展行上的「打开」，进全屏模态
   const plugin = await openDrawer(page);
   out.pluginDrawer = plugin.ok;
   if (!plugin.ok) out.reason = plugin.reason;
-
-  // ②b **切到「高级工作台」视图**（S5 第二步起默认入口是迁移向导）
-  //     向导一次只披露当前步的区块 ⇒ 不切则 `#target-select` 恒 0×0，
-  //     下面第 ③ 步的可见性验收必然红（2026-10-13 实测 `npm run e2e` 17 项红即由此）。
-  if (out.pluginDrawer) out.view = await useAdvancedView(page);
 
   // 可见性验收：工作台第一个控件有真实尺寸（这是后面所有真实交互的前提）
   try {
@@ -588,7 +578,7 @@ module.exports = {
     if (!opened.hostDrawer) {
       t.log(`      ! 诊断：${JSON.stringify(opened.diag)}`);
     }
-    t.ok('插件工作台抽屉已展开（#st_zip_converter_settings）', opened.pluginDrawer,
+    t.ok('插件工作台已打开（全屏模态，宿主扩展行「打开」入口）', opened.pluginDrawer,
       opened.reason || '');
     t.ok('工作台控件**真实可见**（target-select 有尺寸）—— 后续一切真实交互的前提',
       opened.visible);

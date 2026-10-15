@@ -255,42 +255,4 @@ async function openInstance(inst) {
   };
 }
 
-/**
- * 切到「高级工作台」视图。
- *
- * **为什么必须显式调用**（2026-10-13 实测）：S5 第二步起，插件**默认入口是迁移向导**
- * （`workbench-template.js` 的 `data-wb-view="wizard"`），而向导**一次只披露当前步的区块**
- * ⇒ 非当前步的控件是 `display:none`，`#target-select` 恒 `0×0` ⇒ 直接点它必然以
- * 「element is not visible」超时（实测 `npm run e2e` 因此 17 项红）。
- *
- * standalone 运行器早有等价实现（`e2e/standalone/lib/common.cjs` 的 `useAdvancedView`），
- * **实例侧规格此前未适配** —— 本函数就是补齐这一层。
- *
- * @param {import('playwright').Page} page
- * @returns {Promise<string>} 切换后的视图码（期望 `'advanced'`）
- */
-async function useAdvancedView(page) {
-  /** 视图根：带 `data-wb-view` 的容器（standalone 是 `#app`，抽屉态是抽屉内的那个根） */
-  const read = () => page.evaluate(() => {
-    const el = document.querySelector('[data-wb-view]');
-    return el ? el.dataset.wbView : '';
-  });
-  if ((await read()) === 'advanced') return 'advanced';
-  // 用**页内 click**（不做命中测试）：宿主 splash / 第三方模态 dialog 会拦截指针事件，
-  // 而 Playwright 的指针点击会因此超时（与 `produce-via-plugin.cjs` 同一理由）。
-  const clicked = await page.evaluate(() => {
-    const btn = document.getElementById('btn-wb-view-toggle');
-    if (!btn) return false;
-    btn.click();
-    return true;
-  });
-  if (clicked) {
-    await page.waitForFunction(() => {
-      const el = document.querySelector('[data-wb-view]');
-      return Boolean(el) && el.dataset.wbView === 'advanced';
-    }, null, { timeout: 10_000 }).catch(() => { /* 有界等待：超时按当前读数返回 */ });
-  }
-  return read();
-}
-
-module.exports = { openInstance, isPluginRef, PLUGIN_SLUG, useAdvancedView, reportBlockingPopups };
+module.exports = { openInstance, isPluginRef, PLUGIN_SLUG, reportBlockingPopups };

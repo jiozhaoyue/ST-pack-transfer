@@ -142,11 +142,32 @@
   - E2E `category-detail-fullscreen` 真浏览器 **15/15**：卡片 12 条（extensions 单条、
     无 globalExtensions）、明细铺满视口、**主列高度 553 → 553 未变**
 
+- [x] **3.2 清理陈旧 E2E spec**（2026-10-15 完成，用户裁定「删掉 + 改写其余」）
+  - **删除** `e2e/standalone/specs/wizard.e2e.cjs` —— 整篇在测 2026-10-14 已整体删除的迁移向导，
+    每轮固定 4 条红（W2/W3/W4 + spec 级「未抛异常」）
+  - `offline-single-file.e2e.cjs`：O9–O11 由「向导 6 步 / 默认 wizard 视图 / 起始步 source」
+    改写为**反向守卫**（无 `#wizard-rail`、无 `#btn-wb-view-toggle`、无 `data-wb-view`、方向开关 2 枚）；
+    转换流程由「沿步骤条逐段导航」改为**直接驱动**；O23/O24 的「切高级模式」改为
+    「切导入屏 + 共享槽角色标签随之更新」
+  - `useAdvancedView`：两个 helper（`e2e/lib/harness.cjs` 实例侧、`e2e/standalone/lib/common.cjs`
+    独立侧）原本**直接点 `#btn-wb-view-toggle`** ⇒ 所有调用方第一步即超时。
+    改为按「有无视图开关」判定：无开关 ⇒ 单视图 ⇒ 返回 `advanced`（仍读渲染结果，非恒真）。
+    实例侧的该 helper 已无调用点，**整个删除**
+  - 实例侧四个 spec 的「展开插件抽屉」改为共用新 helper
+    `e2e/lib/workbench-entry.cjs` 的 `openWorkbenchModal()`（点宿主扩展行「打开」→ 全屏模态）
+  - `scripts/instance-sync/produce-via-plugin.cjs`：诊断读数由 `drawer` 改为 `modal`
+    （该脚本全程 `page.evaluate` 驱动，模态隐藏不影响它）
+  - `e2e/standalone/run.cjs`：`t.eq` 补第 4 个可选参数 `detail`——原先 spec 传了失败现场
+    （如 `JSON.stringify(consoleErrors)`）却被报告器丢弃，只剩 `actual=1` 一个数字，
+    排查得靠猜。加上之后立刻用它定位到下面那条真因
+  - **顺带查出的真缺陷**：`#btn-storage-inspector` 从「抽屉态专有」挪到共用页头后，
+    独立态也开始探测宿主模块 `/scripts/storage-inspector.js` ⇒ **404 控制台错误**，
+    把「零控制台错误」判据打红。修法：`setupStorageInspectorButton()` 先判 `host.isPlugin` 再探测
+
 - [ ] **3.1 规范落 `.trellis/spec/frontend/`**
   - 三层分层契约 + `hidden` 而非移出 DOM 的理由 + 三条 CSS 铁律 + 「夹具须与模板同构」
   - 挂 body 的自绘浮层只能用自有 id 作 CSS 作用域根（已入 css-scope 白名单）
   - 注意：`component-guidelines.md` 已超 32 KB 上限 ⇒ **按主题新建文件**，不要追加
-- [ ] **3.2 清理陈旧 E2E spec**（向导残留：`#btn-wb-view-toggle` / `#wizard-step-counter`）
 - [ ] **3.3 任务归档**
 
 ## 未做（如实登记）
@@ -154,9 +175,45 @@
 | 项 | 状态 |
 | --- | --- |
 | 2.6 移动视口真机验证 | 只在 1600×950 桌面视口验过，≤480px 未验 |
-| 实例侧 E2E 适配新入口 | `e2e/specs/{matrix,pt-load,smoke,library-inject}.e2e.cjs` 仍在找已删除的 `#st_zip_converter_settings`。**归 3.2 一并清理**（那批 spec 本就因 `#btn-wb-view-toggle` 与 `useAdvancedView` 全红） |
-| 抽屉态残留清理 | `getWorkbenchHtml({isDrawer:true})` 分支与 style.css 里 408 行 `.st-converter-drawer-app` 规则已无生产调用点。保留理由：删 CSS 是 400 行级 diff，与本次目标无关，宜独立增量 |
+| 实例侧 E2E 跑通 | 四个 spec 的**入口**已改到新路径（共用 `workbench-entry.cjs`），但**未实跑验证**——实例侧 `npm run e2e` 需 PT 实例（须 `--replace` 重装快照）与多轮长跑。本轮只做了静态一致性检查 |
 | 模块层统一签名 `state → DOM` | 现有渲染函数已是模块粒度，但签名各异；属后续增量 |
+| 独立侧 ~20 个 spec 的「切到高级视图」断言 | `useAdvancedView` 已改为单视图语义后它们恒真（仍有「读渲染结果」的壳）。逐条删除属噪音清理，未做 |
+
+## 用户报障修复（2026-10-15 · 「插件界面明暗反转 / 像贴在宿主页面上的面板」）
+
+**现象**：用户看真机截图报「全错，完全错误的侵入其他 dom」「反转了」。
+
+**取证（Dev Luker 8003 + Dev ST 8001 双宿主实测）**：
+- 覆盖层几何全对：`position:fixed`、`inset:0`、`z-index:9999`、`display:flex` 居中，
+  `#app.app-container` 宽 1080 —— 布局没问题；
+- 但覆盖层 `background` 计算值是 **`rgba(0,0,0,0)`（全透明）**，`#app` 的
+  `background` 是 **`rgb(220,220,210)`（浅灰）**，而宿主是深色主题 ⇒ 整块明暗反转。
+
+**根因（两条，同源：把宿主的**文字**色当**背景**色用）**：
+1. `#st-converter-modal-overlay` 的 `background` 写了 `var(--bg-secondary)` ——
+   那是**我们自己的**令牌，只定义在**子元素** `#app.app-container` 上，
+   而自定义属性只向下继承 ⇒ 覆盖层取到空值 ⇒ 整条声明失效 ⇒ 遮罩全透明。
+2. `--bg-primary: var(--SmartThemeBodyColor, #14161c)` —— 宿主里
+   `--SmartThemeBodyColor` = `rgba(220,220,210)`（**浅色**，它是**文字**色）、
+   `--SmartThemeBlurTintColor` = `rgba(23,23,23)`（**深色**，面板底色）、
+   `--SmartThemeBodyColorInverted` = **空值（宿主没有这个变量）**。
+   旧写法「背景 ← BodyColor、文字 ← BodyColorInverted」把两者**对调**了。
+
+**修法**：
+- `--bg-primary` → `var(--SmartThemeBlurTintColor, #14161c)`；
+  `--text-main` → `var(--SmartThemeBodyColor, #f2f4f8)`；
+- 覆盖层遮罩 → `color-mix(in srgb, var(--SmartThemeBlurTintColor, #14161c) 78%, transparent)`；
+- **同一根因的另外两处**：`#wb-detail-overlay`（明细全屏浮层）的遮罩与卡片底色、
+  `host-bridge.js` 扩展安装器弹层的 12 处 `--SmartThemeBodyColorInverted`
+  （深色主题下靠回退值侥幸可用，浅色主题下会变成不可见文字）——一并改掉。
+
+**验证**：修复后覆盖层 `background` = `color(srgb 0.09 0.09 0.09 / 0.78)`（深色遮罩）、
+`#app` = `rgb(23,23,23)`；双宿主截图确认面板恢复深色、文字清晰；
+独立态（无宿主令牌，走回退值）仍为深色且零控制台错误。
+
+**为什么之前没被发现**：`openConverterModal()` 在 2.7 之前是**死代码**（全仓无调用点），
+插件态走的是宿主抽屉；2.7 把插件态改成走模态后，这条一直存在但从未被渲染过的坏声明
+才第一次暴露出来。
 
 ## 回滚点
 

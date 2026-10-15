@@ -118,7 +118,7 @@ module.exports = {
     // 跨重载：产物是**临时**条目（ephemeral），重载后待导出区应清空；库里的那条仍在
     await page.reload({ waitUntil: 'domcontentloaded' });
     t.ok('F13 重载后工作台重新就绪', Boolean(await ctx.waitForReady(page)));
-    // 重载后视图码回到默认（向导）⇒ 本 spec 继续走高级视图，需再切一次
+    // 重载后仍是同一视图（向导已删除），此处保留一次幂等的「确保在完整视图」调用
     t.eq('F13b 重载后再次切到高级视图', await common.useAdvancedView(page), 'advanced');
     await page.waitForTimeout(800);
     const queueAfterReload = await page.$$eval('.eq-name', (els) => els.length).catch(() => null);

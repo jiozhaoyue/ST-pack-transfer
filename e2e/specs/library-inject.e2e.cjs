@@ -23,7 +23,8 @@
  * 4. 全流程零本插件报错（拉取被中止也**不得**报成失败）。
  */
 
-const { isPluginRef, useAdvancedView } = require('../lib/harness.cjs');
+const { isPluginRef } = require('../lib/harness.cjs');
+const { openWorkbenchModal } = require('../lib/workbench-entry.cjs');
 const { pruneFixtures } = require('../lib/fixture-prune.cjs');
 
 /** 桩供给方：两条可导出聊天 + 一条隐藏容器（都被源包"缺"⇒ 应全部被导出） */
@@ -104,30 +105,9 @@ module.exports = {
     }, null, { timeout: 120_000 }).then(() => true).catch(() => false);
     t.ok('I1b 插件在工作台里完成初始化（#env-badge 脱离模板初值）', pluginReady);
 
-    // 打开抽屉要**两步**（矩阵同款）：
-    //  ① 先开**宿主**的扩展设置抽屉 —— 插件抽屉嵌在它里面，祖先隐藏时 Playwright 一律判不可见
-    //     （首版只强制显示了插件抽屉的内容 ⇒ `#btn-host-fetch` "element is not visible"，点击超时）；
-    //  ② 再展开插件自己的抽屉内容。
-    const hostOpened = await page.evaluate(() => {
-      const btn = document.querySelector('#extensions-settings-button .drawer-toggle')
-        || document.querySelector('.drawer-opener[data-target="extensions-settings-button"]');
-      if (!btn) return 'not-found';
-      btn.click();
-      return 'clicked';
-    });
-    await page.waitForTimeout(1200);
-    t.ok('I2a 宿主扩展设置抽屉已打开（原生 toggle）', hostOpened !== 'not-found', `via=${hostOpened}`);
-    const opened = await page.evaluate(() => {
-      const drawer = document.getElementById('st_zip_converter_settings');
-      if (!drawer) return { ok: false, reason: '抽屉不存在（插件未挂载？）' };
-      const content = drawer.querySelector(':scope > .inline-drawer-content');
-      if (content) content.style.display = 'block';
-      return { ok: true, app: Boolean(drawer.querySelector('.st-converter-drawer-app')) };
-    });
-    t.ok('I2 插件工作台抽屉可打开', opened.ok && opened.app, JSON.stringify(opened));
-    // I2b **切到「高级工作台」视图**（S5 第二步起默认入口是迁移向导；不切则 I3 的入口按钮恒不可见）
-    const viewAfter = await useAdvancedView(page);
-    t.eq('I2b 已切到高级工作台视图', viewAfter, 'advanced', `view=${viewAfter}`);
+    // 打开工作台（2026-10-15 起：宿主扩展行「打开」→ 全屏模态，抽屉路径已删除）
+    const opened = await openWorkbenchModal(page);
+    t.ok('I2 插件工作台可打开（全屏模态）', opened.ok, opened.reason || '');
     t.ok('I3 宿主态下「从宿主拉取」入口可见',
       await page.evaluate(() => {
         const el = document.getElementById('btn-host-fetch');

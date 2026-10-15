@@ -806,12 +806,14 @@ async function entryCountOf(filePath) {
     phases.pluginReady = stamp();
     console.log(`[produce] 插件就绪（t+${phases.pluginReady}s）`);
 
+    // 2026-10-15：插件态工作台改挂全屏模态（宿主扩展行「打开」入口），
+    // boot 时**建好但隐藏**——本脚本全程用 page.evaluate 驱动，隐藏不影响。
     const workbench = await page.evaluate(() => ({
-      drawer: Boolean(document.getElementById('st_zip_converter_settings')),
-      app: Boolean(document.querySelector('.st-converter-drawer-app')),
+      modal: Boolean(document.getElementById('st-converter-modal-overlay')),
+      app: Boolean(document.querySelector('#st-converter-modal-overlay #app.app-container')),
       badge: (document.getElementById('env-badge') || {}).textContent || null,
     }));
-    console.log(`[produce] 工作台注入：drawer=${workbench.drawer} app=${workbench.app} badge=${JSON.stringify(workbench.badge)}`);
+    console.log(`[produce] 工作台注入：modal=${workbench.modal} app=${workbench.app} badge=${JSON.stringify(workbench.badge)}`);
 
     await expandLog(page);   // 不展开则日志面板**不追加任何行**（读不到证据）
 

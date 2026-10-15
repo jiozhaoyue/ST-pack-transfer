@@ -53,7 +53,7 @@ module.exports = {
   async run(t, h, ctx) {
     const { page, rec } = h;
     t.ok('A1 工作台就绪', Boolean(await ctx.waitForReady(page)));
-    // 本 spec 测的是**高级工作台**：向导默认只披露当前步，直接点控件会超时
+    // 本 spec 测的是**完整工作台**（向导已删除，不存在「非当前步控件不可见」这回事）
     t.eq('A1b 切到高级视图', await common.useAdvancedView(page), 'advanced');
 
     await page.setInputFiles('#file-input', await buildFixture(ctx.fixtureDir));

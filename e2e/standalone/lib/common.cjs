@@ -34,23 +34,35 @@ function ensureFixtures(fixtureDir) {
 }
 
 /**
- * 切到「高级工作台」视图（S5 第二步起，默认入口是迁移向导）。
+ * 确保工作台处于「完整视图」，返回视图码（期望 `advanced`）。
  *
- * **为什么必须显式调用**：向导一次只披露当前步的区块，非当前步的控件是 `display:none`
- * ⇒ 直接点高级工作台控件（`#target-select` / `#category-panel` / 折叠区…）会必然超时。
- * 让每个 spec 自己声明「我测的是高级视图」，比在夹具里悄悄替你切视图更诚实——
- * 否则「向导是默认入口」这条契约就没人测得到了。
+ * **2026-10-15 修正**：迁移向导外壳已于 2026-10-14 整体删除，`#btn-wb-view-toggle`
+ * 与 `data-wb-view` 一并消失。旧实现**直接点那个按钮**，于是所有调用它的 spec
+ * 都在第一步以「element not found / 超时」告终（实测 24 项红）。
+ *
+ * 现在按「有没有视图开关」判定：
+ *   · 没有开关 ⇒ 工作台**只有一个视图**，`advanced` 就是当前状态，无需切换；
+ *   · 有开关   ⇒ 按老路径真切换（将来若重新引入视图切换，本函数自动恢复成真切换）。
+ *
+ * 这不是"把断言改成恒真"——它仍读**渲染结果**；只是「非 advanced 状态」在当前
+ * 单一视图的工作台里不存在。
  *
  * @param {object} page
- * @returns {Promise<string>} 切换后的视图码（期望 `advanced`）
+ * @returns {Promise<string>} 视图码（当前实现下恒为 `advanced`）
  */
 async function useAdvancedView(page) {
-  const view = () => page.evaluate(() => (document.getElementById('app') || {}).dataset?.wbView || '');
-  if ((await view()) === 'advanced') return 'advanced';
+  const state = await page.evaluate(() => {
+    const app = document.getElementById('app');
+    return {
+      view: app ? app.dataset.wbView || '' : '',
+      hasToggle: Boolean(document.getElementById('btn-wb-view-toggle')),
+    };
+  });
+  if (state.view === 'advanced' || !state.hasToggle) return 'advanced';
   await page.click('#btn-wb-view-toggle');
   await page.waitForFunction(() => document.getElementById('app')?.dataset?.wbView === 'advanced',
     null, { timeout: 10_000 }).catch(() => {});
-  return view();
+  return page.evaluate(() => (document.getElementById('app') || {}).dataset?.wbView || '');
 }
 
 /** 等计划摘要条出现且文本非空 */

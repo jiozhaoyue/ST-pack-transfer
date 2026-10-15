@@ -98,70 +98,58 @@ module.exports = {
       appChildren: (document.getElementById('app') || { children: [] }).children.length,
       hasFileInput: Boolean(document.getElementById('file-input')),
       hasConvertBtn: Boolean(document.getElementById('btn-convert')),
+      // 迁移向导 2026-10-14 整体删除 ⇒ 这三项必须全部不存在
       hasWizardRail: Boolean(document.getElementById('wizard-rail')),
-      railSteps: document.querySelectorAll('#wizard-rail [data-wb-step]').length,
-      view: (document.getElementById('app') || {}).dataset?.wbView || '',
-      step: (document.getElementById('app') || {}).dataset?.wbStep || '',
+      hasViewToggle: Boolean(document.getElementById('btn-wb-view-toggle')),
+      wbView: (document.getElementById('app') || {}).dataset?.wbView || '',
+      flowTabs: document.querySelectorAll('#wb-flow-switch .wb-flow-tab').length,
     }));
     t.log(`  · 外壳读数：${JSON.stringify(shell)}`);
     t.ge('O6 `#app` 已被工作台填充（不是白屏）', shell.appChildren, 1);
     t.eq('O7 关键控件就绪（`#file-input`）', shell.hasFileInput, true);
     t.eq('O8 转换按钮存在（`#btn-convert`）', shell.hasConvertBtn, true);
-    t.eq('O9 向导步骤条渲染（6 步）', shell.railSteps, 6);
-    t.eq('O10 默认入口是**向导**视图', shell.view, 'wizard');
-    t.eq('O11 向导起始步是「来源」', shell.step, 'source');
+    // 单一视图：向导壳与其视图开关都不得回流（用户 2026-10-14 裁定整体删除）
+    t.eq('O9 无向导步骤条（向导已整体删除）', shell.hasWizardRail, false);
+    t.eq('O10 无视图开关（工作台只有一个视图）', shell.hasViewToggle, false);
+    t.eq('O11 `#app` 上无 data-wb-view 标记', shell.wbView, '');
+    t.eq('O11b 方向开关两枚（导出 / 导入）', shell.flowTabs, 2);
 
-    // ── 真实转换：选包 → 转换 → 领取结果（**沿向导步骤条走**，不是绕开它）──
+    // ── 真实转换：选包 → 转换 → 领取结果（直接驱动，无中间步骤条）──
     const fixtures = await common.ensureFixtures(ctx.fixtureDir);
     await page.setInputFiles('#file-input', fixtures['fixture-st.zip']);
     t.ok('O12 上传源包后计划预览就绪', await common.waitForPlan(page));
 
-    // 向导把非当前步的区块隐藏起来（这正是它的作用）⇒ 必须逐步导航，
-    // 不能像高级模式那样一次点到底。这本身就是对向导导航的验证。
-    const gotoStep = async (step) => {
-      await page.click(`#wizard-rail [data-wb-step="${step}"]`);
-      await page.waitForFunction((s) => {
-        const app = document.getElementById('app');
-        return Boolean(app) && app.dataset.wbStep === s;
-      }, step, { timeout: 10_000 });
-      return page.evaluate(() => document.getElementById('app').dataset.wbStep);
-    };
-
-    t.eq('O13 向导可跳到「目标」步', await gotoStep('target'), 'target');
     const targetVisible = await page.isVisible('#target-select');
-    t.eq('O14 跳到「目标」步后目标选择器**可见**（步骤披露生效）', targetVisible, true);
+    t.eq('O13 目标选择器可见（idle/scanned 阶段门控下打包选项常驻）', targetVisible, true);
     await page.selectOption('#target-select', 'l');
 
-    t.eq('O15 向导可跳到「范围」步', await gotoStep('scope'), 'scope');
     const scopeVisible = await page.isVisible('#category-panel');
-    t.eq('O16 「范围」步显示类目面板', scopeVisible, true);
+    t.eq('O14 计划就绪后类目面板可见', scopeVisible, true);
 
-    t.eq('O17 向导可跳到「检查」步', await gotoStep('check'), 'check');
-    const checkText = await page.$eval('#wizard-check-summary', (el) => el.textContent.trim());
-    t.ok('O18 「检查」步给出了计划读数（非空前置门）', checkText.length > 0, checkText);
+    const checkText = await page.$eval('#wizard-check-summary', (el) => el.textContent.trim()).catch(() => '');
+    t.ok('O15 检查面板给出了计划读数（非空前置门）', checkText.length > 0, checkText);
 
-    t.eq('O19 向导可跳到「执行」步', await gotoStep('run'), 'run');
     await page.click('#btn-convert');
-
-    t.eq('O20 向导可跳到「核对」步', await gotoStep('verify'), 'verify');
     const names = await common.waitForQueue(page, 1, 180_000);
-    t.ok('O21 转换产出进入待导出区', Array.isArray(names) && names.length >= 1,
+    t.ok('O16 转换产出进入待导出区', Array.isArray(names) && names.length >= 1,
       JSON.stringify(names));
 
     const saved = await common.downloadFirstRow(page, ctx.fixtureDir, 'offline-out.zip');
     const zip = await common.readZip(saved);
-    t.ge('O22 领取的产物是**可读的 zip**（落盘后读回条目，不只看「触发了下载」）',
+    t.ge('O17 领取的产物是**可读的 zip**（落盘后读回条目，不只看「触发了下载」）',
       zip.names.length, 1);
 
-    // 「高级模式」切换：同一份 DOM，不复制第二套 UI
-    await page.click('#btn-wb-view-toggle');
-    const advanced = await page.evaluate(() => ({
-      view: document.getElementById('app').dataset.wbView,
-      targetVisible: !!(document.getElementById('target-select') || {}).offsetParent,
-      queueVisible: !!(document.getElementById('export-queue-panel') || {}).offsetParent,
+    // 方向开关：同一份模块换摆法，不复制第二套 UI（PRD R2.1 / R2.4）
+    await page.click('#btn-flow-in');
+    await page.waitForTimeout(200);
+    const inFlow = await page.evaluate(() => ({
+      restoreVisible: !!(document.getElementById('btn-restore-inline') || {}).offsetParent,
+      packVisible: !!(document.getElementById('target-select') || {}).offsetParent,
+      slotRole: (document.getElementById('wb-slot-role') || {}).textContent || '',
     }));
-    t.eq('O23 切到「高级模式」后视图码正确', advanced.view, 'advanced');
-    t.eq('O24 高级模式下各步区块**同时可见**（回到既有全量展示）', advanced.targetVisible, true);
+    t.eq('O18 切到导入屏后恢复区可见', inFlow.restoreVisible, true);
+    t.eq('O19 切到导入屏后打包选项退场（两流程只差一个选项槽）', inFlow.packVisible, false);
+    t.eq('O20 共享槽角色标签随方向更新', inFlow.slotRole, '待恢复包');
 
     // ── 自包含读数（必须在**所有**交互之后取：交互过程中才可能暴露外部依赖）──
     t.log(`  · 外部 http(s) 请求：${externalRequests.length} 条 ${JSON.stringify(externalRequests.slice(0, 5))}`);

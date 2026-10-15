@@ -14,14 +14,17 @@ import postcss from 'postcss';
  * 3. **移除**原 `body:has(> .app-container)` 豁免——那条豁免允许以 `body` 为主体的规则，
  *    而 `body` 属宿主页面元素（宿主仓内确有第三方扩展使用 `.app-container` 类名）。
  *
- * 2026-10-15 变更：**新增 `#wb-detail-overlay`**（类目明细全屏面板）。理由与模态覆盖层同源：
- * 它是挂在 `document.body` 上的自绘浮层，**不在** `#app.app-container` /
- * `.st-converter-drawer-app` 之内 —— 双前缀写法命中不了它，只能用自有 id 作作用域根。
- * 允许 id 作根是安全的：`#wb-detail-overlay` 是本插件独有的 id，宿主与第三方不会撞。
+ * 2026-10-15 变更（两处）：
+ * 1. **新增 `#wb-detail-overlay`**（类目明细全屏面板）。理由与模态覆盖层同源：
+ *    它是挂在 `document.body` 上的自绘浮层，**不在** `#app.app-container` 之内 ——
+ *    双前缀写法命中不了它，只能用自有 id 作作用域根。
+ *    允许 id 作根是安全的：`#wb-detail-overlay` 是本插件独有的 id，宿主与第三方不会撞。
+ * 2. **移除 `.st-converter-drawer-app`**：插件态工作台 2026-10-15 起改挂在全屏模态里
+ *    （宿主扩展抽屉注入已删除），三种形态的根统一为 `#app.app-container`。
+ *    该前缀在 style.css 里已无任何规则，白名单留着会让「根选择器」形同虚设。
  */
 const ALLOWED_ROOTS = [
   /^#app\.app-container(?=$|[\s>+~.#:[\]])/,
-  /^\.st-converter-drawer-app(?=$|[\s>+~.#:[\]])/,
   /^#st-converter-modal-overlay(?=$|[\s>+~.#:[\]])/,
   /^#wb-detail-overlay(?=$|[\s>+~.#:[\]])/,
 ];

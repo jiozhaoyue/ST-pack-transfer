@@ -1275,9 +1275,13 @@ export async function renderExtensionInstallerModal(extensions, onFinish, option
     padding: 20px; font-family: system-ui, -apple-system, sans-serif;
   `;
 
+  // 底色取宿主的面板底色令牌（BlurTint），文字取宿主的文字令牌（BodyColor）。
+  // ⚠ 不要用 `--SmartThemeBodyColorInverted`：ST / Luker 里**没有这个变量**
+  // （2026-10-15 在 Dev Luker 8003 与 Dev ST 8001 实测均为空值），
+  // 旧写法靠回退值在深色主题下侥幸可用，浅色主题下会变成不可见文字。
   const modalBox = document.createElement('div');
   modalBox.style.cssText = `
-    background: var(--SmartThemeBlurTintColor, #1e1e2e); color: var(--SmartThemeBodyColorInverted, #f2f4f8); border: 1px solid rgba(255,255,255,0.15);
+    background: var(--SmartThemeBlurTintColor, #1e1e2e); color: var(--SmartThemeBodyColor, #f2f4f8); border: 1px solid rgba(255,255,255,0.15);
     border-radius: 12px; width: 100%; max-width: 680px; max-height: 85vh;
     display: flex; flex-direction: column; box-shadow: 0 20px 40px rgba(0,0,0,0.6);
     overflow: hidden;
@@ -1289,7 +1293,7 @@ export async function renderExtensionInstallerModal(extensions, onFinish, option
         <h3 style="margin: 0; font-size: 1.15rem; color: var(--SmartThemeQuoteColor, #f59e0b); display: flex; align-items: center; gap: 8px;">
           <i class="fa-solid fa-puzzle-piece"></i> 扩展安装器
         </h3>
-        <p style="margin: 4px 0 0 0; font-size: 0.85rem; color: color-mix(in srgb, var(--SmartThemeBodyColorInverted, #f2f4f8) 78%, transparent);">
+        <p style="margin: 4px 0 0 0; font-size: 0.85rem; color: color-mix(in srgb, var(--SmartThemeBodyColor, #f2f4f8) 78%, transparent);">
           数据包已恢复。以下扩展将由酒馆以 <strong>depth: 1</strong> 浅克隆在线拉取，保留一键更新能力。
         </p>
         <p style="margin: 2px 0 0 0; font-size: 0.78rem; color: #f9e2af;">
@@ -1297,7 +1301,7 @@ export async function renderExtensionInstallerModal(extensions, onFinish, option
           且<b>扩展仓库可访问</b>（私有仓需手动处理）。
         </p>
       </div>
-      <button id="ext-modal-close" style="background: transparent; border: none; color: color-mix(in srgb, var(--SmartThemeBodyColorInverted, #f2f4f8) 78%, transparent); font-size: 1.5rem; cursor: pointer; padding: 4px 8px;">&times;</button>
+      <button id="ext-modal-close" style="background: transparent; border: none; color: color-mix(in srgb, var(--SmartThemeBodyColor, #f2f4f8) 78%, transparent); font-size: 1.5rem; cursor: pointer; padding: 4px 8px;">&times;</button>
     </div>
 
     <div style="padding: 10px 20px; background: rgba(0,0,0,0.2); border-bottom: 1px solid rgba(255,255,255,0.05); display: flex; gap: 12px; align-items: center; font-size: 0.85rem;">
@@ -1325,7 +1329,7 @@ export async function renderExtensionInstallerModal(extensions, onFinish, option
     <div id="ext-progress-bar-container" style="display: none; padding: 12px 20px; background: rgba(0,0,0,0.3); border-top: 1px solid rgba(255,255,255,0.05);">
       <div style="display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 6px;">
         <span id="ext-progress-status" style="color: var(--SmartThemeQuoteColor, #f59e0b);">准备安装...</span>
-        <span id="ext-progress-num" style="color: color-mix(in srgb, var(--SmartThemeBodyColorInverted, #f2f4f8) 78%, transparent);">0 / 0</span>
+        <span id="ext-progress-num" style="color: color-mix(in srgb, var(--SmartThemeBodyColor, #f2f4f8) 78%, transparent);">0 / 0</span>
       </div>
       <div style="width: 100%; height: 8px; background: var(--SmartThemeBorderColor, rgba(255,255,255,0.14)); border-radius: 4px; overflow: hidden;">
         <div id="ext-progress-fill" style="width: 0%; height: 100%; background: #a6e3a1; transition: width 0.3s ease;"></div>
@@ -1385,12 +1389,12 @@ export async function renderExtensionInstallerModal(extensions, onFinish, option
     titleRow.style.cssText = 'display: flex; align-items: center; gap: 8px;';
 
     const nameEl = document.createElement('strong');
-    nameEl.style.cssText = 'color: var(--SmartThemeBodyColorInverted, #f2f4f8); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;';
+    nameEl.style.cssText = 'color: var(--SmartThemeBodyColor, #f2f4f8); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;';
     nameEl.textContent = ext.displayName || ext.name || folder || '未命名扩展';
     titleRow.appendChild(nameEl);
 
     const folderEl = document.createElement('span');
-    folderEl.style.cssText = 'font-size: 0.75rem; color: color-mix(in srgb, var(--SmartThemeBodyColorInverted, #f2f4f8) 58%, transparent);';
+    folderEl.style.cssText = 'font-size: 0.75rem; color: color-mix(in srgb, var(--SmartThemeBodyColor, #f2f4f8) 58%, transparent);';
     folderEl.textContent = `(${folder || '未知目录'})`;
     titleRow.appendChild(folderEl);
 
@@ -1405,7 +1409,7 @@ export async function renderExtensionInstallerModal(extensions, onFinish, option
       stateStyle = 'font-size: 0.72rem; padding: 1px 6px; background: rgba(243,139,168,0.2); color: #f38ba8; border-radius: 4px;';
     } else if (isInstalled) {
       stateText = '本地已安装';
-      stateStyle = 'font-size: 0.72rem; padding: 1px 6px; background: var(--SmartThemeBorderColor, rgba(255,255,255,0.14)); color: color-mix(in srgb, var(--SmartThemeBodyColorInverted, #f2f4f8) 78%, transparent); border-radius: 4px;';
+      stateStyle = 'font-size: 0.72rem; padding: 1px 6px; background: var(--SmartThemeBorderColor, rgba(255,255,255,0.14)); color: color-mix(in srgb, var(--SmartThemeBodyColor, #f2f4f8) 78%, transparent); border-radius: 4px;';
     } else {
       stateText = '待安装';
       stateStyle = 'font-size: 0.72rem; padding: 1px 6px; background: rgba(137,180,250,0.2); color: var(--SmartThemeQuoteColor, #f59e0b); border-radius: 4px;';
@@ -1417,7 +1421,7 @@ export async function renderExtensionInstallerModal(extensions, onFinish, option
     mainCol.appendChild(titleRow);
 
     const metaRow = document.createElement('div');
-    metaRow.style.cssText = 'font-size: 0.78rem; color: color-mix(in srgb, var(--SmartThemeBodyColorInverted, #f2f4f8) 58%, transparent); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;';
+    metaRow.style.cssText = 'font-size: 0.78rem; color: color-mix(in srgb, var(--SmartThemeBodyColor, #f2f4f8) 58%, transparent); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;';
 
     // 渲染期校验：非 http(s) 协议（javascript: / data: / vbscript: 等）不输出原值
     const urlEl = document.createElement('span');
@@ -1443,7 +1447,7 @@ export async function renderExtensionInstallerModal(extensions, onFinish, option
 
     const itemStatusEl = document.createElement('span');
     itemStatusEl.id = `ext-item-status-${idx}`;
-    itemStatusEl.style.cssText = 'font-size: 0.8rem; color: color-mix(in srgb, var(--SmartThemeBodyColorInverted, #f2f4f8) 58%, transparent);';
+    itemStatusEl.style.cssText = 'font-size: 0.8rem; color: color-mix(in srgb, var(--SmartThemeBodyColor, #f2f4f8) 58%, transparent);';
 
     itemEl.appendChild(chk);
     itemEl.appendChild(mainCol);

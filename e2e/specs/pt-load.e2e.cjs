@@ -14,10 +14,9 @@
 const path = require('path');
 const fs = require('fs');
 const { pathToFileURL } = require('url');
-const { useAdvancedView } = require('../lib/harness.cjs');
+const { openWorkbenchModal } = require('../lib/workbench-entry.cjs');
 const { pruneFixtures } = require('../lib/fixture-prune.cjs');
 
-const DRAWER_ID = 'st_zip_converter_settings';
 const FIXTURE_DIR = path.resolve(__dirname, '..', '..', 'test-results', 'fixtures');
 
 module.exports = {
@@ -60,31 +59,24 @@ module.exports = {
     t.ok('P3b 宿主扩展设置抽屉已打开（原生 toggle；不打开则工作台控件一律不可见）',
       hostOpened !== 'not-found', `via=${hostOpened}`);
 
-    // 打开插件抽屉并读工作台真实渲染（与矩阵同一手法）
-    const opened = await page.evaluate((id) => {
-      const drawer = document.getElementById(id);
-      if (!drawer) return { ok: false, reason: '抽屉不存在' };
-      const content = drawer.querySelector(':scope > .inline-drawer-content');
-      if (content) content.style.display = 'block';
-      const app = drawer.querySelector('.st-converter-drawer-app');
+    // 打开工作台：点宿主扩展行上的「打开」进全屏模态（2026-10-15 起，抽屉路径已删除）
+    const openedResult = await openWorkbenchModal(page);
+    const opened = await page.evaluate(() => {
+      const app = document.querySelector('#st-converter-modal-overlay #app.app-container');
+      if (!app) return { ok: false, reason: '模态内无 #app.app-container' };
       return {
         ok: true,
-        hasApp: Boolean(app),
-        categoryPanel: app ? app.querySelectorAll('.category-panel').length : 0,
-        dropzone: Boolean(app && app.querySelector('#dropzone')),
-        controlIds: app ? ['file-input', 'btn-convert', 'stash-list', 'export-queue-panel', 'task-controls']
-          .filter((x) => app.querySelector(`#${x}`)).length : 0,
+        hasApp: true,
+        categoryPanel: app.querySelectorAll('.category-panel').length,
+        dropzone: Boolean(app.querySelector('#dropzone')),
+        controlIds: ['file-input', 'btn-convert', 'stash-list', 'export-queue-panel', 'task-controls']
+          .filter((x) => app.querySelector(`#${x}`)).length,
       };
-    }, DRAWER_ID);
-    t.ok('P4 工作台容器渲染（`.st-converter-drawer-app`）', opened.ok && opened.hasApp,
-      JSON.stringify(opened));
+    });
+    t.ok('P4 工作台容器渲染（模态内 #app.app-container）', openedResult.ok && opened.hasApp,
+      JSON.stringify({ openedResult, opened }));
     t.eq('P4b 关键控件齐全（file-input / btn-convert / stash-list / export-queue-panel / task-controls 五项）',
       opened.controlIds, 5, JSON.stringify(opened));
-
-    // P4c **切到「高级工作台」视图**（S5 第二步起默认入口是迁移向导）
-    //      向导一次只披露当前步的区块 ⇒ 不切则 `#target-select` 恒 0×0，P9b 前置门必然红。
-    const viewAfter = await useAdvancedView(page);
-    t.eq('P4c 已切到高级工作台视图（否则高级控件恒不可见）', viewAfter, 'advanced', `view=${viewAfter}`);
 
     // 平台徽标：PT 上应给出一个**非模板初值**的判定（具体文案由 host-bridge 决定，不断言字面）
     const badge = await page.evaluate(() => {
@@ -230,16 +222,9 @@ module.exports = {
         if (btn) btn.click();
       });
       await page.waitForTimeout(1200);
-      await page.evaluate((id) => {
-        const drawer = document.getElementById(id);
-        const content = drawer && drawer.querySelector(':scope > .inline-drawer-content');
-        if (content) content.style.display = 'block';
-      }, DRAWER_ID);
-      await page.waitForTimeout(300);
-      // ⚠️ 重载会把视图打回**向导默认入口** ⇒ 必须**再切一次**高级视图，
-      //    否则后面的 `#btn-convert` / `#split-input` 全是 `display:none`（2026-10-13 实测 P19 红）。
-      const viewAfterReload = await useAdvancedView(page);
-      t.eq('P16d 重载后已重新切到高级工作台视图', viewAfterReload, 'advanced', `view=${viewAfterReload}`);
+      // 重载会把工作台关掉（模态默认隐藏）⇒ 必须重新打开一次
+      const reopened = await openWorkbenchModal(page);
+      t.eq('P16d 重载后工作台可再次打开', reopened.ok, true, reopened.reason || '');
       await page.setInputFiles('#file-input', splitFixture);
       const planReady2 = await page.waitForFunction(() => {
         const bar = document.getElementById('plan-summary-bar');

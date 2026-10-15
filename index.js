@@ -777,17 +777,22 @@ async function main(appRoot) {
   }
 
   /**
-   * 宿主原生存储面板入口（`#btn-storage-inspector`，仅抽屉态渲染）。
+   * 宿主原生存储面板入口（`#btn-storage-inspector`）。
    *
    * T2 按用户裁决 13 移除了自绘双行配额条，只留这枚按钮的外观，**行为归本任务**。
    * 语义：宿主提供原生 Storage Inspector 才解除 `hidden`；不提供则整块保持隐藏，
    * **不出现死按钮**，也**不恢复自绘配额条**（用户裁决 13 不可回退）。
    * 唤起失败时保持静默——按钮本就不该可见，无需用户可见报错。
+   *
+   * 2026-10-15：按钮从「抽屉态专有」改为三形态共用的页头位置（抽屉已删除）。
+   * 因此必须**先判宿主**再探测——存储面板是宿主模块（`/scripts/storage-inspector.js`），
+   * 独立态探测只会打出一条 404 控制台错误（实测把「零控制台错误」判据打红）。
    */
   function setupStorageInspectorButton() {
     const btn = document.getElementById('btn-storage-inspector');
-    if (!btn) return; // 独立态 / 模态态不渲染该按钮
+    if (!btn) return;
     btn.addEventListener('click', () => { void openStorageInspector(); });
+    if (!host.isPlugin) return;
     void isStorageInspectorAvailable().then((available) => {
       if (available) btn.hidden = false;
     });
@@ -3079,9 +3084,6 @@ function ensureConverterModal() {
   const appContainer = document.createElement('div');
   appContainer.className = 'app-container';
   appContainer.id = 'app';
-  // 插件态：工作台仍是**嵌在宿主页面里**的实例（只是从设置抽屉挪到了全屏浮层），
-  // 保留宿主内嵌变体类，让 style.css 里 `.st-converter-drawer-app` 那一整套样式继续生效。
-  if (detectHost().isPlugin) appContainer.classList.add('st-converter-drawer-app');
   appContainer.innerHTML = trustedStaticMarkup(getWorkbenchHtml({ isModal: true }));
 
   modalOverlay.appendChild(appContainer);
