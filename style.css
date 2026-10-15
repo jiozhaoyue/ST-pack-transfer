@@ -1230,6 +1230,8 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  /* 徽标与「明细」不得被类目名挤扁 —— 缺此条时窄列下按钮会被压成逐字折行（2026-10-15 实测） */
+  flex-shrink: 0;
 }
 
 #app.app-container .btn-expand-detail, .st-converter-drawer-app .btn-expand-detail {
@@ -1240,6 +1242,7 @@
   padding: 2px 7px;
   border-radius: var(--radius-sm);
   cursor: pointer;
+  white-space: nowrap;
 }
 
 #app.app-container .btn-expand-detail:hover, .st-converter-drawer-app .btn-expand-detail:hover {
