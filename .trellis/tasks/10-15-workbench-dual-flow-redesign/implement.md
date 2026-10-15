@@ -175,9 +175,11 @@
 | 项 | 状态 |
 | --- | --- |
 | 2.6 移动视口真机验证 | 只在 1600×950 桌面视口验过，≤480px 未验 |
-| 实例侧 E2E 跑通 | 四个 spec 的**入口**已改到新路径（共用 `workbench-entry.cjs`），但**未实跑验证**——实例侧 `npm run e2e` 需 PT 实例（须 `--replace` 重装快照）与多轮长跑。本轮只做了静态一致性检查 |
+| 实例侧 E2E 跑通 | 四个 spec 的**入口**已改到新路径（共用 `workbench-entry.cjs`），但**未实跑验证**——实例侧 `npm run e2e` 需 PT 实例（须 `--replace` 重装快照）与多轮长跑。本轮只做了静态一致性检查（`node --check` 全过） |
+| 独立侧 E2E 存量红（**与本次改动无关**） | 全量实测 **212 项 / 191 通过 / 21 失败**（本次改动前为 27 失败，本次净修 6 条）。逐条归因：<br>· `input[name="extension-mode"]:checked` —— 2026-10-14 并排 radio 改 `<select>` 枚举时留下的陈旧断言<br>· `.category-card .detail-search-input` / 明细行读数 —— 2026-10-15 `3bcb599` 把明细改成**全屏浮层**后，明细不再在类目卡片内<br>· 多条 `page.click: Timeout 30s` —— 失败现场是 `wb-guide-overlay intercepts pointer events`（首装引导自动打开，spec 未先退出）<br>以上选择器**均不在本次改动面内**；本次动到的 `#st_zip_converter_settings` / `#btn-wb-view-toggle` / `#status-row` 在独立侧 spec 中零引用。修它们属独立增量 |
 | 模块层统一签名 `state → DOM` | 现有渲染函数已是模块粒度，但签名各异；属后续增量 |
 | 独立侧 ~20 个 spec 的「切到高级视图」断言 | `useAdvancedView` 已改为单视图语义后它们恒真（仍有「读渲染结果」的壳）。逐条删除属噪音清理，未做 |
+| 扩展安装器弹层的按钮文字色 | `host-bridge.js` 里 `#f38ba8`/`#a6e3a1` 彩色按钮上的 `color: var(--SmartThemeBodyColor)` 语义仍是「拿文字色当按钮前景」——深色主题下对比度偏低。属另一surface 的设计取舍，未动 |
 
 ## 用户报障修复（2026-10-15 · 「插件界面明暗反转 / 像贴在宿主页面上的面板」）
 
