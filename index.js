@@ -22,6 +22,8 @@ import {
   selectAll as categorySelectAll,
   resetCategoryFilter,
 } from './src/ui/category-filter.js';
+import { applyShell, getFlow, setupWorkbenchShell } from './src/ui/workbench-shell.js';
+import { stageOf } from './src/ui/workbench-layout.js';
 import {
   saveFile,
   getFile,
@@ -609,6 +611,10 @@ async function main(appRoot) {
     // 宿主无恢复能力时把原因显式挂在按钮上（禁用而不是静默隐藏，用户可知为何不可用）
     const restoreBtn = document.getElementById('btn-restore-luker');
     if (restoreBtn) restoreBtn.title = isRestoreUnsupported() ? getRestoreUnsupportedReason() : '';
+    // 外壳同步：阶段（idle/scanned/running/done）或方向变化后重排模块。
+    // 内部按「流程×形态×阶段」签名比对，签名未变即不重排——重排会抖掉焦点与滚动位置。
+    applyShell();
+    syncRestoreInline();
   }
   let isPlanning = false;
   let pendingRestoreFile = null;
@@ -1200,6 +1206,53 @@ async function main(appRoot) {
   let latestPlan = null;
   const btnExportExtManifest = document.getElementById('btn-export-ext-manifest');
 
+  // ── 工作台外壳（模块 / 流程 / 外壳 三层，见 design.md §2）──────────────────
+  // 阶段由实况派生：等待确认 > 在途任务 > 产物 > 计划 > 空（workbench-layout.js 的 stageOf）。
+  // `awaitingTreeConfirm` 必须在本行之前声明：`getStage` 会在外壳装好后的**任何**
+  // `applyActionAvailability()` 里被求值，而它散落在全函数各处 —— 声明晚了就是 TDZ。
+  let awaitingTreeConfirm = false;
+  // `applyShell` 先守卫 shellRoot 再求值 stage，故此处引用 latestPlan / workbenchBusy /
+  // lastConvertedBlob 无 TDZ 风险——三者均在本行之前声明。
+  const workbenchShell = setupWorkbenchShell({
+    root,
+    getStage: () => stageOf({
+      hasPlan: !!latestPlan,
+      isRunning: workbenchBusy,
+      isAwaiting: awaitingTreeConfirm,
+      hasProducts: !!lastConvertedBlob,
+    }),
+    onFlowChange: () => syncRestoreInline(),
+  });
+  void workbenchShell;
+
+  /**
+   * 导入屏主操作读数。写回宿主是**整包**语义，不认类目勾选，
+   * 故这里只报「待恢复的是哪个包」+ 能不能写，不重复类目面板。
+   */
+  function syncRestoreInline() {
+    const btn = document.getElementById('btn-restore-inline');
+    const target = document.getElementById('wb-restore-target');
+    if (target) {
+      target.textContent = currentFile ? `待恢复 ${currentFile.name}` : '尚未选择数据包';
+    }
+    if (btn) {
+      const canRestore = host.isPlugin && !!currentFile;
+      btn.disabled = !canRestore;
+      btn.title = !host.isPlugin ? '独立模式无宿主可写' : (currentFile ? '' : '请先选择数据包');
+    }
+  }
+
+  {
+    const btnRestoreInline = document.getElementById('btn-restore-inline');
+    if (btnRestoreInline) {
+      btnRestoreInline.addEventListener('click', () => {
+        if (!currentFile) return;
+        openRestoreModal({ name: currentFile.name, blob: currentFile.blob, size: currentFile.blob.size });
+      });
+    }
+    syncRestoreInline();
+  }
+
   /** 无扩展可导出时禁用按钮并给出提示（含未选源包的情形）。 */
   function syncExportExtManifestButton() {
     if (!btnExportExtManifest) return;
@@ -1392,6 +1445,9 @@ async function main(appRoot) {
       const hadPlan = Boolean(latestPlan);
       latestPlan = plan;
       syncExportExtManifestButton();
+      // 计划到达 ⇒ 阶段 idle → scanned，内容范围与执行条进场（workbench-layout.js 的 visibleModules）
+      applyShell();
+      syncRestoreInline();
       // 关键输入（源/目标/范围）变更 ⇒ 上一次的「检查」读数与确认作废（R-05 / AC-04）。
       // 首次出计划不算"变更"（否则用户一上传就见到失效警告）。
       if (hadPlan) staleFlag.mark();
@@ -1616,6 +1672,10 @@ async function main(appRoot) {
         resolve(true); // 无确认栏（测试环境/模板漂移）：维持现状行为直接继续
         return;
       }
+      // 切到 awaiting 阶段：running 阶段会把 `scope` 藏起来，而确认条就在 scope 里 ——
+      // 藏起来用户就看不到、点不到，`await` 会永久挂住。
+      awaitingTreeConfirm = true;
+      applyShell();
       bar.hidden = false;
       bar.dataset.taskId = taskId;
       view.setProgress(38, `请在统一文件树勾选需要的文件/类目，确认后继续`);
@@ -1625,6 +1685,10 @@ async function main(appRoot) {
   function resolveHostTreeConfirm(confirmed) {
     const bar = document.getElementById('host-tree-confirm-bar');
     if (bar) bar.hidden = true;
+    if (awaitingTreeConfirm) {
+      awaitingTreeConfirm = false;
+      applyShell();
+    }
     if (hostTreeConfirmResolve) {
       const r = hostTreeConfirmResolve;
       hostTreeConfirmResolve = null;

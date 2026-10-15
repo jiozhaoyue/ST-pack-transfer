@@ -122,17 +122,47 @@ const SHELL = {
 
 ```js
 function visible(stage, flow) {
-  const base = ['QuotaBoard', 'SourceSlot'];
+  const base = ['quota', 'source'];
+  const persistent = ['log'];          // 常驻：出错时唯一的可见反馈
   switch (stage) {
-    case 'idle':    return [...base, FLOWS[flow].options];
-    case 'scanned': return [...base, 'ScopeTree', FLOWS[flow].options, 'ActionBar'];
-    case 'running': return [...base, 'ActionBar'];
-    case 'done':    return [...base, 'ProductList', 'ActionBar', 'LogConsole'];
+    case 'idle':     return [...base, FLOWS[flow].options, ...persistent];
+    case 'scanned':  return [...base, 'scope', FLOWS[flow].options, 'action', ...persistent];
+    case 'running':  return [...base, 'action', ...persistent];
+    case 'awaiting': return [...base, 'scope', 'action', ...persistent];
+    case 'done':     return [...base, 'products', 'action', ...persistent];
   }
 }
 ```
 
 `idle` 态即用户要求的「初始只有上传和打包区」+「上方配额与数据分布」。
+
+**实施中修正了初稿两处**：
+
+1. **`awaiting` 阶段是必需的，不是可选。** 初稿只有 `running`，而宿主拉取路径在
+   `workbenchBusy = true` 期间要渲染统一文件树并**等用户点确认**（`index.js` 的
+   `waitHostTreeConfirm`）。`running` 藏掉 `scope` ⇒ 确认条不在视野里 ⇒ `await` 永久挂起。
+   故把「执行到一半停下来等用户拍板」独立成一阶段，且其**优先级高于 running**。
+2. **`log` 是常驻模块，不参与阶段门控。** 它是一条折叠着的单行抽屉，几乎不占版面，
+   却是扫描/转换出错时唯一的可见反馈；按阶段藏起来等于让人看不到错误。
+   与「初始只有上传和打包区」不冲突——那句话针对的是**内容区块**，不是状态条。
+
+### 2.5 隐藏方式：`hidden` 属性，不是移出 DOM
+
+初稿写的是「切屏 = 移出 DOM（AC-2.3）」，理由是「`display:none` 的子树仍会被
+`getElementById` 命中，业务代码可能误取到另一个方向的控件」。**该理由被现场证据推翻**：
+
+- 全仓有十余处**动态** `getElementById`（`renderCategoryStats` 取 `#category-panel`、
+  宿主文件树确认取 `#host-tree-confirm-bar`、暂存区渲染取 `#stash-list` …）。
+  摘出 DOM 会让它们拿到 `null` 而**静默空转**；
+- 宿主拉取路径更会直接死锁（见 §2.4 第 1 条）。
+
+故改为翻 `hidden`：元素留在 DOM 里，上述查找全部照旧。
+属性隐藏的**已知陷阱**是「作者样式的 `display` 压过 UA 的 `[hidden]{display:none}`」
+（本仓 2026-09-25 与 2026-10-14 各踩过一次）——项目已在 `style.css:2711` 用
+`#app.app-container [hidden] { display: none }`（双前缀，位置排在 `.wb-sec` 之后）统一兜住。
+
+⇒ **PRD 的 AC-2.3 相应改写为**：切屏后非当前方向的模块带 `hidden` 属性且不可见，
+**但仍在 DOM 中**（由 `test/workbench-shell.test.js` 与 E2E 双向锁）。
 
 ---
 
@@ -336,3 +366,49 @@ style.css:1919-1924
 ⇒ 按文件名无法把两者分开提交，`git add <file>` 会把在途改动一并带走（正是 P-18 形态）。
 
 **处置**：提交前必须由用户裁定归属，不得默认捎带。
+
+已按用户 2026-10-15 裁定执行：在途改动先单独落一个提交（`fb344bc`，提交信息标注非本任务产物），
+再在其上提交本任务改动。
+
+---
+
+## 11. 实施中踩到的坑（值得进 spec 的）
+
+### 11.1 单测夹具与真实模板不一致 ⇒ 夹具绿而真页面红
+
+`test/workbench-shell.test.js` 的 `buildShell()` 把方向开关放在了 `#wb-shell` **内部**，
+而模板里我把它写在了**外面**（兄弟节点）。后果：外壳用 `shell.querySelector('#btn-flow-*')`
+按 id 找按钮 → 返回 `null` → `syncFlowTabs` 静默什么都不做 → **方向切换整个失效**，
+且不抛任何错误（E2E 的 E1/E2「零异常」照样通过）。
+
+单测全绿（夹具里开关在 shell 内），真页面 20 项断言里 4 项红。
+**抓到它的是真浏览器 E2E，不是单测。**
+
+两条防护已补：
+- 模板注释里写明「方向开关必须在 wb-shell 内部」；
+- `test/workbench-layout.test.js` 增加**按模板源码**的顺序断言
+  （`#wb-flow-switch` 必须夹在 `#wb-shell` 与 `#wb-col-left` 之间）。
+
+**教训**：单测的 DOM 夹具必须与模板**同构**；凡是「按 id/选择器查找」的契约，
+夹具对不上就测不出模板写错。这类契约应当补一条**按模板源码**的断言（本仓守卫文化已有先例）。
+
+### 11.2 模板是 JS 模板字符串 ⇒ 注释里不能出现反引号
+
+`workbench-template.js` 返回的是模板字符串。我在 HTML 注释里写了 `` `#wb-shell` ``，
+反引号直接**终止了模板字符串**，`vite build` 报
+`Expected ';', got '#'`。构建失败，E2E 直接终止。
+**教训**：往该文件的注释里写字时，反引号与 `${` 一律回避。
+
+### 11.3 E2E 套件当前是红的，原因与本任务无关（既存）
+
+`e2e/standalone/lib/common.cjs:50` 的 `gotoWorkbench` 会先点 `#btn-wb-view-toggle`——
+该控件在 2026-10-14 随迁移向导一起删除（任务 `10-14-ui-full-rewrite` R-01，
+`git show HEAD:src/ui/workbench-template.js | grep -c wb-view-toggle` ⇒ **0**）。
+于是**所有**走该 helper 的 spec 都在第一步 30s 超时，共 24 项断言失败；
+`#wizard-step-counter` 等 4 项同理。
+
+**这不是本次改动引入的**：该控件在本次改动之前的 HEAD 就已不存在。
+本次新增的 `e2e/standalone/specs/workbench-shell.e2e.cjs` 不引 `common.cjs`，
+自带就绪判定，实测 **20/20 全绿**。
+
+⇒ 后续需要单独一个任务清理这批陈旧 spec（删掉向导残留引用）。

@@ -100,6 +100,11 @@ export const CONTROL_CONSUMERS = Object.freeze({
   'btn-cancel-restore': 'index.js:1167 — click 取消恢复',
   'btn-confirm-restore': 'index.js:1174 — click 确认恢复写入',
   'btn-restore-luker': 'index.js — click 恢复到当前用户（打开恢复模态）',
+
+  // ── 流程方向与导入屏（2026-10-15：工作台双方向重设计）──
+  'btn-flow-out': 'workbench-shell.js — click 切到导出流程（重排模块，导出屏）',
+  'btn-flow-in': 'workbench-shell.js — click 切到导入流程（重排模块，导入屏）',
+  'btn-restore-inline': 'index.js — click 用当前源包打开恢复模态（导入屏主操作；无宿主或无源包时 disabled）',
 });
 
 /** 从模板源码提取全部交互控件 */

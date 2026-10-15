@@ -1891,6 +1891,99 @@
     width: 100%;
     justify-content: flex-end;
   }
+
+  /* 执行条吸底：用 sticky 不用 fixed —— fixed 在插件抽屉态会脱离宿主层叠上下文，
+     且需要自己算 safe-area。sticky 天然待在文档流里，父容器滚动时自然贴住。 */
+  #app.app-container .wb-shell[data-wb-form="mobile"] [data-wb-module="action"],
+  .st-converter-drawer-app .wb-shell[data-wb-form="mobile"] [data-wb-module="action"] {
+    position: sticky;
+    bottom: 0;
+    z-index: 3;
+    background: var(--bg-primary);
+    padding-bottom: max(0px, env(safe-area-inset-bottom));
+  }
+}
+
+/* ==========================================================================
+   工作台外壳（2026-10-15：模块 / 流程 / 外壳 三层，见 design.md §2）
+   外壳只负责**摆法**；模块本身不知道自己被摆在哪儿、也不判断桌面还是移动。
+   摆法由 workbench-shell.js 落到 DOM，本段只描述落位后的样子。
+   ========================================================================== */
+
+/* 方向开关（导出 / 导入）。grid-column: 1 / -1 —— 否则它会占掉第一个栅格单元 */
+#app.app-container .wb-flow-switch,
+.st-converter-drawer-app .wb-flow-switch {
+  display: flex;
+  gap: 6px;
+  grid-column: 1 / -1;
+  margin-bottom: 10px;
+}
+
+#app.app-container .wb-flow-tab,
+.st-converter-drawer-app .wb-flow-tab {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  opacity: 0.62;
+}
+
+#app.app-container .wb-flow-tab.active,
+.st-converter-drawer-app .wb-flow-tab.active {
+  opacity: 1;
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* 栏目容器 */
+#app.app-container .wb-shell,
+.st-converter-drawer-app .wb-shell {
+  display: grid;
+  gap: 12px;
+  align-items: start;
+}
+
+#app.app-container .wb-shell[data-wb-form="desktop"],
+.st-converter-drawer-app .wb-shell[data-wb-form="desktop"] {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
+#app.app-container .wb-shell[data-wb-form="mobile"],
+.st-converter-drawer-app .wb-shell[data-wb-form="mobile"] {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* min-width: 0 不可省 —— 缺它时长内容（如包名）会把栅格撑破，横向滚动条就是这么来的 */
+#app.app-container .wb-col,
+.st-converter-drawer-app .wb-col {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+/* 移动端右栏不参与布局时由外壳置 hidden —— 显式覆盖 display:flex 的兜底 */
+#app.app-container .wb-col[hidden],
+.st-converter-drawer-app .wb-col[hidden] {
+  display: none;
+}
+
+/* 导入屏的待恢复读数 */
+#app.app-container .wb-restore-target,
+.st-converter-drawer-app .wb-restore-target {
+  margin: 0 0 8px;
+  color: var(--text-muted);
+  font-size: 0.85em;
+  word-break: break-all;
+}
+
+/* 可折叠模块：仅移动端由外壳打 .wb-collapsible（桌面两栏本来就不长，加折叠会让双端分叉） */
+#app.app-container .wb-collapsible > .wb-sec-head,
+.st-converter-drawer-app .wb-collapsible > .wb-sec-head {
+  cursor: pointer;
+}
+
+#app.app-container .wb-collapsible.wb-collapsed > .wb-sec-body,
+.st-converter-drawer-app .wb-collapsible.wb-collapsed > .wb-sec-body {
+  display: none;
 }
 
 /* ===== 宿主环境内嵌模态工作台与抽屉 ===== */
