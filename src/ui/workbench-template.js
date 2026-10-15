@@ -166,15 +166,6 @@ export function getWorkbenchHtml({ isModal = false, isDrawer = false, isStandalo
             <button type="button" class="menu_button btn-tool" id="btn-select-all">全选</button>
             <button type="button" class="menu_button btn-tool" id="btn-deselect-all">全不选</button>
             <button type="button" class="menu_button btn-tool" id="btn-invert-select">反选</button>
-            <label class="wb-field">
-              <span class="wb-field-key">快速选择</span>
-              <select id="category-preset-select" class="text_pole">
-                <option value="" selected>不套用</option>
-                <option value="chars">仅角色卡</option>
-                <option value="chats">仅聊天记录</option>
-                <option value="safe">安全脱敏</option>
-              </select>
-            </label>
           </div>
           <div class="category-grid" id="category-checkboxes"></div>
           <div class="host-tree-confirm-bar" id="host-tree-confirm-bar" hidden>

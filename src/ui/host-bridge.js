@@ -1901,13 +1901,10 @@ function makeHostButton({ id, icon, label, title, onClick }) {
  *     本仓 2026-09-25 曾因只点错入口 id（`#user-settings-button` 等）而误判为回归。
  *
  * @param {() => void} [onOpen] 打开抽屉后的回调
- * @param {{ onQuickFetch?: () => void }} [opts] onQuickFetch：一键拉取宿主数据包进转换队列
  */
-export function mountNativeBackupButton(onOpen, opts = {}) {
+export function mountNativeBackupButton(onOpen) {
   if (typeof document === 'undefined') return;
   const BTN_ID = 'st-zip-converter-native-btn';
-
-  const QUICK_ID = `${BTN_ID}-quick-fetch`;
 
   const addBtn = () => {
     // 多锚点：账号弹层（userProfile）与管理面板（admin，每用户行一个）都有 .userBackupButton
@@ -1927,20 +1924,6 @@ export function mountNativeBackupButton(onOpen, opts = {}) {
         },
       });
       anchor.parentElement.insertBefore(openBtn, anchor.nextSibling);
-
-      // 「一键拉取」只加在账号弹层锚点（含 <span> 文案）；管理面板行（纯图标）不加，
-      // 避免逐行出现针对当前用户的拉取按钮造成误解
-      const isProfileAnchor = !!anchor.querySelector('span');
-      if (isProfileAnchor && typeof opts.onQuickFetch === 'function') {
-        const quick = makeHostButton({
-          id: QUICK_ID,
-          icon: 'fa-cloud-arrow-down',
-          label: '一键拉取',
-          title: '一键拉取宿主数据包并进入待导出区（走完整拉取/转换流程）',
-          onClick: opts.onQuickFetch,
-        });
-        anchor.parentElement.insertBefore(quick, openBtn.nextSibling);
-      }
     });
   };
 

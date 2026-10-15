@@ -19,36 +19,30 @@ export function setupLogConsole(containerElement) {
 
   // 构建 HTML 结构
   const drawer = document.createElement('div');
-  drawer.className = 'log-console-drawer';
+  drawer.className = 'inline-drawer log-console-drawer';
   drawer.id = 'log-console-drawer';
 
   drawer.innerHTML = `
-    <div class="log-bar-header" id="log-bar-header">
-      <div class="log-bar-status">
-        <span class="log-indicator-dot" id="log-status-dot"></span>
-        <span class="log-latest-text" id="log-latest-text">就绪 · 实时控制台就绪</span>
-      </div>
-      <div class="log-bar-badges">
-        <span class="log-badge badge-info" id="log-badge-info">0 INFO</span>
-        <span class="log-badge badge-warn" id="log-badge-warn">0 WARN</span>
-        <span class="log-badge badge-error" id="log-badge-error">0 ERR</span>
-      </div>
-      <div class="log-bar-toggle">
-        <button type="button" class="btn-toggle-log" id="btn-toggle-log" title="展开/收起实时日志控制台">展开日志 ▲</button>
-      </div>
+    <div class="inline-drawer-toggle inline-drawer-header" id="log-bar-header">
+      <b><i class="fa-solid fa-terminal"></i> 日志</b>
+      <span class="log-latest-text" id="log-latest-text"></span>
+      <span class="log-badge badge-info" id="log-badge-info">0 INFO</span>
+      <span class="log-badge badge-warn" id="log-badge-warn" style="display: none;">0 WARN</span>
+      <span class="log-badge badge-error" id="log-badge-error" style="display: none;">0 ERR</span>
+      <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down" id="log-toggle-icon"></div>
     </div>
-    <div class="log-console-body" id="log-console-body" style="display: none;">
+    <div class="inline-drawer-content" id="log-console-body" style="display: none;">
       <div class="log-toolbar">
         <div class="log-filter-group" id="log-filter-group">
-          <button type="button" class="btn-log-filter active" data-level="ALL">全部</button>
-          <button type="button" class="btn-log-filter" data-level="INFO">信息</button>
-          <button type="button" class="btn-log-filter" data-level="WARN">警告</button>
-          <button type="button" class="btn-log-filter" data-level="ERROR">错误</button>
+          <button type="button" class="menu_button btn-log-filter active" data-level="ALL">全部</button>
+          <button type="button" class="menu_button btn-log-filter" data-level="INFO">信息</button>
+          <button type="button" class="menu_button btn-log-filter" data-level="WARN">警告</button>
+          <button type="button" class="menu_button btn-log-filter" data-level="ERROR">错误</button>
         </div>
         <div class="log-action-group">
-          <button type="button" class="btn-log-action" id="btn-copy-log" title="复制所有日志到剪贴板"><i class="fa-solid fa-copy"></i> 复制</button>
-          <button type="button" class="btn-log-action" id="btn-download-log" title="下载为 .log 文件"><i class="fa-solid fa-download"></i> 导出</button>
-          <button type="button" class="btn-log-action" id="btn-clear-log" title="清空日志"><i class="fa-solid fa-trash-can"></i> 清空</button>
+          <button type="button" class="menu_button menu_button_icon btn-log-action" id="btn-copy-log" title="复制所有日志到剪贴板"><i class="fa-solid fa-copy"></i> 复制</button>
+          <button type="button" class="menu_button menu_button_icon btn-log-action" id="btn-download-log" title="下载为 .log 文件"><i class="fa-solid fa-download"></i> 导出</button>
+          <button type="button" class="menu_button menu_button_icon btn-log-action" id="btn-clear-log" title="清空日志"><i class="fa-solid fa-trash-can"></i> 清空</button>
         </div>
       </div>
       <div class="log-stream-container" id="log-stream-container">
@@ -61,8 +55,7 @@ export function setupLogConsole(containerElement) {
 
   const headerEl = drawer.querySelector('#log-bar-header');
   const bodyEl = drawer.querySelector('#log-console-body');
-  const btnToggle = drawer.querySelector('#btn-toggle-log');
-  const statusDot = drawer.querySelector('#log-status-dot');
+  const toggleIcon = drawer.querySelector('#log-toggle-icon');
   const latestText = drawer.querySelector('#log-latest-text');
   const badgeInfo = drawer.querySelector('#log-badge-info');
   const badgeWarn = drawer.querySelector('#log-badge-warn');
@@ -85,23 +78,13 @@ export function setupLogConsole(containerElement) {
       badgeError.textContent = `${stats.error} ERR`;
       badgeError.style.display = stats.error > 0 ? 'inline-block' : 'none';
     }
-
-    if (statusDot) {
-      if (stats.error > 0) {
-        statusDot.className = 'log-indicator-dot dot-error';
-      } else if (stats.warn > 0) {
-        statusDot.className = 'log-indicator-dot dot-warn';
-      } else {
-        statusDot.className = 'log-indicator-dot dot-ready';
-      }
-    }
   }
 
   function setExpanded(expanded) {
     isExpanded = expanded;
     drawer.classList.toggle('expanded', isExpanded);
     if (bodyEl) bodyEl.style.display = isExpanded ? 'flex' : 'none';
-    if (btnToggle) btnToggle.textContent = isExpanded ? '收起日志 ▼' : '展开日志 ▲';
+    if (toggleIcon) toggleIcon.classList.toggle('down', !isExpanded);
 
     if (isExpanded) {
       renderLogStream();
@@ -171,16 +154,10 @@ export function setupLogConsole(containerElement) {
     });
   }
 
-  // 头部点击折叠/展开
+  // 头部点击折叠/展开。stopPropagation：宿主对 `.inline-drawer-toggle` 有全局事件委托，
+  // 不拦会与本处双触发（展开又立刻收起）。
   if (headerEl) {
     headerEl.addEventListener('click', (e) => {
-      // 避免重复触发按钮
-      if (e.target === btnToggle || btnToggle?.contains(e.target)) return;
-      setExpanded(!isExpanded);
-    });
-  }
-  if (btnToggle) {
-    btnToggle.addEventListener('click', (e) => {
       e.stopPropagation();
       setExpanded(!isExpanded);
     });

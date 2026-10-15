@@ -138,15 +138,13 @@ describe('makeHostButton 契约（经 mountNativeBackupButton 注入）', () => 
     expect(opened).toBe(1);
   });
 
-  it('仅在提供 onQuickFetch 时额外注入「一键拉取」', () => {
-    const withFn = installDom({ anchors: [anchor] });
-    mountNativeBackupButton(() => {}, { onQuickFetch: () => {} });
-    expect(byId(withFn, 'st-zip-converter-native-btn-quick-fetch')).not.toBeNull();
+  it('只注入「数据包互转」一个入口，不再有「一键拉取」', () => {
+    const created = installDom({ anchors: [anchor] });
 
-    delete g.document;
-    const withoutFn = installDom({ anchors: [anchor] });
     mountNativeBackupButton(() => {});
-    expect(byId(withoutFn, 'st-zip-converter-native-btn-quick-fetch')).toBeNull();
+
+    expect(byId(created, 'st-zip-converter-native-btn')).not.toBeNull();
+    expect(byId(created, 'st-zip-converter-native-btn-quick-fetch')).toBeNull();
   });
 });
 

@@ -34,6 +34,12 @@ let activeActionFilter = null;
 let currentPlan = null;
 let onSelectionChangeCallback = null;
 
+/**
+ * 尚未扫描到数据包时仍列出全部 13 个类目（用户 2026-10-15：面板不能是空的，
+ * 每一项都要能单独勾选）。此标记随扫描结果到来而关闭。
+ */
+let isUnscanned = false;
+
 function formatBytes(bytes) {
   if (!bytes || bytes <= 0) return '0 B';
   const units = ['B', 'KB', 'MB', 'GB'];
@@ -89,23 +95,26 @@ export function setupCategoryFilter({ onSelectionChange } = {}) {
     btnInvertSelect.addEventListener('click', invertSelection);
   }
 
-  // 2026-10-14：三个预设按钮（仅角色卡 / 仅聊天记录 / 安全脱敏）并为**一个枚举**
-  // （用户裁定「多选一用枚举」「禁止并排」）。选完立即套用并复位，避免留下一个「看起来还生效」的选中态。
-  const presetSelect = document.getElementById('category-preset-select');
-  if (presetSelect) {
-    presetSelect.addEventListener('change', () => {
-      const preset = presetSelect.value;
-      presetSelect.value = '';
-      if (preset) applyPreset(preset);
-    });
+  renderCategoryDefaults();
+}
+
+/**
+ * 还没扫描到数据包时，先把全部 13 个类目列出来，每一项都能单独勾选
+ * （用户 2026-10-15：面板不能空着）。扫描结果到达后由 `renderCategoryStats` 接管。
+ */
+export function renderCategoryDefaults() {
+  const categories = {};
+  for (const key of Object.keys(DEFAULT_SELECTION)) {
+    categories[key] = { count: 0, sizeBytes: 0, items: [] };
   }
+  renderCategoryStats({ categories }, { unscanned: true });
 }
 
 /**
  * 依据 inspectArchive 或 generatePlan 结果渲染细粒度类目卡片与动作预测条
  * @param {object} planOrInspectResult
  */
-export function renderCategoryStats(planOrInspectResult) {
+export function renderCategoryStats(planOrInspectResult, opts = {}) {
   const panel = document.getElementById('category-panel');
   const container = document.getElementById('category-checkboxes');
   const planSummaryBar = document.getElementById('plan-summary-bar');
@@ -114,6 +123,8 @@ export function renderCategoryStats(planOrInspectResult) {
 
   if (!panel || !container || !planOrInspectResult?.categories) return;
 
+  // 只有显式传入才改模式：内部重渲染（展开明细 / 动作筛选）须沿用当前模式
+  if (typeof opts.unscanned === 'boolean') isUnscanned = opts.unscanned;
   currentPlan = planOrInspectResult;
 
   // 1. 渲染完全扫描动作预测汇总条
@@ -178,7 +189,7 @@ export function renderCategoryStats(planOrInspectResult) {
   availableCategories.clear();
 
   for (const [key, data] of Object.entries(planOrInspectResult.categories)) {
-    const isAvailable = (data.count || 0) > 0;
+    const isAvailable = isUnscanned || (data.count || 0) > 0;
     if (isAvailable) {
       availableCategories.add(key);
       if (typeof currentSelection[key] === 'undefined') {
@@ -267,7 +278,9 @@ export function renderCategoryStats(planOrInspectResult) {
 
     const badge = document.createElement('span');
     badge.className = 'cat-badge';
-    badge.textContent = isAvailable ? `${data.count} 项 · ${formatBytes(data.sizeBytes)}` : '0 项 · 0 B';
+    badge.textContent = isUnscanned
+      ? '待扫描'
+      : (isAvailable ? `${data.count} 项 · ${formatBytes(data.sizeBytes)}` : '0 项 · 0 B');
 
     rightGroup.appendChild(badge);
 

@@ -1448,20 +1448,6 @@ async function main(appRoot) {
     // 按钮可见性/可用性统一由 applyActionAvailability 求值——此处不再单独写 display
     // （原实现：btn-host-fetch 强制 inline-flex、btn-restore-luker 仅 luker 显示）
 
-    // ST 宿主端点不支持 selection：在类目面板头部注入"插件内过滤"提示
-    const categoryPanel = document.getElementById('category-panel');
-    let hint = document.getElementById('host-selection-mode-hint');
-    if (platform === 'st' && categoryPanel && !hint) {
-      hint = document.createElement('small');
-      hint.id = 'host-selection-mode-hint';
-      hint.className = 'zone-hint';
-      hint.style.display = 'block';
-      hint.textContent = 'ST 宿主端点仅支持全量导出：勾选的类目将在导出后由插件内过滤生效';
-      categoryPanel.insertBefore(hint, categoryPanel.firstChild);
-    } else if (hint) {
-      hint.style.display = platform === 'st' ? 'block' : 'none';
-    }
-
     // 插件态下按钮可用性统一求值（含 btn-restore-luker 的可见性）
     applyActionAvailability();
     if (targetSelect) {
@@ -1478,12 +1464,9 @@ async function main(appRoot) {
     registerMenuButton(() => {
       window.scrollTo({ top: 0, behavior: 'smooth' });
     });
-    // 原生"用户数据备份"UI 旁也注入入口，与扩展设置抽屉共存；
-    // 「一键拉取」复用完整 handleHostExport 流程（TaskManager/文件树确认/待导出区）
+    // 原生"用户数据备份"UI 旁注入入口，与扩展设置抽屉共存
     mountNativeBackupButton(() => {
       window.scrollTo({ top: 0, behavior: 'smooth' });
-    }, {
-      onQuickFetch: () => handleHostExport(),
     });
     // Luker 备份管理器弹层内也注入入口（仅 Luker 有该锚点，其余宿主无操作）
     mountLukerBackupManagerButton(() => {
