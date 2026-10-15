@@ -58,8 +58,22 @@ export function getWorkbenchHtml({ isModal = false, isDrawer = false, isStandalo
     </header>
     ` : ''}
 
+    <!-- ═══ 外壳：模块由 workbench-shell.js 按「流程 × 阶段」摆进两栏 ═══
+         模板里的顺序只是初始落点，运行时由 resolveLayout 重排，详见 design.md 第 2 节。
+         ⚠ 方向开关必须在 wb-shell **内部**：外壳用 shell.querySelector 按 id 找它。
+         放到外面（兄弟节点）不会报错，只会静默失效——2026-10-15 实测踩过。 -->
+    <div class="wb-shell" id="wb-shell">
+
+    <!-- ═══ 方向开关（导出 / 导入）═══ -->
+    <div class="wb-flow-switch" id="wb-flow-switch" role="tablist" aria-label="流程方向">
+      <button type="button" class="menu_button wb-flow-tab" id="btn-flow-out" data-wb-flow="out" role="tab">导出</button>
+      <button type="button" class="menu_button wb-flow-tab" id="btn-flow-in" data-wb-flow="in" role="tab">导入</button>
+    </div>
+
+    <div class="wb-col" id="wb-col-left">
+
     <!-- ═══ 状态读数（配额）═══ -->
-    <div class="wb-status-line">
+    <div class="wb-status-line" data-wb-module="quota">
       ${isDrawer ? `
       <div class="status-row" id="status-row">
         ${BADGES_HTML}
@@ -73,7 +87,7 @@ export function getWorkbenchHtml({ isModal = false, isDrawer = false, isStandalo
     </div>
 
     <!-- ═══ 源包 ═══ -->
-    <section class="wb-sec">
+    <section class="wb-sec" data-wb-module="source">
       <div class="wb-sec-head"><span class="wb-sec-title"><i class="fa-solid fa-inbox"></i> 源包</span></div>
       <div class="wb-sec-body">
         <div class="dropzone dropzone-inline" id="dropzone">
@@ -87,7 +101,7 @@ export function getWorkbenchHtml({ isModal = false, isDrawer = false, isStandalo
     </section>
 
     <!-- ═══ 产物 ═══ -->
-    <section class="wb-sec">
+    <section class="wb-sec" data-wb-module="products">
       <div class="wb-sec-head"><span class="wb-sec-title"><i class="fa-solid fa-file-export"></i> 产物</span></div>
       <div class="wb-sec-body">
         <div id="export-queue-panel"></div>
@@ -95,7 +109,7 @@ export function getWorkbenchHtml({ isModal = false, isDrawer = false, isStandalo
     </section>
 
     <!-- ═══ 打包设置 ═══ -->
-    <section class="wb-sec">
+    <section class="wb-sec" data-wb-module="pack">
       <div class="wb-sec-head"><span class="wb-sec-title"><i class="fa-solid fa-sliders"></i> 打包</span></div>
       <div class="wb-sec-body">
         <label class="wb-field">
@@ -155,7 +169,7 @@ export function getWorkbenchHtml({ isModal = false, isDrawer = false, isStandalo
     </section>
 
     <!-- ═══ 内容范围 ═══ -->
-    <section class="wb-sec">
+    <section class="wb-sec" data-wb-module="scope">
       <div class="wb-sec-head">
         <span class="wb-sec-title"><i class="fa-solid fa-list-check"></i> 内容</span>
         <span class="category-sub-summary" id="category-summary-badge"></span>
@@ -189,7 +203,7 @@ export function getWorkbenchHtml({ isModal = false, isDrawer = false, isStandalo
     </section>
 
     <!-- ═══ 清理与差量（可选，紧凑折叠）═══ -->
-    <section class="wb-sec">
+    <section class="wb-sec" data-wb-module="pack">
       <div class="inline-drawer wb-fold" id="fold-cleanup">
         <div class="inline-drawer-toggle inline-drawer-header">
           <b><i class="fa-solid fa-broom"></i> 清理</b>
@@ -246,7 +260,7 @@ export function getWorkbenchHtml({ isModal = false, isDrawer = false, isStandalo
     </section>
 
     <!-- ═══ 检查 ═══ -->
-    <section class="wb-sec">
+    <section class="wb-sec" data-wb-module="scope">
       <div class="wb-sec-head"><span class="wb-sec-title"><i class="fa-solid fa-clipboard-check"></i> 检查</span></div>
       <div class="wb-sec-body">
         <div class="wb-check-panel" id="wizard-check-panel">
@@ -256,8 +270,21 @@ export function getWorkbenchHtml({ isModal = false, isDrawer = false, isStandalo
       </div>
     </section>
 
+    <!-- ═══ 恢复选项（仅导入流程）═══ -->
+    <section class="wb-sec" data-wb-module="restore">
+      <div class="wb-sec-head"><span class="wb-sec-title"><i class="fa-solid fa-rotate"></i> 恢复</span></div>
+      <div class="wb-sec-body">
+        <p class="wb-restore-target" id="wb-restore-target"></p>
+        <div class="wb-actions">
+          <button type="button" class="menu_button menu_button_icon btn-accent" id="btn-restore-inline" disabled>
+            <i class="fa-solid fa-rotate"></i> <span>恢复到当前宿主</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
     <!-- ═══ 执行 ═══ -->
-    <section class="wb-sec">
+    <section class="wb-sec" data-wb-module="action">
       <div class="wb-sec-head"><span class="wb-sec-title"><i class="fa-solid fa-play"></i> 执行</span></div>
       <div class="wb-sec-body">
         <div class="action-row">
@@ -296,7 +323,7 @@ export function getWorkbenchHtml({ isModal = false, isDrawer = false, isStandalo
     </section>
 
     <!-- ═══ 报告 ═══ -->
-    <section class="wb-sec">
+    <section class="wb-sec" data-wb-module="products">
       <div class="wb-sec-head"><span class="wb-sec-title"><i class="fa-solid fa-chart-simple"></i> 报告</span></div>
       <div class="wb-sec-body">
         <div class="report-panel" id="report-panel" hidden>
@@ -328,7 +355,11 @@ export function getWorkbenchHtml({ isModal = false, isDrawer = false, isStandalo
     </section>
 
     <!-- 日志控制台挂载点 -->
-    <div id="log-console-mount"></div>
+    <div id="log-console-mount" data-wb-module="log"></div>
+
+    </div><!-- /#wb-col-left -->
+    <div class="wb-col" id="wb-col-right"></div>
+    </div><!-- /#wb-shell -->
 
     <div class="restore-modal-overlay" id="restore-modal-overlay" style="display: none;">
       <div class="restore-modal-card">
