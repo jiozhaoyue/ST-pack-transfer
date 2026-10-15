@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeEach, afterEach } from 'vitest';
-import { mountNativeBackupButton, mountLukerBackupManagerButton } from '../src/ui/host-bridge.js';
+import { mountNativeBackupButton, mountLukerBackupManagerButton, mountExtensionRowButton } from '../src/ui/host-bridge.js';
 
 /**
  * 宿主注入按钮工厂契约（R7.3）。
@@ -54,6 +54,8 @@ function makeEl(tag = 'div') {
     },
     querySelector(sel) {
       if (sel === 'span') return this.children.find((c) => c.tagName === 'SPAN') || null;
+      // 扩展行注入用：幂等标记与宿主原生动作区。桩里都没有 ⇒ 一律返回 null
+      if (sel === '[data-st-zip-injected="1"]' || sel === '.extension_actions') return null;
       return null;
     },
     querySelectorAll() {
@@ -62,8 +64,9 @@ function makeEl(tag = 'div') {
   };
 }
 
-/** 安装最小 DOM：anchors = .userBackupButton 锚点；row = Luker 备份管理器动作行 */
-function installDom({ anchors = [], row = null } = {}) {
+/** 安装最小 DOM：anchors = .userBackupButton 锚点；row = Luker 备份管理器动作行；
+ *  blocks = 宿主扩展列表行（`.extension_block[data-name*=st-zip-converter]`） */
+function installDom({ anchors = [], row = null, blocks = [] } = {}) {
   const created = [];
   g.document = {
     readyState: 'complete',
@@ -73,10 +76,14 @@ function installDom({ anchors = [], row = null } = {}) {
       created.push(el);
       return el;
     },
-    // 载入宿主设置抽屉锚点：桩环境下一律缺失，使 openConverterDrawer 安全早退
+    // 宿主设置锚点：桩环境下一律缺失，注入函数安全早退
     getElementById: () => null,
     querySelector: (sel) => (sel === '.userBackupManager .backupActionRow' ? row : null),
-    querySelectorAll: (sel) => (sel === '.userBackupButton' ? anchors : []),
+    querySelectorAll: (sel) => {
+      if (sel === '.userBackupButton') return anchors;
+      if (sel === '.extension_block[data-name*="st-zip-converter"]') return blocks;
+      return [];
+    },
     addEventListener: () => {},
   };
   g.MutationObserver = class {
@@ -111,7 +118,7 @@ describe('makeHostButton 契约（经 mountNativeBackupButton 注入）', () => 
     expect(btn).not.toBeNull();
     expect(btn.className).toBe('menu_button menu_button_icon');
     expect(btn.dataset.stZipInjected).toBe('1');
-    expect(btn.title).toBe('打开酒馆数据包互转工坊（在扩展设置中）');
+    expect(btn.title).toBe('打开酒馆数据包互转工坊（全屏）');
   });
 
   it('结构为「图标在前、文案在后」，文案走 textContent 而非 innerHTML', () => {
@@ -179,6 +186,58 @@ describe('makeHostButton 契约（经 mountLukerBackupManagerButton 注入）', 
     const created = installDom({ row: null });
 
     expect(() => mountLukerBackupManagerButton(() => {})).not.toThrow();
+    expect(created.length).toBe(0);
+  });
+});
+
+/**
+ * 扩展列表行注入（2026-10-15 用户裁定：扩展列表只留宿主那一行）。
+ *
+ * 宿主自己会为每个扩展渲染 `.extension_block`（含原生启用开关），
+ * 我们**只往那一行追加「打开」**，不再往 `#extensions_settings2` 塞内联抽屉。
+ * 锁定三条：落点是宿主原生行、按钮走同一工厂、宿主重渲染时幂等不重复。
+ */
+describe('mountExtensionRowButton 契约（扩展列表行上的「打开」）', () => {
+  afterEach(() => {
+    delete g.document;
+    delete g.MutationObserver;
+  });
+
+  it('只往宿主扩展行追加一个「打开」，不生成任何自建面板', () => {
+    const block = makeEl('div');
+    const created = installDom({ blocks: [block] });
+
+    mountExtensionRowButton(() => {});
+
+    const btn = byId(created, 'st-zip-converter-open-btn');
+    expect(btn).not.toBeNull();
+    expect(btn.className).toBe('menu_button menu_button_icon');
+    expect(btn.dataset.stZipInjected).toBe('1');
+    expect(btn.children.map((c) => c.tagName)).toEqual(['I', 'SPAN']);
+    expect(btn.children[1].textContent).toBe('打开');
+    // 落点就是宿主那一行
+    expect(block.children).toContain(btn);
+  });
+
+  it('click 后回调 onOpen（全屏打开工作台）', () => {
+    const block = makeEl('div');
+    installDom({ blocks: [block] });
+    let opened = 0;
+
+    mountExtensionRowButton(() => { opened += 1; });
+    clickEffects = { prevented: 0, stopped: 0 };
+    const btn = [...block.children].find((c) => c.id === 'st-zip-converter-open-btn');
+    btn.click();
+
+    expect(opened).toBe(1);
+    expect(clickEffects.prevented).toBe(1);
+    expect(clickEffects.stopped).toBe(1);
+  });
+
+  it('列表行不存在时静默不注入（宿主未渲染扩展弹层）', () => {
+    const created = installDom({ blocks: [] });
+
+    expect(() => mountExtensionRowButton(() => {})).not.toThrow();
     expect(created.length).toBe(0);
   });
 });
