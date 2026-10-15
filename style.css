@@ -2339,6 +2339,68 @@
   transition: width 0.4s ease;
 }
 
+/* 不可用项**置灰而非撤掉**（用户 2026-10-15：独立模式就只有浏览器配额，宿主之类的是灰）。
+   撤掉会让人以为「本来就没这东西」；置灰才说得清「有这个读数、只是当前环境没有」。 */
+#app.app-container .usage-quota-section.is-disabled,
+.st-converter-drawer-app .usage-quota-section.is-disabled {
+  opacity: 0.45;
+}
+
+#app.app-container .usage-quota-section.is-disabled .usage-quota-fill,
+.st-converter-drawer-app .usage-quota-section.is-disabled .usage-quota-fill {
+  background: var(--text-sub);
+}
+
+/* 宿主数据分布（10 类各自占用，随宿主配额同生共死） */
+#app.app-container .usage-dist,
+.st-converter-drawer-app .usage-dist {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: 8px;
+}
+
+#app.app-container .usage-dist-row,
+.st-converter-drawer-app .usage-dist-row {
+  display: grid;
+  grid-template-columns: 5.5em minmax(0, 1fr) 4.5em;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+#app.app-container .usage-dist-label,
+.st-converter-drawer-app .usage-dist-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* span 默认 inline，不给 display 则 height 不生效 */
+#app.app-container .usage-dist-bar,
+.st-converter-drawer-app .usage-dist-bar {
+  display: block;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--SmartThemeShadowColor, rgba(0, 0, 0, 0.3));
+  overflow: hidden;
+}
+
+#app.app-container .usage-dist-fill,
+.st-converter-drawer-app .usage-dist-fill {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  opacity: 0.7;
+}
+
+#app.app-container .usage-dist-size,
+.st-converter-drawer-app .usage-dist-size {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
 #app.app-container .usage-origin-chips,
 .st-converter-drawer-app .usage-origin-chips {
   display: flex;

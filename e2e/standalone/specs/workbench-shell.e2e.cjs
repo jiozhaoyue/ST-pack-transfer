@@ -96,8 +96,23 @@ module.exports = {
     t.ok('D8 切回导出后打包选项回来', await isVisible(page, MODULE_PROBES.pack));
     t.ok('D9 切回导出后恢复区退场', !(await isVisible(page, MODULE_PROBES.restore)));
 
-    // ============ E 零报错（独立形态下整页可归因于本插件）============
-    t.eq('E1 零未捕获页面异常', rec.pageErrors.length, 0, JSON.stringify(rec.pageErrors.slice(0, 2)));
-    t.eq('E2 零控制台错误', rec.consoleErrors.length, 0, JSON.stringify(rec.consoleErrors.slice(0, 2)));
+    // ============ E 配额看板（AC-2.6）============
+    const quota = await page.evaluate(() => Array.from(
+      document.querySelectorAll('#usage-dashboard .usage-quota-section'),
+    ).map((s) => ({
+      disabled: s.classList.contains('is-disabled'),
+      aria: s.getAttribute('aria-disabled'),
+      text: s.textContent.replace(/\s+/g, ' ').trim().slice(0, 48),
+    })));
+    t.log(`  · QUOTA ${JSON.stringify(quota)}`);
+    t.eq('E1 配额看板渲染两区（浏览器 + 宿主）', quota.length, 2, JSON.stringify(quota));
+    t.ok('E2 独立模式下宿主区**置灰**而非撤掉（撤掉会让人以为本来就没这功能）',
+      !!quota[1] && quota[1].disabled === true, JSON.stringify(quota[1]));
+    t.ok('E3 置灰区带 aria-disabled 供无障碍识别',
+      !!quota[1] && quota[1].aria === 'true', JSON.stringify(quota[1]));
+
+    // ============ F 零报错（独立形态下整页可归因于本插件）============
+    t.eq('F1 零未捕获页面异常', rec.pageErrors.length, 0, JSON.stringify(rec.pageErrors.slice(0, 2)));
+    t.eq('F2 零控制台错误', rec.consoleErrors.length, 0, JSON.stringify(rec.consoleErrors.slice(0, 2)));
   },
 };
