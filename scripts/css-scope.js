@@ -13,11 +13,17 @@ import postcss from 'postcss';
  *    （`index.html` 骨架、`index.js` 模态容器）**都带 `id="app"`**，故以 id + 类双条件限定。
  * 3. **移除**原 `body:has(> .app-container)` 豁免——那条豁免允许以 `body` 为主体的规则，
  *    而 `body` 属宿主页面元素（宿主仓内确有第三方扩展使用 `.app-container` 类名）。
+ *
+ * 2026-10-15 变更：**新增 `#wb-detail-overlay`**（类目明细全屏面板）。理由与模态覆盖层同源：
+ * 它是挂在 `document.body` 上的自绘浮层，**不在** `#app.app-container` /
+ * `.st-converter-drawer-app` 之内 —— 双前缀写法命中不了它，只能用自有 id 作作用域根。
+ * 允许 id 作根是安全的：`#wb-detail-overlay` 是本插件独有的 id，宿主与第三方不会撞。
  */
 const ALLOWED_ROOTS = [
   /^#app\.app-container(?=$|[\s>+~.#:[\]])/,
   /^\.st-converter-drawer-app(?=$|[\s>+~.#:[\]])/,
   /^#st-converter-modal-overlay(?=$|[\s>+~.#:[\]])/,
+  /^#wb-detail-overlay(?=$|[\s>+~.#:[\]])/,
 ];
 
 /**
@@ -130,7 +136,7 @@ export function checkCssScope(css, file = '<css>') {
           line: rule.source?.start?.line ?? 1,
           column: rule.source?.start?.column ?? 1,
           selector: normalized,
-          message: '选择器必须以 .app-container / .st-converter-drawer-app / #st-converter-modal-overlay 为作用域根',
+          message: '选择器必须以 .app-container / .st-converter-drawer-app / #st-converter-modal-overlay / #wb-detail-overlay 为作用域根',
         });
       }
     }

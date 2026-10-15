@@ -2,7 +2,34 @@ import { CATEGORIES, CATEGORY_LABELS } from '../core/inspect.js';
 import { ACTION_LABELS, SPECIAL_CATEGORIES, SPECIAL_LABELS } from '../core/plan-preview.js';
 import { DEFAULT_SELECTION } from '../core/selection-defaults.js';
 import { actionTokenVar } from './action-colors.js';
-import { createCategoryDetailList } from './file-tree-picker.js';
+import { openCategoryDetailPanel } from './category-detail-panel.js';
+
+/**
+ * **界面上合并成一条**的类目（用户 2026-10-15：「扩展列表处只留一条」）。
+ *
+ * 键 = 卡片 key；值 = 该卡片实际驱动的全部 selection 键。
+ *
+ * 为什么只在**界面**合并：用户扩展与第三方扩展对用户是同一个概念（都叫扩展），
+ * 分两行既占地方、又要分别勾选；但 `selection` 语义上必须保留两个键——
+ * 宿主端点（`/api/users/backup`）按这两个键分开认，合并成一个键会让第三方扩展静默丢失。
+ * 所以「一张卡片驱动两个键」，不是「删掉一个键」。
+ */
+const MERGED_CATEGORY_GROUPS = Object.freeze({
+  [CATEGORIES.EXTENSIONS]: Object.freeze([CATEGORIES.EXTENSIONS, CATEGORIES.GLOBAL_EXTENSIONS]),
+});
+
+/** 合并卡片的显示名（不写则回落成员各自的标签，会出现「用户扩展」这种只指一半的名字） */
+const MERGED_CATEGORY_LABELS = Object.freeze({
+  [CATEGORIES.EXTENSIONS]: '扩展',
+});
+
+/** 被并入别处的类目键 → 承载它的卡片键（这些键不再单独出卡片） */
+const MERGED_INTO = Object.freeze(
+  Object.entries(MERGED_CATEGORY_GROUPS).reduce((acc, [primary, members]) => {
+    for (const m of members) if (m !== primary) acc[m] = primary;
+    return acc;
+  }, {}),
+);
 
 const CATEGORY_ICONS = {
   [CATEGORIES.CHARACTERS]: 'fa-solid fa-user-ninja',
@@ -29,7 +56,6 @@ let currentSelection = { ...DEFAULT_SELECTION };
 
 let currentExcludedPaths = new Set();
 let availableCategories = new Set();
-let expandedCategories = new Set();
 let activeActionFilter = null;
 let currentPlan = null;
 let onSelectionChangeCallback = null;
@@ -148,16 +174,9 @@ export function renderCategoryStats(planOrInspectResult, opts = {}) {
 
           badge.addEventListener('click', (e) => {
             e.preventDefault();
-            if (activeActionFilter === actionKey) {
-              activeActionFilter = null;
-            } else {
-              activeActionFilter = actionKey;
-              for (const [catKey, catData] of Object.entries(planOrInspectResult.categories)) {
-                if (catData.items?.some((it) => it.action === actionKey)) {
-                  expandedCategories.add(catKey);
-                }
-              }
-            }
+            // 动作筛选不再「顺带展开类目」——明细已改为全屏打开，
+            // 筛选值经 `openCategoryDetailPanel({ actionFilter })` 传进面板
+            activeActionFilter = activeActionFilter === actionKey ? null : actionKey;
             renderCategoryStats(currentPlan);
           });
 
@@ -188,15 +207,31 @@ export function renderCategoryStats(planOrInspectResult, opts = {}) {
   container.innerHTML = '';
   availableCategories.clear();
 
-  for (const [key, data] of Object.entries(planOrInspectResult.categories)) {
-    const isAvailable = isUnscanned || (data.count || 0) > 0;
+  for (const [rawKey, rawData] of Object.entries(planOrInspectResult.categories)) {
+    // 被并入别处的类目不出卡片：它的读数与勾选由承载它的那张卡片一并处理
+    if (MERGED_INTO[rawKey]) continue;
+    const memberKeys = MERGED_CATEGORY_GROUPS[rawKey] || [rawKey];
+    // 合并卡片的读数：计数与体积求和、明细条目拼接（驱动同一张卡片的多个 selection 键）
+    const data = memberKeys.length > 1
+      ? {
+        ...rawData,
+        count: memberKeys.reduce((n, k) => n + (planOrInspectResult.categories[k]?.count || 0), 0),
+        sizeBytes: memberKeys.reduce((n, k) => n + (planOrInspectResult.categories[k]?.sizeBytes || 0), 0),
+        items: memberKeys.flatMap((k) => planOrInspectResult.categories[k]?.items || []),
+      }
+      : rawData;
+    const key = rawKey;
+    const isAvailable = isUnscanned
+      || memberKeys.some((k) => (planOrInspectResult.categories[k]?.count || 0) > 0);
     if (isAvailable) {
-      availableCategories.add(key);
-      if (typeof currentSelection[key] === 'undefined') {
-        currentSelection[key] = (key !== SPECIAL_CATEGORIES.CACHE);
+      for (const k of memberKeys) {
+        availableCategories.add(k);
+        if (typeof currentSelection[k] === 'undefined') {
+          currentSelection[k] = (k !== SPECIAL_CATEGORIES.CACHE);
+        }
       }
     } else {
-      currentSelection[key] = false;
+      for (const k of memberKeys) currentSelection[k] = false;
     }
 
     const card = document.createElement('div');
@@ -225,7 +260,7 @@ export function renderCategoryStats(planOrInspectResult, opts = {}) {
 
     if (!isAvailable) {
       checkbox.checked = false;
-    } else if (currentSelection[key] === false) {
+    } else if (memberKeys.every((k) => currentSelection[k] === false)) {
       checkbox.checked = false;
       checkbox.indeterminate = false;
     } else if (excludedInThisCat === 0) {
@@ -241,7 +276,9 @@ export function renderCategoryStats(planOrInspectResult, opts = {}) {
 
     checkbox.addEventListener('change', (e) => {
       const isChecked = e.target.checked;
-      currentSelection[key] = isChecked;
+      // 一张卡片驱动多个 selection 键（合并类目）——逐个写，别只写主键，
+      // 否则「第三方扩展」会静默留在旧值上（宿主端点按两个键分开认）。
+      for (const k of memberKeys) currentSelection[k] = isChecked;
       checkbox.indeterminate = false;
 
       // 如果勾选整个类目，清除属于该类目的单项排除
@@ -267,7 +304,7 @@ export function renderCategoryStats(planOrInspectResult, opts = {}) {
 
     const text = document.createElement('span');
     text.className = 'cat-text';
-    text.textContent = data.label || CATEGORY_LABELS[key] || SPECIAL_LABELS[key] || key;
+    text.textContent = MERGED_CATEGORY_LABELS[key] || data.label || CATEGORY_LABELS[key] || SPECIAL_LABELS[key] || key;
 
     labelWrap.appendChild(checkbox);
     labelWrap.appendChild(icon);
@@ -284,24 +321,35 @@ export function renderCategoryStats(planOrInspectResult, opts = {}) {
 
     rightGroup.appendChild(badge);
 
-    // 如果包含单文件详情，渲染展开/收起按钮
+    // 明细**全屏打开**，不再内联展开（用户 2026-10-15：「禁止任何被覆盖，置于下方」）。
+    // 内联展开会把后面所有类目、执行区、报告区一并顶下去，是外层滚动条的来源之一。
     if (items.length > 0) {
-      const isExpanded = expandedCategories.has(key);
       const btnExpand = document.createElement('button');
       btnExpand.type = 'button';
       btnExpand.className = 'btn-expand-detail';
-      btnExpand.textContent = isExpanded ? '收起 ▴' : '明细 ▾';
-      btnExpand.title = isExpanded ? '收起单项文件明细' : '展开查看该类目下的每个文件与动作，支持穿透反选';
+      btnExpand.textContent = '明细';
+      btnExpand.title = '全屏查看该类目下的每个文件与动作，支持穿透反选';
 
       btnExpand.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
-        if (expandedCategories.has(key)) {
-          expandedCategories.delete(key);
-        } else {
-          expandedCategories.add(key);
-        }
-        renderCategoryStats(currentPlan);
+        openCategoryDetailPanel({
+          categoryKey: key,
+          label: text.textContent,
+          items,
+          excludedPaths: currentExcludedPaths,
+          actionFilter: activeActionFilter,
+          onItemToggle: (sourcePath, checked) => {
+            if (checked) {
+              currentExcludedPaths.delete(sourcePath);
+            } else {
+              currentExcludedPaths.add(sourcePath);
+            }
+            notifySelectionChanged();
+          },
+          // 关闭时整块重绘：类目卡片上的「已选 N/M」与三态勾选要跟着明细里的逐项反选走
+          onClosed: () => { if (currentPlan) renderCategoryStats(currentPlan); },
+        });
       });
 
       rightGroup.appendChild(btnExpand);
@@ -310,26 +358,6 @@ export function renderCategoryStats(planOrInspectResult, opts = {}) {
     header.appendChild(labelWrap);
     header.appendChild(rightGroup);
     card.appendChild(header);
-
-    // 展开的内容区域
-    if (items.length > 0 && expandedCategories.has(key)) {
-      const detailView = createCategoryDetailList({
-        categoryKey: key,
-        items,
-        excludedPaths: currentExcludedPaths,
-        actionFilter: activeActionFilter,
-        onItemToggle: (sourcePath, checked) => {
-          if (checked) {
-            currentExcludedPaths.delete(sourcePath);
-          } else {
-            currentExcludedPaths.add(sourcePath);
-          }
-          renderCategoryStats(currentPlan);
-          notifySelectionChanged();
-        },
-      });
-      card.appendChild(detailView);
-    }
 
     container.appendChild(card);
   }
@@ -467,6 +495,5 @@ export function resetCategoryFilter() {
 
   availableCategories.clear();
   currentExcludedPaths.clear();
-  expandedCategories.clear();
   currentPlan = null;
 }

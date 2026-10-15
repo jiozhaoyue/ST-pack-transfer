@@ -46,6 +46,20 @@ module.exports = {
     }, null, { timeout: 30_000 }).then(() => page.$eval('#env-badge', (el) => el.textContent.trim())).catch(() => null);
     t.ok('A1 工作台就绪（env-badge 有读数）', !!envBadge, String(envBadge));
 
+    // 首装引导会自动打开且铺满视口（`aria-modal`），会拦下后续**所有**点击 —— 先退出。
+    // 全新浏览器上下文里 localStorage 无完成标记，故每次跑都会遇到；不加这段会随机挂。
+    if (await page.$('.wb-guide-overlay')) {
+      await page.click('.wb-guide-actions button:has-text("退出")').catch(() => {});
+      await page.waitForFunction(() => {
+        const el = document.querySelector('.wb-guide-overlay');
+        return !el || el.hidden || getComputedStyle(el).display === 'none';
+      }, null, { timeout: 5_000 }).catch(() => {});
+    }
+    t.ok('A2 首装引导已退出（否则会拦下后续所有点击）', await page.evaluate(() => {
+      const el = document.querySelector('.wb-guide-overlay');
+      return !el || el.hidden || getComputedStyle(el).display === 'none';
+    }));
+
     // ============ B 初始态收敛（AC-2.5：初始只有上传和打包区）============
     t.ok('B1 上传槽可见', await isVisible(page, MODULE_PROBES.source));
     t.ok('B2 打包选项可见', await isVisible(page, MODULE_PROBES.pack));

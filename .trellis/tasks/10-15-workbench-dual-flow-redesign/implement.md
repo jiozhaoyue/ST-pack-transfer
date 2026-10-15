@@ -109,11 +109,35 @@
 
 ## 收口
 
+- [x] **2.10 明细改全屏 + 扩展两行合并**（2026-10-15 追加，源自用户原话
+      「扩展列表处只留一条，里面是插件开关以及打开插件，打开是全屏」
+      「禁止任何被覆盖，置于下方」）
+  - `src/ui/category-detail-panel.js` 新建：明细**全屏**面板，复用 `file-tree-picker.js`
+    的同一份明细实现（搜索/排序/逐项穿透反选零重复）
+  - `category-filter.js`：明细按钮改为开面板；删除内联展开路径与 `expandedCategories`
+  - `category-filter.js`：用户扩展 + 第三方扩展**界面合并为一条**卡片，
+    但 `selection` 仍保留两个键（一张卡片驱动两个键）——宿主端点按两键分开认，
+    只写主键会让第三方扩展静默丢失
+  - 实测：`npm test` 865 passed；`check:css-scope` 白名单新增 `#wb-detail-overlay`
+    （挂 body 的自绘浮层，双前缀写法命中不了）
+  - E2E `category-detail-fullscreen` 真浏览器 **15/15**：卡片 12 条（extensions 单条、
+    无 globalExtensions）、明细铺满视口、**主列高度 553 → 553 未变**
+
 - [ ] **3.1 规范落 `.trellis/spec/frontend/`**
   - 三层分层契约 + `hidden` 而非移出 DOM 的理由 + 三条 CSS 铁律 + 「夹具须与模板同构」
+  - 挂 body 的自绘浮层只能用自有 id 作 CSS 作用域根（已入 css-scope 白名单）
   - 注意：`component-guidelines.md` 已超 32 KB 上限 ⇒ **按主题新建文件**，不要追加
 - [ ] **3.2 清理陈旧 E2E spec**（向导残留：`#btn-wb-view-toggle` / `#wizard-step-counter`）
 - [ ] **3.3 任务归档**
+
+## 未做（如实登记）
+
+| 项 | 状态 |
+| --- | --- |
+| 2.4 上传槽「角色标签」 | 共享槽已成立；「源包 / 待恢复包」显式标签未做 |
+| 2.6 移动视口真机验证 | 只在 1600×950 桌面视口验过，≤480px 未验 |
+| 2.7 宿主扩展列表收敛为单行 | **未做**。已取证：宿主自己渲染 `extension_toggle` 复选框（`Instance/Dev/Luker/public/scripts/extensions.js` 的 `generateExtensionElement`），故「插件开关」是宿主原生的；我们目前往 `#extensions_settings2` 注入的是「内联展开整个工作台」，会撑长宿主设置页 |
+| 模块层统一签名 `state → DOM` | 现有渲染函数已是模块粒度，但签名各异；属后续增量 |
 
 ## 回滚点
 
