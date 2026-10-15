@@ -2899,6 +2899,64 @@
 }
 
 /* ==========================================================================
+   类目明细全屏面板（2026-10-15）
+   明细原本**内联展开**在类目卡片下方，一展开就把后面的类目、执行区、报告区全部顶下去
+   （用户：「禁止任何被覆盖，置于下方」），也是外层滚动条的来源之一。
+   改为全屏后，明细不再参与主列布局；明细内容本身复用 file-tree-picker 的同一份实现。
+
+   ⚠ 选择器用 **id** 而非双前缀类：本浮层挂在 `document.body` 上，不在
+   `#app.app-container` / `.st-converter-drawer-app` 之内，双前缀写法命中不了它。
+   与既有模态 `#st-converter-modal-overlay` 同一处理（同为挂 body 的自绘浮层）。
+   ========================================================================== */
+#wb-detail-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9997;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: color-mix(in srgb, var(--SmartThemeBodyColor, #14161c) 78%, transparent);
+}
+
+#wb-detail-overlay .wb-detail-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  max-width: 720px;
+  max-height: 88vh;
+  padding: 12px;
+  background: var(--SmartThemeBodyColor, #14161c);
+  border: 1px solid var(--SmartThemeBorderColor, rgba(255, 255, 255, 0.14));
+  border-radius: 8px;
+  box-shadow: 0 20px 50px -12px rgba(0, 0, 0, 0.6);
+}
+
+#wb-detail-overlay .wb-detail-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+#wb-detail-overlay .wb-detail-title {
+  font-size: 0.85rem;
+  color: var(--SmartThemeEmColor, #dcdcd2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 明细列表在**卡片内**滚动（模块内滚动，R1 铁律），卡片本身不滚 */
+#wb-detail-overlay .detail-file-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+}
+
+/* ==========================================================================
    局域网互传面板（2026-10-14）
    发送与接收各占一节，同屏并列展示——**不做角色切换**（用户裁定「禁止模式选择」）。
    ========================================================================== */

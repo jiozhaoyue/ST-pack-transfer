@@ -1,5 +1,9 @@
 import { describe, expect, it, beforeEach, afterEach } from 'vitest';
-import { renderCategoryDefaults, renderCategoryStats } from '../src/ui/category-filter.js';
+import {
+  getSelectionState,
+  renderCategoryDefaults,
+  renderCategoryStats,
+} from '../src/ui/category-filter.js';
 import { DEFAULT_SELECTION } from '../src/core/selection-defaults.js';
 
 /**
@@ -26,6 +30,7 @@ import { DEFAULT_SELECTION } from '../src/core/selection-defaults.js';
 const g = globalThis;
 
 function makeEl(tag = 'div') {
+  const listeners = {};
   const el = {
     tagName: tag.toUpperCase(),
     id: '',
@@ -54,7 +59,8 @@ function makeEl(tag = 'div') {
       child.parentElement = this;
       return child;
     },
-    addEventListener() {},
+    addEventListener(type, fn) { (listeners[type] = listeners[type] || []).push(fn); },
+    fire(type, ev = {}) { (listeners[type] || []).forEach((fn) => fn(ev)); },
     remove() {},
     contains: () => false,
     closest: () => null,
@@ -122,10 +128,31 @@ describe('类目面板「待扫描」占位态（回归守护：占位态必须�
   it('占位态：全部类目标为「待扫描」，且每一项都可单独勾选（面板不能空着）', () => {
     renderCategoryDefaults();
     const texts = allBadgeTexts();
-    expect(texts.length).toBe(Object.keys(DEFAULT_SELECTION).length);
+    // 13 个 selection 键 → 12 张卡片：用户扩展与第三方扩展在**界面**上合并为一条
+    // （用户 2026-10-15「扩展列表处只留一条」），但 selection 仍保留两个键。
+    expect(texts.length).toBe(Object.keys(DEFAULT_SELECTION).length - 1);
     expect(texts.every((t) => t === '待扫描')).toBe(true);
     // 占位态下不置灰：用户 2026-10-15 要求每一项都能单独勾选
     expect(checkboxOf('vectors').disabled).toBe(false);
+  });
+
+  it('扩展两行合并为一条：一张卡片驱动 extensions 与 globalExtensions 两个键', () => {
+    renderCategoryDefaults();
+    const cardKeys = registry['category-checkboxes'].children.map((c) => c.dataset.category);
+    expect(cardKeys).toContain('extensions');
+    expect(cardKeys).not.toContain('globalExtensions'); // 不再单独出卡片
+
+    const cb = checkboxOf('extensions');
+    cb.checked = false;
+    cb.fire('change', { target: cb });
+    expect(getSelectionState().extensions).toBe(false);
+    expect(getSelectionState().globalExtensions).toBe(false);
+
+    cb.checked = true;
+    cb.fire('change', { target: cb });
+    expect(getSelectionState().extensions).toBe(true);
+    // 这一条是关键：只写主键会让第三方扩展静默留在旧值上（宿主端点按两个键分开认）
+    expect(getSelectionState().globalExtensions).toBe(true);
   });
 
   it('扫描结果到达（显式 unscanned:false）⇒ 改显计划读数，空类目被置灰', () => {
