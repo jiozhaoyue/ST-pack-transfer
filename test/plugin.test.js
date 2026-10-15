@@ -32,7 +32,7 @@ describe('SillyTavern 标准插件工程结构 (st-zip-converter)', () => {
     expect(code).toContain('convert');
     expect(code).toContain('detectHost');
     expect(code).toContain('openConverterModal');
-    expect(code).toContain('mountSettingsDrawer');
+    expect(code).toContain('mountExtensionRowButton');
   });
 
   it('扩展打包枚举与保留构建配置节点位于唯一模板源（index.html 仅为骨架，不再持有业务节点）', async () => {
@@ -50,14 +50,14 @@ describe('SillyTavern 标准插件工程结构 (st-zip-converter)', () => {
     expect(html).not.toContain('id="keep-dev-files-check"');
   });
 
-  it('host-bridge 导出了 discoverHostExtensions, installExtensionViaHost, checkHostThirdPartyAnomaly, deleteExtensionViaHost 与 mountSettingsDrawer', async () => {
+  it('host-bridge 导出了 discoverHostExtensions, installExtensionViaHost, checkHostThirdPartyAnomaly, deleteExtensionViaHost 与 mountExtensionRowButton', async () => {
     const {
       discoverHostExtensions,
       installExtensionViaHost,
       renderExtensionInstallerModal,
       checkHostThirdPartyAnomaly,
       deleteExtensionViaHost,
-      mountSettingsDrawer,
+      mountExtensionRowButton,
       registerMenuButton,
       mountNativeBackupButton,
       mountLukerBackupManagerButton,
@@ -67,7 +67,7 @@ describe('SillyTavern 标准插件工程结构 (st-zip-converter)', () => {
     expect(typeof renderExtensionInstallerModal).toBe('function');
     expect(typeof checkHostThirdPartyAnomaly).toBe('function');
     expect(typeof deleteExtensionViaHost).toBe('function');
-    expect(typeof mountSettingsDrawer).toBe('function');
+    expect(typeof mountExtensionRowButton).toBe('function');
     expect(typeof registerMenuButton).toBe('function');
     expect(typeof mountNativeBackupButton).toBe('function');
     expect(typeof mountLukerBackupManagerButton).toBe('function');

@@ -3,8 +3,8 @@
  *
  * 三个入口共用本函数（L1-MR-10 单向化）：
  *   · 独立 Web   ：index.html 空骨架 → bootstrap() 注入 getWorkbenchHtml({ isStandalone: true })
- *   · 插件抽屉态 ：mountSettingsDrawer() → getWorkbenchHtml({ isDrawer: true })
- *   · 模态态     ：openConverterModal() → getWorkbenchHtml({ isModal: true })
+ *   · 插件态     ：ensureConverterModal() → getWorkbenchHtml({ isModal: true })（全屏浮层）
+ *   · 抽屉态     ：getWorkbenchHtml({ isDrawer: true })，无页头变体，仅测试与向后兼容在用
  *
  * 2026-10-14 重构：**删除迁移向导外壳**（六步步骤条 / 向导模式·高级模式切换 / 不兼容门）。
  * 向导把同一份 DOM 用 `data-wb-step` 分段显隐，结果第 6 步是空的、第 3 步显示的不是范围
@@ -86,9 +86,14 @@ export function getWorkbenchHtml({ isModal = false, isDrawer = false, isStandalo
       <div class="quota-bars" id="usage-dashboard"></div>
     </div>
 
-    <!-- ═══ 源包 ═══ -->
+    <!-- ═══ 数据包槽：导出与导入共享 ═══
+         角色标签由 index.js syncSlotRole() 按方向写：导出=源包 / 导入=待恢复包。
+         槽本身是同一个，切方向不重传、不重扫。 -->
     <section class="wb-sec" data-wb-module="source">
-      <div class="wb-sec-head"><span class="wb-sec-title"><i class="fa-solid fa-inbox"></i> 源包</span></div>
+      <div class="wb-sec-head">
+        <span class="wb-sec-title"><i class="fa-solid fa-inbox"></i> 数据包</span>
+        <span class="wb-slot-role" id="wb-slot-role">源包</span>
+      </div>
       <div class="wb-sec-body">
         <div class="dropzone dropzone-inline" id="dropzone">
           <input type="file" id="file-input" accept=".zip" multiple style="display: none;">

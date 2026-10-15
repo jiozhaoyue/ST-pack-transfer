@@ -73,7 +73,7 @@ import {
   registerMenuButton,
   mountNativeBackupButton,
   mountLukerBackupManagerButton,
-  mountSettingsDrawer,
+  mountExtensionRowButton,
   setupDrawerToggles,
   hostLayoutCode,
   resolveTargetLayout,
@@ -504,7 +504,7 @@ export function mountDebugProbe() {
  *
  * 原签名是 `main(appRoot = document.getElementById('app'))`：插件态下若宿主页面上存在
  * 任意第三方 `#app`，兜底会先命中它，整棵工作台挂进别人的容器。容器来源收敛为两条唯一路径：
- * 独立态 = `index.html` 的 `#app` 骨架；插件态 = `mountSettingsDrawer` 回调传入的抽屉 `#app`。
+ * 独立态 = `index.html` 的 `#app` 骨架；插件态 = `ensureConverterModal()` 建的全屏模态 `#app`。
  * @param {HTMLElement|undefined} appRoot 承载工作台的容器元素
  */
 async function main(appRoot) {
@@ -1221,9 +1221,20 @@ async function main(appRoot) {
       isAwaiting: awaitingTreeConfirm,
       hasProducts: !!lastConvertedBlob,
     }),
-    onFlowChange: () => syncRestoreInline(),
+    onFlowChange: () => { syncRestoreInline(); syncSlotRole(); },
   });
   void workbenchShell;
+
+  /**
+   * 共享槽的角色标签。**槽是同一个**（`currentFile` 不因切方向而清空），
+   * 变的只是标签文字 —— 这正是「同一包可先导出再导回」的可见证据（PRD R2.5 / AC-2.4）。
+   */
+  function syncSlotRole() {
+    const role = document.getElementById('wb-slot-role');
+    if (!role) return;
+    role.textContent = getFlow() === 'in' ? '待恢复包' : '源包';
+  }
+  syncSlotRole();
 
   /**
    * 导入屏主操作读数。写回宿主是**整包**语义，不认类目勾选，
@@ -1519,15 +1530,15 @@ async function main(appRoot) {
       targetSelect.value = 'native';
     }
     registerMenuButton(() => {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      openConverterModal();
     });
-    // 原生"用户数据备份"UI 旁注入入口，与扩展设置抽屉共存
+    // 原生"用户数据备份"UI 旁注入入口，与扩展行上的「打开」并存
     mountNativeBackupButton(() => {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      openConverterModal();
     });
     // Luker 备份管理器弹层内也注入入口（仅 Luker 有该锚点，其余宿主无操作）
     mountLukerBackupManagerButton(() => {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      openConverterModal();
     });
   };
   applyPluginUi(host.platform);
@@ -3048,51 +3059,67 @@ async function main(appRoot) {
 let isWorkbenchInitialized = false;
 
 /**
- * 呼出模态数据包工作台 (供宿主插件环境使用)
+ * 建好全屏工作台模态（幂等），**不改可见性**。
+ *
+ * 拆出来的理由：插件态要在 boot 时就建好并跑 `main()` —— `main()` 里注册宿主入口
+ * （扩展菜单项 / 账号弹层按钮 / 备份管理器按钮），若等到用户第一次点「打开」才建，
+ * 那些入口就永远不会出现。建好即 `display:none`，点「打开」才 `display:flex`。
+ *
+ * @returns {HTMLElement} 覆盖层节点
+ */
+function ensureConverterModal() {
+  let modalOverlay = document.getElementById('st-converter-modal-overlay');
+  if (modalOverlay) return modalOverlay;
+
+  modalOverlay = document.createElement('div');
+  modalOverlay.id = 'st-converter-modal-overlay';
+  modalOverlay.className = 'st-converter-modal-overlay';
+  modalOverlay.style.display = 'none';
+
+  const appContainer = document.createElement('div');
+  appContainer.className = 'app-container';
+  appContainer.id = 'app';
+  // 插件态：工作台仍是**嵌在宿主页面里**的实例（只是从设置抽屉挪到了全屏浮层），
+  // 保留宿主内嵌变体类，让 style.css 里 `.st-converter-drawer-app` 那一整套样式继续生效。
+  if (detectHost().isPlugin) appContainer.classList.add('st-converter-drawer-app');
+  appContainer.innerHTML = trustedStaticMarkup(getWorkbenchHtml({ isModal: true }));
+
+  modalOverlay.appendChild(appContainer);
+  document.body.appendChild(modalOverlay); // dom-scope:allow 自绘模态覆盖层必须挂 body 才能全页覆盖（放进宿主抽屉会被其 overflow/transform 裁剪）
+
+  const closeBtn = appContainer.querySelector('#btn-close-converter-modal');
+  if (closeBtn) {
+    closeBtn.addEventListener('click', () => {
+      modalOverlay.style.display = 'none';
+    });
+  }
+
+  modalOverlay.addEventListener('click', (e) => {
+    if (e.target === modalOverlay) {
+      modalOverlay.style.display = 'none';
+    }
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && modalOverlay && modalOverlay.style.display !== 'none') {
+      modalOverlay.style.display = 'none';
+    }
+  });
+
+  if (!isWorkbenchInitialized) {
+    isWorkbenchInitialized = true;
+    main(appContainer);
+  }
+
+  return modalOverlay;
+}
+
+/**
+ * 呼出全屏数据包工作台 (供宿主插件环境使用)
  */
 export function openConverterModal() {
   if (typeof document === 'undefined') return;
-
-  let modalOverlay = document.getElementById('st-converter-modal-overlay');
-  if (!modalOverlay) {
-    modalOverlay = document.createElement('div');
-    modalOverlay.id = 'st-converter-modal-overlay';
-    modalOverlay.className = 'st-converter-modal-overlay';
-
-    const appContainer = document.createElement('div');
-    appContainer.className = 'app-container';
-    appContainer.id = 'app';
-    appContainer.innerHTML = trustedStaticMarkup(getWorkbenchHtml({ isModal: true }));
-
-    modalOverlay.appendChild(appContainer);
-    document.body.appendChild(modalOverlay); // dom-scope:allow 自绘模态覆盖层必须挂 body 才能全页覆盖（放进扩展抽屉会被其 overflow/transform 裁剪）
-
-    const closeBtn = appContainer.querySelector('#btn-close-converter-modal');
-    if (closeBtn) {
-      closeBtn.addEventListener('click', () => {
-        modalOverlay.style.display = 'none';
-      });
-    }
-
-    modalOverlay.addEventListener('click', (e) => {
-      if (e.target === modalOverlay) {
-        modalOverlay.style.display = 'none';
-      }
-    });
-
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && modalOverlay && modalOverlay.style.display !== 'none') {
-        modalOverlay.style.display = 'none';
-      }
-    });
-
-    if (!isWorkbenchInitialized) {
-      isWorkbenchInitialized = true;
-      main(appContainer);
-    }
-  } else {
-    modalOverlay.style.display = 'flex';
-  }
+  ensureConverterModal().style.display = 'flex';
 }
 
 /**
@@ -3114,14 +3141,12 @@ function bootstrap() {
 
   if (host.isPlugin) {
     // 宿主扩展模式 (SillyTavern / Luker)
-    // 仅在扩展设置抽屉中展开工作台，遵循“只在插件页面做，不在魔法棒做”
-    mountSettingsDrawer((drawerApp) => {
-      if (!isWorkbenchInitialized && drawerApp) {
-        isWorkbenchInitialized = true;
-        main(drawerApp);
-      }
-    });
-    logger.info(`st-zip-converter 扩展设置抽屉已就绪 (${host.platform.toUpperCase()} 模式)`);
+    // 工作台挂在**全屏模态**里，入口是宿主扩展行上追加的「打开」按钮
+    // （用户 2026-10-15 裁定：扩展列表只留宿主那一行，不再内联展开）。
+    // **boot 时就建好但保持隐藏** —— main() 里注册宿主入口，等首次点击才建会让它们永不出现。
+    ensureConverterModal();
+    mountExtensionRowButton(() => openConverterModal());
+    logger.info(`st-zip-converter 工作台入口已就绪 (${host.platform.toUpperCase()} 模式)`);
     return;
   }
 

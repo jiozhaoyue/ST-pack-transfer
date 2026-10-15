@@ -7,7 +7,6 @@ import { logger } from '../core/logger.js';
 import { zipIo, readZipEntryManifest } from '../core/zip-io.js';
 import { buildTargetManifest } from '../core/target-inventory.js';
 import * as zip from '../vendor/zip.js';
-import { getWorkbenchHtml } from './workbench-template.js';
 import { isSafeHttpUrl, trustedStaticMarkup } from './escape.js';
 import {
   AVAILABILITY,
@@ -1749,73 +1748,53 @@ function watchHostDom(injectFn) {
 }
 
 /**
- * 宿主扩展设置抽屉注入 (#extensions_settings2 / #extensions_settings)
- * 直接在酒馆原生设置侧栏展开工作台，无需多余模态弹窗
- * @param {(appEl: HTMLElement) => void} [onInit] 抽屉初次挂载后初始化控制器的回调
+ * 宿主扩展列表「打开」入口注入。
+ *
+ * **为什么不再注入内联抽屉**（2026-10-15 用户裁定「扩展列表处只留一条」）：
+ * 宿主**自己**会为每个扩展渲染一行 `.extension_block`（含原生启用开关，见宿主
+ * `extensions.js` 的 `generateExtensionElement`）。我们原先再往 `#extensions_settings2`
+ * 塞一个「内联展开整个工作台」的抽屉 ⇒ 扩展区出现第二条、且把宿主设置页撑得很长。
+ * 现在只往宿主那一行追加一个「打开」，点开是**全屏**工作台（`openConverterModal()`）。
+ *
+ * 落点要兼容两类命名：Luker 的用户私有扩展是 `data-name="/st-zip-converter"`，
+ * 全局扩展是 `data-name="st-zip-converter"`（宿主侧 `externalId = name.replace('third-party','')`），
+ * 故用 `*=` 子串匹配。
+ *
+ * **该列表是宿主按需渲染的弹层**（点 `#extensions_details` 才出现，初始 DOM 里一个
+ * `.extension_block` 都没有——2026-10-15 在 Dev Luker 8003 实测），
+ * 所以必须挂 `watchHostDom`，不能在 boot 时只查一次。
+ *
+ * @param {() => void} [onOpen] 打开全屏工作台（应为 `openConverterModal`）
  */
-export function mountSettingsDrawer(onInit) {
+export function mountExtensionRowButton(onOpen) {
   if (typeof document === 'undefined') return;
-  const PANEL_ID = 'st-zip-converter-settings-panel';
 
-  const mount = () => {
-    if (document.getElementById(PANEL_ID)) return;
-    const container = document.getElementById('extensions_settings2')
-      || document.getElementById('extensions_settings');
-    if (!container) return;
+  const addBtn = () => {
+    document.querySelectorAll('.extension_block[data-name*="st-zip-converter"]').forEach((block) => {
+      // 幂等：宿主重渲染会让标记随节点消失，observer 自动重注
+      if (block.querySelector('[data-st-zip-injected="1"]')) return;
 
-    const panel = document.createElement('div');
-    panel.id = PANEL_ID;
-    panel.className = 'st-converter-drawer-wrapper';
-    panel.innerHTML = `
-      <div class="inline-drawer" id="st_zip_converter_settings" style="margin-bottom: 12px;">
-        <div class="inline-drawer-toggle inline-drawer-header">
-          <b><i class="fa-solid fa-file-zipper" style="color: var(--SmartThemeQuoteColor, #f59e0b);"></i> <span data-i18n="ST Zip Converter">酒馆数据包互转工坊</span></b>
-          <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
-        </div>
-        <div class="inline-drawer-content" style="display: none;">
-          <div class="st-converter-drawer-app" id="app">
-            ${trustedStaticMarkup(getWorkbenchHtml({ isDrawer: true }))}
-          </div>
-        </div>
-      </div>
-    `;
-
-    container.appendChild(panel);
-
-    // 绑定抽屉及内部子抽屉展开折叠
-    setupDrawerToggles(panel);
-
-    if (typeof onInit === 'function') {
-      const appEl = panel.querySelector('#app');
-      onInit(appEl);
-    }
+      const openBtn = makeHostButton({
+        id: 'st-zip-converter-open-btn',
+        icon: 'fa-file-zipper',
+        label: '打开',
+        title: '打开数据包互转工坊',
+        onClick: () => {
+          if (typeof onOpen === 'function') onOpen();
+        },
+      });
+      // 优先并入宿主原生动作区（`.extension_actions`），无则退化为行尾
+      const actions = block.querySelector('.extension_actions');
+      (actions || block).appendChild(openBtn);
+    });
   };
 
-  watchHostDom(mount);
-}
-
-/**
- * 展开并平滑滚动到扩展设置抽屉（各注入入口共用的打开动作）
- */
-function openConverterDrawer() {
-  const drawer = document.getElementById('st_zip_converter_settings');
-  if (!drawer) return false;
-  const content = drawer.querySelector(':scope > .inline-drawer-content');
-  const icon = drawer.querySelector(':scope > .inline-drawer-toggle .inline-drawer-icon');
-  if (content) {
-    content.style.display = 'block';
-    if (icon) {
-      icon.classList.remove('down');
-      icon.classList.add('up');
-    }
-  }
-  drawer.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  return true;
+  watchHostDom(addBtn);
 }
 
 /**
  * 宿主扩展菜单按钮注入 (保留向下兼容)
- * @param {() => void} [onOpen]
+ * @param {() => void} [onOpen] 打开全屏工作台
  */
 export function registerMenuButton(onOpen) {
   if (typeof document === 'undefined') return;
@@ -1836,7 +1815,6 @@ export function registerMenuButton(onOpen) {
     item.addEventListener('click', (e) => {
       e.preventDefault();
       e.stopPropagation();
-      openConverterDrawer();
       if (typeof onOpen === 'function') {
         onOpen();
       }
@@ -1917,9 +1895,8 @@ export function mountNativeBackupButton(onOpen) {
         id: BTN_ID,
         icon: 'fa-right-left',
         label: '数据包互转',
-        title: '打开酒馆数据包互转工坊（在扩展设置中）',
+        title: '打开酒馆数据包互转工坊（全屏）',
         onClick: () => {
-          openConverterDrawer();
           if (typeof onOpen === 'function') onOpen();
         },
       });
@@ -1959,9 +1936,8 @@ export function mountLukerBackupManagerButton(onOpen) {
       id: BTN_ID,
       icon: 'fa-right-left',
       label: '数据包互转',
-      title: '打开酒馆数据包互转工坊（在扩展设置中）',
+      title: '打开酒馆数据包互转工坊（全屏）',
       onClick: () => {
-        openConverterDrawer();
         if (typeof onOpen === 'function') {
           onOpen();
         }

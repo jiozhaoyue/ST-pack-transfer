@@ -92,6 +92,9 @@ module.exports = {
     t.ok('D1 方向开关存在', await inDom(page, '#wb-flow-switch'));
     const outActive = await page.$eval('#btn-flow-out', (el) => el.classList.contains('active'));
     t.ok('D2 默认停在导出流程', outActive);
+    // 共享槽的角色标签：同一个槽，切方向只换标签（AC-2.4 的可见部分）
+    t.eq('D2b 导出方向角色标签为「源包」',
+      await page.$eval('#wb-slot-role', (el) => el.textContent.trim()), '源包');
 
     await page.click('#btn-flow-in');
     await page.waitForTimeout(150);
@@ -99,6 +102,8 @@ module.exports = {
     t.ok('D4 切到导入后打包选项退场', !(await isVisible(page, MODULE_PROBES.pack)));
     t.ok('D5 切到导入后上传槽**仍在**（共享槽，不因换方向而消失）',
       await isVisible(page, MODULE_PROBES.source));
+    t.eq('D5b 导入方向角色标签变「待恢复包」',
+      await page.$eval('#wb-slot-role', (el) => el.textContent.trim()), '待恢复包');
     t.ok('D6 导入流程**不出现**内容范围（整包写回不认类目勾选）',
       !(await isVisible(page, MODULE_PROBES.scope)));
     const inActive = await page.$eval('#btn-flow-in', (el) => el.classList.contains('active'));
@@ -109,6 +114,8 @@ module.exports = {
     await page.waitForTimeout(150);
     t.ok('D8 切回导出后打包选项回来', await isVisible(page, MODULE_PROBES.pack));
     t.ok('D9 切回导出后恢复区退场', !(await isVisible(page, MODULE_PROBES.restore)));
+    t.eq('D9b 切回导出后角色标签复原为「源包」',
+      await page.$eval('#wb-slot-role', (el) => el.textContent.trim()), '源包');
 
     // ============ E 配额看板（AC-2.6）============
     const quota = await page.evaluate(() => Array.from(

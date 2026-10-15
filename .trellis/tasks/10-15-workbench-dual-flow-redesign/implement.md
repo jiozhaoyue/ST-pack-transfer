@@ -79,9 +79,12 @@
   - 切屏 = 翻 `hidden`（**不是**移出 DOM，见 `design.md` §2.5 —— 初稿方向被证据推翻）
   - 实测：E2E `workbench-shell` D1–D9 全绿（真浏览器）
 
-- [ ] **2.4 上传槽「角色标签」**
-  - 共享槽已成立（切方向不重传、不重扫，E2E D5 已验）；**「源包 / 待恢复包」角色标签未做**
-  - 现以 `#wb-restore-target` 的文案承担部分语义（「待恢复 <包名>」）
+- [x] **2.4 上传槽「角色标签」** —— 2026-10-15 完成
+  - 模板 `data-wb-module="source"` 的标题行加 `<span class="wb-slot-role" id="wb-slot-role">`；
+    `index.js` 新增 `syncSlotRole()`，挂在 `onFlowChange` 与初次装配上（导出=源包 / 导入=待恢复包）
+  - 槽仍是**同一个**（`currentFile` 不因切方向清空），换的只是标签 ⇒ R2.5 / AC-2.4 成立
+  - 实测：`npm test` 868 passed；E2E `workbench-shell` **27/27**（新增 D2b/D5b/D9b 三条角色标签断言）；
+    **真机双宿主**：Dev Luker 8003 与 Dev ST 8001 打开工作台后 `#wb-slot-role` 文本为「源包」
 
 - [x] **2.5 阶段门控接入**
   - `applyShell()` 挂在 `applyActionAvailability()`（既有的「状态唯一应用点」）与
@@ -91,9 +94,25 @@
 
 - [ ] **2.6 QuotaBoard（配额 + 数据分布，宿主项可置灰）**
   - 现有 `usage-dashboard.js` 已有配额条；**「数据分布」维度与独立模式置灰未做**
+  - ⚠ 本项**已由 `d3d9c6e` 落地**（「配额看板加宿主数据分布，不可用项改为置灰」），
+    该复选框此前未随执行勾选，2026-10-15 复核时补记；AC-2.6 由 E2E `workbench-shell` E1–E3 守
 
-- [ ] **2.7 宿主扩展列表收敛为单行**
-  - `host-bridge.js` 注入体未改
+- [x] **2.7 宿主扩展列表收敛为单行** —— 2026-10-15 完成（用户裁定「甲：只留酒馆那一行」）
+  - 取证：宿主**自己**为每个扩展渲染 `.extension_block`（含原生 `.extension_toggle`，
+    见 `Instance/Dev/{Luker,SillyTavern}/public/scripts/extensions.js` 的 `generateExtensionElement`）。
+    我们原先再往 `#extensions_settings2` 注入「内联展开整个工作台」的抽屉 ⇒ 多出一条且撑长设置页
+  - 改法：删 `mountSettingsDrawer` + 自建面板 `#st-zip-converter-settings-panel`；
+    新增 `mountExtensionRowButton()` 只往宿主那一行追加「打开」（`data-name*="st-zip-converter"`，
+    兼容 Luker 的 `/st-zip-converter` 与全局 `st-zip-converter`）
+  - 插件态工作台改由**全屏模态**承载：`openConverterModal()` 拆出 `ensureConverterModal()`
+    —— boot 时**建好但隐藏**（`main()` 里要注册宿主入口，等首次点击才建会让入口永不出现），
+    点「打开」才 `display:flex`。三个既有入口（扩展菜单项 / 账号弹层 / Luker 备份管理器）同改
+  - 实测：`npm test` **868 passed**（新增 3 条 `mountExtensionRowButton` 用例）；五条守卫全绿；
+    **真机双宿主**——扩展行读数均为 `[☑ 原生开关] 👤 酒馆数据包互转器 1.0.0 [更新][设置][删除][打开]`，
+    `legacyPanel/legacyDrawer` 双双为 `false`，点「打开」后模态 `display:flex`、`#app` 宽 1080
+  - ⚠ **遗留**：`getWorkbenchHtml({isDrawer:true})` 分支与 `.st-converter-drawer-app` 那套 CSS
+    已无生产调用点（插件态改用 `.app-container` 前缀的模态）。当前**保留**（仅测试在用），
+    清理属独立增量，见「未做」表
 
 - [x] **2.8 双端布局（部分）**
   - 桌面两栏 grid（含 `min-width: 0`）、移动单列 + `action` 吸底 + 折叠把手已落
@@ -134,9 +153,9 @@
 
 | 项 | 状态 |
 | --- | --- |
-| 2.4 上传槽「角色标签」 | 共享槽已成立；「源包 / 待恢复包」显式标签未做 |
 | 2.6 移动视口真机验证 | 只在 1600×950 桌面视口验过，≤480px 未验 |
-| 2.7 宿主扩展列表收敛为单行 | **未做**。已取证：宿主自己渲染 `extension_toggle` 复选框（`Instance/Dev/Luker/public/scripts/extensions.js` 的 `generateExtensionElement`），故「插件开关」是宿主原生的；我们目前往 `#extensions_settings2` 注入的是「内联展开整个工作台」，会撑长宿主设置页 |
+| 实例侧 E2E 适配新入口 | `e2e/specs/{matrix,pt-load,smoke,library-inject}.e2e.cjs` 仍在找已删除的 `#st_zip_converter_settings`。**归 3.2 一并清理**（那批 spec 本就因 `#btn-wb-view-toggle` 与 `useAdvancedView` 全红） |
+| 抽屉态残留清理 | `getWorkbenchHtml({isDrawer:true})` 分支与 style.css 里 408 行 `.st-converter-drawer-app` 规则已无生产调用点。保留理由：删 CSS 是 400 行级 diff，与本次目标无关，宜独立增量 |
 | 模块层统一签名 `state → DOM` | 现有渲染函数已是模块粒度，但签名各异；属后续增量 |
 
 ## 回滚点
