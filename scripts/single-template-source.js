@@ -47,7 +47,6 @@ export const REQUIRED_TEMPLATE_IDS = [
   'btn-select-base-zip',
   'btn-target-preflight',
   'category-panel',
-  'category-preset-select',
   'compression-select',
   'drop-main-text',
   'drop-sub-text',

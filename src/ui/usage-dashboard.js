@@ -47,29 +47,7 @@ export async function renderUsageDashboard({ containerEl }) {
   if (!containerEl) return;
   containerEl.innerHTML = '';
 
-  // 行① 浏览器配额（页面整体，涵盖插件 IndexedDB + OPFS 临时包）
-  if (typeof navigator !== 'undefined' && navigator.storage && navigator.storage.estimate) {
-    try {
-      const est = await navigator.storage.estimate();
-      if (est && est.quota > 0) {
-        const pct = Math.min(100, ((est.usage || 0) / est.quota) * 100);
-        const browserSection = document.createElement('div');
-        browserSection.className = 'usage-quota-section';
-        browserSection.innerHTML = `
-          <div class="usage-quota-label">
-            <span><i class="fa-solid fa-hard-drive"></i> 浏览器配额</span>
-            <span>${escapeHtml(formatBytes(est.usage || 0))} / ${escapeHtml(formatBytes(est.quota))} (${escapeHtml(pct.toFixed(1))}%)</span>
-          </div>
-          <div class="usage-quota-bar"><div class="usage-quota-fill" style="width:${escapeHtml(pct.toFixed(1))}%"></div></div>
-        `;
-        containerEl.appendChild(browserSection);
-      }
-    } catch {
-      // estimate 失败静默跳过第一行
-    }
-  }
-
-  // 行② 用户配额（Luker 管理员分配；数据异步到达前占位，慢查询不阻塞首行）
+  // 行① 用户配额（Luker 管理员分配；用户 2026-10-15 定：这一行排在最前）
   const userSection = document.createElement('div');
   userSection.className = 'usage-quota-section usage-quota-user';
   userSection.innerHTML = `
@@ -106,4 +84,26 @@ export async function renderUsageDashboard({ containerEl }) {
   }).catch(() => {
     if (containerEl.isConnected && containerEl.contains(userSection)) userSection.remove();
   });
+
+  // 行② 浏览器配额（页面整体，涵盖插件 IndexedDB + OPFS 临时包）
+  if (typeof navigator !== 'undefined' && navigator.storage && navigator.storage.estimate) {
+    try {
+      const est = await navigator.storage.estimate();
+      if (est && est.quota > 0) {
+        const pct = Math.min(100, ((est.usage || 0) / est.quota) * 100);
+        const browserSection = document.createElement('div');
+        browserSection.className = 'usage-quota-section';
+        browserSection.innerHTML = `
+          <div class="usage-quota-label">
+            <span><i class="fa-solid fa-hard-drive"></i> 浏览器配额</span>
+            <span>${escapeHtml(formatBytes(est.usage || 0))} / ${escapeHtml(formatBytes(est.quota))} (${escapeHtml(pct.toFixed(1))}%)</span>
+          </div>
+          <div class="usage-quota-bar"><div class="usage-quota-fill" style="width:${escapeHtml(pct.toFixed(1))}%"></div></div>
+        `;
+        containerEl.appendChild(browserSection);
+      }
+    } catch {
+      // estimate 失败静默跳过
+    }
+  }
 }

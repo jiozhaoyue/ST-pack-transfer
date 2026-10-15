@@ -164,9 +164,12 @@ export function mountOnboardingGuide({ root, onClose = null } = {}) {
       : Math.max(8, r.top - gap - cardRect.height);
     card.style.position = 'fixed';
     card.style.top = `${top}px`;
-    card.style.left = '50%';
-    card.style.transform = 'translateX(-50%)';
     card.style.maxWidth = `min(320px, calc(100vw - 24px))`;
+    card.style.transform = 'none';
+    // 卡片左缘对齐环的左缘。原实现固定 left:50% 居中，环却在别处，
+    // 两者看起来互不相关（2026-10-15 用户指出「引导全错」）。
+    const cardW = Math.min(320, window.innerWidth - 24);
+    card.style.left = `${Math.max(12, Math.min(r.left, window.innerWidth - cardW - 12))}px`;
   };
 
   const render = () => {

@@ -1525,29 +1525,17 @@
 /* ==========================================================================
    底部实时抽屉式日志控制台 (Log Console Drawer)
    ========================================================================== */
+/* 外观（背景/边框/圆角/阴影）交给酒馆原生 .inline-drawer；此处只保宽度 */
 #app.app-container .log-console-drawer, .st-converter-drawer-app .log-console-drawer {
   width: 100%;
-  background: color-mix(in srgb, var(--bg-secondary) 95%, transparent);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
-  overflow: hidden;
-  box-shadow: 0 4px 18px var(--SmartThemeShadowColor, rgba(0, 0, 0, 0.4));
 }
 
-#app.app-container .log-bar-header, .st-converter-drawer-app .log-bar-header {
+/* 头部外观交给酒馆原生 .inline-drawer-header（用户 2026-10-15：日志要酒馆风格）；
+   此处只补内部排布，不再自带背景/内边距/边框。 */
+#app.app-container #log-bar-header, .st-converter-drawer-app #log-bar-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 8px 14px;
-  cursor: pointer;
-  background: color-mix(in srgb, var(--text-main) 2%, transparent);
-  user-select: none;
-  border-bottom: 1px solid transparent;
-}
-
-#app.app-container .log-console-drawer.expanded .log-bar-header, .st-converter-drawer-app .log-console-drawer.expanded .log-bar-header {
-  border-bottom: 1px solid var(--border-color);
-  background: color-mix(in srgb, var(--text-main) 4%, transparent);
+  gap: 8px;
 }
 
 #app.app-container .log-bar-status, .st-converter-drawer-app .log-bar-status {
@@ -1556,28 +1544,6 @@
   gap: 8px;
   min-width: 0;
   flex: 1;
-}
-
-#app.app-container .log-indicator-dot, .st-converter-drawer-app .log-indicator-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  flex-shrink: 0;
-  background: var(--success);
-}
-
-#app.app-container .log-indicator-dot.dot-warn, .st-converter-drawer-app .log-indicator-dot.dot-warn {
-  background: var(--warning);
-}
-
-#app.app-container .log-indicator-dot.dot-error, .st-converter-drawer-app .log-indicator-dot.dot-error {
-  background: var(--danger);
-  animation: pulse-dot 1.5s infinite;
-}
-
-@keyframes pulse-dot {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.4; transform: scale(1.3); }
 }
 
 #app.app-container .log-latest-text, .st-converter-drawer-app .log-latest-text {
@@ -1619,24 +1585,7 @@
   color: var(--danger);
 }
 
-#app.app-container .btn-toggle-log, .st-converter-drawer-app .btn-toggle-log {
-  font-size: 0.75rem;
-  padding: 4px 10px;
-  border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--text-main) 6%, transparent);
-  color: var(--text-muted);
-  border: 1px solid var(--border-color);
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-#app.app-container .btn-toggle-log:hover, .st-converter-drawer-app .btn-toggle-log:hover {
-  color: var(--text-gold);
-  background: color-mix(in srgb, var(--accent) 15%, transparent);
-  border-color: var(--accent);
-}
-
-#app.app-container .log-console-body, .st-converter-drawer-app .log-console-body {
+#app.app-container #log-console-body, .st-converter-drawer-app #log-console-body {
   height: 240px;
   display: flex;
   flex-direction: column;
@@ -1718,6 +1667,8 @@
   padding: 2px 0;
   border-bottom: 1px solid color-mix(in srgb, var(--text-main) 2%, transparent);
   word-break: break-word;
+  /* 显式给色：宿主 .inline-drawer-content 带 0.62 透明度，继承过去日志会淡到看不清 */
+  color: var(--text-main);
 }
 
 #app.app-container .log-time, .st-converter-drawer-app .log-time {
@@ -2504,24 +2455,37 @@
   margin-bottom: 6px;
 }
 
-/* 设置项：一律单列，禁止并排（用户 2026-10-14） */
+/* 设置项：标签与控件同行（用户 2026-10-15——禁的是说明文字堆砌，不是同行布局；
+   纵向排布是"大量空白"的直接来源）。 */
 #app.app-container .wb-field, .st-converter-drawer-app .wb-field {
   display: flex;
-  flex-direction: column;
-  gap: 3px;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
 }
 
 #app.app-container .wb-field-key, .st-converter-drawer-app .wb-field-key {
   color: var(--text-muted);
   font-size: 0.85em;
+  flex: 0 0 auto;
+  min-width: 4.2em;
 }
 
-/* 工具按钮行：**单列**（用户裁定「禁止并排」）。
-   2026-10-14 由横向 flex 改为纵向——原实现 6 个按钮横排，与「控件一律单列」自相矛盾。 */
+#app.app-container .wb-field > select,
+#app.app-container .wb-field > input,
+.st-converter-drawer-app .wb-field > select,
+.st-converter-drawer-app .wb-field > input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* 工具按钮行：横排。用户 2026-10-15 澄清——禁的是「一大排说明文字和标题」，
+   不是「按钮只能竖排」；2026-10-14 把这里改成纵向是误读原话。 */
 #app.app-container .wb-tool-row, .st-converter-drawer-app .wb-tool-row {
   display: flex;
-  flex-direction: column;
-  align-items: stretch;
+  flex-direction: row;
+  align-items: center;
+  flex-wrap: wrap;
   gap: 6px;
 }
 
@@ -2699,14 +2663,12 @@
    ⚠ `[hidden]` 必须显式覆盖：本节的 `display: flex` 会压过 hidden 属性
    （2026-10-14 实际踩过——`.wb-gate` 就是被这条规则坑成了永远可见的空壳框）。
    ========================================================================== */
+/* 遮罩不铺整屏：改由高亮环的 box-shadow 提供，从而「目标区域保持明亮、其余变暗」
+   （2026-10-15 用户要求：引导到正确位置、UI 看得全、遮罩要暗色）。 */
 #app.app-container .wb-guide-overlay, .st-converter-drawer-app .wb-guide-overlay {
   position: fixed;
   inset: 0;
   z-index: 9999;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: color-mix(in srgb, var(--bg-primary) 74%, transparent);
 }
 
 #app.app-container .wb-guide-overlay[hidden], .st-converter-drawer-app .wb-guide-overlay[hidden] {
@@ -2719,6 +2681,8 @@
   pointer-events: none;
   border: 2px solid var(--accent);
   border-radius: var(--radius-sm);
+  /* 巨型外阴影 = 挖孔遮罩：目标区域不被压暗，其余压暗 */
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.62);
 }
 
 #app.app-container .wb-guide-ring[hidden], .st-converter-drawer-app .wb-guide-ring[hidden] {
