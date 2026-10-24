@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-2.md`
-- **Total Sessions**: 47
+- **Total Sessions**: 48
 - **Last Active**: 2026-10-24
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-2.md` | ~130 | Active |
+| `journal-2.md` | ~172 | Active |
 | `journal-1.md` | ~2491 | Archived |
 <!-- @@@/auto:active-documents -->
 
@@ -30,6 +30,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 48 | 2026-10-24 | A 线收口——四脚本入库、任务登记归档、journal 断档修复、spec index 补登记 | `f793e6c`, `1d5ae0d`, `cc16777`, `0057175`, `4b2734b` | `main` |
 | 47 | 2026-10-24 | A 线实施——分组列表/帮助层/UI 铁律/detectHost TT·PT/拉取前预览 + flash 视觉复审 | `72021f1`, `17c26e6` | `main` |
 | 46 | 2026-10-24 | UI 编排与数据流重规划（r2 父任务）+ D-12 域名强制守卫 | `7fb7b1e` | `main` |
 | 45 | 2026-10-24 | 10-15 任务收口——S1 四现症固化 + 规范落盘 + 归档 | `5839079`, `f97a000` | `main` |

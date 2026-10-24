@@ -128,3 +128,45 @@ S1 四现症固化为 s1-remedies E2E（15/15）；三层架构与 CSS 铁律落
 ### Status
 
 [OK] **Completed**
+
+
+## Session 48: A 线收口——四脚本入库、任务登记归档、journal 断档修复、spec index 补登记
+<!-- trellis-session: v=2 fp=90652836c9b01015 -->
+
+**Date**: 2026-10-24
+**Task**: A 线收口——四脚本入库、任务登记归档、journal 断档修复、spec index 补登记
+**Branch**: `main`
+
+### Summary
+
+上一会话被 API 报错打断的收口续完：四脚本按 design §6.2 先入库（P-18 防捎带）；r2/impl 两任务目录登记并勾结 AC（impl 八项、父任务 AC-0~3；AC-4 的 8899 实测留 C 线）；spec index 抓出并补上 ui-orchestration-rules 漏登记、读数对齐 892/21；journal 补记 44-47 并回填索引断档 27-43（add_session 会话号解析只认冒号头的坑已踩明）；impl 归档，r2 保持 active 待 B/C/D 线
+
+### Main Changes
+
+- scripts/ 四脚本入库（PT 安装/扩展行探针/实例探针/实例重启）
+- 10-24 r2+impl 任务目录入库，PRD AC 勾结附证据
+- spec frontend index 登记 UI 编排铁律页 + 计数对齐
+- journal-2 拆卷、Session 44-47 补记、index 27-43 回填
+- task.py archive 10-24-ui-orchestration-impl（父任务 1/1 done）
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `f793e6c` | chore(scripts): 四脚本入库——PT 扩展安装/扩展行探针/实例探针/实例重启 |
+| `1d5ae0d` | chore(task): 登记 10-24-ui-orchestration-r2 父任务与 A 线 impl 子任务 |
+| `cc16777` | docs(spec): frontend index 补登记 UI 编排铁律页，对齐现状读数 |
+| `0057175` | docs(journal): 补记 Session 44-47 并回填索引断档 27-43 |
+| `4b2734b` | chore(task): archive 10-24-ui-orchestration-impl |
+
+### Testing
+
+- [OK] npm test 复跑 892 passed / 2 skipped 零回归（收口门禁）
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- B/C/D 线子任务创建（luker-selection-max / authority-st-capability / tt-cdp-probe / e2e-instances-runner / harness-reflow），建前按 L0-2 回填 PRD
