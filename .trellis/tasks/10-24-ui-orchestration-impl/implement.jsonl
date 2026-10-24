@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/frontend/workbench-three-layer.md", "reason": "三层契约与CSS铁律——外壳零改动边界、浮层必锚行、夹具同构"}
+{"file": ".trellis/spec/frontend/workbench-single-view.md", "reason": "文案/控件/配色纪律——帮助层与铁律页的基线"}
+{"file": ".trellis/spec/frontend/host-capabilities.md", "reason": "能力获取决策树与显式声明表——detectHost/拉取预览依据"}
+{"file": ".trellis/spec/frontend/dom-write-scope.md", "reason": "宿主DOM写入锚点白名单——帮助按钮注入点约束"}

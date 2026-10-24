@@ -1,0 +1,28 @@
+{
+  "id": "ui-orchestration-r2",
+  "name": "ui-orchestration-r2",
+  "title": "UI 编排与数据流重规划",
+  "description": "从头讨论工作台 UI 编排（空间利用最大化、列表架构、操作台模式、按钮文案铁律、教程呈现）、宿主数据流（暂存必要性、按需拉取可行性、四宿主能力）、多实例自动化测试推广、tavern-harness 回流与去中心化",
+  "status": "planning",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "jiozhaoyue",
+  "assignee": "jiozhaoyue",
+  "createdAt": "2026-10-24",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "10-24-ui-orchestration-impl"
+  ],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {}
+}
