@@ -67,6 +67,7 @@ import {
   alertDialog,
   confirmDialog,
   hostSelectionCapability,
+  describeHostFetchPlan,
   isStorageInspectorAvailable,
   openStorageInspector,
   getHandle,
@@ -87,6 +88,7 @@ import { UPLOAD_TIMEOUT_MS } from './src/ui/fetch-bounds.js';
 import { setupFileDrop } from './src/ui/file-drop.js';
 import { createViewController } from './src/ui/view.js';
 import { getWorkbenchHtml } from './src/ui/workbench-template.js';
+import { mountSectionHelp } from './src/ui/help-topics.js';
 import {
   createStaleFlag,
   evaluateSavedSession,
@@ -530,6 +532,7 @@ async function main(appRoot) {
 
   // 初始化底部实时日志抽屉（块二底部挂载点）
   const logConsole = setupLogConsole(document.getElementById('log-console-mount') || root);
+  mountSectionHelp(root); // R-A2 幂等补注：日志台头部晚于模态创建，这里补上它那份「?」
   logger.info(`应用启动，运行模式: ${host.isPlugin ? host.platform.toUpperCase() + ' 扩展插件' : '独立 Web 模式'}`);
 
   let currentFile = null;
@@ -841,6 +844,40 @@ async function main(appRoot) {
   }
   if (btnHostTreeSelectAll) {
     btnHostTreeSelectAll.addEventListener('click', () => categorySelectAll());
+  }
+
+  // 拉取前预览行（R-A5）：确认后才真正发起宿主拉取；续传路径直接继续不预览
+  let hostFetchPreviewResolve = null;
+  function waitHostFetchPreview(planText) {
+    return new Promise((resolve) => {
+      const bar = document.getElementById('host-fetch-preview');
+      const text = document.getElementById('host-fetch-preview-text');
+      if (!bar || !text) {
+        resolve(true); // 无预览行（测试环境/模板漂移）：维持旧行为直接继续
+        return;
+      }
+      hostFetchPreviewResolve = resolve;
+      text.textContent = planText;
+      bar.hidden = false;
+      view.setProgress(8, planText);
+    });
+  }
+  function resolveHostFetchPreview(confirmed) {
+    const bar = document.getElementById('host-fetch-preview');
+    if (bar) bar.hidden = true;
+    if (hostFetchPreviewResolve) {
+      const r = hostFetchPreviewResolve;
+      hostFetchPreviewResolve = null;
+      r(confirmed);
+    }
+  }
+  const btnHostFetchGo = document.getElementById('btn-host-fetch-go');
+  const btnHostFetchCancel = document.getElementById('btn-host-fetch-cancel');
+  if (btnHostFetchGo) {
+    btnHostFetchGo.addEventListener('click', () => resolveHostFetchPreview(true));
+  }
+  if (btnHostFetchCancel) {
+    btnHostFetchCancel.addEventListener('click', () => resolveHostFetchPreview(false));
   }
 
   // 批量队列转换执行逻辑（R-16 / U-5 / U-7：接入任务状态机 + 子项游标续传）
@@ -1723,6 +1760,16 @@ async function main(appRoot) {
       if (hostBaseZipSection) hostBaseZipSection.style.display = 'block';
       updateBaseZipStatusUI();
       return;
+    }
+
+    // R-A5 拉取前预览：先亮出「将拉取什么」与能力读数，用户确认后才发起；
+    // 续传（resumeCheckpoint）是同一任务的继续，不再预览。
+    if (!resumeCheckpoint) {
+      const confirmed = await waitHostFetchPreview(describeHostFetchPlan(host.platform, getSelectionState()));
+      if (!confirmed) {
+        logger.info('用户在拉取预览处取消，本次不发起宿主拉取');
+        return;
+      }
     }
 
     workbenchBusy = true;
@@ -3088,6 +3135,7 @@ function ensureConverterModal() {
 
   modalOverlay.appendChild(appContainer);
   document.body.appendChild(modalOverlay); // dom-scope:allow 自绘模态覆盖层必须挂 body 才能全页覆盖（放进宿主抽屉会被其 overflow/transform 裁剪）
+  mountSectionHelp(appContainer); // R-A2 区块「?」帮助层（幂等，随模态一次性注入）
 
   const closeBtn = appContainer.querySelector('#btn-close-converter-modal');
   if (closeBtn) {
@@ -3164,6 +3212,7 @@ function bootstrap() {
   }
   if (!isWorkbenchInitialized) {
     isWorkbenchInitialized = true;
+    mountSectionHelp(existingApp); // R-A2 区块「?」帮助层（独立态与模态度同款注入）
     main(existingApp);
   }
 }

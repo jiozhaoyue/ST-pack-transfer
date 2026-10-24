@@ -112,7 +112,9 @@ export function visibleModules(stage, flow) {
       ids = [...base, 'scope', 'action', ...persistent];
       break;
     case 'done':
-      ids = [...base, 'products', 'action', ...persistent];
+      // 2026-10-24（E2E 实测修正）：done 必须保留 options——否则第一次转换完成后
+      // 打包区被藏，用户**再也无法换目标连转**（四宿主互转是核心场景，s1-remedies H4 抓出）。
+      ids = [...base, 'products', spec.options, 'action', ...persistent];
       break;
     default:
       ids = [];

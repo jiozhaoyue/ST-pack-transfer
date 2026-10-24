@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeEach } from 'vitest';
-import { ExportQueue } from '../src/ui/export-queue.js';
+import { ExportQueue, groupQueueItems } from '../src/ui/export-queue.js';
 
 // Node 环境无 DOM 下载，mock triggerBlobDownload 的依赖（document.createElement 等仅浏览器用）
 // ExportQueue.enqueue 中 autoDownload 走 triggerBlobDownload —— 测试中不设 autoDownload 即可。
@@ -62,5 +62,32 @@ describe('ExportQueue 待导出区状态机', () => {
     queue.enqueue({ blob: makeBlob(), name: 'b.zip' });
     await expect(queue.stashAll()).resolves.toBeUndefined();
     await expect(queue.downloadAll()).resolves.toBeUndefined();
+  });
+});
+
+describe('groupQueueItems 产物按目标平台分组（R-A1 纯函数）', () => {
+  const item = (targetLayout) => ({ targetLayout, blob: { size: 1024 } });
+
+  it('声明序在前：st → l → tt → pt，乱序输入也按此序输出', () => {
+    const groups = groupQueueItems([item('pt'), item('st'), item('tt'), item('l')]);
+    expect(groups.map((g) => g.key)).toEqual(['st', 'l', 'tt', 'pt']);
+  });
+
+  it('标签与 #target-select 的 option 文案一字不差', () => {
+    const groups = groupQueueItems([item('st'), item('l'), item('tt'), item('pt')]);
+    expect(groups.map((g) => g.label)).toEqual(['SillyTavern', 'Luker', 'TauriTavern', 'PureTavern']);
+  });
+
+  it('无布局的产物归 unknown 组、排声明序之后；空输入不产出空组', () => {
+    const groups = groupQueueItems([item(''), item(null), item('pt')]);
+    expect(groups.map((g) => g.key)).toEqual(['pt', 'unknown']);
+    expect(groupQueueItems([])).toEqual([]);
+  });
+
+  it('同平台多条进同一组且保持入序', () => {
+    const groups = groupQueueItems([item('pt'), item('st'), item('pt')]);
+    const pt = groups.find((g) => g.key === 'pt');
+    expect(pt.items.length).toBe(2);
+    expect(groups.find((g) => g.key === 'st').items.length).toBe(1);
   });
 });

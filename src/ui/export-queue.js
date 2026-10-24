@@ -89,6 +89,43 @@ const ORIGIN_LABELS = {
 
 let seq = 0;
 
+/** 目标布局分组顺序与标签（与 #target-select 的 option 文案一字不差，R-A1） */
+const LAYOUT_GROUP_ORDER = Object.freeze(['st', 'l', 'tt', 'pt']);
+const LAYOUT_GROUP_LABELS = Object.freeze({
+  st: 'SillyTavern',
+  l: 'Luker',
+  tt: 'TauriTavern',
+  pt: 'PureTavern',
+});
+
+/** 折叠态（纯视图态，模块级 Set；选中态在渲染闭包内） */
+const collapsedQueueGroups = new Set();
+
+/**
+ * 按目标平台给产物分组（纯函数，R-A1）
+ * @param {Array<{targetLayout?: string}>} items
+ * @returns {Array<{key: string, label: string, items: Array}>} 声明序在前、未登记键按字典序排后；空组不产出
+ */
+export function groupQueueItems(items) {
+  const buckets = new Map();
+  for (const it of items || []) {
+    const key = it.targetLayout || 'unknown';
+    if (!buckets.has(key)) buckets.set(key, []);
+    buckets.get(key).push(it);
+  }
+  const rank = (key) => {
+    const idx = LAYOUT_GROUP_ORDER.indexOf(key);
+    return idx === -1 ? LAYOUT_GROUP_ORDER.length : idx;
+  };
+  return [...buckets.entries()]
+    .sort((a, b) => (rank(a[0]) - rank(b[0])) || (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0))
+    .map(([key, groupItems]) => ({
+      key,
+      label: LAYOUT_GROUP_LABELS[key] || key.toUpperCase(),
+      items: groupItems,
+    }));
+}
+
 export class ExportQueue {
   constructor() {
     /** @type {Array<{id,name,blob,targetLayout,origin,ephemeral,autoDownload,storedId?}>} */
@@ -250,6 +287,7 @@ export function renderExportQueue({
   restoreBatch = null, restoreUnsupportedReason = '',
   onCancelRestore, onRestoreToHost, onRestoreBatch, onRetryFailedBatch, onRefreshPage,
   onWorkspaceChanged, confirmFn = null,
+  groupBy = 'targetLayout',
 }) {
   if (!containerEl) return;
   // 破坏性操作确认走宿主原生弹窗（由调用方注入 host-bridge 的 confirmDialog），
@@ -447,7 +485,9 @@ export function renderExportQueue({
 
     const list = document.createElement('div');
     list.className = 'export-queue-list';
-    for (const item of queue.items) {
+
+    /** 单行构建（分组/平铺两条路径共用，改动只改这一处） */
+    const buildRow = (item) => {
       const row = document.createElement('div');
       row.className = 'export-queue-item';
       row.draggable = true;
@@ -507,7 +547,73 @@ export function renderExportQueue({
       }
       btns.appendChild(mkBtn('delete', '移除', '', () => { selected.delete(item.id); queue.remove(item.id); }));
       row.appendChild(btns);
-      list.appendChild(row);
+      return row;
+    };
+
+    if (groupBy === 'targetLayout') {
+      // R-A1 按目标平台分组：组头 = 折叠钮 + 三态组勾选 + 徽标计数；空组不渲染
+      for (const group of groupQueueItems(queue.items)) {
+        const section = document.createElement('div');
+        section.className = 'eq-group';
+        section.dataset.group = group.key;
+
+        const head = document.createElement('div');
+        head.className = 'eq-group-head';
+        const body = document.createElement('div');
+        body.className = 'eq-group-body';
+
+        const collapsed = collapsedQueueGroups.has(group.key);
+        body.hidden = collapsed;
+        const toggle = document.createElement('button');
+        toggle.type = 'button';
+        toggle.className = 'menu_button eq-group-toggle';
+        toggle.textContent = collapsed ? '▸' : '▾';
+        toggle.title = collapsed ? '展开' : '收起';
+        toggle.addEventListener('click', () => {
+          const now = !collapsedQueueGroups.has(group.key);
+          if (now) collapsedQueueGroups.add(group.key);
+          else collapsedQueueGroups.delete(group.key);
+          body.hidden = now;
+          toggle.textContent = now ? '▸' : '▾';
+          toggle.title = now ? '展开' : '收起';
+        });
+
+        const groupBox = document.createElement('input');
+        groupBox.type = 'checkbox';
+        groupBox.className = 'eq-group-box';
+        groupBox.title = '组内全选';
+        const syncGroupBox = () => {
+          const hit = group.items.filter((it) => selected.has(it.id)).length;
+          groupBox.checked = hit === group.items.length && hit > 0;
+          groupBox.indeterminate = hit > 0 && hit < group.items.length;
+        };
+        groupBox.addEventListener('change', () => {
+          const allIn = group.items.every((it) => selected.has(it.id));
+          for (const box of body.querySelectorAll('.eq-select-box')) {
+            box.checked = !allIn;
+            if (allIn) selected.delete(box.dataset.id);
+            else selected.add(box.dataset.id);
+          }
+          syncGroupBox();
+          refreshSelBar();
+        });
+
+        const label = document.createElement('span');
+        label.className = 'eq-group-label';
+        label.textContent = group.label;
+        const totalBytes = group.items.reduce((sum, it) => sum + (it.blob?.size || 0), 0);
+        const count = document.createElement('span');
+        count.className = 'eq-group-count';
+        count.textContent = `${group.items.length} 项 · ${formatBytes(totalBytes)}`;
+
+        head.append(toggle, groupBox, label, count);
+        for (const item of group.items) body.appendChild(buildRow(item));
+        syncGroupBox();
+        section.append(head, body);
+        list.appendChild(section);
+      }
+    } else {
+      for (const item of queue.items) list.appendChild(buildRow(item));
     }
     containerEl.appendChild(list);
 

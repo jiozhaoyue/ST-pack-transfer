@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
-import { renderStashList } from '../src/ui/stash-list.js';
+import { renderStashList, resetStashGroupCollapse } from '../src/ui/stash-list.js';
 
 /**
  * 暂存区**渲染路径**的回归守护。
@@ -60,6 +60,9 @@ function makeEl(tag = 'div') {
       child.parentElement = this;
       return child;
     },
+    append(...children) {
+      for (const child of children) this.appendChild(child);
+    },
     get lastElementChild() {
       return this.children.length ? this.children[this.children.length - 1] : null;
     },
@@ -114,12 +117,21 @@ const setup = async ({ isHostAvailable = true, onBatchConvert } = {}) => {
   return { containerEl, batchBarEl, loaded };
 };
 
+/** 深度遍历收集满足条件的节点（分组后卡片在组体里，不再挂在 list 直下） */
+const walk = (el, pred, out = []) => {
+  for (const child of el.children || []) {
+    if (pred(child)) out.push(child);
+    else walk(child, pred, out);
+  }
+  return out;
+};
+
 const cardsOf = (containerEl) => {
   // containerEl → 唯一的子节点即 `list`（`.archive-item-list.stash-list`）
   expect(containerEl.children.length).toBe(1);
   const list = containerEl.children[0];
   expect(list.className).toContain('stash-list');
-  return list.children;
+  return walk(list, (c) => String(c.className).includes('archive-card'));
 };
 
 describe('renderStashList 渲染路径（回归守护：缺失声明 ⇒ 整块暂存区恒空）', () => {
@@ -201,5 +213,70 @@ describe('renderStashList 渲染路径（回归守护：缺失声明 ⇒ 整块�
     const labels = batchBarEl.children.map((c) => c.innerHTML || c.textContent || '');
     expect(labels.join('|')).not.toContain('批量转换');
     expect(labels.join('|')).toContain('载入为源');
+  });
+});
+
+describe('renderStashList 分组视图（R-A1）', () => {
+  beforeEach(() => { installDom(); resetStashGroupCollapse(); });
+  afterEach(() => { delete g.document; resetStashGroupCollapse(); });
+
+  const groupsOf = (containerEl) => walk(containerEl, (c) => String(c.className) === 'stash-group');
+  const headText = (group) => group.children[0].children.map((c) => c.textContent || '').join(' ');
+
+  it('默认按来源分组：同来源两张卡进同一组，组头带计数徽标', async () => {
+    const { containerEl } = await setup();
+    const groups = groupsOf(containerEl);
+    expect(groups.length).toBe(1);
+    expect(groups[0].dataset.group).toBe('upload');
+    expect(headText(groups[0])).toContain('上传');
+    expect(headText(groups[0])).toContain('2 项 · 2.0 KB');
+    const body = groups[0].children[1];
+    expect(body.children.length).toBe(2);
+  });
+
+  it('两种来源 ⇒ 两组，声明序 upload 在前、宿主导出在后', async () => {
+    h.records = [rec('f-a', 'a.zip'), { ...rec('f-b', 'b.zip'), origin: 'host-export' }];
+    const containerEl = makeEl('div');
+    await renderStashList({ containerEl, onLoadFile: () => {}, onListChanged: () => {} });
+    const groups = groupsOf(containerEl);
+    expect(groups.length).toBe(2);
+    expect(groups[0].dataset.group).toBe('upload');
+    expect(groups[1].dataset.group).toBe('host-export');
+    expect(headText(groups[1])).toContain('宿主导出');
+  });
+
+  it('组头含折叠钮与三态组勾选（className 契约，CSS/交互依赖）', async () => {
+    const { containerEl } = await setup();
+    const head = groupsOf(containerEl)[0].children[0];
+    const cls = head.children.map((c) => String(c.className));
+    expect(cls.join(' ')).toContain('stash-group-toggle');
+    expect(cls.join(' ')).toContain('stash-group-box');
+    expect(cls.join(' ')).toContain('stash-group-label');
+    expect(cls.join(' ')).toContain('stash-group-count');
+  });
+
+  it('groupBy=null ⇒ 平铺回退：卡片直接挂在 list 下，无组节点（内置回退开关）', async () => {
+    h.records = [rec('f-a', 'a.zip'), { ...rec('f-b', 'b.zip'), origin: 'host-export' }];
+    const containerEl = makeEl('div');
+    await renderStashList({ containerEl, groupBy: null, onLoadFile: () => {}, onListChanged: () => {} });
+    expect(groupsOf(containerEl).length).toBe(0);
+    const list = containerEl.children[0];
+    expect(list.children.length).toBe(2);
+    expect(String(list.children[0].className)).toContain('archive-card');
+  });
+
+  it('折叠组后重渲染仍保持折叠（模块级视图态跨渲染保持）', async () => {
+    const { containerEl } = await setup();
+    const group = groupsOf(containerEl)[0];
+    const head = group.children[0];
+    const toggle = head.children.find((c) => String(c.className).includes('stash-group-toggle'));
+    toggle.fire('click', {});
+    expect(group.children[1].hidden).toBe(true);
+
+    // 重渲染（新容器）：折叠态保持
+    const container2 = makeEl('div');
+    await renderStashList({ containerEl: container2, onLoadFile: () => {}, onListChanged: () => {} });
+    const group2 = groupsOf(container2)[0];
+    expect(group2.children[1].hidden).toBe(true);
   });
 });

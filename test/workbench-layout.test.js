@@ -121,10 +121,11 @@ describe('阶段门控：初始态只给「上传 + 选项槽」（用户 2026-1
     expect([...visibleModules('running', 'out')].sort()).toEqual(['action', 'log', 'quota', 'source']);
   });
 
-  it('done 含产物与日志', () => {
+  it('done 含产物与日志，且保留打包选项（换目标连转是核心场景，2026-10-24 修正）', () => {
     const v = visibleModules('done', 'out');
     expect(v).toContain('products');
     expect(v).toContain('log');
+    expect(v).toContain('pack');
   });
 
   it('每个阶段 × 每个流程的组合都有定义（无空洞）', () => {
