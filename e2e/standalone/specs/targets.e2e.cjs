@@ -69,12 +69,13 @@ module.exports = {
     t.ge('T3 前置门：源包解析出角色卡', full.chars.count, 1, JSON.stringify(full.chars));
     t.ge('T4 前置门：源包解析出聊天记录', full.chats.count, 1, JSON.stringify(full.chats));
 
-    // ============ ① 默认 = 「轻量清单」模式（扩展实体**不打包**）============
-    // ⚠️ 首版这里断言「扩展在 third-party 下」⇒ 三条假红。查证：UI 的扩展模式 radio
-    //    **默认选中 `manifest`**（`workbench-template.js:176` 的 `checked`），而该模式按设计
-    //    「不打包扩展实体代码，但合成索引与安装脚本」。断言少了这个前提 ⇒ 预期本身是错的。
-    const defaultMode = await page.$eval('input[name="extension-mode"]:checked', (el) => el.value);
-    t.eq('T5 默认扩展模式 = 轻量清单（后续断言的**前提**，必须显式记录）', defaultMode, 'manifest');
+    // ============ ① 轻量清单模式（扩展实体**不打包**）============
+    // ⚠️ 2026-10-24 改写：extension-mode 的 radio 已于 2026-10-14 被枚举下拉取代
+    //    （10-14-ui-full-rewrite R-02），且**默认值变为「完整扩展包」**（旧 radio 默认 manifest）。
+    //    本节改为：先断言新默认，再显式切「只导出清单」跑轻量路径。
+    const defaultMode = await page.$eval('#extension-mode-select', (el) => el.value);
+    t.eq('T5 默认扩展模式 = 完整扩展包（2026-10-14 枚举化后的新默认）', defaultMode, 'full');
+    await page.selectOption('#extension-mode-select', 'manifest');
 
     await page.selectOption('#target-select', 'st');
     await page.click('#btn-convert');
@@ -93,19 +94,13 @@ module.exports = {
       JSON.stringify(lite.names.filter((n) => n.startsWith('_convert/') || n.endsWith('.json'))));
     let rowIndex = 1;
 
-    // ============ ② 切到「完整」模式后跑四目标兼容矩阵 ============
-    // 扩展模式的 radio 在**折叠区**里 ⇒ 可见性门会超时（实测：`check()` 30s、`check({force})`
-    // 也点不动 —— 元素本身没被渲染到可点位置）。故走 DOM 事件路径，
-    // 随后由 T10 **回读**确认真的切过去了（回读才是判据，动作方式不是）。
-    await page.evaluate(() => {
-      const el = document.querySelector('input[name="extension-mode"][value="full"]');
-      if (!el) return;
-      el.checked = true;
-      el.dispatchEvent(new Event('change', { bubbles: true }));
-    });
+    // ============ ② 切回「完整」模式后跑四目标兼容矩阵 ============
+    // 2026-10-24：radio→枚举后直接 selectOption（旧 radio 藏在折叠区才需要 DOM 事件路径）。
+    // done 阶段已保留打包区（2026-10-24 修正），连转不再被阶段门控挡住。
+    await page.selectOption('#extension-mode-select', 'full');
     await page.waitForTimeout(150);
     t.eq('T10 扩展模式已切到「完整」（可打包扩展实体代码）',
-      await page.$eval('input[name="extension-mode"]:checked', (el) => el.value), 'full');
+      await page.$eval('#extension-mode-select', (el) => el.value), 'full');
 
     for (const target of ['st', 'l', 'tt', 'pt']) {
       const rule = TARGET_RULES[target];

@@ -300,44 +300,79 @@ export function hostSelectionCapability(platform) {
   const declared = BACKUP_SELECTION_SUPPORT[platform];
   return {
     supported: declared === true,
-    known: declared !== undefined,
-    reason: declared === true ? '宿主透传勾选' : '全量导出后插件内过滤',
+    known: declared !== undefined,        // 区分「确认不支持」与「未取证」
+    reason: declared === true ? '宿主透传勾选' : '全量导出后插件内过滤',   // 状态读数
   };
 }
 
 /**
- * 检测当前运行环境
+ * 拉取前预览文案（R-A5 纯函数）：发起宿主拉取前给用户看的**状态读数行**。
+ * 数据源零新增请求——类目数来自选择表，能力读数来自 `hostSelectionCapability` 声明表。
+ * 不支持透传的宿主按端点实际行为展示全量数（FULL_SELECTION 的真值类目数），不展示用户勾选数。
+ * @param {'st'|'luker'|string} platform 宿主平台码
+ * @param {Record<string, boolean>} [selection] 当前类目勾选（13 键表；透传宿主才采用）
+ * @returns {string} 如「将拉取 8 类目 · 宿主透传勾选」
+ */
+export function describeHostFetchPlan(platform, selection = null) {
+  const cap = hostSelectionCapability(platform);
+  const base = cap.supported && selection ? selection : FULL_SELECTION;
+  const count = Object.values(base).filter(Boolean).length;
+  return `将拉取 ${count} 类目 · ${cap.reason}`;
+}
+
+/**
+ * 宿主注册表（R-A4，数据驱动判定——新增宿主＝加一行，不改判定逻辑）。
  *
- * 判定协议（顺序不可颠倒，Luker 前端同时暴露两个全局对象）：
- * 1. Luker 专属信号 globalThis.lukerContext 存在 → luker
- * 2. globalThis.SillyTavern 存在 → st（Luker script.js:360 也暴露它，故必须后判）
- * 3. 都不存在 → standalone
+ * 判据全部为 2026-10-14 实测（四宿主取证，见 workbench-single-view.md §6）：
+ *  - `globalFlag`：前端全局标识（数组顺序即判定优先级；Luker 同时暴露 SillyTavern 全局，故必须最先判）
+ *  - `agentIncl` / `agentPrefix`：`/version` 响应 `agent` 串的二级复核特征
+ *  - `domProbe`：仅 st 用的 DOM 兜底（老版 ST 可能无全局只有挂载点）
+ */
+const HOST_REGISTRY = Object.freeze([
+  Object.freeze({ code: 'luker', globalFlag: 'lukerContext', agentPrefix: 'Luker', versionKeys: ['stCompatVersion'] }),
+  Object.freeze({ code: 'tt', globalFlag: '__TAURITAVERN__', agentIncl: 'TauriTavern' }),
+  Object.freeze({ code: 'pt', globalFlag: '__PURE_TAVERN__', agentIncl: 'PureTavern' }),
+  Object.freeze({ code: 'st', globalFlag: 'SillyTavern', agentPrefix: 'SillyTavern', domProbe: '#extensionsMenu' }),
+]);
+
+/** 注册表单条是否命中（globalFlag 为惰性 getter 时读取可能抛错，按未命中继续） */
+function registryHit(entry) {
+  try {
+    if (typeof globalThis[entry.globalFlag] !== 'undefined') return true;
+  } catch {
+    // lukerContext 惰性 getter 在宿主脚本未就绪时可能抛错，走后续判据
+  }
+  if (entry.domProbe && typeof document !== 'undefined' && document.querySelector(entry.domProbe)) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * 检测当前运行环境（第 1 级：前端全局，同步）
  *
- * 注意 lukerContext 是惰性 getter（首次读取触发 getContext()），需 try/catch。
- * @returns {{ platform: 'st'|'luker'|'standalone', isPlugin: boolean, confidence: 'frontend'|'none' }}
+ * 返回 platform ∈ st|luker|tt|pt|standalone：
+ *  - 命中注册表 → 对应宿主码（isPlugin: true）
+ *  - 无任何宿主信号 → `standalone`（独立 Web / Node）
+ *
+ * `unknown` **不在本层产生**——本层的信号集是穷举的（四宿主判据全量登记），
+ * 硬造一个不可达分支就是死代码。未登记宿主的兜底在两处：
+ *  - 第 2 级 `verifyHostPlatform()`：`/version` 响应形如宿主但映射不上任何注册项 → `unknown`；
+ *  - 展示层 `currentHostLabel()`：探测抛错 → `unknown`。
+ *
+ * 第 2 级复核（`/version` 的 `agent` 串）两级不一致以服务端为准。
+ *
+ * @returns {{ platform: 'st'|'luker'|'tt'|'pt'|'standalone', isPlugin: boolean, confidence: 'frontend'|'none' }}
  */
 export function detectHost() {
   if (typeof window === 'undefined') {
     return { platform: 'standalone', isPlugin: false, confidence: 'none' };
   }
-
-  let lukerContext = null;
-  try {
-    lukerContext = (typeof globalThis.lukerContext === 'object' && globalThis.lukerContext) || null;
-  } catch {
-    // lukerContext 惰性 getter 在宿主脚本未就绪时可能抛错，忽略并走后续判定
+  for (const entry of HOST_REGISTRY) {
+    if (registryHit(entry)) {
+      return { platform: entry.code, isPlugin: true, confidence: 'frontend' };
+    }
   }
-  if (lukerContext) {
-    return { platform: 'luker', isPlugin: true, confidence: 'frontend' };
-  }
-
-  const hasSTGlobal = typeof globalThis.SillyTavern !== 'undefined'
-    || typeof window.SillyTavern !== 'undefined'
-    || Boolean(document.querySelector('#extensionsMenu'));
-  if (hasSTGlobal) {
-    return { platform: 'st', isPlugin: true, confidence: 'frontend' };
-  }
-
   return { platform: 'standalone', isPlugin: false, confidence: 'none' };
 }
 
@@ -509,14 +544,15 @@ export async function openStorageInspector() {
 }
 
 /**
- * 通过服务端 /version 端点二次校验宿主类型
+ * 通过服务端 /version 端点二次校验宿主类型（第 2 级复核，R-A4）
  *
- * 实测响应形状（research/host-probe-results.md）：
+ * 实测响应形状（research/host-probe-results.md + 2026-10-14 四宿主取证）：
  * - Luker: { agent: "Luker:2.7.0:...", stCompatVersion, pkgVersion, ... }
+ * - TT/PT: { agent: "…:TauriTavern" / "…:PureTavern", ... }
  * - ST:    { version: "1.18.0" }（老形状，无 agent 字段）
  *
- * @param {'st'|'luker'|'standalone'} frontendPlatform detectHost() 的前端判定结果
- * @returns {Promise<{ platform: 'st'|'luker'|'standalone', verified: boolean, version?: string }>}
+ * @param {'st'|'luker'|'tt'|'pt'|'unknown'|'standalone'} frontendPlatform detectHost() 的前端判定结果
+ * @returns {Promise<{ platform: 'st'|'luker'|'tt'|'pt'|'standalone', verified: boolean, version?: string }>}
  */
 export async function verifyHostPlatform(frontendPlatform) {
   let data = null;
@@ -532,13 +568,24 @@ export async function verifyHostPlatform(frontendPlatform) {
   let endpointPlatform = 'standalone';
   if (data && typeof data === 'object') {
     const agent = typeof data.agent === 'string' ? data.agent : '';
-    if (agent.startsWith('Luker') || 'stCompatVersion' in data) {
+    // TT/PT 先判：两者的 agent 串可能同时含 ST 兼容字样，特征子串更具辨别力
+    const ttHit = HOST_REGISTRY.find((e) => e.code === 'tt' && e.agentIncl && agent.includes(e.agentIncl));
+    const ptHit = HOST_REGISTRY.find((e) => e.code === 'pt' && e.agentIncl && agent.includes(e.agentIncl));
+    if (ttHit) {
+      endpointPlatform = 'tt';
+    } else if (ptHit) {
+      endpointPlatform = 'pt';
+    } else if (agent.startsWith('Luker') || 'stCompatVersion' in data) {
       endpointPlatform = 'luker';
     } else if (agent.startsWith('SillyTavern') || ('version' in data && !('stCompatVersion' in data))) {
       endpointPlatform = 'st';
     } else if (typeof data.pkgVersion === 'string') {
       // 有 pkgVersion 但 agent 不可识别：按版本主号兜底
       endpointPlatform = data.pkgVersion.startsWith('1.') ? 'st' : 'luker';
+    } else {
+      // 响应形如宿主（/version OK 且为对象）但映射不上任何注册项 → 未登记宿主兜底 unknown
+      // （能力表按 unknown 处理：known=false 保守路径，置灰而非隐藏）
+      endpointPlatform = 'unknown';
     }
   }
 

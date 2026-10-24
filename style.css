@@ -1029,6 +1029,117 @@
   padding-right: 4px;
 }
 
+/* R-A1 列表分组（源包按来源 / 产物按平台）：组头 = 折叠钮 + 三态组勾选 + 徽标计数 */
+#app.app-container .stash-group,
+#app.app-container .eq-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+#app.app-container .stash-group-head,
+#app.app-container .eq-group-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  color: var(--text-sub);
+}
+
+#app.app-container .stash-group-toggle,
+#app.app-container .eq-group-toggle {
+  padding: 0 4px;
+  min-width: 20px;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+#app.app-container .stash-group-label,
+#app.app-container .eq-group-label {
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+#app.app-container .stash-group-count,
+#app.app-container .eq-group-count {
+  font-size: 0.72rem;
+  opacity: 0.8;
+  white-space: nowrap;
+}
+
+#app.app-container .stash-group-body,
+#app.app-container .eq-group-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* R-A2 区块「?」帮助层：浮层锚定标题栏（R2 浮层必锚行），配色沿用既有卡片变量 */
+#app.app-container .wb-sec-head {
+  position: relative; /* 帮助浮层的定位基准 */
+}
+
+/* R-A5 拉取前预览行：状态读数 + 确认/取消（不是浮层，占源包区一行） */
+#app.app-container .host-fetch-preview {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 6px 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-card);
+}
+
+#app.app-container .host-fetch-preview .hfp-text {
+  font-size: 0.8rem;
+  color: var(--text-sub);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+#app.app-container .wb-help-btn {
+  margin-left: auto;
+  min-width: 20px;
+  padding: 0 5px;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+#app.app-container .wb-help-popover {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 180px;
+  max-width: 260px;
+  padding: 8px 10px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px var(--SmartThemeShadowColor, rgba(0, 0, 0, 0.35));
+}
+
+#app.app-container .wb-help-popover-title {
+  font-weight: 600;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+#app.app-container .wb-help-popover-points {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.78rem;
+  color: var(--text-sub);
+}
+
 #app.app-container .archive-empty {
   text-align: center;
   font-size: 0.75rem;

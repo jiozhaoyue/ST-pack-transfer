@@ -48,6 +48,42 @@ const ORIGIN_LABELS = {
   'host-export': { text: '宿主导出', cls: 'origin-host' },
 };
 
+/** 分组展示顺序：声明序即渲染序（R-A1）；未登记来源排其后（键序稳定） */
+const ORIGIN_GROUP_ORDER = Object.freeze(['upload', 'host-export']);
+
+/** 折叠态（纯视图态，模块级 Set；参与业务的选中态在渲染闭包内，不在此处） */
+const collapsedStashGroups = new Set();
+
+/** 重置分组折叠视图态（测试接缝；不触碰选中/业务状态） */
+export function resetStashGroupCollapse() {
+  collapsedStashGroups.clear();
+}
+
+/**
+ * 按来源给源包分组（纯函数，R-A1）
+ * @param {Array<{origin?: string}>} files
+ * @returns {Array<{key: string, label: string, items: Array}>} 每组带稳定顺序，空组不产出
+ */
+export function groupStashFiles(files) {
+  const buckets = new Map();
+  for (const f of files || []) {
+    const key = f.origin || 'upload';
+    if (!buckets.has(key)) buckets.set(key, []);
+    buckets.get(key).push(f);
+  }
+  const rank = (key) => {
+    const idx = ORIGIN_GROUP_ORDER.indexOf(key);
+    return idx === -1 ? ORIGIN_GROUP_ORDER.length : idx;
+  };
+  return [...buckets.entries()]
+    .sort((a, b) => (rank(a[0]) - rank(b[0])) || (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0))
+    .map(([key, items]) => ({
+      key,
+      label: (ORIGIN_LABELS[key] || { text: key }).text,
+      items,
+    }));
+}
+
 function triggerDownload(full) {
   if (!full?.blob || typeof document === 'undefined') return;
   const url = URL.createObjectURL(full.blob);
@@ -120,6 +156,8 @@ function openRowMenu(anchor, actions) {
  * @param {function(Array<object>): void} [params.onBatchConvert] (fileRecords[]) => void
  *   批量转换入口：把选中的源包逐个转换为当前目标格式。
  *   **未注入时不渲染该按钮**（与 onRestoreToHost 同形的可选接缝，保持本组件可脱离宿主单测）。
+ * @param {'origin'|null} [params.groupBy] 分组维度：'origin'=按来源分组（默认）；
+ *   null=平铺不分组（内置回退开关，单测两态锁定）
  */
 export async function renderStashList({
   containerEl,
@@ -131,6 +169,7 @@ export async function renderStashList({
   onRestoreToHost,
   onBatchConvert,
   confirmFn = null,
+  groupBy = 'origin',
 }) {
   if (!containerEl) return;
   // 删除确认走宿主原生弹窗（由调用方注入 host-bridge 的 confirmDialog），
@@ -219,7 +258,7 @@ export async function renderStashList({
     }));
   };
 
-  for (const file of files) {
+  const buildCard = (file) => {
     const isActive = file.id === activeFileId;
     const item = document.createElement('div');
     item.className = `archive-card ${isActive ? 'active' : ''}`;
@@ -301,7 +340,74 @@ export async function renderStashList({
       openRowMenu(btns.lastElementChild, actions);
     }));
     item.appendChild(btns);
-    list.appendChild(item);
+    return item;
+  };
+
+  if (groupBy === 'origin') {
+    // R-A1 按来源分组：组头 = 折叠钮 + 三态组勾选 + 徽标计数；空组不渲染（groupStashFiles 不产出）
+    for (const group of groupStashFiles(files)) {
+      const section = document.createElement('div');
+      section.className = 'stash-group';
+      section.dataset.group = group.key;
+
+      const head = document.createElement('div');
+      head.className = 'stash-group-head';
+      const body = document.createElement('div');
+      body.className = 'stash-group-body';
+
+      const collapsed = collapsedStashGroups.has(group.key);
+      body.hidden = collapsed;
+      const toggle = document.createElement('button');
+      toggle.type = 'button';
+      toggle.className = 'menu_button stash-group-toggle';
+      toggle.textContent = collapsed ? '▸' : '▾';
+      toggle.title = collapsed ? '展开' : '收起';
+      toggle.addEventListener('click', () => {
+        const now = !collapsedStashGroups.has(group.key);
+        if (now) collapsedStashGroups.add(group.key);
+        else collapsedStashGroups.delete(group.key);
+        body.hidden = now;
+        toggle.textContent = now ? '▸' : '▾';
+        toggle.title = now ? '展开' : '收起';
+      });
+
+      // 组勾选三态是选中集合的**派生读数**；点击只批量改组内成员，跨组多选不受影响
+      const groupBox = document.createElement('input');
+      groupBox.type = 'checkbox';
+      groupBox.className = 'stash-group-box';
+      groupBox.title = '组内全选';
+      const syncGroupBox = () => {
+        const hit = group.items.filter((f) => selected.has(f.id)).length;
+        groupBox.checked = hit === group.items.length && hit > 0;
+        groupBox.indeterminate = hit > 0 && hit < group.items.length;
+      };
+      groupBox.addEventListener('change', () => {
+        const allIn = group.items.every((f) => selected.has(f.id));
+        for (const box of body.querySelectorAll('.stash-select-box')) {
+          box.checked = !allIn;
+          if (allIn) selected.delete(box.dataset.id);
+          else selected.add(box.dataset.id);
+        }
+        syncGroupBox();
+        refreshBatchBar();
+      });
+
+      const label = document.createElement('span');
+      label.className = 'stash-group-label';
+      label.textContent = group.label;
+      const totalBytes = group.items.reduce((sum, f) => sum + (f.size || 0), 0);
+      const count = document.createElement('span');
+      count.className = 'stash-group-count';
+      count.textContent = `${group.items.length} 项 · ${formatBytes(totalBytes)}`;
+
+      head.append(toggle, groupBox, label, count);
+      for (const file of group.items) body.appendChild(buildCard(file));
+      syncGroupBox();
+      section.append(head, body);
+      list.appendChild(section);
+    }
+  } else {
+    for (const file of files) list.appendChild(buildCard(file));
   }
   containerEl.appendChild(list);
 

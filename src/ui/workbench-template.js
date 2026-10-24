@@ -92,6 +92,13 @@ export function getWorkbenchHtml({ isModal = false, isStandalone = false } = {})
           <p class="main-text" id="drop-main-text"><i class="fa-solid fa-cloud-arrow-up"></i> 选择数据包</p>
           <p class="sub-text" id="drop-sub-text"></p>
         </div>
+        <div class="host-fetch-preview" id="host-fetch-preview" hidden>
+          <span class="hfp-text" id="host-fetch-preview-text"></span>
+          <button type="button" class="menu_button menu_button_icon btn-accent" id="btn-host-fetch-go">
+            <i class="fa-solid fa-cloud-arrow-down"></i> <span>确认拉取</span>
+          </button>
+          <button type="button" class="menu_button" id="btn-host-fetch-cancel">取消</button>
+        </div>
         <div id="stash-list"></div>
         <div id="stash-batch-bar" hidden></div>
       </div>

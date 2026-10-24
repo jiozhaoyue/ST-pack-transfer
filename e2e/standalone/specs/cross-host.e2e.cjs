@@ -75,12 +75,8 @@ async function convertAllTargets(ctx, fixturePath) {
       return { ok: false, reason: 'no-plan', perTarget, pageErrors: h.rec.pageErrors };
     }
     // 「完整」扩展模式：让扩展实体也走一遍路由（否则轻量清单模式会跳过扩展面）
-    await h.page.evaluate(() => {
-      const el = document.querySelector('input[name="extension-mode"][value="full"]');
-      if (!el) return;
-      el.checked = true;
-      el.dispatchEvent(new Event('change', { bubbles: true }));
-    });
+    // 2026-10-24：radio 已被枚举下拉取代（默认即 full），显式选一次以稳态。
+    await h.page.selectOption('#extension-mode-select', 'full');
 
     let rowIndex = 0;
     for (const target of TARGETS) {

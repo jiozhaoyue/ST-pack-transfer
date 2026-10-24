@@ -141,5 +141,86 @@ module.exports = {
       // 收尾：点空白处收起菜单，不影响后续 spec
       await page.mouse.click(8, 300).catch(() => {});
     }
+
+    // ============ F 帮助层（R-A2）：有标题栏的可见区块全部带「?」，点开锚定浮层 ============
+    // 豁免无标题栏的结构性模块（如 quota 是一行状态行，不是 .wb-sec）——帮助契约只覆盖两种标题栏。
+    const helpAudit = await page.evaluate(() => {
+      const sections = [...document.querySelectorAll('#app [data-wb-module]')];
+      const withHead = sections.filter((s) => !s.hidden
+        && (s.querySelector('.wb-sec-head') || s.querySelector('.inline-drawer-header'))
+        && (s.offsetParent || s.getClientRects().length));
+      const withBtn = withHead.filter((s) => s.querySelector('.wb-help-btn'));
+      return { visible: withHead.length, withBtn: withBtn.length };
+    });
+    t.ok('F1 可见区块全部带「?」帮助入口', helpAudit.visible > 0
+      && helpAudit.visible === helpAudit.withBtn, JSON.stringify(helpAudit));
+
+    const helpOpen = await page.evaluate(async () => {
+      const btn = document.querySelector('#app .wb-help-btn');
+      if (!btn) return { clicked: false };
+      btn.click();
+      await new Promise((r) => setTimeout(r, 120));
+      const pop = document.querySelector('#app .wb-help-popover');
+      return {
+        clicked: true,
+        open: !!pop,
+        anchored: !!pop && !!pop.closest('[data-wb-module]'),
+        points: pop ? pop.querySelectorAll('.wb-help-popover-points li').length : 0,
+      };
+    });
+    t.ok('F2 点「?」开锚定浮层（含要点列表）', helpOpen.open && helpOpen.anchored
+      && helpOpen.points > 0, JSON.stringify(helpOpen));
+    await page.mouse.click(10, 400).catch(() => {}); // 点外部收起
+
+    // ============ G 拉取前预览行（R-A5）：模板产出且默认隐藏 ============
+    const previewInDom = await page.$eval('#host-fetch-preview', (el) => el.hidden).catch(() => null);
+    t.ok('G1 拉取前预览行在 DOM 且默认隐藏（独立态无宿主拉取入口）', previewInDom === true,
+      `hidden=${previewInDom}`);
+
+    // ============ H 分组列表（R-A1）：源包按来源、产物按平台、跨组多选 ============
+    const stashGroups = await page.evaluate(() => [...document.querySelectorAll('#stash-list .stash-group')]
+      .map((g) => ({
+        key: g.dataset.group,
+        count: (g.querySelector('.stash-group-count') || {}).textContent || '',
+        cards: g.querySelectorAll('.archive-card').length,
+      })));
+    t.eq('H1 上传后源包恰一组（upload）', stashGroups.length, 1, JSON.stringify(stashGroups));
+    t.ok('H2 组头徽标计数正确', stashGroups[0] && stashGroups[0].count.includes('1 项')
+      && stashGroups[0].cards === 1, JSON.stringify(stashGroups));
+
+    // 转两个目标 ⇒ 产物两组（SillyTavern + PureTavern），跨组各选一条 ⇒ 批量条计数 2
+    await page.selectOption('#target-select', 'st');
+    await page.click('#btn-convert');
+    t.ok('H3 第一次转换（→st）完成入队', await common.waitForQueue(page, 1));
+    await page.selectOption('#target-select', 'pt');
+    await page.click('#btn-convert');
+    t.ok('H4 第二次转换（→pt）完成入队', await common.waitForQueue(page, 2));
+    await page.waitForTimeout(300);
+
+    const eqGroups = await page.evaluate(() => [...document.querySelectorAll('#export-queue-panel .eq-group')]
+      .map((g) => ({
+        key: g.dataset.group,
+        label: (g.querySelector('.eq-group-label') || {}).textContent || '',
+        rows: g.querySelectorAll('.export-queue-item').length,
+      })));
+    t.eq('H5 两个目标 ⇒ 产物恰两组', eqGroups.length, 2, JSON.stringify(eqGroups));
+    t.ok('H6 组标签与目标平台一致（st→SillyTavern / pt→PureTavern）',
+      eqGroups.some((g) => g.key === 'st' && g.label === 'SillyTavern')
+      && eqGroups.some((g) => g.key === 'pt' && g.label === 'PureTavern'),
+      JSON.stringify(eqGroups));
+
+    const crossSelect = await page.evaluate(() => {
+      const boxes = [...document.querySelectorAll('#export-queue-panel .eq-group .eq-select-box')];
+      if (boxes.length < 2) return { ok: false, boxes: boxes.length };
+      boxes[0].checked = true;
+      boxes[0].dispatchEvent(new Event('change', { bubbles: true }));
+      boxes[1].checked = true;
+      boxes[1].dispatchEvent(new Event('change', { bubbles: true }));
+      const selBar = document.querySelector('#export-queue-panel .eq-selected-bar');
+      const label = selBar ? selBar.textContent : '';
+      return { ok: /已选\s*2/.test(label), label: label.slice(0, 40) };
+    });
+    t.ok('H7 跨组各选一条 ⇒ 批量条计数 2（组不切断多选）', crossSelect.ok, JSON.stringify(crossSelect));
+    await page.screenshot({ path: shot('s1-groups.png'), fullPage: true });
   },
 };

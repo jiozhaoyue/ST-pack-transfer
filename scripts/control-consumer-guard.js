@@ -53,6 +53,10 @@ export const CONTROL_CONSUMERS = Object.freeze({
   'btn-host-tree-confirm': 'index.js:302 — click 确认文件树',
   'btn-host-tree-cancel': 'index.js:305 — click 取消文件树',
 
+  // ── 拉取前预览行（R-A5，2026-10-24）──
+  'btn-host-fetch-go': 'index.js — click 确认发起宿主拉取（resolveHostFetchPreview(true)）',
+  'btn-host-fetch-cancel': 'index.js — click 取消本次拉取（resolveHostFetchPreview(false)）',
+
   // ── 输出三联（F 区）──
   'target-select': 'index.js:163/314 — .value 目标平台（st|l|tt|pt）',
   'compression-select': 'index.js:337 — .value 转 int → zip 压缩级别',
