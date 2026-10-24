@@ -109,6 +109,9 @@
   margin: 0 auto;
   min-height: 100vh;
   padding: 20px 12px;
+  /* 容器自身也铺底色（与下方 fixed 伪元素同色）：fullPage 截图/打印等场景下 fixed 层
+     只按视口合成会露出 body 白底（2026-10-24 视觉复审实测），容器铺色后任何合成方式都不断层 */
+  background: var(--bg-primary);
   /* 840px 内容宽 + 左右各 12px 内边距（padding 计入 margin auto 居中口径） */
   max-width: 864px;
 }
