@@ -33,17 +33,19 @@
 | [异步阶段超时/取消边界](./async-bounds.md) | **每个 `await` 的边界与取消路径**：阶段边界表（含 `file:line`）· 「总时长 vs 间隔」两种口径 · 三个**刻意不设上限**的阶段及其代价 · 停滞守卫契约 · **测量装置 `createStageRecorder`** 与**实测读数**（Dev ST：TTFB 141ms / 685MB 传输 60.1s / 块间最大间隔 651ms） | ✅ 就位（2026-10-14 新建 + **已取首批实测读数**；Luker / 慢速网络 / 上传方向仍未测） |
 | [工作台单一视图与局域网互传](./workbench-single-view.md) | **迁移向导外壳已整体删除**（六步步骤条 / 向导·高级模式切换 / 不兼容门）· `[hidden]` 与 `display` 的特异度事故 · **配色只用 `--SmartTheme*`** · 文案纪律（无说明、无黑话）· 控件纪律（枚举 / 单列 / 紧凑折叠）· 宿主动态识别四宿主判据 · **WebRTC 一次性取件码互传**与必须如实告知的两跳信令限制 | ✅ 就位（2026-10-14 新建；端到端实测 300 KB 字节级一致） |
 | [工作台三层架构与 CSS 铁律](./workbench-three-layer.md) | **模块/流程/外壳三层契约**（模块层唯一实现）· 阶段门控与 `hidden` 不移出 DOM 的理由 · **三条 CSS 铁律**（无外层滚动 / 浮层必锚行 / 单行不折，均带 E2E 断言）· body 级浮层的作用域根约定 · **单测夹具须与模板同构**（真实事故）· 模板字符串注释禁反引号 · 首装引导拦截点击（E2E 必读） | ✅ 就位（2026-10-24 新建；断言固化为 `e2e/standalone/specs/s1-remedies.e2e.cjs` 15/15） |
+| [UI 编排铁律](./ui-orchestration-rules.md) | **工作台 UI 定型规范**：布局/控件/文案/帮助四节（每节「规则 + 判据 + 守卫」）· **按钮动词封闭集**（新增按钮先扩表再写码）· 帮助层「常驻说明为零、说明只活在引导层与「?」浮层」· `HELP_TOPICS` 键与 `data-wb-module` 防悬空 | ✅ 就位（2026-10-24 新建；动词表断言 `test/ui-verb-table.test.js`，悬空断言 `test/help-topics.test.js`） |
 
 > 上述三份“迁移”文档是经用户批准记录的**后续目标契约**，不是当前实现事实；其中拟新增签名、测试和验收均有状态标注。不得据此宣称产品已完成迁移向导或双击离线交付。
 
-> 现行质量门槛：`npm test` 全绿（当前 **81 个测试文件 / 817 passed / 2 skipped**，零回归），
+> 现行质量门槛：`npm test` 全绿（当前 **85 个测试文件 / 892 passed / 2 skipped**，零回归），
 > 外加**五条**静态守卫 `npm run check:css-scope`、`npm run check:dom-injection`、
 > `npm run check:template-source`、`npm run check:control-consumer` 与 `npm run check:dom-scope`
 > （详见 quality-guidelines.md 与 dom-write-scope.md）。
 >
 > **实例 E2E（`npm run e2e`）不是发版门槛**，因为它需要实例在跑且**只许连 Dev 白名单**
-> （`8001` / `8003` / `8899`，Real 端口出现即拒绝）。当前覆盖：端口守卫负例（17 项）
-> + 加载冒烟（`8001` / `8003`）。契约与纪律见 `../guides/instance-e2e-and-data-sync.md`。
+> （`8001` / `8003` / `8899`，Real 端口出现即拒绝）。当前覆盖：端口守卫负例（21 项，
+> D-12 域名强制——实例目标一律 `*.localhost` 命名式域名，裸 `localhost`/`127` 与域名端口
+> 错配即拒）+ 加载冒烟（`8001` / `8003`）。契约与纪律见 `../guides/instance-e2e-and-data-sync.md`。
 > 同一事实只允许一处权威表述；遇到冲突以本目录文档与根 `CLAUDE.md` 为准。
 >
 > ⚠ **单个 spec 文件不得超过 Trellis 的 `context_injection.max_file_bytes`（32768 字节）**——
