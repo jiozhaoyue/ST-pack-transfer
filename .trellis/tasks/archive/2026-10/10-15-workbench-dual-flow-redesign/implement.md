@@ -21,31 +21,22 @@
   - `.category-right-group` 增 `flex-shrink: 0;`
   - 实测：`npm run check:css-scope` 通过；**320px 视口截图校对未做**（浏览器工具当轮不可用）
 
-- [ ] **1.3 行菜单覆盖上传区** —— **初判被现场证据推翻，未改动**
-  - 原假设「`.stash-row-menu` 缺定位祖先」**错误**：`.archive-buttons` 早在
-    `style.css:1107` 就有 `position: relative; /* 行内「更多」菜单的定位基准 */`（已提交，非在途）
-  - 截图中的重叠**尚未归因**。候选：`.archive-item-list` 的 `overflow-y:auto; max-height:250px`
-    （`style.css:1023-1029`）裁剪了绝对定位子元素；或重叠物实为 `#stash-batch-bar`
-    （该 id 在 `style.css` 中**零 CSS 规则**，全仓 grep 只命中模板与 JS）
-  - **未验证前不改动**——避免把「看起来像」当「是」（本仓已有多次此类返工）
+- [x] **1.3 行菜单覆盖上传区** —— 2026-10-24 真浏览器闭环：`e2e/standalone/specs/s1-remedies.e2e.cjs`
+  E3 断言「菜单矩形 ∩ #dropzone 矩形 === ∅」通过（menu t:455 vs dz b:402，不相交）。
+  原假设「缺定位祖先」确被现场证据推翻（`.archive-buttons` 有 relative）；截图中的历史重叠
+  未再复现，本项以断言关闭，若再复发由该 spec 红灯兜底
 
-- [ ] **1.4 消除外层滚动条** —— **真因已定位，真修法属 S2，移至 2.5**
-  - 取证：5 处 `overflow-y:auto` 中 4 处是**模块内滚动**且合法（`pre` 160px / `.archive-item-list`
-    250px / `.detail-file-list` 220px / `.log-stream-container` flex:1），
-    **唯一的外层滚动条**是 `style.css:1919-1924` 的模态根
-    `#st-converter-modal-overlay #app.app-container { max-height:92vh; overflow-y:auto }`
-  - 真因：8 个区块常驻 ⇒ 内容必然超 92vh。把滚动挪到内层 div 只是把滚动条换个位置，
-    **不解决「用户看到滚动条」**；真正的修法是 **2.5 阶段门控**（`idle` 态内容短到不触发滚动）
-  - ⇒ 本项不单独修，并入 2.5 验收（AC-1.4 随 2.5 一起判定）
+- [x] **1.4 消除外层滚动条** —— 2026-10-24 随 2.5 阶段门控验收闭环：`s1-remedies.e2e.cjs`
+  B2/B3 断言 idle 态根容器 `overflow-y=visible` 且 `scrollH(950) <= clientH(950)+1`
 
 - [ ] **1.5 S1 收口**
   - [x] `npm test` 全绿（821 passed / 2 skipped / 0 failed）
   - [x] 五条守卫全绿：`check:css-scope` / `check:dom-injection` / `check:template-source` /
     `check:control-consumer` / `check:dom-scope`（逐条实跑通过）
-  - [ ] **浏览器实测未做**——当轮 `preview_start` 不可用（分类器临时故障）。待补：
-    `npm run dev` 后上传一个包，确认 ① 无「待扫描」残留 ② 空类目置灰
-    ③ 320px 下「明细」单行 ④ 展开行菜单不压上传区
-  - [ ] 提交前必须解决**工作区在途改动归属**（见「提交边界」节）
+  - [x] **浏览器实测**——2026-10-24 补做：新增 `e2e/standalone/specs/s1-remedies.e2e.cjs`
+    **15/15 全绿**（① 零「待扫描」+ vectors/appPrivate 置灰禁勾 ② 320px 明细单行 21px
+    ③ 行菜单与上传区不相交 ④ idle 无外层滚动），四张截图落 `test-results/shots/s1-*.png`
+  - [x] 提交前必须解决**工作区在途改动归属**（见「提交边界」节）——2026-10-15 已裁定执行（`fb344bc`）
   - [x] 推送 origin —— `d96da6f..8834361`
 
 ### S1 提交记录（2026-10-15）
@@ -92,7 +83,10 @@
   - 实施中新增 `awaiting` 阶段：宿主拉取等文件树确认时必须保留 `scope`，否则死锁
   - 实测：E2E B4/B5 证明 idle 态范围与产物确实不显示
 
-- [ ] **2.6 QuotaBoard（配额 + 数据分布，宿主项可置灰）**
+- [x] **2.6 QuotaBoard（配额 + 数据分布，宿主项可置灰）** —— 落地于 `d3d9c6e`
+  （宿主数据分布 + 置灰），`be04efd` 修正宿主令牌映射颠倒（底色 BlurTint / 文字 BodyColor）；
+  实现在 `src/ui/usage-dashboard.js`（`is-disabled` + `aria-disabled`），覆盖于
+  `test/dom-scope.test.js` 与 E2E `workbench-shell`（E2/E3 置灰断言）、`smoke`；2026-10-24 复核绿
   - 现有 `usage-dashboard.js` 已有配额条；**「数据分布」维度与独立模式置灰未做**
   - ⚠ 本项**已由 `d3d9c6e` 落地**（「配额看板加宿主数据分布，不可用项改为置灰」），
     该复选框此前未随执行勾选，2026-10-15 复核时补记；AC-2.6 由 E2E `workbench-shell` E1–E3 守
@@ -124,7 +118,8 @@
   - [x] 新增 E2E `e2e/standalone/specs/workbench-shell.e2e.cjs`，**20/20 全绿**
   - [x] ⚠ 既有 E2E 24 项失败与本任务无关（`common.cjs` 还在点已删除的
         `#btn-wb-view-toggle`，见 `design.md` §11.3），已取证登记
-  - [ ] 提交 + 推送
+  - [x] 提交 + 推送 —— S2 各片已随 `3bcb599`/`93c803f`/`d3d9c6e`/`be04efd`/`37f0006` 提交并推送
+    （2026-10-24 核对 `git log origin/main..HEAD` 为空 ⇒ 无未推送提交）
 
 ## 收口
 
@@ -164,10 +159,10 @@
     独立态也开始探测宿主模块 `/scripts/storage-inspector.js` ⇒ **404 控制台错误**，
     把「零控制台错误」判据打红。修法：`setupStorageInspectorButton()` 先判 `host.isPlugin` 再探测
 
-- [ ] **3.1 规范落 `.trellis/spec/frontend/`**
-  - 三层分层契约 + `hidden` 而非移出 DOM 的理由 + 三条 CSS 铁律 + 「夹具须与模板同构」
-  - 挂 body 的自绘浮层只能用自有 id 作 CSS 作用域根（已入 css-scope 白名单）
-  - 注意：`component-guidelines.md` 已超 32 KB 上限 ⇒ **按主题新建文件**，不要追加
+- [x] **3.1 规范落 `.trellis/spec/frontend/`**
+  - 新建 `workbench-three-layer.md`（三层契约 + hidden 理由 + 三条 CSS 铁律 + 夹具同构 +
+    body 浮层作用域根 + 模板字符串注释陷阱 + 首装引导拦截），并登记进 `index.md` 表
+  - 未追加 `component-guidelines.md`（已超 32 KB 上限，按主题新建文件）
 - [ ] **3.3 任务归档**
 
 ## 未做（如实登记）
