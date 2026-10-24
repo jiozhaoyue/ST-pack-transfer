@@ -23,6 +23,27 @@ const REAL_PORTS = Object.freeze(new Set(['8002', '8004']));
 const FORBIDDEN_PORTS = Object.freeze(new Set(['8000']));
 
 /**
+ * D-12（2026-10-24 用户指令）：E2E 目标一律用**实例命名式域名**，禁止裸 localhost / 127。
+ *
+ * 为什么是 `<env>-<host>.localhost` 子域形态：
+ *  - 它是真正的域名（RFC 6762 special-use `.localhost` TLD），Chromium 原生解析到回环；
+ *  - 主机名里带 env（dev/real）⇒ 目标自描述，写错端口也能一眼看出意图（P-11 缓解）；
+ *  - PT 的 vite 8 默认 Host 校验只放行 `localhost` / `*.localhost` 子域——自定义域名
+ *    （如 dev-pt.tavern.test）会被 vite 拒绝，而改实例的 vite.config.ts 违反 L0-1（宿主源码禁改）。
+ *
+ * 注意：**Node 侧不认 `.localhost` 子域**（那是浏览器内置解析），Node 直连探测仍用回环 IP——
+ * 本守卫只管「页面自动化目标」。
+ */
+const DEV_DOMAINS = Object.freeze({
+  8001: 'dev-st.localhost',
+  8003: 'dev-luker.localhost',
+  8899: 'dev-pt.localhost',
+});
+
+/** 裸回环主机名：出现即拒（D-12） */
+const BARE_LOOPBACK_HOSTS = Object.freeze(new Set(['localhost', '127.0.0.1', '[::1]', '::1', '0.0.0.0']));
+
+/**
  * 断言目标是允许自动化的 Dev 实例。
  * @param {string} rawUrl 目标基址；**必须显式提供**，空值即失败
  * @returns {URL}
@@ -57,6 +78,15 @@ function assertDevTarget(rawUrl) {
       + `${[...DEV_PORTS].join(' / ')}（tavern-browser-automation）。`
       + '若确需新增目标，请显式修改白名单并说明理由，不要绕过本守卫。');
   }
+  if (BARE_LOOPBACK_HOSTS.has(u.hostname)) {
+    throw new Error(`拒绝启动：禁止裸回环主机名（${u.hostname}）——目标一律用实例命名式域名 `
+      + `${DEV_DOMAINS[u.port]}（D-12：用域名，禁 localhost/127）。`);
+  }
+  const expectedHost = DEV_DOMAINS[u.port];
+  if (expectedHost && u.hostname !== expectedHost) {
+    throw new Error(`拒绝启动：主机名 ${u.hostname} 与端口 ${u.port} 的登记域名不符`
+      + `（应为 ${expectedHost}，D-12 域名-端口配对强制）。`);
+  }
   return u;
 }
 
@@ -65,4 +95,4 @@ function isRealPort(port) {
   return REAL_PORTS.has(String(port));
 }
 
-module.exports = { assertDevTarget, isRealPort, DEV_PORTS, REAL_PORTS, FORBIDDEN_PORTS };
+module.exports = { assertDevTarget, isRealPort, DEV_PORTS, REAL_PORTS, FORBIDDEN_PORTS, DEV_DOMAINS };

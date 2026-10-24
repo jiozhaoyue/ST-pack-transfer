@@ -57,7 +57,7 @@ const INSTANCES = Object.freeze({
   'dev-st': Object.freeze({
     id: 'dev-st', side: 'dev', host: 'st', port: 8001,
     // ST `config.yaml` 的 `ssl.enabled: false` ⇒ 明文 HTTP（实测 http=200 / https=EPROTO）
-    url: 'http://127.0.0.1:8001',
+    url: 'http://dev-st.localhost:8001',
     dir: path.join(INSTANCES_ROOT, 'Dev', 'SillyTavern'),
     profile: PROFILES.dev,
     userDir: 'data/default-user',
@@ -67,7 +67,7 @@ const INSTANCES = Object.freeze({
   'real-st': Object.freeze({
     id: 'real-st', side: 'real', host: 'st', port: 8002,
     // 同 Dev ST：`ssl.enabled: false` ⇒ HTTP
-    url: 'http://127.0.0.1:8002',
+    url: 'http://real-st.localhost:8002',
     dir: path.join(INSTANCES_ROOT, 'Real', 'SillyTavern'),
     profile: PROFILES.real,
     userDir: 'data/default-user',
@@ -76,7 +76,7 @@ const INSTANCES = Object.freeze({
   }),
   'dev-luker': Object.freeze({
     id: 'dev-luker', side: 'dev', host: 'luker', port: 8003,
-    url: 'https://127.0.0.1:8003',
+    url: 'https://dev-luker.localhost:8003',
     dir: path.join(INSTANCES_ROOT, 'Dev', 'Luker'),
     profile: PROFILES.dev,
     userDir: 'data/default-user',
@@ -85,7 +85,7 @@ const INSTANCES = Object.freeze({
   }),
   'real-luker': Object.freeze({
     id: 'real-luker', side: 'real', host: 'luker', port: 8004,
-    url: 'https://127.0.0.1:8004',
+    url: 'https://real-luker.localhost:8004',
     dir: path.join(INSTANCES_ROOT, 'Real', 'Luker'),
     profile: PROFILES.real,
     userDir: 'data/default-user',
@@ -94,7 +94,7 @@ const INSTANCES = Object.freeze({
   }),
   'pt-web': Object.freeze({
     id: 'pt-web', side: 'dev', host: 'pt', port: 8899,
-    url: 'http://127.0.0.1:8899',
+    url: 'http://dev-pt.localhost:8899',
     dir: path.join(INSTANCES_ROOT, 'Dev', 'PureTavern', 'apps', 'web'),
     profile: PROFILES.dev,
     // PT 是纯前端：用户数据在浏览器 Profile（IndexedDB），**没有磁盘数据目录**

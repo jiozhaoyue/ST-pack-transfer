@@ -31,6 +31,14 @@
 
 等价实现见 `e2e/lib/guard.cjs`。**白名单 = `{8001, 8003, 8899}`；`{8002, 8004}` 出现即拒绝。**
 
+**域名强制（D-12，2026-10-24 用户指令）**：目标一律用**实例命名式域名**，裸 `localhost` / `127.0.0.1`
+一律拒绝，且**域名-端口必须配对**：`dev-st.localhost:8001` / `dev-luker.localhost:8003` /
+`dev-pt.localhost:8899`。为什么是 `.localhost` 子域而非自定义域名：PT 的 vite 8 默认 Host 校验只放行
+`localhost` 与 `*.localhost`，自定义域名会被 vite 拒，而改实例 `vite.config.ts` 违反 L0-1（宿主源码禁改）；
+ST/Luker 的白名单按**客户端 IP**（::1/127.0.0.1）判定，不查 Host，域名照常通过。
+**Node 侧不认 `.localhost` 子域**（那是 Chromium 内置解析）——Node 直连的就绪探测仍用回环 IP，
+守卫只管「页面自动化目标」。
+
 ```js
 const DEV_PORTS = new Set(['8001', '8003', '8899']);
 const REAL_PORTS = new Set(['8002', '8004']);

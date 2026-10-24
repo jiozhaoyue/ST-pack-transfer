@@ -9,7 +9,7 @@
  * （`harness.openInstance` 对 Real 端口必须在启动浏览器之前就抛错）。
  */
 
-const { assertDevTarget, isRealPort, DEV_PORTS, REAL_PORTS, FORBIDDEN_PORTS } = require('../lib/guard.cjs');
+const { assertDevTarget, isRealPort, DEV_PORTS, REAL_PORTS, FORBIDDEN_PORTS, DEV_DOMAINS } = require('../lib/guard.cjs');
 const { openInstance } = require('../lib/harness.cjs');
 const { getInstance } = require('../lib/instances.cjs');
 
@@ -55,14 +55,25 @@ module.exports = {
     throws(t, '非白名单端口 5173 被拒', () => assertDevTarget('http://127.0.0.1:5173'), '白名单');
     throws(t, '不可解析的 URL 被拒', () => assertDevTarget('not a url at all'));
 
-    // —— 正例：三个 Dev 目标放行且端口原样保留 ——
-    for (const [url, port] of [['https://127.0.0.1:8001', '8001'],
-      ['http://127.0.0.1:8003', '8003'], ['http://127.0.0.1:8899', '8899']]) {
+    // —— 负例：D-12 域名强制（裸 localhost / 127 / 域名端口错配） ——
+    throws(t, '裸 localhost 被拒（D-12）', () => assertDevTarget('http://localhost:8001'), '域名');
+    throws(t, '裸 127.0.0.1 被拒（D-12）', () => assertDevTarget('http://127.0.0.1:8001'), '域名');
+    throws(t, '域名与端口错配被拒（8001 配 PT 域名）',
+      () => assertDevTarget('http://dev-pt.localhost:8001'), '登记域名');
+
+    // —— 正例：三个 Dev 目标放行且端口/域名原样保留 ——
+    for (const [url, port, host] of [['http://dev-st.localhost:8001', '8001', 'dev-st.localhost'],
+      ['https://dev-luker.localhost:8003', '8003', 'dev-luker.localhost'],
+      ['http://dev-pt.localhost:8899', '8899', 'dev-pt.localhost']]) {
       let parsed = null;
       let err = null;
       try { parsed = assertDevTarget(url); } catch (e) { err = e; }
-      t.ok(`Dev ${port} 放行`, parsed !== null && parsed.port === port, err ? err.message : '');
+      t.ok(`Dev ${port} 放行（域名形态）`, parsed !== null && parsed.port === port
+        && parsed.hostname === host, err ? err.message : '');
     }
+    t.ok('DEV_DOMAINS 覆盖全部 Dev 白名单端口',
+      [...DEV_PORTS].every((p) => typeof DEV_DOMAINS[p] === 'string'),
+      JSON.stringify(DEV_DOMAINS));
 
     // —— 集成：守卫**真的**接在自动化路径上（不是只写了个函数没人用） ——
     // 把实例登记的 URL 换成 Real 端口，openInstance 必须在**启动浏览器之前**抛错。

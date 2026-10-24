@@ -5,7 +5,7 @@
  *   node e2e/run.cjs                       # 全部
  *   node e2e/run.cjs --only guard          # 只跑名字含 guard 的
  *   node e2e/run.cjs --only smoke          # 只跑冒烟
- *   node e2e/run.cjs --url https://127.0.0.1:8001   # 覆盖目标（仍过端口守卫）
+ *   node e2e/run.cjs --url http://dev-st.localhost:8001   # 覆盖目标（仍过端口守卫；D-12 域名强制）
  *
  * ⚠️ **后缀必须是 `.e2e.cjs`，不能是 `.spec.cjs`**：vitest 的默认 include 覆盖
  * `**\/*.spec.?(c|m)[jt]s?(x)`，用 `.spec.cjs` 会让 `npm test` **把这些用例当单测收集**，
