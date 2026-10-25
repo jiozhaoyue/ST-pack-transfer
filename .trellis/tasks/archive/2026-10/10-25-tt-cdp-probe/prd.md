@@ -25,11 +25,11 @@ WebView2 远程调试口 + Playwright `connectOverCDP` 冒烟取证，结论三�
 
 ## Acceptance Criteria
 
-- [ ] AC-1 CDP 口开启与连接的完整命令序列可复现（含环境变量、启动、验证三步）。
-- [ ] AC-2 冒烟链结果记录（通/不通 + 阻塞点 file:line / 报错原文）。
-- [ ] AC-3 结论三分支之一明确落 `research/tt-cdp-verdict.md`，并同步父任务 AC-7 勾结。
-- [ ] AC-4 若结论=并入矩阵：向 `e2e-instances-runner` 交付矩阵约定（目标/端口/tag）；若=不可行：替证策略落 `.trellis/spec/`。
-- [ ] AC-5 全程不动 TT 源码、不碰 Real 侧；端口登记不撞 L0-16 段位。
+- [x] AC-1 CDP 口开启与连接的完整命令序列可复现（含环境变量、启动、验证三步）。—— `tt-cdp-verdict.md` §复现（旧 debug exe + 静态 dev server 1430 + 环境变量 9223）
+- [x] AC-2 冒烟链结果记录（通/不通 + 阻塞点 file:line / 报错原文）。—— 全通：插件发现→启用→工作台挂载（`hasAppContainer=true`，视觉正常）；页面错误均为 TT 自身更新检查的 GitHub 网络失败，与本插件无关
+- [x] AC-3 结论三分支之一明确落 `research/tt-cdp-verdict.md`，并同步父任务 AC-7 勾结。—— 分支①并入 e2e:instances（tag `tt-cdp`）
+- [x] AC-4 若结论=并入矩阵：向 `e2e-instances-runner` 交付矩阵约定（目标/端口/tag）。—— `tt-cdp` 行：CDP 目标 `127.0.0.1:9223`（控制面）+ 前端 1430；TT 安装形态=真实目录拷贝（junction 被 TT 发现机制跳过，见 verdict 附带收获①）
+- [x] AC-5 全程不动 TT 源码、不碰 Real 侧；端口登记不撞 L0-16 段位。—— TT 仓 git 全程干净；数据根 AppData 属 P-11 高敏区已按纯增量纪律操作（快照 41 项扩展清单、安装物可整删）；9223/1430 均为 TT 专属口不撞实例段
 
 ## 范围外
 
