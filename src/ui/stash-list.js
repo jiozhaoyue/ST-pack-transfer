@@ -153,6 +153,9 @@ function openRowMenu(anchor, actions) {
  * @param {function(object): void} params.onLoadFile (fileRecord) => void
  * @param {function(): void} [params.onListChanged]
  * @param {function(object): void} [params.onRestoreToHost]
+ * @param {function(object): void} [params.onVaultSave] (fileRecord) => void
+ *   行内存入私有格式仓（vault-store）。**未注入时不渲染该菜单项**
+ *   （可选接缝，保持本组件可脱离仓单测）。
  * @param {function(Array<object>): void} [params.onBatchConvert] (fileRecords[]) => void
  *   批量转换入口：把选中的源包逐个转换为当前目标格式。
  *   **未注入时不渲染该按钮**（与 onRestoreToHost 同形的可选接缝，保持本组件可脱离宿主单测）。
@@ -167,6 +170,7 @@ export async function renderStashList({
   onLoadFile,
   onListChanged,
   onRestoreToHost,
+  onVaultSave,
   onBatchConvert,
   confirmFn = null,
   groupBy = 'origin',
@@ -326,6 +330,15 @@ export async function renderStashList({
           onClick: async () => {
             const full = await getFile(file.id);
             if (full?.blob) onRestoreToHost(full);
+          },
+        });
+      }
+      if (typeof onVaultSave === 'function') {
+        actions.push({
+          label: '存入仓',
+          onClick: async () => {
+            const full = await getFile(file.id);
+            if (full?.blob) onVaultSave(full);
           },
         });
       }

@@ -38,6 +38,8 @@ import { buildExtensionManifest } from './src/core/extension-manifest.js';
 import { TaskManager, TASK_STATES } from './src/core/task-manager.js';
 import { BATCH_STATUS, ITEM_STATUS, createRestoreBatch } from './src/core/restore-batch.js';
 import { renderStashList, filterStashFiles } from './src/ui/stash-list.js';
+import { renderVaultPanel, saveFilesToVault } from './src/ui/vault-panel.js';
+import { vaultPut } from './src/storage/vault-store.js';
 import { ExportQueue, renderExportQueue } from './src/ui/export-queue.js';
 import { initTaskControls } from './src/ui/task-controls.js';
 import { createCheckpointAdapter } from './src/storage/authority-store.js';
@@ -1176,6 +1178,68 @@ async function main(appRoot) {
       // （暂存区批量栏只有"载入为源/下载/写回宿主/删除"），而 README 承诺了"批量转换"
       // ⇒ 补上这个入口，让已有实现可达、让 README 的承诺成立。
       onBatchConvert: (records) => { void handleBatchConvert({ sourceRecords: records }); },
+      // 私有格式仓入口②：暂存区行内存仓（上传包/宿主拉取包/转换产物都可从行内「⋯」存入，
+      // 拉取的原生格式包由此进仓——与仓面板的文件入口互补）
+      onVaultSave: async (fileRecord) => {
+        try {
+          const entry = await vaultPut({
+            name: fileRecord.name,
+            blob: fileRecord.blob,
+            formatTag: fileRecord.layout,
+          });
+          if (entry) {
+            logger.info(`已存入仓: ${entry.name} [${entry.formatTag}]`);
+            view.setProgress(0, `已存入仓: ${entry.name}`);
+            await updateWorkspaceUI();
+          } else {
+            logger.warn('仓不可用，未存入');
+          }
+        } catch (err) {
+          logger.error(`存入仓失败: ${fileRecord.name}`, err);
+        }
+      },
+    });
+  }
+
+  // 私有格式仓面板（vault-store 的 UI：各酒馆原生格式包的后端完整存储与导入导出）
+  const vaultListEl = document.getElementById('vault-list');
+  const vaultBackendBadge = document.getElementById('vault-backend-badge');
+  const vaultFileInput = document.getElementById('vault-file-input');
+  const btnVaultAdd = document.getElementById('btn-vault-add');
+
+  async function refreshVaultPanel() {
+    if (!vaultListEl) return;
+    try {
+      await renderVaultPanel({
+        containerEl: vaultListEl,
+        badgeEl: vaultBackendBadge,
+        hostLayout: host.isPlugin ? hostLayoutCode(host.platform) : null,
+        onRestore: ({ name, blob }) => {
+          openRestoreModal({ name, blob, size: blob.size });
+        },
+        confirmFn: confirmDialog,
+        logger,
+        onChanged: () => { void updateWorkspaceUI(); },
+      });
+    } catch (err) {
+      console.warn('刷新仓面板失败:', err);
+    }
+  }
+
+  if (btnVaultAdd && vaultFileInput) {
+    // 仓入口①：任意文件存入（不限 zip——仓的本义就是"不兼容也原样存"）
+    btnVaultAdd.addEventListener('click', () => vaultFileInput.click());
+    vaultFileInput.addEventListener('change', async () => {
+      const files = Array.from(vaultFileInput.files || []);
+      vaultFileInput.value = '';
+      if (files.length === 0) return;
+      view.setProgress(0, `正在存入仓: ${files.length} 个文件`);
+      const res = await saveFilesToVault(files, {
+        logger,
+        onChanged: () => { void updateWorkspaceUI(); },
+      });
+      view.setProgress(100, `存入仓完成: 成功 ${res.ok} 个${res.fail > 0 ? `，失败 ${res.fail} 个` : ''}`);
+      await updateWorkspaceUI();
     });
   }
 
@@ -1411,6 +1475,7 @@ async function main(appRoot) {
     try {
       await refreshArchiveManagerUI();
       await refreshUsageDashboard();
+      await refreshVaultPanel();
       refreshExportQueueUI();
     } catch (err) {
       console.warn('刷新工作区 UI 失败:', err);

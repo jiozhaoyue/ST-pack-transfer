@@ -43,6 +43,10 @@ export const CONTROL_CONSUMERS = Object.freeze({
   // ── 源包与暂存区 ──
   'file-input': 'file-drop.js — change → .files 取上传文件',
 
+  // ── 私有格式仓（2026-10-26：vault-store 的 UI 入口）──
+  'btn-vault-add': 'index.js — click 触发 vault-file-input 选文件存入仓',
+  'vault-file-input': 'index.js — change → .files 经 saveFilesToVault 存入仓',
+
   // ── 类目工具按钮 ──
   'btn-select-all': 'category-filter.js:84 — click 全选',
   'btn-deselect-all': 'category-filter.js:89 — click 全不选',

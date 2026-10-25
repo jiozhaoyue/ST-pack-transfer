@@ -112,6 +112,23 @@ export function getWorkbenchHtml({ isModal = false, isStandalone = false } = {})
       </div>
     </section>
 
+    <!-- ═══ 私有格式仓：各酒馆原生格式包的原样保存与进出 ═══ -->
+    <section class="wb-sec" data-wb-module="vault">
+      <div class="wb-sec-head">
+        <span class="wb-sec-title"><i class="fa-solid fa-box-archive"></i> 仓</span>
+        <span class="vault-backend-badge" id="vault-backend-badge"></span>
+      </div>
+      <div class="wb-sec-body">
+        <div class="wb-tool-row">
+          <button type="button" class="menu_button btn-tool" id="btn-vault-add">
+            <i class="fa-solid fa-file-arrow-up"></i> 存入文件
+          </button>
+          <input type="file" id="vault-file-input" style="display: none;" multiple>
+        </div>
+        <div id="vault-list"></div>
+      </div>
+    </section>
+
     <!-- ═══ 打包设置 ═══ -->
     <section class="wb-sec" data-wb-module="pack">
       <div class="wb-sec-head"><span class="wb-sec-title"><i class="fa-solid fa-sliders"></i> 打包</span></div>
