@@ -25,6 +25,7 @@ const STORES = {
  * converted     转换生成的产物
  * delta         增量补丁包（基于基准 ZIP 差量）
  * split-part    智能分卷切片（组内关联）
+ * vault         私有格式仓条目（vault-store 的 IndexedDB 降级层）
  */
 export const ORIGINS = Object.freeze({
   UPLOAD: 'upload',
@@ -35,6 +36,7 @@ export const ORIGINS = Object.freeze({
   SOURCE_BACKUP: 'source-backup',
   REPORT: 'report',
   TARGET_BACKUP: 'target-backup',
+  VAULT: 'vault',
 });
 
 /**

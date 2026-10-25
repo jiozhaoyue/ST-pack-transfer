@@ -73,10 +73,10 @@ describe('流程声明：共享内核一致，分歧只准落在声明的三个�
 });
 
 describe('阶段门控：初始态只给「上传 + 选项槽」（用户 2026-10-15 裁定）', () => {
-  it('idle = 配额 + 上传槽 + 选项槽 + 常驻日志，且不含范围/产物/执行条', () => {
+  it('idle = 配额 + 上传槽 + 仓 + 选项槽 + 常驻日志，且不含范围/产物/执行条', () => {
     for (const flow of FLOW_IDS) {
       const v = visibleModules('idle', flow);
-      expect([...v].sort()).toEqual(['quota', 'source', 'log', FLOWS[flow].options].sort());
+      expect([...v].sort()).toEqual(['quota', 'source', 'vault', 'log', FLOWS[flow].options].sort());
       for (const absent of ['scope', 'products', 'action']) {
         expect(v).not.toContain(absent);
       }

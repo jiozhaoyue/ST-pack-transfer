@@ -29,6 +29,10 @@ export const HELP_TOPICS = Object.freeze({
     title: '产物',
     points: Object.freeze(['转换与拉取的成果都在此', '列表按目标平台分组', '可下载或存入工作区', '插件内可写回宿主']),
   }),
+  vault: Object.freeze({
+    title: '仓',
+    points: Object.freeze(['原样保存各酒馆私有格式包', '不兼容的包也能整包存放', '服务端存储为佳', '无服务端时存本机浏览器', '可导出可恢复可删除']),
+  }),
   pack: Object.freeze({
     title: '打包',
     points: Object.freeze(['选目标平台', '选压缩档位', '包名可用占位符', '可分卷']),

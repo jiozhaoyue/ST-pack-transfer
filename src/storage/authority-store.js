@@ -126,6 +126,35 @@ async function kvSetCheckpoint(client, key, manifest) {
   await kvSet(client, key, manifest);
 }
 
+// ===== KV 公开接缝（vault-store 等同仓模块用）=====
+//
+// KV 私有封装在上面，位置参数的坑也在上面注释里——导出这三个薄封装是为了让
+// vault-store 不必重新踩一遍签名坑。返回值约定：Get 失败/不可用返回 null，
+// Set/Delete 不可用返回 false（调用方自行决定降级路径）。
+
+/** @returns {Promise<boolean>} 是否写入成功 */
+export async function authorityKvSet(key, value) {
+  const client = await getAuthorityClient();
+  if (!client) return false;
+  await kvSet(client, key, value);
+  return true;
+}
+
+/** @returns {Promise<*|null>} 值或 null（不存在 / Authority 不可用） */
+export async function authorityKvGet(key) {
+  const client = await getAuthorityClient();
+  if (!client) return null;
+  return kvGet(client, key);
+}
+
+/** @returns {Promise<boolean>} 是否删除成功 */
+export async function authorityKvDelete(key) {
+  const client = await getAuthorityClient();
+  if (!client) return false;
+  await kvDelete(client, key);
+  return true;
+}
+
 // ===== 断点 checkpoint（TaskManager adapter 接缝）=====
 
 /**

@@ -32,6 +32,7 @@ export const MODULE_IDS = Object.freeze([
   'restore',   // 恢复选项（仅导入流程）
   'action',    // 主操作条 + 进度
   'products',  // 产物列表
+  'vault',     // 私有格式仓（各酒馆原生格式包的完整存储与导入导出）
   'log',       // 日志控制台
 ]);
 
@@ -54,17 +55,17 @@ export const FLOWS = Object.freeze({
   out: Object.freeze({
     label: '导出',
     options: 'pack',
-    modules: Object.freeze(['quota', 'source', 'scope', 'pack', 'action', 'products', 'log']),
+    modules: Object.freeze(['quota', 'source', 'scope', 'pack', 'action', 'products', 'vault', 'log']),
   }),
   in: Object.freeze({
     label: '导入',
     options: 'restore',
-    modules: Object.freeze(['quota', 'source', 'restore', 'action', 'products', 'log']),
+    modules: Object.freeze(['quota', 'source', 'restore', 'action', 'products', 'vault', 'log']),
   }),
 });
 
 /** 两个流程必须完全一致的共享内核（顺序无关）。 */
-export const SHARED_CORE_MODULES = Object.freeze(['quota', 'source', 'action', 'products', 'log']);
+export const SHARED_CORE_MODULES = Object.freeze(['quota', 'source', 'action', 'products', 'vault', 'log']);
 
 /** 允许两流程分歧的模块——超出这个集合即视为「流程各自长出了实现」。 */
 export const FLOW_VARIANT_MODULES = Object.freeze(['scope', 'pack', 'restore']);
@@ -93,11 +94,15 @@ export function visibleModules(stage, flow) {
   // 却是扫描/转换出错时唯一的可见反馈。按阶段藏起来会让人「看不到错误」——
   // 与「初始只有上传和打包区」并不冲突（那句话针对的是**内容区块**，不是状态条）。
   const persistent = ['log'];
+  // `vault` 在 idle / done 可见：存取私有格式包是**空闲期动作**，不参与
+  // scanned（选范围）/running（执行中）的注意力焦点；done 阶段回到视野，
+  // 让「刚拉取/刚转换的包顺手存仓」成为连续动作。
+  const idleExtra = ['vault'];
   let ids;
   switch (stage) {
     case 'idle':
       // 用户 2026-10-15：初始只有上传和打包区，上方显示配额与数据分布
-      ids = [...base, spec.options, ...persistent];
+      ids = [...base, ...idleExtra, spec.options, ...persistent];
       break;
     case 'scanned':
       ids = [...base, 'scope', spec.options, 'action', ...persistent];
@@ -114,7 +119,7 @@ export function visibleModules(stage, flow) {
     case 'done':
       // 2026-10-24（E2E 实测修正）：done 必须保留 options——否则第一次转换完成后
       // 打包区被藏，用户**再也无法换目标连转**（四宿主互转是核心场景，s1-remedies H4 抓出）。
-      ids = [...base, 'products', spec.options, 'action', ...persistent];
+      ids = [...base, 'products', ...idleExtra, spec.options, 'action', ...persistent];
       break;
     default:
       ids = [];
@@ -150,12 +155,13 @@ export function stageOf(state) {
 export const SHELL = Object.freeze({
   desktop: Object.freeze({
     // 左 = 数据侧（进/出），右 = 决策侧（范围/选项/执行）
-    left: Object.freeze(['quota', 'source', 'products', 'log']),
+    left: Object.freeze(['quota', 'source', 'products', 'vault', 'log']),
     right: Object.freeze(['scope', 'options', 'action']),
   }),
   mobile: Object.freeze({
     order: 'flow',                        // 按 FLOWS[flow].modules 顺序单列
     sticky: Object.freeze(['action']),    // 吸底，不随滚动跑掉
+    // vault 不进折叠清单：它是数据侧主内容（与 source/products 同列），移动端保持展开
     collapsible: Object.freeze(['scope', 'pack', 'restore', 'log']),
   }),
 });
