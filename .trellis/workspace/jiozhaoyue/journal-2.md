@@ -170,3 +170,34 @@ S1 四现症固化为 s1-remedies E2E（15/15）；三层架构与 CSS 铁律落
 ### Next Steps
 
 - B/C/D 线子任务创建（luker-selection-max / authority-st-capability / tt-cdp-probe / e2e-instances-runner / harness-reflow），建前按 L0-2 回填 PRD
+
+
+## Session 49: B/C 线三子任务登记 + Luker selection 契约七轮取证定案（luker-selection-max 完结归档）
+<!-- trellis-session: v=2 fp=09a7aadc752a48b6 -->
+
+**Date**: 2026-10-25
+**Task**: B/C 线三子任务登记 + Luker selection 契约七轮取证定案（luker-selection-max 完结归档）
+**Branch**: `main`
+
+### Summary
+
+登记 tt-cdp-probe/e2e-instances-runner/luker-selection-max 三子任务（PRD+manifest 全过 validate）；luker-selection-max 七轮黑盒取证（Dev 8003）：10 标准键布尔全有效、settings 与 backups/892.2MB 绑死（勾设置必拖备份占包 49.8%）、无 Content-Length、特殊键静默忽略——透传层现状已到顶（分支乙零产品代码改动），反选 settings 实测省 50.2%；解绑诉求登记 R-B2；spec host-capabilities 增补契约表+三条硬约束；父任务 AC-5 勾结；npm test 892 零回归五守卫全绿；任务归档
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `2dd2055` | feat(task)+docs(spec): B/C 线子任务登记 + Luker selection 契约七轮取证定案 |
+| `a29fdc8` | chore(task): archive 10-25-luker-selection-max |
+
+### Testing
+
+- [OK] npm test 892 passed / 2 skipped 零回归；五守卫全绿；取证只连 dev-luker.localhost:8003
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- C 线 tt-cdp-probe（WebView2 CDP 冒烟，结论定 e2e-instances 矩阵）→ e2e-instances-runner（吸收本次 163s 冷启动读数：restart 脚本 90s waitReady 不够）；B 线 authority-st-capability 在 Authority 仓建任务（含 settings↔backups 解绑诉求）
