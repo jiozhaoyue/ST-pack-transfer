@@ -83,6 +83,16 @@ describe('convert → l', () => {
     expect(JSON.parse(files.get('manifest.json').toString('utf8')).schemaVersion).toBe(1);
   });
 
+  // 2026-10-25 转正（源自 10-25-e2e-instances-runner 的口径审计）：锁 core 直调路径的
+  // 特殊类目丢弃语义——include* 参数默认 false 时 thumbnails/backups 不进产物、secrets 保留。
+  // 与 UI 路径（DEFAULT_SELECTION 13 键全 true ⇒ plan 报直通 10）是两条参数面，各自自洽。
+  it('st→l:thumbnails 与 backups 默认不进产物,secrets 保留', async () => {
+    const { files } = await runConvert(stEntries(), TARGETS.L);
+    expect(files.has('thumbnails/fixture-avatar.png')).toBe(false);
+    expect(files.has('backups/auto-2026.json')).toBe(false);
+    expect(files.has('secrets.json')).toBe(true);
+  });
+
   it('l→l 引擎旁路:dump 条目透传', async () => {
     const entries = [
       ...lEntries(),

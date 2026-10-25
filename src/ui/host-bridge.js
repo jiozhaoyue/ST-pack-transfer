@@ -772,6 +772,35 @@ export async function opfsHandleToFile(handle) {
  *   默认 `DOWNLOAD_STALL_TIMEOUT_MS`，传 `0` 关闭守卫。
  * @returns {Promise<Blob|{kind:'opfs', name:string, size:number, handle:FileSystemFileHandle}>}
  */
+/**
+ * Authority ST 选择性备份增强——特性检测（L0-11 唯一探测点）。
+ *
+ * ST 原生 `/api/users/backup` 忽略 selection（必全量）；Authority 装了
+ * `st-backup` 端点时（probe 响应带 `stBackup: true` 标记）提供类目级选择。
+ * **未装（404）/ 无标记 / 探测失败 ⇒ 一律 `{supported:false}`**，调用方回退
+ * 原生路径，纯前端主路径零依赖后端（探测有短超时兜底，不阻塞）。
+ */
+export async function probeAuthorityStBackup({ signal } = {}) {
+  try {
+    const response = await fetchWithTimeout('/api/plugins/authority/probe', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}',
+    }, {
+      timeoutMs: SHORT_FETCH_TIMEOUT_MS,
+      signal,
+      label: '探测 Authority 增强通道',
+    });
+    if (!response.ok) return { supported: false, reason: `probe ${response.status}` };
+    const data = await response.json();
+    const supported = data?.stBackup === true;
+    return { supported, reason: supported ? 'Authority 选择性备份' : '无 stBackup 标记' };
+  } catch {
+    return { supported: false, reason: 'Authority 不可达' };
+  }
+}
+
 export async function fetchHostBackup(platform, selection = null, {
   onPhase, taskId, signal, resumeCheckpoint,
   timings = null, stallTimeoutMs = DOWNLOAD_STALL_TIMEOUT_MS,
@@ -804,13 +833,42 @@ export async function fetchHostBackup(platform, selection = null, {
   };
   if (useRangeResume) headers.Range = `bytes=${resumeBytes}-`;
 
-  const response = await fetch('/api/users/backup', {
+  // Authority ST 增强通道（L0-11 适配器：装了增强、未装/失败回退原生全量）。
+  // 增强端点给类目级选择（ST 原生端点忽略 selection 必全量）；会话用户由
+  // Authority 侧 session 提供，body 只需 selection。
+  let requestUrl = '/api/users/backup';
+  let requestBody = JSON.stringify(body);
+  let viaAuthority = false;
+  if (platform === 'st') {
+    const enhanced = await probeAuthorityStBackup({ signal });
+    if (enhanced.supported) {
+      requestUrl = '/api/plugins/authority/host/st-backup';
+      requestBody = JSON.stringify({ selection: sel });
+      viaAuthority = true;
+    }
+  }
+
+  let response = await fetch(requestUrl, {
     method: 'POST',
     credentials: 'same-origin',
     headers,
-    body: JSON.stringify(body),
+    body: requestBody,
     signal,
   });
+
+  // 增强通道任何失败（探测过但请求失败/中途撤载）⇒ 静默回退原生全量路径再试一次
+  // （L0-11：增强不可用绝不让纯前端主路径失败；原生是 ST 的既定语义——全量+插件内过滤）。
+  if (!response.ok && viaAuthority) {
+    logger.warn(`Authority 增强通道不可用 (${response.status})，回退宿主原生全量拉取`);
+    viaAuthority = false;
+    response = await fetch('/api/users/backup', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers,
+      body: JSON.stringify(body),
+      signal,
+    });
+  }
 
   if (!response.ok) {
     let detail = '';
