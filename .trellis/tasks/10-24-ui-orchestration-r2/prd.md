@@ -85,7 +85,7 @@
 - [x] **AC-2** 每个区块有「?」入口，浮层仅含该区块说明；界面常驻说明文案为零（守卫保持全绿）。—— A 线落地，help-topics 5/5
 - [x] **AC-3** 《UI 编排铁律》落 `.trellis/spec/frontend/`，新增守卫断言全绿。—— `ui-orchestration-rules.md` + 动词表/悬空断言（index 登记于 2026-10-24 收口补齐）
 - [ ] **AC-4** PT 实例（8899）实测 `detectHost()` 返回 PT 平台码；unknown 兜底单测在。—— 单测已就位（detect-host 30/30）；8899 实测留待 C 线 e2e-instances-runner
-- [ ] **AC-5** Luker 同勾选拉取字节数较基线下降，附取证报告与实测数字。
+- [x] **AC-5** Luker 同勾选拉取字节数较基线下降，附取证报告与实测数字。—— `10-25-luker-selection-max` 七轮取证定案（2026-10-25）：全量 1.79GB；反选 settings 省 50.2%（透传层已生效零改动）；`settings↔backups` 绑死 892.2MB 登记为 R-B2 解绑需求；报告 `10-25-luker-selection-max/research/luker-selection-probe.md` + `deliverables/bytes-report.md`；spec 契约表落 `host-capabilities.md`
 - [ ] **AC-6** Authority PR 按该仓流程提交并登记链接；本仓特性检测单测覆盖装/未装两态。
 - [ ] **AC-7** TT CDP 取证有结论：可行→至少一条 TT 冒烟 spec；不可行→替证策略落 spec。
 - [ ] **AC-8** `npm run e2e:instances` 一键三 Dev 宿主冒烟全绿；`scripts/` 四脚本入库。

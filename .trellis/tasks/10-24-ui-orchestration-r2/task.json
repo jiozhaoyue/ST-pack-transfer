@@ -19,7 +19,10 @@
   "pr_url": null,
   "subtasks": [],
   "children": [
-    "10-24-ui-orchestration-impl"
+    "10-24-ui-orchestration-impl",
+    "10-25-luker-selection-max",
+    "10-25-tt-cdp-probe",
+    "10-25-e2e-instances-runner"
   ],
   "parent": null,
   "relatedFiles": [],

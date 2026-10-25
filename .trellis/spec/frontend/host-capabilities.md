@@ -289,3 +289,44 @@ export function hostSelectionCapability(platform) {
 「三态各产出 N 个必需节点」中的 N 由 `scripts/single-template-source.js` 的
 `REQUIRED_TEMPLATE_IDS` 决定。**spec 与文档里不要写死数字**——否则每次增删节点
 都要回头改一遍文档，且极易漏改（本项目已发生一次：41 → 40）。
+
+---
+
+## Luker `/api/users/backup` selection 契约（2026-10-25 七轮黑盒取证）
+
+> 取证任务 `10-25-luker-selection-max`（父任务 R-B1「极致省字节」）。Dev Luker 8003
+> 认证态实测；方法为黑盒差分 + zip 清单双验证。本节是**透传层的事实基线**——
+> 改 `fetchHostBackup` 的 luker 分支前先读本节。
+
+### 契约形状（全部实测）
+
+| 事实 | 内容 | 违者后果 |
+| --- | --- | --- |
+| selection = **10 标准键 × 布尔** | `characters/chats/lorebooks/presets/settings/secrets/assets/extensions/globalExtensions/vectors`；`true/false` 精准控制包内目录 | 传非布尔形状（数组等）会被**静默忽略**、按缺省处理——契约内没有文件/路径级粒度 |
+| 特殊键不是开关 | `backups/cache/appPrivate` 与未知键（如 `exclude`）被静默忽略，显式 true/false 均**零效果** | 以为传了 `backups:false` 就省字节——实测零差分 |
+| 空集 400 | `At least one backup category must be selected.` | 全 false 请求直接失败 |
+| 无 Content-Length | 200 响应一律 `transfer-encoding: chunked` | 拉取前**无法免费预估字节**；不要在 UI 承诺预估量 |
+| 缺省语义 | 多数键缺省=包含；**`globalExtensions` 缺省=排除（唯一特例）** | 产品层恒显式传 10 键（现状如此），不依赖缺省 |
+| 打包确定性 | 同 selection 重复请求**逐字节一致**；服务端按 selection 规范化指纹缓存 zip（复用 <10ms，新指纹重打包秒级） | 差分取证可靠；连续请求的耗时读数不反映打包成本 |
+
+### 键 → 包内目录映射 + `settings↔backups` 绑死（核心）
+
+- 每键 `false` 精准排掉对应目录（差分与清单双证）：
+  `settings`→`settings.json`+**`backups/`**；`extensions`→`extensions/`；`chats`→`chats/`；
+  `assets`→`user/`；`globalExtensions`→`public/`；`characters`→`characters/`+`OpenAI Settings/`；
+  `lorebooks`→`worlds/`；`presets`→presets 系；`secrets`/`vectors`→小文件。
+- **`settings` 键与 `backups/` 目录绑死**（本节最重要事实）：勾「设置」⇒ Luker 被迫把
+  `backups/`（本机 Dev 实测 892.2MB，占全量包 49.8%）一起打包，插件侧 `includeBackups=false`
+  只能**拉取后**丢弃——字节已过网络。契约内无分离开关。
+- `extensions-data/` **不进包**（与 `extensions/` 是两回事）。
+- 解绑诉求已登记 Authority PR 需求（父任务 R-B2）；本仓候选缓解「两段式拉取」
+  （settings:false 拉 + settings.json 单取注入）改动面大，未经裁决不得实施。
+
+### 对产品代码的三条硬约束
+
+1. **透传层只发 10 键布尔**（现状 `src/ui/host-bridge.js` 的 `FULL_SELECTION` 即此）；
+   不得发数组/嵌套形状（会被静默忽略，产生「以为排除了其实没有」的假象）。
+2. **`BACKUP_SELECTION_SUPPORT.luker = true` 的语义粒度**=「标准类目布尔」，
+   不升级表述为「按勾选精确省字节」——backups 绑死场景下这句话是假的。
+3. **字节读数不进产品 UI**：映射表随实例数据面漂移，静态值会误导用户；
+   只作开发参考（实测表见任务 `10-25-luker-selection-max/deliverables/bytes-report.md`）。
