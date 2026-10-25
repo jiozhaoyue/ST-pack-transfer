@@ -12,6 +12,11 @@
  *   node scripts/restart-instances.cjs                 # 全部六个
  *   node scripts/restart-instances.cjs --only dev-st,dev-luker
  *   node scripts/restart-instances.cjs --no-restart    # 只做插件同步，不重启进程
+ *   node scripts/restart-instances.cjs --wait-secs 300 # 就绪等待上限（默认 300）
+ *
+ * 就绪等待为何默认 300s（2026-10-25 实测）：Dev Luker 冷启动 163s——服务端插件
+ * 自动更新逐个 SSL 超时（GitHub 不可达，每个 30~100s）会拖住监听。90s 旧默认
+ * 会误报"超时未就绪"（实例随后仍会起来），e2e:instances 编排器依赖真实就绪态。
  */
 
 const path = require('path');
@@ -36,6 +41,8 @@ const argv = process.argv.slice(2);
 const onlyArg = argv.indexOf('--only');
 const only = onlyArg > -1 && argv[onlyArg + 1] ? argv[onlyArg + 1].split(',') : null;
 const noRestart = argv.includes('--no-restart');
+const waitArg = argv.indexOf('--wait-secs');
+const waitSecs = waitArg > -1 && Number(argv[waitArg + 1]) > 0 ? Number(argv[waitArg + 1]) : 300;
 const targets = only ? ALL.filter((t) => only.includes(t.id)) : ALL;
 
 const PLUGIN_NAME = 'st-zip-converter';
@@ -115,7 +122,7 @@ function startInstance(t) {
   console.log(`  ${t.id}: 已启动 (PID ${child.pid}) -> 端口 ${t.port}`);
 }
 
-async function waitReady(t, timeoutMs = 90_000) {
+async function waitReady(t, timeoutMs = 300_000) {
   const started = Date.now();
   while (Date.now() - started < timeoutMs) {
     if (isListening(t.port)) return true;
@@ -143,7 +150,7 @@ async function waitReady(t, timeoutMs = 90_000) {
   if (!noRestart) {
     for (const t of targets) startInstance(t);
     for (const t of targets) {
-      const ok = await waitReady(t);
+      const ok = await waitReady(t, waitSecs * 1000);
       console.log(`  ${t.id}: ${ok ? '就绪' : '超时未就绪'}`);
     }
   } else {

@@ -41,15 +41,22 @@ if (targets.length === 0) {
   const { chromium } = loadPlaywright();
   // PT 前端体量大，headless 下渲染进程 Target crashed（2026-10-15 实测两次）；
   // 改有头模式——仍是脚本驱动，不需要人操作。
-  const browser = await chromium.launch({
-    headless: false,
-    args: ['--disable-dev-shm-usage', '--no-sandbox', '--disable-gpu', '--disable-software-rasterizer'],
-  });
+  //
+  // ⚠ 必须用**持久化档案**（2026-10-25 实测定位）：PT 前端的扩展可见性绑定浏览器
+  // IndexedDB——`browser.newContext()` 临时档装完即丢，e2e 的 `.pw-profile-dev` 看不到
+  // （此前 pt-load 的绿靠早期人工装进该档案的旧记录）。与 `e2e/lib/instances.cjs`
+  // 的登记共用同一档案，装完即对矩阵可见。
+  const { PROFILES } = require(path.resolve(__dirname, '..', 'e2e', 'lib', 'instances.cjs'));
+  const PROFILE_BY_ID = { 'dev-pt': PROFILES.dev, 'real-pt': PROFILES.real };
   let failed = 0;
 
   for (const t of targets) {
-    const context = await browser.newContext();
-    const page = await context.newPage();
+    const context = await chromium.launchPersistentContext(PROFILE_BY_ID[t.id] || PROFILES.dev, {
+      headless: false,
+      ignoreHTTPSErrors: true,
+      args: ['--disable-dev-shm-usage', '--no-sandbox', '--disable-gpu', '--disable-software-rasterizer'],
+    });
+    const page = context.pages()[0] || await context.newPage();
     const logs = [];
     page.on('console', (m) => logs.push(`${m.type()}: ${m.text()}`));
     page.on('pageerror', (e) => logs.push(`pageerror: ${e.message}`));
@@ -108,7 +115,6 @@ if (targets.length === 0) {
     await context.close();
   }
 
-  await browser.close();
   console.log(`\n完成：${targets.length - failed}/${targets.length} 成功`);
   process.exit(failed > 0 ? 1 : 0);
 })();

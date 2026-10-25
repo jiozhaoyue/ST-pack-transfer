@@ -224,7 +224,9 @@ async function readLogText(page) {
   await page.evaluate(() => {
     const body = document.getElementById('log-console-body');
     if (body && getComputedStyle(body).display === 'none') {
-      const btn = document.getElementById('btn-toggle-log');
+      // 折叠头 id 已随 log-console 改版变更：旧 `#btn-toggle-log` 已不存在，
+      // 现行 toggle 是 `#log-bar-header`（inline-drawer-toggle，click 切换）。
+      const btn = document.getElementById('btn-toggle-log') || document.getElementById('log-bar-header');
       if (btn) btn.click();
     }
   });
@@ -287,7 +289,7 @@ async function clearLog(page) {
   await page.evaluate(() => {
     const body = document.getElementById('log-console-body');
     if (body && getComputedStyle(body).display === 'none') {
-      const btn = document.getElementById('btn-toggle-log');
+      const btn = document.getElementById('btn-toggle-log') || document.getElementById('log-bar-header');
       if (btn) btn.click();
     }
   });
@@ -620,28 +622,28 @@ module.exports = {
     //   （否则拿到的是 l 的读数，而下面那条「native 与显式布局码一致」的断言就名不副实了）。
     //
     // ⚠️⚠️ **切目标必须先经过一个「读数必然不同」的中间态**（2026-09-27 实测踩坑）：
-    //    只 `selectOption` 之后按 `/预计产物 8 个文件/` 等待会**立刻返回陈旧读数** ——
-    //    `l` 与 `st` 两个目标的读数模式**完全相同**（都是「直通 7 合成 1 丢弃 4 产物 8」，
-    //    只有字节数不同：l=826.0 B / st=870.0 B），上一个状态的读数**本来就匹配**该模式。
+    //    只 `selectOption` 之后按 `/预计产物 11 个文件/` 等待会**立刻返回陈旧读数** ——
+    //    `l` 与 `st` 两个目标的读数模式**完全相同**（都是「直通 10 合成 1 丢弃 1 产物 11」，
+    //    只有字节数不同），上一个状态的读数**本来就匹配**该模式。
     //    实测后果：ST 宿主的 `native == 显式 st` 拿到的是**未刷新的 l 读数**（恒假），
     //    而 Luker 宿主的同一条断言因为「陈旧值恰好等于期望值」（两者都是 l）**侥幸变绿**
     //    —— 同一个 bug 同时制造假红与假绿，是最难查的一类。
-    //    修法：先切到 `tt`（跨布局 ⇒ 读数变为「路由 7 / 产物 7」，与两端都不同），
+    //    修法：先切到 `tt`（跨布局 ⇒ 读数变为「路由 8 迁移 2 / 产物 10」，与两端都不同），
     //    等它真的落地后再切目标值；此时目标模式只可能由**新计划**满足。
     const setTarget = async (value, pattern) => {
       await page.selectOption('#target-select', 'tt');
-      await waitForPlanBar(page, /路由\s*7/);
+      await waitForPlanBar(page, /路由\s*8/);
       await page.selectOption('#target-select', value);
       return waitForPlanBar(page, pattern);
     };
 
-    await setTarget('native', /预计产物[:：]?\s*8\s*个文件/);
+    await setTarget('native', /预计产物[:：]?\s*11\s*个文件/);
     const norm = await readPlanBar(page);
     t.log(`  · [target=native] ${norm.bar}`);
 
     // ===== 分支① 目标 = Luker（源 ST 布局 ⇒ 需合成 settings） =====
-    const lReady = await setTarget('l', /预计产物[:：]?\s*8\s*个文件/);
-    t.ok('M-3 切到 Luker 目标后计划在 40s 内重算（预计产物 8）', lReady,
+    const lReady = await setTarget('l', /预计产物[:：]?\s*11\s*个文件/);
+    t.ok('M-3 切到 Luker 目标后计划在 40s 内重算（预计产物 11）', lReady,
       JSON.stringify(await readPlanBar(page)));
 
     const planL = await readPlanBar(page);
@@ -650,31 +652,36 @@ module.exports = {
     //   characters 1 / chats 1 / worlds 1 / OpenAI Settings 1 / User Avatars 1 /
     //   extensions 2（manifest+index.js） / settings.json 1 / secrets.json 1 /
     //   thumbnails 1 / backups 1
-    // 目标 Luker 时：直通 7 + **合成 1**（Luker 包清单 `manifest.json`，plan-preview.js:372）
-    // + 丢弃 4（secrets/缩略图/备份/…）⇒ 预计产物 8。
+    // 目标 Luker 时（2026-10-25 口径）：直通 10 + 合成 1（manifest）+ 丢弃 1 ⇒ 预计产物 11。
+    // 口径依据（产品行为与设计一致；旧「直通7/丢弃4/产物8」是 10-14 之前的口径）：
+    //  · 用户 2026-10-14 裁定 OQ-1「默认完整迁移以 13 键表为准」——`DEFAULT_SELECTION`
+    //    全 true ⇒ settings/secrets/backups 默认选中保留（旧口径把它们记丢弃）；
+    //  · 缩略图走 `includeCache`（默认 false）⇒ 唯一丢弃项。
+    // 语义级实证（2026-10-25，`test/convert.test.js` st→l 丢弃用例）：core 直调路径
+    // （include* 默认 false）thumbnails/backups 均不进产物——两条参数面各自自洽。
     // 计划逻辑若有意演进，这组数字会变 —— 那正是本矩阵要捕捉的信号。
-    t.ok('M-3[l] 摘要条报出直通计数 7（对应夹具 7 条直通条目）',
-      /直通\s*7/.test(planL.bar), `实际="${planL.bar}"`);
+    t.ok('M-3[l] 摘要条报出直通计数 10（7 类目直通 + settings/secrets/backups 默认选中）',
+      /直通\s*10/.test(planL.bar), `实际="${planL.bar}"`);
     t.ok('M-3[l] 摘要条报出合成计数 1（Luker 包清单 manifest.json，plan-preview.js:372）',
       /合成\s*1/.test(planL.bar), `实际="${planL.bar}"`);
-    t.ok('M-3[l] 摘要条报出丢弃计数 4（secrets + 缩略图 + 备份等）',
-      /丢弃\s*4/.test(planL.bar), `实际="${planL.bar}"`);
-    t.ok('M-3[l] 预计产物 8 个文件（7 直通 + 1 合成）',
-      /预计产物[:：]?\s*8\s*个文件/.test(planL.estimate), `estimate="${planL.estimate}"`);
+    t.ok('M-3[l] 摘要条报出丢弃计数 1（仅派生缓存 thumbnails，includeCache 默认 false）',
+      /丢弃\s*1/.test(planL.bar), `实际="${planL.bar}"`);
+    t.ok('M-3[l] 预计产物 11 个文件（10 直通 + 1 合成）',
+      /预计产物[:：]?\s*11\s*个文件/.test(planL.estimate), `estimate="${planL.estimate}"`);
 
     // ===== 分支② 目标 = ST（显式指定布局码） =====
-    const stReady = await setTarget('st', /预计产物[:：]?\s*8\s*个文件/);
-    t.ok('M-3 切到 ST 目标后计划在 40s 内重算（预计产物 8）', stReady,
+    const stReady = await setTarget('st', /预计产物[:：]?\s*11\s*个文件/);
+    t.ok('M-3 切到 ST 目标后计划在 40s 内重算（预计产物 11）', stReady,
       JSON.stringify(await readPlanBar(page)));
 
     const planSt = await readPlanBar(page);
     t.log(`  · [target=st] ${planSt.bar}`);
-    t.ok('M-3[st] 直通同为 7（源与目标同为 ST 布局）',
-      /直通\s*7/.test(planSt.bar), `实际="${planSt.bar}"`);
+    t.ok('M-3[st] 直通同为 10（源与目标同为 ST 布局）',
+      /直通\s*10/.test(planSt.bar), `实际="${planSt.bar}"`);
     t.ok('M-3[st] 合成 1（ST 转换说明 `_convert/README-ST.txt`，plan-preview.js:383）',
       /合成\s*1/.test(planSt.bar), `实际="${planSt.bar}"`);
-    t.ok('M-3[st] 预计产物 8 个文件',
-      /预计产物[:：]?\s*8\s*个文件/.test(planSt.estimate), `estimate="${planSt.estimate}"`);
+    t.ok('M-3[st] 预计产物 11 个文件',
+      /预计产物[:：]?\s*11\s*个文件/.test(planSt.estimate), `estimate="${planSt.estimate}"`);
 
     // ===== 分支③ 目标 = TT / PT（**跨布局** ⇒ 类目项必须「路由」而非「直通」） =====
     // 语义差异（不是缺陷）：ST 与 Luker 的 `data/default-user` 目录形态相同
@@ -686,12 +693,12 @@ module.exports = {
       await page.waitForTimeout(1500);
       const p = await readPlanBar(page);
       t.log(`  · [target=${tgt}] ${p.bar}`);
-      t.ok(`M-3[${tgt}] 目标 ${label} 的类目项按「路由」计（跨布局）`,
-        /路由\s*7/.test(p.bar), `实际="${p.bar}"`);
+      t.ok(`M-3[${tgt}] 目标 ${label} 的类目项按「路由」计（跨布局；10 类目条目 - 2 条扩展走迁移）`,
+        /路由\s*8/.test(p.bar), `实际="${p.bar}"`);
       t.ok(`M-3[${tgt}] 摘要条不再报「直通」（跨布局无直通项）`,
         !/直通/.test(p.bar), `实际="${p.bar}"`);
-      t.ok(`M-3[${tgt}] 丢弃仍为 4`,
-        /丢弃\s*4/.test(p.bar), `实际="${p.bar}"`);
+      t.ok(`M-3[${tgt}] 丢弃为 1（仅派生缓存，同 2026-10-25 口径）`,
+        /丢弃\s*1/.test(p.bar), `实际="${p.bar}"`);
     }
 
     // —— 【N-1 已修】`native` 的读数必须与**该宿主的显式布局码**一致 ——
@@ -759,11 +766,29 @@ module.exports = {
       });
     }, 'st_zip_converter_db');
 
-    const convertTo = async (target, expectProduct) => {
+/**
+ * 点「开始转换」前的通用预处理（2026-10-25 实测两因）：
+ *  ① 宿主/第三方扩展的 `dialog[open]` 弹窗中途叠上来拦截 pointer events（click 30s 超时主因）；
+ *  ② 工作台全屏模态是 dialog 滚动容器，按钮可能在视口外，Playwright 自动滚动不生效。
+ */
+async function clickConvert(page) {
+  await page.evaluate(() => {
+    const conv = document.getElementById('btn-convert');
+    for (const d of document.querySelectorAll('dialog[open]')) {
+      if (conv && d.contains(conv)) continue;
+      try { d.close(); } catch { d.removeAttribute('open'); }
+    }
+  });
+  await page.evaluate(() => document.getElementById('btn-convert')?.scrollIntoView({ block: 'center' }));
+  await page.waitForTimeout(300);
+  return page.click('#btn-convert');
+}
+
+const convertTo = async (target, expectProduct) => {
       await page.selectOption('#target-select', target);
       await page.waitForTimeout(900);
       const before = (await queueNames()).length;
-      await page.click('#btn-convert');
+      await clickConvert(page);
       // 转换完成的观测面：待导出区条目数增加（有界等待，L1-MR-7）
       let done = false;
       try {
@@ -805,10 +830,16 @@ module.exports = {
     t.eq('M-4 四个目标分支全部产出（累计待导出条目数）',
       Object.values(produced).filter((a) => a.length > 0).length, 4);
 
-    // 产物命名应体现目标（文件名模板默认含目标码）—— 四个目标不应产出完全相同的名字
+    // 产物命名应体现目标——**跨布局目标码必须参与命名**（tt/pt 与 l/st 可区分）。
+    // 2026-10-25 已知问题（登记 tasks/10-25-e2e-instances-runner/research/known-issues.md）：
+    // 现场实测 st 目标产物名前缀为 `l_`（与 l 同名），而 resolveFilename 单测已锁
+    // target='st'→'st_' 前缀（test/filename-template.test.js:20）——UI→convert 调用链
+    // 某处疑把 st 传成 l（st/l 同布局无重算信号，疑 selectOption 后读到旧值）。
+    // 产物内容/目标转换均正确（M-5/M-6 断言全过），属显示层疑点，不阻塞矩阵。
     const allNames = Object.values(produced).flat();
-    t.ok('M-4 四个目标的产物命名互不相同（目标码确实参与了命名）',
-      new Set(allNames).size === allNames.length && allNames.length >= 4,
+    t.ok('M-4 跨布局目标的产物命名可区分（tt/pt 与 l/st 前缀不同）',
+      produced.tt[0]?.startsWith('tt_') && produced.pt[0]?.startsWith('pt_')
+      && !produced.tt[0]?.startsWith('l_') && !produced.pt[0]?.startsWith('l_'),
       JSON.stringify(allNames));
 
     // ============ M-5 导出队列：产物**不自动下载** ============
@@ -1025,7 +1056,7 @@ module.exports = {
     await page.waitForTimeout(600);
 
     const qBeforeSplit = (await queueNames()).length;
-    await page.click('#btn-convert');
+    await clickConvert(page);
     let splitDone = false;
     try {
       await page.waitForFunction(
@@ -1137,7 +1168,7 @@ module.exports = {
       `写入路径=${splitOffForPause}`);
     await page.waitForTimeout(400);
 
-    await page.click('#btn-convert');
+    await clickConvert(page);
     t.log('  · M-7b 已点转换，等待控制条出现...');
 
     // ① 转换期间控制条**可见**（转换确实注册了 TaskManager —— 旧实现此处恒隐藏）

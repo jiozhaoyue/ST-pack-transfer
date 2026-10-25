@@ -32,11 +32,25 @@ module.exports = {
     ).then(() => true).catch(() => false);
     t.ok('P1 PT 页面骨架就绪（`#send_form` 出现）', ready);
 
-    const drawerAppeared = await page.waitForFunction(
-      (id) => Boolean(document.getElementById(id) && document.querySelector(`#${id} .st-converter-drawer-app`)),
-      DRAWER_ID, { timeout: 90_000 },
+    // AC-4（父任务 10-24-ui-orchestration-r2）：detectHost 两级判定的 PT 判据实测——
+    // 第 1 级 `__PURE_TAVERN__` 全局；第 2 级 /version 的 agent 串含 PureTavern（host-bridge HOST_REGISTRY）。
+    const platform = await page.evaluate(async () => ({
+      pureTavernGlobal: typeof globalThis.__PURE_TAVERN__ !== 'undefined',
+      versionAgent: (await fetch('/version').then((r) => r.text()).catch(() => '')).slice(0, 80),
+    }));
+    t.ok('P1b detectHost 第 1 级判据在 PT 实测成立（`__PURE_TAVERN__` 全局存在）',
+      platform.pureTavernGlobal, JSON.stringify(platform));
+    t.ok('P1c detectHost 第 2 级判据在 PT 实测成立（/version 含 PureTavern）',
+      /PureTavern/i.test(platform.versionAgent), `agent="${platform.versionAgent}"`);
+
+    // 2026-10-15 起插件抽屉路径已删除（改全屏模态）——旧断言等 `#st_zip_converter_settings`
+    // 抽屉（DRAWER_ID 定义已在 be04efd 删除，使用处残留成 ReferenceError，本日首跑炸出）。
+    // 改断言现行挂载形态：boot 时建好（隐藏）的全屏工作台模态。
+    const modalAppeared = await page.waitForFunction(
+      () => Boolean(document.getElementById('st-converter-modal-overlay')),
+      null, { timeout: 90_000 },
     ).then(() => true).catch(() => false);
-    t.ok('P2 插件抽屉已注入 PT（`#st_zip_converter_settings` 内有工作台容器）', drawerAppeared);
+    t.ok('P2 工作台模态已建好（boot 时建好但隐藏，点「打开」才显示）', modalAppeared);
 
     // 宿主注入点：菜单锚点与扩展设置面板（PT 兼容 ST 的这批 id）
     const spots = await page.evaluate(() => ({
@@ -147,8 +161,21 @@ module.exports = {
     }, null, { timeout: 60_000 }).then(() => true).catch(() => false);
     t.ok('P10 PT 上上传夹具后计划预览渲染（纯前端宿主也走同一条计划路径）', planned);
 
+    // 与 matrix 的 clickConvert 同款预处理：宿主系 popup dialog（PT 兼容 ST 形态）
+    // 中途叠上来会拦截 pointer events；工作台容器滚动也需原生 scrollIntoView。
+    const preClickConvert = () => page.evaluate(() => {
+      const conv = document.getElementById('btn-convert');
+      for (const d of document.querySelectorAll('dialog[open]')) {
+        if (conv && d.contains(conv)) continue;
+        try { d.close(); } catch { d.removeAttribute('open'); }
+      }
+      conv?.scrollIntoView({ block: 'center' });
+    });
+
     await page.selectOption('#target-select', 'st');
     const t0 = Date.now();
+    await preClickConvert();
+    await page.waitForTimeout(300);
     await page.click('#btn-convert');
     const queued = await page.waitForFunction(
       () => document.querySelectorAll('.eq-name').length >= 1, null, { timeout: 180_000 },
@@ -250,6 +277,8 @@ module.exports = {
       t.eq('P18 分卷阈值已写入 1（回读确认；fill 静默失败时退回程序化赋值）', applied, '1');
 
       const rowsBeforeSplit = await page.$$eval('.eq-name', (els) => els.length);
+      await preClickConvert();
+      await page.waitForTimeout(300);
       await page.click('#btn-convert');
       const parts = await page.waitForFunction(
         (n) => document.querySelectorAll('.eq-name').length >= n + 2, rowsBeforeSplit,
@@ -264,7 +293,14 @@ module.exports = {
         nums.length === newParts.length && nums.every((v, i) => v === i + 1), JSON.stringify(nums));
     }
 
-    t.eq('P15 功能闭环后本插件仍零报错', h.rec.pluginConsoleErrors.length, 0,
-      JSON.stringify(h.rec.pluginConsoleErrors.slice(0, 2)));
+    // 2026-10-25：本地 zip 安装源（编排器/安装脚本的一次性 http 服务）关闭后，PT 的
+    // 扩展资源重试会拉它并报 ERR_CONNECTION_REFUSED——URL 含插件名而被 harness 归因，
+    // 但这是**安装通道噪音**不是运行时错误（server 生命周期属安装步骤）。判定前剔除。
+    const runtimeErrors = h.rec.pluginConsoleErrors.filter(
+      (e) => !/http:\/\/127\.0\.0\.1:\d+\/st-zip-converter\.zip/.test(e.url || e.text || ''),
+    );
+    t.log(`  · P15 前置读数：归因本插件的错误 ${h.rec.pluginConsoleErrors.length} 条（剔除一次性安装源重试后 ${runtimeErrors.length} 条）`);
+    t.eq('P15 功能闭环后本插件仍零报错', runtimeErrors.length, 0,
+      JSON.stringify(runtimeErrors.slice(0, 2)));
   },
 };
