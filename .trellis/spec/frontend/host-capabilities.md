@@ -330,3 +330,38 @@ export function hostSelectionCapability(platform) {
    不升级表述为「按勾选精确省字节」——backups 绑死场景下这句话是假的。
 3. **字节读数不进产品 UI**：映射表随实例数据面漂移，静态值会误导用户；
    只作开发参考（实测表见任务 `10-25-luker-selection-max/deliverables/bytes-report.md`）。
+
+---
+
+## TauriTavern（TT）宿主事实（2026-10-25 CDP 取证）
+
+> 取证任务 `10-25-tt-cdp-probe`（父任务 R-C1/D-11）。改动 TT 相关的自动化/安装逻辑前先读本节。
+
+### TT 自动化通道（CDP 注入，已验证可行）
+
+- 启动链：仓内静态服务 `node scripts/tauri-dev-server.mjs`（1430，纯静态无编译）
+  + `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=9223` 直接跑
+  `src-tauri/target/debug/tauritavern.exe` → Playwright `chromium.connectOverCDP('http://127.0.0.1:9223')`。
+- **不要走 `pnpm tauri dev`**：本机 mingw 链接实测 `ld returned 37` 编不过；
+  「旧 debug 产物 + 静态 server」即可全链自动化（连接/枚举/evaluate/点击/截图全通）。
+- 浏览器目标是 `localhost:1430`（devUrl 写死于 TT 自身配置）——D-12 的实例命名式域名
+  约束适用于 8001/8003/8899 族 HTTP 实例；TT 桌面 WebView 无 DNS 形态，矩阵按
+  「CDP 控制面 9223」单列并在 guard 里开对应例外。
+
+### TT 扩展安装三条铁则
+
+1. **junction 无效**：TT 扩展发现**跳过 symlink/junction 目录**（实测 junction 装完重启
+   不可见；真实目录拷贝立即发现并自动启用）。TT 侧同步 = 文件拷贝（manifest/index/style/
+   src/ 四件即可，~2MB）。
+2. **数据根在 `AppData\Roaming\com.tauritavern.client\data`**（不在实例仓内），且本机有
+   **真实使用数据**——TT 无 Dev/Real 之分，属 **P-11 高敏区**：任何写操作必须纯增量、
+   先快照现有清单、安装物可整目录删除；自动化冒烟不得动 chats/characters 等用户数据。
+3. **删除 junction 必须用 `cmd /c rmdir`**：`rm -rf` 会穿透 junction 删掉目标工作区内容
+   （P-19 同形灾难）。
+
+### detectHost 判据实测
+
+TT 页面**同时暴露** `window.__TAURITAVERN__` 与 `window.SillyTavern` 全局（实测）——
+两级判定的「顺序不可颠倒」有真实宿主依据；`__TAURITAVERN__` 优先判 `tt` 的判据有效。
+TT 页面另实测到自身扩展更新检查的 GitHub 网络失败 console error（`/api/extensions/version`
+Git handshake failed）——**非本插件错误**，E2E 判定须按「只属于本插件」的既有口径过滤。
