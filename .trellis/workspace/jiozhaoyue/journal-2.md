@@ -201,3 +201,33 @@ S1 四现症固化为 s1-remedies E2E（15/15）；三层架构与 CSS 铁律落
 ### Next Steps
 
 - C 线 tt-cdp-probe（WebView2 CDP 冒烟，结论定 e2e-instances 矩阵）→ e2e-instances-runner（吸收本次 163s 冷启动读数：restart 脚本 90s waitReady 不够）；B 线 authority-st-capability 在 Authority 仓建任务（含 settings↔backups 解绑诉求）
+
+
+## Session 50: r2 任务群全线推进：luker 取证/tt-cdp/e2e:instances 错峰模型/harness 回流四件套/Authority ST 适配器（交接）
+<!-- trellis-session: v=2 fp=0b01b2597a11367b -->
+
+**Date**: 2026-10-26
+**Task**: r2 任务群全线推进：luker 取证/tt-cdp/e2e:instances 错峰模型/harness 回流四件套/Authority ST 适配器（交接）
+**Branch**: `main`
+
+### Summary
+
+五线并行推进至交接点：B-1 luker-selection-max 七轮取证完结归档（settings↔backups 绑死 892MB、反选省 50.2%、透传层零改动）；C-1 tt-cdp-probe 完结归档（CDP 链全通、TT 三铁则进 spec）；C-2 e2e-instances-runner 落地错峰模型（用户裁定计入规则：同刻只保被测宿主在线+收尾全停），st 93/93·luker 93/93·pt 28/28·guard 21/21 全绿，唯一阻断 KI-3（TT 重启后扩展停用+自动启用兜底未通）；B-2 Authority 仓 e4fb996（st-backup 手写 stored-zip 端点+probe 标记+5/5 测试）+本仓适配器 probeAuthorityStBackup 单测 8/8；D 线 harness f068c2c/b5e28d0（contributions 机制/tavern-ui-style skill/scan_register/MCP 查询面×2）。修复存量缺陷六项（DRAWER_ID 残留/M-3 口径/dialog 遮障/日志 id 改版/PT 临时档案安装/restore-probe 负载 flake 定性）。交接文档 workspace/HANDOFF-2026-10-25.md
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `098e158` | feat(e2e)+feat(host-bridge): e2e:instances 错峰模型落地 + Authority ST 适配器 + 六项存量缺陷修复（交接提交） |
+
+### Testing
+
+- [OK] npm test 900 passed / 2 skipped；五守卫全绿；错峰矩阵 st/luker/pt/guard 全绿、tt-cdp 待 KI-3
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- ① KI-3（TT 自动启用兜底，known-issues.md 三选一续法）→ 整轮 exit 0 → 勾 AC-1/AC-8；② 终跑 npm test 勾 AC-10；③ 归档 e2e-instances-runner 与 r2 父任务；④ harness C-002/C-003 回流审核；⑤ KI-1 st 命名疑点独立小任务；⑥ Authority st-restore 待治理裁定
