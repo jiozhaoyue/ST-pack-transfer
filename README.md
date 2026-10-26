@@ -1,243 +1,99 @@
-# ST-pack-transfer (全能酒馆数据包工作站)
+# ST-pack-transfer · 数据包转运
 
-> 🚀 **全平台跨酒馆（SillyTavern / Luker / PureTavern / TauriTavern）全能数据包工作站**
->
-> 具备**全闭环**前端架构：既是强大的酒馆内置全能工作站（可完全接替各酒馆原生导出，支持细粒度筛选、一键直出跨平台目标格式、增量写入恢复宿主与实时日志审计），又是完全免安装的零依赖独立 Web 应用与 GitHub Pages 静态站点。
+在 **SillyTavern / Luker / TauriTavern / PureTavern** 之间互转、搬运和恢复用户数据包。
 
----
+纯前端，装进酒馆就是一个面板；也能当独立网页用，不需要服务端。
 
-## 🌟 核心特性与全闭环能力
-
-### 1. 🏛️ 宿主数据导出与细粒度筛选（接替原生导出）
-- **单面板全闭环**：无需在不同酒馆设置菜单间来回跳转，所有导出、转换、体检与恢复均在插件内部一站式完成。
-- **细粒度类目自由勾选**：支持对 **角色卡 (characters)**、**聊天记录 (chats)**、**世界书 (lorebooks)**、**预设配置 (presets)**、**资产背景 (assets)**、**系统配置 (settings)**、**敏感密钥 (secrets)**、**扩展插件 (extensions)** 进行独立勾选与一键预设（全选、仅角色卡、仅聊天记录、安全脱敏）。
-- **角色与聊天智能联动**：可选联动逻辑，勾选角色或聊天时自动联动关联资源，确保头像背景与对话记录上下文完整不丢失。
-- **一步直出目标格式**：从当前宿主拉取数据时，可直接指定目标酒馆格式（如当前为 SillyTavern，直接一步直出为 TauriTavern 或 PureTavern 包），无需二次中转。
-
-### 2. 🔄 增量导出与一键恢复写入宿主（Incremental Support）
-- **增量合并恢复 (Merge Mode)**：支持将外部导入或转换后的数据包一键写入/恢复到当前宿主酒馆（调用 `/api/users/restore` 端点），保留酒馆已有数据，仅新增缺失项或更新同名冲突文件。
-- **全量覆盖恢复 (Overwrite Mode)**：支持二次警示确认的全量数据重置与恢复。
-- **离线多包增量合并 (Incremental Archive Merge)**：工作区内支持对两个 Zip 数据包执行差量合并，新版文件自动更新、历史独有文件完整保留，尤其针对 TauriTavern (TT) 与 SillyTavern 历史数据包提供无损补丁融合。
-
-### 3. ⚡ 7-Zip ZS 与 TauriTavern Method 93 (Zstandard) 透明兼容
-- 原生支持 **7-Zip-zstd (7-Zip ZS)** 以及 TauriTavern (Rust `zip-rs`) 生成的 **Method 93 (Zstandard 压缩)** Zip 数据包。
-- 无论数据包内的条目使用标准 Deflate 还是 Zstandard 压缩，均自动完成透明解压与标准化重构。
-
-### 4. 🧩 SillyTavern Git URL 插件免安装（零 npm 依赖）
-- 采用自包含纯 ESM 引擎（内建本地封装的 `zip.js` 与纯 JS `fzstd` 解压模块），杜绝浏览器原生运行时报 `Failed to resolve module specifier` 错误。
-- 在 SillyTavern 扩展管理器中直接粘贴 Git 仓库 URL 安装后，**无需运行 `npm install` 或 `npm run build`**，开箱即用。
-
-### 5. 📟 底部抽屉式实时日志与诊断控制台
-- 内置结构化日志中心，常驻于主面板底部微型状态栏，支持向上抽屉式平滑展开。
-- 支持实时高亮自动滚屏、级别标签过滤（`全部` / `信息` / `警告` / `错误`）、一键复制到剪贴板与一键下载 `.log` 审计文本文件。
-
-### 6. 🔌 可选 Authority 后端增强（纯前端为主）
-- **纯前端默认可用**：全部核心功能（导出/转换/增量/恢复/断点续传）在纯浏览器环境（IndexedDB/OPFS/内存 Blob）即可完整闭环，无需任何服务端依赖。
-- **Authority 可选增强**：当宿主安装了 [ST-Delegation-of-authority](https://github.com/) 服务端插件时，自动启用增强能力（产物服务端持久化归档、跨设备同步基础），不可用时静默降级，不影响主路径。
-- 集成为「适配器 + 特性检测 + 静默降级」模式，后端不可用绝不阻塞纯前端主路径。
-
-### 7. 📱 全屏幕与移动端极致响应式适配
-
-- 严格遵循所有 UI 在单一统一面板内的交互原则，杜绝割裂的弹窗与横向滚动溢出。
-- 针对手机竖屏深度优化：双列表自动垂直堆叠、触控按钮高度 $\ge 44\text{px}$、日志抽屉自适应半屏高度并支持平滑触控滚动。
-
-### 8. 🗃️ 聊天库（纯数据库模式）适配 —— 聊天不再"消失"
-
-有些聊天库插件（如 **ChatFilesys** 的「纯数据库模式」）会把聊天**收进数据库**，
-磁盘上的 `.jsonl` 只在导出时才生成。这会让"按文件搬运"的工具**静默丢掉全部聊天记录**。
-本工具为此加了一层适配（**特性检测 + 静默降级**，没有这类插件时行为与日志**完全不变**）：
-
-| 方向 | 做了什么 |
-|:---|:---|
-| **打包时补齐** | 宿主拉取后，把库里那些**磁盘上没有**的聊天一并打进包（源包已有的以源包为准，绝不覆盖） |
-| **从聊天库导出** | 只想把库里的聊天拷出来时，一键产出标准数据包（不拉整份用户数据） |
-| **还原后入库** | 还原只写磁盘文件，而纯库模式**读库不读盘** —— 故还原成功后会把包里聊天**录入库**，用户才看得到 |
-
-> ⚠ **前置条件**：需要聊天库插件暴露一个带版本号的接入接口（契约见
-> `.trellis/spec/frontend/chat-store-seam.md`）。**当前上游尚未实现该接口**，
-> 故上述能力在真实纯库环境下**还没跑通**（已按「不可用即静默透传」处理，不影响其它功能）。
-> 接口一落地，本工具无需改动即可生效。
-
-### 9. 🗄️ 私有格式仓：各酒馆原生格式包的完整后端存储
-
-- 任意酒馆的私有格式数据包（含与当前宿主不兼容的格式）可**原样整包**存入仓中，不做任何转换与过滤，字节精确。
-- 存储落**宿主服务端后端**（Authority blob 分块存储，4MB 分块流式写入）；未装 Authority 时降级为浏览器 IndexedDB，面板徽标明示当前存储层。
-- 仓条目支持导入（任意文件 / 暂存区行内「存入仓」）、导出下载、删除；条目格式与当前宿主一致时可一键恢复到宿主。
+[在线使用](https://jiozhaoyue.github.io/ST-pack-transfer/) · [作为扩展安装](#1-装进酒馆推荐) · [本地部署](#2-本地部署)
 
 ---
 
-## 🛠️ 使用方式
+## 什么是「四酒馆数据包」
 
-### 场景 1: 作为 SillyTavern / Luker 扩展插件安装（强烈推荐）
+四款酒馆都把用户数据（角色卡、聊天、世界书、预设、背景图、扩展……）放在各自的目录结构里，
+导出的 zip 只有对应酒馆认得：
 
-#### 方式 A: 在酒馆扩展管理中通过 Git URL 一键安装
-在 SillyTavern 的「扩展管理」->「从 URL 安装」输入框中直接粘贴：
+| 平台 | 导出包形态 | 怎么导入 |
+| :-- | :-- | :-- |
+| **SillyTavern**（ST） | 用户目录摊平在根 | 解压覆盖到 `data/<用户>/`，或用本工具一键写回 |
+| **Luker**（L） | 目录摊平 + `manifest.json` | 同上；支持增量合并写入 |
+| **TauriTavern**（TT） | `data/default-user/` 结构 | 桌面端导入 |
+| **PureTavern**（PT） | 与 TT 相近 + 扩展来源记录 | 导入时选 TT 迁移包 |
+
+于是换酒馆、备份迁移、把旧包搬给新设备时，常常「包是对的，但那边打不开」。
+本工具就是把这一步做掉：**任意一方的包 → 任意一方的包**，尽量不丢东西。
+
+## 能做什么
+
+- **四个方向互转**，包括部分酒馆用非标准压缩（Zstd / Method 93）的包。
+- **细粒度勾选**：角色卡、聊天、世界书、预设、资产、设置、密钥、扩展，逐项选。
+- **从宿主直接拉取**：不手动下载，工具向当前酒馆要数据，可一步直出成目标平台格式。
+- **恢复写入宿主**：合并（只补缺失/更新同名）或覆盖（二次确认）。
+- **大包友好**：分卷导出、断点续传（暂停后接着跑，不重做）。
+- **扩展打包二选一**：轻量清单（恢复时联网装回）或完整离线包（含扩展代码）。
+- **可选后端增强**：装了 [Authority](https://github.com/jiozhaoyue/ST-Delegation-of-authority) 时产物可服务端托管；没装就静默走浏览器本地，功能不缺。
+
+## 优点
+
+- **零依赖安装**：插件形态经 Git URL 克隆即可用，不需要 `npm install`，不需要 CDN。
+- **数据不出本机**：转换全程在浏览器里完成，没有上传。
+- **同一份界面三处可跑**：酒馆插件、独立网页、Node 测试环境共用一套核心逻辑。
+
+## 使用
+
+### 1. 装进酒馆（推荐）
+
+扩展管理 → 从 URL 安装，粘贴：
+
 ```
 https://github.com/jiozhaoyue/ST-pack-transfer.git
 ```
-点击安装即可，无需任何命令行或依赖构建步骤！
 
-#### 方式 B: 手动克隆至第三方扩展目录
-```bash
-cd <SillyTavern安装目录>/public/scripts/extensions/third-party/
-git clone https://github.com/jiozhaoyue/ST-pack-transfer.git
-```
-刷新酒馆页面后，在扩展列表中展开 **「数据包转运」** 并点击「打开面板」即可呼出全功能工作台。
+或手动克隆到 `public/scripts/extensions/third-party/`。
+刷新页面后，在扩展列表里展开 **「数据包转运」** → **「打开面板」**。
 
----
-
-### 场景 2: 本地独立 Web 工作站模式
+### 2. 本地部署
 
 ```bash
 git clone https://github.com/jiozhaoyue/ST-pack-transfer.git
 cd ST-pack-transfer
-
 npm install
-npm start
+npm run dev
 ```
-本地开发服务在 **`http://127.0.0.1:3040`** 启动（端口在 `vite.config.js` 里显式声明并 `strictPort`：
-**不用 5173** —— 该端口被本机 env-sync 桌面应用的 `devUrl` 占用，实测会串页；也不用 8000/3000 段）。
-支持离线 IndexedDB 工作区双列表、完全扫描规划、批量转换与自定义包名。
 
-想看**构建产物**（与云端部署同一份）则用 `npm run build && npm run preview`（`4173`）。
+打开 `http://127.0.0.1:3040`。
 
-> ⚠ **不要用「双击 index.html」的方式打开**：浏览器禁止 `file://` 下的 ES Module 加载
-> （origin 为 `null`），双击只会看到一句说明。独立形态**必须经 HTTP(S) 提供**
-> （`npm start` / `npm run preview` / 任意静态服务器 / 云托管均可）。
-
----
-
-### 场景 3: GitHub Pages 在线直接使用
-
-无需在本地安装任何 Node.js 环境或软件，直接访问官方静态部署页面：
-👉 **`https://jiozhaoyue.github.io/ST-pack-transfer/`**
-
----
-
-### 场景 4: 🚀 一键部署到自己的专属站点 (GitHub Pages / Vercel / Netlify)
-
-如果您希望拥有完全属于自己的独立转换工作站，本仓库已完成自动化 CI/CD 与相对路径深度适配，支持零门槛一键部署：
-
-#### 方案 A: 部署到自己的 GitHub Pages (推荐，免费且自动跟随更新)
-
-[![Fork to Deploy](https://img.shields.io/badge/GitHub-Fork_&_Deploy_to_Pages-2ea44f?style=for-the-badge&logo=github)](https://github.com/jiozhaoyue/ST-pack-transfer/fork)
-
-只需简单 3 步即可上线：
-1. **Fork 本仓库**：点击上方绿色徽标或页面右上角的 **[Fork]**，将项目复制到您的个人 GitHub 账号下。
-2. **启用工作流**：进入您 Fork 后的仓库，点击 **Actions** 标签页，点击绿色的 **「I understand my workflows, go ahead and enable them」** 按钮启用自动化构建。
-3. **开启 Pages 并触发**：
-   - 进入仓库 **Settings** -> **Pages**，在 **Build and deployment** 下的 **Source** 下拉框选择 **「GitHub Actions」**。
-   - 回到 **Actions** 标签页，在左侧点击 **Deploy to GitHub Pages**，点击右侧的 **Run workflow** 按钮。
-   - 约 20 秒后部署完成，即可在 `https://<您的GitHub用户名>.github.io/ST-pack-transfer/` 拥有永久私有的专属在线转换站！
-
-#### 方案 B: 一键部署至 Vercel / Netlify (极速秒级上线)
-
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/jiozhaoyue/ST-pack-transfer)
-[![Deploy to Netlify](https://www.netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy?repository=https://github.com/jiozhaoyue/ST-pack-transfer)
-
-点击上方按钮，登录对应平台并一键授权，平台将全自动配置并在全球 CDN 节点秒级部署完成。
-
-
----
-
-## 🗺️ 四大酒馆平台数据映射规则
-
-| 目标平台 | 布局形态 | 平台导入方式与注意事项 |
-|:---:|:---:|---|
-| **SillyTavern (ST)** | 摊平用户目录根 | 解压后覆盖到 `data/<handle>/` 目录；在插件环境下支持一键通过 API 恢复写入当前用户。 |
-| **Luker (L)** | 摊平目录 + `manifest.json` | 包含完整资产清单；在插件环境下支持增量合并写入 (`mode: merge`) 或全量覆盖。 |
-| **TauriTavern (TT)** | `data/default-user/` 结构 | 完美适配 TT 桌面端导入，支持 Method 93 (Zstandard) 自适应解密与转出。 |
-| **PureTavern (PT)** | TT 布局 + 合成 `extension-sources` | PT 导入选 TT 迁移包；用户级扩展已按 PT 规范自动迁移至 `third-party` 目录并合成来源记录。 |
-
----
-
-## 🧩 扩展打包模式（清单包不含扩展代码）
-
-转换时可二选一：
-
-| 模式 | 包内内容 | 恢复后行为 |
-|:---|:---|---|
-| **轻量清单模式**（推荐） | 只记清单，**不打包扩展代码与 `.git`**（体积可缩减 99%，杜绝 408 超时） | 按清单里的 Git URL **联网在线安装**（宿主 `depth: 1` 浅克隆，保留一键更新能力） |
-| **完整离线包** | 打包扩展实体代码 | 扩展随恢复直接写入；清单仅用于**更新引导**，不自动联网重装 |
-
-> ⚠ **清单包不含扩展代码**：恢复后需要**联网**才能装回扩展，且需同时满足三个条件——
-> 网络连通、宿主扩展安装端点可用（部分部署或权限配置会禁用它）、扩展仓库可访问（私有仓需手动处理）。
-> 需要完全离线可用时请选**完整离线包**。
-
-### `.git` 历史策略（仅「完整离线包」生效）
-
-完整离线包会带上每个扩展的 `.git`，而**历史 packfile 常占数据包体积过半**（实测一个真实包 503 MB 里 464 MB 是扩展 `.git`）。
-转换器的「Git 历史」三档可控制这部分：
-
-| 策略 | 包内保留的 `.git` | 酒馆「检查更新」 | 适用场景 |
-|:---|:---|:---|:---|
-| **Git 原样**（默认） | 全部条目，与磁盘上完全一致 | ✅ 完全不变 | 需要与来源逐字节一致的归档 |
-| **Git 瘦身** | 仅 `config` / `HEAD` / `index` / `refs/heads/<分支>`，外加一个合成的 `objects/.keep` | ✅ **仍可用**：首次更新会从 origin 自动补齐对象，此后自愈为完整仓库 | **迁移包推荐**（接收方能联网） |
-| **Git 剔除** | 不含 `.git` | ❌ 宿主不再认它是 Git 仓库，只能重新 `git clone` | 纯归档 / 接收方不需要在线更新 |
-
-> **「Git 瘦身」的两个前提，务必确认后再用**：
-> ① **接收方必须能联网** —— 对象存储已被剔除，首次「检查更新」要从源仓库重新拉取；
-> ② 首次更新**之前**该扩展的 `git status` 不可读（会报 `bad object HEAD`），
-> 这是对象缺失的必然结果，不影响宿主的更新链路（`checkIsRepo` → `branch` → `pull` 三步均实测通过），
-> 首次更新完成后 `status` 与 `fsck` 均恢复正常。
->
-> 接收方完全离线时，请改用 **Git 原样** 或 **Git 剔除**。
-
-### 恢复时的扩展安装面板
-
-恢复包含扩展的数据包后，面板会按三种状态分类展示，**只有「待安装」的扩展会被联网拉取**：
-
-| 状态 | 含义 | 可否勾选 |
-|:---|:---|:---:|
-| **待安装** | 清单记录了可用的 Git URL，尚未安装到本机 | ✅ 默认勾选 |
-| **本地已安装** | 本机已有同名扩展 | ✅ 默认不勾选 |
-| **包内已含** | 完整离线包已随恢复写入该扩展实体 | ❌ 无需安装 |
-| **无法在线安装** | 清单未记录可用 Git URL | ❌ 需手动获取 |
-
-若包内**没有任何可在线安装**的扩展，安装面板不会自动弹出（仅写入日志），避免打扰。
-
-### 仅导出扩展清单
-
-工作台的扩展模式区提供 **「仅导出扩展清单」** 按钮：只产出一份 JSON 清单
-（扩展名 / 展示名 / 安装 URL / 分支 / 提交），**不含扩展代码、不进包、不触发安装**，产物进入待导出区。
-适合审阅、分享或留档；也可用于比对两台设备上安装了哪些扩展。
-
----
-
-## 🧪 质量保障（怎么知道它是对的）
-
-本项目的质量门槛是**可执行的**，不是"看代码觉得没问题"：
+构建静态站点：
 
 ```bash
-npm test                 # 单测：64 个文件 / 610 项（纯逻辑层 100% 可测：无 DOM 依赖）
-npm run e2e:web          # 独立 Web / 云部署形态：337 项断言 / 17 个 spec（**不需要实例**）
-npm run e2e              # 实例侧：冒烟 + 功能矩阵（需要 Dev 实例在跑）
-npm run check:css-scope check:dom-injection check:template-source \
-        check:dom-scope check:control-consumer      # 五条静态守卫
+npm run build        # 产出 dist/
+npm run preview      # 本地预览 dist（4173）
 ```
 
-几条**判定纪律**（都是本项目实际付出代价后写下来的）：
+> 不要直接双击 `index.html`：浏览器禁止 `file://` 下加载 ES Module，双击只会看到一句说明。
+> 独立形态必须经 HTTP(S) 提供（`npm run dev`、`npm run preview` 或任意静态服务器）。
 
-- **先证明判定能抓到违规，再相信它报 0**：每条关键断言都做过"把它对应的功能改坏，
-  看它是否转红"的判别力证明（例如把构建的 `--base=./` 改成 `--base=/` ⇒ 云子路径那组
-  10 条如期转红）。
-- **不许拿耗时当判据**：性能相关的结论一律用**确定性事实**（例如产物体积、
-  压缩方法号 `0=Store / 8=Deflate`；同一份可压缩内容在 L0/L5/L9 下的体积单调不增），
-  墙钟时间只作读数 —— 因为负载波动会让"计时断言"变成假红。
-- **断言要锁不变量，不要锁机理**：见 `.trellis/spec/frontend/resume-checkpoint-invariant.md`
-  —— 那里记录了一处**静默数据损失**（暂停后续传产物缺条目）为什么被两层测试同时漏掉，
-  以及"这个功能坏了，这条断言会红吗？"这条判别法。
-- **灯光可归因**：实例侧 E2E 把页面报错分成"整页背景读数"与"只属于本插件"两栏，**只按后者判定**
-  （酒馆同页跑着几十个第三方扩展）。
+### 3. 在线使用
 
-> 曾经有一处**暂停 → 续传后产物缺条目**的静默数据损失，**2026-09-28 已修**（改真增量续传：
-> 暂停收尾成合法 zip 落 OPFS，续传 `appendZip` 原样搬运再接着写）。
-> 判据是**两条同时成立**：**跳过 N > 0 且 源 == 产物** —— 缺任一条都不算真增量。
-> 复现与读数：`npm run e2e:web -- --only pause-resume`；
-> 机理、为什么两层测试曾同时漏掉它，见上面那份规范页。
+无需安装：<https://jiozhaoyue.github.io/ST-pack-transfer/>
 
----
+想部署自己的站点，Fork 仓库后在 **Settings → Pages** 把 Source 设为 **GitHub Actions** 即可，
+后续每次推送自动发布。
 
-## 📜 许可证
+## 质量
 
-MIT License © 2026 [jiozhaoyue](https://github.com/jiozhaoyue)
+```bash
+npm test                      # 单元测试（纯逻辑层无 DOM 依赖）
+npm run e2e:web               # 独立 Web / 云部署形态，不需要实例
+npm run e2e                   # 实例侧冒烟与功能矩阵（需要 Dev 实例）
+npm run check:css-scope check:dom-injection check:template-source check:dom-scope check:control-consumer
+```
+
+静态守卫覆盖 CSS 作用域、宿主 DOM 写入范围、单一模板源、死控件；测试只锁不变量，不锁耗时。
+
+## 许可证
+
+GNU General Public License v3.0 or later（GPL-3.0-or-later）。
+完整条款见 [LICENSE](LICENSE)。
+
+Copyright (C) 2026 jiozhaoyue
