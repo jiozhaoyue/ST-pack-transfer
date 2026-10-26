@@ -1,13 +1,16 @@
-# 存储图表工作台 · 交接（2026-10-26）
+# 存储图表工作台 · 交接（2026-10-26，2026-10-27 评审后更新）
 
 ## 一、当前状态
 
 - 父任务：`10-26-storage-chart-workbench`（planning，0/6 子任务完成）
 - 子任务：`naming-injection` / `storage-chart` / `zones-flow` / `package-cards-vault` / `tutorial-copy` / `ui-demo`（全部 planning）
-- 规划产物：`prd.md`（R1–R8 + AC-1–AC-11）、`design.md`、`implement.md`
-- UI demo：`deliverables/ui-demo.html`（单文件离线；桌面 1280×900 与移动 430×900 截图校对；无控制台错误、无组件交错）
-- 产品代码：零改动；未跑 `npm test`（无代码变更）；任务未 `task.py start`
-- 截图证据：`test-results/ui2-*.png`、`ui3-*.png`（gitignored，不入库）
+- 规划产物：`prd.md`（R1–R8 + 2026-10-27 补充 R9–R12 + AC-1–AC-19）、`design.md`（§10–13 为评审轮增补）、`implement.md`
+- UI demo：`deliverables/ui-demo.html`（单文件离线；**评审轮已按用户逐条反馈改到 2026-10-27 版本**）
+- 产品代码：零改动；任务未 `task.py start`
+- 截图证据：`test-results/ui4/*.png`（gitignored，不入库）
+- 校验方式：Playwright 打开 `file://` 截图 + 控制台零错误；脚本在 `test-results/tmp/shot-demo.cjs`
+
+> ⚠️ 本文件可能落后于 `prd.md`；验收以 `prd.md` 为准。
 
 ## 二、本轮锁定的关键决策
 
@@ -70,3 +73,28 @@
 
 - 旧 `10-14-workbench-overhaul`（planning，0/3）与 `10-24-ui-orchestration-r2`（planning，4/4）未动，本计划不依赖它们。
 - 旧 `10-01-safe-migration-productization`（planning，12/12）仍是上一阶段总任务。
+
+## 八、2026-10-27 评审轮改动（已落到 demo）
+
+| 用户反馈 | 处理 |
+| --- | --- |
+| 目标平台配色要按图标取色 | ST `#a11b1b`、PT `#584078`、TT 浅黄 `#f8c034`、Luker 纯黑剪影；均写入 token 并只用于标识 |
+| Luker 图标错用了 ST 的 | 取证 `apple-icon-512x512.png`（提交 `d44656a6b`），换成真图标并垫浅底 |
+| 背景要随酒馆主题、不要独立配色 | 面板/文字/边框/强调全部改为 `--SmartTheme*` 派生；demo 增加「酒馆主题」深浅切换 |
+| 面板外要有明显轮廓 | 轮廓改由 BodyColor 派生（宿主 BorderColor 默认是全黑，深底不可见） |
+| 「在图表中查看」按钮与点卡重复 | 删除按钮；点卡即切换图表 |
+| 包名旁 `包·Luker_搬家包…` 太长 | 改为两区独立序号：图表组头 `导入05`，包卡只显示两位数字于图标角 |
+| 分卷要上下限、要显示 MB | 32–2048 MB，框旁 `MB`，越界提示、失焦钳制 |
+| 分卷后要变多张标准图表 | 每卷一张标准图表卡（卷号 + 本卷容量 + 整包容量），可下钻到子项装卷 |
+| 多选包批量改、移动端怎么办 | 桌面网格多组图表 + 批量条；移动端单列折叠，默认只展开第一卷 |
+| 图表树不精确到文件 | 按真实备份包重写整棵树（chats/角色/聊天、私有边车、user/files、backups…） |
+| 「宿主·Luker」与「当前宿主 Luker」重复 | 两处都删；顶栏徽标改为「宿主英文名 + 插件 / GitHub + Web」 |
+| 包名框要占满且可拖角 | 改为 textarea，满宽 + `resize:vertical` |
+| 日志显示不全 / 执行显示不全 | 日志移进顶栏弹窗；右栏面板改为「执行贴底、数据包占余量」 |
+| 桌面要能拖分隔条 | 加左右 8px 竖向 + 右栏横向分隔条，交叉点十字手柄可同时调两者 |
+| 数据包筛选行要固定 | 选择数据包/格式/排序固定，只有包卡列表滚动 |
+| 包名换行出现残句 | Canvas 量宽判定：折行尾段 ≥45% 才折两行，否则单行省略 |
+| 不允许重复 UI / 落单文字 | 删除导出区说明句、`共 N 个` 等旁注；说明只进「?」浮层 |
+
+**遗留待确认**：无。下一轮若要动产品代码，按 §四 顺序 `task.py start` 子任务，并把 demo 当作唯一 UI 基准。
+

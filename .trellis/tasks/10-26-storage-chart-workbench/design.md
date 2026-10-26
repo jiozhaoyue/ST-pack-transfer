@@ -138,7 +138,58 @@ src/storage/
 - `registerMenuButton`（扩展菜单注入）。
 - 模板里的独立「清理」与「差量」折叠区、独立「仓」区块。
 
-## 10. 风险与取舍
+## 10. 主题令牌与品牌色（2026-10-27 增补）
+
+**令牌继承**：面板不持有自己的色板，全部由宿主令牌派生（与项目 `style.css:35-57` 同一套映射）：
+
+```css
+--panel:      var(--SmartThemeBlurTintColor);
+--panel-2/3:  color-mix(in srgb, var(--SmartThemeChatTintColor) 92%/84%, var(--SmartThemeBodyColor) 8%/16%);
+--text:       var(--SmartThemeBodyColor);
+--accent:     var(--SmartThemeQuoteColor);
+--keep:       var(--SmartThemeUnderlineColor);
+--optional:   var(--accent);
+--drop:       var(--SmartThemeEmColor);
+--outline:    color-mix(in srgb, var(--SmartThemeBodyColor) 36%, transparent);  /* 轮廓专用 */
+```
+
+**为什么轮廓要自己派生**：真机默认 `--SmartThemeBorderColor: rgba(0,0,0,.5)`，在 `#171717` 面板上等于不可见。宿主要求「面板外有明显轮廓」，所以轮廓一律取 BodyColor 混色，深浅主题都成立。
+
+**品牌色（仅标识）**：
+
+```css
+--brand-st:#a11b1b;   --brand-st-ring:#c4413a;
+--brand-luker:#121216; --brand-luker-ring: color-mix(in srgb, var(--text) 54%, transparent);
+--brand-tt:#f2c75c;    --brand-tt-ring:#f2c75c;
+--brand-pt:#7d5cb0;    --brand-pt-ring:#a486d8;
+```
+
+Luker 图标是纯黑剪影，单元规则 `.pkg-icon[data-host="luker"], .host-icon[data-host="luker"]{background:#eceef2}` 垫浅底。
+
+## 11. 多图表与分卷算法
+
+```
+chartTargets()  → 勾了包则每包一组；否则当前 source；否则宿主
+volumesOf(pkg)  → splitChunks(下钻) → 贪心装卷 → buildVolumeTree(重建祖先)
+```
+
+- **必须下钻**：一级分类常常大于单卷上限（实测「聊天记录」570 MB vs 300 MB 上限），只在顶层切会撑破卷。
+- `buildVolumeTree` 为每卷重建祖先链并按卷内实际重算父体积，保证「卷容量 = 树内合计」。
+- 单文件 > 上限时该卷标 `over`，不静默；`c.mb===0` 的节点不单独开卷。
+- 勾选状态按 `scope`（`host:<宿主>` / `pkg:<id>`）记忆，多包多卷互不串。
+
+## 12. 桌面分隔条
+
+- `.app-main` 改为三列网格：`minmax(0,var(--split-left,62%)) 8px minmax(0,1fr)`，中间 8px 即竖向分隔条。
+- 右栏 `flex:0 0 var(--zone-h,56%)` 的数据包 + `flex:1 1 auto` 的执行，保证执行贴底。
+- 交叉点为绝对定位手柄，`top:calc(var(--zone-h) - 1px)`（−1px 让手柄中心落在横向分隔条中心），拖动时同时写两个变量。
+- 移动端三件套 `display:none`；`.col-side{overflow:visible}` 以免裁掉负偏移的手柄。
+
+## 13. 包名换行判定
+
+Canvas `measureText` 量整名宽度除以可用宽度：折行数的小数部分 ≥ 0.45 才允许 `-webkit-line-clamp:2`，否则单行省略——避免第二行只剩 `.zip`。
+
+## 14. 风险与取舍
 
 1. **ST 图表置灰**是明确取舍：没有清单端点，不做假数据。
 2. **TT fs 作用域**需实测确认 `$APPDATA/data` 在 `fs:default`/`fs:allow-read` 范围内；若被拒，退回「整包备份反推」并标注为低精度。
