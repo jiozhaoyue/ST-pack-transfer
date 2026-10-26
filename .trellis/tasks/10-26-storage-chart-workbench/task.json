@@ -1,0 +1,33 @@
+{
+  "id": "storage-chart-workbench",
+  "name": "storage-chart-workbench",
+  "title": "存储图表工作台总任务",
+  "description": "四酒馆数据包工作站以单一存储图表为核心的 UI 重构总任务：图表化一切、导入导出分区、数据包区、教程、命名与注入、私有格式存储",
+  "status": "planning",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P0",
+  "creator": "jiozhaoyue",
+  "assignee": "jiozhaoyue",
+  "createdAt": "2026-10-26",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "10-26-naming-injection",
+    "10-26-storage-chart",
+    "10-26-zones-flow",
+    "10-26-package-cards-vault",
+    "10-26-tutorial-copy",
+    "10-26-ui-demo"
+  ],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {}
+}
