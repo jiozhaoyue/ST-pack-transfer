@@ -427,7 +427,7 @@
   .log-line.error .lv{color:var(--drop)}
 
   /* 帮助浮层 / 弹窗 / toast */
-  .help-popover{position:fixed;z-index:90;width:min(280px,calc(100vw - 24px));background:var(--panel);
+  .help-popover{position:fixed;z-index:140;width:min(280px,calc(100vw - 24px));background:var(--panel);
     border:1px solid var(--border-strong);border-radius:10px;padding:10px 12px;box-shadow:var(--shadow)}
   .help-popover h4{margin:0 0 6px;font-size:12px}
   .help-popover ul{margin:0;padding-left:16px;font-size:11px;color:var(--muted);line-height:1.7}
@@ -477,6 +477,9 @@
   .tutorial-card .acts button{border:1px solid var(--border);background:var(--panel-3);border-radius:6px;
     padding:4px 9px;font-size:10.5px;color:var(--text)}
   .tutorial-card .acts button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  .tutorial-card .acts button.link{border-color:transparent;background:transparent;color:var(--muted);
+    text-decoration:underline;margin-right:auto;padding-left:0}
+  .tutorial-card .acts button.link:hover{color:var(--text)}
 
   /* 移动端：演示切换 + 真实窄屏 */
   .app-container[data-view="mobile"]{width:390px;max-width:100%;height:min(820px,calc(100vh - 110px));margin:0 auto}
@@ -685,6 +688,7 @@
     <div class="td" id="tutorial-desc"></div>
     <div class="dots" id="tutorial-dots"></div>
     <div class="acts">
+      <button id="tutorial-adv" class="link">进阶教程</button>
       <button id="tutorial-skip">跳过</button>
       <button id="tutorial-prev">上一步</button>
       <button id="tutorial-next" class="primary">下一步</button>
@@ -707,6 +711,7 @@
   <div class="modal log-modal">
     <div class="log-modal-head">
       <h3>日志</h3>
+      <button class="help-btn" data-help="log" title="日志帮助">?</button>
       <span class="latest" id="log-latest">暂无日志</span>
       <button class="icon-btn" id="log-close" title="关闭">×</button>
     </div>
@@ -960,7 +965,7 @@ const state = {
   packages: INITIAL_PACKAGES.map(p=>({...p})),
   selectedPkgs:new Set(), expanded:{}, collapsedVol:{}, sel:{}, log:[], logLevel:'ALL',
   noTrafficPrompt:false, keepExport:true, autoTutorial:true,
-  sort:'time-desc', filter:'all', tutorialStep:0, tutorialOpen:false,
+  sort:'time-desc', filter:'all', tutorialStep:0, tutorialOpen:false, tutorialKind:'basic',
   sourceKey:'host:luker', seq:{}
 };
 
@@ -1678,7 +1683,7 @@ function openHelp(btn,key){
 }
 
 /* ── 教程 ── */
-const TUTORIAL=[
+const TUTORIAL_BASIC=[
   { sel:'#target-select', title:'选择目标平台', desc:'四个酒馆的英文全称，带各自图标；当前宿主那一项后面标（宿主）。' },
   { sel:'#chart-stack .vol-card', title:'看存储图表', desc:'没有数据包时显示宿主；点包卡即切换成该包的图表。' },
   { sel:'#chart-stack .tree-tools', title:'精简勾选', desc:'建议保留用宿主下划线色，可选用引用色，建议清理用强调灰。备份、缓存、构建默认不勾。' },
@@ -1687,19 +1692,29 @@ const TUTORIAL=[
   { sel:'#btn-generate', title:'生成导出包', desc:'把当前勾选落到包，并复制一份只读副本到导出区。' },
   { sel:'#zone-card', title:'导出完成', desc:'导出区只读，可下载、回传宿主，或复制回导入区再编辑。' }
 ];
+const TUTORIAL_ADV=[
+  { sel:'#dropzone', title:'上传数据包', desc:'点一下模拟上传一个 zip；真实实现里是拖拽或选文件。' },
+  { sel:'#chart-stack', title:'逐项确认勾选', desc:'展开大类逐个确认：绿是建议保留、橙是可选、灰是建议清理。' },
+  { sel:'#target-select', title:'选目标平台', desc:'四个英文全称，当前宿主那一项带（宿主）标记。' },
+  { sel:'#split-input', title:'要不要分卷', desc:'单卷 32–2048 MB；填了会按卷拆成多个可独立导入的包。' },
+  { sel:'#btn-generate', title:'生成并核对', desc:'导出区出现只读副本，可下载、回传宿主或复制回导入区。' }
+];
+function tutorialSet(){ return state.tutorialKind==='adv' ? TUTORIAL_ADV : TUTORIAL_BASIC; }
 function openTutorial(){
-  state.tutorialOpen=true; state.tutorialStep=0;
+  state.tutorialOpen=true; state.tutorialStep=0; state.tutorialKind='basic';
   document.getElementById('tutorial-overlay').classList.add('open');
   renderTutorial();
 }
 function closeTutorial(){ state.tutorialOpen=false; document.getElementById('tutorial-overlay').classList.remove('open'); }
 function renderTutorial(){
-  const step=TUTORIAL[state.tutorialStep];
+  const set=tutorialSet();
+  const step=set[state.tutorialStep];
   document.getElementById('tutorial-title').textContent=step.title;
   document.getElementById('tutorial-desc').textContent=step.desc;
-  const dots=document.getElementById('tutorial-dots'); dots.innerHTML=TUTORIAL.map((_,i)=>'<i class="'+(i===state.tutorialStep?'on':'')+'"></i>').join('');
+  const dots=document.getElementById('tutorial-dots'); dots.innerHTML=set.map((_,i)=>'<i class="'+(i===state.tutorialStep?'on':'')+'"></i>').join('');
   document.getElementById('tutorial-prev').disabled=state.tutorialStep===0;
-  document.getElementById('tutorial-next').textContent=state.tutorialStep===TUTORIAL.length-1?'完成':'下一步';
+  document.getElementById('tutorial-next').textContent=state.tutorialStep===set.length-1?'完成':'下一步';
+  document.getElementById('tutorial-adv').textContent=state.tutorialKind==='adv'?'基础教程':'进阶教程';
   const el=document.querySelector(step.sel)||document.querySelector('#chart-card');
   const ring=document.getElementById('tutorial-ring');
   const card=document.getElementById('tutorial-card');
@@ -1938,8 +1953,13 @@ function bind(){
   document.getElementById('tutorial-skip').addEventListener('click',closeTutorial);
   document.getElementById('tutorial-prev').addEventListener('click',()=>{ if(state.tutorialStep>0){ state.tutorialStep--; renderTutorial(); } });
   document.getElementById('tutorial-next').addEventListener('click',()=>{
-    if(state.tutorialStep>=TUTORIAL.length-1){ closeTutorial(); toast('教程完成'); }
+    const set=tutorialSet();
+    if(state.tutorialStep>=set.length-1){ closeTutorial(); toast('教程完成'); }
     else{ state.tutorialStep++; renderTutorial(); }
+  });
+  document.getElementById('tutorial-adv').addEventListener('click',()=>{
+    state.tutorialKind = state.tutorialKind==='adv' ? 'basic' : 'adv';
+    state.tutorialStep=0; renderTutorial();
   });
   window.addEventListener('resize',()=>{ if(state.tutorialOpen) renderTutorial(); closeHelp(); fitPackageNames(); });
 }
@@ -2012,7 +2032,7 @@ function resetDemo(){
   state.selectedPkgs=new Set(); state.expanded={}; state.collapsedVol={}; state.sel={}; state.log=[];
   state.zone='import'; state.source={type:'host',pkgId:null}; state.target='SillyTavern';
   state.delta='overwrite'; state.splitMb=''; state.host='luker'; state.mode='plugin';
-  state.view='desktop'; state.theme='dark';
+  state.view='desktop'; state.theme='dark'; state.tutorialKind='basic';
   state.noTrafficPrompt=false; state.keepExport=true; state.autoTutorial=true; state.filter='all'; state.sourceKey='host:luker';
   document.getElementById('app').dataset.host='luker';
   document.getElementById('app').dataset.view='desktop';
