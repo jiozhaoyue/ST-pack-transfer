@@ -114,3 +114,25 @@
 3. **实例并发**：**最多 2 个**，默认 1 个；PT/TT 必须单独跑。
 4. **禁止与其它自动开浏览器的工具并行**；`browserLaunch.enabled` 必须为 `false`。
 5. 改 demo 后必须重新跑生成脚本，否则模板/样式与 demo 漂移。
+
+---
+
+## 九、本轮实例实测（2026-10-27，严格错峰：每次只起 1 个）
+
+| 宿主 | 规格 | 结果 |
+| --- | --- | --- |
+| Dev SillyTavern (8001) | smoke + newui | ✅ smoke 16 OK / newui 12 OK |
+| Dev Luker (8003) | smoke + newui | ✅ smoke 16 OK / newui 12 OK |
+| Dev PureTavern (8899) | pt-load | ✅ 28 OK（快照已 `--replace` 重装） |
+| TauriTavern (9223 CDP) | ttCdpSmoke | ✅ modal / #app.app-container / 零插件报错 |
+
+`newui` 实际覆盖：真实路径打开 → 上传 `fixture-st.zip` → 图表树 9 行 → 四目标逐一切换后仍有树 → 勾选包 → 生成导出包并切到导出区。
+
+**局域网互传**（两个浏览器上下文，同一台机器）：offer/answer 交换成功，发送端 100%、接收端 100%、
+接收端得到同名包（585 B 夹具），零页面错误。
+
+**未覆盖（下一会话继续）**：
+- 两台**不同机器**的局域网互传（mDNS / 扫码 / 非安全上下文降级提示）。
+- Dev ST ↔ Dev Luker 之间用**真实数据包**做跨实例搬运（同一时刻最多 2 个实例）。
+- PT / TT 的新工作台交互规格（目前 PT 只有加载、TT 只有挂载冒烟）。
+
