@@ -25,7 +25,7 @@ const REPO_ROOT = path.resolve(__dirname, '..', '..');
 
 /**
  * 实例根目录。标准仓群布局：
- * `<Tavern-repo>/My-repo/ST-zip-converter` ← 本仓；`<Tavern-repo>/Instance` ← 实例根。
+ * `<Tavern-repo>/My-repo/ST-pack-transfer` ← 本仓；`<Tavern-repo>/Instance` ← 实例根。
  * 故从本仓根上两级即 `<Tavern-repo>`。
  */
 const INSTANCES_ROOT = process.env.TAVERN_INSTANCES_ROOT

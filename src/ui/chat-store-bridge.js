@@ -287,7 +287,7 @@ export async function importChatsToLibrary(items, {
           avatarUrl: item.avatarUrl ?? null,
           fileName: fileName.trim(),
           jsonl: item.jsonl,
-          sourceLabel: item.sourceLabel || 'st-zip-converter',
+          sourceLabel: item.sourceLabel || 'ST-pack-transfer',
         })),
         timeoutMs,
       );

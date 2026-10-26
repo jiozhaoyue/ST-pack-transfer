@@ -45,7 +45,7 @@ const waitArg = argv.indexOf('--wait-secs');
 const waitSecs = waitArg > -1 && Number(argv[waitArg + 1]) > 0 ? Number(argv[waitArg + 1]) : 300;
 const targets = only ? ALL.filter((t) => only.includes(t.id)) : ALL;
 
-const PLUGIN_NAME = 'st-zip-converter';
+const PLUGIN_NAME = 'ST-pack-transfer';
 
 /** 端口是否已监听 */
 function isListening(port) {

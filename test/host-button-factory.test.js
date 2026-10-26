@@ -54,8 +54,7 @@ function makeEl(tag = 'div') {
     },
     querySelector(sel) {
       if (sel === 'span') return this.children.find((c) => c.tagName === 'SPAN') || null;
-      // 扩展行注入用：幂等标记与宿主原生动作区。桩里都没有 ⇒ 一律返回 null
-      if (sel === '[data-st-zip-injected="1"]' || sel === '.extension_actions') return null;
+      if (sel === '[data-st-pack-transfer-injected="1"]') return null;
       return null;
     },
     querySelectorAll() {
@@ -65,7 +64,7 @@ function makeEl(tag = 'div') {
 }
 
 /** 安装最小 DOM：anchors = .userBackupButton 锚点；row = Luker 备份管理器动作行；
- *  blocks = 宿主扩展列表行（`.extension_block[data-name*=st-zip-converter]`） */
+ *  blocks = 宿主扩展列表行（`.extension_block[data-name*=ST-pack-transfer]`） */
 function installDom({ anchors = [], row = null, blocks = [] } = {}) {
   const created = [];
   g.document = {
@@ -81,7 +80,7 @@ function installDom({ anchors = [], row = null, blocks = [] } = {}) {
     querySelector: (sel) => (sel === '.userBackupManager .backupActionRow' ? row : null),
     querySelectorAll: (sel) => {
       if (sel === '.userBackupButton') return anchors;
-      if (sel === '.extension_block[data-name*="st-zip-converter"]') return blocks;
+      if (sel === '.extension_block[data-name*="ST-pack-transfer"]') return blocks;
       return [];
     },
     addEventListener: () => {},
@@ -114,11 +113,11 @@ describe('makeHostButton 契约（经 mountNativeBackupButton 注入）', () => 
 
     mountNativeBackupButton(() => {});
 
-    const btn = byId(created, 'st-zip-converter-native-btn');
+    const btn = byId(created, 'st-pack-transfer-native-btn');
     expect(btn).not.toBeNull();
     expect(btn.className).toBe('menu_button menu_button_icon');
     expect(btn.dataset.stZipInjected).toBe('1');
-    expect(btn.title).toBe('打开酒馆数据包互转工坊（全屏）');
+    expect(btn.title).toBe('打开数据包转运面板');
   });
 
   it('结构为「图标在前、文案在后」，文案走 textContent 而非 innerHTML', () => {
@@ -126,10 +125,10 @@ describe('makeHostButton 契约（经 mountNativeBackupButton 注入）', () => 
 
     mountNativeBackupButton(() => {});
 
-    const btn = byId(created, 'st-zip-converter-native-btn');
+    const btn = byId(created, 'st-pack-transfer-native-btn');
     expect(btn.children.map((c) => c.tagName)).toEqual(['I', 'SPAN']);
     expect(btn.children[0].className).toBe('fa-fw fa-solid fa-right-left');
-    expect(btn.children[1].textContent).toBe('数据包互转');
+    expect(btn.children[1].textContent).toBe('数据包转运');
   });
 
   it('click 先 preventDefault + stopPropagation，再回调 onClick', () => {
@@ -138,20 +137,20 @@ describe('makeHostButton 契约（经 mountNativeBackupButton 注入）', () => 
 
     mountNativeBackupButton(() => { opened += 1; });
     clickEffects = { prevented: 0, stopped: 0 };
-    byId(created, 'st-zip-converter-native-btn').click();
+    byId(created, 'st-pack-transfer-native-btn').click();
 
     expect(clickEffects.prevented).toBe(1);
     expect(clickEffects.stopped).toBe(1);
     expect(opened).toBe(1);
   });
 
-  it('只注入「数据包互转」一个入口，不再有「一键拉取」', () => {
+  it('只注入「数据包转运」一个入口，不再有「一键拉取」', () => {
     const created = installDom({ anchors: [anchor] });
 
     mountNativeBackupButton(() => {});
 
-    expect(byId(created, 'st-zip-converter-native-btn')).not.toBeNull();
-    expect(byId(created, 'st-zip-converter-native-btn-quick-fetch')).toBeNull();
+    expect(byId(created, 'st-pack-transfer-native-btn')).not.toBeNull();
+    expect(byId(created, 'st-pack-transfer-native-btn-quick-fetch')).toBeNull();
   });
 });
 
@@ -169,12 +168,12 @@ describe('makeHostButton 契约（经 mountLukerBackupManagerButton 注入）', 
 
     mountLukerBackupManagerButton(() => {});
 
-    const btn = byId(created, 'st-zip-converter-luker-manager-btn');
+    const btn = byId(created, 'st-pack-transfer-luker-manager-btn');
     expect(btn).not.toBeNull();
     expect(btn.className).toBe('menu_button menu_button_icon');
     expect(btn.dataset.stZipInjected).toBe('1');
     expect(btn.children.map((c) => c.tagName)).toEqual(['I', 'SPAN']);
-    expect(btn.children[1].textContent).toBe('数据包互转');
+    expect(btn.children[1].textContent).toBe('数据包转运');
 
     // 插到动作行最前：原生 ZIP 下载按钮之前
     expect(row.inserted.length).toBe(1);
@@ -197,36 +196,45 @@ describe('makeHostButton 契约（经 mountLukerBackupManagerButton 注入）', 
  * 我们**只往那一行追加「打开」**，不再往 `#extensions_settings2` 塞内联抽屉。
  * 锁定三条：落点是宿主原生行、按钮走同一工厂、宿主重渲染时幂等不重复。
  */
-describe('mountExtensionRowButton 契约（扩展列表行上的「打开」）', () => {
+describe('mountExtensionRowButton 契约（扩展列表行内联下拉）', () => {
   afterEach(() => {
     delete g.document;
     delete g.MutationObserver;
   });
 
-  it('只往宿主扩展行追加一个「打开」，不生成任何自建面板', () => {
+  it('只往宿主扩展行内追加一条内联下拉，内容只有「打开面板」', () => {
     const block = makeEl('div');
-    const created = installDom({ blocks: [block] });
+    installDom({ blocks: [block] });
 
     mountExtensionRowButton(() => {});
 
-    const btn = byId(created, 'st-zip-converter-open-btn');
-    expect(btn).not.toBeNull();
+    // 宿主行内只多一个节点：宿主同款 inline-drawer
+    expect(block.children).toHaveLength(1);
+    const drawer = block.children[0];
+    expect(drawer.className).toBe('inline-drawer');
+    expect(drawer.dataset.stPackTransferInjected).toBe('1');
+
+    const [toggle, content] = drawer.children;
+    expect(toggle.className).toContain('inline-drawer-toggle');
+    expect(toggle.children[0].textContent).toBe('数据包转运');
+
+    expect(content.className).toBe('inline-drawer-content');
+    const btn = content.children[0];
+    expect(btn.id).toBe('st-pack-transfer-open-btn');
     expect(btn.className).toBe('menu_button menu_button_icon');
     expect(btn.dataset.stZipInjected).toBe('1');
     expect(btn.children.map((c) => c.tagName)).toEqual(['I', 'SPAN']);
-    expect(btn.children[1].textContent).toBe('打开');
-    // 落点就是宿主那一行
-    expect(block.children).toContain(btn);
+    expect(btn.children[1].textContent).toBe('打开面板');
   });
 
   it('click 后回调 onOpen（全屏打开工作台）', () => {
     const block = makeEl('div');
-    installDom({ blocks: [block] });
+    const created = installDom({ blocks: [block] });
     let opened = 0;
 
     mountExtensionRowButton(() => { opened += 1; });
     clickEffects = { prevented: 0, stopped: 0 };
-    const btn = [...block.children].find((c) => c.id === 'st-zip-converter-open-btn');
+    const btn = byId(created, 'st-pack-transfer-open-btn');
     btn.click();
 
     expect(opened).toBe(1);

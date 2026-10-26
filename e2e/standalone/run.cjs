@@ -12,7 +12,7 @@
  *  3. 云酒馆的真实形态是**子路径静态托管**（GitHub Pages 项目页），这只有自己起服务器才验得了。
  *
  * **两个挂载点**（同一端口、同一台服务器）：
- *  - `/st-zip-converter/` → `dist/`（构建产物）⇒ `specs/` 下的用例；
+ *  - `/ST-pack-transfer/` → `dist/`（构建产物）⇒ `specs/` 下的用例；
  *  - `/src-tree/` → 仓库源码树（未打包的 ESM）⇒ `specs-src/` 下的用例，
  *    它们能在真实浏览器里直接 `import` 真实模块（真 Blob / 真 Worker 路径），
  *    而不必为了这点验证去拉一遍实例的 1.5 GB 数据。
@@ -44,7 +44,7 @@ const FIXTURE_DIR = path.join(REPO_ROOT, 'test-results', 'fixtures-web');
 const SRC_PREFIX = '/src-tree/';
 
 function parseArgs(argv) {
-  const out = { only: '', prefix: '/st-zip-converter/', port: DEFAULT_PORT, build: true, rebuild: false };
+  const out = { only: '', prefix: '/ST-pack-transfer/', port: DEFAULT_PORT, build: true, rebuild: false };
   for (let i = 0; i < argv.length; i += 1) {
     if (argv[i] === '--only') out.only = argv[++i] || '';
     else if (argv[i] === '--prefix') out.prefix = argv[++i] || '/';

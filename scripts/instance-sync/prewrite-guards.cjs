@@ -15,7 +15,7 @@
  * 2026-10-13 实测（本机四实例）：`git check-ignore -v data/default-user` **命中**（`.gitignore:52:/data`），
  * 但 `git check-ignore -v public/scripts/extensions/third-party` **不命中** —— 该目录自身的规则
  * （`.gitignore:18` 带尾斜杠、`:54` 不带）对**目录路径**不返回匹配，而对其**子路径**返回
- * （`public/scripts/extensions/third-party/st-zip-converter/index.js` ⇒ `.gitignore:54`）。
+ * （`public/scripts/extensions/third-party/ST-pack-transfer/index.js` ⇒ `.gitignore:54`）。
  * ⇒ 判据统一改成**在写入根下探一个子路径**：只要 `<root>/<任意子>` 被忽略，则 `<root>/<实际子>` 必被忽略
  * （gitignore 语义：忽略目录即忽略其全部内容）。这样对「根自身命中」与「仅子路径命中」两种形态都成立。
  *

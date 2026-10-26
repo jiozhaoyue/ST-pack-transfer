@@ -49,7 +49,7 @@ export async function alertDialog(message: string, title?: string): Promise<void
   ⇒ 信息提示用 **`.text`**。**严禁**照 `.confirm` 的形状编造一个 `Popup.show.alert`（L1-MR-5）。
 - **不需要、也不要动态 `import()` 宿主模块**：`getContext()` 已经给出全部所需能力。
 - 判定式：`result === ctx.POPUP_RESULT.AFFIRMATIVE`；返回 `null`（用户直接关闭弹窗）视为**取消**。
-- 标题用插件功能名 `数据包互转`（`HOST_DIALOG_TITLE`，确认与提示共用），不写解释性文案（R4）。
+- 标题用插件功能名 `数据包转运`（`HOST_DIALOG_TITLE`，确认与提示共用），不写解释性文案（R4）。
 - **宿主路径是非阻塞的（Promise），`window.alert` 是阻塞的**：调用方在 async 上下文里 `await`，
   在同步上下文里 `void alertDialog(...)`（适配器自身永不 reject，故不会产生未处理拒绝）。
 

@@ -500,7 +500,7 @@ export function getWorkbenchHtml({ isModal = false, isDrawer = false } = {}) {
 
     ${!isDrawer ? `
     <footer class="app-footer">
-      <p>st-zip-converter · 遵循 SillyTavern 扩展规范 · <a href="https://github.com/jiozhaoyue/st-zip-converter" target="_blank" rel="noopener">GitHub 仓库</a> · <a href="https://github.com/jiozhaoyue/st-zip-converter/fork" target="_blank" rel="noopener">Fork 并部署专属 Pages</a></p>
+      <p>ST-pack-transfer · 遵循 SillyTavern 扩展规范 · <a href="https://github.com/jiozhaoyue/ST-pack-transfer" target="_blank" rel="noopener">GitHub 仓库</a> · <a href="https://github.com/jiozhaoyue/ST-pack-transfer/fork" target="_blank" rel="noopener">Fork 并部署专属 Pages</a></p>
     </footer>
     ` : ''}
   `;

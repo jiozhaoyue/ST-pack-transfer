@@ -1,7 +1,7 @@
 # Frontend Development Guidelines
 
 > 本仓前端（`src/ui/**`、根 `index.js`、`index.html`、`style.css`）的**真实**约定，不是理想设计。
-> 项目形态：四酒馆（SillyTavern / Luker / TauriTavern / PureTavern）数据包互转工具，
+> 项目形态：四酒馆（SillyTavern / Luker / TauriTavern / PureTavern）数据包转运工具，
 > **纯前端为主、Authority 服务端为可选增强层**（适配器 + 特性检测 + 静默降级）。
 
 ---

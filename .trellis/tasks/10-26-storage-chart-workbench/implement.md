@@ -23,7 +23,7 @@
 ## 阶段 1：纯逻辑骨架
 
 - [ ] 新增 `src/core/format-registry.js`：四宿主英文全称、icon 资源、检测规则、类目映射。
-- [ ] 新增 `src/core/naming.js`：完整占位符集合；`{target}` 英文全称；`{datetime}` 到秒；默认模板。
+- [x] 新增 `src/core/naming.js`：完整占位符集合；`{target}` 英文全称；`{datetime}` 到秒；默认模板。（2026-10-27 完成，取代 `filename-template.js`）
 - [ ] 新增 `src/core/package-model.js`：包、私有配置、图表节点的纯数据模型。
 - [ ] `src/storage/db.js` 扩展 origins：`export-copy`、`private-config`、`unrecognized`。
 - [ ] 单测覆盖命名、注册表、模型。
@@ -84,11 +84,11 @@
 
 ## 阶段 6：命名、注入与入口
 
-- [ ] 全仓改名 `ST-pack-transfer` / 「数据包转运」；同步 manifest、package.json、文档、E2E、`data-name` 匹配。
-- [ ] `src/ui/host-entry.js`：扩展列表内联下拉（与其他扩展一致）+ 原生备份按钮 + Luker 备份管理器。
-- [ ] 删除 `registerMenuButton`；扩展菜单零注入。
-- [ ] 四宿主注入幂等与自愈。
-- [ ] E2E 快照：四宿主入口均出现且可用。
+- [x] 全仓改名 `ST-pack-transfer` / 「数据包转运」；同步 manifest、package.json、文档、E2E、`data-name` 匹配。（2026-10-27；生成规则块 AGENTS/CLAUDE 与历史文档除外，待外部真源与仓目录改名）
+- [x] 扩展列表内联下拉（与其他扩展一致）+ 原生备份按钮 + Luker 备份管理器。（实现在 `host-bridge.js`，按 design §8；未另建 `host-entry.js`）
+- [x] 删除 `registerMenuButton`；扩展菜单零注入。（并从 `check:dom-scope` 锚点白名单移除 `#extensionsMenu`/`#options`）
+- [x] 四宿主注入幂等与自愈。（沿用 `watchHostDom` + `data-st-pack-transfer-injected`）
+- [ ] E2E 快照：四宿主入口均出现且可用。（需 Dev 实例，本轮未跑）
 
 **验证**：`npm run check:css-scope && npm run check:dom-injection && npm run check:template-source`
 

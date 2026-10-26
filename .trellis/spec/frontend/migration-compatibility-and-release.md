@@ -114,7 +114,7 @@ TaskManager.start(id, label, { resumable, totalBytes }) -> control
 
 **file:// 单文件离线（S7）**：
 
-- 产出：`npm run build:offline` → `dist-offline/st-zip-converter-offline.html`（**单文件**，可双击）。
+- 产出：`npm run build:offline` → `dist-offline/ST-pack-transfer-offline.html`（**单文件**，可双击）。
 - 与既有 `npm run build` **并存**：那个仍是 `type="module"` 的 HTTP 形态，本脚本是独立入口，不改它。
 - 三条硬要求（都由 `offline-single-file.e2e.cjs` 的 28 条断言锁住）：
   1. **零外部 `http(s)` 请求**（CSS/JS/字体全部内联为 data URI）；

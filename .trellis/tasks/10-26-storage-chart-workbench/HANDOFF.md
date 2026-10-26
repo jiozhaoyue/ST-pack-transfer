@@ -8,14 +8,15 @@
 
 ## 一、一句话现状
 
-规划与 **UI 定稿 demo** 已完成并推送；**产品代码零改动**；6 个子任务全部处于 `planning`，PRD 已回填，随时可以逐个 `task.py start` 进入实现。
+规划与 **UI 定稿 demo** 已完成并推送；`10-26-naming-injection` 已于 2026-10-27 完成实现（改名 / 目标选择器 / 入口 / 命名引擎 / 顶栏徽标），其余五个子任务仍为 `planning`。
 
 | 项 | 值 |
 | --- | --- |
 | 父任务 | `10-26-storage-chart-workbench`（planning） |
-| 子任务 | `naming-injection` / `storage-chart` / `zones-flow` / `package-cards-vault` / `tutorial-copy` / `ui-demo`（全部 planning） |
-| 已推送提交 | `0143b9d`（HEAD = origin/main） |
-| 产品代码 | 未改；`npm test` 未跑（无代码变更，上次全绿基线 817 passed / 2 skipped / 81 文件） |
+| 子任务 | `naming-injection`（本轮实现完成）/ `storage-chart` / `zones-flow` / `package-cards-vault` / `tutorial-copy` / `ui-demo`（其余 planning） |
+| 已推送提交 | `b648d7c`（本轮改名实现见最新提交） |
+| 产品代码 | `src/core/naming.js`、`src/ui/host-icons.js` 新增；命名/入口/徽标改动已落 |
+| 质量门 | `npm test` 945 passed / 2 skipped；五个静态守卫全绿 |
 | demo | `deliverables/ui-demo.html`（2026-10-27 评审版） |
 
 ---

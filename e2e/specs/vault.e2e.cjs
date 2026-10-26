@@ -35,7 +35,7 @@ const FIXTURE_DIR = path.resolve(__dirname, '..', '..', 'test-results', 'fixture
 const FIXTURE = 'fixture-tt.zip';
 
 /** 插件资源根（ST/Luker 的标准落点；PT 用页面实测推导覆盖） */
-const DEFAULT_BASE = '/scripts/extensions/third-party/st-zip-converter';
+const DEFAULT_BASE = '/scripts/extensions/third-party/ST-pack-transfer';
 
 let fixturesPromise = null;
 function ensureFixtures() {
@@ -55,7 +55,7 @@ async function resolveStoreUrl(page) {
   const derived = await page.evaluate(() => {
     const src = [...document.querySelectorAll('script[src]')]
       .map((el) => el.getAttribute('src') || '')
-      .find((u) => /st-zip-converter/.test(u) && /index\.js(\?|$)/.test(u));
+      .find((u) => /ST-pack-transfer/i.test(u) && /index\.js(\?|$)/.test(u));
     if (!src) return null;
     return new URL(src, location.href).href.replace(/index\.js(\?.*)?$/, 'src/storage/vault-store.js');
   }).catch(() => null);
@@ -107,25 +107,17 @@ async function clearTestSources(page, storeUrl) {
 }
 
 /**
- * 打开插件态工作台。两条路径都实测过：
- *  · 扩展菜单项 `#st-zip-converter-menu-item`（boot 后最早可用，PT/ST 都稳）；
- *  · 扩展行「打开」（`openWorkbenchModal`，需先渲染宿主扩展弹层，Luker 上更稳）。
+ * 打开插件态工作台。入口只剩扩展行内联下拉（`openWorkbenchModal`）；
+ * 扩展菜单项（顶栏魔方棒）自 2026-10-27 R1.3 起**不再注入**，旧路径已删除。
  */
 async function openPanel(page) {
   const mounted = await page.waitForFunction(
-    () => Boolean(document.getElementById('st-zip-converter-menu-item')
-      || document.getElementById('st-converter-modal-overlay')),
+    () => Boolean(document.getElementById('st-converter-modal-overlay')),
     null, { timeout: 60_000 },
   ).then(() => true).catch(() => false);
   if (!mounted) return { ok: false, via: 'not-mounted' };
 
-  let opened = await page.evaluate(() => {
-    const item = document.getElementById('st-zip-converter-menu-item');
-    if (!item) return { ok: false, via: 'no-menu-item' };
-    item.click();
-    return { ok: true, via: 'menu-item' };
-  });
-  if (!opened.ok) opened = await openWorkbenchModal(page);
+  const opened = await openWorkbenchModal(page);
 
   const rendered = await page.waitForFunction(() => {
     const ov = document.getElementById('st-converter-modal-overlay');

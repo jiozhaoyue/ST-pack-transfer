@@ -50,7 +50,7 @@ export function normalizeFormatTag(tag) {
 
 /**
  * 从文件名猜格式标签（纯函数）。
- * 依据是本插件自己的产物命名约定 `{target}_...`（filename-template.js）与
+ * 依据是本插件自己的产物命名约定 `{target}_...`（naming.js）与
  * 宿主拉取包名；猜不中就是 raw——仓的本义就是「不兼容也原样存」。
  */
 export function guessVaultFormat(name) {

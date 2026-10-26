@@ -64,8 +64,8 @@
   执行 `git remote -v` 与 `git config --list --local`，检查 Remote URL 是否存在嵌入的 Personal Access Token (PAT)。
 - **审计结果**:
   ```text
-  origin  https://github.com/jiozhaoyue/st-zip-converter.git (fetch)
-  origin  https://github.com/jiozhaoyue/st-zip-converter.git (push)
+  origin  https://github.com/jiozhaoyue/ST-pack-transfer.git (fetch)
+  origin  https://github.com/jiozhaoyue/ST-pack-transfer.git (push)
   ```
   采用纯净的标准 HTTPS 地址，认证完全托管于本机系统的 GitHub CLI / Windows 凭据管理器中。
 - **结论**: ✅ **通过**。未在 URL 中硬编码认证信息。
@@ -99,7 +99,7 @@
 ### 3.3 建立安全政策与责任披露机制 (`SECURITY.md`)
 - 规范化建立安全模型声明：
   - 强调本工作站为 **100% 纯客户端本地计算**（运行于浏览器 Web Worker / IndexedDB 或本地 SillyTavern Node 环境），绝不设立任何外部数据收集服务器。
-  - 为开源社区提供 [GitHub Private Vulnerability Reporting](https://github.com/jiozhaoyue/st-zip-converter/security/advisories/new) 负责任的安全漏洞私密提报通道。
+  - 为开源社区提供 [GitHub Private Vulnerability Reporting](https://github.com/jiozhaoyue/ST-pack-transfer/security/advisories/new) 负责任的安全漏洞私密提报通道。
 
 ### 3.4 `.gitignore` 深度防御规则加固
 在根目录 `.gitignore` 中补充完善以下规则：

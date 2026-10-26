@@ -1,6 +1,6 @@
 # Directory Structure (Trinity Web & Extension Architecture · 三形态同构)
 
-> `st-zip-converter` 的目录组织：**同一份纯前端核心**跑在三种入口——独立 Web 页、ST/Luker 扩展插件、Node/Vitest 测试环境。
+> `ST-pack-transfer` 的目录组织：**同一份纯前端核心**跑在三种入口——独立 Web 页、ST/Luker 扩展插件、Node/Vitest 测试环境。
 
 ---
 
@@ -26,7 +26,7 @@
 ## Directory Layout (目录布局 · 2026-09-24 快照)
 
 ```
-st-zip-converter/
+ST-pack-transfer/
 ├── index.html              # 独立 Web 入口：静态 markup（<div class="app-container" id="app">），末尾 <script type="module" src="./index.js">
 ├── index.js                # 根控制器：detectHost → 独立/插件 UI 装配 → ExportQueue + TaskManager
 ├── style.css               # 全部样式；每条规则必须以 .app-container / .st-converter-drawer-app 为作用域根

@@ -15,11 +15,14 @@
 
 | 宿主锚点 | 允许插入的节点 | 代码位置 |
 | --- | --- | --- |
-| `#extensions_settings2`（或旧版 `#extensions_settings`） | `#st-zip-converter-settings-panel.st-converter-drawer-wrapper` | `src/ui/host-bridge.js` `mountSettingsDrawer()` |
-| `#extensionsMenu`（`.list-group` 优先，`#options` 兜底） | `#st-zip-converter-menu-item.list-group-item` | `src/ui/host-bridge.js` `registerMenuButton()` |
-| `.userBackupButton` 的父元素（账号弹层 / 管理面板每用户行） | `#st-zip-converter-native-btn` / `-quick-fetch`（`menu_button menu_button_icon`） | `src/ui/host-bridge.js` `mountNativeBackupButton()` |
-| `.userBackupManager .backupActionRow` | `#st-zip-converter-luker-manager-btn` | `src/ui/host-bridge.js` `mountLukerBackupManagerButton()` |
+| `.extension_block[data-name*="ST-pack-transfer"]` | `div.inline-drawer`（宿主同款内联下拉，内容只有「打开面板」按钮 `#st-pack-transfer-open-btn`） | `src/ui/host-bridge.js` `mountExtensionRowButton()` |
+| `.userBackupButton` 的父元素（账号弹层 / 管理面板每用户行） | `#st-pack-transfer-native-btn`（`menu_button menu_button_icon`） | `src/ui/host-bridge.js` `mountNativeBackupButton()` |
+| `.userBackupManager .backupActionRow` | `#st-pack-transfer-luker-manager-btn` | `src/ui/host-bridge.js` `mountLukerBackupManagerButton()` |
 | `document.body`（**须显式标记**） | 自绘模态覆盖层、下载用临时 `<a>` | `index.js` 模态、`src/ui/{view,export-queue,stash-list,log-console}.js` 下载锚点 |
+
+**2026-10-27 R1.3 变更**：扩展菜单（顶栏魔方棒）**禁止注入**——`registerMenuButton` 已删除，
+`#extensionsMenu` / `.list-group` / `#options` 已从 `ANCHOR_SELECTORS` 白名单移除，
+任何写回菜单的代码都会被 `check:dom-scope` 拦截。
 
 **禁止**（任一命中即失败）：往白名单之外的宿主节点 `appendChild`/`insertBefore`/`insertAdjacentHTML`；
 对**非本插件节点**做 `setAttribute`/`classList.*`/`style.*`；`removeChild`/`remove()` 删宿主既有节点。
@@ -54,7 +57,7 @@
 
 - 在**任何页面脚本之前**劫持 DOM 写 API（`appendChild`/`insertBefore`/`removeChild`/`replaceChild`/
   `setAttribute`/`removeAttribute`/`Element.remove`/`classList.add|remove|toggle`），
-  按**调用栈**把每次写入归属到具体脚本（栈里含 `st-zip-converter` 即判为本插件所为）。
+  按**调用栈**把每次写入归属到具体脚本（栈里含 `ST-pack-transfer` 即判为本插件所为）。
 - 分流：插件所为**全量记录**，宿主只计数 + 限量样本（宿主加载期就有两万多次写，共用上限必被吃满）。
 - 自带 `--selftest`：把**合成**操作序列喂给同一个判定函数，断言四类违规都能抓到。
   **这一步不可省**——只看真实读数报 0 违规，无法区分"没违规"与"判定失灵"。

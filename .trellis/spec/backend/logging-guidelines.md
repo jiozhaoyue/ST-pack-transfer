@@ -18,7 +18,7 @@
 - 单例 `logger`，级别集合 `LOG_LEVELS = INFO | WARN | ERROR | SUCCESS`；方法 `logger.info / warn / error / success`。
 - **环形内存缓冲**：最多 `MAX_LOG_ENTRIES = 1000` 条，超出后丢弃最旧的。
 - **订阅机制**：`subscribers` 集合，供 `src/ui/log-console.js` 实时渲染；`logger.subscribe(fn)` 返回取消订阅函数。订阅者抛错会被捕获并记 `Logger subscriber error:`，不影响主流程。
-- **控制台镜像**：按级别调用 `console.error` / `console.warn` / `console.log`，前缀 `[st-zip-converter][HH:MM:SS.mmm][LEVEL]`。
+- **控制台镜像**：按级别调用 `console.error` / `console.warn` / `console.log`，前缀 `[ST-pack-transfer][HH:MM:SS.mmm][LEVEL]`。
   - 因此**“core 必须完全静默”是过时说法**：`src/core/` 中确实存在控制台输出，但**仅**出自 `logger.js`（其他核心模块只能经 `logger.*` 输出）。核心模块**不得**自行裸调 `console.*`。
 - 条目结构：`{ id, level, message, detail, timestamp, timeMs }`；支持文本导出。
 

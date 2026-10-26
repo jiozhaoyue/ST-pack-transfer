@@ -67,7 +67,7 @@ describe('confirmDialog 宿主原生确认适配器', () => {
 
     await expect(confirmDialog('确定删除吗？')).resolves.toBe(true);
     // 参数序按官方文档 Popup.show.confirm(header, text)
-    expect(calls).toEqual([['数据包互转', '确定删除吗？']]);
+    expect(calls).toEqual([['数据包转运', '确定删除吗？']]);
   });
 
   it('原生弹窗返回非 AFFIRMATIVE（含 null = 直接关闭）视为取消', async () => {

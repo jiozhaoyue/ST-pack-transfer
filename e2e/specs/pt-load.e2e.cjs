@@ -297,7 +297,7 @@ module.exports = {
     // 扩展资源重试会拉它并报 ERR_CONNECTION_REFUSED——URL 含插件名而被 harness 归因，
     // 但这是**安装通道噪音**不是运行时错误（server 生命周期属安装步骤）。判定前剔除。
     const runtimeErrors = h.rec.pluginConsoleErrors.filter(
-      (e) => !/http:\/\/127\.0\.0\.1:\d+\/st-zip-converter\.zip/.test(e.url || e.text || ''),
+      (e) => !/http:\/\/127\.0\.0\.1:\d+\/ST-pack-transfer\.zip/.test(e.url || e.text || ''),
     );
     t.log(`  · P15 前置读数：归因本插件的错误 ${h.rec.pluginConsoleErrors.length} 条（剔除一次性安装源重试后 ${runtimeErrors.length} 条）`);
     t.eq('P15 功能闭环后本插件仍零报错', runtimeErrors.length, 0,

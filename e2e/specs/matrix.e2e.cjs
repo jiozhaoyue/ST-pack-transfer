@@ -29,7 +29,7 @@ const { pathToFileURL } = require('url');
 const { pruneFixtures } = require('../lib/fixture-prune.cjs');
 const { openWorkbenchModal } = require('../lib/workbench-entry.cjs');
 
-const SLUG = 'st-zip-converter';
+const SLUG = 'ST-pack-transfer';
 const FIXTURE_DIR = path.resolve(__dirname, '../../test-results/fixtures');
 
 /** 现场生成夹具（进程内缓存，多个 spec 共用） */

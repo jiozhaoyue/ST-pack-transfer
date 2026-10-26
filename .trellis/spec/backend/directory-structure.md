@@ -6,7 +6,7 @@
 
 ## Overview
 
-`st-zip-converter` 的主干是一条**流式 zip 转换管线**，外加一层宿主注入 UI，用于在四酒馆平台（SillyTavern / Luker / TauriTavern / PureTavern）的导出包之间互转。项目**没有服务端进程，也没有 CLI**。
+`ST-pack-transfer` 的主干是一条**流式 zip 转换管线**，外加一层宿主注入 UI，用于在四酒馆平台（SillyTavern / Luker / TauriTavern / PureTavern）的导出包之间互转。项目**没有服务端进程，也没有 CLI**。
 
 关键设计原则：
 
@@ -20,7 +20,7 @@
 ## Directory Layout
 
 ```
-st-zip-converter/
+ST-pack-transfer/
 ├── index.html              # 独立 Web 入口（#app 容器）
 ├── index.js                # 根控制器：detectHost → 插件注入 / 独立工作台渲染
 ├── style.css               # 全部规则带 .app-container / .st-converter-drawer-app 双前缀

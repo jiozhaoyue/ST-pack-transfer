@@ -19,7 +19,7 @@
 const path = require('path');
 const { loadPlaywright } = require(path.resolve(__dirname, '..', 'e2e', 'lib', 'resolve-playwright.cjs'));
 
-const EXT_URL = process.env.PT_EXT_URL || 'https://github.com/jiozhaoyue/st-zip-converter';
+const EXT_URL = process.env.PT_EXT_URL || 'https://github.com/jiozhaoyue/ST-pack-transfer';
 
 /** PT 实例登记（端口为唯一判据；8899 dev / 8900 real——real 用 CLI 覆盖端口，见本仓 AGENTS） */
 const TARGETS = [
@@ -79,7 +79,7 @@ if (targets.length === 0) {
             const del = await fetch('/api/extensions/delete', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ extensionName: 'third-party/st-zip-converter' }),
+              body: JSON.stringify({ extensionName: 'third-party/ST-pack-transfer' }),
             });
             out.delete = { status: del.status, body: (await del.text()).slice(0, 200) };
           } catch (e) {

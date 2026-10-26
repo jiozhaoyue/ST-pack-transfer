@@ -110,7 +110,7 @@ PT 原生归档的条目**不是用户目录路径**,而是 PT 内部模块模�
   - 包根注入审计清单 `_delta_manifest.json`〔仓内 `src/core/delta.js` 的 `generateDeltaArchive`〕:
     ```json
     {
-      "generator": "st-zip-converter",
+      "generator": "ST-pack-transfer",
       "type": "delta-patch",
       "version": "1.0.0",
       "createdAt": "ISO-8601",

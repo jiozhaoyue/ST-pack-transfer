@@ -24,7 +24,7 @@
    **探针只信登记表里的 URL，写错了就会以「就绪超时」的形式表现出来**，容易误判成实例没起来。
 3. **禁止 `8000`**（`L0-16` 出厂默认段）；实例启动一律用其 `config.yaml` 的登记端口。
 
-目录按标准仓群布局**相对解析**：本仓 `<Tavern-repo>/My-repo/st-zip-converter` ⇒ 实例根
+目录按标准仓群布局**相对解析**：本仓 `<Tavern-repo>/My-repo/ST-pack-transfer` ⇒ 实例根
 `<Tavern-repo>/Instance`（即本仓根的 `../../Instance`）。**不写本机绝对路径**（`P-17` / `L1-MR-14`）。
 
 ## 2. E2E 只许连 Dev —— 守卫契约

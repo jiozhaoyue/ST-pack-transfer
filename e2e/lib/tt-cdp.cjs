@@ -27,7 +27,7 @@ const CDP_PORT = 9223;
 const FRONT_PORT = 1430;
 /** TT 数据根（真实数据区——P-11 高敏，写操作只允许纯增量安装目录） */
 const TT_EXT_DIR = path.join(
-  process.env.APPDATA || '', 'com.tauritavern.client', 'data', 'default-user', 'extensions', 'st-zip-converter',
+  process.env.APPDATA || '', 'com.tauritavern.client', 'data', 'default-user', 'extensions', 'ST-pack-transfer',
 );
 
 function portOpen(port) {
@@ -150,18 +150,18 @@ async function ttCdpSmoke({ loadPlaywright, shotPath = '', readyTimeoutMs = 120_
     // 冷启动实测宿主全局出现后约 **25–30s** 本插件才注入痕迹（2026-10-26 复现）。
     // ⇒ 断言前必须有界等待本插件自己的信号，不能读一次就判死。
     //
-    // 判据用插件**自注入**的节点（TT/Luker 模式只往宿主扩展行加「打开」+ 扩展菜单项，
-    // 不常驻 `.app-container`）：`#st-zip-converter-menu-item` 在扩展菜单容器存在时注入，
+    // 判据用插件**自注入**的节点（TT/Luker 模式只往宿主扩展行加内联下拉，
+    // 不常驻 `.app-container`）：`#st-converter-modal-overlay` 在 boot 时就建好（保持隐藏），
     // 之后 `.app-container` / `[class*="st-converter"]` 随工作台挂载出现。
     const pluginSignal = () => tt.evaluate(() => ({
       hasTauriTavernGlobal: typeof window.__TAURITAVERN__ !== 'undefined',
-      menuItem: !!document.getElementById('st-zip-converter-menu-item'),
-      openBtn: !!document.getElementById('st-zip-converter-open-btn'),
+      modal: !!document.getElementById('st-converter-modal-overlay'),
+      openBtn: !!document.getElementById('st-pack-transfer-open-btn'),
       hasDrawerApp: !!document.querySelector('[class*="st-converter"]'),
       hasAppContainer: !!document.querySelector('.app-container'),
-      mentionsPlugin: /数据包互转|st-zip-converter/i.test(document.documentElement.innerHTML),
+      mentionsPlugin: /数据包转运|ST-pack-transfer/i.test(document.documentElement.innerHTML),
     }));
-    const isLoaded = (r) => r.menuItem || r.openBtn || r.hasDrawerApp || r.hasAppContainer;
+    const isLoaded = (r) => r.modal || r.openBtn || r.hasDrawerApp || r.hasAppContainer;
 
     const t0 = Date.now();
     let trace = await retryOnNav(() => pluginSignal());
@@ -195,7 +195,7 @@ async function ttCdpSmoke({ loadPlaywright, shotPath = '', readyTimeoutMs = 120_
  */
 async function ttVaultSmoke({ loadPlaywright, shotPath = '', readyTimeoutMs = 120_000 } = {}) {
   const { chromium } = loadPlaywright();
-  const STORE_URL = '/scripts/extensions/third-party/st-zip-converter/src/storage/vault-store.js';
+  const STORE_URL = '/scripts/extensions/third-party/ST-pack-transfer/src/storage/vault-store.js';
   const FIXTURE_DIR = path.resolve(REPO_ROOT, 'test-results', 'fixtures');
   const fixturePath = path.join(FIXTURE_DIR, 'fixture-tt.zip');
 
@@ -220,11 +220,11 @@ async function ttVaultSmoke({ loadPlaywright, shotPath = '', readyTimeoutMs = 12
 
     // 等插件真正加载（延迟激活；与 ttCdpSmoke 同一判据）
     const t0 = Date.now();
-    let loaded = await retryOnNav(() => tt.evaluate(() => Boolean(document.getElementById('st-zip-converter-menu-item')
+    let loaded = await retryOnNav(() => tt.evaluate(() => Boolean(document.getElementById('st-converter-modal-overlay')
       || document.querySelector('.app-container'))));
     while (!loaded && Date.now() - t0 < readyTimeoutMs) {
       await tt.waitForTimeout(3_000);
-      loaded = await retryOnNav(() => tt.evaluate(() => Boolean(document.getElementById('st-zip-converter-menu-item')
+      loaded = await retryOnNav(() => tt.evaluate(() => Boolean(document.getElementById('st-converter-modal-overlay')
         || document.querySelector('.app-container'))));
     }
     if (!loaded) return { pass: false, details: { error: '插件未加载（延迟激活超窗）', waitedMs: Date.now() - t0 } };
@@ -243,8 +243,10 @@ async function ttVaultSmoke({ loadPlaywright, shotPath = '', readyTimeoutMs = 12
       return list.length;
     }, STORE_URL));
 
+    const { openWorkbenchModal } = require('./workbench-entry.cjs');
     const openPanel = async () => {
-      await retryOnNav(() => tt.evaluate(() => document.getElementById('st-zip-converter-menu-item')?.click()));
+      const res = await openWorkbenchModal(tt, { timeout: 30_000 });
+      if (!res.ok) return false;
       return retryOnNav(() => tt.waitForFunction(() => {
         const sec = document.querySelector('section[data-wb-module="vault"]');
         if (!sec || sec.getBoundingClientRect().height === 0) return false;
@@ -264,7 +266,7 @@ async function ttVaultSmoke({ loadPlaywright, shotPath = '', readyTimeoutMs = 12
       let again = false;
       while (!again && Date.now() - t1 < readyTimeoutMs) {
         await tt.waitForTimeout(3_000);
-        again = await retryOnNav(() => tt.evaluate(() => Boolean(document.getElementById('st-zip-converter-menu-item'))));
+        again = await retryOnNav(() => tt.evaluate(() => Boolean(document.getElementById('st-converter-modal-overlay'))));
       }
       panelOpen = again && await openPanel();
       panel = await readPanel();

@@ -16,7 +16,7 @@
 | **独立 Web** | `index.html`（仅空骨架 `#app.app-container`） | `index.js` → `bootstrap()` → `main()` | 无宿主；`file-protocol-notice.js` 只在 `file://` 下给提示 |
 | **酒馆扩展插件** | `index.js` 检测到宿主 | `index.js` → `mountSettingsDrawer()` | 抽屉态；额外注入宿主原生备份 UI 入口 |
 | **模态态** | `openConverterModal()` 导出 | `index.js:2662` 附近 | 自绘覆盖层 `#st-converter-modal-overlay` |
-| **file:// 单文件离线**（新） | `dist-offline/st-zip-converter-offline.html` | `scripts/build-offline.mjs` | 单文件、IIFE、Worker 强制主线程降级 |
+| **file:// 单文件离线**（新） | `dist-offline/ST-pack-transfer-offline.html` | `scripts/build-offline.mjs` | 单文件、IIFE、Worker 强制主线程降级 |
 
 **单一模板源**：`src/ui/workbench-template.js` 的 `getWorkbenchHtml()` 是 HTML 的**唯一**来源；
 `index.html` 只允许有空骨架容器（`scripts/single-template-source.js` 守卫强制）。

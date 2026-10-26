@@ -17,7 +17,7 @@
   `tavern-convert-` DOM 前缀**均已删除**，出现即为陈旧描述。）
 - **DOM 隔离靠两件事，不靠命名前缀**：
   1. **样式**：所有 CSS 规则作用域化在 `.app-container`（独立态）/ `.st-converter-drawer-app`（插件态）之下（见下方 CSS Scoping Mandate）；
-  2. **注入要素**：id 统一为 `st-zip-converter-*`，防重标记用 `dataset.stZipInjected`。
+  2. **注入要素**：id 统一为 `ST-pack-transfer-*`，防重标记用 `dataset.stZipInjected`。
 
 > 复用宿主原生类（`menu_button` / `text_pole` / `inline-drawer` 等）**只允许出现在标记里**，样式仍须作用域化——宿主用的是同一套设计系统，裸选择器会连带改掉宿主的每一个按钮。
 
@@ -66,7 +66,7 @@ document.querySelectorAll('.userBackupButton').forEach((anchor) => {
   if (!anchor.parentElement) return;
   // 幂等：兄弟位已注入则跳过（弹层重渲染后标记随节点消失，observer 自动重注）
   if (anchor.nextElementSibling?.dataset?.stZipInjected === '1') return;
-  anchor.parentElement.insertBefore(makeHostButton({ id: BTN_ID, icon: 'fa-right-left', label: '数据包互转', title: '…', onClick }), anchor.nextSibling);
+  anchor.parentElement.insertBefore(makeHostButton({ id: BTN_ID, icon: 'fa-right-left', label: '数据包转运', title: '…', onClick }), anchor.nextSibling);
 });
 ```
 
@@ -94,7 +94,7 @@ document.querySelectorAll('.userBackupButton').forEach((anchor) => {
 | --- | --- | --- |
 | `mountSettingsDrawer()` | `#extensions_settings2` / `#extensions_settings` | 工作台主抽屉（`getWorkbenchHtml({ isDrawer: true })`） |
 | `registerMenuButton()` | `#extensionsMenu .list-group` | 扩展菜单入口（兼容保留，点击后展开上述抽屉） |
-| `mountNativeBackupButton()` | `.userBackupButton`（账号弹层 + 管理面板每用户行） | 「数据包互转」+（仅账号弹层）「一键拉取」 |
+| `mountNativeBackupButton()` | `.userBackupButton`（账号弹层 + 管理面板每用户行） | 「数据包转运」 |
 | `mountLukerBackupManagerButton()` | `.userBackupManager .backupActionRow` | 仅 Luker 有该锚点，其余宿主自然无操作 |
 
 > **无锚点时不造浮层**：找不到锚点就什么都不做，等 observer 下次触发。**不要**自造右下角浮动按钮之类的非官方挂载点（UI 落点只认官方文档记载的位置）。
@@ -122,7 +122,7 @@ document.querySelectorAll('.userBackupButton').forEach((anchor) => {
 
 1. 先确认**宿主面板已被打开**（记录用了哪个入口 id 与点击链），再查锚点计数；
 2. 初始计数为 0 **不构成回归证据**——它只是说明面板没开；
-3. `#st-zip-converter-menu-item`（扩展菜单注入）恒存在，可作为「注入机制是否整体健康」的对照探针。
+3. `#ST-pack-transfer-menu-item`（扩展菜单注入）恒存在，可作为「注入机制是否整体健康」的对照探针。
 
 **另一处实测细节**：`.backupActionRow` 在 Luker 有 **5 行**，但只有 index 0 含原生 ZIP 下载按钮，
 故 `querySelector('.userBackupManager .backupActionRow')` 取首个**正是预期落点**（已真机确认）。

@@ -11,7 +11,7 @@
  *   3. 注入 `__ST_ZIP_OFFLINE__` ⇒ `worker-client.js` 确定走主线程降级（file:// 下 Worker 不可用）；
  *   4. 内联字体等二进制资源（`assetsInlineLimit` 调高）⇒ 产物**零外部资源请求**。
  *
- * 产出：`dist-offline/st-zip-converter-offline.html`（单文件，可双击）。
+ * 产出：`dist-offline/ST-pack-transfer-offline.html`（单文件，可双击）。
  * 既有 `npm run build`（GitHub Pages 形态）**不受影响**——本脚本是独立入口。
  */
 import { readFile, writeFile, readdir, rm, mkdir } from 'node:fs/promises';
@@ -22,8 +22,8 @@ import { build } from 'vite';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const OUT_DIR = 'dist-offline';
-const OUT_HTML = 'st-zip-converter-offline.html';
-const LIB_NAME = 'st-zip-converter';
+const OUT_HTML = 'ST-pack-transfer-offline.html';
+const LIB_NAME = 'ST-pack-transfer';
 
 /** `</script>` 出现在内联脚本里会提前闭合标签；转义为 `<\/script>`（JS 字符串里等价）。 */
 function escapeScriptBody(code) {
@@ -128,7 +128,7 @@ async function main() {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>酒馆数据包互转工坊（离线单文件）</title>
+<title>数据包转运（离线单文件）</title>
 <!--
   由 scripts/build-offline.mjs 生成，请勿手工编辑。
   单文件自包含：CSS 与 JS 全部内联，字体已内联为 data URI，file:// 下零外部请求。

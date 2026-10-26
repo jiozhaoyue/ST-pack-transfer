@@ -16,7 +16,7 @@ const { loadPlaywright, warnOnVersionDrift } = require('./resolve-playwright.cjs
 const { assertDevTarget } = require('./guard.cjs');
 
 /** 插件资源路径里的稳定 slug；两侧（ST / Luker）共用同一 URL 形态 */
-const PLUGIN_SLUG = 'st-zip-converter';
+const PLUGIN_SLUG = 'ST-pack-transfer';
 
 /** 该 URL / 文本 / 堆栈是否属于本插件 */
 function isPluginRef(value) {

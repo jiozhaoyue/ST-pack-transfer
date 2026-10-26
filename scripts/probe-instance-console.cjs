@@ -68,7 +68,7 @@ const shotPath = valueOf('--shot', '');
     pluginTrace = await page.evaluate(() => {
       const html = document.documentElement.innerHTML;
       return {
-        mentionsPlugin: /st-zip-converter|酒馆数据包互转|zip-converter/i.test(html),
+        mentionsPlugin: /ST-pack-transfer|数据包转运|zip-converter/i.test(html),
         hasAppContainer: !!document.querySelector('.app-container'),
         drawerCount: document.querySelectorAll('[class*="st-converter"]').length,
       };

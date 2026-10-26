@@ -86,7 +86,7 @@ export const CONTROL_CONSUMERS = Object.freeze({
   'host-base-archive-select': 'index.js — .value 从暂存区选基准包',
 
   // ── 包名（K 区）──
-  'filename-template-input': 'index.js — .value 包名模板（{target}_{user}_{part}_{date}）',
+  'filename-template-input': 'index.js — .value 包名模板（{target}_{user}_{part}_{datetime}）',
 
   // ── 动作按钮（E 区）──
   'btn-host-fetch': 'index.js — click 从宿主拉取数据包',

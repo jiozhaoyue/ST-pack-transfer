@@ -199,7 +199,7 @@ export function setupLogConsole(containerElement) {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `st-zip-converter-log-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.log`;
+      a.download = `ST-pack-transfer-log-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.log`;
       document.body.appendChild(a); // dom-scope:allow 下载锚点：临时 <a> 必须挂进文档 click() 才会触发下载，紧随其后即 removeChild
       a.click();
       document.body.removeChild(a);

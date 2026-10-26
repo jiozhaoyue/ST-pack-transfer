@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { namedBlob } from '../src/core/filename-template.js';
+import { namedBlob } from '../src/core/naming.js';
 
 /**
  * `namedBlob` —— 给 blob 一个可读的名字而**不改动原对象**。

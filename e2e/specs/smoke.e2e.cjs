@@ -9,19 +9,19 @@
  * 首版按绝对值断言，跑出 5 条失败 —— 回源码核实后确认**是断言写错了，不是插件缺陷**：
  *   · `host-bridge.js` 明写「初始页面查询 `.userBackupButton` → **0 个**，
  *     本函数自然什么都不做」⇒ 未打开账号弹层时 `data-st-zip-injected` 为 0 是**设计行为**；
- *   · 菜单项依赖宿主存在 `#extensionsMenu` 锚点（Luker 初始 DOM 里没有）。
+ *   · 顶栏魔方棒（扩展菜单）自 2026-10-27 起**绝对不注入**。
  * ⇒ 故改为断言**不变量**：注入按钮数 == 宿主原生锚点数（1:1、绝无孤儿）；
- *   锚点存在时菜单项必须存在。
+ *   顶栏魔方棒在任何宿主上都不得出现本插件节点。
  *
  * 注入点（取自源码，非猜测；2026-10-15 起插件态改挂全屏模态）：
- *   `#st-zip-converter-open-btn`          宿主扩展列表行上的「打开」（宿主桥 `mountExtensionRowButton`）
+ *   `#st-pack-transfer-open-btn`          宿主扩展列表行内联下拉里的「打开面板」
  *   `#st-converter-modal-overlay`         全屏工作台覆盖层（`index.js` ensureConverterModal）
  *   `#app.app-container`                  工作台容器（三形态同一个根）
- *   `#st-zip-converter-menu-item`         扩展菜单项
+ *   `#st-pack-transfer-menu-item`         （不存在——顶栏魔方棒零注入，见契约①）
  *   `[data-st-zip-injected="1"]`          注入到宿主原生按钮旁的动作按钮（幂等标记）
  */
 
-const SLUG = 'st-zip-converter';
+const SLUG = 'ST-pack-transfer';
 const BASE = `/scripts/extensions/third-party/${SLUG}`;
 
 module.exports = {
@@ -56,22 +56,18 @@ module.exports = {
     let mounted = false;
     try {
       await page.waitForFunction(
-        (slug) => Boolean(document.getElementById(`${slug}-menu-item`)
-          || document.getElementById('st-converter-modal-overlay')),
-        SLUG, { timeout: 60_000 },
+        () => Boolean(document.getElementById('st-converter-modal-overlay')),
+        null, { timeout: 60_000 },
       );
       mounted = true;
     } catch { mounted = false; }
-    t.ok('宿主已挂上插件（工作台模态或扩展菜单项已就绪）', mounted);
+    t.ok('宿主已挂上插件（全屏工作台模态已建好）', mounted);
 
     // —— 3. 注入点清点 ——
     const spots = await page.evaluate((slug) => ({
       modal: Boolean(document.getElementById('st-converter-modal-overlay')),
-      openBtn: Boolean(document.getElementById('st-zip-converter-open-btn')),
+      openBtn: Boolean(document.getElementById('st-pack-transfer-open-btn')),
       menuItem: Boolean(document.getElementById(`${slug}-menu-item`)),
-      // 宿主侧锚点是否存在（插件只在锚点存在处注入）
-      hostMenuAnchor: Boolean(document.querySelector('#extensionsMenu .list-group')
-        || document.querySelector('#extensionsMenu') || document.querySelector('#options')),
       injectedButtons: document.querySelectorAll('[data-st-zip-injected="1"]').length,
       backupAnchors: document.querySelectorAll('.userBackupButton').length,
     }), SLUG);
@@ -80,25 +76,11 @@ module.exports = {
     // 扩展行上的「打开」按钮是**按需渲染**的：宿主扩展管理弹层未打开时它不存在（设计行为，不算失败）
     t.log(`  · 扩展行「打开」按钮当前存在: ${spots.openBtn}（宿主扩展弹层未开时为 false，属设计行为）`);
 
-    // 契约①：菜单项与宿主菜单锚点同生共死 —— 锚点在则必须注入。
-    // ⚠️ 必须**有界等待**而非瞬时判定（L1-MR-7）：实测宿主菜单先渲染成**空壳**
-    // （`#extensionsMenu` 子节点 `0 → 16`），插件的菜单项要到 **t≈7 s** 才出现 ——
-    // 首版按瞬时值判定，于是同一个实例时红时绿。这是测量时机问题，不是插件缺陷。
-    let menuItem = spots.menuItem;
-    if (spots.hostMenuAnchor && !menuItem) {
-      try {
-        await page.waitForFunction(
-          (slug) => Boolean(document.getElementById(`${slug}-menu-item`)),
-          SLUG, { timeout: 15_000 },
-        );
-        menuItem = true;
-      } catch { menuItem = false; }
-    }
-    if (spots.hostMenuAnchor) {
-      t.ok('宿主菜单锚点存在 ⇒ 菜单项在 15s 内完成注入', menuItem);
-    } else {
-      t.ok('宿主无菜单锚点 ⇒ 菜单项缺省不算失败', true, '本实例初始 DOM 无 #extensionsMenu');
-    }
+    // 契约①（R1.3）：顶栏魔方棒**绝对不注入**。
+    // 旧的「菜单项与宿主菜单锚点同生共死」契约已于 2026-10-27 反向 —— 现在断言零注入；
+    // 静态侧由 `check:dom-scope` 把 `#extensionsMenu` 移出锚点白名单兜底。
+    const menuItem = spots.menuItem;
+    t.ok('顶栏魔方棒零注入（DOM 中不存在扩展菜单项）', !menuItem);
 
     // 契约②：**注入按钮数 == 宿主原生备份锚点数**（1:1，绝无孤儿按钮）
     t.eq('注入按钮数与宿主原生备份锚点数一致（1:1）',

@@ -750,7 +750,7 @@ junction**。同步器按"路径"逐条写入 ⇒ **1090 条穿透写进了那�
 
 <!-- TAVERN-RULES:END -->
 
-# 项目概览 (st-zip-converter)
+# 项目概览 (ST-pack-transfer)
 
 SillyTavern / Luker / TauriTavern / PureTavern 数据包互转工具，三形态运行：
 1. **独立 Web**（Vite 页面，`index.html` + `#app`）

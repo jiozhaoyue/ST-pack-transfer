@@ -6,7 +6,7 @@
 
 ## Overview
 
-`st-zip-converter` 是四酒馆（SillyTavern / Luker / TauriTavern / PureTavern）数据包互转工具。同一份 `src/core/` 核心跑在三种形态：
+`ST-pack-transfer` 是四酒馆（SillyTavern / Luker / TauriTavern / PureTavern）数据包转运工具。同一份 `src/core/` 核心跑在三种形态：
 
 1. **独立 Web**：`index.html`（`#app` 容器）+ 根 `index.js` 渲染工作台。
 2. **酒馆扩展插件**：`src/ui/host-bridge.js` 把工作台注入 ST / Luker 的扩展设置抽屉。

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import * as zip from '@zip.js/zip.js';
-import { resolveFilename, sanitizeFilename, DEFAULT_FILENAME_TEMPLATE } from '../src/core/filename-template.js';
+import { resolveFilename, sanitizeFilename, DEFAULT_FILENAME_TEMPLATE } from '../src/core/naming.js';
 import { zipIo } from '../src/core/zip-io.js';
 import { convert, TARGETS } from '../src/core/transform.js';
 import { lEntries } from '../fixtures/gen.js';
@@ -24,7 +24,7 @@ describe('自定义包名模板解析器 (resolveFilename)', () => {
       date: '2026-09-05',
     });
 
-    expect(filename).toBe('MySillyTavernBackup-to-pt_alice_2026-09-05.zip');
+    expect(filename).toBe('MySillyTavernBackup-to-PureTavern_alice_2026-09-05.zip');
   });
 
   it('模板未提供扩展名时自动补齐 .zip', () => {
@@ -34,7 +34,7 @@ describe('自定义包名模板解析器 (resolveFilename)', () => {
     });
 
     expect(filename.endsWith('.zip')).toBe(true);
-    expect(filename).toBe('backup_tt.zip');
+    expect(filename).toBe('backup_TauriTavern.zip');
   });
 
   it('模板为空时回退到默认模板 DEFAULT_FILENAME_TEMPLATE', () => {
@@ -44,7 +44,8 @@ describe('自定义包名模板解析器 (resolveFilename)', () => {
       date: '2026-09-05',
     });
 
-    expect(filename).toBe('test-to-l-2026-09-05.zip');
+    // 默认模板为 {target}_{user}_{part}_{datetime}.zip，datetime 取当前时间
+    expect(filename).toMatch(/^Luker_default-user_part1_\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}\.zip$/);
   });
 
   it('自动过滤与清洗跨平台非法字符', () => {
@@ -66,14 +67,14 @@ describe('自定义包名模板解析器 (resolveFilename)', () => {
       handle: 'bob',
       date: '2026-09-06',
     });
-    expect(filename1).toBe('MyBackup_for_tt_by_bob_2026-09-06.zip');
+    expect(filename1).toBe('MyBackup_for_TauriTavern_by_bob_2026-09-06.zip');
 
     const filename2 = resolveFilename('{filename}-{layout}-{username}.zip', {
       sourceName: 'CustomData.zip',
       target: 'pt',
       handle: 'charlie',
     });
-    expect(filename2).toBe('CustomData-pt-charlie.zip');
+    expect(filename2).toBe('CustomData-PureTavern-charlie.zip');
   });
 
   it('安全处理包含 $ 等特殊符号的源文件名与用户名，防止正则替换逃逸', () => {

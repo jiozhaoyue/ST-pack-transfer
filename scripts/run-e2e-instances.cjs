@@ -144,7 +144,7 @@ function stopAll() {
 // ────────────────────────── PT 本地 zip 安装（正名 + 持久档案 + spawn 异步） ──────────────────────────
 
 async function installPtExtension() {
-  const zipPath = path.join(OUT_DIR, 'st-zip-converter.zip'); // zip 名=扩展目录名（folderName 实测取自文件名）
+  const zipPath = path.join(OUT_DIR, 'ST-pack-transfer.zip'); // zip 名=扩展目录名（folderName 实测取自文件名）
   fs.mkdirSync(OUT_DIR, { recursive: true });
   run('git', ['archive', '--format=zip', '-o', zipPath, 'HEAD']);
   const http = require('http');
@@ -164,7 +164,7 @@ async function installPtExtension() {
   const installOnce = () => new Promise((resolve) => {
     const child = spawn('node', ['scripts/install-pt-extension.cjs', '--only', 'dev-pt', '--replace'], {
       cwd: REPO_ROOT,
-      env: { ...process.env, PT_EXT_URL: `http://127.0.0.1:${port}/st-zip-converter.zip` },
+      env: { ...process.env, PT_EXT_URL: `http://127.0.0.1:${port}/ST-pack-transfer.zip` },
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     let out = '';

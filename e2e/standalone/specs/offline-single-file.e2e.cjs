@@ -18,7 +18,7 @@ const { spawnSync } = require('child_process');
 const { pathToFileURL } = require('url');
 const common = require('../lib/common.cjs');
 
-const OFFLINE_HTML = path.join('dist-offline', 'st-zip-converter-offline.html');
+const OFFLINE_HTML = path.join('dist-offline', 'ST-pack-transfer-offline.html');
 
 /** 源码里最新的 mtime（与运行器的判据同源：只看得见「改」，看不见「删」） */
 function newestSourceMtime(repoRoot) {

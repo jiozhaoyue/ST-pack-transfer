@@ -224,7 +224,7 @@ rsync -av --delete --exclude='__pycache__' .trellis/scripts/ packages/cli/src/te
 
 ---
 
-## 本仓复用契约（ST-zip-converter）
+## 本仓复用契约（ST-pack-transfer）
 
 下面是本项目已收敛出的「单一来源」清单——新增代码前先对照，**不要另起一份实现**。
 `src/ui/escape.js` 的模块注释即引用本文件作为「全仓只此一处实现」的依据，故本节随代码变动同步维护。

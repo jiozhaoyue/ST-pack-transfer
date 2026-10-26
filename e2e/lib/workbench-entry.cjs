@@ -11,7 +11,7 @@
  *   ② 点 `#extensions_details` 打开**扩展管理弹层** —— 该弹层是**按需渲染**的，
  *      不点它 DOM 里一个 `.extension_block` 都没有（2026-10-15 在 Dev Luker 8003
  *      与 Dev ST 8001 双宿主实测：初始 `blockCount === 0`，点开后才 60+）；
- *   ③ 点宿主那一行里的 `#st-zip-converter-open-btn`。
+ *   ③ 点宿主那一行里的 `#st-pack-transfer-open-btn`（行内内联下拉里的「打开面板」）。
  *
  * 全程用**页内 click**（`page.evaluate`）而不是 Playwright 指针点击：宿主 splash 与
  * 第三方扩展的模态 dialog 会拦截指针事件，指针点击会以「element is not visible」超时
@@ -19,7 +19,7 @@
  */
 
 /** 宿主扩展行上我们追加的「打开」按钮 id（`host-bridge.js` mountExtensionRowButton） */
-const OPEN_BTN_ID = 'st-zip-converter-open-btn';
+const OPEN_BTN_ID = 'st-pack-transfer-open-btn';
 /** 全屏工作台覆盖层（`index.js` ensureConverterModal） */
 const MODAL_ID = 'st-converter-modal-overlay';
 

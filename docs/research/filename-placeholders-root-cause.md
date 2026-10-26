@@ -9,7 +9,7 @@
 
 ## 1. 调研背景与问题陈述
 
-在酒馆数据包互转工坊（`st-zip-converter`）中，用户期望能够通过占位符自定义导出的 Zip 文件名，例如：
+在酒馆数据包互转工坊（`ST-pack-transfer`）中，用户期望能够通过占位符自定义导出的 Zip 文件名，例如：
 - `{target}-{handle}-{date}.zip` 期望生成 `st-default-user-2026-09-06.zip`
 - `{source}-to-{target}-{date}.zip` 期望生成 `tauritavern-to-st-2026-09-06.zip`
 

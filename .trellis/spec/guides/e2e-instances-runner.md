@@ -67,19 +67,19 @@ node scripts/run-e2e-instances.cjs --only dev-st,tt-cdp
 7. **TT 第三方扩展是「延迟激活」，冷启动后约 25–30s 才注入本插件痕迹**（2026-10-26 定案）：
    TT 在 `APP_READY` 之后才走 `activateDeferredThirdPartyExtensions`
    （`nextPaint → initTokenizers → initScrapers → 激活 local/global 扩展`）。
-   ⇒ 冒烟**必须先有界等待插件自注入信号**（`#st-zip-converter-menu-item` /
+   ⇒ 冒烟**必须先有界等待插件自注入信号**（`#ST-pack-transfer-menu-item` /
    `[class*="st-converter"]` / `.app-container`），**不能读完一次就判 FAIL**；
    实测冷启动 `waitedMs≈28.6s`、热进程 160ms。默认上限 120s。
    旧兜底「点 `#extensions_menu_button` → 管理扩展 → 勾启用」**整套已废**：该 id 在现版
    TT 不存在（现为 `extensions-settings-button` / `third_party_extension_button`），
    且插件本就会自动激活，不需要也不该由测试去勾选。
-   **`mentionsPlugin`（HTML 文本命中）不可作主判据**：扩展面板列表里的显示名「酒馆数据包互转器」
+   **`mentionsPlugin`（HTML 文本命中）不可作主判据**：扩展面板列表里的显示名「数据包转运」
    未加载时也能命中（假绿），只作诊断留档。
 
 ## 判定口径
 
 - 本插件错误**只算可归因条目**（`harness.isPluginRef`）；PT 的「一次性安装源重试」
-  （`http://127.0.0.1:<port>/st-zip-converter.zip` ERR_CONNECTION_REFUSED）是安装通道
+  （`http://127.0.0.1:<port>/ST-pack-transfer.zip` ERR_CONNECTION_REFUSED）是安装通道
   噪音，pt-load P15 判定前剔除。
 - M-3 计划摘要计数口径=**OQ-1「默认完整迁移」13 键全 true**（直通 10/合成 1/丢弃 1/
   产物 11，夹具 11 条）；core 直调路径（include* 默认 false）是另一参数面——

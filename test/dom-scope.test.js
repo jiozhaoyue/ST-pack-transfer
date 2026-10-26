@@ -32,11 +32,19 @@ cond ? a.appendChild(x) : b;
   it('放行：写入白名单锚点（含可选链写法）', () => {
     const code = `
 document.querySelector('#extensions_settings2').appendChild(panel);
-document.getElementById('extensionsMenu')?.appendChild(item);
-document.querySelector('#extensionsMenu .list-group').appendChild(item);
+document.querySelector('.userBackupButton')?.appendChild(btn);
 document.querySelector('.userBackupManager .backupActionRow').insertBefore(btn, row.firstChild);
+document.querySelector('.extension_block[data-name*="ST-pack-transfer"]').appendChild(drawer);
 `;
     expect(checkDomScope(code, 'fixture.js')).toEqual([]);
+  });
+
+  it('拦截：扩展菜单（顶栏魔方棒）已移出白名单，任何写回都算违规（R1.3）', () => {
+    for (const sel of ['#extensionsMenu', '#extensionsMenu .list-group', '#options']) {
+      const violations = checkDomScope(`document.querySelector('${sel}').appendChild(item);`, 'fixture.js');
+      expect(violations, `${sel} 必须被拦下`).toHaveLength(1);
+      expect(violations[0].reason).toContain('不在锚点白名单内');
+    }
   });
 
   it('拦截：直接写宿主 body / documentElement / head', () => {

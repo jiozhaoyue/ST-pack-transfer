@@ -56,7 +56,15 @@
   --accent-hover: color-mix(in srgb, var(--accent) 80%, var(--text-main));
   --accent-soft-fallback: color-mix(in srgb, var(--SmartThemeQuoteColor, #9a9a92) 24%, transparent);
 
-  /* 平台标识色：**不再自造四个品牌色**，一律回落宿主强调色 */
+  /* 平台品牌色：2026-10-27 **定向推翻**上一轮「一律回落宿主强调色」的决定。
+     四色取自官方图标，但**只做标识**（图标环 / 包卡角标 / 下拉图标），
+     不得染按钮、面板或任何大面积区域；面板配色仍全部继承 `--SmartTheme*`。 */
+  --brand-st: #a11b1b;      --brand-st-ring: #c4413a;
+  --brand-luker: #121216;   --brand-luker-ring: color-mix(in srgb, var(--text-main) 54%, transparent);
+  --brand-tt: #f2c75c;      --brand-tt-ring: #f2c75c;
+  --brand-pt: #7d5cb0;      --brand-pt-ring: #a486d8;
+
+  /* 动作强调仍一律回落宿主强调色（品牌色不参与动作语义） */
   --accent-st: var(--accent);
   --accent-luker: var(--accent);
   --accent-tt: var(--accent);
@@ -245,6 +253,35 @@
   color: var(--accent-luker);
   border-color: color-mix(in srgb, var(--accent) 35%, transparent);
 }
+
+/* 顶栏宿主徽标：图标 + 英文全名 + 「插件」/「Web」。宿主名全仓只此一处。 */
+#app.app-container .badge-host {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+#app.app-container .host-badge-icon {
+  width: 14px;
+  height: 14px;
+  object-fit: contain;
+  flex: none;
+  border-radius: 50%;
+  outline: 1px solid var(--brand-st-ring);
+  outline-offset: 1px;
+}
+
+/* Luker 图标是**纯黑剪影**（`apple-icon-512x512.png`），深色主题下必须垫浅底才看得见。
+   这是宿主主题之外唯一必要的固定色，只作用于这枚 14px 图标。 */
+#app.app-container .badge-host[data-host="l"] .host-badge-icon {
+  outline-color: var(--brand-luker-ring);
+  background: #eceef2;
+  padding: 1px;
+}
+
+#app.app-container .badge-host[data-host="tt"] .host-badge-icon { outline-color: var(--brand-tt-ring); }
+#app.app-container .badge-host[data-host="pt"] .host-badge-icon { outline-color: var(--brand-pt-ring); }
+#app.app-container .badge-host[data-host="web"] .host-badge-gh { opacity: 0.85; }
 
 /* ==========================================================================
    卡片通用样式 (SillyTavern Card Frames)

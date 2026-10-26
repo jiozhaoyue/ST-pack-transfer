@@ -43,10 +43,10 @@ const shot = process.argv.includes('--shot') ? process.argv[process.argv.indexOf
 
   const listState = await page.evaluate(() => {
     const block = [...document.querySelectorAll('.extension_block')]
-      .find((b) => (b.dataset.name || '').includes('st-zip-converter'));
-    const panel = document.getElementById('st-zip-converter-settings-panel');
+      .find((b) => (b.dataset.name || '').includes('ST-pack-transfer'));
+    const panel = document.getElementById('st-pack-transfer-settings-panel');
     const drawer = document.getElementById('st_zip_converter_settings');
-    const btn = document.getElementById('st-zip-converter-open-btn');
+    const btn = document.getElementById('st-pack-transfer-open-btn');
     return {
       blockFound: !!block,
       blockName: block ? block.dataset.name : null,

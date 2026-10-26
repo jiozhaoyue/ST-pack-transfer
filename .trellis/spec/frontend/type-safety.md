@@ -96,7 +96,7 @@ v1 → v2 迁移的语义映射（`role → origin`）；新增来源必须同�
 
 ST / Luker 扩展清单由 `test/plugin.test.js` 把关，字段：
 
-- `name`：kebab-case（`st-zip-converter`）。
+- `name`：kebab-case（`ST-pack-transfer`）。
 - `display_name`：可读标题。
 - `version`：与项目版本一致的 semver（当前 `1.0.0`）。
 - `author`、`description`：非空。

@@ -25,7 +25,7 @@
 
 | 前缀 | 根 | 用途 |
 | --- | --- | --- |
-| `/st-zip-converter/` | `dist/` | 构建产物 ⇒ `specs/` 下的用例（形态 / 云子路径 / 闭环 / 分卷） |
+| `/ST-pack-transfer/` | `dist/` | 构建产物 ⇒ `specs/` 下的用例（形态 / 云子路径 / 闭环 / 分卷） |
 | `/src-tree/` | 仓库根 | **未打包 ESM 源码树** ⇒ `specs-src/` 下的用例 |
 
 为什么要有源码树挂载：构建产物是**单包**，模块边界被打散 ⇒ 页内 `import` 不到单个模块。
@@ -45,7 +45,7 @@
 ## 2 为什么「子路径」是独立形态的核心判据
 
 `vite.config.js` 用的是 `base: './'`（全部资源相对引用），**这正是云子路径部署能否成立的前提**。
-在根路径跑永远发现不了绝对路径引用 ⇒ 运行器默认把站点挂在 **`/st-zip-converter/`** 之下：
+在根路径跑永远发现不了绝对路径引用 ⇒ 运行器默认把站点挂在 **`/ST-pack-transfer/`** 之下：
 真源 `dist/` 不动，靠服务器把前缀映射掉（`e2e/standalone/lib/static-server.cjs`）。
 
 判定：
@@ -263,7 +263,7 @@
 ## 6 运行
 
 ```bash
-npm run e2e:web                    # 需要时自动构建 → 挂 /st-zip-converter/ → 跑全部
+npm run e2e:web                    # 需要时自动构建 → 挂 /ST-pack-transfer/ → 跑全部
 npm run e2e:web -- --no-build      # 用现有 dist（会做新鲜度告警）
 npm run e2e:web -- --only split    # 只跑某个 spec
 npm run e2e:web -- --prefix /      # 对照：根路径形态

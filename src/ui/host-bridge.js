@@ -228,31 +228,29 @@ export function hostLayoutCode(platform) {
   return platform;
 }
 
+/** 转换器接受的四个布局码（`convert()` 的 TARGETS 子集）。 */
+const TARGET_LAYOUT_CODES = new Set(['st', 'l', 'tt', 'pt']);
+
 /**
  * 目标选择器的**原始值** → 转换器布局代码（`st|l|tt|pt`）。
  *
- * 目标下拉里的 `native` 是「**宿主原生格式**」的意思，不是一个布局码 ——
- * 它的实际布局取决于**当前宿主**，故必须经 `hostLayoutCode()` 归一。
+ * 2026-10-27 R1.2 起选择器只有四项英文全称（值仍是布局码），
+ * 旧版 `native` 选项已删除——「宿主原生格式」的等价物就是当前宿主那一项本身。
  *
- * 这个函数存在的理由是「**归一只能有一处**」：
- * 修前只有宿主拉取路径与文件名预览做了归一，而 `refreshPlan` / `btnConvert` /
- * `runBatchConversion`（现 `handleBatchConvert`）/ 扩展清单的 `targetLayout` 都把字符串 `'native'`
- * **直接交给了计划器与转换器**；计划器的合成分支只认 `TARGETS.L` / `TARGETS.ST`
- * （`src/core/plan-preview.js`），`native` 不匹配任何分支 ⇒
- * 「宿主原生格式」退化成**原样直通**：
- * 在 ST 宿主上（源本就是 ST 布局）恰好等价、用户看不出差别；
- * 在 **Luker 宿主上选「宿主原生格式」**就会拿到**未经布局转换**的结果。
- *
- * @param {string} [rawValue] 选择器原始值（可能是 `native`；空值走 fallback）
- * @param {'st'|'luker'|'standalone'|string} [platform] 当前宿主平台码（`detectHost()` 的结果）
+ * @param {string} [rawValue] 选择器原始值
+ * @param {'st'|'luker'|'standalone'|string} [platform] 当前宿主平台码（保留签名，仅用于空值兜底）
  * @param {string} [fallback='l'] 选择器缺失/为空时的缺省布局码
  * @returns {string} 布局码 `st|l|tt|pt`
  */
 export function resolveTargetLayout(rawValue, platform, fallback = 'l') {
+  const known = TARGET_LAYOUT_CODES;
   const v = String(rawValue ?? '').trim();
-  if (!v) return fallback;
-  if (v === 'native') return hostLayoutCode(platform || 'st');
-  return v;
+  if (known.has(v)) return v;
+  // 未知值（含已删除的旧版 `native`、脏存档）一律回落到当前宿主布局：
+  // 「宿主原生格式」的语义本来就等于宿主那一项，不能把字符串直接交给转换器。
+  const hostLayout = hostLayoutCode(platform || '');
+  if (known.has(hostLayout)) return hostLayout;
+  return known.has(fallback) ? fallback : 'st';
 }
 
 /**
@@ -377,7 +375,7 @@ export function detectHost() {
 }
 
 /** 宿主原生弹窗标题——插件自身的功能名，非说明性文案（R4）。确认与信息提示共用同一标题 */
-const HOST_DIALOG_TITLE = '数据包互转';
+const HOST_DIALOG_TITLE = '数据包转运';
 
 /**
  * 读取宿主上下文对象（`SillyTavern.getContext()`）。
@@ -415,7 +413,7 @@ export async function confirmDialog(message) {
       const result = await hostConfirm(HOST_DIALOG_TITLE, message);
       return result === affirmative;
     } catch (err) {
-      console.warn('[st-zip-converter] 宿主原生确认弹窗不可用，降级为原生 confirm：', err);
+      console.warn('[ST-pack-transfer] 宿主原生确认弹窗不可用，降级为原生 confirm：', err);
     }
   }
   if (typeof window !== 'undefined' && typeof window.confirm === 'function') {
@@ -453,7 +451,7 @@ export async function alertDialog(message, title = HOST_DIALOG_TITLE) {
       await hostText(title, message);
       return;
     } catch (err) {
-      console.warn('[st-zip-converter] 宿主原生信息弹窗不可用，降级为原生 alert：', err);
+      console.warn('[ST-pack-transfer] 宿主原生信息弹窗不可用，降级为原生 alert：', err);
     }
   }
   if (typeof window !== 'undefined' && typeof window.alert === 'function') {
@@ -492,7 +490,7 @@ function loadStorageInspectorModule() {
     // @vite-ignore：该路径由宿主在运行期提供，不得被 Vite 打包期解析
     storageInspectorModulePromise = import(/* @vite-ignore */ STORAGE_INSPECTOR_MODULE_URL)
       .catch((err) => {
-        console.warn('[st-zip-converter] 宿主存储面板模块不可用，降级隐藏入口：', err);
+        console.warn('[ST-pack-transfer] 宿主存储面板模块不可用，降级隐藏入口：', err);
         return null;
       });
   }
@@ -538,7 +536,7 @@ export async function openStorageInspector() {
     await mod.openStorageInspector({ kind: 'self' });
     return true;
   } catch (err) {
-    console.warn('[st-zip-converter] 唤起宿主存储面板失败：', err);
+    console.warn('[ST-pack-transfer] 唤起宿主存储面板失败：', err);
     return false;
   }
 }
@@ -1857,16 +1855,14 @@ function watchHostDom(injectFn) {
 }
 
 /**
- * 宿主扩展列表「打开」入口注入。
+ * 宿主扩展列表「打开面板」入口注入。
  *
- * **为什么不再注入内联抽屉**（2026-10-15 用户裁定「扩展列表处只留一条」）：
- * 宿主**自己**会为每个扩展渲染一行 `.extension_block`（含原生启用开关，见宿主
- * `extensions.js` 的 `generateExtensionElement`）。我们原先再往 `#extensions_settings2`
- * 塞一个「内联展开整个工作台」的抽屉 ⇒ 扩展区出现第二条、且把宿主设置页撑得很长。
- * 现在只往宿主那一行追加一个「打开」，点开是**全屏**工作台（`openConverterModal()`）。
+ * 形态（2026-10-27 R1.3）：宿主**自己**那一行 `.extension_block` 内追加一条与其它扩展
+ * 一致的内联下拉，内容只有「打开面板」；点开后是全屏工作台（`openConverterModal()`）。
+ * 扩展行仍只有宿主那一条，不在 `#extensions_settings2` 里另起第二个块。
  *
- * 落点要兼容两类命名：Luker 的用户私有扩展是 `data-name="/st-zip-converter"`，
- * 全局扩展是 `data-name="st-zip-converter"`（宿主侧 `externalId = name.replace('third-party','')`），
+ * 落点要兼容两类命名：Luker 的用户私有扩展是 `data-name="/ST-pack-transfer"`，
+ * 全局扩展是 `data-name="ST-pack-transfer"`（宿主侧 `externalId = name.replace('third-party','')`），
  * 故用 `*=` 子串匹配。
  *
  * **该列表是宿主按需渲染的弹层**（点 `#extensions_details` 才出现，初始 DOM 里一个
@@ -1879,57 +1875,41 @@ export function mountExtensionRowButton(onOpen) {
   if (typeof document === 'undefined') return;
 
   const addBtn = () => {
-    document.querySelectorAll('.extension_block[data-name*="st-zip-converter"]').forEach((block) => {
+    document.querySelectorAll('.extension_block[data-name*="ST-pack-transfer"]').forEach((block) => {
       // 幂等：宿主重渲染会让标记随节点消失，observer 自动重注
-      if (block.querySelector('[data-st-zip-injected="1"]')) return;
+      if (block.querySelector('[data-st-pack-transfer-injected="1"]')) return;
 
+      const drawer = document.createElement('div');
+      drawer.className = 'inline-drawer';
+      drawer.dataset.stPackTransferInjected = '1';
+
+      const toggle = document.createElement('div');
+      toggle.className = 'inline-drawer-toggle inline-drawer-header';
+      const title = document.createElement('b');
+      title.textContent = '数据包转运';
+      const icon = document.createElement('div');
+      icon.className = 'inline-drawer-icon fa-solid fa-circle-chevron-down down';
+      toggle.appendChild(title);
+      toggle.appendChild(icon);
+
+      const content = document.createElement('div');
+      content.className = 'inline-drawer-content';
       const openBtn = makeHostButton({
-        id: 'st-zip-converter-open-btn',
-        icon: 'fa-file-zipper',
-        label: '打开',
-        title: '打开数据包互转工坊',
+        id: 'st-pack-transfer-open-btn',
+        icon: 'fa-up-right-and-down-left-from-center',
+        label: '打开面板',
+        title: '打开数据包转运面板',
         onClick: () => {
           if (typeof onOpen === 'function') onOpen();
         },
       });
-      // 优先并入宿主原生动作区（`.extension_actions`），无则退化为行尾
-      const actions = block.querySelector('.extension_actions');
-      (actions || block).appendChild(openBtn);
+      content.appendChild(openBtn);
+
+      drawer.appendChild(toggle);
+      drawer.appendChild(content);
+      block.appendChild(drawer);
+      setupDrawerToggles(block);
     });
-  };
-
-  watchHostDom(addBtn);
-}
-
-/**
- * 宿主扩展菜单按钮注入 (保留向下兼容)
- * @param {() => void} [onOpen] 打开全屏工作台
- */
-export function registerMenuButton(onOpen) {
-  if (typeof document === 'undefined') return;
-
-  const addBtn = () => {
-    if (document.getElementById('st-zip-converter-menu-item')) return;
-    const menuList = document.querySelector('#extensionsMenu .list-group')
-      || document.querySelector('#extensionsMenu')
-      || document.querySelector('#options');
-    if (!menuList) return;
-
-    const item = document.createElement('div');
-    item.id = 'st-zip-converter-menu-item';
-    item.className = 'list-group-item flexify-horizontal interactable';
-    item.style.cursor = 'pointer';
-    item.innerHTML = '<i class="fa-solid fa-file-zipper extensionsMenuExtensionButton" style="margin-right: 8px; color: var(--SmartThemeQuoteColor, #f59e0b);"></i><span style="font-weight: 500;">数据包互转工坊</span>';
-
-    item.addEventListener('click', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      if (typeof onOpen === 'function') {
-        onOpen();
-      }
-    });
-
-    menuList.appendChild(item);
   };
 
   watchHostDom(addBtn);
@@ -1942,11 +1922,8 @@ export function registerMenuButton(onOpen) {
  * 宿主原生类、`dataset.stZipInjected` 幂等标记、`<i>` 图标 + `<span>` 文案结构，
  * 以及 `preventDefault/stopPropagation` 包裹（避免触达宿主原生锚点的默认行为）。
  *
- * 两类按钮**有意不**经由本工厂（形态不同，硬套会破坏宿主原生外观）：
- * - `registerMenuButton` 注入的是宿主扩展菜单项（`list-group-item` +
- *   `extensionsMenuExtensionButton` 图标类），非 `menu_button`；
- * - 工作台的固定动作按钮是**声明式模板标记**（单一模板源 R8），
- *   改由 JS 生成会与 R8 冲突。
+ * 工作台的固定动作按钮是**声明式模板标记**（单一模板源 R8），
+ * 改由 JS 生成会与 R8 冲突，故不经本工厂。
  *
  * @param {{ id: string, icon: string, label?: string, title?: string, onClick?: () => void }} spec
  * @returns {HTMLElement} 已挂好点击处理的按钮节点
@@ -1991,7 +1968,7 @@ function makeHostButton({ id, icon, label, title, onClick }) {
  */
 export function mountNativeBackupButton(onOpen) {
   if (typeof document === 'undefined') return;
-  const BTN_ID = 'st-zip-converter-native-btn';
+  const BTN_ID = 'st-pack-transfer-native-btn';
 
   const addBtn = () => {
     // 多锚点：账号弹层（userProfile）与管理面板（admin，每用户行一个）都有 .userBackupButton
@@ -2003,8 +1980,8 @@ export function mountNativeBackupButton(onOpen) {
       const openBtn = makeHostButton({
         id: BTN_ID,
         icon: 'fa-right-left',
-        label: '数据包互转',
-        title: '打开酒馆数据包互转工坊（全屏）',
+        label: '数据包转运',
+        title: '打开数据包转运面板',
         onClick: () => {
           if (typeof onOpen === 'function') onOpen();
         },
@@ -2034,7 +2011,7 @@ export function mountNativeBackupButton(onOpen) {
  */
 export function mountLukerBackupManagerButton(onOpen) {
   if (typeof document === 'undefined') return;
-  const BTN_ID = 'st-zip-converter-luker-manager-btn';
+  const BTN_ID = 'st-pack-transfer-luker-manager-btn';
 
   const addBtn = () => {
     if (document.getElementById(BTN_ID)) return;
@@ -2044,8 +2021,8 @@ export function mountLukerBackupManagerButton(onOpen) {
     const btn = makeHostButton({
       id: BTN_ID,
       icon: 'fa-right-left',
-      label: '数据包互转',
-      title: '打开酒馆数据包互转工坊（全屏）',
+      label: '数据包转运',
+      title: '打开数据包转运面板',
       onClick: () => {
         if (typeof onOpen === 'function') {
           onOpen();

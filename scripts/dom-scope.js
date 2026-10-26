@@ -58,11 +58,11 @@ const HOST_QUERY_TARGET = /^document\s*\.\s*(?:querySelector|getElementById|getE
 const ANCHOR_SELECTORS = new Set([
   '#extensions_settings2',            // 扩展设置抽屉：工作台面板落点
   '#extensions_settings',             // 同上（旧版宿主 id）
-  '#extensionsMenu',                  // 扩展菜单：入口项落点
-  '#extensionsMenu .list-group',
-  '#options',                         // 扩展菜单兜底容器
+  // 2026-10-27 R1.3：扩展菜单（顶栏魔方棒）**禁止注入**，
+  // `#extensionsMenu` / `#options` 已从白名单移除 —— 任何写回菜单的代码都会被本守卫拦下。
   '.userBackupButton',                // 账号弹层/管理面板按钮的锚点（按钮插在它旁边）
   '.userBackupManager .backupActionRow', // Luker 备份管理器动作行
+  '.extension_block[data-name*="ST-pack-transfer"]', // 扩展列表行内联下拉（扩展开关同款）
 ]);
 
 /**

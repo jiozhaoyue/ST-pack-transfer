@@ -1,10 +1,10 @@
 {
-  "name": "st-zip-converter",
-  "display_name": "酒馆数据包互转器",
+  "name": "ST-pack-transfer",
+  "display_name": "数据包转运",
   "version": "1.0.0",
   "author": "jiozhaoyue",
   "description": "在 SillyTavern / Luker / PureTavern / TauriTavern 之间互转导出的 Zip 数据包",
-  "homePage": "https://github.com/jiozhaoyue/st-zip-converter",
+  "homePage": "https://github.com/jiozhaoyue/ST-pack-transfer",
   "loading_order": 50,
   "js": "index.js",
   "css": "style.css"

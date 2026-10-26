@@ -21,7 +21,10 @@
 ## Acceptance Criteria
 
 - [ ] AC-1 全仓 `grep -ri "st-zip-converter"` 在对外文案/`data-name`/文档中为 0（历史任务目录与 git 历史除外）。
-- [ ] AC-2 目标平台下拉恰好四项英文全称，当前宿主项带「（宿主）」，UI 中不存在 `native` 字符串。
-- [ ] AC-3 三处入口均在宿主重渲染后自动恢复，顶栏魔方棒零注入（可用 E2E 断言 DOM 中不存在注入节点）。
-- [ ] AC-4 十一个占位符各有单测；`{datetime}` 到秒；默认模板渲染结果符合 `{target}_{user}_{part}_{datetime}.zip`。
-- [ ] AC-5 顶栏徽标在插件/Web 两种形态下文字与图标均正确，且宿主名在面板内仅出现一次。
+  - 2026-10-27 现状：代码、manifest/package、E2E、scripts、README/SECURITY/docs、`.trellis/spec` 已收敛；
+    **未清零项**：① `AGENTS.md` / `CLAUDE.md` 的**自动生成规则块**（由 `tavern-harness` 真源仓同步，文件头注明请勿手改）；
+    ② `docs/research/*`、`docs/superpowers/*` 中的本机绝对路径（仓目录尚未改名，改名后一并处理）。
+- [x] AC-2 目标平台下拉恰好四项英文全称，当前宿主项带「（宿主）」，UI 中不存在 `native` 字符串。
+- [x] AC-3 三处入口均在宿主重渲染后自动恢复，顶栏魔方棒零注入（经 `check:dom-scope` 白名单移除 + 单测负例 + smoke spec 反向契约；实例 E2E 本轮未跑）。
+- [x] AC-4 十一个占位符各有单测；`{datetime}` 到秒；默认模板渲染结果符合 `{target}_{user}_{part}_{datetime}.zip`。
+- [x] AC-5 顶栏徽标在插件/Web 两种形态下文字与图标均正确，且宿主名在面板内仅出现一次。（模板渲染已核；浏览器截图待补，预览服务本轮不可用）

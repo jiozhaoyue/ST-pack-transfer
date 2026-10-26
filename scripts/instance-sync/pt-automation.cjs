@@ -29,7 +29,7 @@ const { getInstance } = require('../../e2e/lib/instances.cjs');
 // PT 数据计数装置抽到 lib（**唯一实现**，import-pt.cjs 共用；防两处口径漂移）
 const { countPtData } = require('./lib/pt-count.cjs');
 
-const PLUGIN_GIT_URL = 'https://github.com/jiozhaoyue/st-zip-converter';
+const PLUGIN_GIT_URL = 'https://github.com/jiozhaoyue/ST-pack-transfer';
 const SHOT_DIR = path.resolve(__dirname, '..', '..', 'test-results');
 
 function parseArgs(argv) {
@@ -181,7 +181,7 @@ async function openExtensionsDrawer(page) {
       let installed = false;
       while (Date.now() < instDeadline) {
         const txt = await page.evaluate(() => document.body.innerText).catch(() => '');
-        if (txt.includes('st-zip-converter') || txt.includes('ST-zip-converter') || txt.includes('酒馆数据包')) { installed = true; break; }
+        if (txt.includes('ST-pack-transfer') || txt.includes('数据包转运') || txt.includes('酒馆数据包')) { installed = true; break; }
         if (txt.includes('安装失败') || txt.includes('Failed')) break;
         await page.waitForTimeout(4000);
       }

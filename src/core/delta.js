@@ -150,7 +150,7 @@ export async function generateDeltaArchive(baseArchive, targetArchive, options =
 
   // 注入轻量增量清单 _delta_manifest.json
   const manifest = {
-    generator: 'st-zip-converter',
+    generator: 'ST-pack-transfer',
     type: 'delta-patch',
     version: '1.0.0',
     createdAt: new Date().toISOString(),
