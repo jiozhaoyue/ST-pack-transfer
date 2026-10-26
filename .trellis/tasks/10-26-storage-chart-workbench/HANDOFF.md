@@ -14,7 +14,7 @@
 | --- | --- |
 | 父任务 | `10-26-storage-chart-workbench`（planning） |
 | 子任务 | `naming-injection`（本轮实现完成）/ `storage-chart` / `zones-flow` / `package-cards-vault` / `tutorial-copy` / `ui-demo`（其余 planning） |
-| 已推送提交 | `924e919`（HEAD = origin/main；远端已改名 `jiozhaoyue/ST-pack-transfer`） |
+| 已推送提交 | `7c098ac`（HEAD = origin/main；远端已改名 `jiozhaoyue/ST-pack-transfer`） |
 | 产品代码 | `src/core/naming.js`、`src/ui/host-icons.js` 新增；命名/入口/徽标改动已落 |
 | 质量门 | `npm test` 945 passed / 2 skipped；五个静态守卫全绿 |
 | demo | `deliverables/ui-demo.html`（2026-10-27 评审版） |
