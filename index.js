@@ -110,6 +110,9 @@ async function main(root) {
 
   const pkgById = (id) => state.packages.find((pkg) => pkg.id === id) || null;
 
+  /** 局域网面板在视图构造之后才挂载；用先声明的引用避免 TDZ。 */
+  let lanPanel = null;
+
   async function blobOf(pkg) {
     if (!pkg) return null;
     if (pkg.blob) return pkg.blob;
@@ -490,6 +493,10 @@ async function main(root) {
       uploadRequest: () => root.querySelector('#file-input')?.click(),
       uploadPrivate: (name) => { logger.info(`私有配置上传请求：${name}`); view.toast(`私有配置：${name}`); },
       onActivePackage: (id) => { ensurePlan(id).then(() => view.setActivePackage(id)); },
+      onTargetChange: (name) => {
+        const active = state.packages.find((p) => view.getState().source?.pkgId === p.id);
+        if (active) ensurePlan(active.id, name).then(() => view.setActivePackage(active.id));
+      },
       close: () => {
         const overlay = document.getElementById('st-converter-modal-overlay');
         if (overlay) overlay.style.display = 'none';
@@ -519,7 +526,7 @@ async function main(root) {
     });
   }
 
-  const lanPanel = mountLanTransferPanel({
+  lanPanel = mountLanTransferPanel({
     root,
     onReceive: async (blob, name) => importFiles([new File([blob], name || `lan-${Date.now()}.zip`)]),
   });

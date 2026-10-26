@@ -1451,3 +1451,7 @@ const convertTo = async (target, expectProduct) => {
       `undefined 出现次数=${(batchLogText.match(/undefined/g) || []).length}`);
   },
 };
+
+module.exports.openWorkbench = openWorkbench;
+module.exports.ensureFixtures = ensureFixtures;
+module.exports.FIXTURE_DIR = FIXTURE_DIR;

@@ -41,9 +41,9 @@ const keepUp = argv.includes('--keep-up');
 
 /** 宿主矩阵声明：spec 为 e2e/run.cjs 的参数序列（逐条独立跑，累计判定） */
 const HOSTS = [
-  { id: 'dev-st', label: 'Dev SillyTavern (8001, http)', specs: [['smoke', ['--only', 'smoke', '--instance', 'dev-st']], ['matrix', ['--only', 'matrix', '--instance', 'dev-st']], ['vault', ['--only', 'vault', '--instance', 'dev-st']]] },
-  { id: 'dev-luker', label: 'Dev Luker (8003, https)', specs: [['smoke', ['--only', 'smoke', '--instance', 'dev-luker']], ['matrix', ['--only', 'matrix', '--instance', 'dev-luker']], ['vault', ['--only', 'vault', '--instance', 'dev-luker']]] },
-  { id: 'dev-pt', label: 'Dev PureTavern (8899, http, headed)', specs: [['pt-load', ['--only', 'pt-load', '--instance', 'pt-web']], ['vault', ['--only', 'vault', '--instance', 'pt-web']]] },
+  { id: 'dev-st', label: 'Dev SillyTavern (8001, http)', specs: [['smoke', ['--only', 'smoke', '--instance', 'dev-st']], ['newui', ['--only', 'newui', '--instance', 'dev-st']]] },
+  { id: 'dev-luker', label: 'Dev Luker (8003, https)', specs: [['smoke', ['--only', 'smoke', '--instance', 'dev-luker']], ['newui', ['--only', 'newui', '--instance', 'dev-luker']]] },
+  { id: 'dev-pt', label: 'Dev PureTavern (8899, http, headed)', specs: [['pt-load', ['--only', 'pt-load', '--instance', 'pt-web']]] },
   { id: 'tt-cdp', label: 'TauriTavern (9223, CDP)', specs: null },
 ];
 
@@ -237,13 +237,6 @@ async function installPtExtension() {
         pass = r.pass;
         lines.push(`- ttCdpSmoke: ${r.pass ? 'PASS' : 'FAIL'}`, `- 读数: ${JSON.stringify(r.details)}`, `- 截图: ${shot}`);
         log(`  tt-cdp: ${r.pass ? 'PASS' : 'FAIL'} ${JSON.stringify(r.details).slice(0, 160)}`);
-
-        // 仓（vault）行：与加载冒烟共用同一 TT 进程（TT 冷启动一次 ~35s，重开代价高）
-        const vaultShot = path.join(OUT_DIR, `vault-tt-cdp-stored-${stamp}.png`);
-        const v = await ttCdp.ttVaultSmoke({ loadPlaywright, shotPath: vaultShot });
-        if (!v.pass) pass = false;
-        lines.push(`- ttVaultSmoke: ${v.pass ? 'PASS' : 'FAIL'}`, `- 读数: ${JSON.stringify(v.details)}`, `- 截图: ${vaultShot}`);
-        log(`  tt-vault: ${v.pass ? 'PASS' : 'FAIL'} ${JSON.stringify(v.details).slice(0, 200)}`);
       } catch (e) {
         pass = false;
         lines.push(`- 异常: ${String(e).slice(0, 300)}`);

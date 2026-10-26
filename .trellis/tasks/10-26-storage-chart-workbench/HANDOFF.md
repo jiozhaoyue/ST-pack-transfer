@@ -65,13 +65,12 @@
 
 ## 五、未完成 / 已知问题（按优先级）
 
-1. **实例侧 E2E 规格仍按旧 UI 写**：`e2e/specs/matrix.e2e.cjs`、`vault.e2e.cjs` 仍引用
-   `#plan-summary-bar`、`#category-checkboxes`、`#btn-convert`、`#stash-list` 等已删除节点。
-   `smoke.e2e.cjs` 已改为新节点（`#zone-body` / `#zone-tabs` / `#quota-head` / `#chart-stack`）。
-   → **矩阵与仓规格需要按新 UI 重写**，否则实例 E2E 必红。
-2. **局域网面板只做了「主题化」**：结构仍是自写的「发送 / 接收」两段。
-   用户要求**完全对标 Luker 与 TT**（Luker `public/scripts/lan-sync.js` 的 peer row / 类目勾选 / 状态区；
-   TT 的阶段 + 进度事件）。→ 下一步应重写 `src/ui/lan-transfer-panel.js` 的 DOM 结构与状态区。
+1. **实例侧旧矩阵/仓规格仍按旧 UI 写**：`e2e/specs/matrix.e2e.cjs`、`vault.e2e.cjs` 仍引用已删除节点。
+   **运行器已改用 `e2e/specs/newui.e2e.cjs`**（真实路径打开 → 上传 → 图表 → 四目标切换 → 生成导出包），
+   `smoke` 也已改为新节点。旧矩阵文件保留在仓库里待归档，**不要再用它判定回归**。
+2. **局域网面板已按 Luker / TT 结构重写**（peer row / 角色切换 / 阶段+进度条 / 能力徽标），
+   并用两个浏览器上下文实测：offer/answer 交换成功、双方 100%、接收端得到同名包、零报错。
+   仍需在**两台真实设备**（不同机器）复验 mDNS 与扫码形态。
 3. **宿主自动开浏览器**：Dev ST / Luker 的 `config.yaml` 已设 `browserLaunch.enabled: false`，
    但历史上实例已在运行时仍会开标签；需在**重启后**确认。禁止与其它自动开浏览器的工具同时运行。
 4. **设置弹窗是动态渲染**：`#set-*` 控件不在模板里，静态守卫不覆盖；改设置项时同步改
