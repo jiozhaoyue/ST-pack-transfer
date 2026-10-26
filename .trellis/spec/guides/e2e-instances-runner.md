@@ -36,6 +36,17 @@ node scripts/run-e2e-instances.cjs --only dev-st,tt-cdp
    折叠态读日志=占位符「暂无日志记录」（假红根源），读前必须展开。
 6. **一键连跑的时序脆弱**：dev-luker 轮偶发「插件未挂载」（单跑恒绿，宿主扩展加载
    竞态）——编排器对失败 spec 自动重试一次再判死。
+7. **TT 第三方扩展是「延迟激活」，冷启动后约 25–30s 才注入本插件痕迹**（2026-10-26 定案）：
+   TT 在 `APP_READY` 之后才走 `activateDeferredThirdPartyExtensions`
+   （`nextPaint → initTokenizers → initScrapers → 激活 local/global 扩展`）。
+   ⇒ 冒烟**必须先有界等待插件自注入信号**（`#st-zip-converter-menu-item` /
+   `[class*="st-converter"]` / `.app-container`），**不能读完一次就判 FAIL**；
+   实测冷启动 `waitedMs≈28.6s`、热进程 160ms。默认上限 120s。
+   旧兜底「点 `#extensions_menu_button` → 管理扩展 → 勾启用」**整套已废**：该 id 在现版
+   TT 不存在（现为 `extensions-settings-button` / `third_party_extension_button`），
+   且插件本就会自动激活，不需要也不该由测试去勾选。
+   **`mentionsPlugin`（HTML 文本命中）不可作主判据**：扩展面板列表里的显示名「酒馆数据包互转器」
+   未加载时也能命中（假绿），只作诊断留档。
 
 ## 判定口径
 

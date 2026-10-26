@@ -129,6 +129,16 @@ grep -rn "trustedStaticMarkup(" src/ index.js
    - 另注：宿主路径随安装形态变化（ST 在 `public/scripts/extensions/third-party/**`、
      Luker 在 `data/<user>/extensions/**` 平铺），跨宿主相对路径 `import()` 本就不可靠
 
+11. **异步渲染不做失效控制（并发渲染重复追加，2026-10-26 实测）**
+   - ❌ 面板渲染函数里「`await 取数` → `container.innerHTML=''` → `await 再取数` → 追加」：
+     两个渲染协程交错时，双方都在清场之后追加 ⇒ 列表出现重复行
+   - ✅ 两条并用：**所有 DOM 写入集中在最后一次 `await` 之后**（全同步段），并给容器打
+     **渲染序号**（`containerEl.dataset.xRenderSeq`），每个 `await` 之后检查「序号仍是我」否则丢弃
+   - 实例：`updateWorkspaceUI` 在一次「存入仓」后被 `onChanged` 与 change handler 各触发一次 ⇒
+     `vault-panel.js` 把 1 条后端记录渲染成 4 行（Dev Luker 实测，重载后恢复）；修法与守护用例见
+     `src/ui/vault-panel.js` / `test/vault-panel-render.test.js`「并发渲染」节
+   - 后果：后端真值正确、UI 却重复——用户删掉「一行」看到还有一行，会以为删除失效
+
 ---
 
 ## 单一模板源（取代原「多入口同源同改」）

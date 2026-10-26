@@ -84,14 +84,13 @@
 - [x] **AC-1** 左栏分组列表可见且组头徽标计数正确（源包按来源、产物按目标平台），E2E 断言。—— A 线落地，s1-remedies H1-H7（2026-10-24）
 - [x] **AC-2** 每个区块有「?」入口，浮层仅含该区块说明；界面常驻说明文案为零（守卫保持全绿）。—— A 线落地，help-topics 5/5
 - [x] **AC-3** 《UI 编排铁律》落 `.trellis/spec/frontend/`，新增守卫断言全绿。—— `ui-orchestration-rules.md` + 动词表/悬空断言（index 登记于 2026-10-24 收口补齐）
-- [ ] **AC-4** PT 实例（8899）实测 `detectHost()` 返回 PT 平台码；unknown 兜底单测在。—— 单测已就位（detect-host 30/30）；8899 实测留待 C 线 e2e-instances-runner
+- [x] **AC-4** PT 实例（8899）实测 `detectHost()` 返回 PT 平台码；unknown 兜底单测在。—— pt-load P1b（`__PURE_TAVERN__` 全局实测存在）/P1c（/version 含 PureTavern）双双通过（2026-10-25，28/28 全绿内；2026-10-26 矩阵复跑 28/28 仍绿）；单测 detect-host 30/30（A 线）
 - [x] **AC-5** Luker 同勾选拉取字节数较基线下降，附取证报告与实测数字。—— `10-25-luker-selection-max` 七轮取证定案（2026-10-25）：全量 1.79GB；反选 settings 省 50.2%（透传层已生效零改动）；`settings↔backups` 绑死 892.2MB 登记为 R-B2 解绑需求；报告 `10-25-luker-selection-max/research/luker-selection-probe.md` + `deliverables/bytes-report.md`；spec 契约表落 `host-capabilities.md`
-- [x] **AC-4** PT 实例（8899）实测 `detectHost()` 返回 PT 平台码；unknown 兜底单测在。—— pt-load P1b（`__PURE_TAVERN__` 全局实测存在）/P1c（/version 含 PureTavern）双双通过（2026-10-25，28/28 全绿内）；单测 detect-host 30/30（A 线）
 - [ ] **AC-6** Authority PR 按该仓流程提交并登记链接；本仓特性检测单测覆盖装/未装两态。—— Authority 仓提交 `e4fb996`（st-backup 端点+probe 标记+测试 5/5，已推 origin）；本仓 `probeAuthorityStBackup` + fetchHostBackup st 两态/回退/非 st 四态单测 8/8（`test/authority-st-backup-adapter.test.js`）；待整包恢复端点（治理裁定后）补齐 AC 全勾
 - [x] **AC-7** TT CDP 取证有结论：可行→至少一条 TT 冒烟 spec；不可行→替证策略落 spec。—— `10-25-tt-cdp-probe` 定案可行（2026-10-25）：`WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=9223` + `connectOverCDP` 全链通，插件安装启用且工作台挂载零异常（结论 `tt-cdp-verdict.md`）；并入 e2e:instances 矩阵 tag `tt-cdp`（spec host-capabilities.md 已落 TT 宿主三条事实）
-- [ ] **AC-8** `npm run e2e:instances` 一键三 Dev 宿主冒烟全绿；`scripts/` 四脚本入库。—— 任务 `10-25-e2e-instances-runner`（2026-10-25 交接读数）：**错峰模型**落地（guard→逐宿主停其余起被测→收尾全停，用户裁定计入规则）；st 93/93 ✅ / luker 93/93 ✅（错峰根治偶发）/ pt 28/28 ✅ / guard 21/21 ✅ / **tt-cdp ❌（KI-3：TT 重启后扩展停用+自动启用兜底未通——唯一阻断项）**；四脚本已入库+审阅过堂；spec 落 `guides/e2e-instances-runner.md`。tt-cdp 修复后整轮 exit 0 即勾
+- [x] **AC-8** `npm run e2e:instances` 一键三 Dev 宿主冒烟全绿；`scripts/` 四脚本入库。—— 任务 `10-25-e2e-instances-runner` **2026-10-26 最终全绿（exit 0）**：guard 21/21 · dev-st 16+93 · dev-luker 16+93 · dev-pt 28 · **tt-cdp ✅（KI-3 根治：TT 第三方扩展延迟激活，冷启动 34.6s，改有界等待自注入信号）**；错峰模型落地并计入规则；四脚本入库+审阅过堂；spec 落 `guides/e2e-instances-runner.md`
 - [x] **AC-9** harness 仓内回流任务建立并有交付（回流机制/skill/登记命令至少各一）。── tavern-harness `f068c2c`：contributions.{md,json} 回流机制（三步流程+状态机）/ skills/tavern-ui-style（UI 铁律通用化，C-001 accepted）/ scripts/scan_register.py（扫描登记+--verify，实证抓到未登记仓）/ MCP contributions 查询面 ×2（协议测试 18/18）
-- [ ] **AC-10** 全程 `npm test` 零回归、五守卫全绿；E2E 只连 Dev 白名单 {8001, 8003, 8899}。—— 交接读数：npm test 900 passed / 2 skipped（+8 Authority 适配器用例；restore-probe 高负载偶发超时 3 次单跑稳定，错峰裁定根治方向）；五守卫全绿；E2E 全程只连 Dev 白名单 + TT CDP 口 9223。**待续**：错峰轮后终跑一次 npm test 定读数
+- [x] **AC-10** 全程 `npm test` 零回归、五守卫全绿；E2E 只连 Dev 白名单 {8001, 8003, 8899}。—— **终跑 2026-10-26 13:53**：npm test **924 passed / 2 skipped**；五守卫全绿；E2E 全程只连 Dev 白名单 + TT CDP 口 9223
 
 ## 决策记录（全部已裁定，2026-10-24 两轮 AskUserQuestion）
 

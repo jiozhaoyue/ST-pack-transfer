@@ -33,13 +33,19 @@ Authority 不可用时降级 IndexedDB（L0-11 / L1-MR-1：纯前端路径保持
 
 ## Acceptance Criteria
 
-- [ ] AC-1 vault-store 四操作在 Authority 可用时走后端：多条目互不覆盖、删除互不误伤、
+- [x] AC-1 vault-store 四操作在 Authority 可用时走后端：多条目互不覆盖、删除互不误伤、
       roundtrip 字节精确（含 >4MB 跨块文件）
-- [ ] AC-2 Authority 不可用时自动降级 IndexedDB，同 API 形状；`vaultBackend()` 可查询当前后端
-- [ ] AC-3 UI 全链路：三入口存入、列表渲染（含格式徽标与后端徽标）、导出、删除均有消费者接线
+      —— `test/vault-store.test.js` 12 例（含 4MB+12345B 跨块 roundtrip 字节断言）；
+      **真实宿主** Dev Luker 8003：`backend=authority`，存入/导出/删除全链路通过，导出 2782B 字节一致
+- [x] AC-2 Authority 不可用时自动降级 IndexedDB，同 API 形状；`vaultBackend()` 可查询当前后端
+      —— 同上单测 + **真实宿主** Dev ST 8001 实测 `backend=indexeddb`、徽标「本地」、全链路通过
+- [x] AC-3 UI 全链路：三入口存入、列表渲染（含格式徽标与后端徽标）、导出、删除均有消费者接线
       （control-consumer 守卫过）
-- [ ] AC-4 布局对账：模板 / MODULE_IDS / FLOWS / 测试一致，五守卫全绿
-- [ ] AC-5 `npm test` 零回归
+      —— `check:control-consumer` 全绿；真实宿主截图 `test-results/instances/vault-<host>-stored-*.png`
+- [x] AC-4 布局对账：模板 / MODULE_IDS / FLOWS / 测试一致，五守卫全绿
+      —— `test/workbench-layout.test.js` + 五守卫全绿（2026-10-26）
+- [x] AC-5 `npm test` 零回归
+      —— **924 passed / 2 skipped**（基线 900，+24）
 
 ## 范围外
 

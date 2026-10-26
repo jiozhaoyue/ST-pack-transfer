@@ -99,13 +99,16 @@ async function ensureTtRuntime({ timeoutMs = 90_000 } = {}) {
  * 2026-10-25 实测——判定口径与 harness.isPluginRef 一致由调用方复用）。
  * @returns {Promise<{pass:boolean, details:object, shot?:string}>}
  */
-async function ttCdpSmoke({ loadPlaywright, shotPath = '' } = {}) {
+async function ttCdpSmoke({ loadPlaywright, shotPath = '', readyTimeoutMs = 120_000 } = {}) {
   const { chromium } = loadPlaywright();
   const browser = await chromium.connectOverCDP(`http://127.0.0.1:${CDP_PORT}`, { timeout: 15_000 });
   try {
     const pages = browser.contexts().flatMap((c) => c.pages());
     const tt = pages.find((p) => /localhost:1430|tauri:/i.test(p.url()));
     if (!tt) return { pass: false, details: { error: '未找到 TT 前端页面', pages: pages.map((p) => p.url()) } };
+
+    const pluginErrors = [];
+    tt.on('pageerror', (e) => { if (/zip-converter|st-zip/i.test(String(e))) pluginErrors.push(String(e).slice(0, 150)); });
 
     // 前端就绪有界等待（2026-10-25 实测：exe 起来 ≠ WebView 加载完——连 __TAURITAVERN__
     // 全局都还没有就断言会整轮误判 FAIL）。就绪判据=宿主全局出现（detectHost 同款）。
@@ -115,61 +118,38 @@ async function ttCdpSmoke({ loadPlaywright, shotPath = '' } = {}) {
     ).then(() => true).catch(() => false);
     if (!ready) return { pass: false, details: { error: 'TT 前端 60s 未就绪（宿主全局未出现）' } };
 
-    const pluginErrors = [];
-    tt.on('pageerror', (e) => { if (/zip-converter|st-zip/i.test(String(e))) pluginErrors.push(String(e).slice(0, 150)); });
-
-    const trace = await tt.evaluate(() => ({
+    // TT 第三方扩展是**延迟激活**（extensions.js `activateDeferredThirdPartyExtensions`：
+    // 在 APP_READY 之后 nextPaint → initTokenizers → initScrapers 才加载），
+    // 冷启动实测宿主全局出现后约 **25–30s** 本插件才注入痕迹（2026-10-26 复现）。
+    // ⇒ 断言前必须有界等待本插件自己的信号，不能读一次就判死。
+    //
+    // 判据用插件**自注入**的节点（TT/Luker 模式只往宿主扩展行加「打开」+ 扩展菜单项，
+    // 不常驻 `.app-container`）：`#st-zip-converter-menu-item` 在扩展菜单容器存在时注入，
+    // 之后 `.app-container` / `[class*="st-converter"]` 随工作台挂载出现。
+    const pluginSignal = () => tt.evaluate(() => ({
       hasTauriTavernGlobal: typeof window.__TAURITAVERN__ !== 'undefined',
-      mentionsPlugin: /数据包互转|st-zip-converter/i.test(document.documentElement.innerHTML),
+      menuItem: !!document.getElementById('st-zip-converter-menu-item'),
+      openBtn: !!document.getElementById('st-zip-converter-open-btn'),
       hasDrawerApp: !!document.querySelector('[class*="st-converter"]'),
       hasAppContainer: !!document.querySelector('.app-container'),
-    }));
-
-    // TT 重启后第三方扩展可能回到停用态（2026-10-25 实测：拷贝安装自动启用，
-    // 但进程重启后 enabled 不持久——KI-2 同族）。无痕迹时走「管理扩展 → 勾启用」
-    // 自动恢复，翻转后**有界等待插件痕迹出现**（扩展加载与 UI 注入是异步的）。
-    const readTrace = () => tt.evaluate(() => ({
-      hasTauriTavernGlobal: typeof window.__TAURITAVERN__ !== 'undefined',
       mentionsPlugin: /数据包互转|st-zip-converter/i.test(document.documentElement.innerHTML),
-      hasDrawerApp: !!document.querySelector('[class*="st-converter"]'),
-      hasAppContainer: !!document.querySelector('.app-container'),
     }));
-    if (!trace.mentionsPlugin) {
-      for (let attempt = 0; attempt < 2 && !trace.mentionsPlugin; attempt += 1) {
-        await tt.evaluate(() => {
-          const btn = document.getElementById('extensions_menu_button');
-          if (btn) btn.click();
-        });
-        await tt.waitForTimeout(1_200);
-        await tt.evaluate(() => {
-          const manage = [...document.querySelectorAll('span,button,a')].find((el) => /管理扩展|Manage [Ee]xtensions/i.test(el.textContent || ''));
-          if (manage) manage.click();
-        });
-        await tt.waitForTimeout(1_500);
-        const flipped = await tt.evaluate(() => {
-          const rows = [...document.querySelectorAll('[data-name]')].filter((el) => /st-zip-converter/i.test(el.getAttribute('data-name') || ''));
-          let acted = false;
-          for (const row of rows) {
-            const cb = row.querySelector('input[type="checkbox"]');
-            if (cb && !cb.checked) { cb.click(); acted = true; }
-          }
-          return acted;
-        });
-        if (flipped) {
-          // 有界等待插件痕迹（30s；加载+注入异步）
-          const appeared = await tt.waitForFunction(
-            () => /数据包互转|st-zip-converter/i.test(document.documentElement.innerHTML),
-            null, { timeout: 30_000 },
-          ).then(() => true).catch(() => false);
-          if (appeared) Object.assign(trace, await readTrace());
-        }
-      }
+    const isLoaded = (r) => r.menuItem || r.openBtn || r.hasDrawerApp || r.hasAppContainer;
+
+    const t0 = Date.now();
+    let trace = await pluginSignal();
+    while (!isLoaded(trace) && Date.now() - t0 < readyTimeoutMs) {
+      await tt.waitForTimeout(3_000);
+      trace = await pluginSignal();
     }
+    const waitedMs = Date.now() - t0;
 
     if (shotPath) await tt.screenshot({ path: shotPath }).catch(() => undefined);
 
-    const pass = trace.hasTauriTavernGlobal && (trace.hasDrawerApp || trace.hasAppContainer) && pluginErrors.length === 0;
-    return { pass, details: { ...trace, pluginErrors, pages: pages.length } };
+    // 「插件痕迹」文本命中（`mentionsPlugin`）单独留档：它可能来自扩展面板列表里的
+    // 显示名而**不代表已加载**，只作诊断，不作主判据。
+    const pass = trace.hasTauriTavernGlobal && isLoaded(trace) && pluginErrors.length === 0;
+    return { pass, details: { ...trace, waitedMs, pluginErrors, pages: pages.length } };
   } finally {
     await browser.close(); // 只断开 CDP 连接，不关 TT 窗口
   }

@@ -22,18 +22,28 @@
 - **修复**：`install-pt-extension.cjs` 改 `launchPersistentContext(PROFILES.dev)`；
   错峰补验 **pt-load 28/28 PASS**（2026-10-25）。
 
-## KI-3 TT 重启后扩展停用 + 自动启用兜底未通（**当前唯一阻断项**，交接状态）
+## KI-3 TT 重启后扩展停用 + 自动启用兜底未通（**已根治**，2026-10-26）
 
-- **现象**：TT 每次进程重启后 `st-zip-converter` 回到停用态（拷贝安装时自动启用，
-  **enabled 不持久**）；ttCdpSmoke 的自动启用兜底（管理扩展→勾选→30s 有界等待痕迹）
-  两轮增强后仍未翻转成功——勾选动作执行但插件痕迹未出现（疑 TT 的扩展启用路径
-  另有确认层/加载时机，或 data-name 行选择器在新会话不命中）。
-- **当前读数**：`hasTauriTavernGlobal: true`（前端就绪等待已生效）、`mentionsPlugin: false`。
-- **已验证可绿的路径**：手动启用后完整链 PASS（tt-cdp-probe 任务 2026-10-25 实证：
-  发现→启用→工作台挂载零异常）——**问题只在自动启用这一步**。
-- **下一步建议**（交接）：① 用 `cdp-workbench.cjs` 探针（任务 10-25-tt-cdp-probe 里
-  实证过可用的手动启用流程）逐步 dump「管理扩展」面板 DOM，比对兜底选择器差异；
-  ② 或改走 TT 后端（Rust 日志/扩展状态 API）确认启用语义；③ 最保守：矩阵 tt-cdp 行
-  降级为「宿主就绪 + 扩展已装（manifest 存在）」两断言，挂载断言标 SKIP 待修。
-- **四宿主矩阵现状**：guard 21/21 ✅ · dev-st 93/93 ✅ · dev-luker 93/93 ✅（错峰根治
-  偶发）· dev-pt 28/28 ✅ · **tt-cdp ❌（仅此一项）**。
+- **原现象**：TT 每次进程重启后 `st-zip-converter` 无痕迹；ttCdpSmoke 的自动启用兜底
+  （管理扩展→勾选→30s 有界等待）两轮增强后仍未翻转成功——勾选动作执行但插件痕迹未出现。
+  读数 `hasTauriTavernGlobal: true` / `mentionsPlugin: false`。
+- **真因（2026-10-26 五轮探针定案，不是「扩展被停用」）**：
+  1. **插件是延迟激活的**：TT `script.js` 在 `APP_READY` 之后才调
+     `activateDeferredThirdPartyExtensions()`（`nextPaint → initTokenizers → initScrapers`
+     之后，`extensions.js:2015`）。冷启动实测**宿主全局就绪后 25–30s** 才
+     `Activating extension third-party/st-zip-converter` 并注入工作台。
+     冒烟读完一次立刻判死 ⇒ 整轮误报。
+  2. **旧兜底的 CSS id 已失配**：`#extensions_menu_button` 在现版 TT 不存在
+     （实际 id：`extensions-settings-button` / `third_party_extension_button`）⇒
+     `flipped` 永远为 false，那段 30s 有界等待**从未执行**。
+  3. **`mentionsPlugin` 是假判据**：扩展面板里的显示名「酒馆数据包互转器」在插件
+     **未加载**时也在 DOM 里（`extension_missing` 行）⇒ 文本命中不代表已加载。
+     实测未加载时 `mentionsPlugin=true` 而 `pluginResources=[]`（index.js 从未请求）。
+  4. `disabledExtensions`（`settings.json`）里**从来没有**本插件 ⇒ 不存在「被禁用」这回事；
+     面板里 `extension_missing` = 既未激活也未禁用，即「还没轮到激活」。
+- **修复**（`e2e/lib/tt-cdp.cjs`）：删掉整套勾选兜底；改为**有界等待插件自注入信号**
+  （`#st-zip-converter-menu-item` / `#st-zip-converter-open-btn` /
+  `[class*="st-converter"]` / `.app-container`，默认上限 120s），
+  `mentionsPlugin` 降级为诊断字段。回归读数：热进程 `waitedMs=160`、
+  **冷启动 `waitedMs=28654`**，两态均 PASS。
+- **四宿主矩阵现状（2026-10-26 复跑）**：见 `test-results/instances/summary-*.md`。

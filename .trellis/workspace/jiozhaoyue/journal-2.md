@@ -231,3 +231,34 @@ S1 四现症固化为 s1-remedies E2E（15/15）；三层架构与 CSS 铁律落
 ### Next Steps
 
 - ① KI-3（TT 自动启用兜底，known-issues.md 三选一续法）→ 整轮 exit 0 → 勾 AC-1/AC-8；② 终跑 npm test 勾 AC-10；③ 归档 e2e-instances-runner 与 r2 父任务；④ harness C-002/C-003 回流审核；⑤ KI-1 st 命名疑点独立小任务；⑥ Authority st-restore 待治理裁定
+
+## Session 51: KI-3 定案根治 + 四宿主矩阵全绿 + 仓功能真实后端取证与并发渲染缺陷修复
+<!-- trellis-session: v=2 fp=zcode-continue-20261026 -->
+
+**Date**: 2026-10-26
+**Task**: 10-25-e2e-instances-runner（收口）+ 10-26-host-vault（收口）
+**Branch**: `main`
+
+### Summary
+
+接 ZCode 会话（session_6f09b483…）最后一个动作（vault 提交推送后因并发限流中断）续跑。KI-3 五轮探针定案：TT 第三方扩展是**延迟激活**（APP_READY 后 nextPaint→initTokenizers→initScrapers），冷启动实测 28.6–34.6s 才注入痕迹；旧冒烟读完一次即判死、旧兜底 `#extensions_menu_button` 在现版 TT 已不存在（flopped 从未执行）、`mentionsPlugin` 因面板显示名而假命中。修 `e2e/lib/tt-cdp.cjs` 为有界等待插件自注入信号（menu-item/open-btn/drawer/app-container，上限 120s）。`npm run e2e:instances` 全量复跑 **exit 0**：guard 21/21 · st 16+93 · luker 16+93 · pt 28 · tt-cdp ✅（冷启动 waitedMs=34639）。仓功能做真实宿主取证：Dev Luker 8003（Authority）徽标「服务端」、backend=authority、存入/导出字节一致 2782B/删除归零、插件错误 0；Dev ST 8001 降级 backend=indexeddb 同链路全过。取证中发现并修复**仓面板并发渲染重复行**（1 条后端记录渲染成 4 行）：渲染序号 + DOM 写入集中在最后一次 await 之后；新增守护用例。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| （本次） | fix(vault)+fix(e2e): KI-3 延迟激活定案 + 仓面板并发渲染竞态 + 仓功能双后端运行时取证 |
+
+### Testing
+
+- [OK] npm test 924 passed / 2 skipped（+1 并发渲染用例）；五守卫全绿
+- [OK] e2e:instances 四宿主全绿 exit 0（tt-cdp 冷启动 34.6s）
+- [OK] 仓运行时：dev-luker(authority)/dev-st(indexeddb) 双后端全链路 + 截图 + 后端真值断言
+
+### Status
+
+[OK] **Completed**（两个子任务可归档；父任务 AC-6 Authority 整包恢复端点仍待治理裁定）
+
+### Next Steps
+
+- ① 归档 10-26-host-vault 与 10-25-e2e-instances-runner；② 父任务 r2 仅剩 AC-6（Authority 整包恢复端点，待治理裁定）；③ 仓 UI 在 TT/PT 的运行时截图未取证（TT 延迟激活 ~35s 需并入矩阵才稳）；④ KI-1 st 产物命名疑点仍独立待办
