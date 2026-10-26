@@ -953,6 +953,7 @@ function bind(){
     state.target=it.dataset.target;
     closeTargetPop(); renderTargetPicker(); renderChart();
     log('INFO','目标平台切换为 '+state.target);
+    actions.onTargetChange?.(state.target);
   });
   document.addEventListener('click',e=>{
     if(!targetPop.hidden && !e.target.closest('#target-select')) closeTargetPop();

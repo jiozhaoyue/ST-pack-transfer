@@ -529,62 +529,39 @@
 }
 
 
-/* ── 局域网互传面板 ── */
-#app.app-container .wb-lan-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 9998;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 16px;
-  background: color-mix(in srgb, var(--panel) 78%, transparent);
-}
-#app.app-container .wb-lan-overlay[hidden] { display: none; }
-#app.app-container .wb-lan-card {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  width: 100%;
-  max-width: 440px;
-  max-height: 90vh;
-  overflow: auto;
-  padding: 14px 16px;
-  background: var(--panel-2);
-  border: 1px solid var(--outline);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-}
-#app.app-container .wb-lan-title { font-weight: 600; color: var(--text); }
-#app.app-container .wb-lan-sec {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 10px;
-  border: 1px solid var(--border);
-  border-radius: 9px;
-}
-#app.app-container .wb-lan-sec-title { font-weight: 600; color: var(--muted); }
-#app.app-container .wb-lan-code {
-  font-family: Consolas, "Cascadia Mono", monospace;
-  font-size: 11px;
-  word-break: break-all;
-  resize: vertical;
-  background: var(--panel-3);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  color: var(--text);
-  padding: 6px 8px;
-  min-height: 52px;
-}
-#app.app-container .wb-lan-card .menu_button {
-  background: var(--panel-3);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  color: var(--text);
-  padding: 6px 10px;
-  min-height: 32px;
-}
-#app.app-container .wb-lan-card .menu_button:hover { border-color: var(--border-strong); }
-#app.app-container .wb-lan-note { color: var(--muted); font-size: 0.85em; }
-#app.app-container .wb-lan-status { color: var(--muted); font-size: 0.85em; }
+/* ── 局域网互传面板（对标 Luker peer row / TT 阶段进度）── */
+#app.app-container .wb-lan-overlay{position:fixed;inset:0;z-index:9998;display:flex;align-items:center;justify-content:center;padding:16px;background:color-mix(in srgb,var(--panel) 78%,transparent)}
+#app.app-container .wb-lan-overlay[hidden]{display:none}
+#app.app-container .wb-lan-card{display:flex;flex-direction:column;gap:10px;width:100%;max-width:460px;max-height:90vh;overflow:auto;padding:14px 16px;background:var(--panel-2);border:1px solid var(--outline);border-radius:var(--radius);box-shadow:var(--shadow)}
+#app.app-container .wb-lan-head{display:flex;align-items:center;gap:8px}
+#app.app-container .wb-lan-title{font-size:14px;font-weight:600;color:var(--text)}
+#app.app-container .wb-lan-badge{font-size:9.5px;padding:1px 7px;border-radius:999px;border:1px solid var(--keep);color:var(--keep);white-space:nowrap}
+#app.app-container .wb-lan-badge.warn{color:var(--optional);border-color:var(--optional)}
+#app.app-container .wb-lan-close{margin-left:auto;width:24px;height:24px;border:1px solid var(--border);background:var(--panel-3);border-radius:6px;color:var(--muted);padding:0;line-height:1}
+#app.app-container .wb-lan-seg{display:inline-flex;border:1px solid var(--border);border-radius:7px;overflow:hidden;background:var(--panel-3);align-self:flex-start}
+#app.app-container .wb-lan-seg button{border:0;background:transparent;padding:5px 12px;font-size:11.5px;color:var(--muted)}
+#app.app-container .wb-lan-seg button.active{background:var(--accent-soft);color:var(--text)}
+#app.app-container .wb-lan-pane{display:flex;flex-direction:column;gap:6px}
+#app.app-container .wb-lan-peer{display:flex;align-items:center;gap:9px;padding:9px;border:1px solid var(--border);border-radius:9px;background:var(--panel-3)}
+#app.app-container .wb-lan-ico{width:22px;height:22px;color:var(--accent);flex:0 0 auto}
+#app.app-container .wb-lan-peer-main{flex:1 1 auto;min-width:0}
+#app.app-container .wb-lan-peer-name{font-size:12.5px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#app.app-container .wb-lan-peer-meta{font-size:10px;color:var(--muted);margin-top:2px}
+#app.app-container .wb-lan-field-title{font-size:10.5px;color:var(--muted);margin-top:2px}
+#app.app-container .wb-lan-code{font-family:Consolas,"Cascadia Mono",monospace;font-size:11px;word-break:break-all;resize:vertical;background:var(--panel-3);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:6px 8px;min-height:52px}
+#app.app-container .wb-lan-card .menu_button{background:var(--panel-3);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:6px 10px;min-height:32px}
+#app.app-container .wb-lan-card .menu_button:hover{border-color:var(--border-strong)}
+#app.app-container .wb-lan-card .menu_button:disabled{opacity:.45;cursor:not-allowed}
+#app.app-container .wb-lan-wide{width:100%}
+#app.app-container .wb-lan-hint{font-size:10px;color:var(--muted)}
+#app.app-container .wb-lan-actions{display:flex;gap:6px}
+#app.app-container .wb-lan-actions .menu_button{flex:0 0 auto}
+#app.app-container .wb-lan-progress{display:flex;align-items:center;gap:8px;font-size:10px;color:var(--muted);margin-top:2px;flex-wrap:wrap}
+#app.app-container .wb-lan-phase{min-width:64px}
+#app.app-container .wb-lan-bar{flex:1 1 120px;height:6px;background:var(--panel-3);border:1px solid var(--border);border-radius:999px;overflow:hidden}
+#app.app-container .wb-lan-fill{display:block;height:100%;width:0;background:var(--accent);transition:width .2s ease}
+#app.app-container .wb-lan-pct{min-width:34px;text-align:right;font-variant-numeric:tabular-nums}
+#app.app-container .wb-lan-detail{flex:1 0 100%;font-size:9.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+#app.app-container .wb-lan-detail:empty{display:none}
+#app.app-container .wb-lan-note{color:var(--muted);font-size:0.85em}
+#app.app-container .wb-lan-status{color:var(--muted);font-size:0.85em}
