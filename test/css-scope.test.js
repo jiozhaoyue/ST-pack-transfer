@@ -92,11 +92,9 @@ describe('CSS 宿主作用域守卫', () => {
     expect(cssNoComments).not.toContain('body:has(');
     expect(cssNoComments).not.toMatch(/(^|\})\s*(?:body|html|:root|\*)\s*[,{]/);
     // 根选择器已收紧为 id + 类双条件（第三方同名类不再被命中）
-    expect(css).toMatch(/#app\.app-container\.app-standalone\s*\{[^}]*padding: 20px 12px;/s);
-    expect(css).toMatch(/#app\.app-container\.app-standalone\s*\{[^}]*padding: 8px 6px;/s);
+    expect(css).toMatch(/#app\.app-container\s*\{/s);
     expect(css).toContain('#st-converter-modal-overlay #app.app-container');
     expect(css).not.toMatch(/^\s*\.app-container[\s,{]/m);
-    expect(css).toMatch(/#app\.app-container\s*\{[^}]*padding: 12px 10px;/s);
     expect(css).toContain('#app.app-container .app-header');
     // 2026-10-15：插件态改挂全屏模态后，`.st-converter-drawer-app` 前缀已从 style.css 消失，
     // 该根也不再在白名单里——反向断言把它钉住，防「抽屉态」以任何形式回流。

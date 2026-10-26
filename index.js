@@ -1,3295 +1,553 @@
 /**
- * ST-pack-transfer 核心控制器 (ESM)
- * 全平台跨酒馆数据包工作站：
- * 1. 宿主酒馆直接细粒度导出 (对齐 ST / Luker 分类) 与直出跨平台目标格式
- * 2. 外部数据包转运、动作规划完全扫描与单项穿透
- * 3. 闭环一键还原/写入宿主 (支持合并写入与覆盖写入)
- * 4. 底部实时抽屉式日志控制台与全屏幕/移动端极致响应式适配
+ * 数据包转运 · 控制器（2026-10-27 全面重写）
+ *
+ * 界面：`src/ui/workbench-view.js` = UI 定稿 demo 的原样搬运。
+ * 本文件只做三件事：宿主探测、包仓库读写、把真实动作接到视图的 `actions`。
  */
 
 import { runConversionTask, runPlanTask } from './src/core/worker-client.js';
-import { reportToHuman } from './src/core/report.js';
 import { logger } from './src/core/logger.js';
-import { setupLogConsole } from './src/ui/log-console.js';
-import { escapeHtml, trustedStaticMarkup } from './src/ui/escape.js';
+import { zipIo } from './src/core/zip-io.js';
+import { splitArchiveEntries } from './src/core/splitter.js';
 import {
-  setupCategoryFilter,
-  renderCategoryStats,
-  getSelectionState,
-  setSelectionState,
-  getExcludedPaths,
-  setExcludedPaths,
-  selectAll as categorySelectAll,
-  resetCategoryFilter,
-} from './src/ui/category-filter.js';
-import { applyShell, getFlow, setupWorkbenchShell } from './src/ui/workbench-shell.js';
-import { stageOf } from './src/ui/workbench-layout.js';
-import {
-  saveFile,
-  getFile,
-  saveWorkspaceState,
-  loadWorkspaceState,
-  isStorageSupported,
-  listStoredFiles,
-  ORIGINS,
+  ORIGINS, isStorageSupported, saveFile, getFile, deleteFile, listStoredFiles, getStorageUsage,
 } from './src/storage/db.js';
-import { generateDeltaArchive } from './src/core/delta.js';
-import { buildExtensionManifest } from './src/core/extension-manifest.js';
-import { TaskManager, TASK_STATES } from './src/core/task-manager.js';
-import { BATCH_STATUS, ITEM_STATUS, createRestoreBatch } from './src/core/restore-batch.js';
-import { renderStashList, filterStashFiles } from './src/ui/stash-list.js';
-import { renderVaultPanel, saveFilesToVault } from './src/ui/vault-panel.js';
-import { vaultPut } from './src/storage/vault-store.js';
-import { ExportQueue, renderExportQueue } from './src/ui/export-queue.js';
-import { initTaskControls } from './src/ui/task-controls.js';
-import { createCheckpointAdapter } from './src/storage/authority-store.js';
-import { renderUsageDashboard } from './src/ui/usage-dashboard.js';
-import { exportLibraryToPack, injectLibraryChatsIntoSource, importRestoredChatsIntoLibrary } from './src/ui/chat-store-inject.js';
-import { getChatStoreProbe, probeChatStore } from './src/ui/chat-store-bridge.js';
-import { resolveFilename, previewFilename, DEFAULT_FILENAME_TEMPLATE, namedBlob, hostDisplayName, TARGET_PLATFORMS } from './src/core/naming.js';
-import { hostIcon } from './src/ui/host-icons.js';
-import { buildSourceDeliveries, guardedRestore, buildTargetEvidence } from './src/ui/migration-controller.js';
-import { createMigrationPlan } from './src/core/migration-plan.js';
-import { assessTargetConflicts, describeConflictState, buildTargetBackupEvidence, describeBackupEvidence } from './src/core/migration-target.js';
-import { assessInventoryConflicts } from './src/core/target-inventory.js';
-import { STAGE_LABELS, createStageRecorder } from './src/core/stage-timings.js';
-import { describeSpecialExclusions } from './src/core/selection-defaults.js';
-import { classifyOutcome, MIGRATION_OUTCOMES } from './src/core/migration-evidence.js';
-import { buildRestoreVerification, summarizeVerification } from './src/core/migration-verification.js';
-import {
-  detectHost,
-  verifyHostPlatform,
-  fetchHostBackup,
-  fetchHostInventory,
-  restoreToHost,
-  isRestoreInFlight,
-  cancelRestoreInFlight,
-  isRestoreUnsupported,
-  getRestoreUnsupportedReason,
-  getRestoreProbe,
-  alertDialog,
-  confirmDialog,
-  hostSelectionCapability,
-  describeHostFetchPlan,
-  isStorageInspectorAvailable,
-  openStorageInspector,
-  getHandle,
-  mountNativeBackupButton,
-  mountLukerBackupManagerButton,
-  mountExtensionRowButton,
-  setupDrawerToggles,
-  hostLayoutCode,
-  resolveTargetLayout,
-  opfsTmpHandle,
-  opfsHandleToFile,
-  opfsTmpCleanup,
-  supportsOpfs,
-  FULL_SELECTION,
-} from './src/ui/host-bridge.js';
-import { UPLOAD_TIMEOUT_MS } from './src/ui/fetch-bounds.js';
-import { setupFileDrop } from './src/ui/file-drop.js';
-import { createViewController } from './src/ui/view.js';
+import { buildChartTree, fmtMB, splitLimitOf } from './src/core/chart-model.js';
+import { DEFAULT_FILENAME_TEMPLATE, TARGET_PLATFORMS, resolveFilename, namedBlob } from './src/core/naming.js';
+import { trustedStaticMarkup } from './src/ui/escape.js';
 import { getWorkbenchHtml } from './src/ui/workbench-template.js';
-import { mountSectionHelp } from './src/ui/help-topics.js';
+import { createWorkbenchView } from './src/ui/workbench-view.js';
 import {
-  createStaleFlag,
-  evaluateSavedSession,
-  writeCheckPanel,
-  formatSpecialExclusionSummary,
-} from './src/ui/workbench-session.js';
-import { setupOnboardingGuide } from './src/ui/onboarding-guide.js';
+  detectHost, hostLayoutCode, fetchHostBackup, restoreToHost, restoreToLuker,
+  confirmDialog, mountExtensionRowButton,
+} from './src/ui/host-bridge.js';
+import { exportLibraryToPack, importRestoredChatsIntoLibrary } from './src/ui/chat-store-inject.js';
 import { mountLanTransferPanel } from './src/ui/lan-transfer-panel.js';
-import { createMigrationSession } from './src/ui/migration-controller.js';
-import { splitArchiveEntries, normalizeSplitMb } from './src/core/splitter.js';
-import { zipIo, readZipEntryManifest } from './src/core/zip-io.js';
+import { probeChatStore } from './src/ui/chat-store-bridge.js';
+import { mountDebugProbe } from './src/app/task-runtime.js';
 
-function formatTimestamp() {
-  return new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+export {
+  TASK_KINDS, TASK_PREFIX, taskKindOf, partialNameFor, hasRoomForPartial,
+  persistPartial, createCheckpointThrottle, resumedNote, convertExitForAbort,
+  attachConversionProgress, runBatchItems, batchResumeVerdict, seedEntriesFor,
+} from './src/app/task-runtime.js';
+export { mountDebugProbe };
+
+const ZONE_OF_ORIGIN = {
+  [ORIGINS.UPLOAD]: 'import',
+  [ORIGINS.HOST_EXPORT]: 'import',
+  [ORIGINS.SOURCE_BACKUP]: 'import',
+  [ORIGINS.CONVERTED]: 'export',
+  [ORIGINS.DELTA]: 'export',
+  [ORIGINS.SPLIT_PART]: 'export',
+};
+
+const HOST_CODE = { st: 'st', luker: 'luker', l: 'luker', tt: 'tt', pt: 'pt' };
+const HOST_LABEL = { st: 'SillyTavern', luker: 'Luker', l: 'Luker', tt: 'TauriTavern', pt: 'PureTavern' };
+
+function targetCodeOf(name) {
+  return TARGET_PLATFORMS.find((p) => p.name === name)?.code || 'st';
 }
 
-function formatBytes(bytes) {
-  if (!bytes || bytes <= 0) return '0 B';
-  const units = ['B', 'KB', 'MB', 'GB'];
-  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
-  return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${units[i]}`;
+function clockOf(ts) {
+  const d = new Date(ts || Date.now());
+  const p = (n) => String(n).padStart(2, '0');
+  return `${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
-/* ────────────────────────── 任务类型判据（唯一） ────────────────────────── */
+let initialized = false;
 
-/**
- * 任务 id 前缀 ↔ 类型。**这是全仓唯一的任务类型判据** ——
- * 任何地方都不得再写 `id.startsWith('fetch-')` 这类硬编码（同一判据两处实现 = 立即漂移）。
- *
- * 加一条新任务路径时：只在此处加类型 + 在 `RESUMABLE_HANDLERS` 加执行体。
- * （R-16 之前只有宿主拉取接了状态机，转换/写回都是"读得到但续不了"，
- * 根因之一就是判据写成了散落的 `startsWith`。）
- */
-export const TASK_KINDS = Object.freeze({
-  FETCH: 'fetch',
-  CONVERT: 'convert',
-  CONVERT_BATCH: 'convert-batch',
-  RESTORE: 'restore',
-});
-
-/** 类型 → id 前缀 */
-export const TASK_PREFIX = Object.freeze({
-  [TASK_KINDS.FETCH]: 'fetch-',
-  [TASK_KINDS.CONVERT]: 'convert-',
-  [TASK_KINDS.CONVERT_BATCH]: 'convert-batch-',
-  [TASK_KINDS.RESTORE]: 'restore-',
-});
-
-/**
- * 从任务 id 反解类型。
- *
- * ⚠️ **必须按前缀长度降序匹配**：`convert-batch-` 与 `convert-` 是**前缀重叠**的，
- * 按声明顺序遍历会让 `convert-batch-<ts>` 被 `convert-` 先吃掉 ⇒ **静默降级成单包语义**
- * （断点字段读不到、恢复走错执行体，且不报错）。
- * 故此处**显式排序**，**不依赖对象字面量的插入顺序** —— 依赖插入顺序的写法
- * 会在有人重排常量时无声失效。
- *
- * @param {string} id
- * @returns {'fetch'|'convert'|'convert-batch'|'restore'|null} 未知 id 返回 null（调用方须 warn，不得静默）
- */
-export function taskKindOf(id) {
-  if (typeof id !== 'string') return null;
-  const entries = Object.entries(TASK_PREFIX).sort((a, b) => b[1].length - a[1].length);
-  for (const [kind, prefix] of entries) {
-    if (id.startsWith(prefix)) return kind;
-  }
-  return null;
-}
-
-/* ────────────────────── 断点清单节流（单包/批量共用） ────────────────────── */
-
-// 与 `src/core/task-manager.js:23-25` **同源**的节流窗口 —— 不另立一套数字，
-// 否则「什么时候落盘」在两处会有两种答案。
-const CHECKPOINT_EVERY_ENTRIES = 64;
-const CHECKPOINT_EVERY_MS = 2000;
-
-/* ────────────────────── 半成品持久化（真增量续传） ────────────────────── */
-
-/** 半成品文件名（OPFS `fetch-tmp/` 下）：按 taskId 归属，暂停/中止时按归属清理。
- *  ⚠️ **不再加 `convert-` 前缀**：taskId 本身已是 `convert-<ts>`（见 `TASK_PREFIX`），
- *  再加一层会拼出 `convert-convert-<ts>.partial.zip`。 */
-export function partialNameFor(taskId) {
-  return `${taskId}.partial.zip`;
-}
-
-/**
- * OPFS 配额预检：剩余空间放不下半成品（留 10% 余量）时返回 false。
- *
- * 拿不到 `estimate` 时**放行**：量不出来不等于没空间，因为量不出来就退化成「永不持久化」
- * 是**静默的能力退化**，比偶尔写到一半失败更糟。
- * @param {number} bytes
- * @param {any} [nav]
- * @returns {Promise<boolean>}
- */
-export async function hasRoomForPartial(bytes, nav = (typeof navigator !== 'undefined' ? navigator : null)) {
-  try {
-    if (!nav?.storage?.estimate) return true;
-    const { quota = 0, usage = 0 } = await nav.storage.estimate();
-    if (!quota) return true;
-    return (quota - usage) >= bytes * 1.1;
-  } catch {
-    return true;
-  }
-}
-
-/**
- * 把中止时的**半成品**持久化到 OPFS，并写下「暂停态专用断点」（`setPauseCheckpoint`）。
- *
- * 这是真增量续传的**持久化段**：没有它，续传只能完整重做 —— 正确但慢。
- * 因此**所有失败路径一律降级为「没有半成品」**并留一行**可观测**日志（`L0-11` / `L1-MR-1`）：
- * 半成品只是加速手段，不是主路径依赖，绝不抛错、绝不阻塞暂停语义。
- *
- * ⚠️ 写入的**顺序**不可颠倒：先落 zip、再写断点 —— 反过来的话，断点会指向一个不存在的半成品，
- * 续传时读不到就只能重做（功能不坏，但白写一次断点）。
- *
- * @param {object} p
- * @param {Blob|null} p.partialBlob 中止时收尾出来的**合法 zip**
- * @param {Array<{name:string,crc32:number|null}>|null} p.manifest 它的条目清单（断点的**真源**）
- * @param {string} p.taskId
- * @param {string} p.target 目标布局（诊断用；真正的续传判据是名字 + 内容能对上）
- * @param {number} p.totalBytes
- * @param {function} p.setPauseCheckpoint `TaskManager.start()` 返回的暂停态写入句柄
- * @param {function} [p.buildCheckpoint] 自定义断点形状（收到 `{name, partialEntries}`，返回要写入的清单）。
- *   缺省写**单包形状**；批量路径必须传它 —— 否则会把 `kind:'batch'` 的批次清单覆盖成单包形状，
- *   批次续传读不到 `itemIndex` / `outputs` ⇒ 静默重跑整批（或误判断点作废）。
- * @param {object} [p.deps] 仅测试注入（默认用真实 OPFS 助手与真实配额探测）
- * @returns {Promise<{ok: boolean, name?: string, reason?: string}>}
- */
-export async function persistPartial({
-  partialBlob, manifest, partialError = null, taskId, target, totalBytes, setPauseCheckpoint,
-  buildCheckpoint = null, deps = {},
-}) {
-  const {
-    opfsTmpHandle: getHandle = opfsTmpHandle,
-    supportsOpfs: hasOpfs = supportsOpfs,
-    quotaCheck = hasRoomForPartial,
-  } = deps;
-
-  if (!partialBlob) {
-    // ⚠️ 这一支**必须留痕**：它意味着「暂停收尾没拿到半成品」⇒ 续传会整包重做。
-    // 不记的话，用户与排查者都只能看到「跳过 0 项」而不知为何（静默降级同样是缺陷）。
-    // `partialError` 是收尾侧（worker）回报的**具体原因**，带上它才可诊断。
-    logger.warn(`[转换] 暂停收尾未产出半成品 ⇒ 续传将重做整包（产物仍会完整）`
-      + `${partialError ? `，原因: ${partialError}` : ''}`);
-    return { ok: false, reason: 'no-partial' };
-  }
-  if (!hasOpfs()) {
-    logger.warn('[转换] 环境不支持 OPFS，无法保留半成品 ⇒ 续传将重做整包（产物仍会完整）');
-    return { ok: false, reason: 'no-opfs' };
-  }
-  if (!(await quotaCheck(partialBlob.size))) {
-    logger.warn('[转换] 存储配额不足，跳过半成品持久化 ⇒ 续传将重做整包（产物仍会完整）');
-    return { ok: false, reason: 'quota' };
-  }
-
-  const name = partialNameFor(taskId);
-  try {
-    const handle = await getHandle(name, true);
-    if (!handle) {
-      logger.warn('[转换] 半成品文件句柄获取失败 ⇒ 续传将重做整包（产物仍会完整）');
-      return { ok: false, reason: 'handle' };
-    }
-    const writable = await handle.createWritable();
-    await writable.write(partialBlob);
-    await writable.close();
-  } catch (err) {
-    logger.warn(`[转换] 半成品落盘失败 ⇒ 续传将重做整包（产物仍会完整）: ${err?.message ?? err}`);
-    return { ok: false, reason: 'write-failed' };
-  }
-
-  const partialEntries = Array.isArray(manifest) ? manifest : [];
-  const checkpoint = typeof buildCheckpoint === 'function'
-    ? buildCheckpoint({ name, partialEntries })
-    : { partialOpfsName: name, target, partialEntries, totalEntries: totalBytes };
-  await setPauseCheckpoint(checkpoint);
-  logger.info(`[转换] 已保留半成品 ${name}（${partialEntries.length} 条）—— 续传将原样搬运它，不重压缩、不丢条目`);
-  return { ok: true, name };
-}
-
-/**
- * 造一个断点清单节流器（转换路径专用）。
- *
- * **为什么必须节流**：`Object.fromEntries(doneEntries)` 是 O(n)。若每个进度回调都建一次对象，
- * n 个条目就是 O(n²) 次属性分配 + 大量短命对象（8683 条目的包 ≈ 7500 万次分配），
- * 制造 GC 压力与长任务（`L1-MR-9` 的相邻风险）。
- * **未到窗口时不建对象** —— 这是与「只在 adapter.save 处节流」的关键差别
- * （后者仍会每 tick materialize 一次）。
- *
- * ⚠️ **首次调用一定落盘**（`lastFlushAt` 初值 0 ⇒ 时间条件立刻成立）—— 这是**载荷属性，别"修掉"**：
- * `TaskManager.pause()` 落盘的是**内存里的 `task.checkpoint`**，而它只在 `onCheckpoint`
- * **被调用时**才更新 ⇒ 若首次调用被节流掉，「任务刚开始就暂停」会因 `checkpoint === null`
- * 而 `resume()` 返回 null ⇒ **无法续传**（正是 R-16 的形态）。
- * 该行为与 `src/core/task-manager.js` 自身的节流一致（其时间条件同样在首调用成立）。
- *
- * **方向纪律（不可颠倒）**：快照**只含已完成条目**。滞后窗口 ≤63 条 ⇒ 续传时这 ≤63 条被**重做**（安全）；
- * 若让快照**超前**（把未完成的条目算进去）⇒ 续传时被**错误跳过** ⇒ **产物缺条目**。
- *
- * **必须挂在 `onProgress` 上**：`runConversionTask` 的 `onEntryDone` 只在**主线程降级**分支触发，
- * Worker 路径（= 真浏览器）**永不触发**（见 `src/core/worker-client.js:89` 的 JSDoc）
- * ⇒ 只挂 `onEntryDone` 会让断点在浏览器里永不落盘、`npm test` 却全绿。
- *
- * @param {function} onCheckpoint TaskManager.start() 返回的落盘句柄
- * @param {Map<string, number>} doneEntries 已完成条目（**累积中**，本函数只读它的 size 与内容）
- * @returns {function({force?: boolean, totalEntries?: number, bytes?: number}): void}
- */
-export function createCheckpointThrottle(onCheckpoint, doneEntries, {
-  everyEntries = CHECKPOINT_EVERY_ENTRIES,
-  everyMs = CHECKPOINT_EVERY_MS,
-  buildManifest = null,
-} = {}) {
-  let lastFlushAt = 0;
-  let lastFlushedSize = -1;
-  return function maybeCheckpoint({ force = false, totalEntries = 0, bytes = 0 } = {}) {
-    const now = Date.now();
-    const due = force
-      || doneEntries.size - lastFlushedSize >= everyEntries
-      || now - lastFlushAt >= everyMs;
-    if (!due) return;
-    lastFlushedSize = doneEntries.size;
-    lastFlushAt = now;
-    const doneObject = Object.fromEntries(doneEntries);
-    // ⚠️ 这里造出来的对象会**原样**成为 `task.checkpoint` —— `TaskManager.onCheckpoint` 直接
-    // `task.checkpoint = manifest`（`task-manager.js:106`），`pause()` 落盘它（`:142`），
-    // `resume()` 还原它（`:186`）。**故它必须承载续传所需的全部状态**。
-    // 反面教材（本仓实修过）：此处曾恒为 `{doneEntries, totalEntries}` ⇒ 批量的
-    // `itemIndex` / `outputs` / `itemIds` **全被丢掉** ⇒ 续传读不到游标与产物清单
-    // ⇒ 失效检测必然判定「数目不符」⇒ **每次续传都作废重跑整批**，跳过语义永不生效。
-    const manifest = typeof buildManifest === 'function'
-      ? buildManifest(doneObject, { totalEntries })
-      : { doneEntries: doneObject, totalEntries };
-    void onCheckpoint(manifest, { bytes, force });
-  };
-}
-
-/* ────────────────── 续传命中的可观测面 ────────────────── */
-
-/**
- * 「本轮沿用了断点」的提示串（`> 0` 才给，避免正常转换被噪音污染）。
- *
- * ⚠️ 字段名是 **`report.totals.resumed`**（计数；`report.resumed` 是命中条目**名单**）。
- * 仓里曾有注释与用例名写作 `resumedCount` —— **该字段从来不存在**（全仓零赋值零读取）。
- * 续传是否真的生效必须**可观测**（E2E 要断言它），故把它显式渲染进完成文案与日志。
- *
- * @param {object} report `convert()` 的 Report（或其 toJSON()）
- * @returns {string} 形如「（沿用断点跳过 2 项）」，无命中时为空串
- */
-export function resumedNote(report) {
-  const n = report?.totals?.resumed ?? 0;
-  return n > 0 ? `（沿用断点跳过 ${n} 项）` : '';
-}
-
-/* ────────────────── 转换收尾出口的判定（单一入口） ────────────────── */
-
-/**
- * 转换路径的**收尾出口判定**：给定错误与任务记录，决定走哪个出口。
- *
- * ⚠️ **为什么必须抽出来**：`design.md` 说这是"最容易写错的一处" ——
- * 暂停是**正常用户操作**，若误走 `fail()`，`fail` 会 `adapter.remove(id)`
- * 清掉**刚落盘的断点** ⇒ 续传能力当场失效，且 UI 显示"失败"。
- * 内联在 `main()` 的 catch 里时这段逻辑**单测够不着**（`main()` 需要 DOM），
- * 抽成纯函数后「暂停**绝不**走 fail」这条才成为可断言契约。
- *
- * 「静默」的正确含义：**不调 `fail()`、不 `logger.error`、不显示"失败"**；
- * **不是**"什么都不做" —— 暂停必须**显示暂停态**（`showPaused` + `setPausedCheckpoint`）。
- *
- * @param {object} p
- * @param {Error} p.err 执行体抛出的错误
- * @param {object|null} p.record `taskManager.get(taskId)` 的结果
- * @returns {{action: 'fail'|'paused'|'aborted'|'none'}}
- */
-export function convertExitForAbort({ err, record }) {
-  if (err?.name !== 'AbortError') return { action: 'fail' };
-  if (record?.state === TASK_STATES.PAUSED) return { action: 'paused' };
-  if (record?.state === TASK_STATES.ABORTED) return { action: 'aborted' };
-  return { action: 'none' };
-}
-
-/* ────────────────── 转换路径的进度记账（单一入口） ────────────────── */
-
-/**
- * 造「转换进度回调核」：**唯一**允许挂断点落盘的地方（单包与批量共用，避免两处漂移）。
- *
- * ⚠️ **为什么必须有这个函数**：落盘**只能**挂 `onProgress`。
- * `runConversionTask` 的 `onEntryDone` 是顶层参数，只被传进**主线程降级分支**；
- * Worker 分支走 `postMessage`，**函数过不了结构化克隆** ⇒ **真浏览器里永不触发**
- * （见 `src/core/worker-client.js:89` 的 JSDoc：*"主线程路径直通；Worker 路径由 onProgress 累积"*）。
- * 若把落盘改挂到 `onEntryDone` 上：断点在**浏览器里永不落盘** ⇒ 暂停后无法续传，
- * 而 `npm test` 全绿（Vitest 无 `Worker`，走主线程路径，`onEntryDone` 会触发）**⇒ 缺陷被测试掩盖**。
- *
- * 所以这条契约被拆成可断言的形式：本函数的单测**只调 `onProgress` 一种签名**（模拟 Worker 路径），
- * 断言断点仍然被喂到。「是否真的接在 `onProgress` 上」这一层由 **E2E（真浏览器）** 守 —— 两者缺一不可。
- *
- * @param {object} p
- * @param {Map<string, number>} p.doneEntries 已完成条目（**就地累积**，供续传时命中即跳过）
- * @param {function} p.maybeCheckpoint 断点节流器（`createCheckpointThrottle` 的产物）
- * @returns {function(number, number, string, number|undefined): void}
- */
-export function attachConversionProgress({ doneEntries, maybeCheckpoint }) {
-  return function trackConversionProgress(cur, total, name, crc32) {
-    // 只做 Map.set + 节流判定，**不碰 DOM** —— 渲染由调用方在下一行做（已由 view 侧合帧，L1-MR-9）
-    if (name && crc32 != null) doneEntries.set(name, crc32);
-    maybeCheckpoint({ force: total > 0 && cur === total, totalEntries: total });
-  };
-}
-
-/* ────────────────── 批量转换的纯编排核（可 Node 直测） ────────────────── */
-
-/**
- * 批量子项循环核：**纯编排**（无 DOM / 存储 / 任务管理器依赖），故可在 Node 下直测。
- * `main()` 内的接线代码够不着测试，把语义放这里才对得上「纯逻辑必须可单测」的规格要求。
- *
- * 被测试锁定的两条语义：
- * 1. **从 `startIndex` 开始**（子项游标续传：已完成的子项不重跑）；
- * 2. **`AbortError` 必须终止循环** —— 其余错误"记日志继续"是既有语义（单个坏包不该打断整批），
- *    但暂停/中止是**用户意图**，必须是"停"：否则用户点了暂停，界面显示已暂停，
- *    后台却还在往下跑后续子项，且断点游标与实际进度脱节。
- *
- * @param {object} p
- * @param {Array<*>} p.items 子项列表（**下标即游标**）
- * @param {number} [p.startIndex=0] 下一个待处理的子项下标
- * @param {function(*, number): Promise<void>} p.convertItem (item, index) => Promise
- * @param {function(Error, number): void} [p.onItemError] 非中止错误的回调（**不终止循环**）
- * @returns {Promise<{processed: number, aborted: boolean, error: Error|null}>}
- */
-export async function runBatchItems({ items, startIndex = 0, convertItem, onItemError }) {
-  let processed = 0;
-  for (let i = startIndex; i < items.length; i += 1) {
-    try {
-      await convertItem(items[i], i);
-      processed += 1;
-    } catch (err) {
-      if (err && err.name === 'AbortError') {
-        // 原样上抛中止信号：状态迁移（PAUSED / ABORTED）与 UI 由调用方完成
-        return { processed, aborted: true, error: err };
-      }
-      if (typeof onItemError === 'function') onItemError(err, i);
-    }
-  }
-  return { processed, aborted: false, error: null };
-}
-
-/**
- * 批量续传的**可验证前提**（R-16 / U-6）：断点说「前 k 个子项已完成」，
- * 但那 k 个产物是 `ephemeral`（只在内存 `ExportQueue.items` 里），断点却是持久化的
- * ⇒ 两者可能不一致（产物被删除、被清空、或页面重载过）。
- *
- * 判据刻意取**真正依赖的那个东西**（产物还在不在），而**不是**「会话是否同一个」这类代理量 ——
- * 代理量会在「同会话但用户手动删了产物」时误判为可续。
- *
- * @param {object} p
- * @param {number} p.expectedOutputs 断点记录的已完成产物数
- * @param {number} p.productsPresent 内存队列里该 taskId 的产物数
- * @returns {{valid: boolean, reason: string}}
- */
-export function batchResumeVerdict({ expectedOutputs, productsPresent }) {
-  if (expectedOutputs === productsPresent) return { valid: true, reason: '' };
-  return {
-    valid: false,
-    reason: `断点记 ${expectedOutputs} 个已完成产物，内存队列里只有 ${productsPresent} 个`
-      + '（产物已不在内存：可能被移除，或页面已重载过）',
-  };
-}
-
-/**
- * 为**指定子项**播种条目级断点。
- *
- * ⚠️ 断点里的 `doneEntries` **只对断点游标指向的那个子项有效**：
- * 不同源包可能含**同名条目**（`characters/X.png`、`settings.json` 几乎必然重名），
- * 跨子项复用 crc 清单会让第二个子项**错误跳过**那些条目 ⇒ **产物缺条目**。
- *
- * @param {object} p
- * @param {object|null} p.checkpoint 断点清单
- * @param {number} p.index 当前子项下标
- * @param {number} p.startIndex 断点游标
- * @returns {Map<string, number>}
- */
-export function seedEntriesFor({ checkpoint, index, startIndex }) {
-  if (!checkpoint || index !== startIndex || !checkpoint.doneEntries) return new Map();
-  return new Map(Object.entries(checkpoint.doneEntries));
-}
-
-/**
- * 挂载只读调试探针 `window.__stZipConverterDebug`（R-19）。
- *
- * **规格依据**：`.trellis/spec/frontend/hook-guidelines.md` 的「无全局命名空间」一节明文写着
- * 「若后续确需自动化钩子，应新增**显式命名**的接缝**并在本节登记**，**不要**恢复隐式全局对象」
- * ⇒ 本挂载走的是规格**已预留**的那条路，并已在同节完成登记。
- *
- * **三条约束**（`design.md` D3.2，违约即缺陷）：
- * 1. **只读**：命名空间对象 `Object.freeze`，且 `getRestoreProbe()` 返回的**快照**本身也冻结
- *    —— 防伪能力主要来自后者：E2E 拿到的 `capability` 改不动，断言才有判别力；
- * 2. **不覆盖已占用者**：宿主或别的扩展可能同名，已存在时**不覆盖**并 warn（静默覆盖会
- *    悄悄弄坏别人的对象）；
- * 3. **不泄漏**：只暴露**能力枚举 + 原因文案**，**不含** CSRF token / user handle / 文件路径
- *    （那些各有受控获取路径，不从这里漏出）。
- *
- * 导出面仅为了让单测能覆盖「已占用时不覆盖」这条分支（`test/restore-probe.test.js`）；
- * 生产路径由 `bootstrap()` 调用。
- */
-export function mountDebugProbe() {
-  if (typeof window === 'undefined') return;
-  const DEBUG_KEY = '__stZipConverterDebug';
-  if (Object.prototype.hasOwnProperty.call(window, DEBUG_KEY)) {
-    logger.warn(`window.${DEBUG_KEY} 已被占用，跳过挂载（不覆盖既有对象）`);
-    return;
-  }
-  window[DEBUG_KEY] = Object.freeze({
-    getRestoreProbe,
-    getChatStoreProbe,
-  });
-}
-
-/**
- * 工作台初始化。**容器必须显式传入**（R6）。
- *
- * 原签名是 `main(appRoot = document.getElementById('app'))`：插件态下若宿主页面上存在
- * 任意第三方 `#app`，兜底会先命中它，整棵工作台挂进别人的容器。容器来源收敛为两条唯一路径：
- * 独立态 = `index.html` 的 `#app` 骨架；插件态 = `ensureConverterModal()` 建的全屏模态 `#app`。
- * @param {HTMLElement|undefined} appRoot 承载工作台的容器元素
- */
-async function main(appRoot) {
-  const root = appRoot;
-  if (!root) {
-    logger.warn('main() 未收到容器元素，工作台不初始化（容器来源必须显式传入，不再做裸 #app 兜底）');
-    return;
-  }
-
-  const host = detectHost();
-  const view = createViewController();
-  setupDrawerToggles(root);
-
-  // ── 全屏引导（2026-10-14：取代已删除的迁移向导）────────────────────────────
-  // 首装（本机无完成标记）自动打开；页头「引导」按钮可随时重放。
-  setupOnboardingGuide(root);
-
-  // ── 会话状态与陈旧标记（2026-10-14：迁移向导外壳已删除，界面为单一视图）─────
-  // 原「六步步骤条 / 向导模式·高级模式切换 / 不兼容门」按用户裁定整体删除。
-  // 仍需保留的是：共享会话实例、计划陈旧标记、检查面板写入。
-  const migrationSession = createMigrationSession();
-  const staleFlag = createStaleFlag();
-
-  // 初始化底部实时日志抽屉（块二底部挂载点）
-  const logConsole = setupLogConsole(document.getElementById('log-console-mount') || root);
-  mountSectionHelp(root); // R-A2 幂等补注：日志台头部晚于模态创建，这里补上它那份「?」
-  logger.info(`应用启动，运行模式: ${host.isPlugin ? host.platform.toUpperCase() + ' 扩展插件' : '独立 Web 模式'}`);
-
-  let currentFile = null;
-  let currentFileId = null;
-  let currentFileHandle = 'default-user';
-  let currentHostHandle = 'default-user';
-  let lastConvertedBlob = null;
-
-  // ── 动作按钮契约（用户裁决 8 + 「怎么解耦复用按钮」）─────────────────────
-  // 三枚按钮对应两条并行流程，可同时可见：
-  //   · 宿主拉取 → 转换 → 恢复（插件内一站式）
-  //   · 上传暂存 → 清理 → 转换 / 导出（源码 webui 模式）
-  // 可见性与可用性由本组函数**唯一**求值；禁止在业务分支里散落地写
-  // btnXxx.disabled / btnXxx.style.display（历史上有 14 处分散写点）。
-  let workbenchBusy = false;
-
-  /**
-   * 计算三枚动作按钮的可见性与可用性（纯函数）
-   * @param {{isHost: boolean, hasSource: boolean, hasArtifact: boolean,
-   *          isTaskRunning: boolean, isRestoreInFlight: boolean,
-   *          isRestoreUnsupported: boolean}} s
-   * @returns {{fetch: {visible: boolean, enabled: boolean},
-   *            convert: {visible: boolean, enabled: boolean},
-   *            restore: {visible: boolean, enabled: boolean}}}
-   */
-  function computeActionAvailability(s) {
-    return {
-      fetch: { visible: s.isHost, enabled: !s.isTaskRunning },
-      convert: { visible: true, enabled: s.hasSource && !s.isTaskRunning },
-      // 宿主无整包恢复能力（全部候选 404）时一并禁用：不留「点了必然失败」的按钮（R1.6）
-      restore: {
-        visible: s.isHost && s.hasArtifact,
-        enabled: !s.isTaskRunning && !s.isRestoreInFlight && !s.isRestoreUnsupported,
-      },
-      // 纯库模式下的「从聊天库导出」：**只在检测到聊天库时才出现**（默认路径零变化）。
-      // 探测是同步零副作用的（契约 S-3），故可放进每次可用性求值。
-      libraryExport: {
-        visible: s.chatStore.present,
-        enabled: s.chatStore.canList && s.chatStore.canExport && !s.isTaskRunning,
-      },
-    };
-  }
-
-  /** 从当前工作台状态收集求值输入 */
-  function collectActionState() {
-    return {
-      isHost: host.isPlugin,
-      hasSource: !!currentFile,
-      hasArtifact: !!lastConvertedBlob,
-      isTaskRunning: workbenchBusy,
-      isRestoreInFlight: isRestoreInFlight(),
-      isRestoreUnsupported: isRestoreUnsupported(),
-      chatStore: probeChatStore(),
-    };
-  }
-
-  /**
-   * 三枚动作按钮状态的唯一应用点。
-   * 用 getElementById 动态查询而非闭包变量：btnHostFetch 在本函数之后才声明，
-   * 提前绑定会踩 TDZ。
-   */
-  function applyActionAvailability() {
-    // 状态**只收一次**：`collectActionState()` 里含 `probeChatStore()`（会问到外部插件的 `mode()`），
-    // 多调一次就多问外部一次 —— 既无必要，也让「探测零副作用」这条契约被无谓地反复使用。
-    const s = collectActionState();
-    const a = computeActionAvailability(s);
-    const apply = (el, spec) => {
-      if (!el) return;
-      el.style.display = spec.visible ? '' : 'none';
-      el.disabled = !spec.enabled;
-    };
-    apply(document.getElementById('btn-convert'), a.convert);
-    apply(document.getElementById('btn-host-fetch'), a.fetch);
-    apply(document.getElementById('btn-restore-luker'), a.restore);
-    apply(document.getElementById('btn-library-export'), a.libraryExport);
-    // 有库但能力不足时，把原因挂在按钮上（禁用而不是静默隐藏，用户可知为何不可用）
-    const libBtn = document.getElementById('btn-library-export');
-    if (libBtn) libBtn.title = s.chatStore.reason || '';
-    // 宿主无恢复能力时把原因显式挂在按钮上（禁用而不是静默隐藏，用户可知为何不可用）
-    const restoreBtn = document.getElementById('btn-restore-luker');
-    if (restoreBtn) restoreBtn.title = isRestoreUnsupported() ? getRestoreUnsupportedReason() : '';
-    // 外壳同步：阶段（idle/scanned/running/done）或方向变化后重排模块。
-    // 内部按「流程×形态×阶段」签名比对，签名未变即不重排——重排会抖掉焦点与滚动位置。
-    applyShell();
-    syncRestoreInline();
-  }
-  let isPlanning = false;
-  let pendingRestoreFile = null;
-  /** 非 null 即批量恢复上下文（与 `pendingRestoreFile` 互斥，同一模态复用） */
-  let pendingRestoreBatch = null;
-  /**
-   * S3 执行层：本次对话框内的目标预检结果（真实冲突 + 自动保底备份证据）。
-   *
-   * `null` = 未预检 ⇒ `buildRestoreGateContext()` 退回既有「冲突未知」行为（默认路径零变化）。
-   * 每次打开对话框由 `resetRestoreBackupCheck()` 清空；读取时经 `activeTargetPreflight()` 校验
-   * 目标身份 / 待写入包 / 目标布局三者未变，任一变化即**弃用**（`R-05` 确认失效语义）。
-   */
-  let pendingTargetPreflight = null;
-  /** 当前批量恢复编排器（`createRestoreBatch` 实例） */
-  let activeBatch = null;
-  /** 批量恢复最近一次状态快照（供待导出区渲染） */
-  let lastBatchState = null;
-  let currentBaseZip = null; // { name: string, blob: Blob, size: number }
-
-  /**
-   * 把目标选择器的值解析为**布局码**（`st|l|tt|pt`）。
-   *
-   * 2026-10-27 R1.2 起下拉只有四项英文全称（值仍是布局码），`native` 已删除；
-   * 当前宿主那一项就是「宿主原生格式」的等价物。
-   *
-   * @param {string} [raw] 选择器原始值
-   * @param {string} [fallback='l'] 选择器缺失时的缺省布局码
-   * @returns {string} 布局码
-   */
-  function resolveTarget(raw, fallback = 'l') {
-    return resolveTargetLayout(raw, host.platform, fallback);
-  }
-
-  // 实时生成文件名预览（目标格式选择器 → 布局码）
-  function updateFilenamePreview() {
-    const template = filenameTemplateInput?.value || DEFAULT_FILENAME_TEMPLATE;
-
-    const extPreviewEl = document.getElementById('filename-preview');
-    if (extPreviewEl) {
-      const srcName = currentFile?.name || 'archive.zip';
-      const target = resolveTarget(targetSelect ? targetSelect.value : 'pt', 'pt');
-      const handle = currentFileHandle || currentHostHandle || 'default-user';
-      extPreviewEl.textContent = previewFilename(template, {
-        sourceName: srcName,
-        target,
-        handle,
-        part: 'part1',
-        category: 'all',
-        mode: 'split',
-      });
-    }
-  }
-
-  // DOM 元素引用
-  const envBadge = document.getElementById('env-badge');
-  const hostUserBadge = document.getElementById('host-user-badge');
-  const btnRestoreLuker = document.getElementById('btn-restore-luker');
-  const targetSelect = document.getElementById('target-select');
-  const btnConvert = document.getElementById('btn-convert');
-
-  const usageDashboardEl = document.getElementById('usage-dashboard');
-  const exportQueuePanel = document.getElementById('export-queue-panel');
-
-  const includeBackupsCheck = document.getElementById('include-backups-check');
-  const includeCacheCheck = document.getElementById('include-cache-check');
-  const includePrivateCheck = document.getElementById('include-private-check');
-
-  const compressionSelect = document.getElementById('compression-select');
-  const filenameTemplateInput = document.getElementById('filename-template-input');
-  const splitInput = document.getElementById('split-input');
-
-  /**
-   * 读取智能分包阈值（MB）。
-   * 归一化逻辑（整数/最小值/非法输入）在 `src/core/splitter.js` 的纯函数里，
-   * 此处仅做 DOM 取值，便于单测覆盖。
-   * @returns {number} 0 表示不分卷
-   */
-  function parseSplitInputMb() {
-    return normalizeSplitMb(splitInput ? splitInput.value : null);
-  }
-
-  // 还原模态弹窗元素
-  const restoreModalOverlay = document.getElementById('restore-modal-overlay');
-  const restoreModalDesc = document.getElementById('restore-modal-desc');
-  const btnCancelRestore = document.getElementById('btn-cancel-restore');
-  const btnConfirmRestore = document.getElementById('btn-confirm-restore');
-  const btnTargetPreflight = document.getElementById('btn-target-preflight');
-  const restorePreflightStatus = document.getElementById('restore-preflight-status');
-
-  // 2026-10-14：三组并排 radio 一律改为 `<select>` 枚举（用户裁定「禁止模式选择」）。
-  // 扩展包与 Git 历史**拆回两个枚举**（用户裁定）；后者仅在前者＝完整扩展包时可用。
-  function getExtensionMode() {
-    const el = document.getElementById('extension-mode-select');
-    return el ? el.value : 'manifest';
-  }
-
-  /** Git 历史策略（keep|minimal|strip）。缺省 keep——与 PRD 裁决一致，保默认行为零变化。 */
-  function getGitMode() {
-    const el = document.getElementById('git-mode-select');
-    return el ? el.value : 'keep';
-  }
-
-  /** 只导出清单时整体不打包 .git，故 Git 历史枚举联动禁用。 */
-  function syncGitModeAvailability() {
-    const el = document.getElementById('git-mode-select');
-    if (el) el.disabled = getExtensionMode() !== 'full';
-  }
-
-  function getKeepDevFiles() {
-    const chk = document.getElementById('keep-dev-files-check');
-    return chk ? chk.checked : false;
-  }
-
-  /**
-   * 刷新各折叠区的摘要读数（状态读数，非说明文案）。
-   * 用户裁决：每一类都可折叠，且标题栏须能判断当前状态，不必展开。
-   */
-  function updateFoldSummaries() {
-    // 垃圾清理：勾选 = 打包该项，未勾选 = 已清理；「剔除原生资产」勾选即为已清理
-    const cleanupEl = document.getElementById('fold-summary-cleanup');
-    if (cleanupEl) {
-      const items = [
-        { id: 'include-backups-check', clearedWhenChecked: false },
-        { id: 'include-cache-check', clearedWhenChecked: false },
-        { id: 'include-private-check', clearedWhenChecked: false },
-        { id: 'prune-builtin-check', clearedWhenChecked: true },
-      ];
-      const cleared = items.filter((it) => {
-        const el = document.getElementById(it.id);
-        if (!el) return false;
-        return it.clearedWhenChecked ? el.checked : !el.checked;
-      });
-      cleanupEl.textContent = cleared.length === items.length
-        ? '全部已清理'
-        : `已清理 ${cleared.length}/${items.length}`;
-    }
-
-    // 扩展包与 Git 历史已改为常驻枚举（原「扩展打包」折叠区删除）——枚举自身即读数，
-    // 不再需要折叠摘要。原摘要文案含「瘦身 / 剔除」等黑话，已按用户裁定废弃。
-
-    // 增量与差量：仅「差量补丁」是生效项（原「增量合并」开关经取证确认从不生效，已于 T4 移除）。
-    // 该区必选项是基准 ZIP，故状态读数必须体现基准是否已就绪——否则用户勾了也不知道能不能跑。
-    const incEl = document.getElementById('fold-summary-incremental');
-    if (incEl) {
-      const deltaOn = document.getElementById('host-incremental-export')?.checked;
-      incEl.textContent = !deltaOn ? '' : (currentBaseZip ? '差量补丁 · 基准已就绪' : '差量补丁 · 缺基准');
-    }
-
-    // 包名已是常驻输入框 + 预览框（原「包名」折叠区删除），折叠摘要随之作废。
-  }
-
-  /**
-   * 宿主原生存储面板入口（`#btn-storage-inspector`）。
-   *
-   * T2 按用户裁决 13 移除了自绘双行配额条，只留这枚按钮的外观，**行为归本任务**。
-   * 语义：宿主提供原生 Storage Inspector 才解除 `hidden`；不提供则整块保持隐藏，
-   * **不出现死按钮**，也**不恢复自绘配额条**（用户裁决 13 不可回退）。
-   * 唤起失败时保持静默——按钮本就不该可见，无需用户可见报错。
-   *
-   * 2026-10-15：按钮从「抽屉态专有」改为三形态共用的页头位置（抽屉已删除）。
-   * 因此必须**先判宿主**再探测——存储面板是宿主模块（`/scripts/storage-inspector.js`），
-   * 独立态探测只会打出一条 404 控制台错误（实测把「零控制台错误」判据打红）。
-   */
-  function setupStorageInspectorButton() {
-    const btn = document.getElementById('btn-storage-inspector');
-    if (!btn) return;
-    btn.addEventListener('click', () => { void openStorageInspector(); });
-    if (!host.isPlugin) return;
-    void isStorageInspectorAvailable().then((available) => {
-      if (available) btn.hidden = false;
-    });
-  }
-
-  const extensionModeSelect = document.getElementById('extension-mode-select');
-  if (extensionModeSelect) {
-    extensionModeSelect.addEventListener('change', () => {
-      syncGitModeAvailability();
-      updateFoldSummaries();
-      refreshPlan();
-    });
-  }
-
-  const gitModeSelect = document.getElementById('git-mode-select');
-  if (gitModeSelect) {
-    gitModeSelect.addEventListener('change', () => {
-      updateFoldSummaries();
-      refreshPlan();
-    });
-  }
-  // 初始联动：默认选中「完整扩展包」，故 Git 历史枚举初始可用。
-  syncGitModeAvailability();
-
-  const keepDevFilesCheck = document.getElementById('keep-dev-files-check');
-  if (keepDevFilesCheck) {
-    keepDevFilesCheck.addEventListener('change', () => refreshPlan());
-  }
-
-  // 初始化外部数据包类目过滤器组件
-  setupCategoryFilter({
-    onSelectionChange: () => {
-      refreshPlan();
-    },
-  });
-
-  // 统一文件树确认栏按钮（宿主拉取阶段2）
-  const btnHostTreeConfirm = document.getElementById('btn-host-tree-confirm');
-  const btnHostTreeCancel = document.getElementById('btn-host-tree-cancel');
-  const btnHostTreeSelectAll = document.getElementById('btn-host-tree-selectall');
-  if (btnHostTreeConfirm) {
-    btnHostTreeConfirm.addEventListener('click', () => resolveHostTreeConfirm(true));
-  }
-  if (btnHostTreeCancel) {
-    btnHostTreeCancel.addEventListener('click', () => resolveHostTreeConfirm(false));
-  }
-  if (btnHostTreeSelectAll) {
-    btnHostTreeSelectAll.addEventListener('click', () => categorySelectAll());
-  }
-
-  // 拉取前预览行（R-A5）：确认后才真正发起宿主拉取；续传路径直接继续不预览
-  let hostFetchPreviewResolve = null;
-  function waitHostFetchPreview(planText) {
-    return new Promise((resolve) => {
-      const bar = document.getElementById('host-fetch-preview');
-      const text = document.getElementById('host-fetch-preview-text');
-      if (!bar || !text) {
-        resolve(true); // 无预览行（测试环境/模板漂移）：维持旧行为直接继续
-        return;
-      }
-      hostFetchPreviewResolve = resolve;
-      text.textContent = planText;
-      bar.hidden = false;
-      view.setProgress(8, planText);
-    });
-  }
-  function resolveHostFetchPreview(confirmed) {
-    const bar = document.getElementById('host-fetch-preview');
-    if (bar) bar.hidden = true;
-    if (hostFetchPreviewResolve) {
-      const r = hostFetchPreviewResolve;
-      hostFetchPreviewResolve = null;
-      r(confirmed);
-    }
-  }
-  const btnHostFetchGo = document.getElementById('btn-host-fetch-go');
-  const btnHostFetchCancel = document.getElementById('btn-host-fetch-cancel');
-  if (btnHostFetchGo) {
-    btnHostFetchGo.addEventListener('click', () => resolveHostFetchPreview(true));
-  }
-  if (btnHostFetchCancel) {
-    btnHostFetchCancel.addEventListener('click', () => resolveHostFetchPreview(false));
-  }
-
-  // 批量队列转换执行逻辑（R-16 / U-5 / U-7：接入任务状态机 + 子项游标续传）
-  //
-  // 形态：**一个任务 + 子项游标**（不给每个子项建任务）——`taskControls` 一次只展示一个活动任务，
-  // N 个控制条会让用户心智断裂。断点清单：
-  //   { kind:'batch', itemIndex, outputs:[{index,name}], doneEntries, totalItems, itemIds }
-  //   - `itemIndex` = **下一个待处理**子项下标（不是"已完成个数"，避免 off-by-one 歧义）
-  //   - `itemIds`   = 源包在 files store 的记录 id（源包是**入库**的，故续传时可按 id 取回）
-  //   - `doneEntries` **只属于 itemIndex 那个子项**（见 seedEntriesFor 的注释）
-  async function handleBatchConvert({
-    resumeCheckpoint = null, resumeTaskId = null, sourceRecords = null,
-  } = {}) {
-    const target = resolveTarget(targetSelect ? targetSelect.value : 'pt', 'pt');
-    const taskId = resumeTaskId || `${TASK_PREFIX[TASK_KINDS.CONVERT_BATCH]}${Date.now()}`;
-
-    // 续传时按 id 取回源包（列表页刷新也不影响：源包入的是 files store，产物才是内存态）
-    let records = sourceRecords;
-    if (!records && Array.isArray(resumeCheckpoint?.itemIds)) {
-      records = [];
-      for (const id of resumeCheckpoint.itemIds) {
-        const full = await getFile(id);
-        if (full?.blob) records.push(full);
-      }
-    }
-    if (!records || records.length === 0) {
-      logger.warn('批量转换无可处理的源包（选择为空或源包已不在工作区），未启动任务');
-      return;
-    }
-    const itemIds = sourceRecords ? records.map((r) => r.id) : [...resumeCheckpoint.itemIds];
-    const totalItems = itemIds.length;
-    const startIndex = resumeCheckpoint?.itemIndex ?? 0;
-
-    // ⚠️ 可验证前提（U-6）：产物是 ephemeral（只在内存），断点却持久化 —— 两者可能不一致。
-    // 不校验就硬续 ⇒ 跳过产物已丢失的子项 ⇒ **静默产出残缺批次**。故此处**不满足即作废断点**。
-    if (resumeCheckpoint) {
-      const verdict = batchResumeVerdict({
-        expectedOutputs: (resumeCheckpoint.outputs ?? []).length,
-        productsPresent: exportQueue.items.filter((it) => it.taskId === taskId).length,
-      });
-      if (!verdict.valid) {
-        logger.warn(`批量续传前提不成立，断点作废、将重跑整批：${verdict.reason}`);
-        // 任务记录可能已随页面重载消失（TaskManager 是内存态）⇒ abort 会返回 false，
-        // 此时直接清持久化断点，否则它会一直留在 adapter 里（孤儿条目，且将来若恢复
-        // "暂停态展示"就会变成活缺陷）
-        if (!(await taskManager.abort(taskId))) {
-          try { await authorityCheckpointAdapter?.remove?.(taskId); } catch { /* 清理失败不阻断 */ }
-        }
-        taskControls.hide();
-        await handleBatchConvert({ sourceRecords: records });
-        return;
-      }
-    }
-
-    const { signal, onCheckpoint, setPauseCheckpoint } = taskManager.start(taskId, '批量转换', { resumable: true, totalBytes: 0 });
-    taskControls.showRunning(taskId, { totalBytes: 0 });
-    const outputs = resumeCheckpoint ? [...(resumeCheckpoint.outputs ?? [])] : [];
-    // 断点游标：**下一个待处理**子项下标（不是"已完成个数"，避免 off-by-one 歧义）。
-    // 处理第 i 项期间 = i；该项完成后 = i + 1（此时 `outputs` 恰好覆盖 0…i，两者一致）。
-    let nextIndex = startIndex;
-    // 当前子项的条目断点（每个子项**重建**，见 seedEntriesFor）
-    let doneEntries = new Map();
-    // 当前子项的**半成品**（真增量续传 R6b）：条目清单是「产物里真有这些字节」的真源，
-    // 与单包路径同形。每个子项开始时重建，子项完成/放弃时清空。
-    let currentPartial = { name: null, entries: [] };
-    /**
-     * 批量断点清单的组装（**必须完整** —— 它会被原样存成 `task.checkpoint`，见
-     * `createCheckpointThrottle` 的注释）。缺任何一个字段都会让续传读不到而静默降级。
-     *
-     * `partialOpfsName` / `partialEntries` 属于**游标指向的那个子项**（与 `doneEntries` 同域）——
-     * 跨子项复用半成品会让下一个子项**错误跳过**同名条目 ⇒ 产物缺条目。
-     */
-    const buildBatchManifest = (doneObject, { totalEntries = 0 } = {}) => ({
-      kind: 'batch',
-      itemIndex: nextIndex,
-      outputs: [...outputs],
-      doneEntries: doneObject,
-      itemIds: [...itemIds],
-      totalItems,
-      totalEntries,
-      partialOpfsName: currentPartial.name,
-      partialEntries: currentPartial.entries,
-    });
-    const makeBatchThrottle = () => createCheckpointThrottle(onCheckpoint, doneEntries, {
-      buildManifest: buildBatchManifest,
-    });
-    let maybeCheckpoint = makeBatchThrottle();
-    let trackProgress = attachConversionProgress({ doneEntries, maybeCheckpoint });
-    const totalCount = totalItems;
-
-    workbenchBusy = true;
-    applyActionAvailability();
-    view.setProgress(0, `正在开始批量转换 ${totalCount} 个数据包...`);
-    logger.info(`启动批量转换队列，共 ${totalCount} 个包，目标格式: ${target.toUpperCase()}`
-      + (startIndex > 0 ? `（从第 ${startIndex + 1} 个续传）` : ''));
-
-    try {
-      const run = await runBatchItems({
-        items: itemIds,
-        startIndex,
-        onItemError: (err, i) => {
-          // 单个子项失败沿用既有语义：记日志、继续（任务级 fail 只留给结构性错误）
-          logger.error(`批量转换失败 [${itemIds[i]}]: ${err.message}`);
-        },
-        convertItem: async (itemId, i) => {
-          const full = await getFile(itemId);
-          if (!full?.blob) {
-            logger.warn(`[${i + 1}/${totalCount}] 源包已不在工作区，跳过: ${itemId}`);
-            return;
-          }
-          // ⚠️ 不能写 `currentBlob.name = full.name`：blob 是 `File` 时 `name` 只读，
-          // 严格模式下直接抛 TypeError ⇒ 每个子项都失败、整批零产物（实测，见 namedBlob 注释）
-          const currentBlob = namedBlob(full.blob, full.name);
-
-          const template = filenameTemplateInput?.value || DEFAULT_FILENAME_TEMPLATE;
-          const outputFilename = resolveFilename(template, {
-            sourceName: currentBlob.name,
-            target,
-            handle: full.handle || currentHostHandle || 'default-user',
-          });
-          const compressionLevel = compressionSelect ? parseInt(compressionSelect.value, 10) : 5;
-          const pruneBuiltinCheck = document.getElementById('prune-builtin-check');
-
-          // 每个子项重置条目断点（跨子项复用 crc 清单会因同名条目错误跳过 ⇒ 产物缺条目）
-          //
-          // 真增量续传（R6b）：仅当**续传的就是这一项**且断点带着半成品时，才把它的字节搬进来。
-          // 判据与单包路径**同源** —— 跳过一个条目的充分条件是「半成品里真有它的字节」
-          // （`transform.js` 的 `appendedNames`），台账只作冗余校验。
-          const resumeThisItem = Boolean(resumeCheckpoint) && i === startIndex;
-          const partialOpfsName = resumeThisItem ? (resumeCheckpoint.partialOpfsName || null) : null;
-          let appendFrom = null;
-          if (partialOpfsName) {
-            try {
-              const handle = await opfsTmpHandle(partialOpfsName, false);
-              appendFrom = handle ? await opfsHandleToFile(handle) : null;
-            } catch (err) {
-              logger.warn(`[批量转换] 子项半成品读取失败（该子项将完整重做）: ${err?.message ?? err}`);
-              appendFrom = null;
-            }
-            if (appendFrom) {
-              opfsCleanupId = taskId;
-              opfsCleanupName = partialOpfsName;
-            } else {
-              logger.warn('[批量转换] 断点指向的子项半成品已不存在 ⇒ 该子项完整重做（产物完整，只是不再增量）');
-            }
-          }
-          doneEntries = (appendFrom && Array.isArray(resumeCheckpoint.partialEntries))
-            ? new Map(resumeCheckpoint.partialEntries
-              .filter((e) => e && typeof e.name === 'string').map((e) => [e.name, e.crc32]))
-            : seedEntriesFor({ checkpoint: resumeCheckpoint, index: i, startIndex });
-          currentPartial = { name: appendFrom ? partialOpfsName : null, entries: [] };
-          nextIndex = i; // 游标指向「正在处理的这一项」（尚未完成）
-          maybeCheckpoint = makeBatchThrottle();
-          trackProgress = attachConversionProgress({ doneEntries, maybeCheckpoint });
-
-          const { report, resultBlob } = await runConversionTask({
-            source: currentBlob,
-            target,
-            // 与单包转换**同源**的参数面：类目勾选/排除/压缩等一律取当前 UI 状态，
-            // 不引入第二套参数面（否则两条路径会漂移）
-            options: {
-              selection: getSelectionState(),
-              excludedPaths: getExcludedPaths(),
-              includeBackups: includeBackupsCheck ? includeBackupsCheck.checked : false,
-              includeCache: includeCacheCheck ? includeCacheCheck.checked : false,
-              includeAppPrivate: includePrivateCheck ? includePrivateCheck.checked : false,
-              compressionLevel,
-              extensionMode: getExtensionMode(),
-              gitMode: getGitMode(),
-              keepDevFiles: getKeepDevFiles(),
-              pruneBuiltinAssets: pruneBuiltinCheck ? pruneBuiltinCheck.checked : true,
-              signal,
-              resumeCrcMap: doneEntries,
-              appendFrom,            // 同源半成品（null ⇒ 该子项完整重做）
-              finalizeOnAbort: true, // 中止时把已写部分收成**合法半成品**，交 onPaused 持久化
-            },
-            onPaused: async ({ partialBlob, manifest, partialError }) => {
-              if (partialBlob) {
-                currentPartial = {
-                  name: partialNameFor(taskId),
-                  entries: Array.isArray(manifest) ? manifest : [],
-                };
-              }
-              // 断点必须保持 `kind:'batch'` 形状（见 persistPartial 的 buildCheckpoint 注释）
-              await persistPartial({
-                partialBlob, manifest, partialError, taskId, target, totalBytes: 0, setPauseCheckpoint,
-                buildCheckpoint: () => buildBatchManifest(Object.fromEntries(doneEntries), {
-                  totalEntries: currentPartial.entries.length,
-                }),
-              });
-              if (partialBlob) {
-                opfsCleanupId = taskId;
-                opfsCleanupName = currentPartial.name;
-              }
-            },
-            onProgress: (cur, tot, name, crc32) => {
-              trackProgress(cur, tot, name, crc32);
-              const basePct = Math.round((i / totalCount) * 100);
-              const itemPct = tot > 0 ? Math.round((cur / tot) * (100 / totalCount)) : 0;
-              view.setProgress(basePct + itemPct, `[${i + 1}/${totalCount}] ${currentBlob.name} -> ${name}`);
-            },
-          });
-
-          // 子项完成 ⇒ 半成品使命完成：留着只会占配额，且会让**下一子项**误以为可续。
-          if (currentPartial.name) {
-            opfsTmpCleanup(currentPartial.name);
-            if (opfsCleanupId === taskId) { opfsCleanupId = null; opfsCleanupName = null; }
-          }
-          currentPartial = { name: null, entries: [] };
-
-          exportQueue.enqueue({
-            name: outputFilename,
-            blob: resultBlob,
-            targetLayout: target,
-            origin: 'converted',
-            ephemeral: true,
-            taskId, // ← 失效检测的锚点：续传前按它数"产物还在不在"
-          });
-          outputs.push({ index: i, name: outputFilename });
-          nextIndex = i + 1; // 本项已完成 ⇒ 下一个待处理是 i+1（与 outputs 的覆盖范围一致）
-          // 子项边界是**天然断点**：强制落一次（比 64 条节流更对齐语义）
-          maybeCheckpoint({ force: true, totalEntries: doneEntries.size });
-          view.renderReport(report);
-          logger.success(`[${outputs.length}/${totalCount}] 数据包转换成功${resumedNote(report)}: ${outputFilename}`);
-        },
-      });
-
-      if (run.aborted) {
-        // 把中止信号交给下方 catch 统一做状态迁移（与单包路径**逐字节同构**）
-        throw run.error;
-      }
-
-      view.setProgress(100, `批量队列处理完成：成功 ${outputs.length}/${totalCount} 个包`);
-      await taskManager.complete(taskId);
-      taskControls.hide();
-    } catch (err) {
-      const rec = taskManager.get(taskId);
-      const { action } = convertExitForAbort({ err, record: rec });
-      if (action === 'paused') {
-        const pct = totalCount > 0 ? Math.min(99, Math.round((outputs.length / totalCount) * 100)) : 0;
-        taskControls.showPaused(taskId, { percent: pct, receivedBytes: outputs.length, totalBytes: totalCount });
-        taskControls.setPausedCheckpoint(taskId, rec?.checkpoint ?? null);
-        view.setProgress(pct, `批量转换已暂停于第 ${outputs.length}/${totalCount} 个包，可从断点继续或丢弃`);
-        logger.info(`批量转换已暂停：已完成 ${outputs.length}/${totalCount}`);
-      } else if (action === 'aborted') {
-        taskControls.hide();
-        view.setProgress(100, '批量转换已中止');
-      } else if (action === 'fail') {
-        await taskManager.fail(taskId, true);
-        taskControls.hide();
-        view.setProgress(100, `批量转换出错: ${err.message}`);
-        logger.error('批量转换出错', err);
-      }
-    } finally {
-      workbenchBusy = false;
-      applyActionAvailability();
-      await updateWorkspaceUI();
-    }
-  }
-
-  // 上传暂存区源包列表（含选中批操作）
-  async function refreshArchiveManagerUI() {
-    const stashListEl = document.getElementById('stash-list');
-    const stashBatchBar = document.getElementById('stash-batch-bar');
-    if (!stashListEl) return;
-    await renderStashList({
-      containerEl: stashListEl,
-      batchBarEl: stashBatchBar,
-      activeFileId: currentFileId,
-      isHostAvailable: host.isPlugin,
-      confirmFn: confirmDialog,
-      onLoadFile: async (fileRecord) => {
-        if (!fileRecord || !fileRecord.blob) return;
-        // ⚠️ 同上：`File.name` 只读 ⇒ 不能赋值（见 `namedBlob` 注释）
-        currentFile = namedBlob(fileRecord.blob, fileRecord.name);
-        currentFileId = fileRecord.id;
-        currentFileHandle = fileRecord.handle || 'default-user';
-
-        applyActionAvailability();
-        if (dropHandler?.setFilename) {
-          dropHandler.setFilename(fileRecord.name);
-        }
-        view.setProgress(0, `已载入数据包：${fileRecord.name} (${formatBytes(fileRecord.size)})`);
-        logger.info(`载入数据包作为当前处理源: ${fileRecord.name} (用户: ${currentFileHandle})`);
-        updateFilenamePreview();
-        await refreshPlan();
-        await refreshArchiveManagerUI();
-      },
-      onListChanged: async () => {
-        await updateWorkspaceUI();
-      },
-      onRestoreToHost: (fileRecord) => {
-        openRestoreModal(fileRecord);
-      },
-      // U-7：批量转换入口。此前 `runBatchConversion` 是**无调用者的死代码**
-      // （暂存区批量栏只有"载入为源/下载/写回宿主/删除"），而 README 承诺了"批量转换"
-      // ⇒ 补上这个入口，让已有实现可达、让 README 的承诺成立。
-      onBatchConvert: (records) => { void handleBatchConvert({ sourceRecords: records }); },
-      // 私有格式仓入口②：暂存区行内存仓（上传包/宿主拉取包/转换产物都可从行内「⋯」存入，
-      // 拉取的原生格式包由此进仓——与仓面板的文件入口互补）
-      onVaultSave: async (fileRecord) => {
-        try {
-          const entry = await vaultPut({
-            name: fileRecord.name,
-            blob: fileRecord.blob,
-            formatTag: fileRecord.layout,
-          });
-          if (entry) {
-            logger.info(`已存入仓: ${entry.name} [${entry.formatTag}]`);
-            view.setProgress(0, `已存入仓: ${entry.name}`);
-            await updateWorkspaceUI();
-          } else {
-            logger.warn('仓不可用，未存入');
-          }
-        } catch (err) {
-          logger.error(`存入仓失败: ${fileRecord.name}`, err);
-        }
-      },
-    });
-  }
-
-  // 私有格式仓面板（vault-store 的 UI：各酒馆原生格式包的后端完整存储与导入导出）
-  const vaultListEl = document.getElementById('vault-list');
-  const vaultBackendBadge = document.getElementById('vault-backend-badge');
-  const vaultFileInput = document.getElementById('vault-file-input');
-  const btnVaultAdd = document.getElementById('btn-vault-add');
-
-  async function refreshVaultPanel() {
-    if (!vaultListEl) return;
-    try {
-      await renderVaultPanel({
-        containerEl: vaultListEl,
-        badgeEl: vaultBackendBadge,
-        hostLayout: host.isPlugin ? hostLayoutCode(host.platform) : null,
-        onRestore: ({ name, blob }) => {
-          openRestoreModal({ name, blob, size: blob.size });
-        },
-        confirmFn: confirmDialog,
-        logger,
-        onChanged: () => { void updateWorkspaceUI(); },
-      });
-    } catch (err) {
-      console.warn('刷新仓面板失败:', err);
-    }
-  }
-
-  if (btnVaultAdd && vaultFileInput) {
-    // 仓入口①：任意文件存入（不限 zip——仓的本义就是"不兼容也原样存"）
-    btnVaultAdd.addEventListener('click', () => vaultFileInput.click());
-    vaultFileInput.addEventListener('change', async () => {
-      const files = Array.from(vaultFileInput.files || []);
-      vaultFileInput.value = '';
-      if (files.length === 0) return;
-      view.setProgress(0, `正在存入仓: ${files.length} 个文件`);
-      const res = await saveFilesToVault(files, {
-        logger,
-        onChanged: () => { void updateWorkspaceUI(); },
-      });
-      view.setProgress(100, `存入仓完成: 成功 ${res.ok} 个${res.fail > 0 ? `，失败 ${res.fail} 个` : ''}`);
-      await updateWorkspaceUI();
-    });
-  }
-
-  // 用量看板（配额条 + 来源统计 + 包体积列表）
-  async function refreshUsageDashboard() {
-    if (!usageDashboardEl) return;
-    await renderUsageDashboard({ containerEl: usageDashboardEl });
-  }
-
-  // 待导出区（所有产物统一出口）
-  const exportQueue = new ExportQueue();
-
-  // 长任务管理器（宿主拉取/转换/写回共用）+ 进度条旁任务控制条
-  // 断点持久化：Authority 后端可用时走服务端 KV（跨会话/多端），否则回退默认内存 adapter
-  const authorityCheckpointAdapter = await createCheckpointAdapter();
-  const taskManager = new TaskManager(authorityCheckpointAdapter || undefined);
-
-  /**
-   * 可续传任务的分派表：**类型 → 执行体**（与 `TASK_KINDS` 一一对应，唯一判据见 `taskKindOf`）。
-   *
-   * 用箭头函数包一层是刻意的：惰性解引用，避免"表在函数声明之前求值"的时序依赖。
-   * 加新任务路径时：`TASK_KINDS` / `TASK_PREFIX` 加一项 + 此处加一行 —— **不得再写第二个 `if (id.startsWith(...))`**。
-   */
-  const RESUMABLE_HANDLERS = Object.freeze({
-    [TASK_KINDS.FETCH]: (args) => handleHostExport(args),
-    [TASK_KINDS.CONVERT]: (args) => handleExternalConvert(args),
-    [TASK_KINDS.CONVERT_BATCH]: (args) => handleBatchConvert(args),
-  });
-
-  const taskControls = initTaskControls({
-    taskManager,
-    onPause: (id) => {
-      // 拉取执行体在 reader 循环内感知 signal.aborted 后自行 checkpoint+cancel；
-      // 转换执行体则由 Worker 侧的 signal abort 触发 terminate（`worker-client.js:136`）。
-      // 两处都只记录"暂停请求已发起"，真正的状态迁移由 TaskManager.pause 完成。
-      logger.info(`暂停请求已发送: ${id}`);
-    },
-    onResume: (id, checkpoint) => {
-      const kind = taskKindOf(id);
-      const handler = RESUMABLE_HANDLERS[kind];
-      if (!handler) {
-        // 查不到就**说清楚**，不静默 —— 静默返回会让用户以为"点了继续但没反应"
-        logger.warn(`无可续传的执行体: ${id}（识别出的类型: ${kind ?? 'null'}）`);
-        return;
-      }
-      handler({ resumeCheckpoint: checkpoint, resumeTaskId: id });
-    },
-    onAbort: (id) => {
-      logger.warn(`任务已中止: ${id}`);
-      if (opfsCleanupId === id) {
-        opfsTmpCleanup(opfsCleanupName);
-        opfsCleanupId = null;
-        opfsCleanupName = null;
-      }
-    },
-    onDiscard: (id) => {
-      logger.warn(`断点与半成品已丢弃: ${id}`);
-      if (opfsCleanupId === id) {
-        opfsTmpCleanup(opfsCleanupName);
-        opfsCleanupId = null;
-        opfsCleanupName = null;
-      }
-    },
-  });
-  // 当前 OPFS 半成品归属（中止/丢弃时清理）
-  let opfsCleanupId = null;
-  let opfsCleanupName = null;
-
-  // 最近一次规划结果（供「仅导出扩展清单」复用扩展元数据，避免二次解析源包）
-  let latestPlan = null;
-  const btnExportExtManifest = document.getElementById('btn-export-ext-manifest');
-
-  // ── 工作台外壳（模块 / 流程 / 外壳 三层，见 design.md §2）──────────────────
-  // 阶段由实况派生：等待确认 > 在途任务 > 产物 > 计划 > 空（workbench-layout.js 的 stageOf）。
-  // `awaitingTreeConfirm` 必须在本行之前声明：`getStage` 会在外壳装好后的**任何**
-  // `applyActionAvailability()` 里被求值，而它散落在全函数各处 —— 声明晚了就是 TDZ。
-  let awaitingTreeConfirm = false;
-  // `applyShell` 先守卫 shellRoot 再求值 stage，故此处引用 latestPlan / workbenchBusy /
-  // lastConvertedBlob 无 TDZ 风险——三者均在本行之前声明。
-  const workbenchShell = setupWorkbenchShell({
-    root,
-    getStage: () => stageOf({
-      hasPlan: !!latestPlan,
-      isRunning: workbenchBusy,
-      isAwaiting: awaitingTreeConfirm,
-      hasProducts: !!lastConvertedBlob,
-    }),
-    onFlowChange: () => { syncRestoreInline(); syncSlotRole(); },
-  });
-  void workbenchShell;
-
-  /**
-   * 共享槽的角色标签。**槽是同一个**（`currentFile` 不因切方向而清空），
-   * 变的只是标签文字 —— 这正是「同一包可先导出再导回」的可见证据（PRD R2.5 / AC-2.4）。
-   */
-  function syncSlotRole() {
-    const role = document.getElementById('wb-slot-role');
-    if (!role) return;
-    role.textContent = getFlow() === 'in' ? '待恢复包' : '源包';
-  }
-  syncSlotRole();
-
-  /**
-   * 导入屏主操作读数。写回宿主是**整包**语义，不认类目勾选，
-   * 故这里只报「待恢复的是哪个包」+ 能不能写，不重复类目面板。
-   */
-  function syncRestoreInline() {
-    const btn = document.getElementById('btn-restore-inline');
-    const target = document.getElementById('wb-restore-target');
-    if (target) {
-      target.textContent = currentFile ? `待恢复 ${currentFile.name}` : '尚未选择数据包';
-    }
-    if (btn) {
-      const canRestore = host.isPlugin && !!currentFile;
-      btn.disabled = !canRestore;
-      btn.title = !host.isPlugin ? '独立模式无宿主可写' : (currentFile ? '' : '请先选择数据包');
-    }
-  }
-
-  {
-    const btnRestoreInline = document.getElementById('btn-restore-inline');
-    if (btnRestoreInline) {
-      btnRestoreInline.addEventListener('click', () => {
-        if (!currentFile) return;
-        openRestoreModal({ name: currentFile.name, blob: currentFile.blob, size: currentFile.blob.size });
-      });
-    }
-    syncRestoreInline();
-  }
-
-  /** 无扩展可导出时禁用按钮并给出提示（含未选源包的情形）。 */
-  function syncExportExtManifestButton() {
-    if (!btnExportExtManifest) return;
-    const count = latestPlan?.extensions?.length || 0;
-    btnExportExtManifest.disabled = count === 0;
-    btnExportExtManifest.title = count === 0
-      ? (currentFile ? '未检测到扩展' : '请先选择源数据包')
-      : `导出 ${count} 个扩展的只读清单 (JSON，不含扩展代码)`;
-  }
-
-  /**
-   * 只读清单导出：产出一份 JSON 清单进待导出区，不写包、不触发安装面板。
-   * 这是清单契约的「审阅/分享」入口（决策 D-2）。
-   */
-  async function exportExtensionManifestOnly() {
-    const extensions = latestPlan?.extensions || [];
-    if (extensions.length === 0) {
-      logger.warn('未检测到扩展，无法导出清单');
-      return;
-    }
-    const mode = getExtensionMode();
-    const manifest = buildExtensionManifest({
-      extensions,
-      mode,
-      generatedAt: new Date().toISOString(),
-    });
-    const blob = new Blob([JSON.stringify(manifest, null, 2)], { type: 'application/json' });
-    const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-    exportQueue.enqueue({
-      name: `extensions-manifest-${stamp}.json`,
-      blob,
-      targetLayout: resolveTarget(targetSelect ? targetSelect.value : '', ''),
-      origin: 'converted',
-      ephemeral: true,
-    });
-    refreshExportQueueUI();
-    logger.success(`已生成只读扩展清单：${extensions.length} 个扩展（模式 ${mode}）——可在待导出区下载或存入工作区`);
-  }
-
-  if (btnExportExtManifest) {
-    btnExportExtManifest.addEventListener('click', () => {
-      exportExtensionManifestOnly();
-    });
-    syncExportExtManifestButton();
-  }
-
-  function refreshExportQueueUI() {
-    if (!exportQueuePanel) return;
-    renderExportQueue({
-      containerEl: exportQueuePanel,
-      queue: exportQueue,
-      isHostAvailable: host.isPlugin,
-      confirmFn: confirmDialog,
-      restoreInFlight: isRestoreInFlight(),
-      // 批量恢复状态（进行中/收尾）+ 宿主无恢复能力时的原因（禁用入口，R1.6）
-      restoreBatch: lastBatchState,
-      restoreUnsupportedReason: isRestoreUnsupported() ? getRestoreUnsupportedReason() : '',
-      onCancelRestore: () => {
-        // 先请求编排器停批（未跑的项保持 queued 可续跑），再取消在途请求
-        if (activeBatch) activeBatch.abort();
-        if (cancelRestoreInFlight()) {
-          logger.warn('用户取消了在途恢复写入——宿主可能已收到部分数据，请稍后核对');
-        }
-      },
-      onRestoreToHost: (item) => {
-        openRestoreModal({ name: item.name, blob: item.blob, size: item.blob.size });
-      },
-      onRestoreBatch: (items) => {
-        openBatchRestoreModal(items);
-      },
-      onRetryFailedBatch: async () => {
-        if (!activeBatch || isRestoreInFlight()) return;
-        activeBatch.retryFailed();
-        lastBatchState = activeBatch.getState();
-        refreshExportQueueUI();
-        logger.info(`重跑失败项：${lastBatchState.items.filter((i) => i.status === ITEM_STATUS.QUEUED).length} 项`);
-        const state = await activeBatch.start();
-        lastBatchState = state;
-        if (state.status === BATCH_STATUS.DONE) logger.success(`失败项重跑完成：全部 ${state.total} 项已恢复`);
-        else logger.warn('重跑结束但仍有未成功项——请查看待导出区的逐项原因');
-        refreshExportQueueUI();
-      },
-      onRefreshPage: () => {
-        // 显式按钮：只有用户点击才刷新（不自动强刷，避免打断宿主进行中的工作）
-        logger.info('用户请求刷新页面以让宿主加载已恢复的数据');
-        window.location.reload();
-      },
-      onWorkspaceChanged: async () => {
-        await updateWorkspaceUI();
-      },
-    });
-    // 能力探测结果可能刚刚变化（首次恢复尝试后）→ 同步工作台动作按钮的可用性
-    applyActionAvailability();
-  }
-
-  // 占位符 chip 与包名预设按钮已移除（用户裁决 4/6）：
-  // 包名模板的可用占位符由输入框自身的 placeholder 表达，默认模板即默认值，
-  // 不再提供插入按钮与三档预设——它们与输入框三重表达同一件事。
-
-  // 1. 刷新数据包区（暂存列表/配额条/待导出区）
-  async function updateWorkspaceUI() {
-    if (!isStorageSupported()) return;
-    try {
-      await refreshArchiveManagerUI();
-      await refreshUsageDashboard();
-      await refreshVaultPanel();
-      refreshExportQueueUI();
-    } catch (err) {
-      console.warn('刷新工作区 UI 失败:', err);
-    }
-  }
-
-  // 2. 调度完全扫描与动作预测规划
-  /**
-   * 把当前计划快照灌进向导的检查页（步骤④）。
-   *
-   * 数据源是**计划快照**（`runPlanTask` 的产物），不是 DOM 现场 —— 这正是
-   * `migration-user-journey.md` §7「计划构造一次，执行与结果消费同一计划快照」的界面侧。
-   *
-   * @param {object|null} plan
-   */
-  function syncWizardCheckPanel(plan) {
-    if (!plan) {
-      writeCheckPanel(root, { summary: '尚无计划 · 请先选择数据包', exclusions: [] });
-      return;
-    }
-    const count = plan.expectedOutputFiles ?? 0;
-    const bytes = plan.expectedOutputBytes ?? 0;
-    const stale = staleFlag.isStale();
-    // OQ-1 配套：特殊类目「默认不含」的差异必须明说，不静默丢（读当前勾选，不是读默认表）
-    const specialSummary = formatSpecialExclusionSummary(describeSpecialExclusions({
-      backups: Boolean(includeBackupsCheck && includeBackupsCheck.checked),
-      cache: Boolean(includeCacheCheck && includeCacheCheck.checked),
-      appPrivate: Boolean(includePrivateCheck && includePrivateCheck.checked),
-    }));
-    const exclusions = [];
-    for (const [catKey, cat] of Object.entries(plan.categories || {})) {
-      for (const item of (cat?.items || [])) {
-        if (item && item.selected === false) {
-          exclusions.push({
-            label: `${catKey} · ${item.sourcePath ?? item.hubPath ?? '(未知路径)'}`,
-            reason: item.reason || '已排除',
-          });
-        }
-      }
-    }
-    // 文案按用户裁定收敛：无分号、无括号说明、无长句。
-    const parts = [
-      stale ? '读数已过期' : '',
-      `预计产出 ${count} 个条目 · ${formatBytes(bytes)}`,
-      `排除 ${exclusions.length} 项`,
-      specialSummary,
-    ].filter(Boolean);
-    writeCheckPanel(root, { summary: parts.join(' · '), exclusions });
-  }
-
-  async function refreshPlan() {
-    // 折叠区摘要与「是否已有源包」无关，须在早退前刷新
-    updateFoldSummaries();
-    if (!currentFile || isPlanning) {
-      if (!currentFile) syncWizardCheckPanel(null);
-      return;
-    }
-    isPlanning = true;
-
-    try {
-      const target = resolveTarget(targetSelect ? targetSelect.value : 'l');
-      const selection = getSelectionState();
-      const excludedPaths = getExcludedPaths();
-      const includeBackups = includeBackupsCheck ? includeBackupsCheck.checked : false;
-      const includeCache = includeCacheCheck ? includeCacheCheck.checked : false;
-      const includeAppPrivate = includePrivateCheck ? includePrivateCheck.checked : false;
-
-      const plan = await runPlanTask({
-        source: currentFile,
-        target,
-        options: {
-          selection,
-          excludedPaths,
-          includeBackups,
-          includeCache,
-          includeAppPrivate,
-          extensionMode: getExtensionMode(),
-          gitMode: getGitMode(),
-          keepDevFiles: getKeepDevFiles(),
-        },
-      });
-
-      // 真实扫描已到达 ⇒ 关闭「未扫描」占位态，徽标改显计划读数（category-filter.js:127）
-      renderCategoryStats(plan, { unscanned: false });
-      const hadPlan = Boolean(latestPlan);
-      latestPlan = plan;
-      syncExportExtManifestButton();
-      // 计划到达 ⇒ 阶段 idle → scanned，内容范围与执行条进场（workbench-layout.js 的 visibleModules）
-      applyShell();
-      syncRestoreInline();
-      // 关键输入（源/目标/范围）变更 ⇒ 上一次的「检查」读数与确认作废（R-05 / AC-04）。
-      // 首次出计划不算"变更"（否则用户一上传就见到失效警告）。
-      if (hadPlan) staleFlag.mark();
-      // 向导侧：共享选择快照 + 刷新检查页（同一计划快照，不从 DOM 重拼）
-      migrationSession.setSelection(selection);
-      syncWizardCheckPanel(plan);
-
-      // 持久化当前工作区状态
-      if (currentFileId) {
-        await saveWorkspaceState({
-          fileId: currentFileId,
-          fileName: currentFile.name,
-          target,
-          selection,
-          excludedPaths: Array.from(excludedPaths),
-          includeBackups,
-          includeCache,
-          includeAppPrivate,
-          compressionLevel: compressionSelect ? compressionSelect.value : '5',
-          filenameTemplate: filenameTemplateInput ? filenameTemplateInput.value : '',
-        });
-      }
-    } catch (err) {
-      console.warn('执行规划预测失败:', err);
-    } finally {
-      isPlanning = false;
-    }
-  }
-
-  // 3. 顶栏徽标（R10.1）：插件 = 宿主 icon + 英文全名 + 「插件」；Web = GitHub 图标 + 「Web」。
-  //    宿主名全仓只在这里出现一次，图表区内不得再写。
-  const applyHostBadge = (platform, version = null) => {
-    if (!envBadge) return;
-    const iconEl = document.getElementById('env-badge-icon');
-    const ghEl = document.getElementById('env-badge-gh');
-    const textEl = document.getElementById('env-badge-text');
-    const isWeb = !platform || platform === 'standalone';
-
-    if (isWeb) {
-      envBadge.dataset.host = 'web';
-      envBadge.title = '独立 Web 形态：没有宿主数据源';
-      if (iconEl) { iconEl.hidden = true; iconEl.removeAttribute('src'); }
-      if (ghEl) ghEl.hidden = false;
-      if (textEl) textEl.textContent = 'Web';
-      return;
-    }
-
-    const layout = hostLayoutCode(platform);
-    const name = hostDisplayName(layout);
-    const src = hostIcon(layout);
-    envBadge.dataset.host = layout;
-    envBadge.title = version
-      ? `当前运行在 ${name} 插件内 · v${version}`
-      : `当前运行在 ${name} 插件内`;
-    if (iconEl) {
-      if (src) {
-        iconEl.src = src;
-        iconEl.hidden = false;
-      } else {
-        iconEl.hidden = true;
-      }
-    }
-    if (ghEl) ghEl.hidden = true;
-    if (textEl) textEl.textContent = `${name} 插件`;
-  };
-  applyHostBadge(host.platform);
-
-  // 4. 插件态界面激活与宿主工作台初始化
-  // 目标平台选择器固定四项（R1.2）：任何非四项残留（旧版的 `native`）一律移除，
-  // 当前宿主项追加「（宿主）」标记并默认选中。
-  const syncTargetSelect = (platform) => {
-    if (!targetSelect) return;
-    const layout = hostLayoutCode(platform);
-    const known = new Set(TARGET_PLATFORMS.map((t) => t.code));
-    for (const opt of Array.from(targetSelect.options)) {
-      if (!known.has(opt.value)) {
-        opt.remove();
-        continue;
-      }
-      const base = TARGET_PLATFORMS.find((t) => t.code === opt.value)?.name || opt.value;
-      opt.textContent = opt.value === layout ? `${base}（宿主）` : base;
-    }
-    targetSelect.value = layout;
-  };
-
-  const applyPluginUi = (platform) => {
-    if (!host.isPlugin) return;
-    // 按钮可见性/可用性统一由 applyActionAvailability 求值——此处不再单独写 display
-    // （原实现：btn-host-fetch 强制 inline-flex、btn-restore-luker 仅 luker 显示）
-
-    // 插件态下按钮可用性统一求值（含 btn-restore-luker 的可见性）
-    applyActionAvailability();
-    syncTargetSelect(platform);
-    // 原生"用户数据备份"UI 旁注入入口，与扩展行上的「打开面板」并存
-    mountNativeBackupButton(() => {
-      openConverterModal();
-    });
-    // Luker 备份管理器弹层内也注入入口（仅 Luker 有该锚点，其余宿主无操作）
-    mountLukerBackupManagerButton(() => {
-      openConverterModal();
-    });
-  };
-  applyPluginUi(host.platform);
-
-  // 服务端 /version 二次校验：不一致时以服务端为准并刷新 UI
-  if (host.isPlugin) {
-    verifyHostPlatform(host.platform)
-      .then(({ platform: verifiedPlatform, version }) => {
-        if (verifiedPlatform !== host.platform && verifiedPlatform !== 'standalone') {
-          host.platform = verifiedPlatform;
-          applyPluginUi(verifiedPlatform);
-          logger.info(`宿主环境已按服务端校验结果刷新: ${verifiedPlatform.toUpperCase()}`);
-        }
-        if (verifiedPlatform !== 'standalone') {
-          applyHostBadge(verifiedPlatform, version || null);
-        }
-      })
-      .catch((err) => console.warn('宿主服务端校验失败:', err));
-  }
-
-  if (host.isPlugin) {
-    // 获取当前用户句柄
-    getHandle()
-      .then((handle) => {
-        currentHostHandle = handle;
-        if (hostUserBadge) {
-          hostUserBadge.style.display = 'inline-block';
-          hostUserBadge.textContent = `用户: ${handle}`;
-        }
-        logger.info(`已连接宿主用户: ${handle}`);
-        updateFilenamePreview();
-      })
-      .catch((err) => {
-        logger.warn('获取当前宿主用户信息提示:', err.message);
-      });
-  }
-
-  // 5. 差量补丁基准包交互（统一开关组内，宿主拉取与外部转换共用）
-  const hostIncrementalCheck = document.getElementById('host-incremental-export');
-  const hostBaseZipSection = document.getElementById('host-base-zip-section');
-  const hostBaseZipInput = document.getElementById('host-base-zip-input');
-  const btnSelectBaseZip = document.getElementById('btn-select-base-zip');
-  const hostBaseArchiveSelect = document.getElementById('host-base-archive-select');
-  const hostBaseZipStatus = document.getElementById('host-base-zip-status');
-
-  async function refreshBaseArchiveOptions() {
-    if (!hostBaseArchiveSelect) return;
-    try {
-      const storedFiles = filterStashFiles(await listStoredFiles());
-      const currentVal = hostBaseArchiveSelect.value;
-      hostBaseArchiveSelect.innerHTML = '<option value="">或从上传暂存区选取...</option>';
-      if (storedFiles && storedFiles.length > 0) {
-        storedFiles.forEach((f) => {
-          const opt = document.createElement('option');
-          opt.value = f.id;
-          opt.textContent = `${f.name} (${formatBytes(f.size)})`;
-          hostBaseArchiveSelect.appendChild(opt);
-        });
-      }
-      if (currentVal) hostBaseArchiveSelect.value = currentVal;
-    } catch {
-      // 忽略
-    }
-  }
-
-  function updateBaseZipStatusUI() {
-    if (!hostBaseZipStatus) return;
-    if (currentBaseZip) {
-      hostBaseZipStatus.innerHTML = `<i class="fa-solid fa-circle-check" style="color: #10b981;"></i> 已就绪基准包: <b>${escapeHtml(currentBaseZip.name)}</b> (${escapeHtml(formatBytes(currentBaseZip.size))})`;
-      hostBaseZipStatus.style.color = 'var(--SmartThemeQuoteColor, #93c5fd)';
-    } else {
-      hostBaseZipStatus.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> 请先选择已有基准包，否则无法生成增量差量补丁';
-      hostBaseZipStatus.style.color = '#f87171';
-    }
-  }
-
-  if (hostIncrementalCheck) {
-    hostIncrementalCheck.addEventListener('change', () => {
-      const isInc = hostIncrementalCheck.checked;
-      if (hostBaseZipSection) {
-        hostBaseZipSection.style.display = isInc ? 'block' : 'none';
-      }
-      if (isInc) {
-        refreshBaseArchiveOptions();
-        updateBaseZipStatusUI();
-      }
-      // 折叠摘要须随开关刷新（原实现漏了这一步，摘要会停留在旧值）
-      updateFoldSummaries();
-    });
-  }
-
-  if (btnSelectBaseZip && hostBaseZipInput) {
-    btnSelectBaseZip.addEventListener('click', () => {
-      hostBaseZipInput.click();
-    });
-
-    hostBaseZipInput.addEventListener('change', () => {
-      const file = hostBaseZipInput.files?.[0];
-      if (file) {
-        currentBaseZip = {
-          name: file.name,
-          blob: file,
-          size: file.size,
-        };
-        updateBaseZipStatusUI();
-        logger.info(`已设定外部基准 ZIP: ${file.name} (${formatBytes(file.size)})`);
-      }
-    });
-  }
-
-  if (hostBaseArchiveSelect) {
-    hostBaseArchiveSelect.addEventListener('change', async () => {
-      const id = hostBaseArchiveSelect.value;
-      if (!id) return;
-      try {
-        const fileRecord = await getFile(id);
-        if (fileRecord && fileRecord.blob) {
-          currentBaseZip = {
-            name: fileRecord.name,
-            blob: fileRecord.blob,
-            size: fileRecord.size || fileRecord.blob.size,
-          };
-          updateBaseZipStatusUI();
-          logger.info(`已从暂存区载入基准 ZIP: ${fileRecord.name}`);
-        }
-      } catch (err) {
-        logger.error('载入基准包失败:', err);
-      }
-    });
-  }
-
-  // 6. 执行宿主拉取操作（统一选项，产物一律进待导出区）
-
-  // 统一文件树确认栏（宿主拉取阶段2：渲染树 → 用户勾选 → 确认/取消）
-  let hostTreeConfirmResolve = null;
-
-  function waitHostTreeConfirm(taskId) {
-    return new Promise((resolve) => {
-      hostTreeConfirmResolve = resolve;
-      const bar = document.getElementById('host-tree-confirm-bar');
-      if (!bar) {
-        resolve(true); // 无确认栏（测试环境/模板漂移）：维持现状行为直接继续
-        return;
-      }
-      // 切到 awaiting 阶段：running 阶段会把 `scope` 藏起来，而确认条就在 scope 里 ——
-      // 藏起来用户就看不到、点不到，`await` 会永久挂住。
-      awaitingTreeConfirm = true;
-      applyShell();
-      bar.hidden = false;
-      bar.dataset.taskId = taskId;
-      view.setProgress(38, `请在统一文件树勾选需要的文件/类目，确认后继续`);
-    });
-  }
-
-  function resolveHostTreeConfirm(confirmed) {
-    const bar = document.getElementById('host-tree-confirm-bar');
-    if (bar) bar.hidden = true;
-    if (awaitingTreeConfirm) {
-      awaitingTreeConfirm = false;
-      applyShell();
-    }
-    if (hostTreeConfirmResolve) {
-      const r = hostTreeConfirmResolve;
-      hostTreeConfirmResolve = null;
-      r(confirmed);
-    }
-  }
-
-  async function handleHostExport({ resumeCheckpoint = null, resumeTaskId = null } = {}) {
-    const btnHostFetch = document.getElementById('btn-host-fetch');
-
-    // 检查差量补丁模式是否已指定基准包
-    const isIncremental = hostIncrementalCheck ? hostIncrementalCheck.checked : false;
-    if (isIncremental && !currentBaseZip) {
-      logger.error('差量补丁模式开启，必须先选择一个已有基准 ZIP！');
-      void alertDialog('【差量补丁提示】\n差量补丁模式必须选择一个已有 ZIP 作为基准包！\n请在面板中点击“选择本地基准 ZIP”或从上传暂存区选取基准包。');
-      if (hostBaseZipSection) hostBaseZipSection.style.display = 'block';
-      updateBaseZipStatusUI();
-      return;
-    }
-
-    // R-A5 拉取前预览：先亮出「将拉取什么」与能力读数，用户确认后才发起；
-    // 续传（resumeCheckpoint）是同一任务的继续，不再预览。
-    if (!resumeCheckpoint) {
-      const confirmed = await waitHostFetchPreview(describeHostFetchPlan(host.platform, getSelectionState()));
-      if (!confirmed) {
-        logger.info('用户在拉取预览处取消，本次不发起宿主拉取');
-        return;
-      }
-    }
-
-    workbenchBusy = true;
-    applyActionAvailability();
-
-    // 统一类目勾选（与外部转换路径共用同一份 category-filter 状态）
-    const selection = getSelectionState();
-
-    const selectedTarget = targetSelect ? targetSelect.value : hostLayoutCode(host.platform);
-
-    // 断点续传：携带清单重跑（Range 尽力而为，见 fetchHostBackup 内部决策）
-    const taskId = resumeTaskId || `fetch-${Date.now()}`;
-    let opfsName = null; // OPFS 半成品名（catch 清理需引用，须在 try 外声明避免 TDZ ReferenceError）
-    const { signal, onCheckpoint } = taskManager.start(taskId, '宿主拉取', {
-      resumable: true,
-      totalBytes: resumeCheckpoint?.totalBytes || 0,
-    });
-    taskControls.showRunning(taskId, { totalBytes: resumeCheckpoint?.totalBytes || 0 });
-    if (resumeCheckpoint) {
-      logger.info(`续传任务 ${taskId}: 断点 ${formatBytes(resumeCheckpoint.receivedBytes || 0)}`);
-    }
-
-    try {
-      view.setProgress(10, `正在向宿主 ${host.platform.toUpperCase()} 请求数据包...`);
-      logger.info(`向宿主请求导出数据包，勾选类目: ${Object.keys(selection).filter((k) => selection[k]).join(', ')}`);
-
-      // 宿主 selection 能力：由 host-bridge 的**显式声明表**求值，不在业务层推导（R4.1）。
-      // ST 宿主的 /api/users/backup 端点不支持 selection（全量 glob 导出）：
-      // 必须请求全量包，类目筛选由下方 needsTransform 分支在插件内过滤生效；
-      // Luker 宿主端点原生支持 selection，直接透传。
-      const selectionCap = hostSelectionCapability(host.platform);
-      const hostSupportsSelection = selectionCap.supported;
-      const endpointSelection = hostSupportsSelection
-        ? selection
-        : { ...FULL_SELECTION };
-      if (!hostSupportsSelection) {
-        logger.info(`宿主端点不做 selection 透传（${selectionCap.reason}），类目筛选将在导出后由插件内过滤执行`);
-      }
-
-      // Luker 服务端 selection.settings 会隐含打包 backups/ 目录（历史快照，
-      // src/users.js getUserBackupTargets）：勾了 settings 的用户每次都在拉
-      // 全部历史备份，GB 级 backups 是"慢"的主因——发请求前给出明确警示。
-      const hostIncludeBackups = includeBackupsCheck ? includeBackupsCheck.checked : false;
-      if (hostSupportsSelection && endpointSelection.settings && !hostIncludeBackups) {
-        logger.warn('提示: 勾选「系统设置」时 Luker 服务端会隐含打包 backups/ 历史快照目录（可能数 GB）。'
-          + '若拉取缓慢，请清理酒馆内历史备份快照，或在下方勾选项中取消「系统设置」。');
-      }
-
-      // 分段计时（S0）：阈值校准的唯一手段——把宿主侧三段真实耗时记下来（见 async-bounds.md）
-      const timings = createStageRecorder();
-      const rawBackup = await fetchHostBackup(host.platform, endpointSelection, {
-        taskId,
-        signal,
-        resumeCheckpoint,
-        timings,
-        onPhase: async (phase, received, total, opfsName, currentBps) => {
-          // 实测速度直显（bytes/s → MB/s），非估算
-          const speedText = currentBps ? ` ${((currentBps / 1048576)).toFixed(1)} MB/s` : '';
-          const receivedText = `已接收 ${(received / 1048576).toFixed(1)}${total > 0 ? ` / ${(total / 1048576).toFixed(1)}` : ''} MB`;
-          if (phase === 'host-generating') {
-            view.setProgress(12, `[1/3 宿主打包中] 正在请求 /api/users/backup · 服务端正在读取磁盘并压缩打包 (deflate) · 用户: ${currentHostHandle} · 此阶段耗时取决于数据量与服务端 CPU`);
-          } else if (phase === 'transferring') {
-            if (total > 0) {
-              const pct = 15 + Math.round((received / total) * 20);
-              view.setProgress(pct, `[2/3 传输中] 正在接收宿主打包的 ZIP 流 · ${receivedText}${speedText}`);
-            } else {
-              view.setProgress(18, `[2/3 传输中] 正在接收宿主打包的 ZIP 流 (无 Content-Length) · ${receivedText}${speedText}`);
-            }
-            // 断点清单跟踪（TaskManager 节流持久化；中止/暂停时由 fetch 循环 force 落盘）
-            if (opfsName) {
-              await onCheckpoint({
-                receivedBytes: received,
-                totalBytes: total,
-                opfsName,
-              }, { bytes: received });
-            }
-          }
-        },
-      });
-
-      // 统一源形态：OPFS 句柄 → File（zip.js 原生消费 File，零内存拷贝）
-      const rawBackupIsOpfs = rawBackup && rawBackup.kind === 'opfs';
-      logger.info(`宿主导出分段耗时：${timings.summary()}`);
-      opfsName = rawBackupIsOpfs ? rawBackup.name : null;
-      let rawBackupBlob = rawBackupIsOpfs
-        ? await opfsHandleToFile(rawBackup.handle)
-        : rawBackup;
-
-      // 记录 OPFS 半成品归属（中止/丢弃时清理）
-      if (rawBackupIsOpfs) {
-        opfsCleanupId = taskId;
-        opfsCleanupName = opfsName;
-      }
-
-      // ===== 聊天库补齐（纯数据库模式适配）=====
-      // 纯库模式下磁盘**没有** jsonl（存量入库后源文件被删、只在导出时生成），
-      // 备份包的 chats/ 因此是空的 ⇒ 不打补丁就会**静默丢掉全部聊天记录**。
-      // 必须在下方「统一文件树」扫描**之前**完成：否则用户在树上勾选时根本看不到这些聊天。
-      // 未装聊天库 / 未提供接入 API ⇒ 一个字节不动、一行日志不打（默认路径零变化，L0-11）。
-      try {
-        const injected = await injectLibraryChatsIntoSource(rawBackupBlob, {
-          selection: getSelectionState(),
-          includeBackups: includeBackupsCheck ? includeBackupsCheck.checked : false,
-          compressionLevel: compressionSelect ? parseInt(compressionSelect.value, 10) : 5,
-          signal,
-          onProgress: (done, total) => {
-            view.setProgress(38, `正在并入聊天库中的聊天记录 (${done}/${total})...`);
-          },
-        });
-        if (injected.injected > 0) {
-          rawBackupBlob = injected.source;
-          view.setProgress(38, `已并入 ${injected.injected} 条库中聊天，正在扫描文件树...`);
-        }
-      } catch (err) {
-        // 暂停/中止要原样上抛（由既有 AbortError 分支处理）；其余异常一律降级继续
-        if (err?.name === 'AbortError') throw err;
-        logger.warn(`聊天库补齐过程异常（${err.message}）⇒ 用原源包继续`);
-      }
-
-      // ===== 统一文件树：先扫描后拉取（阶段2 等待用户确认勾选）=====
-      // 端点不支持文件级导出（ST/Luker 同），拉取本身全量落盘；
-      // 过滤在本地 convert() 以 excludedPaths 完成，零额外网络成本。
-      view.setProgress(38, `数据包已落盘，正在扫描文件树 (只读中央目录)...`);
-      let hostPlan = null;
-      try {
-        const effectiveTargetPreview = selectedTarget;
-        hostPlan = await runPlanTask({
-          source: rawBackupBlob,
-          target: effectiveTargetPreview,
-          options: {
-            selection: getSelectionState(),
-            excludedPaths: getExcludedPaths(),
-            includeBackups: includeBackupsCheck ? includeBackupsCheck.checked : false,
-            includeCache: includeCacheCheck ? includeCacheCheck.checked : false,
-            includeAppPrivate: includePrivateCheck ? includePrivateCheck.checked : false,
-            extensionMode: getExtensionMode(),
-            gitMode: getGitMode(),
-            keepDevFiles: getKeepDevFiles(),
-            pruneBuiltinAssets: document.getElementById('prune-builtin-check')?.checked ?? true,
-          },
-        });
-      } catch (scanErr) {
-        logger.warn(`统一文件树扫描失败 (${scanErr.message})，降级为按类目勾选继续`);
-      }
-
-      if (hostPlan) {
-        renderCategoryStats(hostPlan, { unscanned: false });
-        logger.info(`统一文件树就绪: ${hostPlan.totalSourceFiles} 个文件，可展开类目明细逐文件勾选，确认后继续转换`);
-      }
-
-      const confirmed = await waitHostTreeConfirm(taskId);
-      if (!confirmed) {
-        // 用户中止/丢弃：清理半成品与清单
-        await taskManager.abort(taskId);
-        taskControls.hide();
-        if (opfsName) await opfsTmpCleanup(opfsName);
-        resetCategoryFilter();
-        view.setProgress(100, `宿主拉取已取消`);
-        logger.info('宿主拉取在文件树确认阶段被取消，半成品已清理');
-        return;
-      }
-
-      // 确认后的勾选状态即为最终过滤依据（树派生 selection/excludedPaths 已由 category-filter 维护）
-      const confirmedSelection = getSelectionState();
-      const confirmedExcludedPaths = getExcludedPaths();
-
-      const template = filenameTemplateInput?.value || DEFAULT_FILENAME_TEMPLATE;
-      const effectiveTarget = selectedTarget;
-      let finalBlob = rawBackupBlob;
-      let targetLayout = effectiveTarget;
-
-      // 无论原生直出还是跨格式直出，统一通过 resolveFilename 依据模板解析文件名并贯通 handle
-      let finalFilename = resolveFilename(template, {
-        sourceName: `${host.platform}-${currentHostHandle}`,
-        target: effectiveTarget,
-        handle: currentHostHandle,
-      });
-
-      // 检查智能分包与原生资产过滤设置（统一控件）
-      const splitMb = parseSplitInputMb();
-      const shouldSplit = splitMb > 0;
-      const pruneBuiltinCheck = document.getElementById('prune-builtin-check');
-      const pruneBuiltinAssets = pruneBuiltinCheck ? pruneBuiltinCheck.checked : true;
-
-      // 需走转换过滤的场景：目标格式与源布局不同 / 原生资产过滤 / 不包含备份聊天 / 部分勾选 / 逐文件排除
-      const hasPartialSelection = hostSupportsSelection
-        ? false
-        : Object.keys(FULL_SELECTION).some((k) => !selection[k]);
-      const hasFileExclusions = confirmedExcludedPaths.size > 0;
-      const needsTransform = (selectedTarget !== effectiveTarget)
-        || pruneBuiltinAssets
-        || !hostIncludeBackups
-        || hasPartialSelection
-        || hasFileExclusions;
-
-      // 提升到块外：供下方三类交付构建（源备份/目标包/报告）引用（S2）
-      let conversionReport = null;
-      if (needsTransform) {
-        targetLayout = selectedTarget;
-        view.setProgress(40, `数据已拉取，正在转换处理数据包 (${targetLayout.toUpperCase()})...`);
-        logger.info(`进行直出格式与资产过滤处理: ${host.platform.toUpperCase()} -> ${targetLayout.toUpperCase()} (包含备份聊天: ${hostIncludeBackups}, 逐文件排除: ${confirmedExcludedPaths.size})`);
-
-        const compressionLevel = compressionSelect ? parseInt(compressionSelect.value, 10) : 5;
-        timings.begin(STAGE_LABELS.CONVERT);
-        const { report, resultBlob } = await runConversionTask({
-          source: rawBackupBlob,
-          target: targetLayout,
-          options: {
-            selection: confirmedSelection,
-            excludedPaths: confirmedExcludedPaths,
-            includeBackups: hostIncludeBackups,
-            includeCache: includeCacheCheck ? includeCacheCheck.checked : false,
-            includeAppPrivate: includePrivateCheck ? includePrivateCheck.checked : false,
-            compressionLevel,
-            extensionMode: getExtensionMode(),
-            gitMode: getGitMode(),
-            keepDevFiles: getKeepDevFiles(),
-            pruneBuiltinAssets,
-            signal,
-          },
-          onProgress: (cur, total, name) => {
-            const pct = total > 0 ? 40 + Math.round((cur / total) * 50) : 60;
-            view.setProgress(pct, `正在直出写入 [${cur}/${total}]: ${name}`);
-          },
-        });
-
-        finalBlob = resultBlob;
-        conversionReport = report;
-        view.renderReport(report);
-        timings.end(STAGE_LABELS.CONVERT);
-        logger.info(`宿主导出分段耗时（含转换）：${timings.summary()}`);
-      } else if (hasFileExclusions || confirmedExcludedPaths.size > 0) {
-        // 不转换时排除集也应同步到当前过滤器（保持树状态与产物一致）
-        setExcludedPaths(confirmedExcludedPaths);
-      }
-
-      // 执行外部基准增量导出比对 (生成仅包含新增与修改项的纯增量补丁包)
-      if (isIncremental && currentBaseZip) {
-        view.setProgress(88, `正在与外部基准包比对差异并生成增量补丁 (基准: ${currentBaseZip.name})...`);
-        logger.info(`启动外部基准增量比对: [${currentBaseZip.name}] vs 最新宿主数据`);
-
-        const deltaResult = await generateDeltaArchive(currentBaseZip.blob, finalBlob, {
-          baseName: currentBaseZip.name,
-          level: compressionSelect ? parseInt(compressionSelect.value, 10) : 5,
-        });
-
-        finalBlob = deltaResult.deltaBlob;
-        finalFilename = finalFilename.replace(/\.zip$/i, '') + '_delta_patch.zip';
-        logger.success(`纯增量补丁包构建成功: 新增 ${deltaResult.stats.addedCount} 项, 修改 ${deltaResult.stats.modifiedCount} 项, 保持不变 ${deltaResult.stats.unchangedCount} 项 (补丁体积: ${formatBytes(finalBlob.size)})`);
-      }
-
-      // 执行智能增量分卷 (若开启)
-      if (shouldSplit) {
-        const thresholdMB = splitMb;
-        view.setProgress(92, `正在按 ${thresholdMB} MB 阈值执行智能独立分包...`);
-        logger.info(`启动智能分包引擎: 单包阈值 ${thresholdMB} MB`);
-
-        const reader = await zipIo.openReader(finalBlob);
-        const entries = [];
-        for await (const e of reader.entries()) {
-          if (e.isDirectory) { e.skip(); continue; }
-          entries.push({ path: e.fileName, data: await e.read(), size: e.uncompressedSize });
-        }
-        await reader.close();
-
-        const splitResult = await splitArchiveEntries(entries, {
-          thresholdMB,
-          target: effectiveTarget,
-          handle: currentHostHandle,
-          filenameTemplate: template,
-        });
-
-        // 分卷统一进待导出区（来源=分卷），供统一处置
-        for (const p of splitResult.parts) {
-          exportQueue.enqueue({
-            name: p.partName,
-            blob: p.blob,
-            targetLayout: targetLayout,
-            origin: 'split-part',
-            ephemeral: true,
-          });
-        }
-        // S2：分卷之外仍交付「源备份（保底）+ 独立报告」（target 为分卷，已单独入队）
-        for (const it of buildSourceDeliveries({
-          source: { blob: rawBackupBlob, name: `${host.platform}-${currentHostHandle}.zip`, layout: hostLayoutCode(host.platform) },
-          target: null,
-          report: conversionReport ? { text: reportToHuman(conversionReport) } : null,
-          hasTransform: true,
-        })) {
-          exportQueue.enqueue({
-            name: it.name,
-            blob: it.blob,
-            targetLayout: it.targetLayout,
-            origin: it.origin,
-            ephemeral: true,
-          });
-        }
-        refreshExportQueueUI();
-        view.setProgress(100, `宿主数据已切分为 ${splitResult.totalParts} 个分卷，已进入待导出区统一处置！`);
-        logger.success(`宿主导出分卷完成: 共 ${splitResult.totalParts} 个独立包 (${formatBytes(splitResult.totalBytes)})，可在待导出区批量下载或存入工作区`);
-        if (opfsName) await opfsTmpCleanup(opfsName);
-        return;
-      }
-
-      // 单包模式：三类交付（源备份保底 + 目标包 + 独立报告）统一进待导出区（S2）
-      const isDeltaPatch = /_delta_patch\.zip$/i.test(finalFilename);
-      const sourceIsTarget = !needsTransform && !isDeltaPatch;
-      const sourceName = `${host.platform}-${currentHostHandle}.zip`;
-      const deliveries = buildSourceDeliveries({
-        source: { blob: rawBackupBlob, name: sourceName, layout: hostLayoutCode(host.platform) },
-        target: sourceIsTarget
-          ? null
-          : {
-            blob: finalBlob,
-            name: finalFilename,
-            layout: targetLayout,
-            origin: isDeltaPatch ? ORIGINS.DELTA : ORIGINS.CONVERTED,
-          },
-        report: conversionReport ? { text: reportToHuman(conversionReport) } : null,
-        hasTransform: !sourceIsTarget,
-      });
-      for (const it of deliveries) {
-        exportQueue.enqueue({
-          name: it.name,
-          blob: it.blob,
-          targetLayout: it.targetLayout,
-          origin: it.origin,
-          ephemeral: true,
-        });
-      }
-      refreshExportQueueUI();
-
-      view.setProgress(100, `宿主数据包已进入待导出区！`);
-      logger.success(`宿主拉取完成: ${finalFilename} (${formatBytes(finalBlob.size)}) —— 可在待导出区下载、选位置导出、存入工作区或写回宿主`);
-      await taskManager.complete(taskId);
-      taskControls.hide();
-      if (opfsName) await opfsTmpCleanup(opfsName);
-    } catch (err) {
-      if (err?.name === 'AbortError') {
-        // 暂停（signal.aborted + paused 状态）与中止在 UI 层表现一致；中止路径 taskControls 已复位
-        const rec = taskManager.get(taskId);
-        if (rec && rec.state === TASK_STATES.PAUSED) {
-          const total = rec.checkpoint?.totalBytes || rec.totalBytes || 0;
-          const received = rec.receivedBytes || rec.checkpoint?.receivedBytes || 0;
-          const pct = total > 0 ? Math.round((received / total) * 100) : 0;
-          taskControls.showPaused(taskId, { percent: pct, receivedBytes: received, totalBytes: total });
-          taskControls.setPausedCheckpoint(taskId, rec.checkpoint);
-          view.setProgress(pct, `任务已暂停，可从断点继续或丢弃`);
-          logger.info(`任务已暂停于 ${pct}% (${formatBytes(received)})`);
-        } else if (rec && rec.state === TASK_STATES.ABORTED) {
-          taskControls.hide();
-          view.setProgress(100, `任务已中止`);
-          if (typeof opfsName === 'string' && opfsName) await opfsTmpCleanup(opfsName);
-        }
-      } else {
-        await taskManager.fail(taskId, Boolean(opfsName));
-        taskControls.hide();
-        if (typeof opfsName === 'string' && opfsName) await opfsTmpCleanup(opfsName);
-        view.setProgress(100, `导出失败: ${err.message}`);
-        logger.error('宿主拉取过程发生错误', err);
-      }
-    } finally {
-      workbenchBusy = false;
-      applyActionAvailability();
-    }
-  }
-
-  const btnHostFetch = document.getElementById('btn-host-fetch');
-  if (btnHostFetch) {
-    btnHostFetch.addEventListener('click', () => handleHostExport());
-  }
-
-  /**
-   * 「从聊天库导出」——纯库模式（聊天被收进数据库、磁盘上没有 jsonl）下的导出出口。
-   *
-   * 与「打包时并入」的分工：那条补的是**已有源包**缺的聊天；这条是**只有库**时的出口
-   * （不拉整份用户数据，只要库里的聊天）。
-   *
-   * 有意**不接 TaskManager**：这是一次性的短操作（逐条取库 + 一次转换），
-   * 没有断点续传语义可谈；接了反而要为一堆用不上的状态机维护暂停/丢弃分支。
-   * 故只在忙时拒绝重入、失败时给出可读原因。
-   */
-  async function handleLibraryExport() {
-    if (workbenchBusy) {
-      void alertDialog('已有任务正在进行，请等它结束或先暂停/中止它再试。');
-      return;
-    }
-    const probe = probeChatStore();
-    if (!probe.present) {
-      void alertDialog('未检测到聊天库插件（如 ChatFilesys 的纯数据库模式），无法从库导出聊天。');
-      return;
-    }
-    if (!probe.canList || !probe.canExport) {
-      void alertDialog(`聊天库（模式 ${probe.mode}）${probe.reason || '未提供索引/导出能力'}，无法从库导出聊天。`);
-      return;
-    }
-
-    const btn = document.getElementById('btn-library-export');
-    try {
-      workbenchBusy = true;
-      if (btn) btn.disabled = true;
-      applyActionAvailability();
-      view.setProgress(5, '正在读取聊天库索引...');
-      logger.info(`开始从聊天库导出（模式 ${probe.mode}）...`);
-
-      const target = resolveTarget(targetSelect.value);
-      const result = await exportLibraryToPack({
-        target,
-        selection: getSelectionState(),
-        compressionLevel: compressionSelect ? parseInt(compressionSelect.value, 10) : 5,
-        onProgress: (done, total) => {
-          view.setProgress(30, `正在从库中导出聊天 (${done}/${total})...`);
-        },
-      });
-
-      if (!result.ok) {
-        view.setProgress(100, `从聊天库导出失败：${result.reason}`);
-        logger.warn(`从聊天库导出失败：${result.reason}`);
-        void alertDialog(`从聊天库导出失败：${result.reason}`);
-        return;
-      }
-
-      const template = filenameTemplateInput?.value || DEFAULT_FILENAME_TEMPLATE;
-      const name = resolveFilename(template, {
-        sourceName: 'chat-library',
-        target,
-        handle: currentHostHandle || 'default-user',
-      });
-      exportQueue.enqueue({
-        name,
-        blob: result.blob,
-        targetLayout: target,
-        // 复用 'converted'：它确实是一次转换的产物（新造 origin 要同步改类目/染色/落库语义多处）
-        origin: 'converted',
-        ephemeral: true,
-      });
-      refreshExportQueueUI();
-      view.setProgress(100, `已从聊天库导出 ${result.count} 条聊天`);
-      logger.success(`从聊天库导出完成：${result.count} 条聊天 → ${name}`
-        + (result.failed.length ? `（另有 ${result.failed.length} 条导出失败）` : ''));
-    } catch (err) {
-      view.setProgress(100, `从聊天库导出出错：${err.message}`);
-      logger.error('从聊天库导出过程发生错误', err);
-      void alertDialog(`从聊天库导出出错：${err.message}`);
-    } finally {
-      workbenchBusy = false;
-      if (btn) btn.disabled = false;
-      applyActionAvailability();
-    }
-  }
-
-  const btnLibraryExport = document.getElementById('btn-library-export');
-  if (btnLibraryExport) {
-    btnLibraryExport.addEventListener('click', () => { void handleLibraryExport(); });
-    applyActionAvailability(); // 立即求值一次：有库才显示（无库的默认路径零变化）
-  }
-
-  // 7. 还原确认模态弹窗逻辑
-
-  /** S3：重置「已备份目标数据」与「冲突未知确认」勾选（对话框每次打开都从未勾选开始，避免静默通过）。 */
-  function resetRestoreBackupCheck() {
-    pendingTargetPreflight = null; // 上一轮预检结果不得跨对话框复用（不同包 / 不同目标）
-    const el = document.getElementById('restore-backup-confirmed');
-    if (el) el.checked = false;
-    const ack = document.getElementById('restore-conflict-ack');
-    if (ack) {
-      ack.checked = false;
-      ack.disabled = false; // 上一轮预检可能因「确知无冲突」禁用了它，新对话框必须复原
-    }
-    const label = document.getElementById('restore-conflict-text');
-    if (label) label.textContent = describeConflictState(assessTargetConflicts({ targetManifest: null })).label;
-    if (restorePreflightStatus) restorePreflightStatus.textContent = '';
-    refreshRestoreBackupDesc();
-  }
-
-  /** S3：按勾选状态**如实**显示备份证据级别（人工确认 ≠ 机器核对，`spec §3.3`）。 */
-  function refreshRestoreBackupDesc() {
-    const el = document.getElementById('restore-backup-confirmed');
-    const desc = document.getElementById('restore-backup-desc');
-    if (!desc) return;
-    // 已跑过自动预检 ⇒ 呈现机器证据；否则按手动勾选呈现（两条路径不互相冒充，spec §3.1）
-    const auto = activeTargetPreflight();
-    if (auto) {
-      desc.textContent = describeBackupEvidence(auto.backup).label;
-      return;
-    }
-    desc.textContent = describeBackupEvidence(buildTargetBackupEvidence({
-      mode: 'manual',
-      userConfirmed: Boolean(el && el.checked),
-    })).label;
-  }
-  const restoreBackupCheckEl = document.getElementById('restore-backup-confirmed');
-  if (restoreBackupCheckEl) restoreBackupCheckEl.addEventListener('change', refreshRestoreBackupDesc);
-
-  /** 当前待写入载荷（单包或整批），供预检读取条目。 */
-  function pendingRestoreBlobs() {
-    if (pendingRestoreBatch && pendingRestoreBatch.length > 0) {
-      return pendingRestoreBatch.map((it) => it.blob).filter(Boolean);
-    }
-    return pendingRestoreFile ? [pendingRestoreFile] : [];
-  }
-
-  /** 待写入载荷的**身份指纹**：换包 / 换批即变（预检结果据此失效）。 */
-  function pendingRestoreKey() {
-    if (pendingRestoreBatch && pendingRestoreBatch.length > 0) {
-      return `batch:${pendingRestoreBatch.map((it) => `${it.name}:${it.blob?.size ?? 0}`).join('|')}`;
-    }
-    const f = pendingRestoreFile;
-    return f ? `file:${f.name}:${f.size ?? 0}` : '';
-  }
-
-  /**
-   * 取**仍然有效**的预检结果。
-   *
-   * 失效判据（任一命中即弃用，回到「冲突未知」）：
-   *   ① 目标身份变了（切账户 / 切宿主）；② 待写入载荷换了。
-   * 这是 `R-05`「关键输入变化 ⇒ 旧确认作废」在预检结果上的落地。
-   */
-  function activeTargetPreflight() {
-    const pre = pendingTargetPreflight;
-    if (!pre) return null;
-    if (pre.targetRef !== `${host.platform}@${currentHostHandle}`) return null;
-    if (pre.sourceKey !== pendingRestoreKey()) return null;
-    return pre;
-  }
-
-  /**
-   * S3 执行层：拉当前宿主清单做**真实**冲突预检，并把该次导出留存为保底备份。
-   *
-   * 判定与呈现全在纯模块（`src/core/target-inventory.js` / `migration-target.js`）；
-   * 本函数只做「取清单 → 组装证据 → 刷界面」。宿主不支持 / 失败 / 取消一律**静默降级**：
-   * 预检结果保持 `null`，对话框退回既有「冲突未知」路径（`L0-11`）。
-   */
-  async function handleTargetPreflight() {
-    const blobs = pendingRestoreBlobs();
-    if (blobs.length === 0) return;
-    const status = (text) => { if (restorePreflightStatus) restorePreflightStatus.textContent = text; };
-    if (btnTargetPreflight) btnTargetPreflight.disabled = true;
-    status('正在读取待写入条目…');
-    try {
-      // 两侧都用**原始条目名**比较（同经 `target-inventory.js` 的归一）：
-      // 目标清单来自当前宿主自己的备份，待写入条目会被宿主按字面路径落盘，
-      // 故「宿主将写什么」与「宿主已有什么」在同一套词汇里，不需要再经布局归一
-      // （经 `routeSource` 反而会把 `extensions/third-party/X` 与 `extensions/X` 抹成同一条，
-      //  藏掉真实的路径差异）。
-      const incomingEntries = [];
-      for (const blob of blobs) {
-        const entries = await readZipEntryManifest(blob);
-        for (const entry of entries) incomingEntries.push(entry);
-      }
-
-      status('正在从宿主拉取目标清单…');
-      const { manifest, file, reason } = await fetchHostInventory({
-        platform: host.platform,
-        onPhase: (phase, received, total) => {
-          if (phase === 'host-generating') status('宿主正在生成备份…');
-          else if (phase === 'transferring' && total > 0) {
-            status(`正在接收目标备份 ${Math.round((received / total) * 100)}%…`);
-          }
-        },
-      });
-
-      if (!manifest) {
-        status(reason === 'cancelled'
-          ? '预检已取消（仍按「冲突状态未知」处理）'
-          : `预检失败：${reason}（仍按「冲突状态未知」处理）`);
-        return;
-      }
-
-      const conflicts = assessInventoryConflicts({ targetManifest: manifest, incomingPaths: incomingEntries });
-      const targetRef = `${host.platform}@${currentHostHandle}`;
-
-      // 留存：**入待导出区 + 落工作区（IndexedDB）**。仅内存 Blob 不算「已留存」（spec §3.1）。
-      let retained = false;
-      if (file) {
-        const backupName = `目标保底备份_${formatTimestamp()}.zip`;
-        exportQueue.enqueue({ blob: file, name: backupName, origin: ORIGINS.TARGET_BACKUP, targetLayout: '' });
-        try {
-          await saveFile({
-            name: backupName,
-            size: file.size,
-            blob: file,
-            layout: hostLayoutCode(host.platform),
-            role: 'source',
-            origin: ORIGINS.TARGET_BACKUP,
-          });
-          retained = true;
-        } catch (err) {
-          logger.warn(`目标保底备份落工作区失败（本次按「留存未确认」处理）: ${err?.message || err}`);
-        }
-      }
-
-      const backup = buildTargetBackupEvidence({
-        mode: 'auto',
-        targetRef,
-        artifact: { readable: true, scope: 'matches-write', retained },
-      });
-      pendingTargetPreflight = { conflicts, backup, targetRef, sourceKey: pendingRestoreKey() };
-
-      const conflictText = document.getElementById('restore-conflict-text');
-      if (conflictText) conflictText.textContent = describeConflictState(conflicts).label;
-      const ackEl = document.getElementById('restore-conflict-ack');
-      // 已确知无冲突 ⇒ 该确认项不再适用（勾选留着反而误导）；未知 / 有冲突 ⇒ 仍需用户确认
-      if (ackEl) {
-        const needsAck = conflicts.state !== 'known' || conflicts.conflictCount > 0;
-        if (!needsAck) ackEl.checked = false;
-        ackEl.disabled = !needsAck;
-      }
-      refreshRestoreBackupDesc();
-      status(conflicts.alignment === 'aligned'
-        ? `预检完成：${describeConflictState(conflicts).label}`
-        : `预检完成但无法比对（${conflicts.alignmentReason}）`);
-    } catch (err) {
-      logger.warn(`目标预检异常（按「冲突未知」处理）: ${err?.message || err}`);
-      status(`预检异常：${err?.message || err}（仍按「冲突状态未知」处理）`);
-    } finally {
-      if (btnTargetPreflight) btnTargetPreflight.disabled = false;
-    }
-  }
-  if (btnTargetPreflight) {
-    btnTargetPreflight.addEventListener('click', () => { void handleTargetPreflight(); });
-  }
-
-  /** S3：构造目标写入的 plan + evidence（目标端写入只看 targetWrite 与 evidence）。 */
-  function buildRestoreGateContext() {
-    const backupEl = document.getElementById('restore-backup-confirmed');
-    const ackEl = document.getElementById('restore-conflict-ack');
-    const targetRef = `${host.platform}@${currentHostHandle}`;
-    const plan = createMigrationPlan({
-      source: { layout: 'l' },
-      target: { layout: hostLayoutCode(host.platform) },
-      requestedSelection: {},
-    });
-    // 已跑过有效预检 ⇒ 用**真实**冲突与机器备份证据；否则退回既有「读不到目标清单」路径。
-    const pre = activeTargetPreflight();
-    const conflicts = pre ? pre.conflicts : assessTargetConflicts({ targetManifest: null });
-    const backup = pre
-      ? pre.backup
-      : buildTargetBackupEvidence({
-        mode: 'manual',
-        targetRef,
-        userConfirmed: Boolean(backupEl && backupEl.checked),
-      });
-    const evidence = buildTargetEvidence({
-      platform: host.platform,
-      handle: currentHostHandle,
-      planTargetRef: targetRef,
-      planRevision: plan.revision,
-      inFlight: isRestoreInFlight(),
-      backup,
-      conflicts,
-      conflictAcknowledged: Boolean(ackEl && ackEl.checked),
-    });
-    return { plan, evidence };
-  }
-
-  /** S3：门禁拒绝码 → 人类可读文案。 */
-  function restoreGateReasonsText(reasons) {
-    const MAP = {
-      'no-target-backup': '未确认已备份目标数据',
-      'confirmation-stale': '计划已过期',
-      'confirmation-invalid': '当前操作未确认',
-      'target-changed': '目标身份与计划不一致',
-      'restore-in-flight': '已有写入在途',
-      'target-write-unsupported': '目标宿主不支持自动写入',
-      'permission-unknown': '权限未知',
-      'permission-denied': '权限被拒绝',
-      'conflict-unknown-unacknowledged': '未确认「冲突状态未知」风险',
-    };
-    return reasons.map((r) => MAP[r] || r).join('、');
-  }
-
-  /** S3：报告门禁拒绝（零写入）。 */
-  function reportRestoreGateRefusal(reasons) {
-    logger.warn(`目标写入被安全门拒绝（零写入）: ${reasons.join(', ')}`);
-    void alertDialog(`写入被安全门拒绝：${restoreGateReasonsText(reasons)}。\n请先完成目标备份并勾选确认，或改用宿主原生导入方式。`);
-  }
-
-  /** S4：由写入返回体构造核对证据（纯逻辑已抽至 src/core/migration-verification.js）。 */
-
-  function openRestoreModal(archiveFile) {
-    if (!host.isPlugin) {
-      void alertDialog('还原/写入功能仅在作为 SillyTavern 或 Luker 扩展插件运行且已登录时可用。');
-      return;
-    }
-    if (isRestoreUnsupported()) {
-      void alertDialog(getRestoreUnsupportedReason());
-      return;
-    }
-    pendingRestoreBatch = null;
-    pendingRestoreFile = archiveFile;
-    resetRestoreBackupCheck();
-    if (restoreModalDesc) {
-      restoreModalDesc.innerHTML = `即将把数据包 <strong>「${escapeHtml(archiveFile.name)}」</strong> (${escapeHtml(formatBytes(archiveFile.size))}) 恢复写入到当前酒馆宿主 (${escapeHtml(host.platform.toUpperCase())})，请选择恢复模式：`;
-    }
-    if (restoreModalOverlay) {
-      restoreModalOverlay.style.display = 'flex';
-    }
-  }
-
-  /**
-   * 批量恢复模态：**复用**同一个恢复模态，只换描述文案与语义
-   * （用户 2026-09-25 裁决：开批前选一次模式，应用到全批；不新增自绘浮层，L1-MR-4）。
-   * @param {Array<{id: string, name: string, blob: Blob}>} items 待恢复产物（顺序即执行顺序）
-   */
-  function openBatchRestoreModal(items) {
-    if (!host.isPlugin) {
-      void alertDialog('还原/写入功能仅在作为 SillyTavern 或 Luker 扩展插件运行且已登录时可用。');
-      return;
-    }
-    if (isRestoreUnsupported()) {
-      void alertDialog(getRestoreUnsupportedReason());
-      return;
-    }
-    if (!items || items.length === 0) return;
-    // 单项时走单条路径，避免为 1 项多一层批量语义
-    if (items.length === 1) {
-      openRestoreModal({ name: items[0].name, blob: items[0].blob, size: items[0].blob.size });
-      return;
-    }
-    pendingRestoreFile = null;
-    pendingRestoreBatch = items;
-    resetRestoreBackupCheck();
-    const totalBytes = items.reduce((sum, it) => sum + (it.blob?.size || 0), 0);
-    if (restoreModalDesc) {
-      restoreModalDesc.innerHTML = `即将把 <strong>${escapeHtml(String(items.length))} 项</strong>产物`
-        + ` (共 ${escapeHtml(formatBytes(totalBytes))}) 依次恢复写入到当前酒馆宿主`
-        + ` (${escapeHtml(host.platform.toUpperCase())})。<br>本批统一使用所选模式；`
-        + '逐项写入期间部分数据已生效，全部完成前请勿视为已结束。';
-    }
-    if (restoreModalOverlay) {
-      restoreModalOverlay.style.display = 'flex';
-    }
-  }
-
-  /**
-   * 执行一批恢复：逐项写入、逐项记录结果、**单项失败不中断整批**。
-   *
-   * 编排逻辑在 `src/core/restore-batch.js`（纯状态机，Node 可直测）；
-   * 本函数只把宿主调用与 UI 刷新接上（依赖注入式接缝，L0-11）。
-   * @param {Array<{id: string, name: string, blob: Blob}>} items
-   * @param {'merge'|'overwrite'} mode 本批统一模式
-   */
-  async function runBatchRestore(items, mode) {
-    if (isRestoreInFlight()) {
-      void alertDialog('已有恢复任务正在进行，请等待其完成后再试');
-      return;
-    }
-    const targets = items.map((it) => ({ id: it.id, name: it.name, blob: it.blob }));
-    activeBatch = createRestoreBatch({
-      items: targets,
-      restoreOne: async ({ id }) => {
-        const target = targets.find((t) => t.id === id);
-        try {
-          const res = await restoreToHost(target.blob, {
-            mode, platform: host.platform, timeoutMs: UPLOAD_TIMEOUT_MS,
-          });
-          // 宿主 200 但没写任何条目：不计成功（否则整批会谎报「恢复完成」）
-          if (res && res.nothingRestored) {
-            throw new Error('宿主未写入任何条目（该类目可能不被宿主接受）');
-          }
-          // 纯库模式适配：还原只把 jsonl 写到磁盘，而纯库**读库不读盘** ⇒ 这里把聊天录入库。
-          // 入库失败**不得**把「恢复」判成失败（文件确实写进去了），故单独兜住。
-          try {
-            const imported = await importRestoredChatsIntoLibrary(target.blob);
-            if (imported.imported > 0) {
-              logger.success(`本项聊天已录入库：${imported.imported} 条`);
-            }
-          } catch (importErr) {
-            logger.warn(`聊天入库失败（${importErr.message}）——还原本身已成功，不影响其余项`);
-          }
-          return res;
-        } catch (err) {
-          // 宿主根本没这个能力：后续每一项都会同样失败，立即停批（避免刷出 N 条相同失败）
-          if (err?.code === 'RESTORE_UNSUPPORTED' && activeBatch) activeBatch.abort();
-          throw err;
-        }
-      },
-      onUpdate: (state) => {
-        lastBatchState = state;
-        refreshExportQueueUI();
-      },
-    });
-    lastBatchState = activeBatch.getState();
-    refreshExportQueueUI();
-    logger.info(`开始批量恢复：${targets.length} 项，模式 ${mode === 'merge' ? '合并写入' : '覆盖写入'}`);
-
-    const state = await activeBatch.start();
-    const settled = state.doneCount + state.failedCount + state.unconfirmedCount;
-    // 收尾文案：如实区分四种收尾，**不出现**「合并完成」类表述
-    if (state.status === BATCH_STATUS.DONE) {
-      view.setProgress(100, `全部 ${state.total} 项恢复完成，请刷新页面生效`);
-      logger.success(`批量恢复完成：${state.doneCount}/${state.total} 项`);
-    } else if (state.status === BATCH_STATUS.ABORTED) {
-      view.setProgress(100, `批量恢复已中止：完成 ${settled}/${state.total}（部分数据已生效）`);
-      logger.warn('批量恢复已中止——宿主可能已收到部分数据，请核对数据完整性');
-    } else {
-      view.setProgress(100, `批量恢复结束：完成 ${state.doneCount}/${state.total}`
-        + `${state.failedCount ? `，失败 ${state.failedCount}` : ''}`
-        + `${state.unconfirmedCount ? `，未确认 ${state.unconfirmedCount}` : ''}（部分数据已生效）`);
-      logger.warn('批量恢复未全部成功——逐项原因见待导出区，可「重试失败项」');
-    }
-    if (isRestoreUnsupported()) void alertDialog(getRestoreUnsupportedReason());
-    refreshExportQueueUI();
-  }
-
-  if (btnCancelRestore) {
-    btnCancelRestore.addEventListener('click', () => {
-      pendingRestoreFile = null;
-      if (restoreModalOverlay) restoreModalOverlay.style.display = 'none';
-    });
-  }
-
-  if (btnConfirmRestore) {
-    btnConfirmRestore.addEventListener('click', async () => {
-      const batchItems = pendingRestoreBatch;
-      const fileToRestore = pendingRestoreFile;
-      if (!batchItems && !fileToRestore) return;
-      // 并发互斥：恢复在途时拒绝再次发起（两个事务并发写同一用户目录，宿主侧行为未定义）
-      if (isRestoreInFlight()) {
-        void alertDialog('已有恢复任务正在进行，请等待其完成后再试');
-        return;
-      }
-      const modeSelect = document.getElementById('restore-mode-select');
-      const mode = modeSelect ? modeSelect.value : 'merge';
-
-      pendingRestoreBatch = null;
-      if (restoreModalOverlay) restoreModalOverlay.style.display = 'none';
-
-      // S3：目标写入安全门（门禁不过 ⇒ restoreFn 一次都不调用，零写入）
-      const gateCtx = buildRestoreGateContext();
-
-      // 批量：整批交给编排状态机（模式在开批前选一次，逐项结果与失败原因均可见）
-      if (batchItems) {
-        const { wrote, reasons } = await guardedRestore({
-          plan: gateCtx.plan,
-          evidence: gateCtx.evidence,
-          restoreFn: () => runBatchRestore(batchItems, mode),
-        });
-        if (!wrote) reportRestoreGateRefusal(reasons);
-        return;
-      }
-
-      try {
-        btnConfirmRestore.disabled = true;
-        // 单条恢复开始：清掉上一批的收尾条，避免与本次进度并存造成误读
-        lastBatchState = null;
-        view.setProgress(15, `正在恢复写入数据包至宿主 (${mode === 'merge' ? '合并写入' : '覆盖写入'})...`);
-        logger.info(`向宿主发起数据包恢复请求: ${fileToRestore.name}, 模式: ${mode}`);
-
-        // S3：先过安全门（门禁不过 ⇒ restoreToHost 一次都不调用）
-        const { wrote, reasons, result: restoreResult } = await guardedRestore({
-          plan: gateCtx.plan,
-          evidence: gateCtx.evidence,
-          // `restoreToHost` 的同步段会置位在途标志，故先拿到 promise 再刷新，
-          // 待导出区才会渲染出「取消恢复」入口（审计 R-01：大包上传此前无法中途取消）
-          restoreFn: () => {
-            const p = restoreToHost(fileToRestore.blob, {
-              mode, platform: host.platform, timeoutMs: UPLOAD_TIMEOUT_MS,
-            });
-            refreshExportQueueUI();
-            return p;
-          },
-        });
-        if (!wrote) {
-          reportRestoreGateRefusal(reasons);
-          return;
-        }
-        // S4：核对结论（MigrationOutcome 四态）—— 不把「已写入未核对」说成「完成」
-        const verification = buildRestoreVerification(fileToRestore.name, restoreResult);
-        const outcome = classifyOutcome({ verification });
-        const verifySummary = summarizeVerification(verification);
-        logger.info(`恢复核对结论: ${outcome}`
-          + `（机器核对 ${verifySummary.machineVerified} 项 / 人工确认 ${verifySummary.userAttested} 项，`
-          + `覆盖 ${verifySummary.coverage}）`);
-        if (outcome === MIGRATION_OUTCOMES.NEEDS_VERIFICATION) {
-          view.setProgress(100, '请求已发出，但写入状态未确认');
-          logger.warn(`写入状态未确认（${restoreResult?.reason || '响应体不可解析'}）——`
-            + '宿主可能仍在处理，请稍后核对数据。');
-          void alertDialog('写入状态未确认。\n宿主可能仍在处理，请稍后核对数据，勿直接重发。');
-        } else if (outcome === MIGRATION_OUTCOMES.FAILED) {
-          // 宿主返回 200 但一个条目都没写：如实报告，不得说「成功」
-          view.setProgress(100, '宿主未写入任何条目');
-          logger.warn('宿主返回成功但 restoredCount=0——请核对包的类目是否被宿主接受');
-          void alertDialog('宿主未写入任何条目。\n请核对数据包内容是否包含宿主支持的类目。');
-        } else {
-          view.setProgress(100, '数据包已写入并获宿主确认');
-          logger.success('恢复完成：宿主已确认写入（本轮未逐条读回核对目标数据）。');
-          // 纯库模式适配：把包里的聊天录入库（否则纯库读库不读盘 ⇒ 用户看不到它们）
-          try {
-            const imported = await importRestoredChatsIntoLibrary(fileToRestore.blob);
-            if (imported.imported > 0) {
-              view.setProgress(100, `恢复完成，并已录入 ${imported.imported} 条聊天到聊天库`);
-            }
-          } catch (importErr) {
-            logger.warn(`聊天入库失败（${importErr.message}）——还原本身已成功`);
-          }
-        }
-      } catch (err) {
-        if (err?.name === 'AbortError') {
-          // 取消是**请求级**的：宿主可能已收到部分数据，必须提示核对而非报「失败」
-          view.setProgress(100, '恢复写入已取消');
-          logger.warn('恢复写入已由用户取消——宿主可能已收到部分数据，请稍后核对');
-          void alertDialog('恢复已取消。\n宿主可能仍在处理，请稍后核对数据。');
-        } else {
-          view.setProgress(100, `恢复写入失败: ${err.message}`);
-          logger.error('恢复写入宿主过程发生错误', err);
-          void alertDialog(`恢复失败: ${err.message}`);
-        }
-      } finally {
-        btnConfirmRestore.disabled = false;
-        pendingRestoreFile = null;
-        refreshExportQueueUI();
-      }
-    });
-  }
-
-  // Luker 专用旧版快速恢复按钮联动
-  if (btnRestoreLuker) {
-    btnRestoreLuker.addEventListener('click', () => {
-      if (lastConvertedBlob) {
-        openRestoreModal({
-          name: '最新转换产物.zip',
-          size: lastConvertedBlob.size,
-          blob: lastConvertedBlob,
-        });
-      }
-    });
-  }
-
-  // 8. 外部 Zip 拖拽与转换交互
-  const dropHandler = setupFileDrop({
-    dropzoneEl: document.getElementById('dropzone'),
-    fileInputEl: document.getElementById('file-input'),
-    mainTextEl: document.getElementById('drop-main-text'),
-    subTextEl: document.getElementById('drop-sub-text'),
-    onFilesReady: async (fileItems) => {
-      if (!fileItems || fileItems.length === 0) return;
-      // 按钮可用性在源包入库后统一求值（下方 updateWorkspaceUI 之后）
-
-      // 批量存入 IndexedDB
-      for (const item of fileItems) {
-        try {
-          const itemHandle = item.detection.handle || 'default-user';
-          const id = await saveFile({
-            name: item.file.name,
-            size: item.file.size,
-            blob: item.file,
-            layout: item.detection.layout,
-            handle: itemHandle,
-            role: 'source',
-          });
-          logger.info(`外部数据包入库成功: ${item.file.name} (识别类型: ${item.detection.layout.toUpperCase()})`);
-          if (!currentFile) {
-            currentFile = item.file;
-            currentFileId = id;
-            currentFileHandle = itemHandle;
-            if (item.detection.layout === 'st' && targetSelect) targetSelect.value = 'l';
-            if (item.detection.layout === 'tt' && targetSelect) targetSelect.value = 'pt';
-          }
-        } catch (err) {
-          logger.warn('暂存文件到 IndexedDB 失败:', err);
-        }
-      }
-
-      await updateWorkspaceUI();
-      updateFilenamePreview();
-      applyActionAvailability();
-      if (currentFile) {
-        await refreshPlan();
-      }
-    },
-    onError: (err) => {
-      applyActionAvailability();
-      resetCategoryFilter();
-      logger.error('文件读取失败', err);
-    },
-  });
-
-  // 目标平台或高级开关改动时，动态重新生成动作规划与实时更新预览
-  if (targetSelect) {
-    targetSelect.addEventListener('change', () => {
-      updateFilenamePreview();
-      refreshPlan();
-    });
-  }
-  if (compressionSelect) {
-    compressionSelect.addEventListener('change', () => refreshPlan());
-  }
-  if (filenameTemplateInput) {
-    filenameTemplateInput.addEventListener('input', () => {
-      updateFilenamePreview();
-      refreshPlan();
-    });
-  }
-  if (includeBackupsCheck) {
-    includeBackupsCheck.addEventListener('change', () => refreshPlan());
-  }
-  if (includeCacheCheck) {
-    includeCacheCheck.addEventListener('change', () => refreshPlan());
-  }
-  if (includePrivateCheck) {
-    includePrivateCheck.addEventListener('change', () => refreshPlan());
-  }
-
-  // 9. 开始转换外部 Zip（R-16：接入任务状态机，支持暂停/续传）
-  //
-  // 具名函数而非内联箭头：`RESUMABLE_HANDLERS` 要按任务类型分派到它（与 handleHostExport 同形）。
-  // 函数声明会被提升，故可以安全地在定义之前的 `onResume` 里被引用。
-  async function handleExternalConvert({ resumeCheckpoint = null, resumeTaskId = null } = {}) {
-    if (!currentFile) return;
-    const target = resolveTarget(targetSelect.value);
-    const selection = getSelectionState();
-    const excludedPaths = getExcludedPaths();
-    const includeBackups = includeBackupsCheck ? includeBackupsCheck.checked : false;
-    const includeCache = includeCacheCheck ? includeCacheCheck.checked : false;
-    const includeAppPrivate = includePrivateCheck ? includePrivateCheck.checked : false;
-    const compressionLevel = compressionSelect ? parseInt(compressionSelect.value, 10) : 5;
-
-    // 检查智能分包与原生资产过滤设置
-    const splitMb = parseSplitInputMb();
-    const shouldSplit = splitMb > 0;
-    const pruneBuiltinCheck = document.getElementById('prune-builtin-check');
-    const pruneBuiltinAssets = pruneBuiltinCheck ? pruneBuiltinCheck.checked : true;
-
-    const taskId = resumeTaskId || `${TASK_PREFIX[TASK_KINDS.CONVERT]}${Date.now()}`;
-    const totalBytes = currentFile.size || 0;
-    // 与宿主拉取路径同形：start 在 try **之外**（start 自身可能因"同 id 已在运行"抛错，
-    // 那时还没进入 try，不会污染 catch 的失败语义）
-    const { signal, onCheckpoint, setPauseCheckpoint } = taskManager.start(taskId, '转换', { resumable: true, totalBytes });
-    taskControls.showRunning(taskId, { totalBytes });
-
-    // ── 真增量续传：先取**同源半成品**。有半成品才有真正可跳过的字节；
-    // 没有 ⇒ 本次完整重做（这是**正确的降级**，绝不再是「跳过却没字节」的静默残缺）。
-    const partialOpfsName = resumeCheckpoint?.partialOpfsName || null;
-    let appendFrom = null;
-    if (partialOpfsName) {
-      try {
-        const handle = await opfsTmpHandle(partialOpfsName, false);
-        appendFrom = handle ? await opfsHandleToFile(handle) : null;
-      } catch (err) {
-        logger.warn(`[转换] 半成品读取失败（将完整重做整包）: ${err?.message ?? err}`);
-        appendFrom = null;
-      }
-      if (appendFrom) {
-        // 半成品归属本任务：中止/丢弃时由 taskControls 的钩子清理
-        opfsCleanupId = taskId;
-        opfsCleanupName = partialOpfsName;
-        if (resumeCheckpoint?.target && resumeCheckpoint.target !== target) {
-          // 布局不同**不必然**不可续传（判据是名字 + 内容能对上，见 transform 的同源校验）
-          logger.info(`[转换] 断点记录的目标布局为 ${resumeCheckpoint.target}、当前为 ${target} —— 由同源校验决定能否续写`);
-        }
-      } else {
-        logger.warn('[转换] 断点指向的半成品已不存在 ⇒ 本次完整重做整包（产物完整，只是不再增量）');
-      }
-    }
-
-    // 断点清单**由调用方自行累积**：Worker abort 时返回值里的 doneEntries 会随 Promise 一起丢
-    // （`worker-client.js` 直接 reject），故不能依赖它。
-    // 续传时优先用**半成品清单**播种（它是产物字节的真源，与「读到哪」的旧台账不同），
-    // 旧格式断点（只有 doneEntries）仍兼容读取 —— 但那种情况下没有半成品，一条都不会被跳过。
-    const doneEntries = new Map(
-      Array.isArray(resumeCheckpoint?.partialEntries)
-        ? resumeCheckpoint.partialEntries
-          .filter((e) => e && typeof e.name === 'string')
-          .map((e) => [e.name, e.crc32])
-        : (resumeCheckpoint?.doneEntries ? Object.entries(resumeCheckpoint.doneEntries) : []),
-    );
-    const maybeCheckpoint = createCheckpointThrottle(onCheckpoint, doneEntries);
-    const trackProgress = attachConversionProgress({ doneEntries, maybeCheckpoint });
-    if (resumeCheckpoint) {
-      logger.info(`续传任务 ${taskId}: 半成品 ${appendFrom ? '可用' : '不可用'} · 已知条目 ${doneEntries.size} 条`
-        + `${appendFrom ? '（命中即跳过，产物完整）' : '（将完整重做）'}`);
-    }
-
-    /** 产物已交付 ⇒ 半成品使命完成（留着只会占配额）。暂停/中止时**不**调用 —— 那正是要保留它的时刻。 */
-    const releasePartial = () => {
-      if (opfsCleanupId === taskId) {
-        opfsTmpCleanup(opfsCleanupName);
-        opfsCleanupId = null;
-        opfsCleanupName = null;
-      }
-    };
-
-    try {
-      workbenchBusy = true;
-      applyActionAvailability();
-      view.setProgress(5, '正在启动异步 Web Worker 线程处理数据包...');
-      logger.info(`开始转换外部包: ${currentFile.name} -> ${target.toUpperCase()}`);
-
-      const { report, resultBlob } = await runConversionTask({
-        source: currentFile,
-        target,
-        options: {
-          selection,
-          excludedPaths,
-          includeBackups,
-          includeCache,
-          includeAppPrivate,
-          compressionLevel,
-          extensionMode: getExtensionMode(),
-          gitMode: getGitMode(),
-          keepDevFiles: getKeepDevFiles(),
-          pruneBuiltinAssets,
-          signal, // 暂停/中止的执行面（Worker 路径转发成 PAUSE 消息，见 worker-client 的协作式收尾）
-          // 台账只作**冗余校验**：跳过的充分条件是「半成品里真有这条」（transform 的跳过分支）
-          resumeCrcMap: doneEntries,
-          appendFrom,          // 同源半成品（null ⇒ 完整重做）
-          finalizeOnAbort: true, // 中止时把已写部分收成**合法半成品**，交 onPaused 持久化
-        },
-        onProgress: (cur, total, name, crc32) => {
-          trackProgress(cur, total, name, crc32);
-          const pct = total > 0 ? 5 + Math.round((cur / total) * 90) : 50;
-          view.setProgress(pct, `正在转换写入 [${cur}/${total}]: ${name}`);
-        },
-        onPaused: async ({ partialBlob, manifest, partialError }) => persistPartial({
-          partialBlob, manifest, partialError, taskId, target, totalBytes, setPauseCheckpoint,
-        }),
-      });
-
-      lastConvertedBlob = resultBlob;
-      const template = filenameTemplateInput?.value || DEFAULT_FILENAME_TEMPLATE;
-      const currentHandle = currentFileHandle || currentHostHandle || 'default-user';
-
-      // 执行智能增量分卷 (若开启)
-      if (shouldSplit) {
-        const thresholdMB = splitMb;
-        view.setProgress(95, `正在按 ${thresholdMB} MB 阈值执行智能独立分包...`);
-        logger.info(`启动智能分包引擎: 单包阈值 ${thresholdMB} MB`);
-
-        // entries 会持有**全部条目的 data**，是分卷路径的主要内存驻留源；
-        // 无论成功失败都必须在 finally 中释放（审计 S-01 / S-02）。
-        const entries = [];
-        try {
-          const reader = await zipIo.openReader(resultBlob);
-          try {
-            for await (const e of reader.entries()) {
-              if (e.isDirectory) { e.skip(); continue; }
-              entries.push({ path: e.fileName, data: await e.read(), size: e.uncompressedSize });
-            }
-          } finally {
-            await reader.close();
-          }
-
-          const splitResult = await splitArchiveEntries(entries, {
-            thresholdMB,
-            target,
-            handle: currentHandle,
-            filenameTemplate: template,
-          });
-
-          // 分卷统一进待导出区（来源=分卷）
-          for (const p of splitResult.parts) {
-            exportQueue.enqueue({
-              name: p.partName,
-              blob: p.blob,
-              targetLayout: target,
-              origin: 'split-part',
-              ephemeral: true,
-            });
-          }
-          refreshExportQueueUI();
-          view.renderReport(report);
-
-          view.setProgress(100, `外部数据已切分为 ${splitResult.totalParts} 个分卷，进入待导出区统一处置！`);
-          logger.success(`外部 Zip 分卷完成: 共 ${splitResult.totalParts} 个独立包 (${formatBytes(splitResult.totalBytes)})，可在待导出区批量下载或存入工作区`);
-        } finally {
-          // 释放逐条目 data 引用（成功与失败路径都要走到）
-          entries.length = 0;
-        }
-        // 分卷已接管整包（各 part 进待导出区），原始整包不再有任何消费方 → 立即释放
-        lastConvertedBlob = null;
-        // 分卷路径同样是一个**正常完成出口** —— 漏掉这两行会让控制条永远停在 running
-        await taskManager.complete(taskId);
-        releasePartial(); // 产物已交付 ⇒ 半成品使命完成
-        taskControls.hide();
-        return;
-      }
-
-      // ⚠️ 原先写的是 `report.totals.written` —— 该字段**从来不存在**
-      // （`src/core/report.js:157` 的 totals 只有 copied / dropped / droppedBytes /
-      //  filtered / synthesized / resumed / warnings）⇒ 用户看到的进度条与日志恒为
-      // 「共写入 **undefined** 项 / 个文件」（2026-09-27 实测，E2E 日志里抓到的原文）。
-      // 「写入」= 直通复制（copied）+ 合成（synthesized）两类实际写出的条目。
-      const writtenTotal = report.totals.copied + report.totals.synthesized;
-      view.setProgress(100, `转换成功！共写入 ${writtenTotal} 项，已丢弃/过滤 ${report.totals.dropped + (report.totals.filtered || 0)} 项`);
-      logger.success(`数据包转换成功！共写入 ${writtenTotal} 个文件`);
-
-      // 暂存转换产物到 IndexedDB
-      const outputFilename = resolveFilename(template, {
-        sourceName: currentFile.name,
-        target,
-        handle: currentHandle,
-      });
-
-      // 统一出口：产物进入待导出区，由用户在待导出区执行 下载/存工作区/写回宿主
-      exportQueue.enqueue({
-        name: outputFilename,
-        blob: resultBlob,
-        targetLayout: target,
-        origin: 'converted',
-        ephemeral: true,
-      });
-      refreshExportQueueUI();
-      view.renderReport(report);
-
-      view.setProgress(100, `转换完成！产物已进入待导出区: ${outputFilename}`);
-      logger.success(`转换成功${resumedNote(report)}: ${outputFilename} (${formatBytes(resultBlob.size)}) —— 可在待导出区下载、选位置导出、存入工作区或写回宿主`);
-
-      await taskManager.complete(taskId);
-      releasePartial(); // 产物已交付 ⇒ 半成品使命完成（留着只会占配额）
-      taskControls.hide();
-    } catch (err) {
-      const rec = taskManager.get(taskId);
-      const { action } = convertExitForAbort({ err, record: rec });
-      if (action === 'paused') {
-        // 「静默」≠「什么都不做」：暂停必须显示暂停态。语义与宿主拉取路径逐字节同构。
-        const total = rec?.checkpoint?.totalEntries || rec?.totalBytes || 0;
-        const done = doneEntries.size;
-        const pct = total > 0 ? Math.min(99, Math.round((done / total) * 100)) : 0;
-        taskControls.showPaused(taskId, { percent: pct, receivedBytes: 0, totalBytes: total });
-        taskControls.setPausedCheckpoint(taskId, rec?.checkpoint ?? null);
-        view.setProgress(pct, '转换已暂停，可从断点继续或丢弃');
-        logger.info(`转换已暂停于 ${done}/${total || '?'} 条已完成条目`);
-      } else if (action === 'aborted') {
-        taskControls.hide();
-        view.setProgress(100, '转换已中止');
-      } else if (action === 'fail') {
-        await taskManager.fail(taskId, true); // keepCheckpoint=true：暂停过的任务失败后仍可续
-        taskControls.hide();
-        view.setProgress(100, `转换出错: ${err.message}`);
-        logger.error('数据包转换出错', err);
-      }
-      // action === 'none'：AbortError 但任务已不在 PAUSED/ABORTED（如已被 complete）⇒ 不做事。
-      // ⚠️ 本分支**绝不**出现在 action 为 paused 时调 fail() 的写法 —— 见 convertExitForAbort 的注释。
-    } finally {
-      workbenchBusy = false;
-      applyActionAvailability();
-    }
-  }
-
-  if (btnConvert) {
-    btnConvert.addEventListener('click', () => { void handleExternalConvert(); });
-  }
-
-  // 10. 页面启动时无损恢复工作区状态与初始化文件名预览
-  updateFilenamePreview();
-  updateFoldSummaries();
-  // 检查区初始读数：原实现在无源包时不调用，导致「检查」区块开局是空的（2026-10-14 截图可见）
-  syncWizardCheckPanel(null);
-  setupStorageInspectorButton();
-
-  // ── 局域网互传（2026-10-14）：一次性取件码 + WebRTC 纯前端直连 ──
-  // 收到的包进**同一个产物出口**（待导出区），不另建事实源。
-  const lanPanel = mountLanTransferPanel({
-    root,
-    onReceive: (blob, name) => {
-      exportQueue.enqueue({ blob, name, origin: ORIGINS.UPLOAD, targetLayout: '' });
-      logger.info(`局域网互传已接收：${name} (${formatBytes(blob.size)})`);
-    },
-  });
-  const btnLanSend = document.getElementById('btn-lan-send');
-  if (btnLanSend && lanPanel) {
-    btnLanSend.addEventListener('click', () => lanPanel.open());
-  }
-
-  if (isStorageSupported()) {
-    try {
-      await updateWorkspaceUI();
-      const savedState = await loadWorkspaceState();
-      // U-1（2026-10-13 · 用户裁定「禁止兼容旧数据，任何即使没改也要强制不兼容」）：
-      // 旧会话**一律显式拒绝**——不归一、不补齐字段、不猜着恢复。
-      // 作废的是**会话状态**；磁盘上的包与半成品文件不删不动（见 migration-session.js）。
-      // 2026-10-14：原「不兼容门」浮层控件已删除（全仓无调用点却永远显示为空框），
-      // 判定保留，提示降级为一条日志。
-      const sessionVerdict = evaluateSavedSession(savedState);
-      if (sessionVerdict.blocked) {
-        logger.warn(`旧工作区会话已作废：${sessionVerdict.message}`);
-      }
-      if (savedState && !sessionVerdict.blocked && savedState.fileId) {
-        const fileRecord = await getFile(savedState.fileId);
-        if (fileRecord && fileRecord.blob) {
-          // ⚠️ 同上：`File.name` 只读 ⇒ 不能赋值（见 `namedBlob` 注释）。
-          // 原先这句一抛，整个「工作区状态恢复」就在 catch 里静默夭折
-          // （源包/目标/压缩等级/模板全都恢复不了，页面看着像"忘了上次的状态"）
-          currentFile = namedBlob(fileRecord.blob, fileRecord.name);
-          currentFileId = fileRecord.id;
-          currentFileHandle = fileRecord.handle || 'default-user';
-
-          if (savedState.target && targetSelect) {
-            targetSelect.value = savedState.target;
-          }
-          if (savedState.compressionLevel && compressionSelect) {
-            compressionSelect.value = savedState.compressionLevel;
-          }
-          if (savedState.filenameTemplate && filenameTemplateInput) {
-            filenameTemplateInput.value = savedState.filenameTemplate;
-          }
-          if (typeof savedState.includeBackups === 'boolean' && includeBackupsCheck) {
-            includeBackupsCheck.checked = savedState.includeBackups;
-          }
-          if (typeof savedState.includeCache === 'boolean' && includeCacheCheck) {
-            includeCacheCheck.checked = savedState.includeCache;
-          }
-          if (typeof savedState.includeAppPrivate === 'boolean' && includePrivateCheck) {
-            includePrivateCheck.checked = savedState.includeAppPrivate;
-          }
-          if (savedState.selection) {
-            setSelectionState(savedState.selection);
-          }
-          if (savedState.excludedPaths) {
-            setExcludedPaths(savedState.excludedPaths);
-          }
-          updateFilenamePreview();
-
-          applyActionAvailability();
-          if (dropHandler?.setFilename) {
-            dropHandler.setFilename(fileRecord.name);
-          }
-
-          view.setProgress(0, `已恢复上次工作区：${fileRecord.name} (${formatBytes(fileRecord.size)})`);
-          await refreshPlan();
-        }
-      }
-    } catch (err) {
-      console.warn('恢复工作区失败:', err);
-    }
-  }
-}
-
-let isWorkbenchInitialized = false;
-
-/**
- * 建好全屏工作台模态（幂等），**不改可见性**。
- *
- * 拆出来的理由：插件态要在 boot 时就建好并跑 `main()` —— `main()` 里注册宿主入口
- * （扩展菜单项 / 账号弹层按钮 / 备份管理器按钮），若等到用户第一次点「打开」才建，
- * 那些入口就永远不会出现。建好即 `display:none`，点「打开」才 `display:flex`。
- *
- * @returns {HTMLElement} 覆盖层节点
- */
 function ensureConverterModal() {
-  let modalOverlay = document.getElementById('st-converter-modal-overlay');
-  if (modalOverlay) return modalOverlay;
-
-  modalOverlay = document.createElement('div');
-  modalOverlay.id = 'st-converter-modal-overlay';
-  modalOverlay.className = 'st-converter-modal-overlay';
-  modalOverlay.style.display = 'none';
-
-  const appContainer = document.createElement('div');
-  appContainer.className = 'app-container';
-  appContainer.id = 'app';
-  appContainer.innerHTML = trustedStaticMarkup(getWorkbenchHtml({ isModal: true }));
-
-  modalOverlay.appendChild(appContainer);
-  document.body.appendChild(modalOverlay); // dom-scope:allow 自绘模态覆盖层必须挂 body 才能全页覆盖（放进宿主抽屉会被其 overflow/transform 裁剪）
-  mountSectionHelp(appContainer); // R-A2 区块「?」帮助层（幂等，随模态一次性注入）
-
-  const closeBtn = appContainer.querySelector('#btn-close-converter-modal');
-  if (closeBtn) {
-    closeBtn.addEventListener('click', () => {
-      modalOverlay.style.display = 'none';
-    });
-  }
-
-  modalOverlay.addEventListener('click', (e) => {
-    if (e.target === modalOverlay) {
-      modalOverlay.style.display = 'none';
-    }
+  let overlay = document.getElementById('st-converter-modal-overlay');
+  if (overlay) return overlay;
+  overlay = document.createElement('div');
+  overlay.id = 'st-converter-modal-overlay';
+  const app = document.createElement('div');
+  app.className = 'app-container';
+  app.id = 'app';
+  app.innerHTML = trustedStaticMarkup(getWorkbenchHtml({ isModal: true }));
+  overlay.appendChild(app);
+  document.body.appendChild(overlay); // dom-scope:allow 自绘全屏模态必须挂 body
+  overlay.addEventListener('click', (event) => { if (event.target === overlay) overlay.style.display = 'none'; });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && overlay.style.display !== 'none') overlay.style.display = 'none';
   });
-
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && modalOverlay && modalOverlay.style.display !== 'none') {
-      modalOverlay.style.display = 'none';
-    }
-  });
-
-  if (!isWorkbenchInitialized) {
-    isWorkbenchInitialized = true;
-    main(appContainer);
-  }
-
-  return modalOverlay;
+  if (!initialized) { initialized = true; main(app); }
+  return overlay;
 }
 
-/**
- * 呼出全屏数据包工作台 (供宿主插件环境使用)
- */
 export function openConverterModal() {
   if (typeof document === 'undefined') return;
   ensureConverterModal().style.display = 'flex';
 }
 
-/**
- * 自适应启动入口：检测独立 Web 模式 vs 酒馆插件模式
- *
- * **判定顺序（R6，2026-09-25 修正）**：先判宿主，再找容器。
- * 原实现反过来——只看 `document.getElementById('app')` 存不存在就决定走独立态：
- * 插件态下只要宿主页面上有**任意**第三方 `#app`，就会走进独立态分支，
- * 把整棵工作台 `innerHTML` 写进那个**别人的容器**，并且永远不挂宿主抽屉。
- * 实测 Luker 全仓无 `#app`（`grep -rn 'id="app"' public/` 零命中），所以今天没炸；
- * 但这是"当前没炸"而非"不会炸"，判定顺序必须按语义来。
- */
-function bootstrap() {
-  // 只读调试探针最先挂：**两种形态都要有**（插件态的工作台挂在抽屉里、且抽屉默认是关的，
-  // 若把挂载放进 main() 就会让「抽屉未打开」时的探针不可用）
-  mountDebugProbe();
-
+async function main(root) {
   const host = detectHost();
+  const hostKey = host.isPlugin ? (HOST_CODE[host.platform] || 'st') : 'st';
+  root.dataset.host = hostKey;
 
-  if (host.isPlugin) {
-    // 宿主扩展模式 (SillyTavern / Luker)
-    // 工作台挂在**全屏模态**里，入口是宿主扩展行内联下拉里的「打开面板」
-    // （2026-10-27 R1.3 起改为与其它扩展一致的内联下拉；2026-10-15 的
-    //  「只留一行、不展开」决定已被推翻）。
-    // **boot 时就建好但保持隐藏** —— main() 里注册宿主入口，等首次点击才建会让它们永不出现。
-    ensureConverterModal();
-    mountExtensionRowButton(() => openConverterModal());
-    logger.info(`ST-pack-transfer 工作台入口已就绪 (${host.platform.toUpperCase()} 模式)`);
-    return;
+  const settings = {
+    compression: '5',
+    extensionMode: 'full',
+    gitMode: 'keep',
+    keepDev: false,
+    includeBackups: false,
+    includeCache: false,
+    includePrivate: false,
+    pruneBuiltin: true,
+    keepExport: true,
+    trafficPrompt: true,
+    autoTutorial: true,
+  };
+
+  const state = {
+    packages: [],
+    nodesById: new Map(),
+    layoutById: new Map(),
+    planCache: new Map(),
+    busy: false,
+  };
+
+  const pkgById = (id) => state.packages.find((pkg) => pkg.id === id) || null;
+
+  async function blobOf(pkg) {
+    if (!pkg) return null;
+    if (pkg.blob) return pkg.blob;
+    const record = await getFile(pkg.id);
+    pkg.blob = record?.blob || null;
+    return pkg.blob;
   }
 
-  // 独立 Web 模式：index.html 仅为空骨架，工作台内容由同一模板函数产出
-  // （单一模板源 · L1-MR-10：与插件抽屉态、模态态共用 getWorkbenchHtml）
-  const existingApp = document.getElementById('app');
-  if (!existingApp) {
-    logger.warn('独立态未找到 #app 骨架容器，工作台不初始化（index.html 应提供该容器）');
-    return;
+  function toPackage(record) {
+    const zone = ZONE_OF_ORIGIN[record.origin] || 'import';
+    const layout = state.layoutById.get(record.id) || record.layout || 'unknown';
+    const sizeBytes = record.size || 0;
+    return {
+      id: record.id,
+      zone,
+      host: HOST_CODE[layout] || 'unknown',
+      name: record.name || record.id,
+      size: fmtMB(sizeBytes / (1024 * 1024)),
+      mb: sizeBytes / (1024 * 1024),
+      ts: record.createdAt || Date.now(),
+      time: clockOf(record.createdAt),
+      origin: record.origin === ORIGINS.UPLOAD ? '上传'
+        : record.origin === ORIGINS.HOST_EXPORT ? '宿主导出'
+          : record.origin === ORIGINS.SPLIT_PART ? '分卷'
+            : '导出副本',
+      readonly: zone === 'export',
+      unrecognized: layout === 'unknown',
+      split: 0,
+      nodes: state.nodesById.get(record.id) || [],
+      blob: null,
+    };
   }
-  if (!existingApp.hasChildNodes()) {
-    existingApp.innerHTML = trustedStaticMarkup(getWorkbenchHtml({ isStandalone: true }));
+
+  async function syncPackages() {
+    if (!isStorageSupported()) { state.packages = []; view.setPackages([]); return; }
+    try {
+      const records = await listStoredFiles();
+      state.packages = records.filter((r) => ZONE_OF_ORIGIN[r.origin]).map(toPackage);
+      view.setPackages(state.packages);
+    } catch (err) {
+      logger.warn(`读取工作区失败: ${err.message}`);
+      state.packages = [];
+      view.setPackages([]);
+    }
   }
-  if (!isWorkbenchInitialized) {
-    isWorkbenchInitialized = true;
-    mountSectionHelp(existingApp); // R-A2 区块「?」帮助层（独立态与模态度同款注入）
-    main(existingApp);
+
+  async function ensurePlan(pkgId, targetName = null) {
+    const pkg = pkgById(pkgId);
+    if (!pkg) return null;
+    const code = targetCodeOf(targetName || view.getState().target);
+    const key = `${pkgId}::${code}`;
+    if (state.planCache.has(key)) return state.planCache.get(key);
+    const blob = await blobOf(pkg);
+    if (!blob) { logger.warn(`扫描跳过：${pkg.name} 的字节不在工作区`); return null; }
+    view.setProgress(6, `扫描中 · ${pkg.name}`);
+    logger.info(`扫描开始：${pkg.name}（${(blob.size / 1048576).toFixed(1)} MB → ${code.toUpperCase()}）`);
+    try {
+      const plan = await runPlanTask({
+        source: blob,
+        target: code,
+        options: {
+          selection: {},
+          excludedPaths: new Set(),
+          includeCache: settings.includeCache,
+          includeBackups: settings.includeBackups,
+          includeAppPrivate: settings.includePrivate,
+          pruneBuiltinAssets: settings.pruneBuiltin,
+          keepDevFiles: settings.keepDev,
+          extensionMode: settings.extensionMode,
+          gitMode: settings.gitMode,
+        },
+      });
+      const tree = buildChartTree(plan);
+      state.planCache.set(key, { plan, tree, target: code });
+      state.nodesById.set(pkgId, tree);
+      if (plan.sourceLayout) state.layoutById.set(pkgId, plan.sourceLayout);
+      const live = pkgById(pkgId);
+      if (live) {
+        live.nodes = tree;
+        live.host = HOST_CODE[plan.sourceLayout] || live.host;
+        live.unrecognized = plan.totalSourceFiles === 0;
+      }
+      view.setPackages(state.packages);
+      view.setProgress(0, '扫描完成');
+      logger.info(`扫描完成：${pkg.name} · ${plan.totalSourceFiles} 个文件 · ${tree.length} 个分组`);
+      return state.planCache.get(key);
+    } catch (err) {
+      logger.error(`扫描失败：${pkg.name} · ${err.message}`);
+      view.setProgress(0, '扫描失败');
+      return null;
+    }
   }
+
+  async function importFiles(files) {
+    const list = [...(files || [])];
+    if (!list.length) return;
+    if (!isStorageSupported()) { view.toast('当前浏览器不支持本地存储'); return; }
+    for (const file of list) {
+      const id = `pkg-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+      await saveFile({
+        id, name: file.name, size: file.size, blob: file, role: 'source',
+        origin: ORIGINS.UPLOAD, metadata: { importedAt: Date.now() },
+      });
+      logger.info(`已导入 ${file.name}`);
+    }
+    await syncPackages();
+    const newest = state.packages.filter((p) => p.zone === 'import').sort((a, b) => b.ts - a.ts)[0];
+    if (newest) { await ensurePlan(newest.id); view.setActivePackage(newest.id); }
+    view.toast(`已导入 ${list.length} 个包`);
+  }
+
+  async function downloadSelected(ids) {
+    for (const id of ids) {
+      const pkg = pkgById(id);
+      const blob = await blobOf(pkg);
+      if (!blob) continue;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = pkg.name; a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    }
+  }
+
+  async function copyBack(ids) {
+    let count = 0;
+    for (const id of ids) {
+      const pkg = pkgById(id);
+      const blob = await blobOf(pkg);
+      if (!blob) continue;
+      await saveFile({
+        id: `pkg-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        name: pkg.name, size: blob.size, blob, role: 'source',
+        origin: ORIGINS.UPLOAD, metadata: { copiedFrom: id },
+      });
+      count += 1;
+    }
+    await syncPackages();
+    view.toast(`已复制 ${count} 个包回导入区`);
+  }
+
+  async function deleteSelected(ids) {
+    if (!ids.length) { view.toast('先选择要删除的包'); return; }
+    const ok = await confirmDialog(`确定删除选中的 ${ids.length} 个包吗？此操作不可撤销。`);
+    if (!ok) return;
+    for (const id of ids) {
+      try { await deleteFile(id); } catch { /* 已不存在 */ }
+      state.nodesById.delete(id);
+      state.layoutById.delete(id);
+    }
+    await syncPackages();
+    view.toast('已删除');
+  }
+
+  async function restoreSelected(ids) {
+    if (!host.isPlugin) { view.toast('只有插件形态可以回传宿主'); return; }
+    const targets = ids.map(pkgById).filter((p) => p && p.zone === 'export');
+    if (!targets.length) { view.toast('先选择一个导出包'); return; }
+    const ok = await confirmDialog(`将 ${targets[0].name} 恢复到当前宿主？覆盖前请确认已备份。`);
+    if (!ok) return;
+    if (state.busy) return;
+    state.busy = true;
+    try {
+      view.setProgress(25, '正在回传宿主...');
+      const blob = await blobOf(targets[0]);
+      const result = host.platform === 'luker'
+        ? await restoreToLuker(blob, {})
+        : await restoreToHost(blob, { mode: 'merge', platform: host.platform });
+      if (result && result.nothingRestored) throw new Error('宿主未写入任何条目');
+      try { await importRestoredChatsIntoLibrary(blob); } catch { /* 纯库模式可选 */ }
+      view.setProgress(100, '恢复完成');
+      logger.info(`已恢复 ${targets[0].name}`);
+      view.toast('恢复完成');
+    } catch (err) {
+      logger.error(`恢复失败：${err.message}`);
+      view.setProgress(0, '恢复失败');
+    } finally {
+      state.busy = false;
+    }
+  }
+
+  async function fetchFromHost() {
+    if (!host.isPlugin) { view.toast('独立 Web 模式没有宿主数据源'); return; }
+    if (state.busy) return;
+    state.busy = true;
+    try {
+      view.setProgress(5, '正在请求宿主打包...');
+      const blob = await fetchHostBackup(host.platform, null, {
+        onPhase: (phase, received, total) => {
+          if (phase === 'host-generating') view.setProgress(12, '宿主打包中...');
+          else if (phase === 'transferring') {
+            const pct = total > 0 ? 15 + Math.round((received / total) * 20) : 20;
+            view.setProgress(pct, `接收中 ${(received / 1048576).toFixed(1)} MB`);
+          }
+        },
+      });
+      const name = `${HOST_LABEL[host.platform] || 'Host'}_host-export_${Date.now()}.zip`;
+      const id = `pkg-${Date.now()}`;
+      await saveFile({
+        id, name, size: blob.size, blob: namedBlob(blob, name),
+        layout: hostLayoutCode(host.platform), role: 'source',
+        origin: ORIGINS.HOST_EXPORT, metadata: { fetchedAt: Date.now() },
+      });
+      state.layoutById.set(id, hostLayoutCode(host.platform));
+      await syncPackages();
+      await ensurePlan(id);
+      view.setActivePackage(id);
+      view.setProgress(100, '宿主拉取完成');
+      view.toast('宿主拉取完成');
+    } catch (err) {
+      logger.error(`宿主拉取失败：${err.message}`);
+      view.setProgress(0, '宿主拉取失败');
+    } finally {
+      state.busy = false;
+    }
+  }
+
+  async function generate({ packages, target, splitMb, filenameTemplate }) {
+    if (state.busy) return;
+    if (!packages?.length) { view.toast('先选择要导出的包'); return; }
+    state.busy = true;
+    const code = targetCodeOf(target);
+    const limit = splitLimitOf(splitMb);
+    const created = [];
+    try {
+      for (const pkg of packages) {
+        const blob = await blobOf(pkg);
+        if (!blob) continue;
+        const cached = await ensurePlan(pkg.id, target);
+        if (!cached) continue;
+        const excluded = view.getExcludedPaths(pkg);
+        view.setProgress(3, `转换中 · ${pkg.name}`);
+        const { resultBlob } = await runConversionTask({
+          source: blob,
+          target: code,
+          options: {
+            excludedPaths: excluded,
+            compressionLevel: Number(settings.compression),
+            extensionMode: settings.extensionMode,
+            gitMode: settings.gitMode,
+            keepDevFiles: settings.keepDev,
+            includeCache: settings.includeCache,
+            includeBackups: settings.includeBackups,
+            includeAppPrivate: settings.includePrivate,
+            pruneBuiltinAssets: settings.pruneBuiltin,
+          },
+          onProgress: (current, total, filename) => {
+            const pct = total ? Math.round((current / total) * 92) : 10;
+            view.setProgress(pct, `转换中 ${current}/${total}${filename ? ` · ${filename}` : ''}`);
+          },
+        });
+        if (!resultBlob) continue;
+        if (limit) {
+          const entries = [];
+          const reader = await zipIo.openReader(resultBlob);
+          try {
+            for await (const entry of reader.entries()) {
+              if (entry.isDirectory) { entry.skip(); continue; }
+              entries.push({ path: entry.fileName, blob: await entry.read() });
+              entry.skip();
+            }
+          } finally { await reader.close(); }
+          const split = await splitArchiveEntries(entries, {
+            thresholdMB: limit, target: code, handle: 'default-user',
+            filenameTemplate: filenameTemplate || DEFAULT_FILENAME_TEMPLATE,
+          });
+          for (const part of split.parts) {
+            created.push({ blob: part.blob, name: part.partName });
+          }
+        } else {
+          const name = resolveFilename(filenameTemplate || DEFAULT_FILENAME_TEMPLATE, {
+            sourceName: pkg.name, target: code, handle: 'default-user',
+            part: 'part1', category: 'all', mode: 'single',
+          });
+          created.push({ blob: resultBlob, name });
+        }
+        logger.info(`已转换 ${pkg.name}`);
+      }
+      for (const item of created) {
+        await saveFile({
+          id: `out-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+          name: item.name, size: item.blob.size, blob: namedBlob(item.blob, item.name),
+          layout: code, role: 'output', origin: ORIGINS.CONVERTED,
+          metadata: { convertedAt: Date.now() },
+        });
+      }
+      await syncPackages();
+      view.setProgress(100, '导出包已就绪');
+      view.toast(`已生成 ${created.length} 个导出包`);
+      if (created.length) view.setZone('export');
+    } catch (err) {
+      logger.error(`转换失败：${err.message}`);
+      view.setProgress(0, '转换失败');
+      view.toast('转换失败，详见日志');
+    } finally {
+      state.busy = false;
+    }
+  }
+
+  async function exportLibrary() {
+    try {
+      const pack = await exportLibraryToPack({});
+      if (!pack?.ok || !pack.blob) { view.toast(pack?.reason || '没有可导出的聊天'); return; }
+      const id = `lib-${Date.now()}`;
+      await saveFile({
+        id, name: pack.name || 'library-export.zip', size: pack.blob.size,
+        blob: pack.blob, role: 'source', origin: ORIGINS.UPLOAD,
+        metadata: { libraryExport: true },
+      });
+      await syncPackages();
+      await ensurePlan(id);
+      view.toast('聊天库已导出到导入区');
+    } catch (err) {
+      logger.error(`聊天库导出失败：${err.message}`);
+    }
+  }
+
+  function openSettings() {
+    const v = settings;
+    view.openModal('设置', '这些选项会记住。', [
+      '<div class="settings-grid">',
+      `<label class="set-row"><span>压缩</span><select id="set-compression" class="text_pole">`
+        + ['0|不压缩', '1|快速', '5|标准', '9|最大'].map((x) => { const [k, t] = x.split('|'); return `<option value="${k}"${v.compression === k ? ' selected' : ''}>${t}</option>`; }).join('')
+        + '</select></label>',
+      `<label class="set-row"><span>扩展包</span><select id="set-extension-mode" class="text_pole">`
+        + `<option value="manifest"${v.extensionMode === 'manifest' ? ' selected' : ''}>只导出清单</option>`
+        + `<option value="full"${v.extensionMode === 'full' ? ' selected' : ''}>完整扩展包</option>`
+        + '</select></label>',
+      `<label class="set-row"><span>Git 历史</span><select id="set-git-mode" class="text_pole">`
+        + `<option value="keep"${v.gitMode === 'keep' ? ' selected' : ''}>保留历史</option>`
+        + `<option value="minimal"${v.gitMode === 'minimal' ? ' selected' : ''}>只留更新所需</option>`
+        + `<option value="strip"${v.gitMode === 'strip' ? ' selected' : ''}>不含历史</option>`
+        + '</select></label>',
+      `<label class="check"><input type="checkbox" id="set-keep-dev"${v.keepDev ? ' checked' : ''}> 保留构建配置</label>`,
+      `<label class="check"><input type="checkbox" id="set-include-backups"${v.includeBackups ? ' checked' : ''}> 打包 backups 快照</label>`,
+      `<label class="check"><input type="checkbox" id="set-include-cache"${v.includeCache ? ' checked' : ''}> 打包派生缓存</label>`,
+      `<label class="check"><input type="checkbox" id="set-include-private"${v.includePrivate ? ' checked' : ''}> 打包私有配置</label>`,
+      `<label class="check"><input type="checkbox" id="set-prune-builtin"${v.pruneBuiltin ? ' checked' : ''}> 清理原生重复资产</label>`,
+      `<label class="check"><input type="checkbox" id="set-keep-export"${v.keepExport ? ' checked' : ''}> 导出后在导出区保留包</label>`,
+      `<label class="check"><input type="checkbox" id="set-traffic"${v.trafficPrompt ? ' checked' : ''}> 后端上下传流量提示</label>`,
+      `<label class="check"><input type="checkbox" id="set-auto-tutorial"${v.autoTutorial ? ' checked' : ''}> 基础教程自动打开</label>`,
+      '</div>',
+    ], [
+      { label: '关闭', onClick: () => view.closeModal() },
+      {
+        label: '保存',
+        primary: true,
+        onClick: () => {
+          const q = (sel2) => root.querySelector(sel2);
+          settings.compression = q('#set-compression')?.value || settings.compression;
+          settings.extensionMode = q('#set-extension-mode')?.value || settings.extensionMode;
+          settings.gitMode = q('#set-git-mode')?.value || settings.gitMode;
+          settings.keepDev = !!q('#set-keep-dev')?.checked;
+          settings.includeBackups = !!q('#set-include-backups')?.checked;
+          settings.includeCache = !!q('#set-include-cache')?.checked;
+          settings.includePrivate = !!q('#set-include-private')?.checked;
+          settings.pruneBuiltin = !!q('#set-prune-builtin')?.checked;
+          settings.keepExport = !!q('#set-keep-export')?.checked;
+          settings.trafficPrompt = !!q('#set-traffic')?.checked;
+          settings.autoTutorial = !!q('#set-auto-tutorial')?.checked;
+          view.closeModal();
+          view.toast('设置已保存');
+        },
+      },
+    ]);
+  }
+
+  const view = createWorkbenchView({
+    actions: {
+      fetch: fetchFromHost,
+      generate,
+      restore: restoreSelected,
+      copyBack,
+      deleteSelected,
+      download: downloadSelected,
+      libraryExport: exportLibrary,
+      lan: () => lanPanel?.open?.(),
+      settings: openSettings,
+      uploadRequest: () => root.querySelector('#file-input')?.click(),
+      uploadPrivate: (name) => { logger.info(`私有配置上传请求：${name}`); view.toast(`私有配置：${name}`); },
+      onActivePackage: (id) => { ensurePlan(id).then(() => view.setActivePackage(id)); },
+      close: () => {
+        const overlay = document.getElementById('st-converter-modal-overlay');
+        if (overlay) overlay.style.display = 'none';
+      },
+    },
+  });
+
+  logger.subscribe((entry) => {
+    view.pushLog(entry.level === 'SUCCESS' ? 'INFO' : entry.level, entry.message);
+  });
+
+  view.setHost(hostKey, host.isPlugin ? 'plugin' : 'web');
+  try { view.setLibraryExport(probeChatStore().present); } catch { /* 外部库可选 */ }
+
+  root.querySelector('#file-input')?.addEventListener('change', async (event) => {
+    const files = [...(event.target.files || [])];
+    event.target.value = '';
+    await importFiles(files);
+  });
+
+  for (const target of [root, root.querySelector('#chart-card')]) {
+    target?.addEventListener('dragover', (event) => event.preventDefault());
+    target?.addEventListener('drop', async (event) => {
+      event.preventDefault();
+      const files = [...(event.dataTransfer?.files || [])].filter((f) => f.name.toLowerCase().endsWith('.zip'));
+      if (files.length) await importFiles(files);
+    });
+  }
+
+  const lanPanel = mountLanTransferPanel({
+    root,
+    onReceive: async (blob, name) => importFiles([new File([blob], name || `lan-${Date.now()}.zip`)]),
+  });
+
+  await syncPackages();
+  if (isStorageSupported()) {
+    getStorageUsage().then((usage) => logger.info(`浏览器配额占用 ${((usage?.totalBytes || 0) / (1024 ** 3)).toFixed(2)} GB`)).catch(() => {});
+  }
+  view.setProgress(0, '准备就绪');
+  logger.info(`工作台已就绪 · ${host.isPlugin ? (HOST_LABEL[host.platform] || '宿主') + ' 插件' : '独立 Web'}`);
 }
 
-// 启动应用
-if (typeof document !== 'undefined') {
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', bootstrap);
-  } else {
-    bootstrap();
+function bootstrap() {
+  mountDebugProbe();
+  const host = detectHost();
+  if (host.isPlugin) {
+    ensureConverterModal();
+    mountExtensionRowButton(() => openConverterModal());
+    return;
   }
+  const app = document.getElementById('app');
+  if (!app) return;
+  app.classList.add('app-standalone');
+  if (!app.hasChildNodes()) app.innerHTML = trustedStaticMarkup(getWorkbenchHtml({ isStandalone: true }));
+  if (!initialized) { initialized = true; main(app); }
+}
+
+if (typeof document !== 'undefined') {
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bootstrap);
+  else bootstrap();
 }

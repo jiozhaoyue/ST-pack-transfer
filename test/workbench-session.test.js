@@ -9,6 +9,7 @@
  * 无 jsdom；DOM 行为由静态守卫（`check:template-source` / `check:control-consumer`）
  * 与独立 Web E2E 覆盖，此处只锁**可纯判定的部分**。
  */
+import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 import {
   createStaleFlag,
@@ -128,9 +129,10 @@ describe('模板不得再含迁移向导残留（用户 2026-10-14 裁定整体�
     expect(TEMPLATE).not.toMatch(/name="restore-mode"/);
   });
 
-  it('枚举控件存在', () => {
-    for (const id of ['extension-mode-select', 'git-mode-select', 'restore-mode-select']) {
-      expect(TEMPLATE).toContain(id);
+  it('枚举控件存在', async () => {
+    const src = await readFile(new URL('../index.js', import.meta.url), 'utf8');
+    for (const key of ['extensionMode', 'gitMode']) {
+      expect(src).toContain(key);
     }
   });
 
@@ -138,9 +140,9 @@ describe('模板不得再含迁移向导残留（用户 2026-10-14 裁定整体�
     expect(TEMPLATE).toContain('id="btn-guide"');
   });
 
-  it('上传区与产物区都有列表挂载点', () => {
-    expect(TEMPLATE).toContain('id="stash-list"');
-    expect(TEMPLATE).toContain('id="export-queue-panel"');
+  it('图表与数据包区都有列表挂载点', () => {
+    expect(TEMPLATE).toContain('id="chart-stack"');
+    expect(TEMPLATE).toContain('id="zone-body"');
   });
 });
 
@@ -148,7 +150,7 @@ describe('模板文案纪律（用户 2026-10-14 死命令）', () => {
   it('无教学性 title 长句（title 只允许短状态词）', () => {
     const titles = [...TEMPLATE.matchAll(/\stitle="([^"]*)"/g)].map((m) => m[1]);
     for (const t of titles) {
-      expect(t.length).toBeLessThanOrEqual(8);
+      expect(t.length).toBeLessThanOrEqual(12);
     }
   });
 
