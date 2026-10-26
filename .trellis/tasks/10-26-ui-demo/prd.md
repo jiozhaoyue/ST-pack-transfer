@@ -1,19 +1,28 @@
-# 独立 HTML UI Demo
+# 单文件 UI Demo（评审件）
 
 ## Goal
 
-单文件离线 HTML，还原酒馆运行时面板观感与交互，面板有边框且组件不交错，供 UI 定稿评审
+单文件离线 HTML，双击即开；还原酒馆运行时面板观感与全部关键交互；桌面与移动双形态；作为定稿评审件与后续实现的唯一 UI 基准。父任务 R8。
 
 ## Requirements
 
-- TBD
+- R8.1 单文件 `deliverables/ui-demo.html`，**零外部依赖**（无 CDN、无外链字体/图标），双击即开，兼容 `file://`。
+- R8.2 模拟数据必须覆盖：四宿主可读/不可读、逐文件图表树、私有配置、未识别包、分卷多图表、多包多图表、导入/导出区、包卡、日志弹窗、基础/进阶教程、问号浮层。
+- R8.3 面板内配色必须**模拟真实酒馆令牌**（`--SmartTheme*`），并提供深浅主题切换以验证继承关系；不得用独立色板糊过去。
+- R8.4 四宿主品牌色按官方图标取色（取证见父 PRD 附录 A），只用于标识。
+- R8.5 桌面（≥1280px）与移动（390px）两种形态都要能看；移动端隐藏分隔条、多卷竖向折叠。
+- R8.6 面板之外的元素（顶部演示控制条）不属于插件 UI，需明确标注。
+- R8.7 Demo 只是中间评审件；最终交付物是插件本体。
+
+## 约束
+
+- 不得为了让 demo 好看而引入真实实现不会有的结构（demo 即实现基准）。
+- 每次改完必须截图校对桌面/移动，且控制台零错误；截图不入库（`test-results/` 已 gitignore）。
 
 ## Acceptance Criteria
 
-- [ ] TBD
-
-## Notes
-
-- Keep `prd.md` focused on requirements, constraints, and acceptance criteria.
-- Lightweight tasks can remain PRD-only.
-- For complex tasks, add `design.md` for technical design and `implement.md` for execution planning before `task.py start`.
+- [ ] AC-32 双击 `ui-demo.html` 可直接打开，无外链请求，控制台零错误。
+- [ ] AC-33 桌面与移动两形态截图校对通过：面板边框完整、无组件交错、无贴边溢出。
+- [ ] AC-34 深浅主题切换时面板整体跟随，无硬编码颜色残留。
+- [ ] AC-35 R8.2 列出的交互在 demo 中都能走通（含批量生成导出包、分卷多图表、教程两套）。
+- [ ] AC-36 demo 与 PRD 无偏差：PRD 中每条 UI 相关要求都能在 demo 中找到对应呈现。

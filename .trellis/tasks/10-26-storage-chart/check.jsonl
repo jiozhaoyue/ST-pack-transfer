@@ -1,0 +1,2 @@
+{"file": ".trellis/tasks/10-26-storage-chart/prd.md", "reason": "验收 AC-6~AC-12,含 0 MB 空卷、超限标记、移动端折叠"}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "质量门:npm test 全绿为唯一门槛"}

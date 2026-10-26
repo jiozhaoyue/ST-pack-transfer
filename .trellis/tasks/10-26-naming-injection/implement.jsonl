@@ -1,0 +1,3 @@
+{"file": ".trellis/tasks/10-26-naming-injection/prd.md", "reason": "本任务需求 R1/R6.5/R10.1 与 AC-1~AC-5"}
+{"file": ".trellis/spec/frontend/host-capabilities.md", "reason": "四宿主入口与能力差异,决定注入点落位与自愈策略"}
+{"file": ".trellis/spec/frontend/dom-write-scope.md", "reason": "注入必须走锚点白名单,禁止全域写入"}

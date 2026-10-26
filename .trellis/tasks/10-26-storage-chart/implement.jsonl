@@ -1,0 +1,4 @@
+{"file": ".trellis/tasks/10-26-storage-chart/prd.md", "reason": "本任务需求 R2/R9/R12 与 AC-6~AC-12,含分卷下钻与多包渲染"}
+{"file": ".trellis/tasks/10-26-storage-chart-workbench/deliverables/ui-demo.html", "reason": "图表渲染与分卷算法的可运行基准,实现需与之一致"}
+{"file": ".trellis/spec/frontend/workbench-single-view.md", "reason": "单一图表容器约束与切包不重建"}
+{"file": ".trellis/spec/guides/tavern-datapack-formats.md", "reason": "图表分类表与真实包目录结构的依据"}

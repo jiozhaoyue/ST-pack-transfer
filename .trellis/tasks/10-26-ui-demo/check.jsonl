@@ -1,0 +1,2 @@
+{"file": ".trellis/tasks/10-26-ui-demo/prd.md", "reason": "验收 AC-32~AC-36,含零外链、零控制台错误、demo 与 PRD 无偏差"}
+{"file": ".trellis/spec/guides/standalone-web-and-cloud-e2e.md", "reason": "用 Playwright 打开 file:// 截图校对的既有做法"}

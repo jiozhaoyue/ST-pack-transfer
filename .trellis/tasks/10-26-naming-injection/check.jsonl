@@ -1,0 +1,2 @@
+{"file": ".trellis/tasks/10-26-naming-injection/prd.md", "reason": "验收 AC-1~AC-5,含全仓旧名残留为 0 与魔方棒零注入"}
+{"file": ".trellis/spec/frontend/dom-write-scope.md", "reason": "检查注入点是否越界"}

@@ -1,0 +1,4 @@
+{"file": ".trellis/tasks/10-26-storage-chart-workbench/prd.md", "reason": "验收标准 AC-1~AC-19,逐条对照检查"}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "前端质量门:标注项目当前无 lint/typecheck,质量门槛即 npm test 全绿"}
+{"file": ".trellis/spec/frontend/dom-write-scope.md", "reason": "宿主 DOM 写入作用域守卫:注入点必须走锚点白名单"}
+{"file": ".trellis/spec/frontend/state-management.md", "reason": "状态与断点续传不变量;图表勾选记忆键与包/宿主隔离需符合此规范"}
