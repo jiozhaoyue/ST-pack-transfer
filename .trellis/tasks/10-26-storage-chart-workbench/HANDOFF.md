@@ -1,235 +1,117 @@
-# 存储图表工作台 · 完整交接（2026-10-27）
+# 存储图表工作台 · 交接（2026-10-27 全面重构后）
 
-> 自包含交接文档：新会话读完这一份即可接手，不需要回溯对话。
-> **权威顺序**：`prd.md`（需求与验收）> `design.md`（技术设计）> 本文件（状态与操作指南）。
-> 本文件可能落后于 `prd.md`；验收一律以 `prd.md` 为准。
+> 自包含：新会话读完这一份即可接手，不需要回溯对话。
+> 权威顺序：`prd.md` > `design.md` > 本文件（状态与操作指南）。
 
 ---
 
 ## 一、一句话现状
 
-规划与 **UI 定稿 demo** 已完成并推送；`10-26-naming-injection` 已于 2026-10-27 完成实现（改名 / 目标选择器 / 入口 / 命名引擎 / 顶栏徽标），其余五个子任务仍为 `planning`。
+**UI 已按 `deliverables/ui-demo.html` 原样重写并落地**：旧 UI 层（布局 / 组件 / 兼容容器 / 旧测试）已全部删除，
+`src/ui/workbench-view.js` 是 demo 渲染脚本的逐行搬运，只在「数据来源 / 动作」两处接真实管线。
+`npm test` **859 passed / 2 skipped**，五个静态守卫全绿，`npm run build` 通过，独立 Web 的上传→图表→转换链路已实测。
 
-| 项 | 值 |
+---
+
+## 二、本轮改了什么（文件级）
+
+### 新增
+
+| 文件 | 作用 |
 | --- | --- |
-| 父任务 | `10-26-storage-chart-workbench`（planning） |
-| 子任务 | `naming-injection`（本轮实现完成）/ `storage-chart` / `zones-flow` / `package-cards-vault` / `tutorial-copy` / `ui-demo`（其余 planning） |
-| 已推送提交 | `7c098ac`（HEAD = origin/main；远端已改名 `jiozhaoyue/ST-pack-transfer`） |
-| 产品代码 | `src/core/naming.js`、`src/ui/host-icons.js` 新增；命名/入口/徽标改动已落 |
-| 质量门 | `npm test` 945 passed / 2 skipped；五个静态守卫全绿 |
-| demo | `deliverables/ui-demo.html`（2026-10-27 评审版） |
+| `src/core/chart-model.js` | 真实计划 → demo 同款树；三态、勾选汇总、分卷下钻、序号、折行判定（纯逻辑） |
+| `src/ui/workbench-view.js` | **demo 的 `<script>` 原样搬运**：渲染 / 事件 / 教程 / 帮助 / 日志 / 分隔条；只注入 `actions.*` 与 `setPackages/setHost/setActivePackage` |
+| `src/app/task-runtime.js` | 从旧控制器抽出的**任务运行时**（批次 / 断点 / 半成品 / 调试探针），非 UI |
+| `.trellis/spec/guides/instance-testing-discipline.md` | 实例测试硬纪律（最多 2 个实例、只准 Dev、禁自动开浏览器） |
 
----
+### 重写
 
-## 二、任务树与编号
-
-```
-10-26-storage-chart-workbench   ← 父任务，持有 R1–R12 与 AC-1~AC-19
-├── 10-26-naming-injection      R1 + R6.5 + R10.1        AC-1~AC-5
-├── 10-26-storage-chart         R2 + R9 + R12            AC-6~AC-12
-├── 10-26-zones-flow            R3 + R11 + R10.2         AC-13~AC-20
-├── 10-26-package-cards-vault   R4 + R5                  AC-21~AC-26
-├── 10-26-tutorial-copy         R6 + R10.3 + R10.4       AC-27~AC-31
-└── 10-26-ui-demo               R8                        AC-32~AC-36
-```
-
-每个子任务的 `prd.md` 已按父 PRD 对应章节回填（不再有 TBD），`implement.jsonl` / `check.jsonl` 已各填真实条目（`task.py start` 的校验能过）。
-
-**建议启动顺序**：`naming-injection` → `storage-chart` → `zones-flow` → `package-cards-vault` → `tutorial-copy`。
-`ui-demo` 已实质完成（AC-32~36 满足），可在其余子任务启动后直接归档。
-
----
-
-## 三、demo 结构速查（改产品代码时对着看）
-
-单文件 `deliverables/ui-demo.html`，约 1800 行，段落顺序固定：
-
-| 区域 | 作用 |
+| 文件 | 说明 |
 | --- | --- |
-| `<style>` 顶部 `:root` | **模拟酒馆令牌**，取值来自真机 Luker `public/style.css:71-82`；派生层与项目 `style.css:35-57` 同构 |
-| `ICON_LUKER / ICON_TT / ICON_PT / ICON_ST` | 四个本地内置图标（base64），无外链 |
-| `HOSTS / TARGETS` | 宿主与目标平台注册表（品牌色变量名也在这里） |
-| `backupTree()` | **图表树唯一来源**，按真实备份包结构写成；宿主图表与包图表共用 |
-| `chartTargets() / volumesOf() / splitChunks() / buildVolumeTree()` | 目标选择与分卷算法（下钻→装卷→重建祖先） |
-| `chartCardHtml() / renderTreeRows() / renderChart()` | 图表卡与树渲染；勾选记忆键 = `scope::nodeId` |
-| `pkgSeq() / seqLabel() / seqNum()` | 两区独立序号 |
-| `fitPackageNames()` | Canvas 量宽的包名折行判定 |
-| `initSplitters()` | 三条拖拽分隔线（含交叉点十字手柄） |
-| `doGenerate()` | 按「包 × 卷」产出多个导出包 |
+| `src/ui/workbench-template.js` | 由 demo 的面板 HTML **逐字生成**（构建脚本 `test-results/mktemplate.cjs`，不手改） |
+| `style.css` | 由 demo 的 `<style>` **逐条搬运 + 容器作用域**（`test-results/mkstyle.cjs`）；固定深色令牌；独立页底色深色 |
+| `index.js` | 全新控制器：宿主探测 / 包仓库 / 计划 / 转换 / 恢复 / 局域网 / 设置，全部通过视图 API |
 
-改 UI 的顺序：**先改 demo → 截图校对 → 再改 `src/`**（这是本项目已定纪律）。
+### 删除（不再保留任何旧 UI）
+
+`workbench-shell.js`、`workbench-layout.js`、`view.js`、`category-filter.js`、`category-detail-panel.js`、
+`file-tree-picker.js`、`stash-list.js`、`usage-dashboard.js`、`vault-panel.js`、`log-console.js`、
+`onboarding-guide.js`、`help-topics.js`、`action-colors.js`、`task-controls.js`、`file-drop.js`，
+以及只服务它们的测试（`workbench-shell/layout`、`category-filter-render`、`stash-list*`、`ui-verb-table`、`vault-panel-render`、`help-topics`）。
 
 ---
 
-## 四、这一轮定下的关键决策（含推翻的旧决定）
+## 三、主题与配色（已定稿）
 
-| 主题 | 决策 | 理由 / 旧状态 |
-| --- | --- | --- |
-| 面板配色 | 全部继承 `--SmartTheme*` | 2026-10-27 用户明确要求「不是独立的，随酒馆主题」 |
-| 面板轮廓 | 由 BodyColor 派生 `--outline` | 真机 `--SmartThemeBorderColor` 是 `rgba(0,0,0,.5)`，深底不可见 |
-| 平台品牌色 | 四色从官方图标取色，**只做标识** | 这是**对 2026-10-14「不再自造四个品牌色」的定向推翻**，但限制在标识用途，不染面板 |
-| Luker 图标 | 用 `apple-icon-512x512.png`（纯黑剪影） | `logo.svg` 至今仍是 ST 那份（fork 未换）；提交 `d44656a6b` 换的是 app icon |
-| 顶栏徽标 | 插件 = 宿主 icon + 英文全名 + 「插件」；Web = GitHub 图标 + 「Web」 | 宿主名只此一处，图表区内不得再写 |
-| 图表身份 | 组头只写 `导入05` / `导出01`，包卡只显示两位数字压图标角 | 取消「包·」前缀，示例信息不重复 |
-| 包卡按钮 | 删除「在图表中查看」 | 与点卡切换图表重复 |
-| 分卷 | 32–2048 MB，单位 MB，可下钻装卷，每卷一张标准图表卡 | 只在顶层切会撑破卷（实测「聊天记录」大于单卷上限） |
-| 导出 | 按「包 × 卷」产出 N 个独立可导入的包 | R7.3「每卷独立可导入」 |
-| 日志 | 移入顶栏弹窗，WARN/ERROR 显红点 | 常驻右栏会挤压「执行」导致显示不全 |
-| 布局 | 左右 8px + 右栏上下分隔条，交叉点十字手柄 | 用户要求桌面可调；执行面板必须贴底 |
-| 移动端 | 分隔条隐藏；多卷单列折叠、默认只展开第一卷；无吸底条 | 吸底条会覆盖列表（被判为「组件交错」） |
-| 文案 | 面板内禁止说明性整句，说明只进「?」与教程 | 用户多次要求去重、去「落单的字」 |
+- **架构**：颜色仍走宿主令牌体系；`style.css` 只读取 `--SmartTheme*` 并提供回退。
+- **当前**：容器内**固定深色令牌**（用户 2026-10-27 裁定「现在只用深色」），不再跟随宿主浅色。
+- **独立页**：`index.html` 内联 `html,body{background:#0b0b0d}`，面板不再白底。
+- 品牌色只出现在标识（包卡图标环 / 宿主角标 / 下拉图标）。
 
 ---
 
-## 五、取证事实（实现时要照抄，别重新猜）
-
-### 5.1 四平台品牌色
-
-| 平台 | 取色 | 来源文件 |
-| --- | --- | --- |
-| SillyTavern | `#a11b1b` | `Instance/Dev/SillyTavern/public/img/logo.svg`（`fill="#a11b1b"` + 白字） |
-| Luker | 纯黑 `#000` 剪影 | `Instance/Dev/Luker/public/img/apple-icon-512x512.png` |
-| TauriTavern | 浅黄 `#f8c034`（词标 Tavern 段） | 官方词标 PNG；青 `#00a0b0` 是 Tauri 段 |
-| PureTavern | 紫 `#584078`（词标） | `Instance/Dev/PureTavern/apps/vscode-extension/media/icon.png` |
-
-> TT 的 `src/img/logo.svg` 与 ST 同源（占位），**不能**当 TT 品牌依据。
-
-### 5.2 真实备份包结构
-
-来源 `data-zip/default-user-2026-08-25-172056.zip`（1.0 GB / 5560 文件）：
-
-| 目录 | 文件数 | 体积 |
-| --- | --- | --- |
-| `backups/` | 101 | 1274.7 MB |
-| `extensions/` | 3769 | 502.3 MB |
-| `user/`（`images/` 178、`files/` 10、`workflows/` 2） | 186 | 152.8 MB |
-| `chats/`（按角色分目录） | 93 | 108.5 MB |
-| `characters/` | 5 | 6.7 MB |
-| `worlds/` | 6 | 1.6 MB |
-
-- 聊天文件旁有 Luker 私有边车：`*.luker-state.chat_sync.json`、`*.luker-state.memory_graph__meta.json` 等。
-- `user/files/` 放插件数据（`LittleWhiteBox_*.json`、`TavernDB_*_snapshot`）。
-- 根上有 `settings.json`（19.9 MB）、`secrets.json`、`manifest.json`、`movingUI/Default.json`。
-
-### 5.3 酒馆主题令牌真值（Luker 默认主题）
-
-```
---SmartThemeBodyColor        rgb(220,220,210)   ← 文字色（深色主题里是浅色）
---SmartThemeEmColor          rgb(145,145,145)
---SmartThemeUnderlineColor   rgb(188,231,207)
---SmartThemeQuoteColor       rgb(225,138,36)    ← 插件唯一可用的强调来源
---SmartThemeBlurTintColor    rgba(23,23,23,1)   ← 面板底色
---SmartThemeChatTintColor    rgba(23,23,23,1)
---SmartThemeBorderColor      rgba(0,0,0,.5)     ← 深底不可见，别拿它画轮廓
-```
-
----
-
-## 六、怎么验证（照抄即可）
-
-> 2026-10-27 补充：GitHub 远端已改名 `ST-pack-transfer`，但**本地目录尚未改名**
-> （Windows 报「另一个程序正在使用」，被 Claude Code 会话/编辑器持有的项目根阻塞）。
-> 关闭相关程序后执行：
-> `mv D:/Repo/Tavern-repo/My-repo/ST-zip-converter D:/Repo/Tavern-repo/My-repo/ST-pack-transfer`，
-> 并同步 `.codex/hooks.json` 的绝对路径。
-> 独立 Web E2E（`npm run e2e:web`）本轮未能跑完（运行器在 9 分钟内无输出、静态服务器常驻），待补。
-
-```bash
-cd D:/Repo/Tavern-repo/My-repo/ST-zip-converter
-
-# 1) 产品代码质量门（改 src/ 之后必跑）
-npm test
-
-# 2) demo 截图校对（改 demo 之后必跑）
-node .trellis/tasks/10-26-storage-chart-workbench/deliverables/shot-demo.cjs
-# 脚本随任务一起入库，自己解析仓库根与 playwright（先找本仓 e2e 解析器，再找全局安装）
-# 截图输出到 test-results/ui4/*.png（gitignored）
-# 覆盖：教程基础/进阶、四宿主、分卷、多包、目标平台下拉、浅色主题、Web 模式、导出区、日志弹窗+帮助、两条分隔条拖拽、批量导出
-```
-
-**判据**：末行打印 `CONSOLE ERRORS: none`；桌面/移动截图无贴边、无交错；分卷每卷 ≤ 上限且无 0 MB 空卷。
-
-### 6.1 推送（本机特有，必看）
-
-`git config http.proxy` 指向**已失效**的 `127.0.0.1:7891`。直接 `git push` 会失败；
-`-c http.proxy=` 是「禁用代理」而不是「回落到环境变量」，也会失败（直连不通）。
-
-```bash
-env | grep -i proxy            # 看当前 $HTTPS_PROXY（本次是 127.0.0.1:12334）
-git -c http.proxy="$HTTPS_PROXY" -c https.proxy="$HTTPS_PROXY" push origin main
-git rev-parse HEAD origin/main  # 两行必须相等
-```
-
----
-
-## 七、下一步怎么做
-
-1. `python ./.trellis/scripts/task.py current` 确认当前任务。
-2. 按顺序 `task.py start 10-26-naming-injection`，实现 `src/core/naming.js` + `src/ui/host-bridge.js` 入口改造。
-3. 每完成一个子任务：跑 `npm test` → 提交（显式 pathspec）→ 推送 → `task.py archive`。
-4. 实现期以 demo 为唯一 UI 基准；若发现 demo 与 PRD 冲突，**先改 PRD，再改 demo，最后改代码**。
-5. 收口时把规范落 `.trellis/spec/`（任务目录不是持久载体）。
-
-### 各阶段入口文件
-
-| 子任务 | 主要落点 |
-| --- | --- |
-| naming-injection | `src/core/naming.js`（新）、`src/ui/host-bridge.js`、`manifest.json`、`package.json` |
-| storage-chart | `src/core/format-registry.js`（新）、`storage-inventory.js`（新）、`src/ui/storage-chart.js`（新） |
-| zones-flow | `src/ui/zone-panel.js`（新）、`export-queue.js`、`workbench-template.js` |
-| package-cards-vault | `src/ui/package-card.js`（新）、`src/core/package-container.js`（新）、`src/storage/db.js` |
-| tutorial-copy | `src/ui/tutorial.js`（新）、`help-topics.js`、全仓文案 |
-| ui-demo | 已完成，可归档 |
-
----
-
-## 八、雷区（本任务专属）
-
-1. **CSS 双前缀铁律**：`style.css` 每条规则必须带 `.app-container` 或 `.st-converter-drawer-app` 前缀；裸酒馆类名会污染全站（2026-09 真实事故）。品牌色只能出现在自定义类上。
-2. **`[hidden]` 压不过同特异度 `display`**：`select`/`div` 写了 `display:flex` 就必须另写 `[hidden]{display:none}`。demo 里 `.batch-bar[hidden]`、`.picker-pop[hidden]` 都是为此而写。
-3. **`display:contents` 只改布局树不改 DOM 树**：选择器要按 DOM 写（`.col-side > *` 而不是 `.app-main > *`），否则移动端面板会被压成 2px。
-4. **分卷只在顶层切会撑破卷**：必须下钻到子项；单文件超上限要显式标记，不能静默。
-5. **`-c http.proxy=` 不是回落**：见 §6.1。
-6. **销毁/重建 Worker 后必须置空引用**（`034b7ab` 教训），本次不涉及但改 worker 时要记住。
-7. **不要改 `src/vendor/`**；不要写本地酒馆实例目录。
-
----
-
-## 九、未决 / 待验
-
-| 项 | 状态 | 怎么验 |
-| --- | --- | --- |
-| TT `fs` scope 是否覆盖 `$APPDATA/data` | 未验 | 在 Dev TT 实例实测 `window.__TAURI__.fs.readDir`；被拒则降级「整包备份反推」并标注低精度 |
-| `user/files/` 上行 500 MB 上限对分卷的影响 | 未定 | 分卷上限 2048 MB 可能超过上传接口 body 上限，实现时需按目标宿主能力取 min |
-| Luker `storage/inspect` 的分页与深度 | 未验 | 对 Dev Luker 实测钻取层级与响应大小 |
-| 大包性能阈值（虚拟滚动触发点） | 未定 | 用真实 3769 文件扩展目录压测后定 |
-
----
-
-## 十、与旧任务的关系
-
-- `10-14-workbench-overhaul`（planning，0/3）、`10-24-ui-orchestration-r2`（planning，4/4）未动，本计划不依赖它们。
-- `10-01-safe-migration-productization`（planning，12/12）仍是上一阶段总任务。
-- 上一阶段背景见记忆 `st-zip-converter-safe-migration-initiative`。
-
----
-
-## 十一、2026-10-27 仓库维护（与图表重构解耦，已完成）
-
-由用户单独提出的三项仓库事务，已实施并推送（`924e919`）：
+## 四、已实测读数
 
 | 项 | 结果 |
 | --- | --- |
-| GitHub 远端改名 | `jiozhaoyue/ST-pack-transfer`；本地 `origin` 已切换；旧 URL 由 GitHub 自动重定向 |
-| README | 重写为简洁结构：四酒馆数据包是什么 → 能做什么 → 优点 → 三种使用方式（装进酒馆 / 本地部署 / 在线）→ 质量门 → 许可证 |
-| 许可证 | MIT → **GNU GPL v3**（`GPL-3.0-or-later`），`package.json` 与 lock 根节点同步；`LICENSE` 为 GPL 全文 |
-| GitHub Pages 部署 | 清理历史部署记录，仅保留最新一条（215 → 1） |
+| `npm test` | 859 passed / 2 skipped（80 文件通过） |
+| `check:css-scope` / `dom-injection` / `template-source` / `dom-scope` / `control-consumer` | 全 PASS |
+| `npm run build` | 通过（dist 正常产出） |
+| 独立 Web 上传→扫描→图表 | `e2e-sample-st.zip` → 3 个分组 / 3 个文件；展开 4 行；勾选 3 项 |
+| 生成导出包 | 导出区出现 1 个只读副本，进度「导出包已就绪」 |
+| 局域网 / 设置 / 日志面板 | 均可打开；局域网已主题化卡片，不再白底浮框 |
 
-**仍未完成（阻塞项）**：本地目录仍是 `ST-zip-converter`——Windows 报「另一个程序正在使用」，
-被 Claude Code 会话/编辑器持有的项目根阻塞；关闭相关程序后执行：
+---
 
-```bash
-mv D:/Repo/Tavern-repo/My-repo/ST-zip-converter D:/Repo/Tavern-repo/My-repo/ST-pack-transfer
-```
+## 五、未完成 / 已知问题（按优先级）
 
-并同步 `.codex/hooks.json` 中的绝对路径。
+1. **实例侧 E2E 规格仍按旧 UI 写**：`e2e/specs/matrix.e2e.cjs`、`vault.e2e.cjs` 仍引用
+   `#plan-summary-bar`、`#category-checkboxes`、`#btn-convert`、`#stash-list` 等已删除节点。
+   `smoke.e2e.cjs` 已改为新节点（`#zone-body` / `#zone-tabs` / `#quota-head` / `#chart-stack`）。
+   → **矩阵与仓规格需要按新 UI 重写**，否则实例 E2E 必红。
+2. **局域网面板只做了「主题化」**：结构仍是自写的「发送 / 接收」两段。
+   用户要求**完全对标 Luker 与 TT**（Luker `public/scripts/lan-sync.js` 的 peer row / 类目勾选 / 状态区；
+   TT 的阶段 + 进度事件）。→ 下一步应重写 `src/ui/lan-transfer-panel.js` 的 DOM 结构与状态区。
+3. **宿主自动开浏览器**：Dev ST / Luker 的 `config.yaml` 已设 `browserLaunch.enabled: false`，
+   但历史上实例已在运行时仍会开标签；需在**重启后**确认。禁止与其它自动开浏览器的工具同时运行。
+4. **设置弹窗是动态渲染**：`#set-*` 控件不在模板里，静态守卫不覆盖；改设置项时同步改
+   `index.js` 的 `openSettings()`。
+5. **旧任务链**：`10-26-storage-chart / zones-flow / package-cards-vault / tutorial-copy` 的 PRD 仍按旧结构写，
+   其中「单一图表 / 分区流转 / 包卡 / 教程」已由本轮 demo 搬运实现；**收口时需要按新实现回填验收**。
+
+---
+
+## 六、下一步怎么做
+
+1. 先读 `instance-testing-discipline.md`，**最多起 2 个实例**，默认只起 1 个：
+   ```bash
+   node scripts/run-e2e-instances.cjs --only dev-st
+   ```
+2. 重写 `e2e/specs/matrix.e2e.cjs` 与 `vault.e2e.cjs` 到新 UI（选择器见模板 id）。
+3. 重写局域网面板结构，对标 Luker / TT；协议层保持现有 WebRTC 取件码。
+4. 每步：`npm test` + 五守卫 → 提交（显式 pathspec）→ 推送 → `task.py archive`。
+
+---
+
+## 七、关键文件地图
+
+| 区域 | 文件 |
+| --- | --- |
+| 模板（唯一来源） | `src/ui/workbench-template.js`（由 demo 生成，勿手改） |
+| 视图（demo 渲染） | `src/ui/workbench-view.js`（勿改渲染逻辑，只接 `actions`） |
+| 控制器 | `index.js` |
+| 图表模型 | `src/core/chart-model.js` |
+| 任务运行时 | `src/app/task-runtime.js` |
+| 样式 | `style.css`（demo 样式 + 容器作用域；固定深色） |
+| 生成脚本 | `test-results/mktemplate.cjs`、`test-results/mkstyle.cjs`（改了 demo 后重新生成） |
+| 实例纪律 | `.trellis/spec/guides/instance-testing-discipline.md` |
+
+---
+
+## 八、雷区
+
+1. **CSS 双前缀**：`style.css` 每条规则的主体必须是 `#app.app-container`（或自有浮层 id）；裸选择器会污染宿主。
+2. **`[hidden]` 压不过同特异度 `display`**：默认隐藏容器若写了 `display`，必须另写 `[hidden]{display:none}`。
+3. **实例并发**：**最多 2 个**，默认 1 个；PT/TT 必须单独跑。
+4. **禁止与其它自动开浏览器的工具并行**；`browserLaunch.enabled` 必须为 `false`。
+5. 改 demo 后必须重新跑生成脚本，否则模板/样式与 demo 漂移。

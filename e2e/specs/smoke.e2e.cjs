@@ -94,10 +94,10 @@ module.exports = {
       return {
         ok: true,
         dropzone: Boolean(q('#dropzone, .dropzone')),
-        stashList: Boolean(q('#stash-list')),
-        exportQueue: Boolean(q('#export-queue-panel')),
-        usageDashboard: Boolean(q('#usage-dashboard')),
-        categoryPanel: app.querySelectorAll('.category-panel').length,
+        zoneBody: Boolean(q('#zone-body')),
+        zoneTabs: Boolean(q('#zone-tabs')),
+        quota: Boolean(q('#quota-head')),
+        chartStack: app.querySelectorAll('#chart-stack').length,
         headerCount: app.querySelectorAll('.app-header').length,
       };
     });
@@ -105,10 +105,10 @@ module.exports = {
     t.ok('工作台容器存在（模态内 #app.app-container）', opened.ok, opened.reason || '');
     if (opened.ok) {
       t.ok('上传暂存区拖放点已渲染（#dropzone）', opened.dropzone);
-      t.ok('源包列表容器已渲染（#stash-list）', opened.stashList);
-      t.ok('待导出区容器已渲染（#export-queue-panel）', opened.exportQueue);
-      t.ok('配额条容器已渲染（#usage-dashboard）', opened.usageDashboard);
-      t.ge('类目面板已渲染（.category-panel）', opened.categoryPanel, 1);
+      t.ok('数据包区容器已渲染（#zone-body）', opened.zoneBody);
+      t.ok('导入/导出分区页签已渲染（#zone-tabs）', opened.zoneTabs);
+      t.ok('配额表头已渲染（#quota-head）', opened.quota);
+      t.ge('存储图表已渲染（#chart-stack）', opened.chartStack, 1);
       // 2026-10-15：插件态与独立态共用同一份模板，页头（含关闭按钮）两态都有
       t.eq('页头已渲染（模态态带关闭入口）', opened.headerCount, 1);
     }

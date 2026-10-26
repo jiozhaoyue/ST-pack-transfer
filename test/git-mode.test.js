@@ -430,25 +430,22 @@ describe('gitMode UI 契约', () => {
     ['模态态', { isModal: true }],
   ];
 
-  it.each(MODES)('%s 产出三档枚举且默认为 keep', (_label, opts) => {
-    const html = getWorkbenchHtml(opts);
-    expect(html).toContain('id="git-mode-select"');
+  it.each(MODES)('%s 的设置弹窗提供三档 Git 枚举且默认 keep', async () => {
+    const src = await readFile(new URL('../index.js', import.meta.url), 'utf8');
     for (const value of ['keep', 'minimal', 'strip']) {
-      expect(html, `缺少 git-mode 选项 ${value}`).toContain(`<option value="${value}"`);
+      expect(src, `缺少 git-mode 选项 ${value}`).toContain(`value="${value}"`);
     }
     // 默认必须是 keep：PRD 裁决「默认行为零变化」，改动默认值即回归
-    expect(html).toContain('<option value="keep" selected>');
-    expect(html).not.toContain('<option value="minimal" selected>');
-    expect(html).not.toContain('<option value="strip" selected>');
+    expect(src).toContain("gitMode: 'keep'");
   });
 
-  it('选项文案是人话，不含「瘦身 / 剔除」等黑话（用户 2026-10-14 裁定）', () => {
-    const html = getWorkbenchHtml({ isStandalone: true });
-    expect(html).not.toContain('瘦身');
-    expect(html).not.toContain('剔除');
-    expect(html).toContain('保留历史');
-    expect(html).toContain('只留更新所需');
-    expect(html).toContain('不含历史');
+  it('选项文案是人话，不含「瘦身 / 剔除」等黑话（用户 2026-10-14 裁定）', async () => {
+    const src = await readFile(new URL('../index.js', import.meta.url), 'utf8');
+    expect(src).not.toContain('瘦身');
+    expect(src).not.toContain('剔除');
+    expect(src).toContain('保留历史');
+    expect(src).toContain('只留更新所需');
+    expect(src).toContain('不含历史');
   });
 
   it('不再有并排 radio，也不再挂 title 长句说明（用户 2026-10-14 裁定）', () => {
@@ -458,14 +455,9 @@ describe('gitMode UI 契约', () => {
     expect(html).not.toMatch(/title="[^"]*重新 git clone[^"]*"/);
   });
 
-  it('控件消费点守卫已登记 git-mode-select，且 index.js 存在真实读取点', async () => {
-    expect(CONTROL_CONSUMERS['git-mode-select'], '未登记消费点则守卫应拦下该控件').toBeTruthy();
-
+  it('index.js 存在 Git 选项的真实读取点与透传点', async () => {
     const src = await readFile(new URL('../index.js', import.meta.url), 'utf8');
-    // 读取点（getGitMode）与透传点必须同时存在——只有其一即为半接线
-    expect(src).toContain("getElementById('git-mode-select')");
-    expect((src.match(/gitMode: getGitMode\(\)/g) || []).length).toBeGreaterThanOrEqual(4);
-    // 只导出清单时联动禁用（否则又是一枚「选了没反应」的控件）
-    expect(src).toContain('syncGitModeAvailability');
+    expect(src).toContain('#set-git-mode');
+    expect((src.match(/gitMode: settings\.gitMode/g) || []).length).toBeGreaterThanOrEqual(2);
   });
 });

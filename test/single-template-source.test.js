@@ -26,7 +26,7 @@ describe('单一模板源守卫', () => {
   });
 
   it.each([
-    ['业务节点 id', '<div id="stash-list"></div>', 'stash-list', 1],
+    ['业务节点 id', '<div id="zone-body"></div>', 'zone-body', 1],
     ['业务控件 id', '<button id="btn-convert"></button>', 'btn-convert', 1],
     ['宿主原生类', '<button class="menu_button"></button>', 'menu_button', 1],
     ['折叠容器类', '<div class="inline-drawer"></div>', 'inline-drawer', 1],
@@ -41,9 +41,9 @@ describe('单一模板源守卫', () => {
   });
 
   it('当模板缺失被 index.js 引用的节点时报告违规', () => {
-    const template = fullTemplate.replace('<div id="stash-list"></div>', '');
+    const template = fullTemplate.replace('<div id="zone-body"></div>', '');
     const violations = checkSingleTemplateSource({ html: skeleton, template });
-    const target = violations.find((v) => v.id === 'stash-list');
+    const target = violations.find((v) => v.id === 'zone-body');
 
     expect(target).toBeDefined();
     expect(target.file).toBe('src/ui/workbench-template.js');
@@ -96,27 +96,11 @@ describe('双入口渲染一致性（R8.2 · 独立态 / 模态态）', () => {
     expect(missing).toEqual([]);
   });
 
-  it.each(MODES)('%s 的折叠区为宿主原生 inline-drawer，且带状态读数（R1.1 / R1.2）', (_label, opts) => {
-    const html = getWorkbenchHtml(opts);
-
-    expect(html).toContain('inline-drawer');
-    // 折叠组件复用宿主原生结构，不得回退到 <details>
-    expect(html).not.toContain('<details');
-    // 2026-10-14：扩展打包与包名两个折叠区随单一视图重构删除（改为常驻枚举与常驻输入框），
-    // 保留的三个折叠区各自仍须带状态读数。
-    for (const id of ['fold-summary-cleanup', 'fold-summary-incremental', 'fold-summary-report']) {
-      expect(html).toContain(`id="${id}"`);
-    }
-  });
-
   it('只有模态态带关闭按钮（两态的唯一合法分支差异）', () => {
-    expect(getWorkbenchHtml({ isModal: true })).toContain('id="btn-close-converter-modal"');
-    expect(getWorkbenchHtml({ isStandalone: true })).not.toContain('id="btn-close-converter-modal"');
+    expect(getWorkbenchHtml({ isModal: true })).toContain('id="btn-close"');
+    expect(getWorkbenchHtml({ isStandalone: true })).not.toContain('id="btn-close"');
     // 页头两态都有（插件态要有关闭入口，独立态要有标题与徽标）
     expect(getWorkbenchHtml({ isModal: true })).toContain('class="app-header"');
     expect(getWorkbenchHtml({ isStandalone: true })).toContain('class="app-header"');
-    // 「存储」入口（宿主原生存储面板）两态都渲染，由 JS 按宿主可用性解除 hidden
-    expect(getWorkbenchHtml({ isModal: true })).toContain('id="btn-storage-inspector"');
-    expect(getWorkbenchHtml({ isStandalone: true })).toContain('id="btn-storage-inspector"');
   });
 });

@@ -119,9 +119,7 @@ const t = \`document.body.appendChild(w);\`;
 describe('宿主 DOM 作用域守卫 · 真仓现状', () => {
   it('src/ui 与 index.js 当前零未声明写入（改动后若报错，先看是否确属必要再决定加标记）', async () => {
     const files = ['index.js'];
-    for (const f of ['view.js', 'export-queue.js', 'stash-list.js', 'log-console.js', 'host-bridge.js',
-      'category-filter.js', 'file-tree-picker.js', 'escape.js', 'file-drop.js', 'task-controls.js',
-      'usage-dashboard.js', 'action-colors.js', 'workbench-template.js']) {
+    for (const f of ['workbench-view.js', 'workbench-template.js', 'host-bridge.js', 'escape.js']) {
       files.push(`src/ui/${f}`);
     }
     const all = [];

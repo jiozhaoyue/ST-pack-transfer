@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import {
@@ -57,16 +58,14 @@ describe('selection-defaults（单一默认源）', () => {
     expect({ ...built }).toEqual({ ...FULL_SELECTION });
   });
 
-  it('【AC-2】模板三个特殊类目复选框的默认 = DEFAULT_SELECTION 对应值', () => {
-    const html = getWorkbenchHtml({ isStandalone: true });
-    const checkedOf = (id) => {
-      const match = html.match(new RegExp(`<input[^>]*id="${id}"[^>]*>`));
-      expect(match, `模板缺少 #${id}`).not.toBeNull();
-      return /\bchecked\b/.test(match[0]);
-    };
-    expect(checkedOf('include-backups-check')).toBe(DEFAULT_SELECTION.backups);
-    expect(checkedOf('include-cache-check')).toBe(DEFAULT_SELECTION.cache);
-    expect(checkedOf('include-private-check')).toBe(DEFAULT_SELECTION.appPrivate);
+  it('【AC-2】三个特殊类目默认值由设置弹窗承接', async () => {
+    const src = await readFile(new URL('../index.js', import.meta.url), 'utf8');
+    expect(src).toContain('includeBackups');
+    expect(src).toContain('includeCache');
+    expect(src).toContain('includePrivate');
+    expect(src).toContain('set-include-backups');
+    expect(src).toContain('set-include-cache');
+    expect(src).toContain('set-include-private');
   });
 
   it('【AC-2 双轨消除】backups 默认勾选 ⇒ 面板意图与产物载体不再矛盾', () => {

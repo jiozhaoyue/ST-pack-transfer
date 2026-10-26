@@ -32,87 +32,26 @@ const CONTROL_TAGS = ['button', 'input', 'select', 'textarea'];
  * 否则写一条 `group:.menu_button` 就能绕过整张表。
  */
 export const CONTROL_CONSUMERS = Object.freeze({
-  // ── 向导外壳（S5 第二步）──
-  // ── 引导（2026-10-14：迁移向导外壳已删除，只留引导按钮 + 全屏引导）──
-  'btn-guide': 'onboarding-guide.js mountOnboardingGuide — click 打开全屏引导（首装自动打开）',
-
-  // ── 抽屉/模态态框架 ──
-  'btn-close-converter-modal': 'index.js openConverterModal() — click 关闭模态工作台',
-  'btn-storage-inspector': 'index.js setupStorageInspectorButton() — click 唤起宿主原生存储面板',
-
-  // ── 源包与暂存区 ──
-  'file-input': 'file-drop.js — change → .files 取上传文件',
-
-  // ── 私有格式仓（2026-10-26：vault-store 的 UI 入口）──
-  'btn-vault-add': 'index.js — click 触发 vault-file-input 选文件存入仓',
-  'vault-file-input': 'index.js — change → .files 经 saveFilesToVault 存入仓',
-
-  // ── 类目工具按钮 ──
-  'btn-select-all': 'category-filter.js:84 — click 全选',
-  'btn-deselect-all': 'category-filter.js:89 — click 全不选',
-  'btn-invert-select': 'category-filter.js:94 — click 反选',
-
-  // ── 统一文件树确认条 ──
-  'btn-host-tree-selectall': 'index.js:308 — click 全选（走 categorySelectAll）',
-  'btn-host-tree-confirm': 'index.js:302 — click 确认文件树',
-  'btn-host-tree-cancel': 'index.js:305 — click 取消文件树',
-
-  // ── 拉取前预览行（R-A5，2026-10-24）──
-  'btn-host-fetch-go': 'index.js — click 确认发起宿主拉取（resolveHostFetchPreview(true)）',
-  'btn-host-fetch-cancel': 'index.js — click 取消本次拉取（resolveHostFetchPreview(false)）',
-
-  // ── 输出三联（F 区）──
-  'target-select': 'index.js:163/314 — .value 目标平台（st|l|tt|pt）',
-  'compression-select': 'index.js:337 — .value 转 int → zip 压缩级别',
-  'split-input': 'index.js:202 — .value → normalizeSplitMb() 分卷阈值',
-
-  // ── 垃圾清理（H 区）──
-  'include-backups-check': 'index.js — .checked 是否打包 backups/ 快照',
-  'include-cache-check': 'index.js — .checked 是否打包派生缓存',
-  'include-private-check': 'index.js — .checked 是否打包私有配置',
-  'prune-builtin-check': 'index.js — .checked 是否剔除酒馆原生重复资产',
-
-  // ── 扩展包与 Git 历史（2026-10-14：由并排 radio 改为两个独立枚举）──
-  'extension-mode-select': 'index.js getExtensionMode() — .value 只导出清单/完整扩展包',
-  'git-mode-select': 'index.js getGitMode() — .value 转 transform 的 gitMode（keep|minimal|strip）；'
-    + 'syncGitModeAvailability() 读 extension-mode-select 决定本项是否 disabled',
-  'keep-dev-files-check': 'index.js getKeepDevFiles() — .checked 是否保留构建配置',
-  'btn-export-ext-manifest': 'index.js:502 — click 导出只读扩展清单',
-
-  // ── 增量与差量（J 区）──
-  'host-incremental-export': 'index.js — .checked 差量补丁开关（控制基准 ZIP 区显隐 + 导出走 delta）',
-  'host-base-zip-input': 'index.js — change → .files 取外部基准 ZIP',
-  'btn-select-base-zip': 'index.js:761 — click 触发基准 ZIP 文件选择',
-  'host-base-archive-select': 'index.js — .value 从暂存区选基准包',
-
-  // ── 包名（K 区）──
-  'filename-template-input': 'index.js — .value 包名模板（{target}_{user}_{part}_{datetime}）',
-
-  // ── 动作按钮（E 区）──
-  'btn-host-fetch': 'index.js — click 从宿主拉取数据包',
-  'btn-library-export': 'index.js handleLibraryExport() — click 把聊天库里的聊天导成一个数据包（纯库模式的导出出口；无库时该按钮不可见）',
-  'btn-convert': 'index.js — click 开始转换',
-  'btn-lan-send': 'index.js — click 打开局域网互传面板（lan-transfer-panel.js open）',
-
-  // ── 任务控制 ──
-  'tc-pause': 'task-controls.js:47 — click 暂停任务',
-  'tc-abort': 'task-controls.js:48 — click 中止任务',
-  'tc-resume': 'task-controls.js:49 — click 继续任务',
-  'tc-discard': 'task-controls.js:50 — click 丢弃断点',
-
-  // ── 恢复模态 ──
-  'restore-backup-confirmed': 'index.js buildRestoreGateContext() — .checked 目标备份声明（S3 写入门禁的 backup 证据）',
-  'restore-conflict-ack': 'index.js buildRestoreGateContext() — .checked 「冲突状态未知」风险确认（S3 写入门禁的 conflicts 确认）',
-  'btn-target-preflight': 'index.js handleTargetPreflight() — click 拉当前宿主清单做真实冲突预检 + 自动保底备份（S3 执行层）',
-  'restore-mode-select': 'index.js — .value 合并写入/覆盖写入',
-  'btn-cancel-restore': 'index.js:1167 — click 取消恢复',
-  'btn-confirm-restore': 'index.js:1174 — click 确认恢复写入',
-  'btn-restore-luker': 'index.js — click 恢复到当前用户（打开恢复模态）',
-
-  // ── 流程方向与导入屏（2026-10-15：工作台双方向重设计）──
-  'btn-flow-out': 'workbench-shell.js — click 切到导出流程（重排模块，导出屏）',
-  'btn-flow-in': 'workbench-shell.js — click 切到导入流程（重排模块，导入屏）',
-  'btn-restore-inline': 'index.js — click 用当前源包打开恢复模态（导入屏主操作；无宿主或无源包时 disabled）',
+  'btn-close': 'src/ui/workbench-view.js — 事件绑定 / 读取（btn-close）',
+  'btn-guide': 'src/ui/workbench-view.js — 事件绑定 / 读取（btn-guide）',
+  'btn-log': 'src/ui/workbench-view.js — 事件绑定 / 读取（btn-log）',
+  'btn-settings': 'src/ui/workbench-view.js — 事件绑定 / 读取（btn-settings）',
+  'file-input': 'src/ui/workbench-view.js — 事件绑定 / 读取（file-input）',
+  'filename-template': 'src/ui/workbench-view.js — 事件绑定 / 读取（filename-template）',
+  'log-clear': 'src/ui/workbench-view.js — 事件绑定 / 读取（log-clear）',
+  'log-close': 'src/ui/workbench-view.js — 事件绑定 / 读取（log-close）',
+  'log-copy': 'src/ui/workbench-view.js — 事件绑定 / 读取（log-copy）',
+  'split-input': 'src/ui/workbench-view.js — 事件绑定 / 读取（split-input）',
+  'target-btn': 'src/ui/workbench-view.js — 事件绑定 / 读取（target-btn）',
+  'tutorial-adv': 'src/ui/workbench-view.js — 事件绑定 / 读取（tutorial-adv）',
+  'tutorial-next': 'src/ui/workbench-view.js — 事件绑定 / 读取（tutorial-next）',
+  'tutorial-prev': 'src/ui/workbench-view.js — 事件绑定 / 读取（tutorial-prev）',
+  'tutorial-skip': 'src/ui/workbench-view.js — 事件绑定 / 读取（tutorial-skip）',
+  'group:.help-btn': 'src/ui/workbench-view.js — 事件委托',
+  'group:.zone-tab': 'src/ui/workbench-view.js — 事件委托',
+  'group:.seg-btn': 'src/ui/workbench-view.js — 事件委托',
+  'group:.log-level-btn': 'src/ui/workbench-view.js — 事件委托',
+  'file-input': 'index.js — change 读取上传的 zip',
 });
 
 /** 从模板源码提取全部交互控件 */
