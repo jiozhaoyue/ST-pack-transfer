@@ -1,0 +1,2 @@
+{"file": ".trellis/spec/guides/e2e-instances-runner.md", "reason": "核对新增 vault 行与既有错峰/重启/PT 重装约定一致"}
+{"file": ".trellis/spec/frontend/ui-orchestration-rules.md", "reason": "仓面板是工作台模块，控件与文案需符合工作台定型规范"}

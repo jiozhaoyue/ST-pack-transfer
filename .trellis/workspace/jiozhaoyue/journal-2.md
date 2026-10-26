@@ -262,3 +262,34 @@ S1 四现症固化为 s1-remedies E2E（15/15）；三层架构与 CSS 铁律落
 ### Next Steps
 
 - ① 归档 10-26-host-vault 与 10-25-e2e-instances-runner；② 父任务 r2 仅剩 AC-6（Authority 整包恢复端点，待治理裁定）；③ 仓 UI 在 TT/PT 的运行时截图未取证（TT 延迟激活 ~35s 需并入矩阵才稳）；④ KI-1 st 产物命名疑点仍独立待办
+
+## Session 52: 仓运行时验证固化进 e2e:instances 矩阵（四宿主含 TT/PT）
+<!-- trellis-session: v=2 fp=vault-e2e-20261026 -->
+
+**Date**: 2026-10-26
+**Task**: 10-26-vault-e2e-spec
+**Branch**: `main`
+
+### Summary
+
+把 `10-26-host-vault` 的一次性取证脚本固化为 `e2e/specs/vault.e2e.cjs`（后端真值判定 + 存入/导出字节一致/删除双归零），并入矩阵 dev-st / dev-luker / dev-pt；TT 走 `tt-cdp.cjs` 新增的 `ttVaultSmoke`。四宿主全绿：st 17/17（indexeddb·本地）、luker 17/17（authority·服务端，连跑 3 次稳定）、pt 17/17、tt PASS；整轮 `e2e:instances` exit 0，npm test 924 + 五守卫全绿。实测暴露并修掉四件事：TT 已装副本过期导致插件 import 404（ensureInstalled 改刷新式）、TT 冷启动导航致 evaluate 上下文销毁（retryOnNav）、PT 阶段停在 scanned（按 fixture- 前缀清源包）、Luker 删除后 UI 刷新 4.5–9s 且弹窗叠层（按文案锁定弹窗 + 30s）。TT 截图改为工作台元素截图，避免带进真实聊天内容（P-11）。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| （本次） | feat(e2e): 仓运行时验证固化为 vault spec 并入四宿主矩阵（含 TT/PT 取证） |
+
+### Testing
+
+- [OK] node e2e/run.cjs --only vault --instance dev-st / dev-luker / pt-web 各 17/17
+- [OK] npm run e2e:instances 全量 exit 0（st 16+93+17 / luker 16+93+17 / pt 28+17 / tt smoke+vault）
+- [OK] npm test 924 passed / 2 skipped；五守卫全绿
+
+### Status
+
+[OK] **Completed**（可归档）
+
+### Next Steps
+
+- ① 父任务 r2 仍只剩 AC-6（Authority 整包恢复端点，待治理裁定）；② KI-1 st 产物命名疑点仍独立待办

@@ -11,9 +11,37 @@ node scripts/run-e2e-instances.cjs --skip-restart   # 实例已在跑，直接�
 node scripts/run-e2e-instances.cjs --only dev-st,tt-cdp
 ```
 
-矩阵行：`dev-st(8001, smoke+matrix)`、`dev-luker(8003, smoke+matrix)`、
-`dev-pt(8899, pt-load，persistent context 天然 headed)`、`tt-cdp(9223, CDP 冒烟)`。
+矩阵行：`dev-st(8001, smoke+matrix+vault)`、`dev-luker(8003, smoke+matrix+vault)`、
+`dev-pt(8899, pt-load+vault，persistent context 天然 headed)`、`tt-cdp(9223, CDP 加载冒烟+仓冒烟)`。
 产物：`test-results/instances/<host>-<date>.md` + `summary-*.md` + tt 截图。
+
+## 仓（vault）行：判据与三条前置
+
+仓 spec（`e2e/specs/vault.e2e.cjs`；TT 走 `e2e/lib/tt-cdp.cjs` 的 `ttVaultSmoke`）验的是
+**双后端全链路**：仓模块可见 → 后端徽标 → 存入 → **UI 恰好 1 行且后端真值恰好 1 条** →
+导出字节一致 → 删除后 UI 与后端双归零 → 零本插件报错。
+
+1. **主判据是后端真值，不是 DOM 行数**：页内 `import()` 插件自身的 `vault-store.js`
+   读 `vaultList/vaultBackend/vaultDelete`。理由见 `quality-guidelines.md` 禁止模式 #11——
+   曾出现「后端 1 条、DOM 4 行」，看 DOM 会得出错误结论。
+2. **徽标只断言「与 `vaultBackend()` 一致」，不写死宿主预期**（Authority 装/卸都不误判；
+   「徽标撒谎」仍会被抓）。实测：dev-luker `authority`/「服务端」；dev-st / pt-web / tt-cdp
+   均 `indexeddb`/「本地」。
+3. **仓只在 idle / done 可见** ⇒ 先清场再断言：`pt-load`/`matrix` 会留下夹具源包把阶段推到
+   scanned。spec 内先按名（`pruneFixtures`）+ 按前缀（`fixture-`，兜住 `fixture-web-*`）
+   删源包记录，再重载；仍不可见时再清一次并重载一次。
+
+**TT 侧两个专属坑（2026-10-26 实测）**：
+
+- **已装副本必须刷成当前 HEAD**：`ensureInstalled()` 早先「manifest 在即跳过」⇒ TT 里是
+  10-25 的旧拷贝，缺 `src/storage/vault-store.js` ⇒ 插件 import 404、**整插件加载失败**
+  （`mentionsPlugin:false`）。现改为每次同步四件 + `src/`。
+- **冷启动期间页面会自行导航** ⇒ `evaluate` 抛 `Execution context was destroyed`，
+  整轮因此异常退出。所有 CDP 取值包一层 `retryOnNav`（只重试导航类错误，不吞真断言失败）。
+
+**截图纪律**：TT 的模态不铺满全屏，整页截图会带进**真实聊天内容**（P-11 高敏）⇒
+`ttVaultSmoke` 用元素截图（`#st-converter-modal-overlay`）；截图前先点掉宿主自己的浮层
+（「后端错误」toast 是扩展版本检查走 GitHub 失败的背景噪声；ChatFilesys「不入库」提示）。
 
 ## 七条实测铁律（2026-10-25 全部踩过）
 
