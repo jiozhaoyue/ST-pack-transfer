@@ -293,3 +293,43 @@ S1 四现症固化为 s1-remedies E2E（15/15）；三层架构与 CSS 铁律落
 ### Next Steps
 
 - ① 父任务 r2 仍只剩 AC-6（Authority 整包恢复端点，待治理裁定）；② KI-1 st 产物命名疑点仍独立待办
+
+## Session 53: naming-injection 落地 + 仓库改名 / README / GPL-3.0 / Pages 部署清理
+<!-- trellis-session: v=2 fp=naming-injection-20261027 -->
+
+**Date**: 2026-10-27
+**Task**: 10-26-naming-injection
+**Branch**: `main`
+
+### Summary
+
+实现父任务 R1 / R6.5 / R10.1：新增 `src/core/naming.js`（11 个占位符语义独立，`{target}` 输出英文全称，`{datetime}` 到秒，默认 `{target}_{user}_{part}_{datetime}.zip`）取代 `filename-template.js`（已删）；新增 `src/ui/host-icons.js`（四宿主本地内置图标，data URI）；目标平台下拉固定四项英文全称 + 当前宿主「（宿主）」，`native` 分支全删且未知值回落宿主布局；扩展行改为宿主同款内联下拉（只含「打开面板」），删除 `registerMenuButton` 并把 `#extensionsMenu`/`#options` 移出 `check:dom-scope` 锚点白名单；顶栏徽标改为「宿主图标+英文全名+插件 / GitHub+Web」，`style.css` 增品牌色令牌（仅标识用途）。
+
+随后按用户要求完成仓库维护：GitHub 远端改名 `jiozhaoyue/ST-pack-transfer`（origin 已切换并推送）；README 精简重写（四酒馆数据包说明 / 功能 / 优点 / 安装与本地部署 / 在线使用）；LICENSE 由 MIT 换成 GNU GPL v3（package.json 与 lock 同步 `GPL-3.0-or-later`）；清理 GitHub Pages 历史部署，只留最新一条（215 → 1）。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `9b5d57c` | feat(naming): 改名 ST-pack-transfer 并落命名引擎、四项目标选择器、三处入口与顶栏徽标 |
+| `13247a6` | refactor(naming): 删除已被 naming.js 取代的 filename-template.js |
+| `29e4ccd` | docs(trellis): 登记改名与验收现状（远端已改、本地目录受阻、Web E2E 待补） |
+| `924e919` | docs: 精简 README 并改用 GPL-3.0-or-later |
+
+### Testing
+
+- [OK] `npm test` 945 passed / 2 skipped（88 文件，1 skipped）
+- [OK] `check:css-scope` / `check:dom-injection` / `check:dom-scope` / `check:template-source` / `check:control-consumer` 五条全绿
+- [OK] `getWorkbenchHtml()` 渲染断言：标题「数据包转运」、徽标结构、四项目标下拉、无 `native`
+- [FAIL] `npm run e2e:web` 本轮未跑完：运行器 9 分钟无输出、静态服务器常驻（已清理），未取得读数
+
+### Status
+
+[PARTIAL] **in_progress**：AC-2/3/4/5 已满足（AC-3 的实例 E2E、AC-5 的浏览器截图待补）；AC-1 未清零
+
+### Next Steps
+
+- ① **本地目录改名**（`ST-zip-converter` → `ST-pack-transfer`）被 Windows「另一个程序正在使用」阻塞（会话/编辑器持有项目根），需关闭相关程序后执行并同步 `.codex/hooks.json` 绝对路径
+- ② 补跑 `npm run e2e:web -- --rebuild`，并补一次浏览器截图核验徽标
+- ③ 之后按顺序推进 `10-26-storage-chart` → `zones-flow` → `package-cards-vault` → `tutorial-copy`
+

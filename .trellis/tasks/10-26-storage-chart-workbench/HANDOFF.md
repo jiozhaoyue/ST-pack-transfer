@@ -14,7 +14,7 @@
 | --- | --- |
 | 父任务 | `10-26-storage-chart-workbench`（planning） |
 | 子任务 | `naming-injection`（本轮实现完成）/ `storage-chart` / `zones-flow` / `package-cards-vault` / `tutorial-copy` / `ui-demo`（其余 planning） |
-| 已推送提交 | `13247a6`（HEAD = origin/main；远端已改名 `jiozhaoyue/ST-pack-transfer`） |
+| 已推送提交 | `924e919`（HEAD = origin/main；远端已改名 `jiozhaoyue/ST-pack-transfer`） |
 | 产品代码 | `src/core/naming.js`、`src/ui/host-icons.js` 新增；命名/入口/徽标改动已落 |
 | 质量门 | `npm test` 945 passed / 2 skipped；五个静态守卫全绿 |
 | demo | `deliverables/ui-demo.html`（2026-10-27 评审版） |
@@ -211,3 +211,25 @@ git rev-parse HEAD origin/main  # 两行必须相等
 - `10-14-workbench-overhaul`（planning，0/3）、`10-24-ui-orchestration-r2`（planning，4/4）未动，本计划不依赖它们。
 - `10-01-safe-migration-productization`（planning，12/12）仍是上一阶段总任务。
 - 上一阶段背景见记忆 `st-zip-converter-safe-migration-initiative`。
+
+---
+
+## 十一、2026-10-27 仓库维护（与图表重构解耦，已完成）
+
+由用户单独提出的三项仓库事务，已实施并推送（`924e919`）：
+
+| 项 | 结果 |
+| --- | --- |
+| GitHub 远端改名 | `jiozhaoyue/ST-pack-transfer`；本地 `origin` 已切换；旧 URL 由 GitHub 自动重定向 |
+| README | 重写为简洁结构：四酒馆数据包是什么 → 能做什么 → 优点 → 三种使用方式（装进酒馆 / 本地部署 / 在线）→ 质量门 → 许可证 |
+| 许可证 | MIT → **GNU GPL v3**（`GPL-3.0-or-later`），`package.json` 与 lock 根节点同步；`LICENSE` 为 GPL 全文 |
+| GitHub Pages 部署 | 清理历史部署记录，仅保留最新一条（215 → 1） |
+
+**仍未完成（阻塞项）**：本地目录仍是 `ST-zip-converter`——Windows 报「另一个程序正在使用」，
+被 Claude Code 会话/编辑器持有的项目根阻塞；关闭相关程序后执行：
+
+```bash
+mv D:/Repo/Tavern-repo/My-repo/ST-zip-converter D:/Repo/Tavern-repo/My-repo/ST-pack-transfer
+```
+
+并同步 `.codex/hooks.json` 中的绝对路径。
