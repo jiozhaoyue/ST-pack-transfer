@@ -9,11 +9,16 @@ const vaultState = vi.hoisted(() => ({
   backend: 'authority',
   entries: [],
   deleted: [],
+  /** 并发渲染用例用：设为 Promise 时 vaultList 会等它 */
+  gate: null,
 }));
 
 vi.mock('../src/storage/vault-store.js', () => ({
   vaultBackend: async () => vaultState.backend,
-  vaultList: async () => vaultState.entries,
+  vaultList: async () => {
+    if (vaultState.gate) await vaultState.gate;
+    return vaultState.entries;
+  },
   vaultGet: async (id) => {
     const e = vaultState.entries.find((x) => x.id === id);
     return e ? { blob: { size: e.size }, entry: e } : null;
@@ -36,6 +41,7 @@ function makeEl(tag = 'div') {
     hidden: false,
     textContent: '',
     children: [],
+    dataset: {},
     _html: '',
     set innerHTML(v) {
       this._html = v;
@@ -88,6 +94,7 @@ beforeEach(() => {
   vaultState.backend = 'authority';
   vaultState.entries = [];
   vaultState.deleted = [];
+  vaultState.gate = null;
   g.document = {
     readyState: 'complete',
     body: makeEl('body'),
@@ -202,6 +209,24 @@ describe('渲染契约', () => {
     btns2.children[btns2.children.length - 1].click();
     await new Promise((r) => setTimeout(r, 5));
     expect(vaultState.deleted).toEqual([]);
+  });
+});
+
+describe('并发渲染（2026-10-26 实测竞态守护）', () => {
+  it('两次渲染交错时只留最后一批行，不重复追加', async () => {
+    vaultState.entries = [entryFixture()];
+    let release;
+    vaultState.gate = new Promise((r) => { release = r; });
+    const container = makeEl();
+    // 存入后 onChanged 与 change handler 会各触发一次渲染 ⇒ 两个协程都在 vaultList 上等待
+    const p1 = renderVaultPanel({ containerEl: container });
+    const p2 = renderVaultPanel({ containerEl: container });
+    release();
+    await Promise.all([p1, p2]);
+    vaultState.gate = null;
+    const list = container.querySelector('.vault-list');
+    expect(list).toBeTruthy();
+    expect(list.children.length).toBe(1);
   });
 });
 

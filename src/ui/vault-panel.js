@@ -93,7 +93,19 @@ export async function renderVaultPanel({
     ? confirmFn
     : (msg) => Promise.resolve(typeof window !== 'undefined' ? window.confirm(msg) : true);
 
+  // 渲染序号：`updateWorkspaceUI` 会在一次存入后被多处触发（onChanged + change handler），
+  // 两个渲染协程会在各自 `await` 之后**都**追加行 ⇒ 列表短暂出现重复条目（2026-10-26 在
+  // Dev Luker 实测：1 条后端记录渲染成 4 行，重载后恢复 2 行）。后发渲染作废旧渲染：
+  // 只有序号仍等于自己时才允许写 DOM，且所有写入集中在**最后一次 await 之后**（全同步）。
+  const seq = (Number(containerEl.dataset.vaultRenderSeq) || 0) + 1;
+  containerEl.dataset.vaultRenderSeq = String(seq);
+  const isStale = () => Number(containerEl.dataset.vaultRenderSeq) !== seq;
+
   const backend = await vaultBackend();
+  if (isStale()) return;
+  const entries = backend ? await vaultList() : [];
+  if (isStale()) return;
+
   if (badgeEl) {
     badgeEl.innerHTML = '';
     if (backend && BACKEND_LABELS[backend]) {
@@ -113,7 +125,6 @@ export async function renderVaultPanel({
     return;
   }
 
-  const entries = await vaultList();
   if (entries.length === 0) {
     const empty = document.createElement('div');
     empty.className = 'archive-empty';
