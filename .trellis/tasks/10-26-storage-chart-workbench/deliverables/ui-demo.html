@@ -1508,19 +1508,33 @@ function doFetch(){
   renderZones(); renderActions(); toast('宿主拉取完成');
 }
 function doGenerate(){
-  if(state.selectedPkgs.size===0){ toast('先选择要导出的包'); return; }
-  const firstId=[...state.selectedPkgs][0];
-  const pkg=state.packages.find(p=>p.id===firstId);
-  if(!pkg) return;
-  if(pkg.unrecognized){ toast('未识别包只允许存储或导出，不提供转换'); return; }
+  const ids=[...state.selectedPkgs];
+  if(ids.length===0){ toast('先选择要导出的包'); return; }
+  const pkgs=ids.map(id=>state.packages.find(p=>p.id===id)).filter(Boolean);
+  const bad=pkgs.find(p=>p.unrecognized);
+  if(bad){ toast('未识别包只允许存储或导出，不提供转换'); return; }
   const targetKey = state.target==='SillyTavern' ? 'st' : state.target==='Luker' ? 'luker' : state.target==='TauriTavern' ? 'tt' : 'pt';
-  const name=state.target+'_default-user_part1_'+dtNow()+'.zip';
-  const exp={ id:'e'+Date.now(), zone:'export', host:targetKey, name, size:pkg.size, mb:pkg.mb, ts:Date.now(), time:'10-26 '+nowTime().slice(0,5), origin:'导出副本', readonly:true };
-  state.packages.push(exp);
-  log('INFO','生成导出包: '+name);
-  log('INFO','已生成导出副本（解耦）');
-  state.zone='export'; state.selectedPkgs=new Set([exp.id]);
-  renderZones(); renderActions(); toast('已生成导出包'); setProgress(100,'导出包已就绪');
+  const dt=dtNow(), stamp=Date.now(), t='10-26 '+nowTime().slice(0,5);
+  const made=[];
+  pkgs.forEach((pkg,pi)=>{
+    // 每卷都是一个可独立导入的合法包，所以分卷后导出区会出现 N 个包，而不是一个「带分卷标记」的包
+    const vols=volumesOf(pkg,scaledNodes(pkg));
+    vols.forEach((v,i)=>{
+      made.push({
+        id:'e'+stamp+'_'+pi+'_'+i, zone:'export', host:targetKey,
+        name:state.target+'_default-user_part'+(i+1)+'_'+dt+'.zip',
+        size:fmtMB(v.mb), mb:Math.round(v.mb), ts:stamp+i,
+        time:t, origin:'导出副本', readonly:true
+      });
+    });
+    log('INFO','生成导出包: '+pkg.name+' → '+vols.length+' 个');
+  });
+  state.packages.push(...made);
+  log('INFO','已生成导出副本（解耦）共 '+made.length+' 个');
+  state.zone='export'; state.selectedPkgs=new Set(made.map(m=>m.id));
+  renderZones(); renderActions(); renderChart();
+  setProgress(100,'导出包已就绪');
+  toast('已生成 '+made.length+' 个导出包');
 }
 function doMerge(){
   if(state.selectedPkgs.size<2){ toast('至少选择两个包'); return; }
@@ -1666,8 +1680,8 @@ function openHelp(btn,key){
 /* ── 教程 ── */
 const TUTORIAL=[
   { sel:'#target-select', title:'选择目标平台', desc:'四个酒馆的英文全称，带各自图标；当前宿主那一项后面标（宿主）。' },
-  { sel:'#chart-stack', title:'看存储图表', desc:'没有数据包时显示宿主；点包卡即切换成该包的图表。' },
-  { sel:'#chart-stack', title:'精简勾选', desc:'建议保留用宿主下划线色，可选用引用色，建议清理用强调灰。备份、缓存、构建默认不勾。' },
+  { sel:'#chart-stack .vol-card', title:'看存储图表', desc:'没有数据包时显示宿主；点包卡即切换成该包的图表。' },
+  { sel:'#chart-stack .tree-tools', title:'精简勾选', desc:'建议保留用宿主下划线色，可选用引用色，建议清理用强调灰。备份、缓存、构建默认不勾。' },
   { sel:'#delta-toggle', title:'覆盖或增量', desc:'差量不是独立区域，就在图表顶部切换。' },
   { sel:'#split-input', title:'不分卷', desc:'单位 MB，单卷限 32–2048 MB；留空即不分卷。填了之后图表会按卷变成多张。' },
   { sel:'#btn-generate', title:'生成导出包', desc:'把当前勾选落到包，并复制一份只读副本到导出区。' },
@@ -1686,7 +1700,7 @@ function renderTutorial(){
   const dots=document.getElementById('tutorial-dots'); dots.innerHTML=TUTORIAL.map((_,i)=>'<i class="'+(i===state.tutorialStep?'on':'')+'"></i>').join('');
   document.getElementById('tutorial-prev').disabled=state.tutorialStep===0;
   document.getElementById('tutorial-next').textContent=state.tutorialStep===TUTORIAL.length-1?'完成':'下一步';
-  const el=document.querySelector(step.sel);
+  const el=document.querySelector(step.sel)||document.querySelector('#chart-card');
   const ring=document.getElementById('tutorial-ring');
   const card=document.getElementById('tutorial-card');
   if(el){
@@ -2028,6 +2042,13 @@ log('INFO','浏览器配额 1.2 GB / 8.0 GB');
 log('INFO','已导入 SillyTavern_default-user_part1_2026-10-26_21-30-05.zip');
 bind();
 initSplitters();
+// 首次进入自动弹一次基础教程（同一浏览器会话只弹一次）
+try{
+  if(state.autoTutorial && !sessionStorage.getItem('pt-demo-tutorial-seen')){
+    sessionStorage.setItem('pt-demo-tutorial-seen','1');
+    setTimeout(openTutorial,300);
+  }
+}catch(_){}
 </script>
 </body>
 </html>
