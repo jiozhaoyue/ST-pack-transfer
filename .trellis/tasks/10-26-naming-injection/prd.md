@@ -22,8 +22,13 @@
 
 - [ ] AC-1 全仓 `grep -ri "st-zip-converter"` 在对外文案/`data-name`/文档中为 0（历史任务目录与 git 历史除外）。
   - 2026-10-27 现状：代码、manifest/package、E2E、scripts、README/SECURITY/docs、`.trellis/spec` 已收敛；
-    **未清零项**：① `AGENTS.md` / `CLAUDE.md` 的**自动生成规则块**（由 `tavern-harness` 真源仓同步，文件头注明请勿手改）；
-    ② `docs/research/*`、`docs/superpowers/*` 中的本机绝对路径（仓目录尚未改名，改名后一并处理）。
+    **GitHub 远端已改名** `jiozhaoyue/ST-pack-transfer`（origin 已切换并推送）。
+  - **未清零项**：① `AGENTS.md` / `CLAUDE.md` 的**自动生成规则块**（由 `tavern-harness` 真源仓同步，文件头注明请勿手改）；
+    ② **本地目录尚未改名**（`ST-zip-converter` → `ST-pack-transfer`）：Windows 报「另一个程序正在使用」，
+    被 Claude Code 会话 / 编辑器持有的项目根阻塞，需在关闭相关程序后执行：
+    `mv D:/Repo/Tavern-repo/My-repo/ST-zip-converter D:/Repo/Tavern-repo/My-repo/ST-pack-transfer`
+    并同步 `.codex/hooks.json` 中的绝对路径；
+    ③ 历史文档（`docs/research/*`、`docs/superpowers/*`）里的本机绝对路径，随目录改名一并处理。
 - [x] AC-2 目标平台下拉恰好四项英文全称，当前宿主项带「（宿主）」，UI 中不存在 `native` 字符串。
 - [x] AC-3 三处入口均在宿主重渲染后自动恢复，顶栏魔方棒零注入（经 `check:dom-scope` 白名单移除 + 单测负例 + smoke spec 反向契约；实例 E2E 本轮未跑）。
 - [x] AC-4 十一个占位符各有单测；`{datetime}` 到秒；默认模板渲染结果符合 `{target}_{user}_{part}_{datetime}.zip`。
