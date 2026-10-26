@@ -70,7 +70,7 @@ export const GIT_MODES = Object.freeze({
 
 /** minimal 策略合成的占位文件内容（非 0 字节：个别解压实现会跳过零长度条目）。 */
 export const GIT_KEEP_PLACEHOLDER = new TextEncoder().encode(
-  '# 由 ST-zip-converter 合成：占位文件，仅用于保证 .git/objects 目录在解压后存在\n',
+  '# 由 ST-pack-transfer 合成：占位文件，仅用于保证 .git/objects 目录在解压后存在\n',
 );
 
 /** 归一化 gitMode：未知取值一律回落 KEEP（防御式，不抛错）。 */

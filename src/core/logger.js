@@ -52,7 +52,7 @@ export const logger = {
     }
 
     // 控制台镜像输出
-    const prefix = `[st-zip-converter][${entry.timestamp}][${level}]`;
+    const prefix = `[ST-pack-transfer][${entry.timestamp}][${level}]`;
     if (level === LOG_LEVELS.ERROR) {
       console.error(prefix, message, detail ?? '');
     } else if (level === LOG_LEVELS.WARN) {

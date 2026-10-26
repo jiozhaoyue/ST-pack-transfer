@@ -10,7 +10,7 @@
 
 import { zipIo } from './zip-io.js';
 import * as zip from '../vendor/zip.js';
-import { resolveFilename } from './filename-template.js';
+import { resolveFilename } from './naming.js';
 
 /**
  * `splitArchiveEntries()` 的 **API 默认参数**——仅当调用方不传 `thresholdMB` 时生效。

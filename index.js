@@ -1,8 +1,8 @@
 /**
- * st-zip-converter 核心控制器 (ESM)
+ * ST-pack-transfer 核心控制器 (ESM)
  * 全平台跨酒馆数据包工作站：
  * 1. 宿主酒馆直接细粒度导出 (对齐 ST / Luker 分类) 与直出跨平台目标格式
- * 2. 外部数据包互转、动作规划完全扫描与单项穿透
+ * 2. 外部数据包转运、动作规划完全扫描与单项穿透
  * 3. 闭环一键还原/写入宿主 (支持合并写入与覆盖写入)
  * 4. 底部实时抽屉式日志控制台与全屏幕/移动端极致响应式适配
  */
@@ -46,7 +46,8 @@ import { createCheckpointAdapter } from './src/storage/authority-store.js';
 import { renderUsageDashboard } from './src/ui/usage-dashboard.js';
 import { exportLibraryToPack, injectLibraryChatsIntoSource, importRestoredChatsIntoLibrary } from './src/ui/chat-store-inject.js';
 import { getChatStoreProbe, probeChatStore } from './src/ui/chat-store-bridge.js';
-import { resolveFilename, previewFilename, DEFAULT_FILENAME_TEMPLATE, namedBlob } from './src/core/filename-template.js';
+import { resolveFilename, previewFilename, DEFAULT_FILENAME_TEMPLATE, namedBlob, hostDisplayName, TARGET_PLATFORMS } from './src/core/naming.js';
+import { hostIcon } from './src/ui/host-icons.js';
 import { buildSourceDeliveries, guardedRestore, buildTargetEvidence } from './src/ui/migration-controller.js';
 import { createMigrationPlan } from './src/core/migration-plan.js';
 import { assessTargetConflicts, describeConflictState, buildTargetBackupEvidence, describeBackupEvidence } from './src/core/migration-target.js';
@@ -73,7 +74,6 @@ import {
   isStorageInspectorAvailable,
   openStorageInspector,
   getHandle,
-  registerMenuButton,
   mountNativeBackupButton,
   mountLukerBackupManagerButton,
   mountExtensionRowButton,
@@ -640,22 +640,12 @@ async function main(appRoot) {
   let currentBaseZip = null; // { name: string, blob: Blob, size: number }
 
   /**
-   * 把目标选择器的**原始值**解析为**布局码**（`st|l|tt|pt`）。
+   * 把目标选择器的值解析为**布局码**（`st|l|tt|pt`）。
    *
-   * `native` 的语义是「当前宿主的原生格式」，必须经 `hostLayoutCode()` 归一
-   * （`luker → l`，见 `src/ui/host-bridge.js` 的 `hostLayoutCode`）。
+   * 2026-10-27 R1.2 起下拉只有四项英文全称（值仍是布局码），`native` 已删除；
+   * 当前宿主那一项就是「宿主原生格式」的等价物。
    *
-   * ⚠️ **归一必须在所有取目标处统一做** —— 这正是本函数存在的理由。
-   * 修前实际状况：只有「宿主拉取」路径（`handleHostExport` 内的
-   * `selectedTarget === 'native' ? hostLayoutCode(...)`）与**文件名预览**做了归一，
-   * 而 `refreshPlan` / `btnConvert` / `runBatchConversion`（现 `handleBatchConvert`）/ 扩展清单的 `targetLayout`
-   * **把字符串 `'native'` 直接交给了计划器与转换器**。
-   * 计划器的合成分支只认 `TARGETS.L` / `TARGETS.ST`（`src/core/plan-preview.js`），
-   * `native` 不匹配任何分支 ⇒ 「宿主原生格式」退化成**原样直通**：
-   * 在 ST 宿主上（源本就是 ST 布局）恰好等价、用户看不出差别；
-   * 在 **Luker 宿主上选「宿主原生格式」**就会拿到**未经布局转换**的结果。
-   *
-   * @param {string} [raw] 选择器原始值（可能是 `native`）
+   * @param {string} [raw] 选择器原始值
    * @param {string} [fallback='l'] 选择器缺失时的缺省布局码
    * @returns {string} 布局码
    */
@@ -663,7 +653,7 @@ async function main(appRoot) {
     return resolveTargetLayout(raw, host.platform, fallback);
   }
 
-  // 实时生成文件名预览（统一目标格式选择器；native 选项经 hostLayoutCode 归一）
+  // 实时生成文件名预览（目标格式选择器 → 布局码）
   function updateFilenamePreview() {
     const template = filenameTemplateInput?.value || DEFAULT_FILENAME_TEMPLATE;
 
@@ -1595,29 +1585,62 @@ async function main(appRoot) {
     }
   }
 
-  // 3. 宿主环境识别与 Badge 标识（单枚合并徽标：运行形态 + 宿主 + 服务端版本）
-  const HOST_BADGE_STYLES = {
-    st: { text: 'SillyTavern 插件', color: 'var(--accent-st)' },
-    luker: { text: 'Luker 插件', color: 'var(--accent-luker)' },
-    standalone: { text: '独立 Web 模式', color: '' },
-  };
+  // 3. 顶栏徽标（R10.1）：插件 = 宿主 icon + 英文全名 + 「插件」；Web = GitHub 图标 + 「Web」。
+  //    宿主名全仓只在这里出现一次，图表区内不得再写。
   const applyHostBadge = (platform, version = null) => {
     if (!envBadge) return;
-    const style = HOST_BADGE_STYLES[platform] || HOST_BADGE_STYLES.standalone;
-    envBadge.textContent = version && platform !== 'standalone'
-      ? `${style.text} · v${version}`
-      : style.text;
-    if (style.color) {
-      envBadge.style.color = style.color;
-      envBadge.style.borderColor = style.color;
-    } else {
-      envBadge.style.color = '';
-      envBadge.style.borderColor = '';
+    const iconEl = document.getElementById('env-badge-icon');
+    const ghEl = document.getElementById('env-badge-gh');
+    const textEl = document.getElementById('env-badge-text');
+    const isWeb = !platform || platform === 'standalone';
+
+    if (isWeb) {
+      envBadge.dataset.host = 'web';
+      envBadge.title = '独立 Web 形态：没有宿主数据源';
+      if (iconEl) { iconEl.hidden = true; iconEl.removeAttribute('src'); }
+      if (ghEl) ghEl.hidden = false;
+      if (textEl) textEl.textContent = 'Web';
+      return;
     }
+
+    const layout = hostLayoutCode(platform);
+    const name = hostDisplayName(layout);
+    const src = hostIcon(layout);
+    envBadge.dataset.host = layout;
+    envBadge.title = version
+      ? `当前运行在 ${name} 插件内 · v${version}`
+      : `当前运行在 ${name} 插件内`;
+    if (iconEl) {
+      if (src) {
+        iconEl.src = src;
+        iconEl.hidden = false;
+      } else {
+        iconEl.hidden = true;
+      }
+    }
+    if (ghEl) ghEl.hidden = true;
+    if (textEl) textEl.textContent = `${name} 插件`;
   };
   applyHostBadge(host.platform);
 
   // 4. 插件态界面激活与宿主工作台初始化
+  // 目标平台选择器固定四项（R1.2）：任何非四项残留（旧版的 `native`）一律移除，
+  // 当前宿主项追加「（宿主）」标记并默认选中。
+  const syncTargetSelect = (platform) => {
+    if (!targetSelect) return;
+    const layout = hostLayoutCode(platform);
+    const known = new Set(TARGET_PLATFORMS.map((t) => t.code));
+    for (const opt of Array.from(targetSelect.options)) {
+      if (!known.has(opt.value)) {
+        opt.remove();
+        continue;
+      }
+      const base = TARGET_PLATFORMS.find((t) => t.code === opt.value)?.name || opt.value;
+      opt.textContent = opt.value === layout ? `${base}（宿主）` : base;
+    }
+    targetSelect.value = layout;
+  };
+
   const applyPluginUi = (platform) => {
     if (!host.isPlugin) return;
     // 按钮可见性/可用性统一由 applyActionAvailability 求值——此处不再单独写 display
@@ -1625,21 +1648,8 @@ async function main(appRoot) {
 
     // 插件态下按钮可用性统一求值（含 btn-restore-luker 的可见性）
     applyActionAvailability();
-    if (targetSelect) {
-      // 插件模式注入"宿主原生格式"选项并默认选中（native → 执行时经 hostLayoutCode 归一）
-      let nativeOpt = targetSelect.querySelector('option[value="native"]');
-      if (!nativeOpt) {
-        nativeOpt = document.createElement('option');
-        nativeOpt.value = 'native';
-        nativeOpt.textContent = `宿主原生格式 (${hostLayoutCode(platform).toUpperCase()})`;
-        targetSelect.insertBefore(nativeOpt, targetSelect.firstChild);
-      }
-      targetSelect.value = 'native';
-    }
-    registerMenuButton(() => {
-      openConverterModal();
-    });
-    // 原生"用户数据备份"UI 旁注入入口，与扩展行上的「打开」并存
+    syncTargetSelect(platform);
+    // 原生"用户数据备份"UI 旁注入入口，与扩展行上的「打开面板」并存
     mountNativeBackupButton(() => {
       openConverterModal();
     });
@@ -1843,7 +1853,7 @@ async function main(appRoot) {
     // 统一类目勾选（与外部转换路径共用同一份 category-filter 状态）
     const selection = getSelectionState();
 
-    const selectedTarget = targetSelect ? targetSelect.value : 'native';
+    const selectedTarget = targetSelect ? targetSelect.value : hostLayoutCode(host.platform);
 
     // 断点续传：携带清单重跑（Range 尽力而为，见 fetchHostBackup 内部决策）
     const taskId = resumeTaskId || `fetch-${Date.now()}`;
@@ -1960,9 +1970,7 @@ async function main(appRoot) {
       view.setProgress(38, `数据包已落盘，正在扫描文件树 (只读中央目录)...`);
       let hostPlan = null;
       try {
-        const effectiveTargetPreview = selectedTarget === 'native'
-          ? hostLayoutCode(host.platform)
-          : selectedTarget;
+        const effectiveTargetPreview = selectedTarget;
         hostPlan = await runPlanTask({
           source: rawBackupBlob,
           target: effectiveTargetPreview,
@@ -2004,9 +2012,7 @@ async function main(appRoot) {
       const confirmedExcludedPaths = getExcludedPaths();
 
       const template = filenameTemplateInput?.value || DEFAULT_FILENAME_TEMPLATE;
-      const effectiveTarget = selectedTarget === 'native'
-        ? hostLayoutCode(host.platform)
-        : selectedTarget;
+      const effectiveTarget = selectedTarget;
       let finalBlob = rawBackupBlob;
       let targetLayout = effectiveTarget;
 
@@ -2023,14 +2029,12 @@ async function main(appRoot) {
       const pruneBuiltinCheck = document.getElementById('prune-builtin-check');
       const pruneBuiltinAssets = pruneBuiltinCheck ? pruneBuiltinCheck.checked : true;
 
-      // 如果指定了跨平台直出格式 (非 native) 或启用了原生资产过滤 或 不包含备份聊天与快照
-      // ST 宿主下 selection 由插件内过滤生效，因此只要勾选不全量就必须走转换过滤；
-      // 统一文件树确认后的 excludedPaths（逐文件勾选差异）也强制走转换过滤
+      // 需走转换过滤的场景：目标格式与源布局不同 / 原生资产过滤 / 不包含备份聊天 / 部分勾选 / 逐文件排除
       const hasPartialSelection = hostSupportsSelection
         ? false
         : Object.keys(FULL_SELECTION).some((k) => !selection[k]);
       const hasFileExclusions = confirmedExcludedPaths.size > 0;
-      const needsTransform = (selectedTarget !== 'native' && selectedTarget !== effectiveTarget)
+      const needsTransform = (selectedTarget !== effectiveTarget)
         || pruneBuiltinAssets
         || !hostIncludeBackups
         || hasPartialSelection
@@ -2039,9 +2043,7 @@ async function main(appRoot) {
       // 提升到块外：供下方三类交付构建（源备份/目标包/报告）引用（S2）
       let conversionReport = null;
       if (needsTransform) {
-        targetLayout = selectedTarget === 'native'
-          ? hostLayoutCode(host.platform)
-          : selectedTarget;
+        targetLayout = selectedTarget;
         view.setProgress(40, `数据已拉取，正在转换处理数据包 (${targetLayout.toUpperCase()})...`);
         logger.info(`进行直出格式与资产过滤处理: ${host.platform.toUpperCase()} -> ${targetLayout.toUpperCase()} (包含备份聊天: ${hostIncludeBackups}, 逐文件排除: ${confirmedExcludedPaths.size})`);
 
@@ -3256,12 +3258,13 @@ function bootstrap() {
 
   if (host.isPlugin) {
     // 宿主扩展模式 (SillyTavern / Luker)
-    // 工作台挂在**全屏模态**里，入口是宿主扩展行上追加的「打开」按钮
-    // （用户 2026-10-15 裁定：扩展列表只留宿主那一行，不再内联展开）。
+    // 工作台挂在**全屏模态**里，入口是宿主扩展行内联下拉里的「打开面板」
+    // （2026-10-27 R1.3 起改为与其它扩展一致的内联下拉；2026-10-15 的
+    //  「只留一行、不展开」决定已被推翻）。
     // **boot 时就建好但保持隐藏** —— main() 里注册宿主入口，等首次点击才建会让它们永不出现。
     ensureConverterModal();
     mountExtensionRowButton(() => openConverterModal());
-    logger.info(`st-zip-converter 工作台入口已就绪 (${host.platform.toUpperCase()} 模式)`);
+    logger.info(`ST-pack-transfer 工作台入口已就绪 (${host.platform.toUpperCase()} 模式)`);
     return;
   }
 

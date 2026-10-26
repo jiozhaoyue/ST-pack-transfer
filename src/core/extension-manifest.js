@@ -173,7 +173,7 @@ export function deriveExtensionEntry({ name, manifest = {}, gitMeta = {}, source
 export function buildExtensionManifest({ extensions, mode, generatedAt }) {
   const entries = extensions.map((ext) => deriveExtensionEntry({ ...ext, mode }));
   return {
-    converter: 'st-zip-converter',
+    converter: 'ST-pack-transfer',
     schemaVersion: MANIFEST_SCHEMA_VERSION,
     generatedAt,
     mode,

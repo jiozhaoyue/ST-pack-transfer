@@ -3,12 +3,12 @@ import { describe, expect, it } from 'vitest';
 import { readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 
-describe('SillyTavern 标准插件工程结构 (st-zip-converter)', () => {
+describe('SillyTavern 标准插件工程结构 (ST-pack-transfer)', () => {
   it('根目录包含合规的 manifest.json', async () => {
     expect(existsSync('manifest.json')).toBe(true);
     const manifest = JSON.parse(await readFile('manifest.json', 'utf8'));
-    expect(manifest.name).toBe('st-zip-converter');
-    expect(manifest.display_name).toContain('酒馆');
+    expect(manifest.name).toBe('ST-pack-transfer');
+    expect(manifest.display_name).toBe('数据包转运');
     expect(manifest.version).toBe('1.0.0');
     expect(manifest.author).toBe('jiozhaoyue');
     expect(manifest.js).toBe('index.js');
@@ -20,7 +20,7 @@ describe('SillyTavern 标准插件工程结构 (st-zip-converter)', () => {
     expect(existsSync('style.css')).toBe(true);
 
     const html = await readFile('index.html', 'utf8');
-    expect(html).toContain('st-zip-converter');
+    expect(html).toContain('ST-pack-transfer');
     expect(html).toContain('<link rel="stylesheet" href="./style.css">');
     expect(html).toContain('<script type="module" src="./index.js"></script>');
   });
@@ -51,6 +51,7 @@ describe('SillyTavern 标准插件工程结构 (st-zip-converter)', () => {
   });
 
   it('host-bridge 导出了 discoverHostExtensions, installExtensionViaHost, checkHostThirdPartyAnomaly, deleteExtensionViaHost 与 mountExtensionRowButton', async () => {
+    const bridge = await import('../src/ui/host-bridge.js');
     const {
       discoverHostExtensions,
       installExtensionViaHost,
@@ -58,19 +59,19 @@ describe('SillyTavern 标准插件工程结构 (st-zip-converter)', () => {
       checkHostThirdPartyAnomaly,
       deleteExtensionViaHost,
       mountExtensionRowButton,
-      registerMenuButton,
       mountNativeBackupButton,
       mountLukerBackupManagerButton,
-    } = await import('../src/ui/host-bridge.js');
+    } = bridge;
     expect(typeof discoverHostExtensions).toBe('function');
     expect(typeof installExtensionViaHost).toBe('function');
     expect(typeof renderExtensionInstallerModal).toBe('function');
     expect(typeof checkHostThirdPartyAnomaly).toBe('function');
     expect(typeof deleteExtensionViaHost).toBe('function');
     expect(typeof mountExtensionRowButton).toBe('function');
-    expect(typeof registerMenuButton).toBe('function');
     expect(typeof mountNativeBackupButton).toBe('function');
     expect(typeof mountLukerBackupManagerButton).toBe('function');
+    // R1.3：扩展菜单（顶栏魔方棒）入口已删除，不得再导出
+    expect(bridge.registerMenuButton).toBeUndefined();
 
     // PT / TT 平台自适应：原生支持 third-party，不应报告异常
     const ptCheck = await checkHostThirdPartyAnomaly('pt');

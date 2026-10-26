@@ -1,4 +1,4 @@
-# st-zip-converter (全能酒馆数据包工作站)
+# ST-pack-transfer (全能酒馆数据包工作站)
 
 > 🚀 **全平台跨酒馆（SillyTavern / Luker / PureTavern / TauriTavern）全能数据包工作站**
 >
@@ -73,24 +73,24 @@
 #### 方式 A: 在酒馆扩展管理中通过 Git URL 一键安装
 在 SillyTavern 的「扩展管理」->「从 URL 安装」输入框中直接粘贴：
 ```
-https://github.com/jiozhaoyue/st-zip-converter.git
+https://github.com/jiozhaoyue/ST-pack-transfer.git
 ```
 点击安装即可，无需任何命令行或依赖构建步骤！
 
 #### 方式 B: 手动克隆至第三方扩展目录
 ```bash
 cd <SillyTavern安装目录>/public/scripts/extensions/third-party/
-git clone https://github.com/jiozhaoyue/st-zip-converter.git
+git clone https://github.com/jiozhaoyue/ST-pack-transfer.git
 ```
-刷新酒馆页面后，在扩展菜单中点击 **「📦 酒馆数据包互转器」** 即可呼出全功能工作台。
+刷新酒馆页面后，在扩展列表中展开 **「数据包转运」** 并点击「打开面板」即可呼出全功能工作台。
 
 ---
 
 ### 场景 2: 本地独立 Web 工作站模式
 
 ```bash
-git clone https://github.com/jiozhaoyue/st-zip-converter.git
-cd st-zip-converter
+git clone https://github.com/jiozhaoyue/ST-pack-transfer.git
+cd ST-pack-transfer
 
 npm install
 npm start
@@ -110,7 +110,7 @@ npm start
 ### 场景 3: GitHub Pages 在线直接使用
 
 无需在本地安装任何 Node.js 环境或软件，直接访问官方静态部署页面：
-👉 **`https://jiozhaoyue.github.io/st-zip-converter/`**
+👉 **`https://jiozhaoyue.github.io/ST-pack-transfer/`**
 
 ---
 
@@ -120,7 +120,7 @@ npm start
 
 #### 方案 A: 部署到自己的 GitHub Pages (推荐，免费且自动跟随更新)
 
-[![Fork to Deploy](https://img.shields.io/badge/GitHub-Fork_&_Deploy_to_Pages-2ea44f?style=for-the-badge&logo=github)](https://github.com/jiozhaoyue/st-zip-converter/fork)
+[![Fork to Deploy](https://img.shields.io/badge/GitHub-Fork_&_Deploy_to_Pages-2ea44f?style=for-the-badge&logo=github)](https://github.com/jiozhaoyue/ST-pack-transfer/fork)
 
 只需简单 3 步即可上线：
 1. **Fork 本仓库**：点击上方绿色徽标或页面右上角的 **[Fork]**，将项目复制到您的个人 GitHub 账号下。
@@ -128,12 +128,12 @@ npm start
 3. **开启 Pages 并触发**：
    - 进入仓库 **Settings** -> **Pages**，在 **Build and deployment** 下的 **Source** 下拉框选择 **「GitHub Actions」**。
    - 回到 **Actions** 标签页，在左侧点击 **Deploy to GitHub Pages**，点击右侧的 **Run workflow** 按钮。
-   - 约 20 秒后部署完成，即可在 `https://<您的GitHub用户名>.github.io/st-zip-converter/` 拥有永久私有的专属在线转换站！
+   - 约 20 秒后部署完成，即可在 `https://<您的GitHub用户名>.github.io/ST-pack-transfer/` 拥有永久私有的专属在线转换站！
 
 #### 方案 B: 一键部署至 Vercel / Netlify (极速秒级上线)
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/jiozhaoyue/st-zip-converter)
-[![Deploy to Netlify](https://www.netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy?repository=https://github.com/jiozhaoyue/st-zip-converter)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/jiozhaoyue/ST-pack-transfer)
+[![Deploy to Netlify](https://www.netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy?repository=https://github.com/jiozhaoyue/ST-pack-transfer)
 
 点击上方按钮，登录对应平台并一键授权，平台将全自动配置并在全球 CDN 节点秒级部署完成。
 

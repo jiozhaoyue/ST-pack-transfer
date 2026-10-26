@@ -30,8 +30,8 @@ export async function getAuthorityClient() {
   if (!sdk) return null;
   try {
     return await sdk.init({
-      extensionId: 'third-party/st-zip-converter',
-      displayName: '酒馆数据包互转工坊',
+      extensionId: 'third-party/ST-pack-transfer',
+      displayName: '数据包转运',
       version: '1.0.0',
       installType: 'local',
       declaredPermissions: {

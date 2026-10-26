@@ -50,7 +50,7 @@ describe('alertDialog 宿主原生信息提示适配器', () => {
     g.window = { alert: () => { windowAlertCalled = true; } };
 
     await alertDialog('宿主未写入任何条目。\n请核对数据包内容。');
-    expect(calls).toEqual([['数据包互转', '宿主未写入任何条目。\n请核对数据包内容。']]);
+    expect(calls).toEqual([['数据包转运', '宿主未写入任何条目。\n请核对数据包内容。']]);
     expect(windowAlertCalled).toBe(false);
   });
 

@@ -133,7 +133,7 @@ describe('buildExtensionManifest（私有清单）', () => {
 
   it('带 schemaVersion 2 与 mode/total/converter 顶层字段', () => {
     const m = buildExtensionManifest({ extensions: inputs, mode: 'manifest', generatedAt: '2020-01-01T00:00:00.000Z' });
-    expect(m.converter).toBe('st-zip-converter');
+    expect(m.converter).toBe('ST-pack-transfer');
     expect(m.schemaVersion).toBe(MANIFEST_SCHEMA_VERSION);
     expect(m.schemaVersion).toBe(2);
     expect(m.mode).toBe('manifest');

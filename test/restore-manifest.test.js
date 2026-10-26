@@ -17,7 +17,7 @@ import {
 
 /** 模拟 FULL 包内清单（扩展实体已随恢复写入，无可安装项） */
 const FULL_MANIFEST = {
-  converter: 'st-zip-converter',
+  converter: 'ST-pack-transfer',
   schemaVersion: 2,
   mode: 'full',
   total: 2,
@@ -29,7 +29,7 @@ const FULL_MANIFEST = {
 
 /** 模拟 MANIFEST 包（混合可安装 / 不可安装） */
 const MIXED_MANIFEST = {
-  converter: 'st-zip-converter',
+  converter: 'ST-pack-transfer',
   schemaVersion: 2,
   mode: 'manifest',
   total: 3,
@@ -87,7 +87,7 @@ describe('恢复端：MANIFEST 包的三态分类', () => {
 describe('恢复端：向后兼容（v1 旧包）', () => {
   it('v1 清单（无 schemaVersion / 无 availability）仍可读且可安装', () => {
     const v1 = {
-      converter: 'st-zip-converter',
+      converter: 'ST-pack-transfer',
       mode: 'manifest',
       total: 1,
       extensions: [{

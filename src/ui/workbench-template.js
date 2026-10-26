@@ -1,5 +1,5 @@
 /**
- * 酒馆数据包互转工坊 - HTML 模板生成器（单一模板源 · 单一视图）
+ * 数据包转运 - HTML 模板生成器（单一模板源 · 单一视图）
  *
  * 三个入口共用本函数（L1-MR-10 单向化）：
  *   · 独立 Web   ：index.html 空骨架 → bootstrap() 注入 getWorkbenchHtml({ isStandalone: true })
@@ -24,13 +24,18 @@
  */
 
 import { DEFAULT_SELECTION } from '../core/selection-defaults.js';
+import { DEFAULT_FILENAME_TEMPLATE } from '../core/naming.js';
 
 /** 特殊类目复选框的 `checked` 由**唯一默认源**派生（用户 2026-10-14 裁定 OQ-1「13 键为准」）。 */
 const checkedAttr = (key) => (DEFAULT_SELECTION[key] ? ' checked' : '');
 
 /** 徽标组（抽屉态渲染在状态行，其余形态渲染在页头；两处只渲染一份，防重复 id） */
 const BADGES_HTML = `
-      <span class="badge" id="env-badge">检测中...</span>
+      <span class="badge badge-host" id="env-badge" title="检测中...">
+        <img class="host-badge-icon" id="env-badge-icon" alt="" hidden>
+        <svg class="host-badge-gh" id="env-badge-gh" viewBox="0 0 24 24" width="13" height="13" fill="currentColor" aria-hidden="true" hidden><path d="M12 2A10 10 0 0 0 2 12c0 4.42 2.87 8.17 6.84 9.5.5.09.68-.22.68-.48v-1.7c-2.78.6-3.37-1.34-3.37-1.34-.45-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.89 1.53 2.34 1.09 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.56-1.11-4.56-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02a9.5 9.5 0 0 1 5 0c1.9-1.29 2.74-1.02 2.74-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.69-4.57 4.94.36.31.68.92.68 1.85v2.74c0 .27.18.58.69.48A10 10 0 0 0 22 12A10 10 0 0 0 12 2z"/></svg>
+        <span id="env-badge-text">检测中...</span>
+      </span>
       <span class="badge badge-user" id="host-user-badge" style="display: none;">用户: 未登录</span>
 `;
 
@@ -47,7 +52,7 @@ export function getWorkbenchHtml({ isModal = false, isStandalone = false } = {})
   return `
     <header class="app-header">
       <div class="title-group">
-        <h1><i class="fa-solid fa-file-zipper"></i> 酒馆数据包互转工坊</h1>
+        <h1><i class="fa-solid fa-file-zipper"></i> 数据包转运</h1>
       </div>
       <div class="header-badges">
         ${BADGES_HTML}
@@ -172,7 +177,7 @@ export function getWorkbenchHtml({ isModal = false, isStandalone = false } = {})
         </label>
         <label class="wb-field">
           <span class="wb-field-key">包名</span>
-          <input type="text" id="filename-template-input" class="text_pole" placeholder="{target}_{user}_{part}_{date}.zip" value="{target}_{user}_{part}_{date}.zip">
+          <input type="text" id="filename-template-input" class="text_pole" placeholder="${DEFAULT_FILENAME_TEMPLATE}" value="${DEFAULT_FILENAME_TEMPLATE}">
         </label>
         <div class="filename-preview-box" id="filename-preview-box">
           <code class="preview-code" id="filename-preview"></code>
@@ -416,7 +421,7 @@ export function getWorkbenchHtml({ isModal = false, isStandalone = false } = {})
     </div>
 
     <footer class="app-footer">
-      <p><a href="https://github.com/jiozhaoyue/st-zip-converter" target="_blank" rel="noopener">GitHub</a></p>
+      <p><a href="https://github.com/jiozhaoyue/ST-pack-transfer" target="_blank" rel="noopener">GitHub</a></p>
     </footer>
   `;
 }
