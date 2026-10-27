@@ -652,7 +652,7 @@ function renderLan(){
   const targets=lanTargets();
   const sum=document.getElementById('lan-send-summary'); if(sum) sum.textContent=lanSummaryText();
   const gen=document.getElementById('lan-btn-generate');
-  if(gen) gen.disabled=!targets.length || L.send.busy;
+  if(gen) gen.disabled=!targets.length || L.send.busy || L.send.waiting;
   const sendCode=document.getElementById('lan-send-code');
   if(sendCode && document.activeElement!==sendCode) sendCode.value=L.send.code||'';
   const copySend=document.getElementById('lan-btn-copy-send'); if(copySend) copySend.hidden=!L.send.code;
@@ -664,7 +664,7 @@ function renderLan(){
   const scanAnswer=document.getElementById('lan-btn-scan-answer');
   if(scanAnswer) scanAnswer.hidden=!L.send.code;
   const retry=document.getElementById('lan-btn-retry'); if(retry) retry.hidden=!L.send.error;
-  const cancel=document.getElementById('lan-btn-cancel'); if(cancel) cancel.hidden=!L.send.busy;
+  const cancel=document.getElementById('lan-btn-cancel'); if(cancel) cancel.hidden=!(L.send.busy || L.send.waiting);
   const sp=document.getElementById('lan-send-phase'); if(sp) sp.textContent=L.send.phase||'准备就绪';
   const sd=document.getElementById('lan-send-detail'); if(sd) sd.textContent=L.send.detail||'';
   setLanBar('lan-send-bar','lan-send-pct',L.send.pct);

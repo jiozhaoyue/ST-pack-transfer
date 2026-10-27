@@ -30,6 +30,7 @@ const STORES = {
 export const ORIGINS = Object.freeze({
   UPLOAD: 'upload',
   HOST_EXPORT: 'host-export',
+  LAN: 'lan',
   CONVERTED: 'converted',
   DELTA: 'delta',
   SPLIT_PART: 'split-part',
