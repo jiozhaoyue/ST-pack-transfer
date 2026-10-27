@@ -251,11 +251,11 @@ function renderTargetPicker(){
   const bi=document.getElementById('target-btn-icon');
   bi.src=hostIcon(cur.host); bi.dataset.host=cur.host;
   document.getElementById('target-btn-text').textContent=cur.value;
-  document.getElementById('target-pop').innerHTML=TARGETS.map(t=>{
-    const isHost = state.mode!=='web' && t.host===state.host;
-    return '<button class="picker-item" role="option" data-target="'+t.value+'" aria-selected="'+(t.value===state.target)+'">'
-      +'<img class="picker-ico" data-host="'+t.host+'" src="'+hostIcon(t.host)+'" alt="">'
-      +'<span>'+t.value+'</span>'
+  document.getElementById('target-pop').innerHTML=TARGETS.map(opt=>{
+    const isHost = state.mode!=='web' && opt.host===state.host;
+    return '<button class="picker-item" role="option" data-target="'+opt.value+'" aria-selected="'+(opt.value===state.target)+'">'
+      +'<img class="picker-ico" data-host="'+opt.host+'" src="'+hostIcon(opt.host)+'" alt="">'
+      +'<span>'+opt.value+'</span>'
       +(isHost?'<span class="host-tag">'+t('target.hostSuffix')+'</span>':'')
       +'</button>';
   }).join('');
@@ -572,8 +572,8 @@ function renderChart(){
   const stack=document.getElementById('chart-stack');
   const scroll=stack.scrollTop;
   let html='';
-  targets.forEach(t=>{
-    if(t.host){
+  targets.forEach(target=>{
+    if(target.host){
       const tree=hostNodes(state.host);
       const degraded = state.mode==='web' || !HOSTS[state.host].readable || !(state.hostTree && state.hostTree.length);
       html+='<div class="chart-group">'
@@ -585,19 +585,19 @@ function renderChart(){
           })+'</div></div>';
       return;
     }
-    if(t.merge){
-      const nodes=mergedNodes(t.pkgs);
-      const totalMb=mergedTotalMb(t.pkgs);
+    if(target.merge){
+      const nodes=mergedNodes(target.pkgs);
+      const totalMb=mergedTotalMb(target.pkgs);
       const vols=volumesFor(totalMb,nodes);
       const multi=vols.length>1;
-      const scope=mergeScope(t.pkgs);
-      const extOwner=t.pkgs.find(p=>p.extensions&&p.extensions.length)||t.pkgs[0];
+      const scope=mergeScope(target.pkgs);
+      const extOwner=target.pkgs.find(p=>p.extensions&&p.extensions.length)||target.pkgs[0];
       const extTools=extensionToolsHtml(extOwner);
       html+='<div class="chart-group is-merged">'
         +'<div class="vol-grid" data-vols="'+vols.length+'">'
         + vols.map(v=>chartCardHtml({
             key:'merge-'+v.i, scope, nodes:v.nodes,
-            idxText:t('chart.mergedBadge',{n:t.pkgs.length}),
+            idxText:t('chart.mergedBadge',{n:target.pkgs.length}),
             merged:true,
             volText: multi ? t('chart.volume',{i:v.i,n:v.n}) : t('chart.whole'),
             capText: fmtMB(v.mb),
@@ -609,7 +609,7 @@ function renderChart(){
         +'</div></div>';
       return;
     }
-    const pkg=t.pkg;
+    const pkg=target.pkg;
     const tree=packageNodes(pkg);
     const vols=volumesOf(pkg, tree.nodes);
     const multi=vols.length>1;
