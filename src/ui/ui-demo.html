@@ -206,7 +206,7 @@ function demoTree(){
     ]}),
     node('group:cache','派生缓存',0.1,'drop',{icon:'bolt',children:[
       node('n-cache-1','user/cache/derived.bin',0.1,'drop',{icon:'file'})
-    ]}),
+    ]}
   ];
 }
 function scaleNodesTo(arr,totalMb){
@@ -339,22 +339,9 @@ const demoLan = {
     demoTimers.push(timer);
   },
   cancel() { clearDemoTimers(); view.setLan({ send: { busy: false, phase: '已取消', pct: 0 } }); },
-  swap() {
-    view.setLan({
-      send: { code: '', answer: '', phase: '准备就绪', detail: '', pct: 0, busy: false, waiting: false, done: false, error: false },
-      recv: { offer: '', code: '', phase: '等待取件码', detail: '', pct: 0, busy: false, done: false },
-    });
-  },
   retry() { demoLan.generate(); },
   abandon() { clearDemoTimers(); view.setLan({ recv: { busy: false, phase: '半成品已放弃', pct: 0, code: '' } }); },
 };
-
-/* 演示数据：云端私有件与互传矩阵（必须在 view 构造前声明，动作闭包会引用）。 */
-const demoPrivateFiles = [
-  { name:'private_chat_sync_1730000000.zip', path:'/user/files/private_chat_sync_1730000000.zip', uploadedAt: Date.now()-3_600_000, sizeBytes: 1.4*1024*1024, sourceName:'…chat_sync.json' },
-  { name:'private_secrets_1730000900.zip', path:'/user/files/private_secrets_1730000900.zip', uploadedAt: Date.now()-1_800_000, sizeBytes: 0.02*1024*1024, sourceName:'secrets.json' },
-  { name:'private_memory_graph_1730001200.zip', path:'/user/files/private_memory_graph_1730001200.zip', uploadedAt: Date.now()-600_000, sizeBytes: 3.1*1024*1024, sourceName:'…memory_graph__meta.json' },
-];
 
 const view = createWorkbenchView({
   qr: demoQr,
@@ -365,14 +352,6 @@ const view = createWorkbenchView({
     copyBack: doCopyBack,
     deleteSelected: doDeleteSelected,
     uploadPrivate: doUploadPrivate,
-    transfer: {
-      pull: async (peerId) => {
-        await new Promise((resolve) => setTimeout(resolve, 400));
-        view.pushLog('INFO', '原生局域网拉取：' + peerId);
-        return { ok: true };
-      },
-      swap: () => demoLan.swap(),
-    },
     privateFiles: {
       list: async () => demoPrivateFiles.slice(),
       /* 演示「校验」：第二条标记为缺失，展示两态。 */
@@ -405,11 +384,6 @@ const view = createWorkbenchView({
 });
 const S = () => view.getState();
 view.setPrivateFiles(demoPrivateFiles.slice());
-view.setTransfer({
-  host: 'luker',
-  peers: [{ id: 'demo-phone', label: '演示手机' }, { id: 'demo-laptop', label: '演示笔记本' }],
-  webRtcAvailable: true,
-});
 document.getElementById('btn-locale')?.addEventListener('click',()=>{
   setLocale(getLocale()==='zh-CN'?'en-US':'zh-CN');
 });
@@ -506,6 +480,12 @@ function doDeleteSelected(ids){
     }}
   ]);
 }
+
+const demoPrivateFiles = [
+  { name:'private_chat_sync_1730000000.zip', path:'/user/files/private_chat_sync_1730000000.zip', uploadedAt: Date.now()-3_600_000, sizeBytes: 1.4*1024*1024, sourceName:'…chat_sync.json' },
+  { name:'private_secrets_1730000900.zip', path:'/user/files/private_secrets_1730000900.zip', uploadedAt: Date.now()-1_800_000, sizeBytes: 0.02*1024*1024, sourceName:'secrets.json' },
+  { name:'private_memory_graph_1730001200.zip', path:'/user/files/private_memory_graph_1730001200.zip', uploadedAt: Date.now()-600_000, sizeBytes: 3.1*1024*1024, sourceName:'…memory_graph__meta.json' },
+];
 
 function doUploadPrivate(payload){
   const name = (payload && payload.name) || '';

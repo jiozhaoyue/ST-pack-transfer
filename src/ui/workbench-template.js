@@ -129,11 +129,6 @@ export function getWorkbenchHtml() {
               <svg class="lan-chev" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5l7 7-7 7"/></svg>
             </button>
             <div class="lan-body" id="lan-body" hidden>
-              <div class="lan-matrix-bar">
-                <button class="btn" id="btn-matrix" data-i18n="transfer.open"></button>
-                <button class="tree-mini" id="btn-swap" data-i18n="transfer.swap"></button>
-                <span class="lan-matrix-dir" id="transfer-direction"></span>
-              </div>
               <div class="lan-scan" id="lan-scan" hidden>
                 <video id="lan-scan-video" playsinline muted></video>
                 <div class="lan-scan-actions">

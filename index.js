@@ -10,7 +10,6 @@ import { logger } from './src/core/logger.js';
 import { zipIo } from './src/core/zip-io.js';
 import { splitArchiveEntries } from './src/core/splitter.js';
 import { mergeConvertedBlobs } from './src/core/merge-packages.js';
-import { probeDirectCapability } from './src/core/lan-transfer.js';
 import {
   ORIGINS, isStorageSupported, saveFile, getFile, deleteFile, listStoredFiles,
 } from './src/storage/db.js';
@@ -23,7 +22,6 @@ import {
   detectHost, hostLayoutCode, fetchHostBackup, restoreToHost, restoreToLuker,
   confirmDialog, mountExtensionRowButton, closeHostExtensionSurface,
   uploadUserFile, userFilesSupported, sanitizeUserFileName, verifyUserFiles, deleteUserFile,
-  isLanSyncAvailable, listLanSyncPeers, triggerLanSyncPull,
 } from './src/ui/host-bridge.js';
 import { packPrivateContainer } from './src/core/private-container.js';
 import { loadPrivateFiles, addPrivateFile, removePrivateFile } from './src/ui/private-files-store.js';
@@ -716,21 +714,7 @@ async function main(root) {
     retry: () => lanPanel?.retry(),
     cancel: () => lanPanel?.cancel(),
     abandon: () => lanPanel?.abandon(),
-    swap: () => lanPanel?.swap(),
   };
-
-  /** 刷新互传矩阵的通道可用性（原生通道只在 Luker 上探测）。 */
-  async function refreshTransferChannels() {
-    let peers = [];
-    if (hostKey === 'luker' && await isLanSyncAvailable()) {
-      peers = await listLanSyncPeers();
-    }
-    view.setTransfer({
-      host: hostKey,
-      peers,
-      webRtcAvailable: probeDirectCapability().direct,
-    });
-  }
 
   const view = createWorkbenchView({
     qr,
@@ -744,18 +728,6 @@ async function main(root) {
       download: downloadSelected,
       libraryExport: exportLibrary,
       lan: lanActions,
-      transfer: {
-        pull: async (peerId) => {
-          const result = await triggerLanSyncPull(peerId);
-          if (!result.ok) {
-            logger.error(t('log.lanPullFailed', { msg: result.detail || result.reason }));
-            return result;
-          }
-          logger.info(t('log.lanPullDone'));
-          return result;
-        },
-        swap: () => lanPanel?.swap(),
-      },
       settings: openSettings,
       uploadRequest: () => root.querySelector('#file-input')?.click(),
       uploadPrivate,
@@ -799,7 +771,6 @@ async function main(root) {
 
   view.setHost(hostKey, host.isPlugin ? 'plugin' : 'web');
   view.setPrivateFiles(loadPrivateFiles());
-  void refreshTransferChannels();
   applyI18n(root);
   root.querySelector('#btn-locale')?.addEventListener('click', () => {
     setLocale(getLocale() === 'zh-CN' ? 'en-US' : 'zh-CN');

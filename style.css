@@ -225,19 +225,6 @@
   #app.app-container .priv-row .pf-meta{font-size:10px;color:var(--muted-2);white-space:nowrap;font-variant-numeric:tabular-nums}
   #app.app-container .priv-row .pf-state{font-size:10px;color:var(--keep);white-space:nowrap}
   #app.app-container .priv-row .pf-state.is-missing{color:var(--drop)}
-  #app.app-container .lan-matrix-bar{display:flex;align-items:center;gap:8px;padding:2px 0 6px}
-  #app.app-container .lan-matrix-dir{font-size:10px;color:var(--muted-2);margin-left:auto}
-  #app.app-container .transfer-matrix{display:flex;flex-direction:column;gap:8px}
-  #app.app-container .transfer-row{border:1px solid var(--border);border-radius:6px;padding:7px 8px;background:var(--panel-3)}
-  #app.app-container .transfer-row.is-off{opacity:.72}
-  #app.app-container .transfer-row .tr-head{display:flex;align-items:center;gap:8px}
-  #app.app-container .transfer-row .tr-name{font-weight:600;flex:1}
-  #app.app-container .transfer-row .tr-state{font-size:10px;color:var(--muted-2)}
-  #app.app-container .transfer-row.is-on .tr-state{color:var(--keep)}
-  #app.app-container .transfer-peers{display:flex;flex-direction:column;gap:5px;margin-top:6px}
-  #app.app-container .transfer-peer{display:flex;align-items:center;gap:8px}
-  #app.app-container .transfer-peer .tp-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  #app.app-container .transfer-note{font-size:10px;color:var(--muted-2);margin-top:6px}
   #app.app-container .tree-children{padding-left:17px;border-left:1px dashed var(--border);margin-left:8px}
   #app.app-container .chart-unavailable{margin:8px 10px;padding:10px 12px;border:1px dashed var(--border);border-radius:9px;
     background:var(--panel-3);font-size:11.5px;color:var(--muted);line-height:1.6}

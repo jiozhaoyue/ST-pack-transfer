@@ -365,21 +365,3 @@ TT 页面**同时暴露** `window.__TAURITAVERN__` 与 `window.SillyTavern` 全�
 两级判定的「顺序不可颠倒」有真实宿主依据；`__TAURITAVERN__` 优先判 `tt` 的判据有效。
 TT 页面另实测到自身扩展更新检查的 GitHub 网络失败 console error（`/api/extensions/version`
 Git handshake failed）——**非本插件错误**，E2E 判定须按「只属于本插件」的既有口径过滤。
-
-## 局域网互传：四宿主的真实能力（2026-10-27 读实例源码取证）
-
-| 宿主 | 原生互传 | 入口 / 契约 | 证据 |
-| --- | --- | --- | --- |
-| Luker | 有 | `POST /api/sync/v1/peers/:peerId/sync` —— **只有本机拉取**（body 可空），没有远端直推端点；配对用 `/pair/start` / `/pair/accept` | `src/endpoints/sync.js`，挂载 `src/server-main.js:491`；`user-files` 类别 `syncDefault:'on'`（`src/sync/categories.js`） |
-| TauriTavern | 有 | LAN Sync v2：本机 HTTPS peer + SPKI pin + 配对 URI/二维码；`/v2/*`（status/session/pull-plan/push-plan/bundle/commit） | `docs/CurrentState/Sync.md` |
-| SillyTavern | 无 | —— | 实例源码检索 `局域网/LAN Sync/WebRTC/RTCPeerConnection/PeerJS/mDNS` = 0 |
-| PureTavern | 无（传输） | README 的「局域网」只指把 Provider/代理指向局域网地址 | `PureTavern/README.md` |
-
-**插件侧硬约束**：
-
-1. 跨宿主不存在统一原生协议（Luker 与 TT 协议不同源）⇒ 原生通道只用于**同宿主设备**，
-   其余一律走自研 WebRTC（`src/core/lan-transfer.js` + `lan-transfer-panel.js`）。
-2. **不得伪称直推**：Luker 推送需对端自己发起同步；TT 扩展不能 invoke Tauri 命令，
-   只能提示用户去原生 Sync 面板。通道矩阵必须逐行写出不可用原因（`src/core/transfer-matrix.js`）。
-3. 原生端点调用与 WebRTC 一样走降级链：健康检查/配对/端点任一失败 → 标不可用并保留 WebRTC 入口。
-4. `user/files` 是 Luker 默认同步类别；它**没有列表端点**，接收侧不能假装自动发现。
