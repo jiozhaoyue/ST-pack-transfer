@@ -374,7 +374,7 @@ PT 安装脚本 `--replace` 同时删除新旧两个名字。PT 规格从旧 UI 
 
 ### Status
 
-[OK] **Completed**（AC-10 真机双设备截图未做，已如实登记）
+[PARTIAL] **功能与四宿主验收完成**；AC-10 真机双设备截图未做，已如实登记（任务保持 in_progress，不归档）
 
 ### Next Steps
 
