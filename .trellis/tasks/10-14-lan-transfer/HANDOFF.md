@@ -1,9 +1,12 @@
-# 局域网互传 · 交接（2026-10-27 · 新 UI demo 完成、正式接线未完成）
+# 局域网互传 · 交接（2026-10-27 · 正式接线完成）
 
-> **状态：中间态。不要发版。**
-> demo（`src/ui/ui-demo.html`）里的新局域网 UI 已完成并在浏览器实测通过；
-> 正式运行时**尚未接线**：`index.js` 仍挂着旧的浮层面板，新内联区块的按钮目前是空动作。
-> 下一会话按「§6 下一步」从第 1 步继续。
+> **UI 偏移溯源见** [../10-26-storage-chart-workbench/HANDOFF-2026-10-27-UI-TRACE.md](../10-26-storage-chart-workbench/HANDOFF-2026-10-27-UI-TRACE.md)：
+> 设置页/图表全选/`导入01` 位置等偏移的完整证据与待修清单；**未确认前不要擅自改**。
+
+> **状态：功能完成，待四宿主/真机复跑。**
+> 执行卡内联 LAN 区块已接入 `index.js`（`qr` + `actions.lan`），旧浮层与 `.wb-lan-*` 样式已删除；
+> 独立 Web 双上下文 3 MB + 64 KB 多包排队真互传 **24/24 通过**。
+> 剩余：四宿主/六对复跑、PT 快照重装、真机双设备 AC-10。
 
 ---
 
@@ -13,10 +16,10 @@
 接收包直接进**唯一的导入区**，只用包卡文件名下原有的来源徽标区分 **本地导入 / 远程导入**，
 宿主仍由**扫包**判定。二维码（显示 + 相机扫描）已接入 demo，相机权限失败时提示并保留粘贴。
 
-**代码层面**：新 UI 已在正式三件套落地（`style.css` / `workbench-template.js` / `workbench-view.js`）；
-`src/ui/ui-demo.html` 只消费正式代码，用于实时预览。
-但 `src/ui/lan-transfer-panel.js` 仍是旧浮层实现，`index.js` 未传 `qr`、未提供 `actions.lan`，
-所以正式插件里新 LAN 区块不可用，且模板与旧浮层存在**重复的 `lan-*` id**。
+**代码层面（2026-10-27 接线后）**：新 UI 已在正式三件套落地（`style.css` / `workbench-template.js` / `workbench-view.js`）；
+`src/ui/lan-transfer-panel.js` 已重写为**内联控制器**（只读模板 id + `view.setLan()`），
+`src/ui/qr.js` 提供二维码，`index.js` 传入 `qr` / `actions.lan` / `getSendTargets`，
+接收走 `ORIGINS.LAN` 并以「远程导入」徽标落进唯一导入区。
 
 ---
 
@@ -105,56 +108,40 @@ jsQR 的 UMD 会自动挂 `window.jsQR`。
 
 ---
 
-## 五、当前未完成 / 已知破损（诚实登记）
+## 五、当前状态（2026-10-27 接线后）
 
-1. **正式插件里的新 LAN 区块不可用**：`index.js` 没有 `actions.lan`，按钮点击无动作。
-2. **重复 id**：模板已有 `#lan-send-code` 等；旧 `mountLanTransferPanel` 仍会创建一套同名 id 的浮层。
-3. **旧浮层未移除**：`src/ui/lan-transfer-panel.js` 仍是 overlay 实现；`overlay`/`#wb-lan-*` 样式仍留在 CSS 区。
-4. **正式侧没有二维码**：未创建 `src/ui/qr.js`，`createWorkbenchView` 未收到 `qr`。
-5. **来源徽标未接线**：`index.js` 仍把上传/宿主拉取映射为 `上传` / `宿主导出`；未加 `ORIGINS.LAN`，未做 `远程导入`。
-6. **多包队列未实现**：协议引擎一次一个文件；新 UI 允许多选，需要排队。
-7. **同名自动加序号未实现**（接收侧）。
-8. **E2E 旧规格未改**：`e2e/standalone/specs/lan-transfer.e2e.cjs` 仍用 `#btn-lan-send` / `#lan-send-file`（已删除），重跑会红。
-9. **四宿主矩阵/六对互传**是在旧浮层 UI 上跑出的（协议层 120/120）；新 UI 需复跑。
-10. **PT 快照**：PT 的插件是 `git archive HEAD` 安装的快照；改完正式接线后要 `install-pt-extension.cjs --replace` 重装。
-11. **真机双设备（AC-10）**：仍未做；现有证据是同机双页面 + 同机跨宿主。
+已完成：
+
+1. `index.js` 已传 `qr` 与 `actions.lan`，按钮全部有真实动作。
+2. 旧 `mountLanTransferPanel` 浮层与重复 `lan-*` id 已删除。
+3. `.wb-lan-*` 样式已删除；旧浮层文件已重写为内联控制器。
+4. `src/ui/qr.js` 已建：classic 注入本地 vendor；`ready()` 失败时二维码隐藏、粘贴可用。
+5. `ORIGINS.LAN` + `远程导入` 徽标已接线；`importFiles({remote:true})` 自动加序号并扫包。
+6. 多包队列已实现：勾选多个包 → 逐个生成取件码，完成一个自动出下一个。
+7. E2E 已改写并通过：两个**独立上下文**、3 MB + 64 KB 两包排队、二维码渲染、远程导入徽标、一次性。
+
+仍未完成：
+
+8. **四宿主矩阵 / 六对互传**：需要在 Dev ST / Dev Luker / Dev PT / TT 上用新 UI 复跑
+   （协议层未改，旧读数 120/120 仍可参考，但新 UI 必须重新取证）。
+9. **PT 快照**：PT 的插件是 `git archive HEAD` 安装的快照；改完要 `install-pt-extension.cjs --replace` 重装。
+10. **真机双设备（AC-10）**：仍未做；现有证据是同机双上下文 + 同机跨宿主。
 
 ---
 
-## 六、下一步（按顺序）
+## 六、剩余步骤（按顺序）
 
-### 第 1 步：正式二维码适配器
-1. 新建 `src/ui/qr.js`：`encodeSvg(text)` + `scan({video,canvas,onResult,onError})`。
-2. 处理 `qrcode-generator` 的 ESM 不导出问题（补 `window.qrcode = qrcode` 或 classic script 注入）。
-3. `index.js`：`import { qr } from './src/ui/qr.js'`，传给 `createWorkbenchView({ actions, qr })`。
+### 第 1 步：四宿主 / 六对复跑（新 UI）
+1. `npm test` + 五守卫（已绿，可复跑确认）。
+2. 四宿主矩阵：`node scripts/run-e2e-instances.cjs --only dev-st,dev-luker,dev-pt,tt-cdp`
+3. 六对互传：`node out/lancheck/pair-all.cjs`。旧脚本用浮层选择器，需改成新 UI：
+   `#lan-toggle` → `#lan-btn-generate` → `#lan-offer-input` → `#lan-btn-accept` →
+   `#lan-answer-input` → `#lan-btn-apply-answer`。
+4. PT 快照：`install-pt-extension.cjs --replace` 后跑 pt-load。
 
-### 第 2 步：把旧浮层改成内联控制器
-1. `src/ui/lan-transfer-panel.js` 删除自建 DOM / overlay / role tabs / 文件选择器。
-2. 改为读取模板 id（`lan-send-code`、`lan-offer-input`、…），通过 `view.setLan()` 更新 UI。
-3. 保留协议引擎：offer/answer、DataChannel、OPFS sink、SHA-256、续传、一次性。
-4. 发送源改为 `getSendTargets()`（index 提供：导入区勾选包的 `{name,blob,size}`）；多包排队。
-5. `index.js` 用 mutable `actions.lan` 接上控制器（view 先建、panel 后挂）。
-6. 删除模板里不再使用的旧 `.wb-lan-*` 样式（确认无引用后）。
-
-### 第 3 步：来源徽标与接收落地
-1. `src/storage/db.js` 增加 `ORIGINS.LAN = 'lan'`。
-2. `index.js` 的 `syncPackages` 映射：导入区 + LAN → `远程导入`；导入区其余 → `本地导入`；导出区 → `导出副本`。
-3. `importFiles(files, { remote: true })`：`origin=ORIGINS.LAN`，接收后 `ensurePlan` 扫包得 layout（宿主角标）。
-4. 同名包自动加序号（仅远程接收）。
-5. `onReceive` 改为 remote 入库并自动选中。
-
-### 第 4 步：测试与证据
-1. 更新 `e2e/standalone/specs/lan-transfer.e2e.cjs`：先上传夹具 → 勾选导入包 → 开 LAN 块 → 生成 → 接收 → 断言 `远程导入` 徽标。
-2. `npm test` + 五守卫 + `npm run e2e:web -- --only lan-transfer --rebuild`。
-3. 四宿主矩阵：`node scripts/run-e2e-instances.cjs --only dev-st,dev-luker,dev-pt,tt-cdp`。
-4. 六对互传：`node out/lancheck/pair-all.cjs`（脚本仍在，需按新 UI 选择器更新）。
-5. PT 重装快照后再跑 PT。
-
-### 第 5 步：收口
-1. 更新 `.trellis/spec/frontend/workbench-single-view.md` §7.2（新交互模型、二维码、来源徽标）。
-2. 回填 `prd.md` / `implement.md`，归档任务。
-3. 截图：桌面发送/接收、移动端接收在上、四宿主运行时。
-4. 真机双设备验收（AC-10）。
+### 第 2 步：收口
+1. 回填 `prd.md` / `implement.md`，更新 spec §7.2（已做），提交推送。
+2. 真机双设备验收（AC-10）。
 
 ---
 

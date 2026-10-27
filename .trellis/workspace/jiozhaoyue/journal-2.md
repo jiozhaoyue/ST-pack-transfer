@@ -480,3 +480,52 @@ demo 现在经 Vite 实时预览：`npm run dev` → `http://localhost:3040/src/
 - ② `lan-transfer-panel.js` 去浮层、绑模板 id
 - ③ 更新 LAN E2E、四宿主复跑、真机双设备
 
+## Session 57: LAN 正式接线完成 + UI 偏移溯源交接
+<!-- trellis-session: v=2 fp=lan-wire-ui-trace-20261027 -->
+
+**Date**: 2026-10-27
+**Task**: 10-14-lan-transfer（in_progress）
+**Branch**: `main`
+
+### Summary
+
+完成局域网正式接线：新建 `src/ui/qr.js`（classic 注入本地 vendor），
+`lan-transfer-panel.js` 去浮层改为内联控制器（`view.setLan` + 多包队列），
+`index.js` 接 `qr` / `actions.lan` / `getSendTargets`，接收走 `ORIGINS.LAN` 并加「远程导入」徽标；
+E2E 重写为两个独立上下文、3 MB + 64 KB 两包排队，**24/24 通过**。
+同时修复主题：LAN `.menu_button` 白底回退、原生 checkbox 白方块改自绘、`color-scheme:dark`。
+
+用户随后叫停 UI 改动并要求**只做溯源交接**。已写
+`.trellis/tasks/10-26-storage-chart-workbench/HANDOFF-2026-10-27-UI-TRACE.md`：
+设置页首次出现在 demo `a1dfa0b`（2026-10-26 23:25），生产由 `3b7aeed`（2026-10-27 03:25）
+「按定稿 demo 全面重写」搬入，同时删除了旧主界面「打包」区
+（`3b7aeed^:src/ui/workbench-template.js:137-258`）。8 项打包设置与图表双源，
+`generate()` 读全局 `settings.*` 覆盖图表勾选；图表虚拟节点（完整扩展/Git/构建/原生资产）
+只存在于 demo，`chart-model.js` 从未实现；「导入01」在 `.chart-group-head`（图表卡外）；
+「大类折叠到文件」无需求来源；逐级全选未实现；设置页无任何 CSS 且 3 个枚举并排；
+最后一 3 项（keepExport/trafficPrompt/autoTutorial）也是死设置；设置不持久化。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| （待提交） | feat(lan)+fix(ui): 局域网正式接线；主题回退；UI 偏移溯源交接 |
+
+### Testing
+
+- [OK] `npm test` 874 passed / 2 skipped
+- [OK] 五守卫全绿；`npm run build` 通过
+- [OK] `npm run e2e:web -- --only lan-transfer --rebuild` 24/24
+- [OK] 3040 实跑：上传→勾选→生成取件码→二维码；桌面/设置/图表截图零控制台错误
+- [PENDING] 四宿主/六对复跑、PT 快照、真机双设备
+
+### Status
+
+[PARTIAL] LAN 接线完成；**UI 偏移未修，等用户裁定**（设置页承载、图表虚拟节点、逐级全选、导入01 位置）。
+
+### Next Steps
+
+- ① 读 `HANDOFF-2026-10-27-UI-TRACE.md` §0 用户裁定与 §4 待修清单
+- ② 等用户确认「打包选项回图表」的具体落点（尤其压缩）
+- ③ 再做 P0 修复与四宿主复跑
+

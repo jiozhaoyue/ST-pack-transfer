@@ -180,12 +180,13 @@ TauriTavern 的阶段+进度事件 / 原子落盘 / 自然续传 / 地址发现�
 `failRecv` 只认第一次失败（sink 打开失败 / 写链异常 / 通道关闭会竞争触发）。
 
 **自动化证据**：`npm run e2e:web -- --only lan-transfer --rebuild`
-两个页面真实互传 3 MB 合法 zip（跨越 64 KB 分块边界），**18/18 通过**：
-取件码/应答码生成 → 传输 → 摘要一致 → 接收端工作区出现同名包 → 一次性失效 → 坏码拒绝。
+两个**独立上下文**（各自 IndexedDB，避免假阳性）真实互传 3 MB + 64 KB 合法 zip
+（跨越 64 KB 分块边界），**24/24 通过**：多包勾选 → 取件码/应答码生成 → 二维码渲染 →
+两包排队传输 → 摘要一致 → 接收端两包均标「远程导入」→ 一次性失效 → 坏码拒绝。
 
 ---
 
-### 7.2 交互模型二次重做（2026-10-27 · demo 已完成、正式接线待做）
+### 7.2 交互模型二次重做（2026-10-27 · 正式接线已完成）
 
 用户四轮评审定稿，**推翻**「独立浮层 + 发送/接收两个绝对页签」：
 
@@ -203,13 +204,15 @@ TauriTavern 的阶段+进度事件 / 原子落盘 / 自然续传 / 地址发现�
 | 同名 | 远程接收自动加序号，不覆盖 |
 
 **二维码来源**：`qrcode-generator` 2.0.4（MIT，编码）+ `jsQR` 1.4.0（Apache-2.0，解码），
-本地 vendor 到 `src/vendor/`；根许可证 **AGPL-3.0**。demo 用 classic `<script>` 加载以驱动 harness；
-正式侧需 `src/ui/qr.js` 适配（注意 qrcode-generator 在 ESM 下不自动挂 window）。
+本地 vendor 到 `src/vendor/`；根许可证 **AGPL-3.0**。`src/ui/qr.js` 以 classic `<script>`
+注入本地文件（qrcode-generator 的顶层 `var qrcode` 在 ESM 里不会挂 window），
+`ready()` 失败时二维码隐藏、文本码与粘贴始终可用。
 
-**当前状态（2026-10-27 修订后）**：正式三件套是手写唯一源；`ui-demo.html` 已改为**只 import
-正式样式 / 模板 / 视图**的预览页。`index.js` 尚未提供 `actions.lan` / `qr`，旧
-`lan-transfer-panel.js` 仍是浮层实现，正式插件内新 LAN 区块不可用。**下一步见
-`10-14-lan-transfer/HANDOFF.md`。**
+**当前状态（2026-10-27 接线后）**：`index.js` 已传入 `qr` 与 `actions.lan`；
+`lan-transfer-panel.js` 已去浮层、只读模板 id 并通过 `view.setLan()` 驱动；
+`getSendTargets()` 取导入区勾选包（多包排队）；接收落库走 `ORIGINS.LAN`，
+`importFiles({remote:true})` 自动加序号并扫包。旧 `.wb-lan-*` 浮层样式已删除。
+剩余：四宿主/六对复跑、PT 快照重装、真机双设备 AC-10（见 HANDOFF）。
 
 **布局约束**：局域网展开时包区让出高度（`.col-side.lan-open > .zone-card{flex:0 0 28%}`），
 执行卡内部滚动；旧的 `inset:0` 全屏浮层在 TT 会塌陷（TT 的 `<html>` 有 transform 且高 0），
