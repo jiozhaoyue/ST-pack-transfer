@@ -230,6 +230,9 @@
 
   #app.app-container .vol-card{display:flex;flex-direction:column;min-width:0;
     border:1px solid var(--border);border-radius:10px;background:var(--panel-2);overflow:hidden}
+  #app.app-container .vol-card.is-disabled{opacity:.55;filter:grayscale(1)}
+  #app.app-container .vol-card.is-disabled .tree-row{pointer-events:none}
+  #app.app-container .vol-card.is-disabled .tree-check{cursor:not-allowed}
   #app.app-container .vol-head{flex:0 0 auto;display:flex;align-items:center;gap:6px;padding:6px 9px;
     border-bottom:1px solid var(--border);
     background:color-mix(in srgb, var(--panel-3) 72%, transparent);

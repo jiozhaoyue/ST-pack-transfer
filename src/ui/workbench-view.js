@@ -361,7 +361,8 @@ function chartCardHtml(o){
   const collapsed = state.collapsedVol[o.key]!==undefined ? !!state.collapsedVol[o.key] : !!o.defaultCollapsed;
   syncAncestors(o.nodes,o.scope);
   const sum=sumSelected(o.nodes,o.scope);
-  return '<div class="vol-card'+(collapsed?' is-collapsed':'')+'" data-scope="'+o.scope+'" data-volkey="'+o.key+'">'
+  const dis = !!o.disabled;
+  return '<div class="vol-card'+(collapsed?' is-collapsed':'')+(dis?' is-disabled':'')+'" data-scope="'+o.scope+'" data-volkey="'+o.key+'"'+(dis?' aria-disabled="true"':'')+'>'
     +(o.hideHead?'':'<div class="vol-head">'
       +'<span class="vol-idx">'+o.idxText+'</span>'
       +(o.capText?'<span class="vol-cap'+(o.over?' is-over':'')+'">'+o.capText+'</span>':'')
@@ -373,14 +374,14 @@ function chartCardHtml(o){
     +'</div>')
     +'<div class="vol-body">'
       +(o.noticeHtml||'')
-      +'<div class="tree-tools">'
+      +(dis?'':'<div class="tree-tools">'
         +'<button data-treeall="1">全选</button>'
         +'<button data-treenone="1">全不选</button>'
         +'<button data-treeinvert="1">反选</button>'
         +'<span class="spacer"></span><span class="hint">大类折叠到文件</span>'
-      +'</div>'
-      +'<div class="chart-tree">'+renderTreeRows(o.nodes,0,o.scope,o.readonly)+'</div>'
-      +'<div class="chart-foot"><span>已选 '+sum.count+' 项 · 预计 '+fmtMB(sum.mb)+'</span></div>'
+      +'</div>')
+      +'<div class="chart-tree">'+renderTreeRows(o.nodes,0,o.scope,o.readonly||dis)+'</div>'
+      +(dis?'':'<div class="chart-foot"><span>已选 '+sum.count+' 项 · 预计 '+fmtMB(sum.mb)+'</span></div>')
     +'</div>'
   +'</div>';
 }
@@ -410,11 +411,12 @@ function renderChart(){
   targets.forEach(t=>{
     if(t.host){
       const tree=hostNodes(state.host);
-      const degraded = state.mode==='web' || !HOSTS[state.host].readable;
+      const degraded = state.mode==='web' || !HOSTS[state.host].readable || !(state.hostTree && state.hostTree.length);
       html+='<div class="chart-group">'
         +'<div class="vol-grid" data-vols="1">'+chartCardHtml({
             key:'host', scope:'host:'+state.host, nodes:tree.nodes, idxText:'宿主数据',
-            noticeHtml: degraded ? '<div class="chart-unavailable"><b>当前形态没有存储清单端点</b><br>宿主图表置灰；下方仍可查看插件自身数据。不新增该宿主专用后端。</div>' : '',
+            noticeHtml: '',
+            disabled: degraded,
             readonly:false
           })+'</div></div>';
       return;
@@ -780,15 +782,15 @@ function openModal(title,desc,extraHtml,actions){
   document.getElementById('modal-overlay').classList.add('open');
 }
 function closeModal(){ document.getElementById('modal-overlay').classList.remove('open'); }
-function openTrafficModal(onConfirm){
-  if(state.noTrafficPrompt){ onConfirm(); return; }
+function openTrafficModal(onConfirm, { enabled = true, onNever } = {}){
+  if(!enabled || state.noTrafficPrompt){ onConfirm(); return; }
   openModal('该操作会耗费大量流量','向后端酒馆上传或下载会消耗大量流量，请确认当前网络环境。',[
     '<label class="check"><input type="checkbox" id="traffic-nodisplay"> 不再显示</label>'
   ],[
     {label:'取消',onClick:closeModal},
     {label:'继续',primary:true,onClick:()=>{
       const cb=document.getElementById('traffic-nodisplay');
-      if(cb && cb.checked){ state.noTrafficPrompt=true; log('INFO','已关闭流量提示'); }
+      if(cb && cb.checked){ state.noTrafficPrompt=true; onNever?.(); log('INFO','已关闭流量提示'); }
       closeModal(); onConfirm();
     }}
   ]);
@@ -1234,6 +1236,7 @@ initSplitters();
     pushLog(level, msg) { log(String(level || 'INFO').toUpperCase(), msg); },
     openModal,
     closeModal,
+    confirmTraffic(onConfirm, opts) { openTrafficModal(onConfirm, opts); },
     toast,
     renderAll,
     getExcludedPaths,

@@ -35,12 +35,24 @@ describe('SillyTavern 标准插件工程结构 (ST-pack-transfer)', () => {
     expect(code).toContain('mountExtensionRowButton');
   });
 
-  it('扩展打包枚举与保留构建配置由设置弹窗提供（index.html 仅为骨架）', async () => {
+  it('设置弹窗只提供 3 个行为开关；打包选项不在设置页（index.html 仅为骨架）', async () => {
     const src = await readFile('index.js', 'utf8');
-    expect(src).toContain('set-extension-mode');
-    expect(src).toContain("value=\"manifest\"");
-    expect(src).toContain("value=\"full\"");
-    expect(src).toContain('set-keep-dev');
+    // 旧契约已推翻：Git / 扩展 / 构建 / 压缩 / backups / 缓存 / 私有 / 清理不得回到设置页
+    for (const legacy of [
+      'set-extension-mode', 'set-keep-dev', 'set-git-mode', 'set-compression',
+      'set-include-backups', 'set-include-cache', 'set-include-private', 'set-prune-builtin',
+    ]) {
+      expect(src, `设置页不得再出现 ${legacy}`).not.toContain(legacy);
+    }
+
+    const panelSrc = await readFile('src/ui/settings-panel.js', 'utf8');
+    for (const key of ['keepExport', 'trafficPrompt', 'autoTutorial']) {
+      expect(panelSrc).toContain(key);
+    }
+    const { buildSettingsHtml } = await import('../src/ui/settings-panel.js');
+    const settingsHtml = buildSettingsHtml({});
+    expect((settingsHtml.match(/type="checkbox"/g) || []).length).toBe(3);
+    expect(settingsHtml).not.toMatch(/git|扩展包|构建配置|backups|派生缓存|清理/i);
 
     // 反向断言：index.html 不得出现这些业务节点（防回归成两份副本）
     const html = await readFile('index.html', 'utf8');

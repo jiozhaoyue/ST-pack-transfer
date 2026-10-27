@@ -421,43 +421,36 @@ describe('plan-preview 的 gitMode 预测', () => {
   });
 });
 
-describe('gitMode UI 契约', () => {
-  // 项目不引入 jsdom（依赖自包含 L1-MR-11），故 UI 契约落在「模板产出 + 消费点」两层。
-  // 2026-10-14：并排 radio 改为 `<select>` 枚举（用户裁定「禁止模式选择」），
-  // 且选项文案去黑话（用户裁定禁止「瘦身 / 剔除」）。
-  const MODES = [
-    ['独立态', { isStandalone: true }],
-    ['模态态', { isModal: true }],
-  ];
-
-  it.each(MODES)('%s 的设置弹窗提供三档 Git 枚举且默认 keep', async () => {
+describe('gitMode UI 契约（设置页不再承载）', () => {
+  // 用户 2026-10-27 裁定：Git 属于图表「扩展」节点；仅完整扩展时显示。
+  // 设置页只留 3 个行为开关，故这里反向断言「设置页不得出现 Git」。
+  it('三档 Git 枚举仍在转换器契约中，默认 keep', async () => {
+    expect(GIT_MODES).toEqual({ KEEP: 'keep', MINIMAL: 'minimal', STRIP: 'strip' });
     const src = await readFile(new URL('../index.js', import.meta.url), 'utf8');
-    for (const value of ['keep', 'minimal', 'strip']) {
-      expect(src, `缺少 git-mode 选项 ${value}`).toContain(`value="${value}"`);
-    }
-    // 默认必须是 keep：PRD 裁决「默认行为零变化」，改动默认值即回归
     expect(src).toContain("gitMode: 'keep'");
   });
 
-  it('选项文案是人话，不含「瘦身 / 剔除」等黑话（用户 2026-10-14 裁定）', async () => {
+  it('设置页不再出现 Git 控件或文案', async () => {
     const src = await readFile(new URL('../index.js', import.meta.url), 'utf8');
-    expect(src).not.toContain('瘦身');
-    expect(src).not.toContain('剔除');
-    expect(src).toContain('保留历史');
-    expect(src).toContain('只留更新所需');
-    expect(src).toContain('不含历史');
+    expect(src).not.toContain('#set-git-mode');
+    expect(src).not.toContain('set-git-mode');
+    expect(src).not.toContain('保留历史');
+    expect(src).not.toContain('只留更新所需');
+    expect(src).not.toContain('不含历史');
+
+    const { buildSettingsHtml } = await import('../src/ui/settings-panel.js');
+    expect(buildSettingsHtml({})).not.toMatch(/git/i);
   });
 
-  it('不再有并排 radio，也不再挂 title 长句说明（用户 2026-10-14 裁定）', () => {
+  it('模板里不再有并排 radio 或 title 长句说明（用户 2026-10-14 裁定）', () => {
     const html = getWorkbenchHtml({ isStandalone: true });
     expect(html).not.toContain('name="git-mode"');
     expect(html).not.toMatch(/title="[^"]*联网[^"]*"/);
     expect(html).not.toMatch(/title="[^"]*重新 git clone[^"]*"/);
   });
 
-  it('index.js 存在 Git 选项的真实读取点与透传点', async () => {
+  it('index.js 仍把 Git 选项透传给转换器（待任务 2 改为图表派生）', async () => {
     const src = await readFile(new URL('../index.js', import.meta.url), 'utf8');
-    expect(src).toContain('#set-git-mode');
     expect((src.match(/gitMode: settings\.gitMode/g) || []).length).toBeGreaterThanOrEqual(2);
   });
 });

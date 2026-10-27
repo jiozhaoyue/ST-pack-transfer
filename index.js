@@ -24,6 +24,8 @@ import {
 import { exportLibraryToPack, importRestoredChatsIntoLibrary } from './src/ui/chat-store-inject.js';
 import { mountLanTransferPanel } from './src/ui/lan-transfer-panel.js';
 import { qr } from './src/ui/qr.js';
+import { buildSettingsHtml, readSettings } from './src/ui/settings-panel.js';
+import { loadSettings, saveSettings } from './src/ui/settings-store.js';
 import { probeChatStore } from './src/ui/chat-store-bridge.js';
 import { mountDebugProbe } from './src/app/task-runtime.js';
 
@@ -88,7 +90,8 @@ async function main(root) {
   const hostKey = host.isPlugin ? (HOST_CODE[host.platform] || 'st') : 'st';
   root.dataset.host = hostKey;
 
-  const settings = {
+  /** 打包选项暂为内部默认；任务 2 会改为从图表派生。设置页只持久化 3 个行为开关。 */
+  const EXPORT_DEFAULTS = {
     compression: '5',
     extensionMode: 'full',
     gitMode: 'keep',
@@ -97,10 +100,8 @@ async function main(root) {
     includeCache: false,
     includePrivate: false,
     pruneBuiltin: true,
-    keepExport: true,
-    trafficPrompt: true,
-    autoTutorial: true,
   };
+  const settings = { ...EXPORT_DEFAULTS, ...loadSettings() };
 
   const state = {
     packages: [],
@@ -258,15 +259,19 @@ async function main(root) {
     return targets;
   }
 
+  function downloadBlob(blob, name) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = name; a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  }
+
   async function downloadSelected(ids) {
     for (const id of ids) {
       const pkg = pkgById(id);
       const blob = await blobOf(pkg);
       if (!blob) continue;
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url; a.download = pkg.name; a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      downloadBlob(blob, pkg.name);
     }
   }
 
@@ -304,6 +309,17 @@ async function main(root) {
     if (!host.isPlugin) { view.toast('只有插件形态可以回传宿主'); return; }
     const targets = ids.map(pkgById).filter((p) => p && p.zone === 'export');
     if (!targets.length) { view.toast('先选择一个导出包'); return; }
+    if (settings.trafficPrompt) {
+      view.confirmTraffic(() => restoreSelectedConfirmed(targets), {
+        enabled: true,
+        onNever: () => { settings.trafficPrompt = false; saveSettings(settings); },
+      });
+      return;
+    }
+    await restoreSelectedConfirmed(targets);
+  }
+
+  async function restoreSelectedConfirmed(targets) {
     const ok = await confirmDialog(`将 ${targets[0].name} 恢复到当前宿主？覆盖前请确认已备份。`);
     if (!ok) return;
     if (state.busy) return;
@@ -329,6 +345,18 @@ async function main(root) {
 
   async function fetchFromHost() {
     if (!host.isPlugin) { view.toast('独立 Web 模式没有宿主数据源'); return; }
+    if (state.busy) return;
+    if (settings.trafficPrompt) {
+      view.confirmTraffic(() => fetchFromHostConfirmed(), {
+        enabled: true,
+        onNever: () => { settings.trafficPrompt = false; saveSettings(settings); },
+      });
+      return;
+    }
+    await fetchFromHostConfirmed();
+  }
+
+  async function fetchFromHostConfirmed() {
     if (state.busy) return;
     state.busy = true;
     try {
@@ -424,18 +452,24 @@ async function main(root) {
         }
         logger.info(`已转换 ${pkg.name}`);
       }
-      for (const item of created) {
-        await saveFile({
-          id: `out-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-          name: item.name, size: item.blob.size, blob: namedBlob(item.blob, item.name),
-          layout: code, role: 'output', origin: ORIGINS.CONVERTED,
-          metadata: { convertedAt: Date.now() },
-        });
+      if (settings.keepExport) {
+        for (const item of created) {
+          await saveFile({
+            id: `out-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+            name: item.name, size: item.blob.size, blob: namedBlob(item.blob, item.name),
+            layout: code, role: 'output', origin: ORIGINS.CONVERTED,
+            metadata: { convertedAt: Date.now() },
+          });
+        }
+        await syncPackages();
+        view.setProgress(100, '导出包已就绪');
+        view.toast(`已生成 ${created.length} 个导出包`);
+        if (created.length) view.setZone('export');
+      } else {
+        for (const item of created) downloadBlob(item.blob, item.name);
+        view.setProgress(100, '导出包已下载');
+        view.toast(`已生成并下载 ${created.length} 个导出包`);
       }
-      await syncPackages();
-      view.setProgress(100, '导出包已就绪');
-      view.toast(`已生成 ${created.length} 个导出包`);
-      if (created.length) view.setZone('export');
     } catch (err) {
       logger.error(`转换失败：${err.message}`);
       view.setProgress(0, '转换失败');
@@ -464,48 +498,14 @@ async function main(root) {
   }
 
   function openSettings() {
-    const v = settings;
-    view.openModal('设置', '这些选项会记住。', [
-      '<div class="settings-grid">',
-      `<label class="set-row"><span>压缩</span><select id="set-compression" class="text_pole">`
-        + ['0|不压缩', '1|快速', '5|标准', '9|最大'].map((x) => { const [k, t] = x.split('|'); return `<option value="${k}"${v.compression === k ? ' selected' : ''}>${t}</option>`; }).join('')
-        + '</select></label>',
-      `<label class="set-row"><span>扩展包</span><select id="set-extension-mode" class="text_pole">`
-        + `<option value="manifest"${v.extensionMode === 'manifest' ? ' selected' : ''}>只导出清单</option>`
-        + `<option value="full"${v.extensionMode === 'full' ? ' selected' : ''}>完整扩展包</option>`
-        + '</select></label>',
-      `<label class="set-row"><span>Git 历史</span><select id="set-git-mode" class="text_pole">`
-        + `<option value="keep"${v.gitMode === 'keep' ? ' selected' : ''}>保留历史</option>`
-        + `<option value="minimal"${v.gitMode === 'minimal' ? ' selected' : ''}>只留更新所需</option>`
-        + `<option value="strip"${v.gitMode === 'strip' ? ' selected' : ''}>不含历史</option>`
-        + '</select></label>',
-      `<label class="check"><input type="checkbox" id="set-keep-dev"${v.keepDev ? ' checked' : ''}> 保留构建配置</label>`,
-      `<label class="check"><input type="checkbox" id="set-include-backups"${v.includeBackups ? ' checked' : ''}> 打包 backups 快照</label>`,
-      `<label class="check"><input type="checkbox" id="set-include-cache"${v.includeCache ? ' checked' : ''}> 打包派生缓存</label>`,
-      `<label class="check"><input type="checkbox" id="set-include-private"${v.includePrivate ? ' checked' : ''}> 打包私有配置</label>`,
-      `<label class="check"><input type="checkbox" id="set-prune-builtin"${v.pruneBuiltin ? ' checked' : ''}> 清理原生重复资产</label>`,
-      `<label class="check"><input type="checkbox" id="set-keep-export"${v.keepExport ? ' checked' : ''}> 导出后在导出区保留包</label>`,
-      `<label class="check"><input type="checkbox" id="set-traffic"${v.trafficPrompt ? ' checked' : ''}> 后端上下传流量提示</label>`,
-      `<label class="check"><input type="checkbox" id="set-auto-tutorial"${v.autoTutorial ? ' checked' : ''}> 基础教程自动打开</label>`,
-      '</div>',
-    ], [
+    view.openModal('设置', '', [buildSettingsHtml(settings)], [
       { label: '关闭', onClick: () => view.closeModal() },
       {
         label: '保存',
         primary: true,
         onClick: () => {
-          const q = (sel2) => root.querySelector(sel2);
-          settings.compression = q('#set-compression')?.value || settings.compression;
-          settings.extensionMode = q('#set-extension-mode')?.value || settings.extensionMode;
-          settings.gitMode = q('#set-git-mode')?.value || settings.gitMode;
-          settings.keepDev = !!q('#set-keep-dev')?.checked;
-          settings.includeBackups = !!q('#set-include-backups')?.checked;
-          settings.includeCache = !!q('#set-include-cache')?.checked;
-          settings.includePrivate = !!q('#set-include-private')?.checked;
-          settings.pruneBuiltin = !!q('#set-prune-builtin')?.checked;
-          settings.keepExport = !!q('#set-keep-export')?.checked;
-          settings.trafficPrompt = !!q('#set-traffic')?.checked;
-          settings.autoTutorial = !!q('#set-auto-tutorial')?.checked;
+          Object.assign(settings, readSettings(root));
+          saveSettings(settings);
           view.closeModal();
           view.toast('设置已保存');
         },
@@ -584,7 +584,7 @@ async function main(root) {
   view.setProgress(0, '准备就绪');
   logger.info(`工作台已就绪 · ${host.isPlugin ? (HOST_LABEL[host.platform] || '宿主') + ' 插件' : '独立 Web'}`);
   try {
-    if (!sessionStorage.getItem('st-pack-transfer:tutorial-seen')) {
+    if (settings.autoTutorial && !sessionStorage.getItem('st-pack-transfer:tutorial-seen')) {
       sessionStorage.setItem('st-pack-transfer:tutorial-seen', '1');
       setTimeout(() => view.openTutorial(), 300);
     }
