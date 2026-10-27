@@ -573,3 +573,50 @@ E2E 重写为两个独立上下文、3 MB + 64 KB 两包排队，**24/24 通过*
 - 迁移 LAN/导出区/二维码 i18n 并扩 SCAN_FILES
 - 定位隔离守卫全量失败
 - UI 截图 + 四宿主复验 + 任务 archive
+
+## Session 59: 剩余 UI 文案迁移与三个子任务收口
+
+**Date**: 2026-10-27
+**Task**: 10-27-i18n-tutorial（归档）/ 10-27-host-chart-settings（归档）/ 10-27-chart-single-source（归档）
+**Branch**: `main`
+
+### Summary
+
+LAN / 导出区 / 二维码文案全量迁入 i18n 并纳入守卫；三个 10-27 子任务如实勾选后归档；
+按用户指令**跳过四宿主复验与浏览器截图**，只跑定向小测。
+
+### Main Changes
+
+- `lan-transfer-panel.js` / `export-queue.js` / `qr.js`：全部中文改 `t()`，加入 `SCAN_FILES`。
+- 语言相关格式走 locale：`lan.duration.{sec,minSec,min}`、`queue.partJoin`、`queue.listSep`；
+  核心 `formatDuration` 保持与 UI 无关，UI 侧用本地 `durationText()`。
+- 清理 locale 重复键 4 组（`progress.ready` / `toast.selectExport*` / `toast.pluginOnlyRestore`）。
+- `dbg()` 调试串统一英文（避免与被守卫文件混淆）。
+- spec `frontend/i18n-and-settings.md` 增补守卫覆盖清单、技术消息排除项、重复键盲区。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `7ee02dc` | feat(i18n): 局域网/导出区/二维码文案迁移并纳入守卫 |
+| `701de3a` | chore(task): archive 10-27-host-chart-settings |
+| `cbb2a1c` | chore(task): archive 10-27-chart-single-source |
+| `6c42195` | chore(task): archive 10-27-i18n-tutorial |
+
+### Testing
+
+- [OK] `npm run check:i18n` + 五个既有守卫全绿
+- [OK] 定向小测：i18n / lan-transfer / export-queue / durable-mirror / tutorial-anchor = 57 passed
+- [OK] `npm run build` 通过
+- [OK] 复核全量：904 passed / 2 skipped / 0 failed（隔离守卫失败未复现）
+- [SKIPPED] 四宿主复验、浏览器截图 —— 用户 2026-10-27 指令明确跳过
+
+### Status
+
+[DONE] 三个 10-27 子任务已归档推送。父任务 `10-26-storage-chart-workbench` 剩 6 个 planning 子任务。
+
+### Next Steps
+
+- `10-26-naming-injection` 仍卡在两处**非代码项**：本地目录改名（需关掉占用程序）、
+  `AGENTS.md` / `CLAUDE.md` 自动生成规则块（真源仓 `tavern-harness` 控制）。
+- 生产 `index.js` 未调用 `setHostTree`，宿主真实树接线需单独立项。
