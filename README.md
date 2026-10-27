@@ -93,7 +93,7 @@ npm run check:css-scope check:dom-injection check:template-source check:dom-scop
 
 ## 许可证
 
-GNU General Public License v3.0 or later（GPL-3.0-or-later）。
+GNU Affero General Public License v3.0 or later（AGPL-3.0-or-later）。
 完整条款见 [LICENSE](LICENSE)。
 
 Copyright (C) 2026 jiozhaoyue
