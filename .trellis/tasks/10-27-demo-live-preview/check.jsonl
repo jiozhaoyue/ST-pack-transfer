@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "验证矩阵与守卫命令；本轮质量门槛按此执行"}
+{"file": ".trellis/spec/frontend/workbench-single-view.md", "reason": "检查 §9 是否已按新方向改写，且不再指示 sync:ui"}
+{"file": "D:/Repo/Tavern-repo/My-repo/ST-zip-converter/package.json", "reason": "确认 sync:ui / check:ui-sync 已移除"}
+{"file": "D:/Repo/Tavern-repo/My-repo/ST-zip-converter/test/ui-demo-isolation.test.js", "reason": "隔离守卫本身是否真的能拦住正式代码引用 demo"}

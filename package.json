@@ -31,8 +31,6 @@
     "check:template-source": "node scripts/single-template-source.js",
     "check:dom-scope": "node scripts/dom-scope.js",
     "check:control-consumer": "node scripts/control-consumer-guard.js",
-    "sync:ui": "node scripts/sync-ui-from-demo.cjs",
-    "check:ui-sync": "node scripts/sync-ui-from-demo.cjs --check",
     "gen-fixtures": "node fixtures/gen.js"
   }
 }

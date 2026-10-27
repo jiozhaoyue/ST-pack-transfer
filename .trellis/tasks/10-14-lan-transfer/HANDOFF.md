@@ -13,7 +13,8 @@
 接收包直接进**唯一的导入区**，只用包卡文件名下原有的来源徽标区分 **本地导入 / 远程导入**，
 宿主仍由**扫包**判定。二维码（显示 + 相机扫描）已接入 demo，相机权限失败时提示并保留粘贴。
 
-**代码层面**：demo 三件套已改完并同步（`style.css` / `workbench-template.js` / `workbench-view.js`），
+**代码层面**：新 UI 已在正式三件套落地（`style.css` / `workbench-template.js` / `workbench-view.js`）；
+`src/ui/ui-demo.html` 只消费正式代码，用于实时预览。
 但 `src/ui/lan-transfer-panel.js` 仍是旧浮层实现，`index.js` 未传 `qr`、未提供 `actions.lan`，
 所以正式插件里新 LAN 区块不可用，且模板与旧浮层存在**重复的 `lan-*` id**。
 
@@ -77,11 +78,11 @@ errors:  []
 截图（gitignored，本地 `out/lancheck/`）：
 `shot-demo-lan-send.png`、`shot-demo-lan-recv.png`、`shot-demo-mobile-lan.png`。
 
-### 3.3 已同步到运行时的文件
+### 3.3 正式三件套落点
 
-`node scripts/sync-ui-from-demo.cjs` 已把 demo 三区逐字复制到：
-`style.css`、`src/ui/workbench-template.js`、`src/ui/workbench-view.js`。
-`test/ui-demo-source.test.js` 与 `check:ui-sync` 通过。
+`style.css`、`src/ui/workbench-template.js`、`src/ui/workbench-view.js` 是手写唯一源；
+`src/ui/ui-demo.html` 只 import 它们（`npm run dev` 后访问 `/src/ui/ui-demo.html`）。
+`test/ui-demo-isolation.test.js` 守卫「正式代码零引用 demo」。
 
 ---
 
@@ -93,7 +94,7 @@ errors:  []
 | 解码 | `src/vendor/jsqr.js`（jsQR 1.4.0，Apache-2.0，256,885 B） |
 | 许可证 | `src/vendor/qrcode-generator.LICENSE`、`src/vendor/jsqr.LICENSE` |
 | 根许可证 | `LICENSE` 已换为 **AGPL-3.0** 标准全文；`package.json` / `README.md` 同步 `AGPL-3.0-or-later` |
-| demo 加载 | 三区之外用 classic `<script src="../vendor/…">`（`file://` 可加载；inline module 不能 import 本地模块） |
+| demo 加载 | demo harness 用 classic `<script src="../vendor/…">` 加载二维码库；demo 只经 HTTP（`npm run dev`）预览 |
 | 正式加载 | **待做**：`index.js` 导入 `src/ui/qr.js`，并把它传给 `createWorkbenchView({ actions, qr })` |
 | 相机 | `getUserMedia({video:{facingMode:'environment'}})`；失败 `onError` → 错误行 + 粘贴仍可用 |
 | 码内容 | 完整 `SZC1.z.…` 取件码/应答码（约 700 字符），QR cellSize=3、margin=2 |
@@ -161,7 +162,8 @@ jsQR 的 UMD 会自动挂 `window.jsQR`。
 
 | 区域 | 文件 |
 | --- | --- |
-| **UI 唯一源** | `src/ui/ui-demo.html`（三区 + demo 外圈） |
+| **正式 UI 唯一源** | 三件套：`style.css` / `src/ui/workbench-template.js` / `src/ui/workbench-view.js` |
+| 开发预览页 | `src/ui/ui-demo.html`（只消费正式代码，`npm run dev` 后访问 `/src/ui/ui-demo.html`） |
 | 生成物 | `style.css` / `src/ui/workbench-template.js` / `src/ui/workbench-view.js` |
 | 视图 LAN 逻辑 | 在 `workbench-view.js` 的 `renderLan` / `startLanScan` / `setLan`（由 demo 同步） |
 | 协议引擎（待改内联） | `src/ui/lan-transfer-panel.js` |
@@ -178,7 +180,7 @@ jsQR 的 UMD 会自动挂 `window.jsQR`。
 
 1. **TT 的 `<html>` 带 `transform` 且高度 0**：全屏浮层用 `top:0;left:0;width:100vw;height:100vh`，不要 `inset:0`（否则塌成 0/24px）；`bottom` 锚点改 `top:calc(100vh - X)`。已在 `f5e2423` 修复。
 2. **打开工作台前关闭宿主扩展弹层**：`host-bridge.closeHostExtensionSurface()`；TT 还会弹「扩展更新」dialog，层级高于工作台。已在 `f5e2423` 修复。
-3. **demo 外圈不得进正式代码**：正式三件套不得出现 `demo` / `演示` / `DEMO_`；`test/ui-demo-source.test.js` 硬门禁。
+3. **demo 外圈不得进正式代码**：正式三件套不得出现 `demo` / `演示` / `DEMO_`；`test/ui-demo-isolation.test.js` 硬门禁。
 4. **正式数据不得造假**：配额用 `navigator.storage.estimate()`；宿主无读数就写「当前宿主无逐项读数」。
 5. **实例里只许留一份插件**：改名前的 `st-zip-converter` 副本会让旧 UI 抢占初始化；已移出为 `.disabled` / `.linkbak`。
 6. **二维码库**：不要引 CDN；正式侧加载 vendor 时注意 qrcode-generator 的 ESM 导出问题。
@@ -188,8 +190,8 @@ jsQR 的 UMD 会自动挂 `window.jsQR`。
 
 ## 九、本轮已验证（可作为回归基线）
 
-- `npm test`：**875 passed / 2 skipped**（含新增控件消费点声明）。
+- `npm test`：**874 passed / 2 skipped**（demo 隔离守卫替换旧逐字同步守卫）。
 - 五守卫全绿：`check:css-scope` / `check:dom-injection` / `check:template-source` / `check:dom-scope` / `check:control-consumer`（43 控件 / 35 声明）。
-- `check:ui-sync`：三件套与 demo 逐字一致。
+- `test/ui-demo-isolation.test.js`：正式源码零引用 demo，demo 只消费正式模块。
 - demo 浏览器探针：零错误、二维码/进度/远程徽标/移动端顺序/导出排序均通过。
 - 协议层六对互传：**120/120**（旧浮层 UI 下；协议未改）。

@@ -435,3 +435,48 @@ PT 安装脚本 `--replace` 同时删除新旧两个名字。PT 规格从旧 UI 
 - ④ 多包队列；更新 LAN E2E；四宿主/六对复跑；PT 重装
 - ⑤ 真机双设备 AC-10
 
+## Session 56: demo 依赖方向反转（demo 消费正式代码）+ 局域网内边距对齐
+<!-- trellis-session: v=2 fp=demo-live-preview-20261027 -->
+
+**Date**: 2026-10-27
+**Task**: 10-27-demo-live-preview（in_progress）
+**Branch**: `main`
+
+### Summary
+
+按用户裁定把 UI 依赖方向反过来：**正式三件套是手写唯一源**（`style.css` /
+`workbench-template.js` / `workbench-view.js`），`src/ui/ui-demo.html` 只通过
+`<link>` + `import` 消费正式代码，演示数据与 harness 仍留在 demo。删除
+`scripts/sync-ui-from-demo.cjs` 与 `test/ui-demo-source.test.js`（用户批准），
+`package.json` 去掉 `sync:ui` / `check:ui-sync`；新增
+`test/ui-demo-isolation.test.js`（正式源码零引用 demo + demo 只消费正式模块）。
+demo 现在经 Vite 实时预览：`npm run dev` → `http://localhost:3040/src/ui/ui-demo.html`
+（ESM 在 `file://` 下被 CORS 拒，demo 不再支持双击）。
+
+同时修局域网区块内边距：`.lan-block` 水平 `4px → 9px`、`.lan-toggle` `2px → 0`，
+收起/展开两态与 `.action-row` / `.progress` 左边缘对齐。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| （本次） | refactor(ui): demo 改为只消费正式代码；局域网区块内边距对齐 |
+
+### Testing
+
+- [OK] `npm test` 874 passed / 2 skipped（81 文件通过 / 1 skipped）
+- [OK] 五守卫全绿（43 控件 / 35 声明）
+- [OK] `npm run build` 通过
+- [OK] 3040：正式页 / demo / demo 展开 LAN / demo 移动端，四张截图控制台零错误
+- [OK] 实测 LAN 内容左边缘 `x=862`，与 action-row 一致（卡片 `x=853` + 9px）
+
+### Status
+
+[DONE] demo 依赖方向反转 + 内边距对齐完成；正式插件内新 LAN 区块仍未接线（属 10-14-lan-transfer）。
+
+### Next Steps
+
+- ① 继续 `10-14-lan-transfer`：`qr.js` + `actions.lan` 正式接线
+- ② `lan-transfer-panel.js` 去浮层、绑模板 id
+- ③ 更新 LAN E2E、四宿主复跑、真机双设备
+

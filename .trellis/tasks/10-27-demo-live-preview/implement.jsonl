@@ -1,0 +1,5 @@
+{"file": ".trellis/spec/frontend/workbench-single-view.md", "reason": "§9 记录旧的 demo→正式同步规则，本轮要改写为 demo 只消费正式代码"}
+{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "单一模板源、CSS 作用域与 DOM 注入防线，改 demo 引用方式时必须遵守"}
+{"file": "D:/Repo/Tavern-repo/My-repo/ST-zip-converter/src/ui/ui-demo.html", "reason": "当前实现：三个内联标记区 + demo harness"}
+{"file": "D:/Repo/Tavern-repo/My-repo/ST-zip-converter/src/ui/workbench-template.js", "reason": "正式 HTML 模板，demo 改为 import 它"}
+{"file": "D:/Repo/Tavern-repo/My-repo/ST-zip-converter/src/ui/workbench-view.js", "reason": "正式视图 API，demo 现通过 window 暴露，需改为 ESM import"}

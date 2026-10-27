@@ -203,12 +203,13 @@ TauriTavern 的阶段+进度事件 / 原子落盘 / 自然续传 / 地址发现�
 | 同名 | 远程接收自动加序号，不覆盖 |
 
 **二维码来源**：`qrcode-generator` 2.0.4（MIT，编码）+ `jsQR` 1.4.0（Apache-2.0，解码），
-本地 vendor 到 `src/vendor/`；根许可证 **AGPL-3.0**。demo 用 classic `<script>` 加载（`file://` 可跑），
+本地 vendor 到 `src/vendor/`；根许可证 **AGPL-3.0**。demo 用 classic `<script>` 加载以驱动 harness；
 正式侧需 `src/ui/qr.js` 适配（注意 qrcode-generator 在 ESM 下不自动挂 window）。
 
-**当前状态（交接时）**：demo 三区已完成并同步到 `style.css` / `workbench-template.js` /
-`workbench-view.js`；`index.js` 尚未提供 `actions.lan` / `qr`，旧 `lan-transfer-panel.js` 仍是浮层实现，
-正式插件内新 LAN 区块不可用。**下一步见 `10-14-lan-transfer/HANDOFF.md`。**
+**当前状态（2026-10-27 修订后）**：正式三件套是手写唯一源；`ui-demo.html` 已改为**只 import
+正式样式 / 模板 / 视图**的预览页。`index.js` 尚未提供 `actions.lan` / `qr`，旧
+`lan-transfer-panel.js` 仍是浮层实现，正式插件内新 LAN 区块不可用。**下一步见
+`10-14-lan-transfer/HANDOFF.md`。**
 
 **布局约束**：局域网展开时包区让出高度（`.col-side.lan-open > .zone-card{flex:0 0 28%}`），
 执行卡内部滚动；旧的 `inset:0` 全屏浮层在 TT 会塌陷（TT 的 `<html>` 有 transform 且高 0），
@@ -216,27 +217,43 @@ TauriTavern 的阶段+进度事件 / 原子落盘 / 自然续传 / 地址发现�
 
 ---
 
-## 9. UI 单一源（2026-10-27 用户裁定）
+## 9. demo 只消费正式代码（2026-10-27 用户裁定）
 
-**规则**：`src/ui/ui-demo.html` 是**唯一可编辑的 UI 源**；正式三件套
-（`style.css`、`src/ui/workbench-template.js`、`src/ui/workbench-view.js`）
-由 `npm run sync:ui` **逐字复制** demo 的三个标记区，运行时不得手写第二份。
+**规则（依赖方向）**：正式三件套（`style.css`、`src/ui/workbench-template.js`、
+`src/ui/workbench-view.js`）是**手写唯一源**。`src/ui/ui-demo.html` 是**开发期预览页**，
+只允许：
 
-**为什么放在 `src/ui/` 而不是任务目录**：Trellis `task.py archive` 会把任务目录整体移到
-`.trellis/tasks/archive/<月>/`；把唯一源放在任务目录会让归档后 `sync:ui` 与守卫静默失效。
+- `<link rel="stylesheet" href="../../style.css">`
+- `import { getWorkbenchHtml } from './workbench-template.js'`
+- `import { createWorkbenchView } from './workbench-view.js'`
+
+**正式代码、构建、测试、CI 一律不得引用 demo**：`index.js` / `index.html` / `src/**` /
+`scripts/**` / `e2e/**` / `.github/**` 出现 `ui-demo` 路径即违规。
+守卫：`test/ui-demo-isolation.test.js`（同时断言 demo 不再内联三件套副本）。
+旧的 `sync:ui` / `check:ui-sync` 同步器已删除（2026-10-27 用户批准）。
+
+**为什么反转**：旧规则让正式代码成为 demo 的生成物，改正式 UI 必须先改 demo；
+用户新裁定是「demo 可以引用正式的 JS，但 demo html 本身不被任何依赖和引用」。
 
 **demo 外圈不是产品代码**：演示工具条、演示数据（`demoTree` / `DEMO_PACKAGES` /
-`DEMO_QUOTA`）、演示重置、入口预览、演示专用 sessionStorage key，全部位于三个标记区**之外**。
-正式三件套**禁止**出现 `demo` / `演示` / `DEMO_` 字样或引用——`test/ui-demo-source.test.js`
-的「正式三件套不含任何 demo / 测试专用物」用例是硬门禁。
+`DEMO_QUOTA`）、演示重置、入口预览、演示专用 sessionStorage key，只存在于 demo 文件内。
+正式三件套**禁止**出现 `demo` / `演示` / `DEMO_` 字样。
+
+**预览方式（只经 HTTP）**：
+
+```bash
+npm run dev
+# http://localhost:3040/src/ui/ui-demo.html
+```
+
+ESM `import` 在 `file://` 下会被 CORS 拒绝，因此 **demo 不再支持双击打开**。
+正式产品的 `file://` 支持不受影响（`index.html` + `public/file-protocol-notice.js`）。
 
 **正式数据必须真实**：浏览器配额来自 `navigator.storage.estimate()`，不可用时显示
 「浏览器未提供配额读数」；宿主配额没有可靠 API 时显示「当前宿主无逐项读数」。
-**禁止**用演示数字冒充真实读数。教程自动弹出用正式 key `st-pack-transfer:tutorial-seen`，
-同一会话一次。
+**禁止**用演示数字冒充真实读数。
 
-**改动流程**：改 demo → 浏览器验证（`file://` 直接打开）→ `npm run sync:ui` →
-`npm test` + 五守卫。模板/视图/样式三件套**不得手改**。
+**改动流程**：改正式三件套 → `npm test` + 五守卫 → 需要看交互时在 demo harness 里调整演示数据。
 
 ---
 

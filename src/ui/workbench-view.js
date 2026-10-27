@@ -1244,4 +1244,3 @@ initSplitters();
   };
 }
 
-if (typeof window !== 'undefined') window.SZC_WORKBENCH_VIEW = createWorkbenchView;
