@@ -1871,6 +1871,42 @@ function watchHostDom(injectFn) {
  *
  * @param {() => void} [onOpen] 打开全屏工作台（应为 `openConverterModal`）
  */
+/**
+ * 收起宿主的扩展设置浮层（工作台是全屏模态，宿主弹层层级比它高，会盖住工作台）。
+ *
+ * 2026-10-27 实测（TT 827×691）：点扩展行「打开」后，宿主的扩展设置抽屉/弹层仍在最上层，
+ * 工作台看得见但点不到；必须关掉它。只关**包含本插件入口**的那一层，不动其它弹窗。
+ */
+export function closeHostExtensionSurface() {
+  if (typeof document === 'undefined') return;
+  const anchor = document.getElementById('st-pack-transfer-open-btn');
+
+  // 1) 内联抽屉（ST/Luker/TT 的 #extensions-settings-button）：只在确实展开时点一下切换
+  const hostDrawer = document.getElementById('extensions-settings-button');
+  if (hostDrawer) {
+    const content = hostDrawer.querySelector('.drawer-content');
+    const visible = content
+      && getComputedStyle(content).display !== 'none'
+      && content.getBoundingClientRect().height > 0;
+    if (visible) {
+      const toggle = hostDrawer.querySelector('.drawer-toggle')
+        || hostDrawer.querySelector(':scope > .inline-drawer-header');
+      try { toggle?.click(); } catch { /* 宿主结构差异 */ }
+    }
+  }
+
+  // 2) 所有打开的宿主弹层：点「打开面板」时它们都是扩展设置/更新提示，必须让位给全屏工作台。
+  //    实测 TT 会额外弹一个「扩展更新」popup，不认 #extensions_settings，光按内容判断关不掉。
+  for (const surface of document.querySelectorAll('dialog[open], .popup[open]')) {
+    try { surface.close?.(); } catch { /* 非 dialog */ }
+    surface.removeAttribute('open');
+    surface.style.display = 'none';
+  }
+
+  // 3) 宿主遮罩
+  document.querySelectorAll('.popup_background').forEach((bg) => { bg.style.display = 'none'; });
+}
+
 export function mountExtensionRowButton(onOpen) {
   if (typeof document === 'undefined') return;
 
