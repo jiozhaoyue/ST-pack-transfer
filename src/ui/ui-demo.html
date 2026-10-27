@@ -206,7 +206,7 @@ function demoTree(){
     ]}),
     node('group:cache','派生缓存',0.1,'drop',{icon:'bolt',children:[
       node('n-cache-1','user/cache/derived.bin',0.1,'drop',{icon:'file'})
-    ]}
+    ]}),
   ];
 }
 function scaleNodesTo(arr,totalMb){
@@ -342,6 +342,12 @@ const demoLan = {
   retry() { demoLan.generate(); },
   abandon() { clearDemoTimers(); view.setLan({ recv: { busy: false, phase: '半成品已放弃', pct: 0, code: '' } }); },
 };
+
+const demoPrivateFiles = [
+  { name:'private_chat_sync_1730000000.zip', path:'/user/files/private_chat_sync_1730000000.zip', uploadedAt: Date.now()-3_600_000, sizeBytes: 1.4*1024*1024, sourceName:'…chat_sync.json' },
+  { name:'private_secrets_1730000900.zip', path:'/user/files/private_secrets_1730000900.zip', uploadedAt: Date.now()-1_800_000, sizeBytes: 0.02*1024*1024, sourceName:'secrets.json' },
+  { name:'private_memory_graph_1730001200.zip', path:'/user/files/private_memory_graph_1730001200.zip', uploadedAt: Date.now()-600_000, sizeBytes: 3.1*1024*1024, sourceName:'…memory_graph__meta.json' },
+];
 
 const view = createWorkbenchView({
   qr: demoQr,
@@ -480,12 +486,6 @@ function doDeleteSelected(ids){
     }}
   ]);
 }
-
-const demoPrivateFiles = [
-  { name:'private_chat_sync_1730000000.zip', path:'/user/files/private_chat_sync_1730000000.zip', uploadedAt: Date.now()-3_600_000, sizeBytes: 1.4*1024*1024, sourceName:'…chat_sync.json' },
-  { name:'private_secrets_1730000900.zip', path:'/user/files/private_secrets_1730000900.zip', uploadedAt: Date.now()-1_800_000, sizeBytes: 0.02*1024*1024, sourceName:'secrets.json' },
-  { name:'private_memory_graph_1730001200.zip', path:'/user/files/private_memory_graph_1730001200.zip', uploadedAt: Date.now()-600_000, sizeBytes: 3.1*1024*1024, sourceName:'…memory_graph__meta.json' },
-];
 
 function doUploadPrivate(payload){
   const name = (payload && payload.name) || '';
