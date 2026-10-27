@@ -673,3 +673,31 @@ tutorial-copy AC-31（无文案审查脚本）。
 
 - 剩余活跃任务：`10-01-safe-migration-productization`、`10-14-workbench-overhaul`（3 子）、`10-24-ui-orchestration-r2`。
 - 若要把「列出/删除 user/files」做成界面，需先定列表来源（只能靠本地索引）。
+
+## Session 61: 互传矩阵回滚 + demo 修复 + 交接
+
+**Date**: 2026-10-27 → 2026-10-28
+**Branch**: `main`
+
+### Summary
+
+做过「跨宿主互传矩阵」并实现插件调 Luker 原生 LAN Sync，用户叫停后整体回滚；
+按用户裁定只修 demo 的三处致命缺陷；四宿主原生互传事实与新产品边界写入 spec 与本任务 HANDOFF。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `1110f47` | feat(transfer): 互传矩阵 + 插件调原生（**已回滚**） |
+| `82b237b` | Revert `1110f47` |
+| `9c38374` | fix(demo): 修复三处阻断整页脚本的既有缺陷 |
+
+### Status
+
+[OK] 代码回到 `306e3d1` + demo 修复。交接见
+`.trellis/tasks/10-28-handover-post-revert/HANDOFF.md`。
+
+### Next Steps
+
+- 待裁定：私有件管理弹窗是否违反「禁止独立弹窗」。
+- 仍缺：序号/折行单测、宿主真实树接线（单独立项）。

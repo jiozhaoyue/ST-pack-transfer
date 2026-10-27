@@ -365,3 +365,20 @@ TT 页面**同时暴露** `window.__TAURITAVERN__` 与 `window.SillyTavern` 全�
 两级判定的「顺序不可颠倒」有真实宿主依据；`__TAURITAVERN__` 优先判 `tt` 的判据有效。
 TT 页面另实测到自身扩展更新检查的 GitHub 网络失败 console error（`/api/extensions/version`
 Git handshake failed）——**非本插件错误**，E2E 判定须按「只属于本插件」的既有口径过滤。
+
+### 四宿主原生局域网同步（2026-10-27 读实例源码取证）
+
+| 宿主 | 原生互传 | 证据 |
+| --- | --- | --- |
+| Luker | 有 | `src/sync/categories.js` 的 `user-files` 类别 `syncDefault:'on'`；`/api/sync/v1/*`（`health`/`peers`/`pair/start`/`pair/accept`/`peers/:id/sync`/`pull`/`undo`），挂载 `src/server-main.js:491` |
+| TauriTavern | 有 | `docs/CurrentState/Sync.md`：LAN Sync v2，本机 HTTPS peer + SPKI pin + 配对 URI/二维码，`/v2/*` |
+| SillyTavern | 无 | 实例源码检索 `局域网/LAN Sync/WebRTC/RTCPeerConnection/PeerJS/mDNS` = 0 |
+| PureTavern | 无传输 | README 的「局域网」只指把 Provider / 代理指向局域网地址 |
+
+**产品边界（用户 2026-10-27/28 裁定，MUST）**：
+
+- 插件**只做插件对插件**；**不得**调用上述原生端点、不得写宿主同步目录、不得做「插件 × 原生」联动。
+- 原生局域网同步是宿主自身能力（同宿主设备之间），插件不显示、不触发、不代理。
+- 不专门造公网 P2P；现有局域网 WebRTC 行为不删不扩。
+- 已知限制：Luker `POST /peers/:id/sync` 只有**本机拉取**语义（无远端直推）；
+  TT 扩展不能 invoke Tauri 命令——这也是「插件不碰原生」的直接原因。
