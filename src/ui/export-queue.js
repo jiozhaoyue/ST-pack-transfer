@@ -14,6 +14,7 @@ import { saveFile, deleteFile, getFile } from '../storage/db.js';
 import { ORIGINS } from '../storage/db.js';
 import { mirrorArtifact } from '../storage/authority-store.js';
 import { escapeHtml, trustedStaticMarkup } from './escape.js';
+import { t } from '../i18n/index.js';
 
 function formatBytes(bytes) {
   if (!bytes || bytes <= 0) return '0 B';
@@ -77,14 +78,14 @@ export function setDragOutPayload(dataTransfer, blob, name) {
 }
 
 const ORIGIN_LABELS = {
-  [ORIGINS.UPLOAD]: { text: '上传', cls: 'origin-upload' },
-  [ORIGINS.HOST_EXPORT]: { text: '宿主导出', cls: 'origin-host' },
-  [ORIGINS.CONVERTED]: { text: '转换生成', cls: 'origin-converted' },
-  [ORIGINS.DELTA]: { text: '增量补丁', cls: 'origin-delta' },
-  [ORIGINS.SPLIT_PART]: { text: '分卷', cls: 'origin-split' },
-  [ORIGINS.SOURCE_BACKUP]: { text: '源备份', cls: 'origin-source-backup' },
-  [ORIGINS.TARGET_BACKUP]: { text: '目标保底备份', cls: 'origin-target-backup' },
-  [ORIGINS.REPORT]: { text: '迁移报告', cls: 'origin-report' },
+  [ORIGINS.UPLOAD]: { key: 'queue.origin.upload', cls: 'origin-upload' },
+  [ORIGINS.HOST_EXPORT]: { key: 'queue.origin.hostExport', cls: 'origin-host' },
+  [ORIGINS.CONVERTED]: { key: 'queue.origin.converted', cls: 'origin-converted' },
+  [ORIGINS.DELTA]: { key: 'queue.origin.delta', cls: 'origin-delta' },
+  [ORIGINS.SPLIT_PART]: { key: 'queue.origin.split', cls: 'origin-split' },
+  [ORIGINS.SOURCE_BACKUP]: { key: 'queue.origin.sourceBackup', cls: 'origin-source-backup' },
+  [ORIGINS.TARGET_BACKUP]: { key: 'queue.origin.targetBackup', cls: 'origin-target-backup' },
+  [ORIGINS.REPORT]: { key: 'queue.origin.report', cls: 'origin-report' },
 };
 
 let seq = 0;
@@ -297,7 +298,7 @@ export function renderExportQueue({
     : (msg) => Promise.resolve(typeof window !== 'undefined' ? window.confirm(msg) : true);
   /** 宿主无恢复能力：禁用全部恢复入口（含单条目），并把原因作为 title */
   const restoreBlocked = Boolean(restoreUnsupportedReason);
-  const restoreBlockedTitle = restoreUnsupportedReason || '已有恢复任务正在进行，请等待其完成';
+  const restoreBlockedTitle = restoreUnsupportedReason || t('queue.restoreBusy');
   const selected = new Set();
 
   const render = () => {
@@ -305,7 +306,7 @@ export function renderExportQueue({
 
     const header = document.createElement('div');
     header.className = 'export-queue-header';
-    header.innerHTML = `<span class="eq-title"><i class="fa-solid fa-file-export"></i> 待导出 (${escapeHtml(queue.items.length)})</span>`;
+    header.innerHTML = `<span class="eq-title"><i class="fa-solid fa-file-export"></i> ${escapeHtml(t('queue.title', { n: queue.items.length }))}</span>`;
 
     if (queue.items.length > 0) {
       const batchBar = document.createElement('div');
@@ -319,13 +320,13 @@ export function renderExportQueue({
         b.addEventListener('click', onClick);
         return b;
       };
-      batchBar.appendChild(mkBtn('<i class="fa-solid fa-download"></i> 全部下载', '', () => queue.downloadAll()));
-      batchBar.appendChild(mkBtn('<i class="fa-solid fa-box-archive"></i> 全部存入工作区', '', async () => {
+      batchBar.appendChild(mkBtn(`<i class="fa-solid fa-download"></i> ${escapeHtml(t('queue.downloadAll'))}`, '', () => queue.downloadAll()));
+      batchBar.appendChild(mkBtn(`<i class="fa-solid fa-box-archive"></i> ${escapeHtml(t('queue.stashAll'))}`, '', async () => {
         await queue.stashAll();
         if (typeof onWorkspaceChanged === 'function') onWorkspaceChanged();
       }));
-      batchBar.appendChild(mkBtn('<i class="fa-solid fa-trash"></i> 清空', '', async () => {
-        if (await askConfirm('确定清空待导出区吗？临时产物将一并丢弃。')) queue.clear();
+      batchBar.appendChild(mkBtn(`<i class="fa-solid fa-trash"></i> ${escapeHtml(t('queue.clear'))}`, '', async () => {
+        if (await askConfirm(t('queue.clearConfirm'))) queue.clear();
       }));
       header.appendChild(batchBar);
     }
@@ -348,9 +349,7 @@ export function renderExportQueue({
         b.addEventListener('click', onClick);
         return b;
       };
-      const askCancel = () => askConfirm(
-        '确定取消正在进行的恢复写入吗？\n宿主可能已收到部分数据，取消后请核对数据完整性。',
-      );
+      const askCancel = () => askConfirm(t('queue.cancelRestoreConfirm'));
       const hint = document.createElement('span');
       hint.className = 'eq-selected-label';
 
@@ -359,36 +358,36 @@ export function renderExportQueue({
         const settled = doneCount + failedCount + unconfirmedCount;
         if (status === 'running') {
           // 非原子性如实展示：逐项恢复期间部分数据已生效
-          hint.textContent = `已完成 ${settled}/${total}（部分数据已生效）`;
+          hint.textContent = t('queue.restoreRunning', { done: settled, total });
           if (typeof onCancelRestore === 'function') {
             bar.appendChild(mkBarBtn(
-              '<i class="fa-solid fa-ban"></i> 取消批量恢复',
-              '中止本批恢复（宿主可能已收到部分数据，取消后请核对）',
+              `<i class="fa-solid fa-ban"></i> ${escapeHtml(t('queue.cancelRestoreBatch'))}`,
+              t('queue.cancelRestoreBatchHint'),
               async () => { if (await askCancel()) onCancelRestore(); },
             ));
           }
         } else {
           const parts = [];
-          if (status === 'done') parts.push(`全部 ${total} 项恢复完成`);
-          else if (status === 'aborted') parts.push(`已中止：完成 ${doneCount}/${total}（部分数据已生效）`);
+          if (status === 'done') parts.push(t('queue.restoreAllDone', { total }));
+          else if (status === 'aborted') parts.push(t('queue.restoreAborted', { done: doneCount, total }));
           else {
-            parts.push(`完成 ${doneCount}/${total}`);
-            if (failedCount) parts.push(`${failedCount} 项失败`);
-            if (unconfirmedCount) parts.push(`${unconfirmedCount} 项结果未确认`);
-            parts.push('部分数据已生效');
+            parts.push(t('queue.restoreSummary', { done: doneCount, total }));
+            if (failedCount) parts.push(t('queue.failedCount', { n: failedCount }));
+            if (unconfirmedCount) parts.push(t('queue.unconfirmedCount', { n: unconfirmedCount }));
+            parts.push(t('queue.partialApplied'));
           }
-          hint.textContent = parts.join('，');
+          hint.textContent = parts.join(t('queue.partJoin'));
           if (restoreBatch.canRetryFailed && typeof onRetryFailedBatch === 'function') {
             bar.appendChild(mkBarBtn(
-              '<i class="fa-solid fa-rotate-right"></i> 重试失败项',
-              '只重跑失败项；结果未确认的项不重跑（请求可能已落盘，重跑会重复写入）',
+              `<i class="fa-solid fa-rotate-right"></i> ${escapeHtml(t('queue.retryFailed'))}`,
+              t('queue.retryFailedHint'),
               onRetryFailedBatch,
             ));
           }
           if (settled > 0 && typeof onRefreshPage === 'function') {
             bar.appendChild(mkBarBtn(
-              '<i class="fa-solid fa-rotate"></i> 刷新页面生效',
-              '点击后才刷新页面，让宿主重新加载已恢复的数据',
+              `<i class="fa-solid fa-rotate"></i> ${escapeHtml(t('queue.refreshPage'))}`,
+              t('queue.refreshHint'),
               onRefreshPage,
             ));
           }
@@ -401,17 +400,17 @@ export function renderExportQueue({
           const detail = document.createElement('span');
           detail.className = 'eq-selected-label';
           detail.textContent = bad
-            .map((i) => `${i.name}: ${i.status === 'unconfirmed' ? '结果未确认' : (i.reason || '失败')}`)
-            .join('；');
+            .map((i) => `${i.name}: ${i.status === 'unconfirmed' ? t('queue.statusUnconfirmed') : (i.reason || t('queue.statusFailed'))}`)
+            .join(t('queue.listSep'));
           bar.appendChild(detail);
         }
       } else {
         bar.appendChild(mkBarBtn(
-          '<i class="fa-solid fa-ban"></i> 取消恢复',
-          '中止正在进行的恢复写入（宿主可能已收到部分数据，取消后请核对）',
+          `<i class="fa-solid fa-ban"></i> ${escapeHtml(t('queue.cancelRestore'))}`,
+          t('queue.cancelRestoreHint'),
           async () => { if (await askCancel()) onCancelRestore(); },
         ));
-        hint.textContent = '恢复写入进行中…';
+        hint.textContent = t('queue.restoring');
         bar.appendChild(hint);
       }
       containerEl.appendChild(bar);
@@ -420,7 +419,7 @@ export function renderExportQueue({
     if (queue.items.length === 0) {
       const empty = document.createElement('div');
       empty.className = 'export-queue-empty';
-      empty.textContent = '无产物';
+      empty.textContent = t('queue.empty');
       containerEl.appendChild(empty);
       return;
     }
@@ -442,18 +441,18 @@ export function renderExportQueue({
       };
       const label = document.createElement('span');
       label.className = 'eq-selected-label';
-      label.textContent = `已选 ${selected.size} 项:`;
+      label.textContent = t('queue.selectedCount', { n: selected.size });
       selBar.appendChild(label);
-      selBar.appendChild(mkSelBtn('<i class="fa-solid fa-download"></i> 下载', '', () => {
+      selBar.appendChild(mkSelBtn(`<i class="fa-solid fa-download"></i> ${escapeHtml(t('queue.download'))}`, '', () => {
         for (const id of selected) queue.download(id);
       }));
-      selBar.appendChild(mkSelBtn('<i class="fa-solid fa-folder-open"></i> 选位置导出', '逐个弹出保存位置 (浏览器不支持时普通下载)', async () => {
+      selBar.appendChild(mkSelBtn(`<i class="fa-solid fa-folder-open"></i> ${escapeHtml(t('queue.exportTo'))}`, t('queue.exportToHint'), async () => {
         for (const id of selected) {
           const item = queue.items.find((it) => it.id === id);
           if (item) await exportToLocation(item.blob, item.name);
         }
       }));
-      selBar.appendChild(mkSelBtn('<i class="fa-solid fa-box-archive"></i> 存工作区', '', async () => {
+      selBar.appendChild(mkSelBtn(`<i class="fa-solid fa-box-archive"></i> ${escapeHtml(t('queue.stash'))}`, '', async () => {
         for (const id of selected) await queue.stash(id);
         if (typeof onWorkspaceChanged === 'function') onWorkspaceChanged();
       }));
@@ -461,7 +460,7 @@ export function renderExportQueue({
         // 批量入口：把「已选 N 项」**整批**交给调用方。
         // 此前实现是 `const first = [...selected][0]`——勾 3 项只恢复 1 项且无任何提示
         // （静默部分执行），本任务将其修正为整批编排。
-        const btnRestore = mkSelBtn('<i class="fa-solid fa-rotate"></i> 写回宿主', '', () => {
+        const btnRestore = mkSelBtn(`<i class="fa-solid fa-rotate"></i> ${escapeHtml(t('queue.restore'))}`, '', () => {
           const items = [...selected]
             .map((id) => queue.items.find((it) => it.id === id))
             .filter(Boolean);
@@ -476,7 +475,7 @@ export function renderExportQueue({
         }
         selBar.appendChild(btnRestore);
       }
-      selBar.appendChild(mkSelBtn('<i class="fa-solid fa-trash"></i> 移除', '', () => {
+      selBar.appendChild(mkSelBtn(`<i class="fa-solid fa-trash"></i> ${escapeHtml(t('queue.remove'))}`, '', () => {
         for (const id of [...selected]) { selected.delete(id); queue.remove(id); }
       }));
     };
@@ -502,15 +501,15 @@ export function renderExportQueue({
         ? `<span class="meta-badge">${escapeHtml(String(item.targetLayout).toUpperCase())}</span>`
         : '';
       const storedBadge = item.storedId
-        ? '<span class="eq-stored">已入库</span>'
-        : '<span class="eq-ephemeral">临时</span>';
+        ? `<span class="eq-stored">${escapeHtml(t('queue.stored'))}</span>`
+        : `<span class="eq-ephemeral">${escapeHtml(t('queue.ephemeral'))}</span>`;
       info.innerHTML = `
         <div class="eq-name-row">
           <input type="checkbox" class="eq-select-box" data-id="${escapeHtml(item.id)}" ${trustedStaticMarkup(selected.has(item.id) ? 'checked' : '')}>
           <span class="eq-name">${escapeHtml(item.name)}</span>
         </div>
         <div class="eq-meta">
-          <span class="origin-badge ${escapeHtml(originLabel.cls)}">${escapeHtml(originLabel.text)}</span>
+          <span class="origin-badge ${escapeHtml(originLabel.cls)}">${escapeHtml(t(originLabel.key))}</span>
           ${trustedStaticMarkup(layoutBadge)}
           <span>${escapeHtml(formatBytes(item.blob.size))}</span>
           ${trustedStaticMarkup(storedBadge)}
@@ -529,23 +528,23 @@ export function renderExportQueue({
         b.addEventListener('click', onClick);
         return b;
       };
-      btns.appendChild(mkBtn('download', '下载', '', () => queue.download(item.id)));
-      btns.appendChild(mkBtn('load-source', '选位置导出', '选择保存位置写出该文件', () => exportToLocation(item.blob, item.name)));
-      const btnStash = mkBtn('load-source', '存工作区', '', async () => {
+      btns.appendChild(mkBtn('download', t('queue.download'), '', () => queue.download(item.id)));
+      btns.appendChild(mkBtn('load-source', t('queue.exportTo'), t('queue.exportToHint'), () => exportToLocation(item.blob, item.name)));
+      const btnStash = mkBtn('load-source', t('queue.stash'), '', async () => {
         await queue.stash(item.id);
         if (typeof onWorkspaceChanged === 'function') onWorkspaceChanged();
       });
       btnStash.disabled = Boolean(item.storedId);
       btns.appendChild(btnStash);
       if (isHostAvailable && typeof onRestoreToHost === 'function') {
-        const btnRestoreRow = mkBtn('restore', '<i class="fa-solid fa-rotate"></i> 写回宿主', '', () => onRestoreToHost(item));
+        const btnRestoreRow = mkBtn('restore', `<i class="fa-solid fa-rotate"></i> ${escapeHtml(t('queue.restore'))}`, '', () => onRestoreToHost(item));
         if (restoreInFlight || restoreBlocked) {
           btnRestoreRow.disabled = true;
           btnRestoreRow.title = restoreBlockedTitle;
         }
         btns.appendChild(btnRestoreRow);
       }
-      btns.appendChild(mkBtn('delete', '移除', '', () => { selected.delete(item.id); queue.remove(item.id); }));
+      btns.appendChild(mkBtn('delete', t('queue.remove'), '', () => { selected.delete(item.id); queue.remove(item.id); }));
       row.appendChild(btns);
       return row;
     };
@@ -568,20 +567,20 @@ export function renderExportQueue({
         toggle.type = 'button';
         toggle.className = 'menu_button eq-group-toggle';
         toggle.textContent = collapsed ? '▸' : '▾';
-        toggle.title = collapsed ? '展开' : '收起';
+        toggle.title = collapsed ? t('queue.expand') : t('queue.collapse');
         toggle.addEventListener('click', () => {
           const now = !collapsedQueueGroups.has(group.key);
           if (now) collapsedQueueGroups.add(group.key);
           else collapsedQueueGroups.delete(group.key);
           body.hidden = now;
           toggle.textContent = now ? '▸' : '▾';
-          toggle.title = now ? '展开' : '收起';
+          toggle.title = now ? t('queue.expand') : t('queue.collapse');
         });
 
         const groupBox = document.createElement('input');
         groupBox.type = 'checkbox';
         groupBox.className = 'eq-group-box';
-        groupBox.title = '组内全选';
+        groupBox.title = t('queue.selectGroup');
         const syncGroupBox = () => {
           const hit = group.items.filter((it) => selected.has(it.id)).length;
           groupBox.checked = hit === group.items.length && hit > 0;
@@ -604,7 +603,7 @@ export function renderExportQueue({
         const totalBytes = group.items.reduce((sum, it) => sum + (it.blob?.size || 0), 0);
         const count = document.createElement('span');
         count.className = 'eq-group-count';
-        count.textContent = `${group.items.length} 项 · ${formatBytes(totalBytes)}`;
+        count.textContent = t('queue.groupCount', { n: group.items.length, size: formatBytes(totalBytes) });
 
         head.append(toggle, groupBox, label, count);
         for (const item of group.items) body.appendChild(buildRow(item));

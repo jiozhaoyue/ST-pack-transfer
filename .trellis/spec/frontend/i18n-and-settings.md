@@ -50,12 +50,18 @@
 - 模板静态文案用 `data-i18n` / `data-i18n-title` / `data-i18n-placeholder` / `data-i18n-aria`，
   由 `src/i18n/dom.js` 的 `applyI18n(root)` 填充；**模板里不得保留中文兜底**。
 - 动态文案用 `t()`；语言切换后 `applyI18n(root)` + `view.renderAll()`。
-- 守卫：`npm run check:i18n`（`scripts/i18n-guard.js`）。当前扫描
-  `index.js` / `workbench-template.js` / `workbench-view.js` / `settings-panel.js`。
+- 守卫：`npm run check:i18n`（`scripts/i18n-guard.js`）。`SCAN_FILES` 当前覆盖
+  `index.js` / `workbench-template.js` / `workbench-view.js` / `settings-panel.js` /
+  `lan-transfer-panel.js` / `export-queue.js` / `qr.js`。
   **新增 UI 文件必须加入 `SCAN_FILES`**；`src/i18n/locales/**` 与注释豁免。
-- 已知未迁移（截至交接）：`lan-transfer-panel.js` / `export-queue.js` / `qr.js` /
-  `host-bridge.js` / `chat-store-*.js` / `src/app` / `src/storage`。LAN 与导出区属于 UI，
-  必须继续迁移；技术错误消息是否纳入由用户裁定。
+- **技术消息不纳入 UI 守卫**（2026-10-27 定案）：`host-bridge.js` / `chat-store-*.js` /
+  `src/app` / `src/storage` 里的错误串面向排障，不进 locale。被守卫文件内的 `dbg()`
+  调试串一律写英文，避免与 UI 文案混淆。
+- 时间/分隔符等**语言相关格式也走 locale**：`lan.duration.{sec,minSec,min}`、
+  `queue.partJoin`、`queue.listSep`。核心 `formatDuration` 保持与 UI 无关的中文实现，
+  UI 层用本地 `durationText()` 包装；**不要**让核心层依赖 i18n。
+- 同一 key 只允许出现一次：locale 对象字面量里的重复键 `test/i18n.test.js`
+  的键一致性用例**看不出来**（对象去重后仍相等），必须用脚本比对行级 key。
 
 ## 4. 教程锚点
 

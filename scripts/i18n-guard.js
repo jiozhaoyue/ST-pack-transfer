@@ -15,6 +15,9 @@ export const SCAN_FILES = Object.freeze([
   'src/ui/workbench-template.js',
   'src/ui/workbench-view.js',
   'src/ui/settings-panel.js',
+  'src/ui/lan-transfer-panel.js',
+  'src/ui/export-queue.js',
+  'src/ui/qr.js',
 ]);
 
 const CJK = /[一-鿿]/;
