@@ -58,14 +58,21 @@ describe('selection-defaults（单一默认源）', () => {
     expect({ ...built }).toEqual({ ...FULL_SELECTION });
   });
 
-  it('【AC-2】三个特殊类目默认值由设置弹窗承接', async () => {
+  it('【AC-2】三个特殊类目默认值不再由设置弹窗承接；改由打包选项派生', async () => {
     const src = await readFile(new URL('../index.js', import.meta.url), 'utf8');
+    // 转换器仍需要这三个 flag（当前作为内部打包默认，任务 2 改为图表派生）
     expect(src).toContain('includeBackups');
     expect(src).toContain('includeCache');
     expect(src).toContain('includePrivate');
-    expect(src).toContain('set-include-backups');
-    expect(src).toContain('set-include-cache');
-    expect(src).toContain('set-include-private');
+    // 但它们不再出现在设置页控件里
+    expect(src).not.toContain('set-include-backups');
+    expect(src).not.toContain('set-include-cache');
+    expect(src).not.toContain('set-include-private');
+
+    const panel = await readFile(new URL('../src/ui/settings-panel.js', import.meta.url), 'utf8');
+    expect(panel).not.toContain('includeBackups');
+    expect(panel).not.toContain('includeCache');
+    expect(panel).not.toContain('includePrivate');
   });
 
   it('【AC-2 双轨消除】backups 默认勾选 ⇒ 面板意图与产物载体不再矛盾', () => {

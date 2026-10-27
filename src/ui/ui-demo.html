@@ -78,8 +78,12 @@ body{min-height:100vh;display:flex;justify-content:center;padding:18px}
    ═══════════════════════════════════════════════════════════════ */
 import { getWorkbenchHtml } from './workbench-template.js';
 import { createWorkbenchView } from './workbench-view.js';
+import { buildSettingsHtml, readSettings } from './settings-panel.js';
+import { loadSettings, saveSettings } from './settings-store.js';
 
 document.getElementById('app').innerHTML = getWorkbenchHtml();
+
+const demoSettings = loadSettings();
 
 
 const HOST_LABEL = { luker:'Luker', pt:'PureTavern', tt:'TauriTavern', st:'SillyTavern' };
@@ -344,7 +348,17 @@ const view = createWorkbenchView({
     deleteSelected: doDeleteSelected,
     uploadPrivate: doUploadPrivate,
     lan: demoLan,
-    settings: () => view.toast('演示模式：设置弹窗由运行时控制器提供'),
+    settings: () => {
+      view.openModal('设置', '', [buildSettingsHtml(demoSettings)], [
+        { label:'关闭', onClick: () => view.closeModal() },
+        { label:'保存', primary:true, onClick: () => {
+            Object.assign(demoSettings, readSettings(document.getElementById('app')));
+            saveSettings(demoSettings);
+            view.closeModal();
+            view.toast('设置已保存');
+        }},
+      ]);
+    },
     close: () => view.toast('演示模式：关闭按钮在真实插件中关闭面板'),
     onTargetChange: (t) => view.pushLog('INFO','目标平台切换为 '+t),
   }
@@ -352,14 +366,14 @@ const view = createWorkbenchView({
 const S = () => view.getState();
 
 function trafficConfirm(onConfirm){
-  if(S().noTrafficPrompt){ onConfirm(); return; }
+  if(!demoSettings.trafficPrompt || S().noTrafficPrompt){ onConfirm(); return; }
   view.openModal('该操作会耗费大量流量','向后端酒馆上传或下载会消耗大量流量，请确认当前网络环境。',[
     '<label class="check"><input type="checkbox" id="traffic-nodisplay"> 不再显示</label>'
   ],[
     {label:'取消',onClick:view.closeModal},
     {label:'继续',primary:true,onClick:()=>{
       const cb=document.getElementById('traffic-nodisplay');
-      if(cb && cb.checked){ S().noTrafficPrompt=true; view.pushLog('INFO','已关闭流量提示'); }
+      if(cb && cb.checked){ S().noTrafficPrompt=true; demoSettings.trafficPrompt=false; saveSettings(demoSettings); view.pushLog('INFO','已关闭流量提示'); }
       view.closeModal(); onConfirm();
     }}
   ]);
@@ -537,7 +551,7 @@ view.pushLog('INFO','浏览器配额 1.2 GB / 8.0 GB');
 view.pushLog('INFO','已导入 SillyTavern_default-user_part1_2026-10-26_21-30-05.zip');
 view.setProgress(0,'准备就绪');
 try{
-  if(!sessionStorage.getItem('szc-demo-tutorial-seen')){
+  if(demoSettings.autoTutorial && !sessionStorage.getItem('szc-demo-tutorial-seen')){
     sessionStorage.setItem('szc-demo-tutorial-seen','1');
     setTimeout(()=>view.openTutorial(),300);
   }
