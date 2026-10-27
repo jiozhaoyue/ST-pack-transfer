@@ -1,7 +1,8 @@
 /**
- * 数据包转运 · HTML 模板
+ * 数据包转运 · HTML 模板（唯一源）
  *
- * 由 `npm run sync:ui` 从定稿 UI 页生成。**不要手改本文件**。
+ * 正式 UI 以此为准；开发预览页只 import 本模块，
+ * 正式代码不得反向引用预览页。
  */
 
 export function getWorkbenchHtml() {

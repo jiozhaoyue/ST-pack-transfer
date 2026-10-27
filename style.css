@@ -523,8 +523,8 @@
 
 
 /* ── 局域网互传（执行卡内联 · 发送/接收同屏） ── */
-#app.app-container .lan-block{flex:0 0 auto;border-top:1px solid var(--border);margin-top:8px;padding:8px 4px 10px}
-#app.app-container .lan-toggle{display:flex;align-items:center;gap:7px;width:100%;padding:6px 2px;background:transparent;border:0;color:var(--text);font-size:12px}
+#app.app-container .lan-block{flex:0 0 auto;border-top:1px solid var(--border);margin-top:8px;padding:8px 9px 10px}
+#app.app-container .lan-toggle{display:flex;align-items:center;gap:7px;width:100%;padding:6px 0;background:transparent;border:0;color:var(--text);font-size:12px}
 #app.app-container .lan-toggle-ico{width:13px;height:13px;color:var(--accent);flex:0 0 auto}
 #app.app-container .lan-toggle-hint{margin-left:auto;color:var(--muted-2);font-size:10px}
 #app.app-container .lan-chev{flex:0 0 auto;color:var(--muted);transition:transform .15s ease}
