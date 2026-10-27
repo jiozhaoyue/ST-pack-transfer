@@ -20,7 +20,6 @@ import {
   encodePickupCode,
   fileIdentity,
   formatBytes,
-  formatDuration,
   formatRate,
   probeDirectCapability,
   progressPercent,
@@ -28,6 +27,7 @@ import {
   verifyTransfer,
 } from '../core/lan-transfer.js';
 import { qr } from './qr.js';
+import { t } from '../i18n/index.js';
 
 const ICE_TIMEOUT_MS = 6000;
 const OPEN_TIMEOUT_MS = 15000;
@@ -65,12 +65,12 @@ function onceEvent(target, type, timeoutMs) {
 
 async function sha256Hex(bytes) {
   const subtle = globalThis.crypto?.subtle;
-  if (!subtle) { dbg('sha256 不可用（无 crypto.subtle）'); return ''; }
+  if (!subtle) { dbg('sha256 unavailable (no crypto.subtle)'); return ''; }
   try {
     const buf = await subtle.digest('SHA-256', bytes);
     return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
   } catch (err) {
-    dbg('sha256 失败', err?.message || String(err));
+    dbg('sha256 failed', err?.message || String(err));
     return '';
   }
 }
@@ -164,8 +164,17 @@ async function waitIceComplete(pc) {
 function withTimeout(promise, ms, label) {
   return Promise.race([
     promise,
-    new Promise((_, reject) => setTimeout(() => reject(new Error(`${label}超时`)), ms)),
+    new Promise((_, reject) => setTimeout(() => reject(new Error(t('lan.timeout', { label }))), ms)),
   ]);
+}
+
+/** 时长文案：单位由 i18n 决定；核心 `formatDuration` 保持与 UI 无关的中文实现。 */
+function durationText(ms) {
+  const total = Math.max(0, Math.round((Number(ms) || 0) / 1000));
+  if (total < 60) return t('lan.duration.sec', { n: total });
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  return s ? t('lan.duration.minSec', { m, s }) : t('lan.duration.min', { m });
 }
 
 export function mountLanTransferPanel({ view, getSendTargets = null, onReceive = null } = {}) {
@@ -200,8 +209,8 @@ export function mountLanTransferPanel({ view, getSendTargets = null, onReceive =
   const partials = new Map();
 
   if (!capability.direct) {
-    setSend({ phase: capability.reason, detail: '请改用导出文件再手动传入', error: false });
-    setRecv({ phase: capability.reason, detail: '请改用导出文件再手动传入' });
+    setSend({ phase: capability.reason, detail: t('lan.hintManual'), error: false });
+    setRecv({ phase: capability.reason, detail: t('lan.hintManual') });
   }
 
   const isActiveSend = () => sendState === 'waiting' || sendState === 'connecting' || sendState === 'sending';
@@ -216,7 +225,7 @@ export function mountLanTransferPanel({ view, getSendTargets = null, onReceive =
     if (doneWaiter) {
       const cb = doneWaiter;
       doneWaiter = null;
-      cb(false, '连接已关闭');
+      cb(false, t('lan.err.sessionClosed'));
     }
     if (incoming?.sink) {
       void incoming.sink.close();
@@ -228,10 +237,10 @@ export function mountLanTransferPanel({ view, getSendTargets = null, onReceive =
     local.addEventListener('connectionstatechange', () => {
       const state = local.connectionState;
       dbg('connection', state, local.iceConnectionState);
-      if (state === 'failed') onFail('连接失败');
+      if (state === 'failed') onFail(t('lan.err.connectFailed'));
       if (state === 'disconnected') {
         setTimeout(() => {
-          if (pc === local && local.connectionState === 'disconnected') onFail('连接中断');
+          if (pc === local && local.connectionState === 'disconnected') onFail(t('lan.err.disconnected'));
         }, DISCONNECT_GRACE_MS);
       }
     });
@@ -251,12 +260,12 @@ export function mountLanTransferPanel({ view, getSendTargets = null, onReceive =
 
   function transferDetail(bytes, total) {
     const { rate, eta } = rateOf(bytes, total);
-    const tail = rate > 0 ? ` · ${formatRate(rate)} · 剩余 ${formatDuration(eta)}` : '';
+    const tail = rate > 0 ? ` · ${formatRate(rate)} · ${t('lan.detail.remaining', { duration: durationText(eta) })}` : '';
     return `${formatBytes(bytes)} / ${formatBytes(total)}${tail}`;
   }
 
   async function ensureQrReady() {
-    try { await qr.ready(); } catch (err) { dbg('二维码库不可用', err?.message || String(err)); }
+    try { await qr.ready(); } catch (err) { dbg('qr library unavailable', err?.message || String(err)); }
   }
 
   // ── 发送端 ──
@@ -265,22 +274,22 @@ export function mountLanTransferPanel({ view, getSendTargets = null, onReceive =
     sendState = 'failed';
     try { machine.fail(message); } catch { /* 已终态 */ }
     setSend({
-      code: '', answer: '', phase: '失败', detail: message,
+      code: '', answer: '', phase: t('lan.phase.failed'), detail: message,
       pct: 0, busy: false, waiting: false, done: false, error: true,
     });
     closeSession();
-    log('ERROR', `局域网发送失败：${message}`);
+    log('ERROR', t('lan.log.sendFailed', { msg: message }));
   }
 
   function finishSend(detail) {
     try { machine.finish(); } catch { /* 已终态 */ }
     sendState = 'done';
     setSend({
-      code: '', answer: '', phase: '已发送', detail,
+      code: '', answer: '', phase: t('lan.phase.sent'), detail,
       pct: 100, busy: false, waiting: false, done: true, error: false,
     });
     closeSession();
-    log('INFO', `局域网发送完成：${currentFile?.name || ''}`);
+    log('INFO', t('lan.log.sendDone', { name: currentFile?.name || '' }));
     queueIndex += 1;
     if (queueIndex < queue.length) {
       const next = queue[queueIndex];
@@ -296,22 +305,22 @@ export function mountLanTransferPanel({ view, getSendTargets = null, onReceive =
 
   function bindSenderChannel(dc) {
     dc.onopen = () => {
-      if (sendState === 'connecting') setSend({ phase: '已连接，准备传输', detail: '' });
+      if (sendState === 'connecting') setSend({ phase: t('lan.phase.connectedReady'), detail: '' });
     };
-    dc.onclose = () => { if (sendState === 'sending') failSend('通道已关闭'); };
-    dc.onerror = () => { if (sendState === 'sending' || sendState === 'connecting') failSend('通道错误'); };
+    dc.onclose = () => { if (sendState === 'sending') failSend(t('lan.err.channelClosed')); };
+    dc.onerror = () => { if (sendState === 'sending' || sendState === 'connecting') failSend(t('lan.err.channelError')); };
     dc.onmessage = (event) => {
       if (typeof event.data !== 'string') return;
       let msg = null;
       try { msg = JSON.parse(event.data); } catch { return; }
       if (msg.t === 'ack') { ackBytes = Number(msg.bytes) || 0; return; }
       if (msg.t === 'ok' && doneWaiter) { const cb = doneWaiter; doneWaiter = null; cb(true, ''); return; }
-      if (msg.t === 'err' && doneWaiter) { const cb = doneWaiter; doneWaiter = null; cb(false, msg.message || '对端核对失败'); }
+      if (msg.t === 'err' && doneWaiter) { const cb = doneWaiter; doneWaiter = null; cb(false, msg.message || t('lan.err.peerVerifyFailed')); }
     };
   }
 
   async function startSend(file) {
-    if (!file) throw new Error('没有可发送的包');
+    if (!file) throw new Error(t('lan.err.noFile'));
     closeSession();
     machine = createTransferMachine();
     cancelRequested = false;
@@ -320,9 +329,9 @@ export function mountLanTransferPanel({ view, getSendTargets = null, onReceive =
     rateSamples = [];
     await ensureQrReady();
 
-    const queueLabel = queue.length > 1 ? `第 ${queueIndex + 1}/${queue.length} 个 · ` : '';
+    const queueLabel = queue.length > 1 ? t('lan.queueLabel', { i: queueIndex + 1, n: queue.length }) : '';
     setSend({
-      code: '', answer: '', phase: '准备中', detail: `${queueLabel}${file.name} · ${formatBytes(file.size)}`,
+      code: '', answer: '', phase: t('lan.phase.preparing'), detail: `${queueLabel}${file.name} · ${formatBytes(file.size)}`,
       pct: 0, busy: false, waiting: true, done: false, error: false,
     });
 
@@ -337,7 +346,7 @@ export function mountLanTransferPanel({ view, getSendTargets = null, onReceive =
 
     machine.openPickup({ total: file.size, ttlMs: PICKUP_TTL_MS });
     expiryTimer = setTimeout(() => {
-      if (machine.isPickupValid()) failSend('取件码已过期');
+      if (machine.isPickupValid()) failSend(t('lan.err.codeExpired'));
     }, PICKUP_TTL_MS);
 
     const offer = await local.createOffer();
@@ -350,25 +359,25 @@ export function mountLanTransferPanel({ view, getSendTargets = null, onReceive =
       file,
     }));
     setSend({
-      code, phase: '把取件码交给对方',
+      code, phase: t('lan.phase.handOffCode'),
       detail: `${queueLabel}${file.name} · ${formatBytes(file.size)}`,
       busy: false, waiting: true,
     });
-    log('INFO', `取件码已生成：${file.name}`);
+    log('INFO', t('lan.log.codeReady', { name: file.name }));
     dbg('offer ready', file.size, local.iceGatheringState);
   }
 
   async function sendFile(resumeFrom) {
     const dc = channel;
-    if (!dc) throw new Error('通道未建立');
+    if (!dc) throw new Error(t('lan.err.channelNotReady'));
     if (dc.readyState !== 'open') {
       const opened = await onceEvent(dc, 'open', OPEN_TIMEOUT_MS);
-      if (!opened || dc.readyState !== 'open') throw new Error('通道未打开');
+      if (!opened || dc.readyState !== 'open') throw new Error(t('lan.err.channelNotOpen'));
     }
 
     machine.start();
     sendState = 'sending';
-    setSend({ busy: true, waiting: false, phase: '传输中', pct: 0, detail: '' });
+    setSend({ busy: true, waiting: false, phase: t('lan.phase.sending'), pct: 0, detail: '' });
 
     const file = currentFile;
     const total = file.size;
@@ -384,27 +393,30 @@ export function mountLanTransferPanel({ view, getSendTargets = null, onReceive =
 
     let offset = Math.max(0, Math.min(Number(resumeFrom) || 0, total));
     rateSamples = [{ t: Date.now(), b: offset }];
-    if (offset > 0) setSend({ pct: progressPercent(offset, total), phase: '续传中', detail: transferDetail(offset, total) });
+    if (offset > 0) setSend({ pct: progressPercent(offset, total), phase: t('lan.phase.resuming'), detail: transferDetail(offset, total) });
 
     while (offset < total) {
-      if (cancelRequested) throw new Error('已取消');
-      if (dc.readyState !== 'open') throw new Error('通道已关闭');
+      if (cancelRequested) throw new Error(t('lan.err.cancelled'));
+      if (dc.readyState !== 'open') throw new Error(t('lan.err.channelClosed'));
       if (dc.bufferedAmount > HIGH_WATER_MARK) {
         await onceEvent(dc, 'bufferedamountlow', 250);
         continue;
       }
       const end = Math.min(offset + CHUNK_SIZE, total);
       const chunk = await file.slice(offset, end).arrayBuffer();
-      if (dc.readyState !== 'open') throw new Error('通道已关闭');
+      if (dc.readyState !== 'open') throw new Error(t('lan.err.channelClosed'));
       dc.send(chunk);
       offset = end;
       try { machine.advanceSent(chunk.byteLength); } catch { /* 状态已终态 */ }
-      setSend({ pct: progressPercent(offset, total), phase: '传输中', detail: transferDetail(offset, total) });
+      setSend({ pct: progressPercent(offset, total), phase: t('lan.phase.sending'), detail: transferDetail(offset, total) });
     }
 
     dc.send(JSON.stringify({ t: 'done', bytes: total, digest }));
     dbg('send done', total);
-    setSend({ phase: '等待对端核对', pct: 100, detail: `${formatBytes(total)}${digest ? ' · 摘要已发送' : ' · 仅核对大小'}` });
+    setSend({
+      phase: t('lan.phase.waitVerify'), pct: 100,
+      detail: `${formatBytes(total)} · ${digest ? t('lan.detail.digestSent') : t('lan.detail.sizeOnly')}`,
+    });
 
     const waitMs = Math.max(30_000, 5_000 + (total / (1024 * 1024)) * 2_000);
     const confirmed = await new Promise((resolve) => {
@@ -412,25 +424,25 @@ export function mountLanTransferPanel({ view, getSendTargets = null, onReceive =
       setTimeout(() => {
         if (!doneWaiter) return;
         doneWaiter = null;
-        resolve({ success: false, message: '等待对端确认超时' });
+        resolve({ success: false, message: t('lan.err.verifyTimeout') });
       }, waitMs);
     });
-    if (!confirmed.success) throw new Error(confirmed.message || '对端未确认');
+    if (!confirmed.success) throw new Error(confirmed.message || t('lan.err.peerNotConfirmed'));
 
-    finishSend(digest ? '摘要一致' : '仅核对大小');
+    finishSend(digest ? t('lan.detail.digestMatch') : t('lan.detail.sizeOnly'));
   }
 
   async function generate() {
     if (!capability.direct) { toast(capability.reason); return; }
-    if (isActiveSend()) { toast('正在传输，请先取消或完成当前任务'); return; }
+    if (isActiveSend()) { toast(t('lan.toast.busy')); return; }
     let targets = [];
     try {
       targets = typeof getSendTargets === 'function' ? await getSendTargets() : [];
     } catch (err) {
-      toast(`读取包失败：${err.message}`);
+      toast(t('lan.toast.readFailed', { msg: err.message }));
       return;
     }
-    if (!targets.length) { toast('先在数据包区勾选要发送的包'); return; }
+    if (!targets.length) { toast(t('lan.toast.selectPack')); return; }
     queue = targets;
     queueIndex = 0;
     sendState = 'idle';
@@ -439,8 +451,8 @@ export function mountLanTransferPanel({ view, getSendTargets = null, onReceive =
 
   async function applyAnswer(code) {
     if (!capability.direct) { toast(capability.reason); return; }
-    if (sendState === 'done') { toast('已完成，再传请重新生成取件码'); return; }
-    if (!pc || !currentFile) { toast('先生成取件码'); return; }
+    if (sendState === 'done') { toast(t('lan.toast.alreadyDone')); return; }
+    if (!pc || !currentFile) { toast(t('lan.toast.needCode')); return; }
     if (sendState === 'connecting' || sendState === 'sending') return;
 
     let payload = null;
@@ -450,13 +462,17 @@ export function mountLanTransferPanel({ view, getSendTargets = null, onReceive =
       failSend(err.message);
       return;
     }
-    if (payload.role !== 'answer') { failSend('不是应答码'); return; }
+    if (payload.role !== 'answer') { failSend(t('lan.err.notAnswerCode')); return; }
 
     try {
       machine.connecting();
       sendState = 'connecting';
-      setSend({ answer: String(code || '').trim(), busy: true, waiting: false, phase: '连接中', pct: 0, detail: '' });
-      await withTimeout(pc.setRemoteDescription({ type: 'answer', sdp: payload.sdp }), 12_000, '应用应答码');
+      setSend({ answer: String(code || '').trim(), busy: true, waiting: false, phase: t('lan.phase.connecting'), pct: 0, detail: '' });
+      await withTimeout(
+        pc.setRemoteDescription({ type: 'answer', sdp: payload.sdp }),
+        12_000,
+        t('lan.label.applyAnswer'),
+      );
       await sendFile(payload.resumeFrom);
     } catch (err) {
       failSend(err.message);
@@ -469,9 +485,9 @@ export function mountLanTransferPanel({ view, getSendTargets = null, onReceive =
     queue = [];
     queueIndex = 0;
     sendState = 'cancelled';
-    setSend({ code: '', answer: '', phase: '已取消', detail: '', pct: 0, busy: false, waiting: false, done: false, error: false });
+    setSend({ code: '', answer: '', phase: t('lan.phase.cancelled'), detail: '', pct: 0, busy: false, waiting: false, done: false, error: false });
     closeSession();
-    log('INFO', '局域网发送已取消');
+    log('INFO', t('lan.log.sendCancelled'));
   }
 
   function retry() {
@@ -490,12 +506,12 @@ export function mountLanTransferPanel({ view, getSendTargets = null, onReceive =
     try { machine.fail(message); } catch { /* 已终态 */ }
     const received = incoming?.sink?.bytes || 0;
     setRecv({
-      code: '', phase: '失败',
-      detail: message + (received ? ` · 已收 ${formatBytes(received)}` : ''),
+      code: '', phase: t('lan.phase.failed'),
+      detail: message + (received ? ` · ${t('lan.detail.received', { size: formatBytes(received) })}` : ''),
       pct: 0, busy: false, done: false,
     });
     closeSession();
-    log('ERROR', `局域网接收失败：${message}`);
+    log('ERROR', t('lan.log.recvFailed', { msg: message }));
   }
 
   async function finishReceive(expectedBytes, expectedDigest) {
@@ -503,19 +519,19 @@ export function mountLanTransferPanel({ view, getSendTargets = null, onReceive =
     if (!current) return;
     await writeChain;
     const sink = current.sink || await current.sinkReady;
-    if (!sink) { failRecv('落盘不可用'); return; }
+    if (!sink) { failRecv(t('lan.err.sinkUnavailable')); return; }
     let blob = null;
     try {
       blob = await sink.finalize();
     } catch (err) {
-      failRecv(`落盘失败 ${err.message}`);
+      failRecv(t('lan.err.sinkFailed', { msg: err.message }));
       return;
     }
 
     let digest = '';
     if (expectedBytes <= DIGEST_MAX_BYTES) {
       try { digest = await sha256Hex(new Uint8Array(await blob.arrayBuffer())); } catch (err) {
-        dbg('digest 计算失败', err?.message || String(err));
+        dbg('digest failed', err?.message || String(err));
         digest = '';
       }
     }
@@ -528,7 +544,7 @@ export function mountLanTransferPanel({ view, getSendTargets = null, onReceive =
       try { channel?.send(JSON.stringify({ t: 'err', message: verdict.reason })); } catch { /* 通道已断 */ }
       partials.delete(current.fileId);
       void discardPartial(current.fileId);
-      failRecv(`核对失败 ${verdict.reason}`);
+      failRecv(t('lan.err.verifyFailed', { msg: verdict.reason }));
       return;
     }
 
@@ -540,8 +556,8 @@ export function mountLanTransferPanel({ view, getSendTargets = null, onReceive =
     partials.delete(current.fileId);
     setRecv({
       offer: '', code: '',
-      phase: verdict.digestChecked ? '已接收 · 摘要一致' : '已接收 · 仅核对大小',
-      detail: `正在保存 ${current.name}`, pct: 100, busy: true, done: true,
+      phase: verdict.digestChecked ? t('lan.phase.receivedMatch') : t('lan.phase.receivedSize'),
+      detail: t('lan.detail.saving', { name: current.name }), pct: 100, busy: true, done: true,
     });
     incoming = null;
     pendingOffer = null;
@@ -549,11 +565,11 @@ export function mountLanTransferPanel({ view, getSendTargets = null, onReceive =
 
     try {
       if (typeof onReceive === 'function') await onReceive(blob, current.name);
-      setRecv({ detail: `${formatBytes(blob.size)}${verdict.digestChecked ? ' · 摘要一致' : ''}`, busy: false });
-      log('INFO', `局域网接收完成：${current.name}`);
+      setRecv({ detail: `${formatBytes(blob.size)}${verdict.digestChecked ? ` · ${t('lan.detail.digestMatch')}` : ''}`, busy: false });
+      log('INFO', t('lan.log.recvDone', { name: current.name }));
     } catch (err) {
-      setRecv({ phase: '已接收但入库失败', detail: err.message, busy: false });
-      log('ERROR', `接收包入库失败：${err.message}`);
+      setRecv({ phase: t('lan.phase.storeFailed'), detail: err.message, busy: false });
+      log('ERROR', t('lan.log.storeFailed', { msg: err.message }));
     }
     void discardPartial(current.fileId);
   }
@@ -580,7 +596,7 @@ export function mountLanTransferPanel({ view, getSendTargets = null, onReceive =
       writeChain = Promise.resolve();
       incoming = entry;
       dbg('recv meta', { size, fileId, digest: Boolean(entry.digest) });
-      setRecv({ phase: '接收中', pct: 0, detail: `${formatBytes(0)} / ${formatBytes(size)}`, busy: true, done: false });
+      setRecv({ phase: t('lan.phase.receiving'), pct: 0, detail: `${formatBytes(0)} / ${formatBytes(size)}`, busy: true, done: false });
       const existing = partials.get(fileId);
       // 数据帧可能先于 OPFS 打开就到达（实测首 8 块被丢）：用 sinkReady 让写链等待，
       // **绝不丢弃**——丢了就是残缺包且校验只报「摘要不一致」，根因被掩盖。
@@ -589,13 +605,13 @@ export function mountLanTransferPanel({ view, getSendTargets = null, onReceive =
         partials.set(fileId, entry.sink);
         dbg('recv sink', entry.sink.kind, entry.sink.bytes);
         setRecv({
-          phase: entry.sink.bytes > 0 ? '续传中' : '接收中',
+          phase: entry.sink.bytes > 0 ? t('lan.phase.resuming') : t('lan.phase.receiving'),
           pct: progressPercent(entry.sink.bytes, size),
           detail: `${formatBytes(entry.sink.bytes)} / ${formatBytes(size)}`,
         });
         return entry.sink;
       })();
-      entry.sinkReady.catch((err) => failRecv(`落盘不可用 ${err.message}`));
+      entry.sinkReady.catch((err) => failRecv(t('lan.err.sinkFailed', { msg: err.message })));
       return;
     }
 
@@ -609,14 +625,14 @@ export function mountLanTransferPanel({ view, getSendTargets = null, onReceive =
 
     if (msg.t === 'cancel') {
       if (incoming?.sink) partials.set(incoming.fileId, incoming.sink);
-      failRecv('对方已取消');
+      failRecv(t('lan.err.peerCancelled'));
     }
   };
 
   function bindReceiverChannel(dc) {
-    dc.onopen = () => { if (recvState === 'connecting') setRecv({ phase: '已连接，等待数据', detail: '' }); };
-    dc.onclose = () => { if (recvState === 'receiving') failRecv('通道已关闭'); };
-    dc.onerror = () => { if (recvState === 'receiving') failRecv('通道错误'); };
+    dc.onopen = () => { if (recvState === 'connecting') setRecv({ phase: t('lan.phase.connectedWait'), detail: '' }); };
+    dc.onclose = () => { if (recvState === 'receiving') failRecv(t('lan.err.channelClosed')); };
+    dc.onerror = () => { if (recvState === 'receiving') failRecv(t('lan.err.channelError')); };
     dc.onmessage = (event) => {
       if (typeof event.data === 'string') { handleReceiverControl(event.data, dc); return; }
       if (!incoming) return;
@@ -627,13 +643,13 @@ export function mountLanTransferPanel({ view, getSendTargets = null, onReceive =
       writeChain = writeChain.then(async () => {
         // 等 sink 就绪再写：数据帧可以来得比 OPFS 打开更早（实测首 8 块）。
         const sink = current.sink || await current.sinkReady;
-        if (!sink) { dbg('chunk dropped: sink 不可用', chunk.byteLength); return; }
+        if (!sink) { dbg('chunk dropped: sink unavailable', chunk.byteLength); return; }
         await sink.write(chunk);
         const bytes = sink.bytes;
         current.chunks = (current.chunks || 0) + 1;
         if (current.chunks % 8 === 0) dbg('recv chunk', current.chunks, bytes, current.size);
         try { machine.advanceReceived(chunk.byteLength); } catch { /* 状态已终态 */ }
-        setRecv({ phase: '接收中', pct: progressPercent(bytes, current.size), detail: transferDetail(bytes, current.size) });
+        setRecv({ phase: t('lan.phase.receiving'), pct: progressPercent(bytes, current.size), detail: transferDetail(bytes, current.size) });
         const now = Date.now();
         if (bytes - ackBytes >= ACK_THRESHOLD_BYTES || now - ackAt >= ACK_INTERVAL_MS) {
           ackBytes = bytes;
@@ -646,16 +662,16 @@ export function mountLanTransferPanel({ view, getSendTargets = null, onReceive =
 
   async function acceptOffer(code) {
     if (!capability.direct) { toast(capability.reason); return; }
-    if (recvState === 'connecting' || recvState === 'receiving') { toast('正在接收，请先放弃当前任务'); return; }
+    if (recvState === 'connecting' || recvState === 'receiving') { toast(t('lan.toast.receivingBusy')); return; }
     const text = String(code || '').trim();
-    if (!text) { toast('先粘贴取件码'); return; }
+    if (!text) { toast(t('lan.toast.pasteCode')); return; }
 
     closeSession();
     machine = createTransferMachine();
     recvState = 'connecting';
     incoming = null;
     pendingOffer = null;
-    setRecv({ offer: text, code: '', phase: '解析取件码', detail: '', pct: 0, busy: true, done: false });
+    setRecv({ offer: text, code: '', phase: t('lan.phase.parsingCode'), detail: '', pct: 0, busy: true, done: false });
 
     let payload = null;
     try {
@@ -664,7 +680,7 @@ export function mountLanTransferPanel({ view, getSendTargets = null, onReceive =
       failRecv(err.message);
       return;
     }
-    if (payload.role !== 'offer') { failRecv('不是取件码'); return; }
+    if (payload.role !== 'offer') { failRecv(t('lan.err.notPickupCode')); return; }
 
     const fileId = payload.fileId || fileIdentity(payload.file || {});
     const resumeFrom = partials.get(fileId)?.bytes || await partialBytes(fileId);
@@ -680,7 +696,11 @@ export function mountLanTransferPanel({ view, getSendTargets = null, onReceive =
     };
 
     try {
-      await withTimeout(local.setRemoteDescription({ type: 'offer', sdp: payload.sdp }), 12_000, '应用取件码');
+      await withTimeout(
+        local.setRemoteDescription({ type: 'offer', sdp: payload.sdp }),
+        12_000,
+        t('lan.label.applyCode'),
+      );
       const answer = await local.createAnswer();
       await local.setLocalDescription(answer);
       await waitIceComplete(local);
@@ -694,12 +714,12 @@ export function mountLanTransferPanel({ view, getSendTargets = null, onReceive =
       }));
       setRecv({
         code: code2,
-        phase: resumeFrom > 0 ? '把应答码回传，将从断点继续' : '把应答码回传给对方',
-        detail: `${pendingOffer.name} · ${formatBytes(pendingOffer.size)}${resumeFrom > 0 ? ` · 续传 ${formatBytes(resumeFrom)}` : ''}`,
+        phase: resumeFrom > 0 ? t('lan.phase.answerResume') : t('lan.phase.answer'),
+        detail: `${pendingOffer.name} · ${formatBytes(pendingOffer.size)}${resumeFrom > 0 ? ` · ${t('lan.detail.resume', { size: formatBytes(resumeFrom) })}` : ''}`,
         pct: progressPercent(resumeFrom, pendingOffer.size),
         busy: true,
       });
-      log('INFO', `应答码已生成：${pendingOffer.name}`);
+      log('INFO', t('lan.log.answerReady', { name: pendingOffer.name }));
     } catch (err) {
       failRecv(err.message);
     }
@@ -715,8 +735,8 @@ export function mountLanTransferPanel({ view, getSendTargets = null, onReceive =
       partials.delete(fileId);
       await discardPartial(fileId);
     }
-    setRecv({ offer: '', code: '', phase: '半成品已放弃', detail: '', pct: 0, busy: false, done: false });
-    log('INFO', '局域网接收半成品已放弃');
+    setRecv({ offer: '', code: '', phase: t('lan.phase.abandoned'), detail: '', pct: 0, busy: false, done: false });
+    log('INFO', t('lan.log.abandoned'));
   }
 
   const onPageHide = () => closeSession();

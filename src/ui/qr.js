@@ -6,6 +6,8 @@
  * jsQR 是 UMD，同样以 classic 注入；两者都是本地文件，无 CDN。
  */
 
+import { t } from '../i18n/index.js';
+
 const VENDOR = {
   encode: new URL('../vendor/qrcode-generator.js', import.meta.url),
   decode: new URL('../vendor/jsqr.js', import.meta.url),
@@ -15,12 +17,12 @@ let loading = null;
 
 function loadScript(url) {
   return new Promise((resolve, reject) => {
-    if (typeof document === 'undefined') { reject(new Error('无 document')); return; }
+    if (typeof document === 'undefined') { reject(new Error(t('qr.noDocument'))); return; }
     const script = document.createElement('script');
     script.src = url.href;
     script.async = true;
     script.onload = () => resolve();
-    script.onerror = () => reject(new Error('二维码库加载失败'));
+    script.onerror = () => reject(new Error(t('qr.loadFailed')));
     // dom-scope:allow classic vendor 脚本必须挂到 document.head 才能得到全局 window.qrcode / window.jsQR；文件为本仓本地副本，不写宿主节点
     document.head.appendChild(script);
   });
@@ -28,15 +30,15 @@ function loadScript(url) {
 
 /** 确保编码 / 解码库都已就绪；失败后允许下次重试。 */
 export function ready() {
-  if (typeof window === 'undefined') return Promise.reject(new Error('无 window'));
+  if (typeof window === 'undefined') return Promise.reject(new Error(t('qr.noWindow')));
   if (typeof window.qrcode === 'function' && typeof window.jsQR === 'function') return Promise.resolve();
   if (loading) return loading;
   loading = Promise.all([
     typeof window.qrcode === 'function' ? null : loadScript(VENDOR.encode),
     typeof window.jsQR === 'function' ? null : loadScript(VENDOR.decode),
   ]).then(() => {
-    if (typeof window.qrcode !== 'function') throw new Error('二维码编码库不可用');
-    if (typeof window.jsQR !== 'function') throw new Error('二维码解码库不可用');
+    if (typeof window.qrcode !== 'function') throw new Error(t('qr.encodeUnavailable'));
+    if (typeof window.jsQR !== 'function') throw new Error(t('qr.decodeUnavailable'));
   }).catch((err) => {
     loading = null;
     throw err;
@@ -65,15 +67,15 @@ export async function scan({ video, canvas, onResult, onError } = {}) {
   try {
     await ready();
   } catch (err) {
-    onError?.(err?.message || '二维码库不可用');
+    onError?.(err?.message || t('qr.unavailable'));
     return () => {};
   }
   if (!video || !canvas) {
-    onError?.('扫码画布不可用');
+    onError?.(t('qr.canvasUnavailable'));
     return () => {};
   }
   if (!navigator.mediaDevices?.getUserMedia) {
-    onError?.('当前环境不支持摄像头');
+    onError?.(t('qr.cameraUnsupported'));
     return () => {};
   }
 
@@ -81,7 +83,7 @@ export async function scan({ video, canvas, onResult, onError } = {}) {
   try {
     stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
   } catch (err) {
-    onError?.('相机不可用：' + (err?.message || '权限被拒绝'));
+    onError?.(t('qr.cameraFailed', { msg: err?.message || t('qr.permissionDenied') }));
     return () => {};
   }
 
