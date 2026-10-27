@@ -456,8 +456,8 @@ describe('gitMode UI 契约（设置页不再承载）', () => {
 
     const view = await readFile(new URL('../src/ui/workbench-view.js', import.meta.url), 'utf8');
     expect(view).toContain('data-gitmode');
-    expect(view).toContain('保留历史');
-    expect(view).toContain('只留更新所需');
-    expect(view).toContain('不含历史');
+    expect(view).toContain('extension.gitKeep');
+    expect(view).toContain('extension.gitMinimal');
+    expect(view).toContain('extension.gitStrip');
   });
 });

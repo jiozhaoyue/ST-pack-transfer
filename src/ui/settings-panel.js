@@ -4,6 +4,7 @@
  * 只承载「面板行为」类开关；打包选项（压缩/扩展/Git/构建/backups/缓存/私有/原生资产）
  * 属于图表选择面，不得回到这里。
  */
+import { t } from '../i18n/index.js';
 
 /** 设置默认值。只允许布尔开关；新增项必须同步 zh-CN / en-US 文案与测试。 */
 export const SETTINGS_DEFAULTS = Object.freeze({
@@ -33,9 +34,9 @@ function setting(id, key, label, checked) {
 export function buildSettingsHtml(settings = {}) {
   const s = normalizeSettings(settings);
   return '<div class="settings-grid">'
-    + setting('set-keep-export', 'keepExport', '导出后在导出区保留包', s.keepExport)
-    + setting('set-traffic', 'trafficPrompt', '后端上下传流量提示', s.trafficPrompt)
-    + setting('set-auto-tutorial', 'autoTutorial', '基础教程自动打开', s.autoTutorial)
+    + setting('set-keep-export', 'keepExport', t('settings.keepExport'), s.keepExport)
+    + setting('set-traffic', 'trafficPrompt', t('settings.trafficPrompt'), s.trafficPrompt)
+    + setting('set-auto-tutorial', 'autoTutorial', t('settings.autoTutorial'), s.autoTutorial)
     + '</div>';
 }
 

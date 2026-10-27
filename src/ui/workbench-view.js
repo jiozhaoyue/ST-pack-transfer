@@ -11,6 +11,29 @@
 
 import { chartTreeFor, deriveExportOptions } from '../core/chart-model.js';
 import { EXTENSION_MODES, GIT_MODES } from '../core/export-modes.js';
+import { t } from '../i18n/index.js';
+
+/**
+ * 教程锚点纯几何：用 overlay 自身矩形做基准，兼容宿主容器的 transform。
+ * 返回 ring / card 的 overlay 局部坐标（clamp 在 overlay 内）。
+ */
+export function tutorialAnchor(targetRect, overlayRect, cardSize = { width: 330, height: 180 }) {
+  const o = overlayRect;
+  const t = targetRect;
+  const width = Math.min(cardSize.width, Math.max(120, o.width - 24));
+  const ring = {
+    left: Math.max(0, t.left - o.left - 5),
+    top: Math.max(0, t.top - o.top - 5),
+    width: Math.max(0, Math.min(t.width + 10, o.width)),
+    height: Math.max(0, Math.min(t.height + 10, o.height)),
+  };
+  let cardLeft = Math.min(Math.max(12, t.left - o.left), o.width - width - 12);
+  let cardTop = t.top - o.top + t.height + 10;
+  if (cardTop + cardSize.height > o.height) cardTop = t.top - o.top - cardSize.height - 10;
+  cardLeft = Math.max(0, Math.min(cardLeft, o.width - width));
+  cardTop = Math.max(0, Math.min(cardTop, o.height - cardSize.height));
+  return { ring, card: { left: cardLeft, top: cardTop, width } };
+}
 
 export function createWorkbenchView({ actions = {}, qr = null } = {}) {
 
@@ -92,8 +115,8 @@ const state = {
   sourceKey:'host:luker', seq:{}, libraryExport:false,
   lan:{
     open:false, scanning:null, scanError:'',
-    send:{ code:'', answer:'', phase:'准备就绪', pct:0, detail:'', busy:false, done:false },
-    recv:{ code:'', phase:'等待取件码', pct:0, detail:'', busy:false, done:false }
+    send:{ code:'', answer:'', phase:t('action.ready'), pct:0, detail:'', busy:false, done:false },
+    recv:{ code:'', phase:t('action.waiting'), pct:0, detail:'', busy:false, done:false }
   }
 };
 
@@ -105,7 +128,7 @@ function fmtMB(mb){
   return Math.max(0,Math.round(n*1000))+' KB';
 }
 function hostIcon(host){ return (HOSTS[host]||{}).icon || HOSTS.luker.icon; }
-function hostName(host){ return (HOSTS[host]||{}).full || '未识别'; }
+function hostName(host){ return (HOSTS[host]||{}).full || t('filter.unknown'); }
 function nowTime(){
   const d=new Date(); const p=n=>String(n).padStart(2,'0');
   return p(d.getHours())+':'+p(d.getMinutes())+':'+p(d.getSeconds());
@@ -164,12 +187,16 @@ function pkgSeq(){
   ['import','export'].forEach(z=>{
     state.packages.filter(p=>p.zone===z).slice()
       .sort((a,b)=>(a.ts||0)-(b.ts||0))
-      .forEach((p,i)=>{ map[p.id]=(z==='import'?'导入':'导出')+String(i+1).padStart(2,'0'); });
+      .forEach((p,i)=>{ map[p.id]=(z==='import'?'I':'E')+String(i+1).padStart(2,'0'); });
   });
   return map;
 }
-function seqLabel(p){ return state.seq[p.id]||'--'; }
-function seqNum(p){ return (state.seq[p.id]||'--').replace(/^(导入|导出)/,''); }
+function seqLabel(p){
+  const raw=state.seq[p.id]||'--';
+  const prefix=raw.startsWith('E')?t('zones.export'):t('zones.import');
+  return prefix+seqNum(p);
+}
+function seqNum(p){ return (state.seq[p.id]||'--').replace(/^[IE]/,''); }
 function visiblePackages(zone){
   let list=state.packages.filter(p=>p.zone===zone);
   if(state.filter && state.filter!=='all'){
@@ -183,10 +210,10 @@ function visiblePackages(zone){
 }
 
 function hostFilterHtml(){
-  const opt=(v,t)=>'<option value="'+v+'"'+(state.filter===v?' selected':'')+'>'+t+'</option>';
-  return '<label>格式 <select id="host-filter">'
-    +opt('all','全部')+opt('st','SillyTavern')+opt('luker','Luker')
-    +opt('tt','TauriTavern')+opt('pt','PureTavern')+opt('unknown','未识别')
+  const opt=(v,label)=>'<option value="'+v+'"'+(state.filter===v?' selected':'')+'>'+label+'</option>';
+  return '<label>'+t('filter.format')+' <select id="host-filter">'
+    +opt('all',t('filter.all'))+opt('st','SillyTavern')+opt('luker','Luker')
+    +opt('tt','TauriTavern')+opt('pt','PureTavern')+opt('unknown',t('filter.unknown'))
     +'</select></label>';
 }
 
@@ -207,8 +234,8 @@ function renderHeader(){
   icon.hidden=isWeb; gh.hidden=!isWeb;
   if(!isWeb){ icon.src=h.icon; icon.dataset.host=state.host; }
   const badge=document.getElementById('host-badge');
-  badge.title = isWeb ? '独立 Web 形态：没有宿主数据源' : ('当前运行在 '+h.full+' 插件内');
-  document.getElementById('host-badge-text').textContent = isWeb ? 'Web' : (h.full+' 插件');
+  badge.title = isWeb ? t('header.webTitle') : t('header.hostTitle', { host: h.full });
+  document.getElementById('host-badge-text').textContent = isWeb ? t('header.web') : t('header.plugin', { host: h.full });
   renderTargetPicker();
 }
 function renderTargetPicker(){
@@ -221,7 +248,7 @@ function renderTargetPicker(){
     return '<button class="picker-item" role="option" data-target="'+t.value+'" aria-selected="'+(t.value===state.target)+'">'
       +'<img class="picker-ico" data-host="'+t.host+'" src="'+hostIcon(t.host)+'" alt="">'
       +'<span>'+t.value+'</span>'
-      +(isHost?'<span class="host-tag">（宿主）</span>':'')
+      +(isHost?'<span class="host-tag">'+t('target.hostSuffix')+'</span>':'')
       +'</button>';
   }).join('');
 }
@@ -230,18 +257,18 @@ function updateSplitSim(){
   if(!sim) return;
   if(state.splitMb===''){ sim.textContent=''; sim.style.color=''; return; }
   const raw=Number(state.splitMb);
-  if(!isFinite(raw)||raw<=0){ sim.textContent='填 MB 数值'; sim.style.color='var(--optional)'; return; }
-  if(raw<SPLIT_MIN){ sim.textContent='最小 '+SPLIT_MIN+' MB'; sim.style.color='var(--optional)'; return; }
-  if(raw>SPLIT_MAX){ sim.textContent='最大 '+SPLIT_MAX+' MB'; sim.style.color='var(--optional)'; return; }
+  if(!isFinite(raw)||raw<=0){ sim.textContent=t('splitSim.invalid'); sim.style.color='var(--optional)'; return; }
+  if(raw<SPLIT_MIN){ sim.textContent=t('splitSim.min',{n:SPLIT_MIN}); sim.style.color='var(--optional)'; return; }
+  if(raw>SPLIT_MAX){ sim.textContent=t('splitSim.max',{n:SPLIT_MAX}); sim.style.color='var(--optional)'; return; }
   sim.style.color='';
   const pkgs=chartTargets().filter(t=>t.pkg);
-  if(!pkgs.length){ sim.textContent='按各包总量估算'; return; }
+  if(!pkgs.length){ sim.textContent=t('splitSim.estimate'); return; }
   let n=0, over=false;
-  pkgs.forEach(t=>{
-    const v=volumesOf(t.pkg,packageNodes(t.pkg).nodes);
+  pkgs.forEach(item=>{
+    const v=volumesOf(item.pkg,packageNodes(item.pkg).nodes);
     n+=v.length; if(v.some(x=>x.over)) over=true;
   });
-  sim.textContent='预计 '+n+' 卷'+(over?' · 有单文件超限':'');
+  sim.textContent=t('splitSim.parts',{n})+(over?' '+t('splitSim.over'):'');
 }
 
 /* ── 渲染：图表 ── */
@@ -329,8 +356,8 @@ function renderQuota(){
       +'<span class="quota-val">'+(cell.used/1073741824).toFixed(1)+' / '+(cell.total/1073741824).toFixed(1)+' GB · '+p+'%</span></div>';
   };
   const hostReadable=!!(HOSTS[state.host]||{}).readable;
-  head.innerHTML = row('浏览器配额','db',state.storage.browser,'浏览器未提供配额读数')
-    + row('宿主配额','shield',hostReadable ? state.storage.host : null,'当前宿主无逐项读数');
+  head.innerHTML = row(t('quota.browser'),'db',state.storage.browser,t('quota.browserEmpty'))
+    + row(t('quota.host'),'shield',hostReadable ? state.storage.host : null,t('quota.hostEmpty'));
 }
 function renderTreeRows(nodes,depth,scope,readonly,extToolsHtml){
   let out='';
@@ -343,21 +370,21 @@ function renderTreeRows(nodes,depth,scope,readonly,extToolsHtml){
     const indeterminate = hasKids && !!n._indeterminate;
     const ind=Math.min(depth,8)*15;
     const pillCls=n.suggest==='keep'?'keep':n.suggest==='optional'?'optional':n.suggest==='drop'?'drop':'unknown';
-    const pillText=n.suggest==='keep'?'建议保留':n.suggest==='optional'?'可选':n.suggest==='drop'?'建议清理':'未识别';
+    const pillText=n.suggest==='keep'?t('tree.suggestKeep'):n.suggest==='optional'?t('tree.suggestOptional'):n.suggest==='drop'?t('tree.suggestDrop'):t('tree.suggestUnknown');
     out+='<div class="tree-row'+(expanded?' expanded':'')+'" data-id="'+n.id+'" style="padding-left:'+(6+ind)+'px">'
-      +'<button class="tree-toggle'+(hasKids?'':' empty')+'" data-node="'+n.id+'" aria-label="展开">'
+      +'<button class="tree-toggle'+(hasKids?'':' empty')+'" data-node="'+n.id+'" aria-label="'+t('chart.expand')+'">'
       +'<svg class="chev" viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5l7 7-7 7"/></svg></button>'
       +'<input class="tree-check" type="checkbox" data-check="'+n.id+'"'+(checked?' checked':'')+(indeterminate?' data-ind="1"':'')+(readonly?' disabled':'')+'>'
       +svg(n.icon,'tree-ico')
       +'<span class="tree-label" title="'+n.label+'">'+n.label+(n.badge?'<span class="sub">'+n.badge+'</span>':'')+(n.note?'<span class="sub">'+n.note+'</span>':'')+'</span>'
       +'<span class="tree-pill '+pillCls+'">'+pillText+'</span>'
       +(hasKids && !readonly ? '<span class="row-bulk">'
-        +'<button data-suball="all" data-subnode="'+n.id+'" title="全选">全</button>'
-        +'<button data-suball="none" data-subnode="'+n.id+'" title="全不选">无</button>'
-        +'<button data-suball="invert" data-subnode="'+n.id+'" title="反选">反</button>'
+        +'<button data-suball="all" data-subnode="'+n.id+'" title="'+t('chart.selectAll')+'">✓</button>'
+        +'<button data-suball="none" data-subnode="'+n.id+'" title="'+t('chart.selectNone')+'">✕</button>'
+        +'<button data-suball="invert" data-subnode="'+n.id+'" title="'+t('chart.invert')+'">⇄</button>'
       +'</span>' : '')
       +'<span class="tree-size">'+fmtMB(n.mb)+'</span>'
-      +(n.uploadable?'<button class="tree-mini" data-upload="'+n.id+'">上传</button>':'')
+      +(n.uploadable?'<button class="tree-mini" data-upload="'+n.id+'">'+t('tree.upload')+'</button>':'')
       +'</div>';
     if(hasKids && expanded){
       out+='<div class="tree-children">'+renderTreeRows(n.children,depth+1,scope,readonly)+'</div>';
@@ -378,22 +405,22 @@ function chartCardHtml(o){
       +'<span class="vol-idx">'+o.idxText+'</span>'
       +(o.volText?'<span class="vol-cap">'+o.volText+'</span>':'')
       +(o.capText?'<span class="vol-cap'+(o.over?' is-over':'')+'">'+o.capText+'</span>':'')
-      +(o.over?'<span class="vol-flag">超单卷上限</span>':'')
+      +(o.over?'<span class="vol-flag">'+t('chart.overLimit')+'</span>':'')
       +'<span class="vol-spacer"></span>'
       +(o.totalText?'<span class="vol-total">'+o.totalText+'</span>':'')
       +(dis || o.readonly ? '' : '<span class="vol-bulk">'
-        +'<button data-treeall="1">全选</button>'
-        +'<button data-treenone="1">全不选</button>'
-        +'<button data-treeinvert="1">反选</button>'
+        +'<button data-treeall="1">'+t('chart.selectAll')+'</button>'
+        +'<button data-treenone="1">'+t('chart.selectNone')+'</button>'
+        +'<button data-treeinvert="1">'+t('chart.invert')+'</button>'
       +'</span>')
-      +(o.pkgId?'<button class="group-close" data-closegroup="'+o.pkgId+'" aria-label="关闭该包图表">×</button>':'')
-      +'<button class="vol-collapse" data-voltoggle="'+o.key+'" aria-label="展开或收起">'
+      +(o.pkgId?'<button class="group-close" data-closegroup="'+o.pkgId+'" aria-label="'+t('chart.closeGroup')+'">×</button>':'')
+      +'<button class="vol-collapse" data-voltoggle="'+o.key+'" aria-label="'+t('chart.expand')+'">'
       +'<svg class="chev" viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5l7 7-7 7"/></svg></button>'
     +'</div>'
     +'<div class="vol-body">'
       +(o.noticeHtml||'')
       +'<div class="chart-tree">'+renderTreeRows(o.nodes,0,o.scope,o.readonly||dis,o.extToolsHtml)+'</div>'
-      +(dis?'':'<div class="chart-foot"><span>已选 '+sum.count+' 项 · 预计 '+fmtMB(sum.mb)+'</span></div>')
+      +(dis?'':'<div class="chart-foot"><span>'+t('chart.selected',{count:sum.count,size:fmtMB(sum.mb)})+'</span></div>')
     +'</div>'
   +'</div>';
 }
@@ -404,18 +431,18 @@ function extensionToolsHtml(pkg){
   if(!hasExt) return '';
   const full = state.extensionMode !== EXTENSION_MODES.MANIFEST;
   return '<div class="extension-tools" data-exttools="1">'
-    +'<span class="et-label">扩展</span>'
+    +'<span class="et-label">'+t('extension.label')+'</span>'
     +'<div class="segmented et-mode">'
-      +'<button class="seg-btn'+(full?' active':'')+'" data-extmode="full">完整扩展</button>'
-      +'<button class="seg-btn'+(full?'':' active')+'" data-extmode="manifest">仅清单</button>'
+      +'<button class="seg-btn'+(full?' active':'')+'" data-extmode="full">'+t('extension.full')+'</button>'
+      +'<button class="seg-btn'+(full?'':' active')+'" data-extmode="manifest">'+t('extension.manifest')+'</button>'
     +'</div>'
     +(full
-      ? '<label class="et-git"><span>Git</span><select class="text_pole" data-gitmode>'
-          +'<option value="keep"'+(state.gitMode===GIT_MODES.KEEP?' selected':'')+'>保留历史</option>'
-          +'<option value="minimal"'+(state.gitMode===GIT_MODES.MINIMAL?' selected':'')+'>只留更新所需</option>'
-          +'<option value="strip"'+(state.gitMode===GIT_MODES.STRIP?' selected':'')+'>不含历史</option>'
+      ? '<label class="et-git"><span>'+t('extension.git')+'</span><select class="text_pole" data-gitmode>'
+          +'<option value="keep"'+(state.gitMode===GIT_MODES.KEEP?' selected':'')+'>'+t('extension.gitKeep')+'</option>'
+          +'<option value="minimal"'+(state.gitMode===GIT_MODES.MINIMAL?' selected':'')+'>'+t('extension.gitMinimal')+'</option>'
+          +'<option value="strip"'+(state.gitMode===GIT_MODES.STRIP?' selected':'')+'>'+t('extension.gitStrip')+'</option>'
         +'</select></label>'
-        +'<label class="check et-keepdev"><input type="checkbox" data-keepdev'+(state.keepDev?' checked':'')+'> 保留构建配置</label>'
+        +'<label class="check et-keepdev"><input type="checkbox" data-keepdev'+(state.keepDev?' checked':'')+'> '+t('extension.keepDev')+'</label>'
       : '')
     +'</div>';
 }
@@ -426,12 +453,12 @@ function renderBatchBar(targets){
   if(pkgs.length<2){ bar.hidden=true; bar.innerHTML=''; return; }
   const vols=pkgs.reduce((a,p)=>a+volumesOf(p,packageNodes(p).nodes).length,0);
   bar.hidden=false;
-  bar.innerHTML='<span class="lbl"><span class="scope">已选 '+pkgs.length+' 个包</span> · 共 '+vols+' 张图表</span>'
-    +'<button data-batchall="1">全选全部</button>'
-    +'<button data-batchnone="1">全不选</button>'
-    +'<button data-batchinvert="1">反选</button>'
+  bar.innerHTML='<span class="lbl"><span class="scope">'+t('chart.batchSelected',{n:pkgs.length,vols})+'</span></span>'
+    +'<button data-batchall="1">'+t('chart.batchAll')+'</button>'
+    +'<button data-batchnone="1">'+t('chart.batchNone')+'</button>'
+    +'<button data-batchinvert="1">'+t('chart.batchInvert')+'</button>'
     +'<span style="flex:1"></span>'
-    +'<span style="color:var(--muted-2)">目标平台 / 差量 / 分卷 同时作用于全部选中包</span>';
+    +'<span style="color:var(--muted-2)">'+t('chart.batchHint')+'</span>';
 }
 
 function renderChart(){
@@ -448,7 +475,7 @@ function renderChart(){
       const degraded = state.mode==='web' || !HOSTS[state.host].readable || !(state.hostTree && state.hostTree.length);
       html+='<div class="chart-group">'
         +'<div class="vol-grid" data-vols="1">'+chartCardHtml({
-            key:'host', scope:'host:'+state.host, nodes:tree.nodes, idxText:'宿主数据',
+            key:'host', scope:'host:'+state.host, nodes:tree.nodes, idxText:t('chart.hostData'),
             noticeHtml: '',
             disabled: degraded,
             readonly:false
@@ -459,16 +486,16 @@ function renderChart(){
     const tree=packageNodes(pkg);
     const vols=volumesOf(pkg, tree.nodes);
     const multi=vols.length>1;
-    const notice=tree.unrecognized ? '<div class="chart-unavailable"><b>未识别包</b><br>逐文件列出，不提供转换；只能存储、导出或删除。</div>' : '';
+    const notice=tree.unrecognized ? '<div class="chart-unavailable"><b>'+t('chart.unrecognizedTitle')+'</b><br>'+t('chart.unrecognizedBody')+'</div>' : '';
     const extTools=extensionToolsHtml(pkg);
     html+='<div class="chart-group">'
       +'<div class="vol-grid" data-vols="'+vols.length+'">'
       + vols.map(v=>chartCardHtml({
           key:pkg.id+'-'+v.i, scope:'pkg:'+pkg.id, nodes:v.nodes,
           idxText: seqLabel(pkg),
-          volText: multi ? ('卷 '+v.i+'/'+v.n) : '整包',
+          volText: multi ? t('chart.volume',{i:v.i,n:v.n}) : t('chart.whole'),
           capText: fmtMB(v.mb),
-          totalText: multi ? ('整包 '+pkg.size) : '',
+          totalText: multi ? t('chart.total',{size:pkg.size}) : '',
           noticeHtml: notice, readonly: pkg.zone==='export',
           over: !!v.over,
           pkgId: pkg.id,
@@ -532,10 +559,10 @@ function pkgCard(p){
     +'<span class="pkg-seq" style="'+seqStyle+'">'+seqNum(p)+'</span>'
     +iconInner+'<span class="pkg-host-tag" style="'+tagStyle+'">'+hostCode+'</span></span>';
   const badges=[];
-  if(p.unrecognized) badges.push('<span class="pkg-badge unknown">未识别包</span>');
+  if(p.unrecognized) badges.push('<span class="pkg-badge unknown">'+t('pkg.unrecognized')+'</span>');
   const limit=splitLimit();
-  if(limit && (p.mb||0)>limit) badges.push('<span class="pkg-badge warn">分卷 '+Math.ceil(p.mb/limit)+'</span>');
-  if(p.zone==='export') badges.push('<span class="pkg-badge lock">只读</span>');
+  if(limit && (p.mb||0)>limit) badges.push('<span class="pkg-badge warn">'+t('pkg.split',{n:Math.ceil(p.mb/limit)})+'</span>');
+  if(p.zone==='export') badges.push('<span class="pkg-badge lock">'+t('pkg.readonly')+'</span>');
   if(p.origin) badges.push('<span class="pkg-badge">'+p.origin+'</span>');
   return '<div class="pkg-card'+(isActive?' is-active':'')+(p.unrecognized?' unrecognized':'')+(p.zone==='export'?' is-export':'')+'" data-pkg="'+p.id+'" data-mobile="'+(isMobile?'1':'0')+'">'
     +'<input class="pkg-check" type="checkbox" data-pkgcheck="'+p.id+'"'+(state.selectedPkgs.has(p.id)?' checked':'')+'>'
@@ -546,10 +573,10 @@ function pkgCard(p){
     +'</div>'
     +'<div class="pkg-actions">'
     +(p.zone==='export'
-      ? '<button data-pkgact="download" data-id="'+p.id+'" title="下载">'+svg('file','tree-ico')+'</button>'
-        +'<button data-pkgact="upload" data-id="'+p.id+'" title="回传宿主">'+svg('cloud','tree-ico')+'</button>'
-        +'<button data-pkgact="copyback" data-id="'+p.id+'" title="复制回导入区">'+svg('folder','tree-ico')+'</button>'
-      : '<button data-pkgact="delete" data-id="'+p.id+'" title="删除">'+svg('archive','tree-ico')+'</button>')
+      ? '<button data-pkgact="download" data-id="'+p.id+'" title="'+t('pkg.download')+'">'+svg('file','tree-ico')+'</button>'
+        +'<button data-pkgact="upload" data-id="'+p.id+'" title="'+t('pkg.restore')+'">'+svg('cloud','tree-ico')+'</button>'
+        +'<button data-pkgact="copyback" data-id="'+p.id+'" title="'+t('pkg.copyBack')+'">'+svg('folder','tree-ico')+'</button>'
+      : '<button data-pkgact="delete" data-id="'+p.id+'" title="'+t('pkg.delete')+'">'+svg('archive','tree-ico')+'</button>')
     +'</div></div>';
 }
 function renderZones(){
@@ -565,29 +592,29 @@ function renderZones(){
   const list=visiblePackages(state.zone);
   let html='';
   if(state.zone==='import'){
-    html+='<div class="dropzone" id="dropzone"><span class="big">选择数据包</span>上传 zip 或从宿主拉取</div>';
-    html+='<div class="zone-toolbar">'+hostFilterHtml()+'<label>排序 <select id="sort-select">'
-      +'<option value="time-desc"'+(state.sort==='time-desc'?' selected':'')+'>时间倒序</option>'
-      +'<option value="name"'+(state.sort==='name'?' selected':'')+'>名称</option>'
-      +'<option value="size"'+(state.sort==='size'?' selected':'')+'>大小</option>'
+    html+='<div class="dropzone" id="dropzone"><span class="big">'+t('zones.dropTitle')+'</span>'+t('zones.dropHint')+'</div>';
+    html+='<div class="zone-toolbar">'+hostFilterHtml()+'<label>'+t('sort.label')+' <select id="sort-select">'
+      +'<option value="time-desc"'+(state.sort==='time-desc'?' selected':'')+'>'+t('sort.timeDesc')+'</option>'
+      +'<option value="name"'+(state.sort==='name'?' selected':'')+'>'+t('sort.name')+'</option>'
+      +'<option value="size"'+(state.sort==='size'?' selected':'')+'>'+t('sort.size')+'</option>'
       +'</select></label><span class="spacer"></span></div>';
   }else{
-    html+='<div class="zone-toolbar">'+hostFilterHtml()+'<label>排序 <select id="sort-select">'
-      +'<option value="time-desc"'+(state.sort==='time-desc'?' selected':'')+'>时间倒序</option>'
-      +'<option value="name"'+(state.sort==='name'?' selected':'')+'>名称</option>'
-      +'<option value="size"'+(state.sort==='size'?' selected':'')+'>大小</option>'
+    html+='<div class="zone-toolbar">'+hostFilterHtml()+'<label>'+t('sort.label')+' <select id="sort-select">'
+      +'<option value="time-desc"'+(state.sort==='time-desc'?' selected':'')+'>'+t('sort.timeDesc')+'</option>'
+      +'<option value="name"'+(state.sort==='name'?' selected':'')+'>'+t('sort.name')+'</option>'
+      +'<option value="size"'+(state.sort==='size'?' selected':'')+'>'+t('sort.size')+'</option>'
       +'</select></label><span class="spacer"></span></div>';
   }
   if(list.length===0){
-    html+='<div class="zone-empty">'+(state.zone==='import'?'导入区为空':'导出区为空')+'</div>';
+    html+='<div class="zone-empty">'+(state.zone==='import'?t('zones.emptyImport'):t('zones.emptyExport'))+'</div>';
   }else{
     html+='<div class="card-list">'+list.map(pkgCard).join('')+'</div>';
   }
   if(state.zone==='import' && state.selectedPkgs.size>0){
-    html+='<div class="batch-bar"><span class="lbl">已选 '+state.selectedPkgs.size+' 项</span>'
-      +'<button id="batch-generate">生成导出包</button>'
-      +'<button id="batch-merge"'+(state.selectedPkgs.size<2?' disabled':'')+'>合并上传</button>'
-      +'<button id="batch-delete">删除</button></div>';
+    html+='<div class="batch-bar"><span class="lbl">'+t('zones.selected',{n:state.selectedPkgs.size})+'</span>'
+      +'<button id="batch-generate">'+t('zones.batchGenerate')+'</button>'
+      +'<button id="batch-merge"'+(state.selectedPkgs.size<2?' disabled':'')+'>'+t('zones.batchMerge')+'</button>'
+      +'<button id="batch-delete">'+t('zones.batchDelete')+'</button></div>';
   }
   body.innerHTML=html;
   body.querySelector('#sort-select')?.addEventListener('change',e=>{ state.sort=e.target.value; renderZones(); });
@@ -622,22 +649,22 @@ function renderActions(){
   const row=document.getElementById('action-row');
   const hasSel=state.selectedPkgs.size>0;
   const libBtn=state.libraryExport
-    ? '<button class="btn" id="btn-library-export">'+svg('db','ico')+'从聊天库导出</button>'
+    ? '<button class="btn" id="btn-library-export">'+svg('db','ico')+t('action.libraryExport')+'</button>'
     : '';
   if(state.zone==='import'){
     row.innerHTML=
-      '<button class="btn" id="btn-fetch">'+svg('cloud','ico')+'从宿主拉取</button>'
-      +'<button class="btn accent" id="btn-generate"'+(hasSel?'':' disabled')+'>'+svg('archive','ico')+'生成导出包</button>'
-      +'<button class="btn" id="btn-merge"'+(state.selectedPkgs.size>1?'':' disabled')+'>'+svg('copy','ico')+'合并上传</button>'
+      '<button class="btn" id="btn-fetch">'+svg('cloud','ico')+t('action.fetch')+'</button>'
+      +'<button class="btn accent" id="btn-generate"'+(hasSel?'':' disabled')+'>'+svg('archive','ico')+t('action.generatePack')+'</button>'
+      +'<button class="btn" id="btn-merge"'+(state.selectedPkgs.size>1?'':' disabled')+'>'+svg('copy','ico')+t('action.mergeUpload')+'</button>'
       +libBtn;
     row.querySelector('#btn-generate')?.addEventListener('click',()=>doGenerate());
     row.querySelector('#btn-merge')?.addEventListener('click',()=>doMerge());
     row.querySelector('#btn-library-export')?.addEventListener('click',()=>actions.libraryExport?.());
   }else{
     row.innerHTML=
-      '<button class="btn" id="btn-download"'+(hasSel?'':' disabled')+'>'+svg('file','ico')+'下载</button>'
-      +'<button class="btn accent" id="btn-upload"'+(hasSel?'':' disabled')+'>'+svg('cloud','ico')+'回传宿主</button>'
-      +'<button class="btn" id="btn-copyback"'+(hasSel?'':' disabled')+'>'+svg('folder','ico')+'复制回导入区</button>';
+      '<button class="btn" id="btn-download"'+(hasSel?'':' disabled')+'>'+svg('file','ico')+t('action.download')+'</button>'
+      +'<button class="btn accent" id="btn-upload"'+(hasSel?'':' disabled')+'>'+svg('cloud','ico')+t('action.restore')+'</button>'
+      +'<button class="btn" id="btn-copyback"'+(hasSel?'':' disabled')+'>'+svg('folder','ico')+t('action.copyBack')+'</button>';
     row.querySelector('#btn-download')?.addEventListener('click',()=>{ actions.download?.([...state.selectedPkgs]); });
     row.querySelector('#btn-upload')?.addEventListener('click',()=>doUploadHost());
     row.querySelector('#btn-copyback')?.addEventListener('click',()=>doCopyBack());
@@ -653,10 +680,10 @@ function lanTargets(){
     .filter(p=>p && p.zone==='import');
 }
 function lanSummaryText(){
-  const t=lanTargets();
-  if(!t.length) return '在数据包区勾选要发送的包';
-  const mb=t.reduce((a,p)=>a+(p.mb||0),0);
-  return '已选 '+t.length+' 个包 · '+fmtMB(mb);
+  const targets=lanTargets();
+  if(!targets.length) return t('action.sendHint');
+  const mb=targets.reduce((a,p)=>a+(p.mb||0),0);
+  return t('lan.selectedSummary',{n:targets.length,size:fmtMB(mb)});
 }
 function setLanBar(fillId, pctId, pct){
   const f=document.getElementById(fillId); if(f) f.style.width=Math.max(0,Math.min(100,Number(pct)||0))+'%';
@@ -678,9 +705,9 @@ function renderLan(){
   document.querySelector('.col-side')?.classList.toggle('lan-open', !!L.open);
   const hint=document.getElementById('lan-toggle-hint');
   if(hint){
-    const s=L.send.busy?('发送 '+Math.round(L.send.pct)+'%'):'';
-    const r=L.recv.busy?('接收 '+Math.round(L.recv.pct)+'%'):'';
-    hint.textContent=[s,r].filter(Boolean).join(' · ') || '发送或接收数据包';
+    const s=L.send.busy?t('lan.sending',{pct:Math.round(L.send.pct)}):'';
+    const r=L.recv.busy?t('lan.receiving',{pct:Math.round(L.recv.pct)}):'';
+    hint.textContent=[s,r].filter(Boolean).join(' · ') || t('action.lanHint');
   }
   const targets=lanTargets();
   const sum=document.getElementById('lan-send-summary'); if(sum) sum.textContent=lanSummaryText();
@@ -698,7 +725,7 @@ function renderLan(){
   if(scanAnswer) scanAnswer.hidden=!L.send.code;
   const retry=document.getElementById('lan-btn-retry'); if(retry) retry.hidden=!L.send.error;
   const cancel=document.getElementById('lan-btn-cancel'); if(cancel) cancel.hidden=!(L.send.busy || L.send.waiting);
-  const sp=document.getElementById('lan-send-phase'); if(sp) sp.textContent=L.send.phase||'准备就绪';
+  const sp=document.getElementById('lan-send-phase'); if(sp) sp.textContent=L.send.phase||t('action.ready');
   const sd=document.getElementById('lan-send-detail'); if(sd) sd.textContent=L.send.detail||'';
   setLanBar('lan-send-bar','lan-send-pct',L.send.pct);
   const offer=document.getElementById('lan-offer-input');
@@ -709,12 +736,12 @@ function renderLan(){
   setLanQr('lan-recv-qr',L.recv.code,!!L.recv.code);
   const accept=document.getElementById('lan-btn-accept'); if(accept) accept.disabled=L.recv.busy;
   const abandon=document.getElementById('lan-btn-abandon'); if(abandon) abandon.hidden=!L.recv.busy;
-  const rp=document.getElementById('lan-recv-phase'); if(rp) rp.textContent=L.recv.phase||'等待取件码';
+  const rp=document.getElementById('lan-recv-phase'); if(rp) rp.textContent=L.recv.phase||t('action.waiting');
   const rd=document.getElementById('lan-recv-detail'); if(rd) rd.textContent=L.recv.detail||'';
   setLanBar('lan-recv-bar','lan-recv-pct',L.recv.pct);
   const scanBox=document.getElementById('lan-scan'); if(scanBox) scanBox.hidden=!L.scanning;
   const scanHint=document.getElementById('lan-scan-hint');
-  if(scanHint) scanHint.textContent=L.scanning==='answer'?'把应答码对准摄像头':'把取件码对准摄像头';
+  if(scanHint) scanHint.textContent=L.scanning==='answer'?t('lan.scanAnswerHint'):t('action.scanHint');
   const err=document.getElementById('lan-scan-error');
   if(err){ err.hidden=!L.scanError; err.textContent=L.scanError||''; }
 }
@@ -727,11 +754,11 @@ function finishLanScan(){
 }
 async function copyLanText(text){
   if(!text) return;
-  try { await navigator.clipboard.writeText(text); toast('已复制'); }
-  catch { toast('复制失败，请手动选择'); }
+  try { await navigator.clipboard.writeText(text); toast(t('lan.copied')); }
+  catch { toast(t('lan.copyFailed')); }
 }
 async function startLanScan(kind){
-  if(typeof qr?.scan!=='function'){ toast('当前环境不支持扫码'); return; }
+  if(typeof qr?.scan!=='function'){ toast(t('lan.scanUnsupported')); return; }
   state.lan.scanError=''; state.lan.scanning=kind; renderLan();
   try {
     stopLanScan=await qr.scan({
@@ -751,10 +778,10 @@ async function startLanScan(kind){
           actions.lan?.applyAnswer?.(text);
         }
       },
-      onError:(msg)=>{ state.lan.scanError=msg||'相机不可用'; finishLanScan(); },
+      onError:(msg)=>{ state.lan.scanError=msg||t('lan.cameraUnavailable'); finishLanScan(); },
     });
   } catch(err) {
-    state.lan.scanError=err?.message||'相机不可用';
+    state.lan.scanError=err?.message||t('lan.cameraUnavailable');
     finishLanScan();
   }
 }
@@ -764,15 +791,15 @@ function renderLog(){
   const lines=document.getElementById('log-lines');
   const filter=state.logLevel;
   const list=state.log.filter(l=>filter==='ALL'||l.level===filter);
-  lines.innerHTML=list.map(l=>'<div class="log-line '+l.level.toLowerCase()+'"><span class="t">['+l.time+']</span> <span class="lv">['+l.level+']</span> '+escapeHtml(l.msg)+'</div>').join('') || '<div class="log-line">暂无日志</div>';
+  lines.innerHTML=list.map(l=>'<div class="log-line '+l.level.toLowerCase()+'"><span class="t">['+l.time+']</span> <span class="lv">['+l.level+']</span> '+escapeHtml(l.msg)+'</div>').join('') || '<div class="log-line">'+t('log.empty')+'</div>';
   const last=state.log[state.log.length-1];
-  document.getElementById('log-latest').textContent=last?last.msg:'暂无日志';
+  document.getElementById('log-latest').textContent=last?last.msg:t('log.empty');
   const counts={INFO:0,WARN:0,ERROR:0}; state.log.forEach(l=>{ if(counts[l.level]!==undefined) counts[l.level]++; });
   document.getElementById('log-count-info').textContent=counts.INFO+' INFO';
   const warn=document.getElementById('log-count-warn'); warn.textContent=counts.WARN+' WARN'; warn.style.display=counts.WARN?'inline-block':'none';
   const err=document.getElementById('log-count-err'); err.textContent=counts.ERROR+' ERR'; err.style.display=counts.ERROR?'inline-block':'none';
   const dot=document.getElementById('log-dot');
-  if(dot){ const n=counts.WARN+counts.ERROR; dot.hidden=n===0; dot.title=n+' 条警告/错误'; }
+  if(dot){ const n=counts.WARN+counts.ERROR; dot.hidden=n===0; dot.title=t('log.dotTitle',{n}); }
   const body=document.getElementById('log-body'); body.scrollTop=body.scrollHeight;
 }
 function escapeHtml(s){ return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
@@ -784,12 +811,13 @@ function doGenerate(){
   actions.generate?.({ packages: pkgs, target: state.target, delta: state.delta, splitMb: state.splitMb, filenameTemplate: document.getElementById('filename-template').value });
 }
 function doMerge(){
-  if(state.selectedPkgs.size<2){ toast('至少选择两个包'); return; }
+  if(state.selectedPkgs.size<2){ toast(t('lan.atLeastTwo')); return; }
   const names=[...state.selectedPkgs].map(id=>state.packages.find(p=>p.id===id)?.name).filter(Boolean);
-  log('WARN','合并上传检测到同名路径: characters/Seraphina.png');
-  openModal('合并冲突','以下路径在多个包中同名，已停止合并。请先在本地编辑或改名。',[
-    '<div class="chart-unavailable" style="margin:0">'+names.join('<br>')+'<br><br>冲突: characters/Seraphina.png</div>'
-  ],[{label:'知道了',primary:true,onClick:closeModal}]);
+  const conflict=t('lan.mergeConflictDetail',{path:'characters/Seraphina.png'});
+  log('WARN',conflict);
+  openModal(t('lan.mergeConflictTitle'),t('lan.mergeConflictBody'),[
+    '<div class="chart-unavailable" style="margin:0">'+names.join('<br>')+'<br><br>'+conflict+'</div>'
+  ],[{label:t('lan.gotIt'),primary:true,onClick:closeModal}]);
 }
 function doUploadHost(){ actions.restore?.([...state.selectedPkgs]); }
 function doCopyBack(){ actions.copyBack?.([...state.selectedPkgs]); }
@@ -815,13 +843,13 @@ function openModal(title,desc,extraHtml,actions){
 function closeModal(){ document.getElementById('modal-overlay').classList.remove('open'); }
 function openTrafficModal(onConfirm, { enabled = true, onNever } = {}){
   if(!enabled || state.noTrafficPrompt){ onConfirm(); return; }
-  openModal('该操作会耗费大量流量','向后端酒馆上传或下载会消耗大量流量，请确认当前网络环境。',[
-    '<label class="check"><input type="checkbox" id="traffic-nodisplay"> 不再显示</label>'
+  openModal(t('traffic.title'),t('traffic.desc'),[
+    '<label class="check"><input type="checkbox" id="traffic-nodisplay"> '+t('traffic.never')+'</label>'
   ],[
-    {label:'取消',onClick:closeModal},
-    {label:'继续',primary:true,onClick:()=>{
+    {label:t('traffic.cancel'),onClick:closeModal},
+    {label:t('traffic.continue'),primary:true,onClick:()=>{
       const cb=document.getElementById('traffic-nodisplay');
-      if(cb && cb.checked){ state.noTrafficPrompt=true; onNever?.(); log('INFO','已关闭流量提示'); }
+      if(cb && cb.checked){ state.noTrafficPrompt=true; onNever?.(); log('INFO',t('traffic.off')); }
       closeModal(); onConfirm();
     }}
   ]);
@@ -829,10 +857,10 @@ function openTrafficModal(onConfirm, { enabled = true, onNever } = {}){
 
 function openSettings(){ actions.settings?.(); }
 /* ── 帮助浮层 ── */const HELP={
-  chart:{ title:'存储图表', points:['图表是唯一工作台','顶部显示两处配额','勾选即导出范围','分卷后每卷一张图表','多选包时同时显示多组图表'] },
-  zone:{ title:'数据包', points:['导入区存放未修改的包','导出区只读','生成导出包后进导出区','可复制回导入区再编辑'] },
-  action:{ title:'执行', points:['按所在区显示可用操作','后端上下传会提示流量','生成导出包不会删除导入区'] },
-  log:{ title:'日志', points:['记录操作与错误','可按级别筛选','可复制或清空'] }
+  chart:{ title:'help.chart.title', points:['help.chart.p1','help.chart.p2','help.chart.p3','help.chart.p4','help.chart.p5'] },
+  zone:{ title:'help.zone.title', points:['help.zone.p1','help.zone.p2','help.zone.p3','help.zone.p4'] },
+  action:{ title:'help.action.title', points:['help.action.p1','help.action.p2','help.action.p3'] },
+  log:{ title:'help.log.title', points:['help.log.p1','help.log.p2','help.log.p3'] }
 };
 let helpOpenFor=null;
 function closeHelp(){ const p=document.getElementById('help-popover'); p.hidden=true; p.innerHTML=''; helpOpenFor=null; }
@@ -840,7 +868,7 @@ function openHelp(btn,key){
   const p=document.getElementById('help-popover');
   if(helpOpenFor===key){ closeHelp(); return; }
   const topic=HELP[key]; if(!topic) return;
-  p.innerHTML='<h4>'+topic.title+'</h4><ul>'+topic.points.map(x=>'<li>'+x+'</li>').join('')+'</ul>';
+  p.innerHTML='<h4>'+t(topic.title)+'</h4><ul>'+topic.points.map(x=>'<li>'+t(x)+'</li>').join('')+'</ul>';
   p.hidden=false; helpOpenFor=key;
   const r=btn.getBoundingClientRect();
   const w=Math.min(280,window.innerWidth-24);
@@ -857,20 +885,20 @@ function openHelp(btn,key){
 
 /* ── 教程 ── */
 const TUTORIAL_BASIC=[
-  { sel:'#target-select', title:'选择目标平台', desc:'四个酒馆的英文全称，带各自图标；当前宿主那一项后面标（宿主）。' },
-  { sel:'#chart-stack .vol-card', title:'看存储图表', desc:'没有数据包时显示宿主；点包卡即切换成该包的图表。' },
-  { sel:'#chart-stack .tree-tools', title:'精简勾选', desc:'建议保留用宿主下划线色，可选用引用色，建议清理用强调灰。备份、缓存、构建默认不勾。' },
-  { sel:'#delta-toggle', title:'覆盖或增量', desc:'差量不是独立区域，就在图表顶部切换。' },
-  { sel:'#split-input', title:'不分卷', desc:'单位 MB，单卷限 32–2048 MB；留空即不分卷。填了之后图表会按卷变成多张。' },
-  { sel:'#btn-generate', title:'生成导出包', desc:'把当前勾选落到包，并复制一份只读副本到导出区。' },
-  { sel:'#zone-card', title:'导出完成', desc:'导出区只读，可下载、回传宿主，或复制回导入区再编辑。' }
+  { sel:'#target-select', title:'tutorial.basic.0.title', desc:'tutorial.basic.0.desc' },
+  { sel:'#chart-stack .vol-card', title:'tutorial.basic.1.title', desc:'tutorial.basic.1.desc' },
+  { sel:'#chart-stack .tree-tools', title:'tutorial.basic.2.title', desc:'tutorial.basic.2.desc' },
+  { sel:'#delta-toggle', title:'tutorial.basic.3.title', desc:'tutorial.basic.3.desc' },
+  { sel:'#split-input', title:'tutorial.basic.4.title', desc:'tutorial.basic.4.desc' },
+  { sel:'#btn-generate', title:'tutorial.basic.5.title', desc:'tutorial.basic.5.desc' },
+  { sel:'#zone-card', title:'tutorial.basic.6.title', desc:'tutorial.basic.6.desc' }
 ];
 const TUTORIAL_ADV=[
-  { sel:'#dropzone', title:'上传数据包', desc:'点选或拖入一个 zip 作为数据包。' },
-  { sel:'#chart-stack', title:'逐项确认勾选', desc:'展开大类逐个确认：绿是建议保留、橙是可选、灰是建议清理。' },
-  { sel:'#target-select', title:'选目标平台', desc:'四个英文全称，当前宿主那一项带（宿主）标记。' },
-  { sel:'#split-input', title:'要不要分卷', desc:'单卷 32–2048 MB；填了会按卷拆成多个可独立导入的包。' },
-  { sel:'#btn-generate', title:'生成并核对', desc:'导出区出现只读副本，可下载、回传宿主或复制回导入区。' }
+  { sel:'#dropzone', title:'tutorial.adv.0.title', desc:'tutorial.adv.0.desc' },
+  { sel:'#chart-stack', title:'tutorial.adv.1.title', desc:'tutorial.adv.1.desc' },
+  { sel:'#target-select', title:'tutorial.adv.2.title', desc:'tutorial.adv.2.desc' },
+  { sel:'#split-input', title:'tutorial.adv.3.title', desc:'tutorial.adv.3.desc' },
+  { sel:'#btn-generate', title:'tutorial.adv.4.title', desc:'tutorial.adv.4.desc' }
 ];
 function tutorialSet(){ return state.tutorialKind==='adv' ? TUTORIAL_ADV : TUTORIAL_BASIC; }
 function openTutorial(){
@@ -882,26 +910,25 @@ function closeTutorial(){ state.tutorialOpen=false; document.getElementById('tut
 function renderTutorial(){
   const set=tutorialSet();
   const step=set[state.tutorialStep];
-  document.getElementById('tutorial-title').textContent=step.title;
-  document.getElementById('tutorial-desc').textContent=step.desc;
+  document.getElementById('tutorial-title').textContent=t(step.title);
+  document.getElementById('tutorial-desc').textContent=t(step.desc);
   const dots=document.getElementById('tutorial-dots'); dots.innerHTML=set.map((_,i)=>'<i class="'+(i===state.tutorialStep?'on':'')+'"></i>').join('');
   document.getElementById('tutorial-prev').disabled=state.tutorialStep===0;
-  document.getElementById('tutorial-next').textContent=state.tutorialStep===set.length-1?'完成':'下一步';
-  document.getElementById('tutorial-adv').textContent=state.tutorialKind==='adv'?'基础教程':'进阶教程';
+  document.getElementById('tutorial-next').textContent=state.tutorialStep===set.length-1?t('tutorial.done'):t('tutorial.next');
+  document.getElementById('tutorial-adv').textContent=state.tutorialKind==='adv'?t('tutorial.basic'):t('tutorial.adv');
   const el=document.querySelector(step.sel)||document.querySelector('#chart-card');
   const ring=document.getElementById('tutorial-ring');
   const card=document.getElementById('tutorial-card');
-  if(el){
-    const r=el.getBoundingClientRect();
-    ring.style.left=Math.max(0,r.left-5)+'px';
-    ring.style.top=Math.max(0,r.top-5)+'px';
-    ring.style.width=(r.width+10)+'px';
-    ring.style.height=(r.height+10)+'px';
-    const cw=Math.min(330,window.innerWidth-24);
-    let left=Math.min(Math.max(12,r.left),window.innerWidth-cw-12);
-    let top=r.bottom+10;
-    if(top+180>window.innerHeight) top=Math.max(12,r.top-190);
-    card.style.left=left+'px'; card.style.top=top+'px'; card.style.width=cw+'px';
+  const overlay=document.getElementById('tutorial-overlay');
+  if(el && overlay){
+    const anchor=tutorialAnchor(el.getBoundingClientRect(), overlay.getBoundingClientRect());
+    ring.style.left=anchor.ring.left+'px';
+    ring.style.top=anchor.ring.top+'px';
+    ring.style.width=anchor.ring.width+'px';
+    ring.style.height=anchor.ring.height+'px';
+    card.style.left=anchor.card.left+'px';
+    card.style.top=anchor.card.top+'px';
+    card.style.width=anchor.card.width+'px';
   }
 }
 
@@ -983,7 +1010,7 @@ function bind(){
     const it=e.target.closest('[data-target]'); if(!it) return;
     state.target=it.dataset.target;
     closeTargetPop(); renderTargetPicker(); renderChart();
-    log('INFO','目标平台切换为 '+state.target);
+    log('INFO',t('toast.targetChanged',{target:state.target}));
     actions.onTargetChange?.(state.target);
   });
   document.addEventListener('click',e=>{
@@ -992,7 +1019,7 @@ function bind(){
   document.getElementById('delta-toggle').addEventListener('click',e=>{
     const b=e.target.closest('button[data-delta]'); if(!b) return;
     document.querySelectorAll('#delta-toggle button').forEach(x=>x.classList.toggle('active',x===b));
-    state.delta=b.dataset.delta; log('INFO','导出方式: '+(state.delta==='overwrite'?'覆盖':'增量'));
+    state.delta=b.dataset.delta; log('INFO',state.delta==='overwrite'?t('toast.deltaOverwrite'):t('toast.deltaIncremental'));
   });
   const splitInput=document.getElementById('split-input');
   splitInput.addEventListener('input',e=>{
@@ -1005,7 +1032,7 @@ function bind(){
     const clamped=Math.min(SPLIT_MAX,Math.max(SPLIT_MIN,Math.round(raw)));
     if(clamped!==raw){
       e.target.value=clamped; state.splitMb=String(clamped);
-      renderChart(); toast('单卷容量限定 '+SPLIT_MIN+'–'+SPLIT_MAX+' MB');
+      renderChart(); toast(t('toast.splitLimit',{min:SPLIT_MIN,max:SPLIT_MAX}));
     }
   });
   const compressionSelect=document.getElementById('compression-select');
@@ -1097,7 +1124,8 @@ function bind(){
     const pkgs=chartTargets().filter(t=>t.pkg);
     pkgs.forEach(t=>applyTreeAll('pkg:'+t.pkg.id,mode,true));
     renderChart(); renderZones();
-    log('INFO','批量'+(mode==='all'?'全选':mode==='none'?'全不选':'反选')+'：'+pkgs.length+' 个包');
+    const modeLabel=mode==='all'?t('chart.selectAll'):mode==='none'?t('chart.selectNone'):t('chart.invert');
+    log('INFO',t('toast.batch',{mode:modeLabel,n:pkgs.length}));
   });
 
   document.getElementById('zone-card').addEventListener('click',e=>{
@@ -1114,7 +1142,7 @@ function bind(){
       if(kind==='delete'){
         state.selectedPkgs=new Set([id]); doDeleteSelected();
       }else if(kind==='download'){
-        log('INFO','已下载 '+pkg.name); toast('已开始下载');
+        log('INFO',t('toast.downloaded',{name:pkg.name})); toast(t('toast.downloadStarted'));
       }else if(kind==='upload'){
         state.selectedPkgs=new Set([id]); doUploadHost();
       }else if(kind==='copyback'){
@@ -1129,7 +1157,7 @@ function bind(){
       const id=card.dataset.pkg;
       state.selectedPkgs=new Set();          // 点卡 = 聚焦单包；批量只走勾选框
       state.source={type:'package',pkgId:id}; state.sourceKey='pkg:'+id; actions.onActivePackage?.(id);
-      renderChart(); renderZones(); renderActions(); toast('图表已切换到该包');
+      renderChart(); renderZones(); renderActions(); toast(t('toast.packageSwitched'));
     }
   });
 
@@ -1145,7 +1173,7 @@ function bind(){
   document.getElementById('log-clear').addEventListener('click',()=>{ state.log=[]; renderLog(); });
   document.getElementById('log-copy').addEventListener('click',()=>{
     const txt=state.log.map(l=>'['+l.time+'] ['+l.level+'] '+l.msg).join('\n');
-    navigator.clipboard?.writeText(txt).then(()=>toast('日志已复制')).catch(()=>toast('复制失败'));
+    navigator.clipboard?.writeText(txt).then(()=>toast(t('toast.logCopied'))).catch(()=>toast(t('toast.copyFailed')));
   });
 
   document.getElementById('modal-overlay').addEventListener('click',e=>{ if(e.target.id==='modal-overlay') closeModal(); });
@@ -1153,7 +1181,7 @@ function bind(){
   document.getElementById('tutorial-prev').addEventListener('click',()=>{ if(state.tutorialStep>0){ state.tutorialStep--; renderTutorial(); } });
   document.getElementById('tutorial-next').addEventListener('click',()=>{
     const set=tutorialSet();
-    if(state.tutorialStep>=set.length-1){ closeTutorial(); toast('教程完成'); }
+    if(state.tutorialStep>=set.length-1){ closeTutorial(); toast(t('toast.tutorialDone')); }
     else{ state.tutorialStep++; renderTutorial(); }
   });
   document.getElementById('tutorial-adv').addEventListener('click',()=>{
@@ -1161,7 +1189,20 @@ function bind(){
     state.tutorialStep=0; renderTutorial();
   });
   document.addEventListener('keydown',(e)=>{ if(e.key!=='Escape') return; closeModal(); document.getElementById('log-overlay')?.classList.remove('open'); closeTutorial(); closeHelp(); });
-  window.addEventListener('resize',()=>{ if(state.tutorialOpen) renderTutorial(); closeHelp(); fitPackageNames(); });
+  let tutorialRaf=0;
+  const scheduleTutorial=()=>{
+    if(!state.tutorialOpen || tutorialRaf) return;
+    tutorialRaf=requestAnimationFrame(()=>{ tutorialRaf=0; renderTutorial(); });
+  };
+  document.addEventListener('scroll',scheduleTutorial,true);
+  window.addEventListener('resize',()=>{ scheduleTutorial(); closeHelp(); fitPackageNames(); });
+  if(typeof ResizeObserver!=='undefined'){
+    const ro=new ResizeObserver(scheduleTutorial);
+    const stack=document.getElementById('chart-stack');
+    const overlay=document.getElementById('tutorial-overlay');
+    if(stack) ro.observe(stack);
+    if(overlay) ro.observe(overlay);
+  }
 }
 
 /* ── 桌面拖拽分隔条 ── */
