@@ -150,6 +150,22 @@ export function buildChartTree(plan, opts = {}) {
 
 /** 构建一个一级分组节点（内部按目录分层）。 */
 function buildGroupNode(def, items) {
+  return buildGroupNodeFromItems(def, items);
+}
+
+/**
+ * 由条目构建一级分组节点。合并模式复用同一实现，因此叶子 id / 体积口径
+ * 都可以经 `opts` 注入，避免出现「两套建树逻辑各说各话」。
+ *
+ * @param {object} def 一级组定义（`CHART_GROUPS` 的一项）
+ * @param {Array<object>} items
+ * @param {{pathOf?:Function, mbOf?:Function, idOf?:Function, extraOf?:Function}} [opts]
+ */
+export function buildGroupNodeFromItems(def, items, opts = {}) {
+  const pathOf = opts.pathOf || ((item) => item.hubPath || item.sourcePath || '');
+  const mbOf = opts.mbOf || ((item) => toMb(item.sizeBytes));
+  const idOf = opts.idOf || ((_item, path) => `leaf:${path}`);
+  const extraOf = opts.extraOf || (() => ({}));
   const root = {
     id: `group:${def.key}`,
     label: def.label,
@@ -162,7 +178,7 @@ function buildGroupNode(def, items) {
   const dirIndex = new Map(); // relPath -> node
 
   for (const item of items) {
-    const path = item.hubPath || item.sourcePath || '';
+    const path = pathOf(item);
     const rel = relPathOf(path);
     const parts = rel.split('/').filter(Boolean);
     const fileName = parts.pop() || rel;
@@ -188,18 +204,19 @@ function buildGroupNode(def, items) {
       container = dir.children;
     }
     container.push({
-      id: `leaf:${path}`,
+      id: idOf(item, path),
       label: fileName,
       icon: 'file',
       suggest: suggestOf(def.key, item),
       children: [],
-      mb: toMb(item.sizeBytes),
+      mb: mbOf(item),
       leaf: true,
       path,
       selected: item.selected !== false,
       checked: item.selected !== false,
       action: item.action || '',
       privateConfig: def.key === 'private',
+      ...extraOf(item),
     });
   }
 

@@ -668,6 +668,131 @@ export async function getCsrfToken({ signal } = {}) {
 }
 
 /**
+ * ── 宿主 `user/files` 适配器（私有配置「传云」） ──
+ *
+ * 端点与请求形态以宿主公开实现为准（2026-10-27 核对 SillyTavern `src/endpoints/files.js`
+ * 与 `public/scripts/chats.js`）：
+ *   · `POST /api/files/upload`  body `{ name, data:<原始 base64>}` → `{ path }`（客户端相对路径）
+ *   · `POST /api/files/delete`  body `{ path }`（必须落在 `user/files` 内）
+ *   · `POST /api/files/verify`  body `{ urls: [] }`
+ * 没有列表端点：文件名由本插件自持，下载走静态 `/user/files/<name>`。
+ *
+ * 纯前端降级（L0-11）：非 ST/Luker、无 CSRF、请求失败一律返回 `{ok:false, reason}`，
+ * 调用方只提示、不阻塞主路径。
+ */
+export const USER_FILES_ENDPOINTS = Object.freeze({
+  upload: '/api/files/upload',
+  delete: '/api/files/delete',
+  verify: '/api/files/verify',
+});
+
+/** 宿主上传接口的请求体上限（base64 会使实际 body 约为文件的 4/3）。 */
+export const USER_FILE_MAX_BYTES = 500 * 1024 * 1024;
+
+export function userFilesSupported(platform) {
+  return platform === 'st' || platform === 'luker';
+}
+
+/** 宿主 `validateAssetFileName` 只接受 `[a-zA-Z0-9._-]`；越界字符替换为下划线。 */
+export function sanitizeUserFileName(name) {
+  const base = String(name || '').split(/[\\/]/).pop() || '';
+  const safe = base.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 100);
+  return safe;
+}
+
+export function userFileUrl(name) {
+  return `/user/files/${encodeURIComponent(name)}`;
+}
+
+async function blobToRawBase64(blob) {
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  let binary = '';
+  const CHUNK = 0x8000;
+  for (let index = 0; index < bytes.length; index += CHUNK) {
+    binary += String.fromCharCode(...bytes.subarray(index, index + CHUNK));
+  }
+  return btoa(binary);
+}
+
+/**
+ * 上传到宿主 `user/files`。
+ * @returns {Promise<{ok:true, name:string, path:string} | {ok:false, reason:string, detail?:string}>}
+ */
+export async function uploadUserFile(name, blob, { platform = null, signal } = {}) {
+  if (platform && !userFilesSupported(platform)) return { ok: false, reason: 'unsupported-host' };
+  const safe = sanitizeUserFileName(name);
+  if (!safe) return { ok: false, reason: 'invalid-name' };
+  if (typeof Blob === 'undefined' || !(blob instanceof Blob)) return { ok: false, reason: 'invalid-blob' };
+  if (blob.size > USER_FILE_MAX_BYTES) return { ok: false, reason: 'too-large' };
+  try {
+    const token = await getCsrfToken({ signal });
+    const response = await fetchWithTimeout(USER_FILES_ENDPOINTS.upload, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': token },
+      body: JSON.stringify({ name: safe, data: await blobToRawBase64(blob) }),
+      signal,
+    }, { timeoutMs: UPLOAD_TIMEOUT_MS, signal, label: '上传到 user/files' });
+    if (!response.ok) {
+      const detail = await response.text().catch(() => '');
+      return { ok: false, reason: `http-${response.status}`, detail };
+    }
+    const data = await response.json().catch(() => ({}));
+    return { ok: true, name: safe, path: data.path || userFileUrl(safe) };
+  } catch (err) {
+    return { ok: false, reason: 'request-failed', detail: err?.message || String(err) };
+  }
+}
+
+/** 删除宿主 `user/files` 里的文件（路径必须是上传时返回的客户端相对路径）。 */
+export async function deleteUserFile(filePath, { platform = null, signal } = {}) {
+  if (platform && !userFilesSupported(platform)) return { ok: false, reason: 'unsupported-host' };
+  if (!filePath) return { ok: false, reason: 'invalid-path' };
+  try {
+    const token = await getCsrfToken({ signal });
+    const response = await fetchWithTimeout(USER_FILES_ENDPOINTS.delete, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': token },
+      body: JSON.stringify({ path: filePath }),
+      signal,
+    }, { timeoutMs: SHORT_FETCH_TIMEOUT_MS, signal, label: '删除 user/files 文件' });
+    if (!response.ok) {
+      const detail = await response.text().catch(() => '');
+      return { ok: false, reason: `http-${response.status}`, detail };
+    }
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, reason: 'request-failed', detail: err?.message || String(err) };
+  }
+}
+
+/** 让宿主核对文件是否仍在（`/api/files/verify`）。 */
+export async function verifyUserFiles(urls, { platform = null, signal } = {}) {
+  if (platform && !userFilesSupported(platform)) return { ok: false, reason: 'unsupported-host' };
+  const list = (urls || []).filter(Boolean);
+  if (!list.length) return { ok: true, urls: [] };
+  try {
+    const token = await getCsrfToken({ signal });
+    const response = await fetchWithTimeout(USER_FILES_ENDPOINTS.verify, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': token },
+      body: JSON.stringify({ urls: list }),
+      signal,
+    }, { timeoutMs: SHORT_FETCH_TIMEOUT_MS, signal, label: '校验 user/files 文件' });
+    if (!response.ok) {
+      const detail = await response.text().catch(() => '');
+      return { ok: false, reason: `http-${response.status}`, detail };
+    }
+    const data = await response.json().catch(() => ({}));
+    return { ok: true, urls: data.urls || list };
+  } catch (err) {
+    return { ok: false, reason: 'request-failed', detail: err?.message || String(err) };
+  }
+}
+
+/**
  * 获取当前登录用户句柄（短超时兜底）
  *
  * ⚠ **该端点是句柄的唯一权威来源**（2026-09-25 认证态实测：Luker 与 ST 均 200，

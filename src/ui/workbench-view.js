@@ -10,6 +10,7 @@
  */
 
 import { chartTreeFor, deriveExportOptions } from '../core/chart-model.js';
+import { mergeChartTrees } from '../core/merge-packages.js';
 import { EXTENSION_MODES, GIT_MODES } from '../core/export-modes.js';
 import { t } from '../i18n/index.js';
 
@@ -95,7 +96,13 @@ function hostNodes(host){
   return { unavailable: !(HOSTS[host] || {}).readable, nodes: state.hostTree || [] };
 }
 function packageNodes(pkg){
-  return { unavailable: false, unrecognized: !!pkg.unrecognized, nodes: chartTreeFor(pkg, state.extensionMode) };
+  const nodes = chartTreeFor(pkg, state.extensionMode);
+  /* 私有件「传云」只在 ST/Luker 有原生 files 接口时出现；宿主树没有源包字节，故不标。 */
+  const canUpload = state.mode!=='web' && (state.host==='st' || state.host==='luker');
+  if(canUpload){
+    walk(nodes,(n)=>{ if(n.leaf && n.privateConfig) n.uploadable=true; });
+  }
+  return { unavailable: false, unrecognized: !!pkg.unrecognized, nodes };
 }
 
 const INITIAL_PACKAGES = [];
@@ -108,7 +115,7 @@ const state = {
   source:{ type:'host', pkgId:null }, target:'SillyTavern', delta:'overwrite', splitMb:'',
   compression:'5', extensionMode:'full', gitMode:'keep', keepDev:false,
   packages: INITIAL_PACKAGES.map(p=>({...p})),
-  selectedPkgs:new Set(), expanded:{}, collapsedVol:{}, sel:{}, log:[], logLevel:'ALL',
+  selectedPkgs:new Set(), mergeMode:false, expanded:{}, collapsedVol:{}, sel:{}, log:[], logLevel:'ALL',
   noTrafficPrompt:false, keepExport:true,
   storage:{ browser:null, host:null },
   sort:'time-desc', filter:'all', tutorialStep:0, tutorialOpen:false, tutorialKind:'basic',
@@ -275,12 +282,25 @@ function updateSplitSim(){
 /* 图表目标：勾了包 → 每个勾选的包一组图表；否则看当前来源；都没有则看宿主。 */
 function chartTargets(){
   const sel=[...state.selectedPkgs].map(id=>state.packages.find(p=>p.id===id)).filter(Boolean);
-  if(sel.length) return sel.map(p=>({pkg:p}));
+  if(sel.length) return mergeActive(sel) ? [{merge:true,pkgs:sel}] : sel.map(p=>({pkg:p}));
   if(state.source.type==='package'){
     const p=state.packages.find(x=>x.id===state.source.pkgId);
     if(p) return [{pkg:p}];
   }
   return [{host:true}];
+}
+/* 合并模式：≥2 个包勾选时才生效；只有一个包时没有可合并的对象。 */
+function mergeActive(sel){
+  return !!state.mergeMode && sel.length>=2;
+}
+function mergeScope(pkgs){
+  return 'merge:'+pkgs.map(p=>p.id).join(',');
+}
+function mergedTotalMb(pkgs){
+  return pkgs.reduce((sum,p)=>sum+(Number(p.mb)||0),0);
+}
+function mergedNodes(pkgs){
+  return mergeChartTrees(pkgs.map(p=>({pkgId:p.id,nodes:packageNodes(p).nodes})));
 }
 function scopeOf(t){ return t.host ? ('host:'+state.host) : ('pkg:'+t.pkg.id); }
 
@@ -327,7 +347,11 @@ function buildVolumeTree(chunks){
   return roots;
 }
 function volumesOf(pkg,nodes){
-  const total=pkg.mb||0, limit=splitLimit();
+  return volumesFor(Number(pkg.mb)||0,nodes);
+}
+/* 合并模式没有单一 pkg，体积按各包之和传入。 */
+function volumesFor(totalMb,nodes){
+  const total=totalMb, limit=splitLimit();
   if(!limit || total<=limit) return [{i:1,n:1,mb:total,nodes}];
   const chunks=splitChunks(nodes,limit,[]);
   const buckets=[];
@@ -402,7 +426,7 @@ function chartCardHtml(o){
   const dis = !!o.disabled;
   return '<div class="vol-card'+(collapsed?' is-collapsed':'')+(dis?' is-disabled':'')+'" data-scope="'+o.scope+'" data-volkey="'+o.key+'"'+(dis?' aria-disabled="true"':'')+'>'
     +'<div class="vol-head">'
-      +'<span class="vol-idx">'+o.idxText+'</span>'
+      +'<span class="vol-idx'+(o.merged?' is-merged':'')+'">'+o.idxText+'</span>'
       +(o.volText?'<span class="vol-cap">'+o.volText+'</span>':'')
       +(o.capText?'<span class="vol-cap'+(o.over?' is-over':'')+'">'+o.capText+'</span>':'')
       +(o.over?'<span class="vol-flag">'+t('chart.overLimit')+'</span>':'')
@@ -449,16 +473,24 @@ function extensionToolsHtml(pkg){
 
 function renderBatchBar(targets){
   const bar=document.getElementById('batch-bar');
-  const pkgs=targets.filter(t=>t.pkg).map(t=>t.pkg);
+  const mergeTarget=targets.find(t=>t.merge);
+  const pkgs=mergeTarget ? mergeTarget.pkgs : targets.filter(t=>t.pkg).map(t=>t.pkg);
   if(pkgs.length<2){ bar.hidden=true; bar.innerHTML=''; return; }
-  const vols=pkgs.reduce((a,p)=>a+volumesOf(p,packageNodes(p).nodes).length,0);
+  const merged=!!mergeTarget;
+  const vols=merged
+    ? volumesFor(mergedTotalMb(pkgs),mergedNodes(pkgs)).length
+    : pkgs.reduce((a,p)=>a+volumesOf(p,packageNodes(p).nodes).length,0);
   bar.hidden=false;
-  bar.innerHTML='<span class="lbl"><span class="scope">'+t('chart.batchSelected',{n:pkgs.length,vols})+'</span></span>'
+  bar.innerHTML='<span class="lbl"><span class="scope">'+t(merged?'chart.mergeSelected':'chart.batchSelected',{n:pkgs.length,vols})+'</span></span>'
+    +'<button class="merge-toggle'+(merged?' is-merged':'')+'" data-mergetoggle="'+(merged?'off':'on')+'">'
+      +(merged?'<i class="fa-solid fa-layer-group"></i> ':'<i class="fa-solid fa-object-group"></i> ')
+      +t(merged?'chart.mergeOff':'chart.mergeOn')+'</button>'
+    +(merged?'<span class="merge-badge">'+t('chart.mergedBadge',{n:pkgs.length})+'</span>':'')
     +'<button data-batchall="1">'+t('chart.batchAll')+'</button>'
     +'<button data-batchnone="1">'+t('chart.batchNone')+'</button>'
     +'<button data-batchinvert="1">'+t('chart.batchInvert')+'</button>'
     +'<span style="flex:1"></span>'
-    +'<span style="color:var(--muted-2)">'+t('chart.batchHint')+'</span>';
+    +'<span style="color:var(--muted-2)">'+t(merged?'chart.mergeHint':'chart.batchHint')+'</span>';
 }
 
 function renderChart(){
@@ -482,11 +514,35 @@ function renderChart(){
           })+'</div></div>';
       return;
     }
+    if(t.merge){
+      const nodes=mergedNodes(t.pkgs);
+      const totalMb=mergedTotalMb(t.pkgs);
+      const vols=volumesFor(totalMb,nodes);
+      const multi=vols.length>1;
+      const scope=mergeScope(t.pkgs);
+      const extOwner=t.pkgs.find(p=>p.extensions&&p.extensions.length)||t.pkgs[0];
+      const extTools=extensionToolsHtml(extOwner);
+      html+='<div class="chart-group is-merged">'
+        +'<div class="vol-grid" data-vols="'+vols.length+'">'
+        + vols.map(v=>chartCardHtml({
+            key:'merge-'+v.i, scope, nodes:v.nodes,
+            idxText:t('chart.mergedBadge',{n:t.pkgs.length}),
+            merged:true,
+            volText: multi ? t('chart.volume',{i:v.i,n:v.n}) : t('chart.whole'),
+            capText: fmtMB(v.mb),
+            totalText: multi ? t('chart.total',{size:fmtMB(totalMb)}) : '',
+            noticeHtml: '', readonly: false, over: !!v.over, pkgId: '',
+            extToolsHtml: extTools,
+            defaultCollapsed: state.view==='mobile' && multi && v.i>1
+          })).join('')
+        +'</div></div>';
+      return;
+    }
     const pkg=t.pkg;
     const tree=packageNodes(pkg);
     const vols=volumesOf(pkg, tree.nodes);
     const multi=vols.length>1;
-    const notice=tree.unrecognized ? '<div class="chart-unavailable"><b>'+t('chart.unrecognizedTitle')+'</b><br>'+t('chart.unrecognizedBody')+'</div>' : '';
+    const notice=tree.unrecognized ? '<div class="chart-unavailable"><b>'+t('chart.unrecognizedTitle')+'</b></div>' : '';
     const extTools=extensionToolsHtml(pkg);
     html+='<div class="chart-group">'
       +'<div class="vol-grid" data-vols="'+vols.length+'">'
@@ -808,21 +864,17 @@ function escapeHtml(s){ return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<'
 function doFetch(){ actions.fetch?.(); return undefined; }
 function doGenerate(){
   const pkgs=[...state.selectedPkgs].map(id=>state.packages.find(p=>p.id===id)).filter(Boolean);
-  actions.generate?.({ packages: pkgs, target: state.target, delta: state.delta, splitMb: state.splitMb, filenameTemplate: document.getElementById('filename-template').value });
+  actions.generate?.({ packages: pkgs, merge: mergeActive(pkgs), target: state.target, delta: state.delta, splitMb: state.splitMb, filenameTemplate: document.getElementById('filename-template').value });
 }
 function doMerge(){
-  if(state.selectedPkgs.size<2){ toast(t('lan.atLeastTwo')); return; }
-  const names=[...state.selectedPkgs].map(id=>state.packages.find(p=>p.id===id)?.name).filter(Boolean);
-  const conflict=t('lan.mergeConflictDetail',{path:'characters/Seraphina.png'});
-  log('WARN',conflict);
-  openModal(t('lan.mergeConflictTitle'),t('lan.mergeConflictBody'),[
-    '<div class="chart-unavailable" style="margin:0">'+names.join('<br>')+'<br><br>'+conflict+'</div>'
-  ],[{label:t('lan.gotIt'),primary:true,onClick:closeModal}]);
+  const pkgs=[...state.selectedPkgs].map(id=>state.packages.find(p=>p.id===id)).filter(Boolean);
+  if(pkgs.length<2){ toast(t('lan.atLeastTwo')); return; }
+  actions.mergeUpload?.(pkgs);
 }
 function doUploadHost(){ actions.restore?.([...state.selectedPkgs]); }
 function doCopyBack(){ actions.copyBack?.([...state.selectedPkgs]); }
 function doDeleteSelected(){ actions.deleteSelected?.([...state.selectedPkgs]); }
-function doUploadPrivate(name){ actions.uploadPrivate?.(name); }
+function doUploadPrivate(payload){ actions.uploadPrivate?.(payload); }
 
 /* ── 弹窗 ── */
 function openModal(title,desc,extraHtml,actions){
@@ -857,7 +909,7 @@ function openTrafficModal(onConfirm, { enabled = true, onNever } = {}){
 
 function openSettings(){ actions.settings?.(); }
 /* ── 帮助浮层 ── */const HELP={
-  chart:{ title:'help.chart.title', points:['help.chart.p1','help.chart.p2','help.chart.p3','help.chart.p4','help.chart.p5'] },
+  chart:{ title:'help.chart.title', points:['help.chart.p1','help.chart.p2','help.chart.p3','help.chart.p4','help.chart.p5','help.chart.p6'] },
   zone:{ title:'help.zone.title', points:['help.zone.p1','help.zone.p2','help.zone.p3','help.zone.p4'] },
   action:{ title:'help.action.title', points:['help.action.p1','help.action.p2','help.action.p3'] },
   log:{ title:'help.log.title', points:['help.log.p1','help.log.p2','help.log.p3'] }
@@ -887,7 +939,7 @@ function openHelp(btn,key){
 const TUTORIAL_BASIC=[
   { sel:'#target-select', title:'tutorial.basic.0.title', desc:'tutorial.basic.0.desc' },
   { sel:'#chart-stack .vol-card', title:'tutorial.basic.1.title', desc:'tutorial.basic.1.desc' },
-  { sel:'#chart-stack .tree-tools', title:'tutorial.basic.2.title', desc:'tutorial.basic.2.desc' },
+  { sel:'#chart-stack .chart-tree', title:'tutorial.basic.2.title', desc:'tutorial.basic.2.desc' },
   { sel:'#delta-toggle', title:'tutorial.basic.3.title', desc:'tutorial.basic.3.desc' },
   { sel:'#split-input', title:'tutorial.basic.4.title', desc:'tutorial.basic.4.desc' },
   { sel:'#btn-generate', title:'tutorial.basic.5.title', desc:'tutorial.basic.5.desc' },
@@ -916,11 +968,14 @@ function renderTutorial(){
   document.getElementById('tutorial-prev').disabled=state.tutorialStep===0;
   document.getElementById('tutorial-next').textContent=state.tutorialStep===set.length-1?t('tutorial.done'):t('tutorial.next');
   document.getElementById('tutorial-adv').textContent=state.tutorialKind==='adv'?t('tutorial.basic'):t('tutorial.adv');
-  const el=document.querySelector(step.sel)||document.querySelector('#chart-card');
+  const el=document.querySelector(step.sel);
   const ring=document.getElementById('tutorial-ring');
   const card=document.getElementById('tutorial-card');
   const overlay=document.getElementById('tutorial-overlay');
-  if(el && overlay){
+  /* 目标不存在时隐藏高亮环：保留上一帧的位置比不显示更糟（R6.4 锚定失败）。 */
+  if(!el){ ring.style.display='none'; return; }
+  ring.style.display='';
+  if(overlay){
     const anchor=tutorialAnchor(el.getBoundingClientRect(), overlay.getBoundingClientRect());
     ring.style.left=anchor.ring.left+'px';
     ring.style.top=anchor.ring.top+'px';
@@ -1049,6 +1104,11 @@ function bind(){
       const p=state.packages.find(x=>x.id===scope.slice(4));
       return p ? packageNodes(p).nodes : [];
     }
+    if(scope && scope.indexOf('merge:')===0){
+      const pkgs=scope.slice(6).split(',').filter(Boolean)
+        .map(id=>state.packages.find(p=>p.id===id)).filter(Boolean);
+      return pkgs.length ? mergedNodes(pkgs) : [];
+    }
     return hostNodes(state.host).nodes;
   };
   const applyTreeAll=(scope,mode,quiet,rootNode)=>{
@@ -1101,8 +1161,10 @@ function bind(){
     }
     const up=e.target.closest('[data-upload]');
     if(up){
-      const n=findNode(nodesForScope(scopeFromEl(up)),up.dataset.upload);
-      doUploadPrivate(n?n.label:''); return;
+      const scope=scopeFromEl(up);
+      const n=findNode(nodesForScope(scope),up.dataset.upload);
+      doUploadPrivate({ name:n?n.label:'', path:n?(n.path||''):'', pkgId:scope && scope.indexOf('pkg:')===0 ? scope.slice(4) : null });
+      return;
     }
   });
   stackEl.addEventListener('change',e=>{
@@ -1119,9 +1181,20 @@ function bind(){
     setChecked(n,scope,cb.checked); renderChart();
   });
   document.getElementById('batch-bar').addEventListener('click',e=>{
+    const toggle=e.target.closest('[data-mergetoggle]');
+    if(toggle){ state.mergeMode = toggle.dataset.mergetoggle==='on'; renderChart(); return; }
     const b=e.target.closest('[data-batchall],[data-batchnone],[data-batchinvert]'); if(!b) return;
     const mode=b.dataset.batchall?'all':b.dataset.batchnone?'none':'invert';
-    const pkgs=chartTargets().filter(t=>t.pkg);
+    const targets=chartTargets();
+    const mergeTarget=targets.find(t=>t.merge);
+    if(mergeTarget){
+      applyTreeAll(mergeScope(mergeTarget.pkgs),mode,true);
+      renderChart(); renderZones();
+      const modeLabel=mode==='all'?t('chart.selectAll'):mode==='none'?t('chart.selectNone'):t('chart.invert');
+      log('INFO',t('toast.batch',{mode:modeLabel,n:mergeTarget.pkgs.length}));
+      return;
+    }
+    const pkgs=targets.filter(t=>t.pkg);
     pkgs.forEach(t=>applyTreeAll('pkg:'+t.pkg.id,mode,true));
     renderChart(); renderZones();
     const modeLabel=mode==='all'?t('chart.selectAll'):mode==='none'?t('chart.selectNone'):t('chart.invert');
@@ -1292,6 +1365,41 @@ initSplitters();
     return excluded;
   }
 
+  /**
+   * 合并模式的导出计划：每个包各自的不勾选路径 + 各自的派生 options。
+   * 合并树里别的包的叶子对本包一律视为「未勾选」，这样 anyChecked 只反映本包。
+   */
+  function getMergedPlan(pkgs) {
+    const nodes = mergeChartTrees(pkgs.map((pkg) => ({ pkgId: pkg.id, nodes: packageNodes(pkg).nodes })));
+    const scope = mergeScope(pkgs);
+    const excludedByPkg = {};
+    for (const pkg of pkgs) {
+      const excluded = new Set();
+      walk(nodes, (n) => {
+        if (n.children && n.children.length) return;
+        if (n.srcPkgId !== pkg.id) return;
+        if (n.action === 'DROP') return;
+        if (!isChecked(n, scope)) excluded.add(n.path || n.id);
+      });
+      excludedByPkg[pkg.id] = excluded;
+    }
+    const optionsByPkg = {};
+    for (const pkg of pkgs) {
+      optionsByPkg[pkg.id] = deriveExportOptions({
+        nodes,
+        isChecked: (n) => (n.srcPkgId && n.srcPkgId !== pkg.id ? false : isChecked(n, scope)),
+        ui: {
+          compression: state.compression,
+          extensionMode: state.extensionMode,
+          gitMode: state.gitMode,
+          keepDev: state.keepDev,
+          target: state.target,
+        },
+      });
+    }
+    return { nodes, scope, excludedByPkg, optionsByPkg };
+  }
+
   function getExportOptions(pkg) {
     const scope = 'pkg:' + pkg.id;
     return deriveExportOptions({
@@ -1354,6 +1462,7 @@ initSplitters();
     renderAll,
     getExcludedPaths,
     getExportOptions,
+    getMergedPlan,
     getVolumes(pkg) { return volumesOf(pkg, packageNodes(pkg).nodes); },
     getState() { return state; },
     openTutorial,
