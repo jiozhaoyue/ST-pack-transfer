@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/frontend/host-capabilities.md", "reason": "宿主能力探测与端点调用的唯一合法路径（Luker LAN Sync / TT 能力判定）"}
+{"file": ".trellis/spec/frontend/async-bounds.md", "reason": "原生通道与 WebRTC 的所有等待都必须有界，失败要能 settle"}
+{"file": ".trellis/spec/frontend/workbench-single-view.md", "reason": "互传矩阵弹窗必须挂进单视图工作台，不新增浮层"}
+{"file": ".trellis/spec/frontend/i18n-and-settings.md", "reason": "新增界面文案走 locale；设置页仍只允许 3 个开关"}

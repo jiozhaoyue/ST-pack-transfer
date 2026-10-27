@@ -795,6 +795,76 @@ export async function verifyUserFiles(urls, { platform = null, signal } = {}) {
 }
 
 /**
+ * ── Luker 原生局域网同步（`/api/sync/v1`） ──
+ *
+ * 端点契约以实例源码 `src/endpoints/sync.js` 为准（2026-10-27）：
+ * `POST /peers/:peerId/sync` **只有本机拉取语义**（请求体可空），没有远端直推端点。
+ */
+export const LAN_SYNC_ENDPOINTS = Object.freeze({
+  health: '/api/sync/v1/health',
+  peers: '/api/sync/v1/peers',
+  syncPeer: (id) => `/api/sync/v1/peers/${encodeURIComponent(id)}/sync`,
+});
+
+/** 宿主是否具备 LAN Sync（Luker 端点可达）。不可达一律 false，不抛。 */
+export async function isLanSyncAvailable({ signal } = {}) {
+  try {
+    const response = await fetchWithTimeout(LAN_SYNC_ENDPOINTS.health, { credentials: 'same-origin' }, {
+      timeoutMs: SHORT_FETCH_TIMEOUT_MS, signal, label: 'LAN Sync 健康检查',
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+/** 已配对设备列表；任何失败都返回空数组（UI 只据此判断「未配对」）。 */
+export async function listLanSyncPeers({ signal } = {}) {
+  try {
+    const response = await fetchWithTimeout(LAN_SYNC_ENDPOINTS.peers, { credentials: 'same-origin' }, {
+      timeoutMs: SHORT_FETCH_TIMEOUT_MS, signal, label: '读取 LAN Sync 设备',
+    });
+    if (!response.ok) return [];
+    const data = await response.json().catch(() => null);
+    const list = Array.isArray(data) ? data : (Array.isArray(data?.peers) ? data.peers : []);
+    return list
+      .map((peer) => ({
+        id: String(peer?.id ?? peer?.peerId ?? ''),
+        label: String(peer?.label ?? peer?.name ?? ''),
+      }))
+      .filter((peer) => peer.id);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * 触发**本机从指定 peer 拉取**（与宿主面板「立即同步」同源）。
+ * @returns {Promise<{ok:true} | {ok:false, reason:string, detail?:string}>}
+ */
+export async function triggerLanSyncPull(peerId, { signal } = {}) {
+  const id = String(peerId || '').trim();
+  if (!id) return { ok: false, reason: 'invalid-peer' };
+  try {
+    const token = await getCsrfToken({ signal });
+    const response = await fetchWithTimeout(LAN_SYNC_ENDPOINTS.syncPeer(id), {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': token },
+      body: JSON.stringify({}),
+      signal,
+    }, { timeoutMs: UPLOAD_TIMEOUT_MS, signal, label: '触发 LAN Sync 拉取' });
+    if (!response.ok) {
+      const detail = await response.text().catch(() => '');
+      return { ok: false, reason: `http-${response.status}`, detail };
+    }
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, reason: 'request-failed', detail: err?.message || String(err) };
+  }
+}
+
+/**
  * 获取当前登录用户句柄（短超时兜底）
  *
  * ⚠ **该端点是句柄的唯一权威来源**（2026-09-25 认证态实测：Luker 与 ST 均 200，
