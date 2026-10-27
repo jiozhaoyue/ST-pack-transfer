@@ -19,6 +19,12 @@ export const PICKUP_PREFIX = 'SZC1';
 /** 取件码默认有效期（毫秒）。 */
 export const PICKUP_TTL_MS = 10 * 60 * 1000;
 
+/** 信令负载版本。v1 是只有 `{role, sdp}` 的旧码，仍可解析。 */
+export const SIGNAL_VERSION = 2;
+
+/** 摘要核对的体积上限：超过它只用字节数核对（SHA-256 需要整块缓冲）。 */
+export const DIGEST_MAX_BYTES = 512 * 1024 * 1024;
+
 /** DataChannel 单条消息上限保守值：Chrome 实测 `maxMessageSize` 因实现而异，64KB 稳妥。 */
 export const CHUNK_SIZE = 64 * 1024;
 
@@ -139,6 +145,103 @@ export async function decodePickupCode(code) {
   const inflated = await inflateRaw(bytes);
   if (!inflated) throw new Error('本环境不支持解压取件码');
   return JSON.parse(utf8Decode(inflated));
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 信令负载（v2：带文件身份与续传偏移）
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** FNV-1a 32 位：短、稳定、无依赖，仅用于「同一个包」的身份判定。 */
+function fnv1a(text) {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < text.length; i += 1) {
+    hash ^= text.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return hash >>> 0;
+}
+
+/**
+ * 文件身份：`name:size:lastModified` 的短哈希。
+ * 只用于续传判定——**不作为安全凭据**，也不假定跨设备完全相同。
+ *
+ * @param {{name?: string, size?: number, lastModified?: number}} file
+ * @returns {string}
+ */
+export function fileIdentity(file = {}) {
+  const name = String(file.name ?? '');
+  const size = Number(file.size) || 0;
+  const mtime = Number(file.lastModified) || 0;
+  return `f${fnv1a(`${name}:${size}:${mtime}`).toString(36)}`;
+}
+
+/**
+ * 组装信令负载。
+ *
+ * @param {{role: 'offer'|'answer', sdp: string, file?: object, fileId?: string, resumeFrom?: number}} input
+ * @returns {object}
+ */
+export function buildSignalPayload(input = {}) {
+  const payload = { v: SIGNAL_VERSION, role: input.role, sdp: String(input.sdp ?? '') };
+  if (input.file) {
+    payload.file = { id: input.fileId || fileIdentity(input.file), name: input.file.name, size: input.file.size };
+  } else if (input.fileId) {
+    payload.file = { id: input.fileId };
+  }
+  if (Number(input.resumeFrom) > 0) payload.resumeFrom = Number(input.resumeFrom);
+  return payload;
+}
+
+/**
+ * 解析信令负载并归一化。v1 旧码（无 `v` / 无 `file`）按无续传处理。
+ *
+ * @param {object} raw
+ * @returns {{version: number, role: string, sdp: string, file: object|null, fileId: string, resumeFrom: number}}
+ */
+export function readSignalPayload(raw = {}) {
+  const role = raw.role;
+  if (role !== 'offer' && role !== 'answer') throw new Error('不是局域网互传的码');
+  if (!raw.sdp || typeof raw.sdp !== 'string') throw new Error('码里没有连接信息');
+  const file = raw.file && typeof raw.file === 'object' ? raw.file : null;
+  return {
+    version: Number(raw.v) || 1,
+    role,
+    sdp: raw.sdp,
+    file,
+    fileId: file?.id ? String(file.id) : '',
+    resumeFrom: Math.max(0, Number(raw.resumeFrom) || 0),
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 人读格式
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** 字节数 → 可读体积（二进制单位）。 */
+export function formatBytes(bytes) {
+  const n = Number(bytes) || 0;
+  if (n < 1024) return `${Math.max(0, Math.round(n))} B`;
+  const units = ['KB', 'MB', 'GB', 'TB'];
+  let value = n / 1024;
+  let unit = 0;
+  while (value >= 1024 && unit < units.length - 1) { value /= 1024; unit += 1; }
+  return `${value >= 100 ? value.toFixed(0) : value.toFixed(1)} ${units[unit]}`;
+}
+
+/** 速率 → 可读文本。 */
+export function formatRate(bytesPerSecond) {
+  const n = Number(bytesPerSecond) || 0;
+  if (n <= 0) return '—';
+  return `${formatBytes(n)}/s`;
+}
+
+/** 毫秒 → 可读时长（`1分23秒` / `23秒`）。 */
+export function formatDuration(ms) {
+  const total = Math.max(0, Math.round((Number(ms) || 0) / 1000));
+  if (total < 60) return `${total}秒`;
+  const minutes = Math.floor(total / 60);
+  const seconds = total % 60;
+  return seconds ? `${minutes}分${seconds}秒` : `${minutes}分`;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -286,21 +389,28 @@ export function createTransferMachine({ now = () => Date.now() } = {}) {
 /**
  * 核对接收端与源端是否一致。
  *
- * 只看**条目数与总字节数**：这是纯前端能拿到的最强证据。
- * 逐条哈希需要源端把每条的摘要也传过去，属后续增强，本轮不做——**不谎称做了**。
+ * 判据优先级：**摘要 > 条目数 + 字节数**。
+ * 只有两端都带 `digest` 时才做摘要比对；缺任一端就退回字节数核对，
+ * 并在 `digestChecked:false` 里如实标出——**不谎称做了摘要**。
  *
- * @param {{files?: number, bytes?: number}} source
- * @param {{files?: number, bytes?: number}} received
- * @returns {{ok: boolean, reason: string}}
+ * @param {{files?: number, bytes?: number, digest?: string}} source
+ * @param {{files?: number, bytes?: number, digest?: string}} received
+ * @returns {{ok: boolean, reason: string, digestChecked: boolean}}
  */
 export function verifyTransfer(source = {}, received = {}) {
   const sf = Number(source.files) || 0;
   const rf = Number(received.files) || 0;
-  if (sf !== rf) return { ok: false, reason: `条目数不一致 ${sf} ≠ ${rf}` };
+  if (sf !== rf) return { ok: false, reason: `条目数不一致 ${sf} ≠ ${rf}`, digestChecked: false };
   const sb = Number(source.bytes) || 0;
   const rb = Number(received.bytes) || 0;
-  if (sb !== rb) return { ok: false, reason: `字节数不一致 ${sb} ≠ ${rb}` };
-  return { ok: true, reason: '' };
+  if (sb !== rb) return { ok: false, reason: `字节数不一致 ${sb} ≠ ${rb}`, digestChecked: false };
+  const sd = typeof source.digest === 'string' ? source.digest : '';
+  const rd = typeof received.digest === 'string' ? received.digest : '';
+  if (sd && rd) {
+    if (sd !== rd) return { ok: false, reason: '内容摘要不一致', digestChecked: true };
+    return { ok: true, reason: '', digestChecked: true };
+  }
+  return { ok: true, reason: '', digestChecked: false };
 }
 
 /**

@@ -1,11 +1,11 @@
 /**
- * dom-injection-guard:allow-file 本文件是 UI 定稿 demo 的逐行搬运，标记由字符串拼装；
+ * dom-injection-guard:allow-file 视图以字符串拼装标记；
  * 来自用户 zip 的动态值（文件名 / 节点标签 / 包名）已在渲染处 escapeHtml。
  *
- * 工作台视图（UI 定稿 demo 原样搬运）
+ * 工作台视图（正式实现）
  *
- * 渲染逻辑与 demo 逐行一致；只在两处插接真实系统：
- *   · 数据：`setPackages` / `setHost` / `setPackageNodes`
+ * 只在两处与外部系统插接：
+ *   · 数据：`setPackages` / `setHost` / `setStorage` / `setPackageNodes`
  *   · 动作：`actions.*`（拉取 / 生成 / 恢复 / 复制 / 删除 / 下载 / 设置 / 关闭）
  */
 
@@ -27,10 +27,10 @@ const ICON_TT = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABze
 const ICON_PT = 'data:image/png;base64,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';
 
 const HOSTS = {
-  luker:{ key:'luker', full:'Luker', brand:'--brand-luker', icon:ICON_LUKER, readable:true, quota:{used:3.4,total:10}, layout:'l' },
-  pt:{ key:'pt', full:'PureTavern', brand:'--brand-pt', icon:ICON_PT, readable:true, quota:{used:2.1,total:8}, layout:'pt' },
-  tt:{ key:'tt', full:'TauriTavern', brand:'--brand-tt', icon:ICON_TT, readable:true, quota:{used:4.6,total:12}, layout:'tt' },
-  st:{ key:'st', full:'SillyTavern', brand:'--brand-st', icon:ICON_ST, readable:false, quota:null, layout:'st' }
+  luker:{ full:'Luker', icon:ICON_LUKER, readable:true },
+  pt:{ full:'PureTavern', icon:ICON_PT, readable:true },
+  tt:{ full:'TauriTavern', icon:ICON_TT, readable:true },
+  st:{ full:'SillyTavern', icon:ICON_ST, readable:false }
 };
 
 /* ── 小型线性图标 ── */
@@ -65,139 +65,11 @@ function node(id,label,mb,suggest,opts){
     expanded: !!opts.expanded, badge:opts.badge||'', note:opts.note||'', privateConfig:!!opts.privateConfig,
     uploadable:!!opts.uploadable };
 }
-/* ── 真实备份包结构 ──
-   取证来源：data-zip/default-user-2026-08-25-172056.zip（Luker 1.18 备份，1.0 GB）
-     · chats/<角色>/<聊天>.jsonl        —— 聊天按角色分目录
-     · chats/<角色>/*.luker-state.*.json —— Luker 私有状态边车（chat_sync / memory_graph …）
-     · characters/<角色>.png、worlds/<世界书>.json
-     · user/images/<合集>/<文件>、user/files/<插件数据>
-     · extensions/<扩展>/…（本机 3769 个文件）
-     · themes/ context/ instruct/ sysprompt/ reasoning/ QuickReplies/ 各为预设目录
-     · settings.json 19.9 MB、secrets.json、manifest.json、movingUI/Default.json
-     · backups/chat_*.jsonl  —— 单个目录 1.27 GB，是体积大头
-   演示里除超大目录用「共 N 个文件」汇总节点外，其余一律逐文件。 */
-function backupTree(){
-  return [
-    node('n-chats','聊天记录',620,'keep',{icon:'chat',children:[
-      node('n-chats-rock','孤独摇滚3',260,'keep',{icon:'folder',children:[
-        node('n-chats-rock-1','孤独摇滚 - 2026-07-19@23h05m21s834ms imported - Branch #1.jsonl',142,'keep',{icon:'file'}),
-        node('n-chats-rock-2','孤独摇滚 - 2026-07-19@23h05m21s834ms imported - Branch #2.jsonl',98,'keep',{icon:'file'}),
-        node('n-chats-rock-3','孤独摇滚 - 2026-08-16@14h49m00s000ms.jsonl',20,'keep',{icon:'file'})
-      ]}),
-      node('n-chats-bang','BanG! City NSFW（紫）·全绿灯',210,'keep',{icon:'folder',children:[
-        node('n-chats-bang-1','聊天 - 2026-08-08@12h30m11s122ms.jsonl',180,'keep',{icon:'file'}),
-        node('n-chats-bang-2','聊天 - 2026-08-20@09h12m45s600ms.jsonl',30,'keep',{icon:'file'})
-      ]}),
-      node('n-chats-sera','塞拉菲亚与薇尔莉特',150,'keep',{icon:'folder',children:[
-        node('n-chats-sera-1','塞拉菲亚 - 2026-07-29@04h03m00s000ms.jsonl',150,'keep',{icon:'file'})
-      ]})
-    ]}),
-    node('n-chars','角色卡',7,'keep',{icon:'user',children:[
-      node('n-chars-1','characters/BanG! City NSFW（紫）·全绿灯.png',1.9,'keep',{icon:'file'}),
-      node('n-chars-2','characters/【Sgw】邦多利~.png',3.3,'keep',{icon:'file'}),
-      node('n-chars-3','characters/原始人？.png',0.9,'keep',{icon:'file'}),
-      node('n-chars-4','characters/孤独摇滚3.png',0.5,'keep',{icon:'file'}),
-      node('n-chars-5','characters/角色画像.png',0.1,'keep',{icon:'file'})
-    ]}),
-    node('n-worlds','世界书',2,'keep',{icon:'book',children:[
-      node('n-worlds-1','worlds/galgame界面插件.json',0.004,'keep',{icon:'file'}),
-      node('n-worlds-2','worlds/【Sgw】popipa，pipopa，popipapipipopa v4.2.json',0.41,'keep',{icon:'file'}),
-      node('n-worlds-3','worlds/原始但是不一定诗人.json',0.15,'keep',{icon:'file'}),
-      node('n-worlds-4','worlds/孤独摇滚.json',0.12,'keep',{icon:'file'}),
-      node('n-worlds-5','worlds/孤独摇滚…数据库记忆-.json',0.07,'keep',{icon:'file'}),
-      node('n-worlds-6','worlds/狐狐子帮多利nsfw 紫·全绿灯.json',0.89,'keep',{icon:'file'})
-    ]}),
-    node('n-images','图片',153,'keep',{icon:'image',children:[
-      node('n-images-1','user/images/The_Ultimate_Encyclopedia/',120,'keep',{icon:'folder',note:'共 170 个文件'}),
-      node('n-images-2','user/images/backgrounds/forest.png',4,'keep',{icon:'file'}),
-      node('n-images-3','user/images/backgrounds/castle.png',3.6,'keep',{icon:'file'}),
-      node('n-images-4','user/images/User Avatars/Seraphina.png',0.4,'optional',{icon:'file'})
-    ]}),
-    node('n-presets','预设与设置',47,'keep',{icon:'sliders',children:[
-      node('n-presets-settings','settings.json',19.9,'keep',{icon:'file'}),
-      node('n-presets-manifest','manifest.json',0.01,'optional',{icon:'file'}),
-      node('n-presets-moveui','movingUI/Default.json',0.01,'keep',{icon:'file'}),
-      node('n-presets-themes','themes/',0.1,'keep',{icon:'folder',children:[
-        node('n-themes-1','themes/Azure.json',0.01,'keep',{icon:'file'}),
-        node('n-themes-2','themes/Cappuccino.json',0.01,'keep',{icon:'file'}),
-        node('n-themes-3','themes/Dark Lite.json',0.01,'optional',{icon:'file'})
-      ]}),
-      node('n-presets-qr','QuickReplies/',0.06,'keep',{icon:'folder',children:[
-        node('n-qr-1','QuickReplies/Default.json',0.01,'keep',{icon:'file'}),
-        node('n-qr-2','QuickReplies/超级大百科_QR.json',0.05,'keep',{icon:'file'})
-      ]}),
-      node('n-presets-openai','OpenAI 预设',26.4,'keep',{icon:'folder',note:'共 61 个文件'}),
-      node('n-presets-inst','instruct/',0.02,'optional',{icon:'folder',children:[
-        node('n-inst-1','instruct/Adventure.json',0.01,'optional',{icon:'file'}),
-        node('n-inst-2','instruct/Alpaca-Single-Turn.json',0.01,'optional',{icon:'file'})
-      ]}),
-      node('n-presets-ctx','context/',0.02,'optional',{icon:'folder',note:'共 37 个文件'}),
-      node('n-presets-sys','sysprompt/',0.01,'optional',{icon:'folder',note:'共 14 个文件'}),
-      node('n-presets-reason','reasoning/',0.01,'optional',{icon:'folder',note:'共 5 个文件'})
-    ]}),
-    node('n-ext','扩展',170,'keep',{icon:'puzzle',children:[
-      node('n-ext-full','完整扩展包',0,'keep',{icon:'puzzle',checked:true,note:'不勾则仅导出清单'}),
-      node('n-ext-lwb','LittleWhiteBox',40,'keep',{icon:'folder',children:[
-        node('n-ext-lwb-1','extensions/LittleWhiteBox/manifest.json',0.01,'keep',{icon:'file'}),
-        node('n-ext-lwb-2','extensions/LittleWhiteBox/index.js',0.2,'keep',{icon:'file'}),
-        node('n-ext-lwb-3','extensions/LittleWhiteBox/style.css',0.05,'keep',{icon:'file'}),
-        node('n-ext-lwb-4','extensions/LittleWhiteBox/modules/',39,'keep',{icon:'folder',note:'共 464 个文件'})
-      ]}),
-      node('n-ext-jsr','JS-Slash-Runner',90,'keep',{icon:'folder',children:[
-        node('n-ext-jsr-1','extensions/JS-Slash-Runner/manifest.json',0.01,'keep',{icon:'file'}),
-        node('n-ext-jsr-2','extensions/JS-Slash-Runner/index.js',0.6,'keep',{icon:'file'}),
-        node('n-ext-jsr-3','extensions/JS-Slash-Runner/dist/',88,'keep',{icon:'folder',note:'共 190 个文件'})
-      ]}),
-      node('n-ext-yuzi','st-yuzi-phone',30,'keep',{icon:'folder',note:'共 384 个文件'}),
-      node('n-ext-git','保留 Git 历史',5,'keep',{icon:'archive',checked:true,note:'只留更新所需'}),
-      node('n-ext-build','保留构建配置',2,'optional',{icon:'sliders',checked:false})
-    ]}),
-    node('n-plugindata','插件数据',160,'optional',{icon:'db',children:[
-      node('n-pd-1','user/files/LittleWhiteBox_EnaPlanner.json',1.1,'optional',{icon:'file'}),
-      node('n-pd-2','user/files/LittleWhiteBox_Tasks.json',0.05,'optional',{icon:'file'}),
-      node('n-pd-3','user/files/LittleWhiteBox_NovelDraw.json',0.001,'optional',{icon:'file'}),
-      node('n-pd-4','user/files/TavernDB_ACU_vector_-_2026-07-19_23h05m21s834ms_imported_snapshot',0.09,'optional',{icon:'file'}),
-      node('n-pd-5','user/workflows/',140,'optional',{icon:'folder',note:'共 2 个文件，体积大'})
-    ]}),
-    node('n-private','私有配置',14,'keep',{icon:'lock',children:[
-      node('n-priv-l','Luker 私有配置',12,'keep',{icon:'lock',badge:'L',children:[
-        node('n-priv-l-1','chats/孤独摇滚3/…Branch #1.luker-state.chat_sync.json',2,'keep',{icon:'file',privateConfig:true,uploadable:true}),
-        node('n-priv-l-2','chats/孤独摇滚3/…Branch #1.luker-state.memory_graph__meta.json',2,'keep',{icon:'file',privateConfig:true,uploadable:true}),
-        node('n-priv-l-3','chats/BanG! City NSFW…/…luker-state.chat_sync.json',2,'keep',{icon:'file',privateConfig:true,uploadable:true}),
-        node('n-priv-l-4','secrets.json',0.01,'keep',{icon:'file',privateConfig:true,uploadable:true})
-      ]}),
-      node('n-priv-st','SillyTavern 私有配置',1,'keep',{icon:'lock',badge:'ST',note:'本包未包含'}),
-      node('n-priv-tt','TauriTavern 私有配置',1,'keep',{icon:'lock',badge:'TT',note:'本包未包含'}),
-      node('n-priv-pt','PureTavern 私有配置',1,'keep',{icon:'lock',badge:'PT',note:'本包未包含'})
-    ]}),
-    node('n-native','原生资产',0,'optional',{icon:'shield',note:'重复项'}),
-    node('n-backups','备份快照',107,'drop',{icon:'archive',children:[
-      node('n-bk-1','backups/chat_____3_20260825-032035.jsonl',19.9,'drop',{icon:'file'}),
-      node('n-bk-2','backups/chat_____3_20260821-133825.jsonl',16.6,'drop',{icon:'file'}),
-      node('n-bk-3','backups/chat_____3_20260820-202325.jsonl',16.3,'drop',{icon:'file'}),
-      node('n-bk-4','backups/chat_____3_20260819-183545.jsonl',14.8,'drop',{icon:'file'}),
-      node('n-bk-5','backups/chat_____3_20260817-121913.jsonl',13.0,'drop',{icon:'file'}),
-      node('n-bk-6','backups/chat_____3_20260814-210359.jsonl',13.1,'drop',{icon:'file'}),
-      node('n-bk-7','backups/chat_____3_20260726-235210.jsonl',12.7,'drop',{icon:'file'}),
-      node('n-bk-8','backups/chat______20260705-005207.jsonl',0.9,'drop',{icon:'file'})
-    ]}),
-    node('n-cache','派生缓存',0,'drop',{icon:'bolt',note:'未包含'})
-  ];
-}
 function hostNodes(host){
   return { unavailable: !(HOSTS[host] || {}).readable, nodes: state.hostTree || [] };
 }
 function packageNodes(pkg){
   return { unavailable: false, unrecognized: !!pkg.unrecognized, nodes: pkg.nodes || [] };
-}
-/* 把示例树整体缩放到该包的真实体积，避免「包 1.8 GB、图里只数出 561 MB」。 */
-function scaleNodesTo(arr,totalMb){
-  const base=arr.reduce((a,n)=>a+n.mb,0);
-  if(!base || !totalMb) return arr;
-  const k=totalMb/base;
-  if(Math.abs(k-1)<0.001) return arr;
-  walk(arr,n=>{ n.mb=Math.max(0,Math.round(n.mb*k)); });
-  return arr;
 }
 function scaledNodes(pkg){ return pkg.nodes || []; }
 
@@ -207,11 +79,12 @@ const INITIAL_PACKAGES = [];
 const SPLIT_MIN = 32, SPLIT_MAX = 2048;
 
 const state = {
-  host:'luker', mode:'plugin', view:'desktop', theme:'dark', zone:'import',
+  host:'luker', mode:'plugin', view:'desktop', zone:'import',
   source:{ type:'host', pkgId:null }, target:'SillyTavern', delta:'overwrite', splitMb:'',
   packages: INITIAL_PACKAGES.map(p=>({...p})),
   selectedPkgs:new Set(), expanded:{}, collapsedVol:{}, sel:{}, log:[], logLevel:'ALL',
-  noTrafficPrompt:false, keepExport:true, autoTutorial:true,
+  noTrafficPrompt:false, keepExport:true,
+  storage:{ browser:null, host:null },
   sort:'time-desc', filter:'all', tutorialStep:0, tutorialOpen:false, tutorialKind:'basic',
   sourceKey:'host:luker', seq:{}, libraryExport:false
 };
@@ -433,27 +306,21 @@ function volumesOf(pkg,nodes){
 }
 function renderQuota(){
   const head=document.getElementById('quota-head');
-  const browserUsed=1.2, browserTotal=8.0;
-  const bp=Math.round(browserUsed/browserTotal*100);
-  let html='';
-  html+='<div class="quota-row">'
-    +'<span class="q-label">'+svg('db','tree-ico')+'浏览器配额</span>'
-    +'<span class="quota-bar"><span class="quota-fill" style="width:'+bp+'%"></span></span>'
-    +'<span class="quota-val">'+browserUsed.toFixed(1)+' / '+browserTotal.toFixed(1)+' GB · '+bp+'%</span></div>';
-  const h=HOSTS[state.host];
-  if(h.readable && h.quota){
-    const p=Math.round(h.quota.used/h.quota.total*100);
-    html+='<div class="quota-row">'
-      +'<span class="q-label">'+svg('shield','tree-ico')+'宿主配额</span>'
-      +'<span class="quota-bar"><span class="quota-fill '+(p>85?'warn':'')+'" style="width:'+p+'%"></span></span>'
-      +'<span class="quota-val">'+h.quota.used.toFixed(1)+' / '+h.quota.total.toFixed(1)+' GB · '+p+'%</span></div>';
-  }else{
-    html+='<div class="quota-row is-disabled">'
-      +'<span class="q-label">'+svg('shield','tree-ico')+'宿主配额</span>'
+  if(!head) return;
+  const row=(label,ico,cell,emptyText)=>{
+    if(!cell || !(cell.total>0)) return '<div class="quota-row is-disabled">'
+      +'<span class="q-label">'+svg(ico,'tree-ico')+label+'</span>'
       +'<span class="quota-bar"><span class="quota-fill" style="width:0%"></span></span>'
-      +'<span class="quota-val">当前宿主无逐项读数</span></div>';
-  }
-  head.innerHTML=html;
+      +'<span class="quota-val">'+emptyText+'</span></div>';
+    const p=Math.max(0,Math.min(100,Math.round(cell.used/cell.total*100)));
+    return '<div class="quota-row">'
+      +'<span class="q-label">'+svg(ico,'tree-ico')+label+'</span>'
+      +'<span class="quota-bar"><span class="quota-fill '+(p>85?'warn':'')+'" style="width:'+p+'%"></span></span>'
+      +'<span class="quota-val">'+(cell.used/1073741824).toFixed(1)+' / '+(cell.total/1073741824).toFixed(1)+' GB · '+p+'%</span></div>';
+  };
+  const hostReadable=!!(HOSTS[state.host]||{}).readable;
+  head.innerHTML = row('浏览器配额','db',state.storage.browser,'浏览器未提供配额读数')
+    + row('宿主配额','shield',hostReadable ? state.storage.host : null,'当前宿主无逐项读数');
 }
 function renderTreeRows(nodes,depth,scope,readonly){
   let out='';
@@ -808,22 +675,6 @@ function openTrafficModal(onConfirm){
 }
 
 function openSettings(){ actions.settings?.(); }
-function openEntries(){
-  openModal('打开入口预览','四宿主统一落点。顶栏扩展菜单不注入。',[
-    '<div class="entry-mock">'
-    +'<h4>用户设置 · 扩展列表</h4>'
-    +'<div class="mock-row"><span>ST-pack-transfer</span><span class="spacer"></span><span class="mock-toggle"></span><button class="mock-btn">设置 ▾</button></div>'
-    +'<div class="mock-drawer"><button class="mock-btn accent">打开面板</button></div>'
-    +'<h4>账号弹层 / 管理面板</h4>'
-    +'<div class="mock-row"><button class="mock-btn">原生备份</button><button class="mock-btn accent">数据包转运</button></div>'
-    +'<h4>Luker 备份管理器</h4>'
-    +'<div class="mock-row"><button class="mock-btn accent">数据包转运</button><button class="mock-btn">原生 ZIP 下载</button><button class="mock-btn">选择 ZIP 恢复</button></div>'
-    +'<h4>顶栏扩展菜单（魔方棒）</h4>'
-    +'<div class="mock-row disabled"><span>不注入</span></div>'
-    +'</div>'
-  ],[{label:'知道了',primary:true,onClick:closeModal}]);
-}
-
 /* ── 帮助浮层 ── */const HELP={
   chart:{ title:'存储图表', points:['图表是唯一工作台','顶部显示两处配额','勾选即导出范围','分卷后每卷一张图表','多选包时同时显示多组图表'] },
   zone:{ title:'数据包', points:['导入区存放未修改的包','导出区只读','生成导出包后进导出区','可复制回导入区再编辑'] },
@@ -862,7 +713,7 @@ const TUTORIAL_BASIC=[
   { sel:'#zone-card', title:'导出完成', desc:'导出区只读，可下载、回传宿主，或复制回导入区再编辑。' }
 ];
 const TUTORIAL_ADV=[
-  { sel:'#dropzone', title:'上传数据包', desc:'点一下模拟上传一个 zip；真实实现里是拖拽或选文件。' },
+  { sel:'#dropzone', title:'上传数据包', desc:'点选或拖入一个 zip 作为数据包。' },
   { sel:'#chart-stack', title:'逐项确认勾选', desc:'展开大类逐个确认：绿是建议保留、橙是可选、灰是建议清理。' },
   { sel:'#target-select', title:'选目标平台', desc:'四个英文全称，当前宿主那一项带（宿主）标记。' },
   { sel:'#split-input', title:'要不要分卷', desc:'单卷 32–2048 MB；填了会按卷拆成多个可独立导入的包。' },
@@ -1169,50 +1020,10 @@ function initSplitters(){
   }
 }
 
-/* ── 重置 ── */
-function resetDemo(){
-  state.packages=INITIAL_PACKAGES.map(p=>({...p}));
-  state.selectedPkgs=new Set(); state.expanded={}; state.collapsedVol={}; state.sel={}; state.log=[];
-  state.zone='import'; state.source={type:'host',pkgId:null}; state.target='SillyTavern';
-  state.delta='overwrite'; state.splitMb=''; state.host='luker'; state.mode='plugin';
-  state.view='desktop'; state.theme='dark'; state.tutorialKind='basic';
-  state.noTrafficPrompt=false; state.keepExport=true; state.autoTutorial=true; state.filter='all'; state.sourceKey='host:luker';
-  document.getElementById('app').dataset.host='luker';
-  document.getElementById('app').dataset.view='desktop';
-  document.documentElement.dataset.theme='dark';
-  document.getElementById('split-input').value='';
-  document.querySelector('.app-main').style.removeProperty('--split-left');
-  document.querySelector('.col-side').style.removeProperty('--zone-h');
-  document.querySelectorAll('#demo-host button').forEach(x=>x.classList.toggle('active',x.dataset.host==='luker'));
-  document.querySelectorAll('#demo-mode button').forEach(x=>x.classList.toggle('active',x.dataset.mode==='plugin'));
-  document.querySelectorAll('#demo-view button').forEach(x=>x.classList.toggle('active',x.dataset.view==='desktop'));
-  document.querySelectorAll('#demo-theme button').forEach(x=>x.classList.toggle('active',x.dataset.theme==='dark'));
-  renderHeader(); renderChart(); renderZones(); renderActions(); renderLog();
-  setProgress(0,'准备就绪');
-  toast('已重置');
-}
-
-/* ── 启动 ── */
-renderHeader();
-renderChart();
-renderZones();
-renderActions();
-renderLog();
-setProgress(0,'准备就绪');
-log('INFO','应用启动，运行模式: LUKER 扩展插件');
-log('INFO','宿主存储读数已加载 · Luker');
-log('INFO','浏览器配额 1.2 GB / 8.0 GB');
-log('INFO','已导入 SillyTavern_default-user_part1_2026-10-26_21-30-05.zip');
+/* ── 初始化（视图自有，不依赖外部数据） ── */
+renderAll();
 bind();
 initSplitters();
-// 首次进入自动弹一次基础教程（同一浏览器会话只弹一次）
-try{
-  if(state.autoTutorial && !sessionStorage.getItem('pt-demo-tutorial-seen')){
-    sessionStorage.setItem('pt-demo-tutorial-seen','1');
-    setTimeout(openTutorial,300);
-  }
-}catch(_){}
-
 
   /* ── 对外 API ── */
   function renderAll() {
@@ -1258,6 +1069,10 @@ try{
       }
     },
     setProgress,
+    setStorage(next) {
+      state.storage = { ...state.storage, ...(next || {}) };
+      renderQuota();
+    },
     setLibraryExport(on) { state.libraryExport = !!on; renderActions(); },
     setZone(zone) { state.zone = zone; state.selectedPkgs = new Set(); renderAll(); },
     setActivePackage(id) { state.source = { type: 'package', pkgId: id }; state.sourceKey = 'pkg:' + id; renderAll(); },
@@ -1270,5 +1085,8 @@ try{
     getVolumes(pkg) { return volumesOf(pkg, scaledNodes(pkg)); },
     getState() { return state; },
     openTutorial,
+    renderLog,
   };
 }
+
+if (typeof window !== 'undefined') window.SZC_WORKBENCH_VIEW = createWorkbenchView;

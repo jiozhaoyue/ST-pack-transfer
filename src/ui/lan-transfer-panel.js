@@ -36,6 +36,15 @@ const HIGH_WATER_MARK = CHUNK_SIZE * 64;
 const LOW_WATER_MARK = CHUNK_SIZE * 16;
 const DISCONNECT_GRACE_MS = 8000;
 
+/** 排障日志：`localStorage.setItem('lan-debug','1')` 后刷新页面才输出。 */
+function dbg(...args) {
+  try {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('lan-debug') === '1') {
+      console.log('[lan]', ...args);
+    }
+  } catch { /* 隐私模式 */ }
+}
+
 /** 图标只用 `createElementNS` 构建——不走 `innerHTML`。 */
 const ICONS = {
   send: [{ tag: 'path', attrs: { d: 'M4 12l16-7-7 16-2-7z' } }],
@@ -99,11 +108,12 @@ function onceEvent(target, type, timeoutMs) {
 
 async function sha256Hex(bytes) {
   const subtle = globalThis.crypto?.subtle;
-  if (!subtle) return '';
+  if (!subtle) { dbg('sha256 不可用（无 crypto.subtle）'); return ''; }
   try {
     const buf = await subtle.digest('SHA-256', bytes);
     return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
-  } catch {
+  } catch (err) {
+    dbg('sha256 失败', err?.message || String(err));
     return '';
   }
 }
@@ -146,9 +156,10 @@ async function opfsSink(fileId) {
       },
       async finalize() {
         await closeWriter();
-        const file = await handle.getFile();
-        try { await dir.removeEntry(name); } catch { /* 已删除 */ }
-        return file;
+        // **不在这里删 .part**：OPFS 的 File 可能仍是惰性读取，先删会让后续
+        // `arrayBuffer()`（摘要 / 入库）抛错并静默退化成「仅核对大小」——
+        // 2026-10-27 E2E 实测。清理交给 success 之后的 `discardPartial`。
+        return handle.getFile();
       },
       async close() { await closeWriter(); },
     };
@@ -392,6 +403,7 @@ export function mountLanTransferPanel({ root, onReceive = null } = {}) {
   function bindConnection(local, onFail) {
     local.addEventListener('connectionstatechange', () => {
       const state = local.connectionState;
+      dbg('connection', state, local.iceConnectionState);
       if (state === 'failed') onFail('连接失败');
       if (state === 'disconnected') {
         setTimeout(() => {
@@ -509,6 +521,7 @@ export function mountLanTransferPanel({ root, onReceive = null } = {}) {
       sdp: local.localDescription.sdp,
       file,
     }));
+    dbg('offer ready', file.size, local.iceGatheringState);
     setStatus(sendStatus, '把取件码交给对方');
   };
 
@@ -556,6 +569,7 @@ export function mountLanTransferPanel({ root, onReceive = null } = {}) {
     }
 
     dc.send(JSON.stringify({ t: 'meta', name: file.name, size: total, fileId, digest }));
+    dbg('send meta', { total, fileId, digest: Boolean(digest), resumeFrom });
 
     let offset = Math.max(0, Math.min(Number(resumeFrom) || 0, total));
     rateSamples = [{ t: Date.now(), b: offset }];
@@ -578,6 +592,7 @@ export function mountLanTransferPanel({ root, onReceive = null } = {}) {
     }
 
     dc.send(JSON.stringify({ t: 'done', bytes: total, digest }));
+    dbg('send done', total);
     setStatus(sendStatus, '等待对端核对');
     sendProgress.set(100, '等待确认', `${formatBytes(total)}${digest ? ' · 摘要已发送' : ' · 仅核对大小'}`);
 
@@ -636,8 +651,10 @@ export function mountLanTransferPanel({ root, onReceive = null } = {}) {
 
   // ── 接收端 ──
   const failRecv = (message) => {
+    // 失败可能由「sink 未就绪」「写链异常」「通道关闭」竞争触发；只认第一次。
+    if (recvState === 'failed') return;
     recvState = 'failed';
-    machine.fail(message);
+    try { machine.fail(message); } catch { /* 已终态 */ }
     setStatus(recvStatus, `失败 ${message}`);
     recvProgress.set(0, '失败', incoming ? `已收 ${formatBytes(incoming.sink?.bytes || 0)}` : '');
     btnAccept.disabled = false;
@@ -650,9 +667,11 @@ export function mountLanTransferPanel({ root, onReceive = null } = {}) {
     const current = incoming;
     if (!current) return;
     await writeChain;
+    const sink = current.sink || await current.sinkReady;
+    if (!sink) { failRecv('落盘不可用'); return; }
     let blob = null;
     try {
-      blob = await current.sink.finalize();
+      blob = await sink.finalize();
     } catch (err) {
       failRecv(`落盘失败 ${err.message}`);
       return;
@@ -660,18 +679,26 @@ export function mountLanTransferPanel({ root, onReceive = null } = {}) {
 
     let digest = '';
     if (expectedBytes <= DIGEST_MAX_BYTES) {
-      try { digest = await sha256Hex(new Uint8Array(await blob.arrayBuffer())); } catch { digest = ''; }
+      try { digest = await sha256Hex(new Uint8Array(await blob.arrayBuffer())); } catch (err) {
+        dbg('digest 计算失败', err?.message || String(err));
+        digest = '';
+      }
     }
     const verdict = verifyTransfer(
       { files: 1, bytes: expectedBytes, digest: expectedDigest },
       { files: 1, bytes: blob.size, digest },
     );
+    dbg('recv verify', { expectedBytes, size: blob.size, digestChecked: Boolean(digest), ok: verdict.ok });
     if (!verdict.ok) {
+      try { channel?.send(JSON.stringify({ t: 'err', message: verdict.reason })); } catch { /* 通道已断 */ }
       partials.delete(current.fileId);
       void discardPartial(current.fileId);
       failRecv(`核对失败 ${verdict.reason}`);
       return;
     }
+
+    // 先回执再断链：发送端靠这一帧结束「等待对端确认」。
+    try { channel?.send(JSON.stringify({ t: 'ok', digest })); } catch { /* 通道已断 */ }
 
     try { machine.finish(); } catch { /* 已终态 */ }
     recvState = 'done';
@@ -681,18 +708,19 @@ export function mountLanTransferPanel({ root, onReceive = null } = {}) {
     btnAbandonRecv.hidden = true;
     btnAccept.disabled = false;
     incoming = null;
-    try {
-      if (typeof onReceive === 'function') await onReceive(blob, current.name);
-    } catch (err) {
-      setStatus(recvStatus, `已接收但入库失败 ${err.message}`);
-    }
-    // 一次性：完成后清空取件码并断开，旧码不再可用。
+    // 一次性：完成即清空取件码并断开，旧码不再可用（先于入库，避免入库耗时让旧码继续可用）。
     offerInput.value = '';
     recvCode.value = '';
     try { channel?.close(); } catch { /* 已关闭 */ }
     try { pc?.close(); } catch { /* 已关闭 */ }
     channel = null;
     pc = null;
+    try {
+      if (typeof onReceive === 'function') await onReceive(blob, current.name);
+    } catch (err) {
+      setStatus(recvStatus, `已接收但入库失败 ${err.message}`);
+    }
+    void discardPartial(current.fileId);
   };
 
   const handleReceiverControl = (text, dc) => {
@@ -716,30 +744,35 @@ export function mountLanTransferPanel({ root, onReceive = null } = {}) {
       rateSamples = [{ t: Date.now(), b: 0 }];
       writeChain = Promise.resolve();
       incoming = entry;
+      dbg('recv meta', { size, fileId, digest: Boolean(entry.digest) });
       const existing = partials.get(fileId);
-      void (async () => {
+      // 数据帧可能先于 OPFS 打开就到达（实测首 8 块被丢）：用 sinkReady 让写链等待，
+      // **绝不丢弃**——丢了就是残缺包且校验只报「摘要不一致」，根因被掩盖。
+      entry.sinkReady = (async () => {
         entry.sink = existing || (await opfsSink(fileId)) || memorySink();
         partials.set(fileId, entry.sink);
+        dbg('recv sink', entry.sink.kind, entry.sink.bytes);
         recvPeerName.textContent = entry.name;
         recvPeerMeta.textContent = `${formatBytes(size)} · ${fileId}`;
         setStatus(recvStatus, entry.sink.bytes > 0 ? '续传中' : '接收中');
         recvProgress.set(progressPercent(entry.sink.bytes, size), entry.sink.bytes > 0 ? '续传中' : '接收中',
           `${formatBytes(entry.sink.bytes)} / ${formatBytes(size)}`);
+        return entry.sink;
       })();
+      entry.sinkReady.catch((err) => failRecv(`落盘不可用 ${err.message}`));
       return;
     }
 
     if (msg.t === 'done' && incoming) {
       const expected = Number(msg.bytes) || incoming.size;
+      dbg('recv done frame', expected);
       writeChain.then(() => finishReceive(expected, msg.digest || incoming.digest))
         .catch((err) => failRecv(err.message));
       return;
     }
 
     if (msg.t === 'cancel') {
-      if (incoming) {
-        partials.set(incoming.fileId, incoming.sink);
-      }
+      if (incoming?.sink) partials.set(incoming.fileId, incoming.sink);
       failRecv('对方已取消');
     }
   };
@@ -756,9 +789,13 @@ export function mountLanTransferPanel({ root, onReceive = null } = {}) {
         : new Uint8Array(event.data?.buffer || event.data || []);
       const current = incoming;
       writeChain = writeChain.then(async () => {
-        if (!current.sink) return;
-        await current.sink.write(chunk);
-        const bytes = current.sink.bytes;
+        // 等 sink 就绪再写：数据帧可以来得比 OPFS 打开更早（实测首 8 块）。
+        const sink = current.sink || await current.sinkReady;
+        if (!sink) { dbg('chunk dropped: sink 不可用', chunk.byteLength); return; }
+        await sink.write(chunk);
+        const bytes = sink.bytes;
+        current.chunks = (current.chunks || 0) + 1;
+        if (current.chunks % 8 === 0) dbg('recv chunk', current.chunks, bytes, current.size);
         try { machine.advanceReceived(chunk.byteLength); } catch { /* 状态已终态 */ }
         recvProgress.set(progressPercent(bytes, current.size), '接收中', transferDetail(bytes, current.size));
         const now = Date.now();

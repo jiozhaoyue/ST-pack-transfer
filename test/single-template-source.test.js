@@ -96,11 +96,9 @@ describe('双入口渲染一致性（R8.2 · 独立态 / 模态态）', () => {
     expect(missing).toEqual([]);
   });
 
-  it('只有模态态带关闭按钮（两态的唯一合法分支差异）', () => {
-    expect(getWorkbenchHtml({ isModal: true })).toContain('id="btn-close"');
-    expect(getWorkbenchHtml({ isStandalone: true })).not.toContain('id="btn-close"');
-    // 页头两态都有（插件态要有关闭入口，独立态要有标题与徽标）
-    expect(getWorkbenchHtml({ isModal: true })).toContain('class="app-header"');
-    expect(getWorkbenchHtml({ isStandalone: true })).toContain('class="app-header"');
+  it('两态返回完全相同的 HTML；关闭按钮由独立态 CSS 隐藏', () => {
+    expect(getWorkbenchHtml({ isStandalone: true })).toBe(getWorkbenchHtml({ isModal: true }));
+    expect(getWorkbenchHtml()).toContain('id="btn-close"');
+    expect(getWorkbenchHtml()).toContain('class="app-header"');
   });
 });
