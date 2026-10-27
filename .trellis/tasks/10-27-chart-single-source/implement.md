@@ -6,7 +6,7 @@
 - [x] 新增 `chart-model` 选项/清单测试；六守卫通过。
 - [ ] 浏览器截图 / 四宿主复验。
 - [ ] `task.py archive`（状态收口）。
-- 详见 [`docs/HANDOVER-2026-10-27-i18n.md`](../../../docs/HANDOVER-2026-10-27-i18n.md)。
+- 详见 [`HANDOFF-2026-10-27-I18N.md`](../10-26-storage-chart-workbench/HANDOFF-2026-10-27-I18N.md)。
 
 
 > 依赖：建议在 `10-27-host-chart-settings` 之后执行（共享视图与样式）。

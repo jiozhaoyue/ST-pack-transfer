@@ -9,7 +9,7 @@
 - [ ] `host-bridge.js` / `chat-store-*.js` / `src/app` / `src/storage` 技术消息未迁移（待用户裁定是否纳入）。
 - [ ] 全量测试有 1 个隔离守卫失败（单跑通过，未定位）。
 - [ ] 浏览器截图 / 四宿主复验。
-- 详见 [`docs/HANDOVER-2026-10-27-i18n.md`](../../../docs/HANDOVER-2026-10-27-i18n.md)。
+- 详见 [`HANDOFF-2026-10-27-I18N.md`](../10-26-storage-chart-workbench/HANDOFF-2026-10-27-I18N.md)。
 
 
 > 依赖：建议在 `10-27-chart-single-source` 之后执行（覆盖新增节点文案）。

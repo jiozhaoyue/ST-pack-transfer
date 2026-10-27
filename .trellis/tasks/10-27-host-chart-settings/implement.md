@@ -6,7 +6,7 @@
 - [x] 新增测试与六守卫通过（最后一次全量）。
 - [ ] 浏览器截图 / 四宿主复验（预览工具当时不可用）。
 - [ ] `task.py archive`（状态收口）。
-- 详见 [`docs/HANDOVER-2026-10-27-i18n.md`](../../../docs/HANDOVER-2026-10-27-i18n.md)。
+- 详见 [`HANDOFF-2026-10-27-I18N.md`](../10-26-storage-chart-workbench/HANDOFF-2026-10-27-I18N.md)。
 
 
 > 顺序执行；每一步完成后跑对应验证，绿了再进下一步。

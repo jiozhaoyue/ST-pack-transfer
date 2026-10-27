@@ -1,7 +1,7 @@
 # 前端规范：设置边界 · 图表选择面 · i18n · 教程锚点
 
 > 2026-10-27 定稿。适用于 `ST-pack-transfer` 工作台 UI。
-> 依据：用户裁定 + `docs/HANDOVER-2026-10-27-i18n.md` + 代码实测。
+> 依据：用户裁定 + `.trellis/tasks/10-26-storage-chart-workbench/HANDOFF-2026-10-27-I18N.md` + 代码实测。
 
 ---
 
