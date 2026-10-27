@@ -35,6 +35,7 @@ export const CONTROL_CONSUMERS = Object.freeze({
   'btn-close': 'src/ui/workbench-view.js — 事件绑定 / 读取（btn-close）',
   'btn-guide': 'src/ui/workbench-view.js — 事件绑定 / 读取（btn-guide）',
   'btn-log': 'src/ui/workbench-view.js — 事件绑定 / 读取（btn-log）',
+  'btn-locale': 'index.js / demo 外壳 — 切换 zh-CN / en-US',
   'btn-settings': 'src/ui/workbench-view.js — 事件绑定 / 读取（btn-settings）',
   'file-input': 'src/ui/workbench-view.js — 事件绑定 / 读取（file-input）',
   'filename-template': 'src/ui/workbench-view.js — 事件绑定 / 读取（filename-template）',

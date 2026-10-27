@@ -26,6 +26,8 @@ import { mountLanTransferPanel } from './src/ui/lan-transfer-panel.js';
 import { qr } from './src/ui/qr.js';
 import { buildSettingsHtml, readSettings } from './src/ui/settings-panel.js';
 import { loadSettings, saveSettings } from './src/ui/settings-store.js';
+import { applyI18n } from './src/i18n/dom.js';
+import { getLocale, onLocaleChange, setLocale, t } from './src/i18n/index.js';
 import { probeChatStore } from './src/ui/chat-store-bridge.js';
 import { mountDebugProbe } from './src/app/task-runtime.js';
 
@@ -70,6 +72,7 @@ function ensureConverterModal() {
   app.className = 'app-container';
   app.id = 'app';
   app.innerHTML = trustedStaticMarkup(getWorkbenchHtml({ isModal: true }));
+  applyI18n(app);
   overlay.appendChild(app);
   document.body.appendChild(overlay); // dom-scope:allow 自绘全屏模态必须挂 body
   overlay.addEventListener('click', (event) => { if (event.target === overlay) overlay.style.display = 'none'; });
@@ -127,10 +130,10 @@ async function main(root) {
       mb: sizeBytes / (1024 * 1024),
       ts: record.createdAt || Date.now(),
       time: clockOf(record.createdAt),
-      origin: record.origin === ORIGINS.LAN ? '远程导入'
-        : record.origin === ORIGINS.SPLIT_PART ? '分卷'
-          : zone === 'export' ? '导出副本'
-            : '本地导入',
+      origin: record.origin === ORIGINS.LAN ? t('origin.remote')
+        : record.origin === ORIGINS.SPLIT_PART ? t('origin.split')
+          : zone === 'export' ? t('origin.exportCopy')
+            : t('origin.local'),
       readonly: zone === 'export',
       unrecognized: layout === 'unknown',
       split: 0,
@@ -147,7 +150,7 @@ async function main(root) {
       state.packages = records.filter((r) => ZONE_OF_ORIGIN[r.origin]).map(toPackage);
       view.setPackages(state.packages);
     } catch (err) {
-      logger.warn(`读取工作区失败: ${err.message}`);
+      logger.warn(t('log.workspaceReadFailed', { msg: err.message }));
       state.packages = [];
       view.setPackages([]);
     }
@@ -160,9 +163,9 @@ async function main(root) {
     const key = `${pkgId}::${code}`;
     if (state.planCache.has(key)) return state.planCache.get(key);
     const blob = await blobOf(pkg);
-    if (!blob) { logger.warn(`扫描跳过：${pkg.name} 的字节不在工作区`); return null; }
-    view.setProgress(6, `扫描中 · ${pkg.name}`);
-    logger.info(`扫描开始：${pkg.name}（${(blob.size / 1048576).toFixed(1)} MB → ${code.toUpperCase()}）`);
+    if (!blob) { logger.warn(t('log.scanSkipped', { name: pkg.name })); return null; }
+    view.setProgress(6, t('progress.scanning', { name: pkg.name }));
+    logger.info(t('log.scanStart', { name: pkg.name, size: (blob.size / 1048576).toFixed(1), target: code.toUpperCase() }));
     try {
       const plan = await runPlanTask({
         source: blob,
@@ -193,12 +196,12 @@ async function main(root) {
         live.unrecognized = plan.totalSourceFiles === 0;
       }
       view.setPackages(state.packages);
-      view.setProgress(0, '扫描完成');
-      logger.info(`扫描完成：${pkg.name} · ${plan.totalSourceFiles} 个文件 · ${tree.length} 个分组`);
+      view.setProgress(0, t('progress.scanDone'));
+      logger.info(t('log.scanDone', { name: pkg.name, files: plan.totalSourceFiles, groups: tree.length }));
       return state.planCache.get(key);
     } catch (err) {
-      logger.error(`扫描失败：${pkg.name} · ${err.message}`);
-      view.setProgress(0, '扫描失败');
+      logger.error(t('log.scanFailed', { name: pkg.name, msg: err.message }));
+      view.setProgress(0, t('progress.scanFailed'));
       return null;
     }
   }
@@ -219,7 +222,7 @@ async function main(root) {
   async function importFiles(files, { remote = false } = {}) {
     const list = [...(files || [])];
     if (!list.length) return;
-    if (!isStorageSupported()) { view.toast('当前浏览器不支持本地存储'); return; }
+    if (!isStorageSupported()) { view.toast(t('toast.storageUnsupported')); return; }
     const used = new Set(state.packages.map((p) => p.name));
     for (const file of list) {
       const name = remote ? uniqueRemoteName(file.name, used) : file.name;
@@ -230,13 +233,13 @@ async function main(root) {
         origin: remote ? ORIGINS.LAN : ORIGINS.UPLOAD,
         metadata: { importedAt: Date.now(), ...(remote ? { remote: true } : {}) },
       });
-      logger.info(`${remote ? '已接收' : '已导入'} ${name}`);
+      logger.info(t(remote ? 'log.received' : 'log.imported', { name }));
     }
     await syncPackages();
     if (remote) view.setZone('import');
     const newest = state.packages.filter((p) => p.zone === 'import').sort((a, b) => b.ts - a.ts)[0];
     if (newest) { await ensurePlan(newest.id); view.setActivePackage(newest.id); }
-    view.toast(remote ? `已接收 ${list.length} 个包` : `已导入 ${list.length} 个包`);
+    view.toast(t(remote ? 'toast.receivedCount' : 'toast.importedCount', { n: list.length }));
   }
 
   /** 局域网发送源：导入区当前勾选的包（控制器拿到的已是可 slice 的 File）。 */
@@ -247,7 +250,7 @@ async function main(root) {
       const pkg = state.packages.find((p) => p.id === id);
       if (!pkg || pkg.zone !== 'import') continue;
       const blob = await blobOf(pkg);
-      if (!blob) { logger.warn(`发送跳过：${pkg.name} 的字节不在工作区`); continue; }
+      if (!blob) { logger.warn(t('log.sendSkipped', { name: pkg.name })); continue; }
       targets.push(new File([blob], pkg.name, { type: 'application/zip', lastModified: pkg.ts || Date.now() }));
     }
     return targets;
@@ -283,12 +286,12 @@ async function main(root) {
       count += 1;
     }
     await syncPackages();
-    view.toast(`已复制 ${count} 个包回导入区`);
+    view.toast(t('toast.copiedBackCount', { n: count }));
   }
 
   async function deleteSelected(ids) {
-    if (!ids.length) { view.toast('先选择要删除的包'); return; }
-    const ok = await confirmDialog(`确定删除选中的 ${ids.length} 个包吗？此操作不可撤销。`);
+    if (!ids.length) { view.toast(t('toast.selectDeleteFirst')); return; }
+    const ok = await confirmDialog(t('modal.confirmDelete', { n: ids.length }));
     if (!ok) return;
     for (const id of ids) {
       try { await deleteFile(id); } catch { /* 已不存在 */ }
@@ -296,13 +299,13 @@ async function main(root) {
       state.layoutById.delete(id);
     }
     await syncPackages();
-    view.toast('已删除');
+    view.toast(t('toast.deleted'));
   }
 
   async function restoreSelected(ids) {
-    if (!host.isPlugin) { view.toast('只有插件形态可以回传宿主'); return; }
+    if (!host.isPlugin) { view.toast(t('toast.pluginOnlyRestore')); return; }
     const targets = ids.map(pkgById).filter((p) => p && p.zone === 'export');
-    if (!targets.length) { view.toast('先选择一个导出包'); return; }
+    if (!targets.length) { view.toast(t('toast.selectExportPack')); return; }
     if (settings.trafficPrompt) {
       view.confirmTraffic(() => restoreSelectedConfirmed(targets), {
         enabled: true,
@@ -314,31 +317,31 @@ async function main(root) {
   }
 
   async function restoreSelectedConfirmed(targets) {
-    const ok = await confirmDialog(`将 ${targets[0].name} 恢复到当前宿主？覆盖前请确认已备份。`);
+    const ok = await confirmDialog(t('modal.confirmRestore', { name: targets[0].name }));
     if (!ok) return;
     if (state.busy) return;
     state.busy = true;
     try {
-      view.setProgress(25, '正在回传宿主...');
+      view.setProgress(25, t('progress.restoring'));
       const blob = await blobOf(targets[0]);
       const result = host.platform === 'luker'
         ? await restoreToLuker(blob, {})
         : await restoreToHost(blob, { mode: 'merge', platform: host.platform });
-      if (result && result.nothingRestored) throw new Error('宿主未写入任何条目');
+      if (result && result.nothingRestored) throw new Error(t('error.nothingRestored'));
       try { await importRestoredChatsIntoLibrary(blob); } catch { /* 纯库模式可选 */ }
-      view.setProgress(100, '恢复完成');
-      logger.info(`已恢复 ${targets[0].name}`);
-      view.toast('恢复完成');
+      view.setProgress(100, t('progress.restoreDone'));
+      logger.info(t('log.restored', { name: targets[0].name }));
+      view.toast(t('toast.restoreDone'));
     } catch (err) {
-      logger.error(`恢复失败：${err.message}`);
-      view.setProgress(0, '恢复失败');
+      logger.error(t('log.restoreFailed', { msg: err.message }));
+      view.setProgress(0, t('progress.restoreFailed'));
     } finally {
       state.busy = false;
     }
   }
 
   async function fetchFromHost() {
-    if (!host.isPlugin) { view.toast('独立 Web 模式没有宿主数据源'); return; }
+    if (!host.isPlugin) { view.toast(t('toast.webNoHost')); return; }
     if (state.busy) return;
     if (settings.trafficPrompt) {
       view.confirmTraffic(() => fetchFromHostConfirmed(), {
@@ -354,13 +357,13 @@ async function main(root) {
     if (state.busy) return;
     state.busy = true;
     try {
-      view.setProgress(5, '正在请求宿主打包...');
+      view.setProgress(5, t('progress.hostRequest'));
       const blob = await fetchHostBackup(host.platform, null, {
         onPhase: (phase, received, total) => {
-          if (phase === 'host-generating') view.setProgress(12, '宿主打包中...');
+          if (phase === 'host-generating') view.setProgress(12, t('progress.hostPacking'));
           else if (phase === 'transferring') {
             const pct = total > 0 ? 15 + Math.round((received / total) * 20) : 20;
-            view.setProgress(pct, `接收中 ${(received / 1048576).toFixed(1)} MB`);
+            view.setProgress(pct, t('progress.receiving', { size: (received / 1048576).toFixed(1) }));
           }
         },
       });
@@ -375,11 +378,11 @@ async function main(root) {
       await syncPackages();
       await ensurePlan(id);
       view.setActivePackage(id);
-      view.setProgress(100, '宿主拉取完成');
-      view.toast('宿主拉取完成');
+      view.setProgress(100, t('progress.hostFetched'));
+      view.toast(t('toast.hostFetched'));
     } catch (err) {
-      logger.error(`宿主拉取失败：${err.message}`);
-      view.setProgress(0, '宿主拉取失败');
+      logger.error(t('log.hostFetchFailed', { msg: err.message }));
+      view.setProgress(0, t('progress.hostFetchFailed'));
     } finally {
       state.busy = false;
     }
@@ -387,7 +390,7 @@ async function main(root) {
 
   async function generate({ packages, target, splitMb, filenameTemplate }) {
     if (state.busy) return;
-    if (!packages?.length) { view.toast('先选择要导出的包'); return; }
+    if (!packages?.length) { view.toast(t('toast.selectExportFirst')); return; }
     state.busy = true;
     const code = targetCodeOf(target);
     const limit = splitLimitOf(splitMb);
@@ -400,7 +403,7 @@ async function main(root) {
         if (!cached) continue;
         const excluded = view.getExcludedPaths(pkg);
         const exportOptions = view.getExportOptions(pkg);
-        view.setProgress(3, `转换中 · ${pkg.name}`);
+        view.setProgress(3, t('progress.converting', { name: pkg.name }));
         const { resultBlob } = await runConversionTask({
           source: blob,
           target: code,
@@ -410,7 +413,7 @@ async function main(root) {
           },
           onProgress: (current, total, filename) => {
             const pct = total ? Math.round((current / total) * 92) : 10;
-            view.setProgress(pct, `转换中 ${current}/${total}${filename ? ` · ${filename}` : ''}`);
+            view.setProgress(pct, t('progress.convertingN', { current, total, file: filename ? ` · ${filename}` : '' }));
           },
         });
         if (!resultBlob) continue;
@@ -438,7 +441,7 @@ async function main(root) {
           });
           created.push({ blob: resultBlob, name });
         }
-        logger.info(`已转换 ${pkg.name}`);
+        logger.info(t('log.converted', { name: pkg.name }));
       }
       if (settings.keepExport) {
         for (const item of created) {
@@ -450,18 +453,18 @@ async function main(root) {
           });
         }
         await syncPackages();
-        view.setProgress(100, '导出包已就绪');
-        view.toast(`已生成 ${created.length} 个导出包`);
+        view.setProgress(100, t('progress.exportReady'));
+        view.toast(t('toast.generated', { n: created.length }));
         if (created.length) view.setZone('export');
       } else {
         for (const item of created) downloadBlob(item.blob, item.name);
-        view.setProgress(100, '导出包已下载');
-        view.toast(`已生成并下载 ${created.length} 个导出包`);
+        view.setProgress(100, t('progress.exportDownloaded'));
+        view.toast(t('toast.generatedDownloaded', { n: created.length }));
       }
     } catch (err) {
-      logger.error(`转换失败：${err.message}`);
-      view.setProgress(0, '转换失败');
-      view.toast('转换失败，详见日志');
+      logger.error(t('log.convertFailed', { msg: err.message }));
+      view.setProgress(0, t('progress.convertFailed'));
+      view.toast(t('toast.convertFailed'));
     } finally {
       state.busy = false;
     }
@@ -470,7 +473,7 @@ async function main(root) {
   async function exportLibrary() {
     try {
       const pack = await exportLibraryToPack({});
-      if (!pack?.ok || !pack.blob) { view.toast(pack?.reason || '没有可导出的聊天'); return; }
+      if (!pack?.ok || !pack.blob) { view.toast(pack?.reason || t('toast.noChats')); return; }
       const id = `lib-${Date.now()}`;
       await saveFile({
         id, name: pack.name || 'library-export.zip', size: pack.blob.size,
@@ -479,23 +482,23 @@ async function main(root) {
       });
       await syncPackages();
       await ensurePlan(id);
-      view.toast('聊天库已导出到导入区');
+      view.toast(t('toast.libraryExported'));
     } catch (err) {
-      logger.error(`聊天库导出失败：${err.message}`);
+      logger.error(t('log.libraryExportFailed', { msg: err.message }));
     }
   }
 
   function openSettings() {
-    view.openModal('设置', '', [buildSettingsHtml(settings)], [
-      { label: '关闭', onClick: () => view.closeModal() },
+    view.openModal(t('settings.title'), '', [buildSettingsHtml(settings)], [
+      { label: t('modal.close'), onClick: () => view.closeModal() },
       {
-        label: '保存',
+        label: t('modal.save'),
         primary: true,
         onClick: () => {
           Object.assign(settings, readSettings(root));
           saveSettings(settings);
           view.closeModal();
-          view.toast('设置已保存');
+          view.toast(t('settings.saved'));
         },
       },
     ]);
@@ -523,7 +526,7 @@ async function main(root) {
       lan: lanActions,
       settings: openSettings,
       uploadRequest: () => root.querySelector('#file-input')?.click(),
-      uploadPrivate: (name) => { logger.info(`私有配置上传请求：${name}`); view.toast(`私有配置：${name}`); },
+      uploadPrivate: (name) => { logger.info(t('log.privateUpload', { name })); view.toast(t('toast.privateUpload', { name })); },
       onActivePackage: (id) => { ensurePlan(id).then(() => view.setActivePackage(id)); },
       onTargetChange: (name) => {
         const active = state.packages.find((p) => view.getState().source?.pkgId === p.id);
@@ -541,6 +544,11 @@ async function main(root) {
   });
 
   view.setHost(hostKey, host.isPlugin ? 'plugin' : 'web');
+  applyI18n(root);
+  root.querySelector('#btn-locale')?.addEventListener('click', () => {
+    setLocale(getLocale() === 'zh-CN' ? 'en-US' : 'zh-CN');
+  });
+  onLocaleChange(() => { applyI18n(root); view.renderAll(); });
   try { view.setLibraryExport(probeChatStore().present); } catch { /* 外部库可选 */ }
 
   root.querySelector('#file-input')?.addEventListener('change', async (event) => {
@@ -569,8 +577,8 @@ async function main(root) {
 
   await syncPackages();
   view.setStorage({ browser: await readBrowserQuota(), host: null });
-  view.setProgress(0, '准备就绪');
-  logger.info(`工作台已就绪 · ${host.isPlugin ? (HOST_LABEL[host.platform] || '宿主') + ' 插件' : '独立 Web'}`);
+  view.setProgress(0, t('progress.ready'));
+  logger.info(t('log.workbenchReady', { host: host.isPlugin ? t('header.plugin', { host: HOST_LABEL[host.platform] || t('host.fallback') }) : t('header.web') }));
   try {
     if (settings.autoTutorial && !sessionStorage.getItem('st-pack-transfer:tutorial-seen')) {
       sessionStorage.setItem('st-pack-transfer:tutorial-seen', '1');
@@ -604,6 +612,7 @@ function bootstrap() {
   if (!app) return;
   app.classList.add('app-standalone');
   if (!app.hasChildNodes()) app.innerHTML = trustedStaticMarkup(getWorkbenchHtml({ isStandalone: true }));
+  applyI18n(app);
   if (!initialized) { initialized = true; main(app); }
 }
 

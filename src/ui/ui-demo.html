@@ -80,8 +80,11 @@ import { getWorkbenchHtml } from './workbench-template.js';
 import { createWorkbenchView } from './workbench-view.js';
 import { buildSettingsHtml, readSettings } from './settings-panel.js';
 import { loadSettings, saveSettings } from './settings-store.js';
+import { applyI18n } from '../i18n/dom.js';
+import { getLocale, onLocaleChange, setLocale } from '../i18n/index.js';
 
 document.getElementById('app').innerHTML = getWorkbenchHtml();
+applyI18n(document.getElementById('app'));
 
 const demoSettings = loadSettings();
 
@@ -366,6 +369,10 @@ const view = createWorkbenchView({
   }
 });
 const S = () => view.getState();
+document.getElementById('btn-locale')?.addEventListener('click',()=>{
+  setLocale(getLocale()==='zh-CN'?'en-US':'zh-CN');
+});
+onLocaleChange(()=>{ applyI18n(document.getElementById('app')); view.renderAll(); });
 
 function trafficConfirm(onConfirm){
   if(!demoSettings.trafficPrompt || S().noTrafficPrompt){ onConfirm(); return; }
