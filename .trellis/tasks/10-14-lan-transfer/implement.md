@@ -35,13 +35,13 @@
 
 ## E. 四实例
 
-- [ ] E1 Dev ST / Dev Luker / PT / TT 打开工作台，`#btn-lan-send` 存在且能开面板
-- [ ] E2 非安全上下文（TT/PT 若为 http 非 localhost）显示不可直连且按钮禁用
-- [ ] E3 截图留证
+- [x] E1 Dev ST / Dev Luker / PT / TT 打开工作台，`#btn-lan-send` 存在且能开面板
+- [x] E2 非安全上下文（TT/PT 若为 http 非 localhost）显示不可直连且按钮禁用（`probeDirectCapability` 单测覆盖；本轮四实例均为 localhost 安全上下文，未真机复现）
+- [x] E3 截图留证（独立 Web 生产页 / demo 页 / TT 矩阵截图）
 
 ## F. 收口
 
-- [ ] F1 更新 `.trellis/spec/frontend/workbench-single-view.md §7`
-- [ ] F2 PRD 的 R-06/AC-04 按「未实现」改写
-- [ ] F3 显式 pathspec 提交 + 推送 origin
-- [ ] F4 完整报告
+- [x] F1 更新 `.trellis/spec/frontend/workbench-single-view.md §7`（含 7.1 实现与落盘硬规则、§9 UI 单一源）
+- [x] F2 PRD 的 R-06/AC-04 按「未实现」改写
+- [x] F3 显式 pathspec 提交 + 推送 origin
+- [x] F4 完整报告

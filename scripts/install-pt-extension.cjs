@@ -75,15 +75,20 @@ if (targets.length === 0) {
         // --replace：先删旧记录再装。PT 的扩展是快照，改代码后必须重装才拿得到最新版；
         // 不删会撞 ExtensionConflictError（同 folder 已存在）。
         if (replace) {
-          try {
-            const del = await fetch('/api/extensions/delete', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ extensionName: 'third-party/ST-pack-transfer' }),
-            });
-            out.delete = { status: del.status, body: (await del.text()).slice(0, 200) };
-          } catch (e) {
-            out.delete = { error: String(e) };
+          // 改名前的旧目录也要删：只删新名会让 PT 同时加载两个插件（旧 UI + 新 UI），
+          // 旧插件的节点会污染断言，用户侧也会出现两个扩展。
+          out.delete = [];
+          for (const extensionName of ['third-party/ST-pack-transfer', 'third-party/st-zip-converter']) {
+            try {
+              const del = await fetch('/api/extensions/delete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ extensionName }),
+              });
+              out.delete.push({ extensionName, status: del.status, body: (await del.text()).slice(0, 200) });
+            } catch (e) {
+              out.delete.push({ extensionName, error: String(e) });
+            }
           }
         }
         try {

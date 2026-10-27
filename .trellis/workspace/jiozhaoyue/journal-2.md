@@ -333,3 +333,53 @@ S1 四现症固化为 s1-remedies E2E（15/15）；三层架构与 CSS 铁律落
 - ② 补跑 `npm run e2e:web -- --rebuild`，并补一次浏览器截图核验徽标
 - ③ 之后按顺序推进 `10-26-storage-chart` → `zones-flow` → `package-cards-vault` → `tutorial-copy`
 
+## Session 54: UI 单一源逐字同步 + 正式代码去演示化 + 局域网修复 + 四宿主/跨宿主实证
+<!-- trellis-session: v=2 fp=goal-continue-20261027 -->
+
+**Date**: 2026-10-27
+**Task**: 10-14-lan-transfer（收口）+ 10-26-storage-chart-workbench（UI 单一源）
+**Branch**: `main`
+
+### Summary
+
+继承上一会话 goal：demo html 必须是唯一 UI 源、四宿主运行时与 demo 逐字一致、局域网两两成功。
+把唯一源从会被归档移动的任务目录迁到 `src/ui/ui-demo.html`，`sync:ui` 逐字复制三区；
+按用户裁定清掉正式三件套里的所有演示物（演示工具条样式、假配额、假启动日志、`resetDemo`、
+入口预览、演示 sessionStorage key），假配额改为 `navigator.storage.estimate()` 真值，
+宿主无读数时如实标注。新增 `test/ui-demo-source.test.js` 硬门禁：三件套与 demo 不一致、
+或出现 `demo` / `演示` / `DEMO_` 即红。
+
+局域网修复真实缺陷：接收端在 OPFS sink 打开前收到数据帧会直接丢弃（实测首 8 块丢，产物缺字节），
+改为 `sinkReady` 让写链等待；`failRecv` 只认第一次失败。独立 Web 3 MB 真互传 18/18。
+
+四宿主排障：改名前的 `st-zip-converter` 副本仍残留在实例里（ST/Luker junction、TT/PT 旧目录），
+旧 UI 抢占初始化导致 PT/TT 表现为「插件未挂载」。已移出扩展目录保留 `.linkbak` / `.disabled`；
+PT 安装脚本 `--replace` 同时删除新旧两个名字。PT 规格从旧 UI 重写到新工作台（21/21）。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `5f02e3a` | feat(ui)+fix(lan): UI 单一源逐字同步并清除演示残留；局域网修复丢块 |
+| （本次） | test(e2e): PT 规格改写新工作台；安装器清理改名前旧副本；PRD/日志收口 |
+
+### Testing
+
+- [OK] `npm test` 875 passed / 2 skipped；五条守卫全绿
+- [OK] 独立 Web 局域网真互传 18/18（3 MB 分块、SHA-256 一致、一次性、坏码）
+- [OK] Dev ST smoke 16 + newui 12；Dev Luker smoke 16 + newui 12
+- [OK] Dev PT pt-load 21/21（新工作台：上传 → 图表 → 四目标 → 生成导出包 → 零报错）
+- [OK] TT ttCdpSmoke PASS（激活 21.3s、零插件报错）
+- [OK] 跨宿主 Dev ST ↔ Dev Luker 双向 20/20（摘要一致、接收端工作区出现同名包）
+
+### Status
+
+[OK] **Completed**（AC-10 真机双设备截图未做，已如实登记）
+
+### Next Steps
+
+- ① 两台不同机器的局域网互传（mDNS / 扫码 / 非安全上下文提示）真机验收
+- ② PT ↔ TT 跨宿主互传（成本高，ST↔Luker 已代表 HTTP 宿主路径）
+- ③ 清理仍按旧 UI 写的 `e2e/specs/matrix.e2e.cjs` / `vault.e2e.cjs`（当前矩阵已改用 newui）
+- ④ 归档 10-14-lan-transfer 与 storage-chart-workbench 子任务（按新实现回填验收）
+

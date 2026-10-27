@@ -124,22 +124,26 @@
 
 ---
 
-## 九、本轮实例实测（2026-10-27，严格错峰：每次只起 1 个）
+## 九、本轮实例实测（2026-10-27 晚，清理旧副本后复跑）
 
 | 宿主 | 规格 | 结果 |
 | --- | --- | --- |
 | Dev SillyTavern (8001) | smoke + newui | ✅ smoke 16 OK / newui 12 OK |
 | Dev Luker (8003) | smoke + newui | ✅ smoke 16 OK / newui 12 OK |
-| Dev PureTavern (8899) | pt-load | ✅ 28 OK（快照已 `--replace` 重装） |
-| TauriTavern (9223 CDP) | ttCdpSmoke | ✅ modal / #app.app-container / 零插件报错 |
+| Dev PureTavern (8899) | pt-load（**新工作台规格**） | ✅ 21/21（上传 → 图表 → 四目标 → 生成导出包 → 零报错） |
+| TauriTavern (9223 CDP) | ttCdpSmoke | ✅ modal / #app.app-container / 零插件报错，激活 21.3s |
 
-`newui` 实际覆盖：真实路径打开 → 上传 `fixture-st.zip` → 图表树 9 行 → 四目标逐一切换后仍有树 → 勾选包 → 生成导出包并切到导出区。
+`newui` / `pt-load` 实际覆盖：真实路径打开 → 上传 `fixture-st.zip` → 图表树 → 四目标逐一切换后仍有树 → 勾选包 → 生成导出包并切到导出区。
 
-**局域网互传**（两个浏览器上下文，同一台机器）：offer/answer 交换成功，发送端 100%、接收端 100%、
-接收端得到同名包（585 B 夹具），零页面错误。
+**关键排障（真实根因）**：改名前的 `st-zip-converter` 副本仍留在实例里（ST/Luker 的 junction、TT/PT 的旧目录），
+旧 UI 会抢占初始化，PT 与 TT 因此表现为「插件没挂载」。现已移出扩展目录保留为 `.linkbak` / `.disabled`；
+`install-pt-extension.cjs --replace` 也改为同时删除新旧两个名字。
+
+**局域网互传**：
+- 独立 Web 双页面 3 MB 真互传 **18/18**（`npm run e2e:web -- --only lan-transfer --rebuild`）。
+- **跨宿主双向**：Dev ST ↔ Dev Luker **20/20**（ST→Luker、Luker→ST 各一遍，含摘要一致、接收端工作区出现同名包）。
 
 **未覆盖（下一会话继续）**：
 - 两台**不同机器**的局域网互传（mDNS / 扫码 / 非安全上下文降级提示）。
-- Dev ST ↔ Dev Luker 之间用**真实数据包**做跨实例搬运（同一时刻最多 2 个实例）。
-- PT / TT 的新工作台交互规格（目前 PT 只有加载、TT 只有挂载冒烟）。
+- PT ↔ TT 的跨宿主互传（TT 单实例 CDP、PT 纯前端，组合成本高；ST↔Luker 已代表 HTTP 宿主路径）。
 
