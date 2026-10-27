@@ -60,6 +60,24 @@ describe('SillyTavern 标准插件工程结构 (ST-pack-transfer)', () => {
     expect(html).not.toContain('set-keep-dev');
   });
 
+  it('打包选项回到图表：扩展/清单切换、Git 仅完整显示、压缩在顶部', async () => {
+    const view = await readFile('src/ui/workbench-view.js', 'utf8');
+    expect(view).toContain('data-extmode');
+    expect(view).toContain('data-gitmode');
+    expect(view).toContain('data-keepdev');
+    expect(view).toContain('data-suball');
+    expect(view).toContain('extension-tools');
+    expect(view).toContain('EXTENSION_MODES.MANIFEST');
+
+    const tpl = await readFile('src/ui/workbench-template.js', 'utf8');
+    expect(tpl).toContain('compression-select');
+
+    const model = await readFile('src/core/chart-model.js', 'utf8');
+    expect(model).toContain('deriveExportOptions');
+    expect(model).toContain('chartTreeFor');
+    expect(model).toContain('group:native');
+  });
+
   it('host-bridge 导出了 discoverHostExtensions, installExtensionViaHost, checkHostThirdPartyAnomaly, deleteExtensionViaHost 与 mountExtensionRowButton', async () => {
     const bridge = await import('../src/ui/host-bridge.js');
     const {

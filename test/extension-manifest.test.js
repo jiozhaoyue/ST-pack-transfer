@@ -168,8 +168,11 @@ describe('buildOfficialIndex（官方索引，仅 MANIFEST 产出）', () => {
       { id: 'ok', name: 'ok', displayName: 'OK', description: '', url: 'https://github.com/a/b', branch: 'main', commit: '', type: 'extension', availability: AVAILABILITY.INSTALLABLE },
       { id: 'bad', name: 'bad', displayName: 'Bad', description: '', url: '', branch: 'main', commit: '', type: 'extension', availability: AVAILABILITY.UNAVAILABLE },
     ]);
-    expect(index.extension).toHaveLength(1);
-    expect(index.extension[0].id).toBe('ok');
+    expect(Array.isArray(index)).toBe(true);
+    expect(index).toHaveLength(1);
+    expect(index[0].id).toBe('ok');
+    expect(index[0].type).toBe('extension');
+    expect(index[0].url).toBe('https://github.com/a/b');
   });
 
   it('全部不可安装时返回 null（调用方跳过写文件）', () => {
@@ -190,8 +193,8 @@ describe('buildOfficialIndex（官方索引，仅 MANIFEST 产出）', () => {
     const index = buildOfficialIndex([
       { id: 'ok', name: 'ok', displayName: 'OK', description: 'd', url: 'https://github.com/a/b', branch: 'main', commit: 'c', type: 'extension', availability: AVAILABILITY.INSTALLABLE, manifest: { secret: 1 }, sourceKind: 'git' },
     ]);
-    expect(Object.keys(index.extension[0]).sort())
-      .toEqual(['branch', 'commit', 'description', 'id', 'name', 'type', 'url']);
+    expect(Object.keys(index[0]).sort())
+      .toEqual(['description', 'id', 'name', 'type', 'url']);
   });
 });
 

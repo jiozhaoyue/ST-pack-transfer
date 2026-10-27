@@ -90,22 +90,12 @@ async function main(root) {
   const hostKey = host.isPlugin ? (HOST_CODE[host.platform] || 'st') : 'st';
   root.dataset.host = hostKey;
 
-  /** 打包选项暂为内部默认；任务 2 会改为从图表派生。设置页只持久化 3 个行为开关。 */
-  const EXPORT_DEFAULTS = {
-    compression: '5',
-    extensionMode: 'full',
-    gitMode: 'keep',
-    keepDev: false,
-    includeBackups: false,
-    includeCache: false,
-    includePrivate: false,
-    pruneBuiltin: true,
-  };
-  const settings = { ...EXPORT_DEFAULTS, ...loadSettings() };
+  const settings = loadSettings();
 
   const state = {
     packages: [],
     nodesById: new Map(),
+    extensionsById: new Map(),
     layoutById: new Map(),
     planCache: new Map(),
     busy: false,
@@ -145,6 +135,7 @@ async function main(root) {
       unrecognized: layout === 'unknown',
       split: 0,
       nodes: state.nodesById.get(record.id) || [],
+      extensions: state.extensionsById.get(record.id) || [],
       blob: null,
     };
   }
@@ -179,22 +170,25 @@ async function main(root) {
         options: {
           selection: {},
           excludedPaths: new Set(),
-          includeCache: settings.includeCache,
-          includeBackups: settings.includeBackups,
-          includeAppPrivate: settings.includePrivate,
-          pruneBuiltinAssets: settings.pruneBuiltin,
-          keepDevFiles: settings.keepDev,
-          extensionMode: settings.extensionMode,
-          gitMode: settings.gitMode,
+          // 完整清单：所有可选项都进树；勾选/虚拟节点只在导出时生效（R9）
+          includeCache: true,
+          includeBackups: true,
+          includeAppPrivate: true,
+          pruneBuiltinAssets: false,
+          keepDevFiles: true,
+          extensionMode: 'full',
+          gitMode: 'keep',
         },
       });
       const tree = buildChartTree(plan);
       state.planCache.set(key, { plan, tree, target: code });
       state.nodesById.set(pkgId, tree);
+      state.extensionsById.set(pkgId, plan.extensions || []);
       if (plan.sourceLayout) state.layoutById.set(pkgId, plan.sourceLayout);
       const live = pkgById(pkgId);
       if (live) {
         live.nodes = tree;
+        live.extensions = plan.extensions || [];
         live.host = HOST_CODE[plan.sourceLayout] || live.host;
         live.unrecognized = plan.totalSourceFiles === 0;
       }
@@ -405,20 +399,14 @@ async function main(root) {
         const cached = await ensurePlan(pkg.id, target);
         if (!cached) continue;
         const excluded = view.getExcludedPaths(pkg);
+        const exportOptions = view.getExportOptions(pkg);
         view.setProgress(3, `转换中 · ${pkg.name}`);
         const { resultBlob } = await runConversionTask({
           source: blob,
           target: code,
           options: {
             excludedPaths: excluded,
-            compressionLevel: Number(settings.compression),
-            extensionMode: settings.extensionMode,
-            gitMode: settings.gitMode,
-            keepDevFiles: settings.keepDev,
-            includeCache: settings.includeCache,
-            includeBackups: settings.includeBackups,
-            includeAppPrivate: settings.includePrivate,
-            pruneBuiltinAssets: settings.pruneBuiltin,
+            ...exportOptions,
           },
           onProgress: (current, total, filename) => {
             const pct = total ? Math.round((current / total) * 92) : 10;

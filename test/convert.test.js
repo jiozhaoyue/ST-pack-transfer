@@ -302,10 +302,11 @@ describe('轻量清单模式 (Manifest-Only Mode - 防 408 超时)', () => {
     expect(files.has('_convert/install_extensions.sh')).toBe(false);
 
     const indexJson = JSON.parse(files.get('extensions-index.json').toString('utf8'));
-    expect(indexJson.extension).toBeInstanceOf(Array);
-    expect(indexJson.extension.length).toBe(1);
-    expect(indexJson.extension[0].id).toBe('test-extension');
-    expect(indexJson.extension[0].url).toBe('https://github.com/example/test-extension');
+    expect(Array.isArray(indexJson)).toBe(true);
+    expect(indexJson.length).toBe(1);
+    expect(indexJson[0].id).toBe('test-extension');
+    expect(indexJson[0].type).toBe('extension');
+    expect(indexJson[0].url).toBe('https://github.com/example/test-extension');
 
     const manifestJson = JSON.parse(files.get('_convert/extensions-manifest.json').toString('utf8'));
     expect(manifestJson.mode).toBe('manifest');

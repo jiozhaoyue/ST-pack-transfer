@@ -44,10 +44,9 @@ export const TARGETS = Object.freeze({
   PT: 'pt',
 });
 
-export const EXTENSION_MODES = Object.freeze({
-  MANIFEST: 'manifest', // 轻量清单模式:仅导出来源清单，不打包插件实体与 git packfile，防 408 超时
-  FULL: 'full',         // 完整离线包模式:打包代码文件，适合无网环境
-});
+import { EXTENSION_MODES, GIT_MODES } from './export-modes.js';
+
+export { EXTENSION_MODES, GIT_MODES };
 
 /**
  * 扩展 `.git` 目录处理策略（任务 09-22-extension-git-slim）。
@@ -62,12 +61,6 @@ export const EXTENSION_MODES = Object.freeze({
  *   首次更新后仓库自愈为完整状态。
  * - `keep` = 100% 现状；`strip` 会让接收方彻底失去在线更新能力。
  */
-export const GIT_MODES = Object.freeze({
-  KEEP: 'keep',       // 原样保留全部 .git 条目（默认，零行为变化）
-  STRIP: 'strip',     // 剔除整个 .git/（接收方需重新 git clone 才能在线更新）
-  MINIMAL: 'minimal', // 仅保留识别与更新所需最小集 + 合成 .git/objects/.keep
-});
-
 /** minimal 策略合成的占位文件内容（非 0 字节：个别解压实现会跳过零长度条目）。 */
 export const GIT_KEEP_PLACEHOLDER = new TextEncoder().encode(
   '# 由 ST-pack-transfer 合成：占位文件，仅用于保证 .git/objects 目录在解压后存在\n',

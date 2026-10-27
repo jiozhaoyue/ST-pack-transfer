@@ -9,6 +9,9 @@
  *   · 动作：`actions.*`（拉取 / 生成 / 恢复 / 复制 / 删除 / 下载 / 设置 / 关闭）
  */
 
+import { chartTreeFor, deriveExportOptions } from '../core/chart-model.js';
+import { EXTENSION_MODES, GIT_MODES } from '../core/export-modes.js';
+
 export function createWorkbenchView({ actions = {}, qr = null } = {}) {
 
 /* ═══════════════════════════════════════════════════════════════
@@ -69,9 +72,8 @@ function hostNodes(host){
   return { unavailable: !(HOSTS[host] || {}).readable, nodes: state.hostTree || [] };
 }
 function packageNodes(pkg){
-  return { unavailable: false, unrecognized: !!pkg.unrecognized, nodes: pkg.nodes || [] };
+  return { unavailable: false, unrecognized: !!pkg.unrecognized, nodes: chartTreeFor(pkg, state.extensionMode) };
 }
-function scaledNodes(pkg){ return pkg.nodes || []; }
 
 const INITIAL_PACKAGES = [];
 
@@ -81,6 +83,7 @@ const SPLIT_MIN = 32, SPLIT_MAX = 2048;
 const state = {
   host:'luker', mode:'plugin', view:'desktop', zone:'import',
   source:{ type:'host', pkgId:null }, target:'SillyTavern', delta:'overwrite', splitMb:'',
+  compression:'5', extensionMode:'full', gitMode:'keep', keepDev:false,
   packages: INITIAL_PACKAGES.map(p=>({...p})),
   selectedPkgs:new Set(), expanded:{}, collapsedVol:{}, sel:{}, log:[], logLevel:'ALL',
   noTrafficPrompt:false, keepExport:true,
@@ -96,8 +99,10 @@ const state = {
 
 /* ── 工具 ── */
 function fmtMB(mb){
-  if(mb>=1024) return (mb/1024).toFixed(1)+' GB';
-  return mb+' MB';
+  const n=Number(mb)||0;
+  if(n>=1024) return (n/1024).toFixed(1)+' GB';
+  if(n>=1) return (Math.round(n*10)/10)+' MB';
+  return Math.max(0,Math.round(n*1000))+' KB';
 }
 function hostIcon(host){ return (HOSTS[host]||{}).icon || HOSTS.luker.icon; }
 function hostName(host){ return (HOSTS[host]||{}).full || '未识别'; }
@@ -233,7 +238,7 @@ function updateSplitSim(){
   if(!pkgs.length){ sim.textContent='按各包总量估算'; return; }
   let n=0, over=false;
   pkgs.forEach(t=>{
-    const v=volumesOf(t.pkg,scaledNodes(t.pkg));
+    const v=volumesOf(t.pkg,packageNodes(t.pkg).nodes);
     n+=v.length; if(v.some(x=>x.over)) over=true;
   });
   sim.textContent='预计 '+n+' 卷'+(over?' · 有单文件超限':'');
@@ -327,9 +332,10 @@ function renderQuota(){
   head.innerHTML = row('浏览器配额','db',state.storage.browser,'浏览器未提供配额读数')
     + row('宿主配额','shield',hostReadable ? state.storage.host : null,'当前宿主无逐项读数');
 }
-function renderTreeRows(nodes,depth,scope,readonly){
+function renderTreeRows(nodes,depth,scope,readonly,extToolsHtml){
   let out='';
   for(const n of nodes){
+    if(n.id==='group:extensions' && extToolsHtml) out+=extToolsHtml;
     const key=treeKey(scope,n.id);
     const expanded=state.expanded[key]!==undefined ? state.expanded[key] : !!n.expanded;
     const hasKids=n.children && n.children.length;
@@ -345,6 +351,11 @@ function renderTreeRows(nodes,depth,scope,readonly){
       +svg(n.icon,'tree-ico')
       +'<span class="tree-label" title="'+n.label+'">'+n.label+(n.badge?'<span class="sub">'+n.badge+'</span>':'')+(n.note?'<span class="sub">'+n.note+'</span>':'')+'</span>'
       +'<span class="tree-pill '+pillCls+'">'+pillText+'</span>'
+      +(hasKids && !readonly ? '<span class="row-bulk">'
+        +'<button data-suball="all" data-subnode="'+n.id+'" title="全选">全</button>'
+        +'<button data-suball="none" data-subnode="'+n.id+'" title="全不选">无</button>'
+        +'<button data-suball="invert" data-subnode="'+n.id+'" title="反选">反</button>'
+      +'</span>' : '')
       +'<span class="tree-size">'+fmtMB(n.mb)+'</span>'
       +(n.uploadable?'<button class="tree-mini" data-upload="'+n.id+'">上传</button>':'')
       +'</div>';
@@ -355,42 +366,65 @@ function renderTreeRows(nodes,depth,scope,readonly){
   return out;
 }
 
-/* 一张标准图表卡：卷号 + 本卷容量 + 工具条 + 树 + 勾选摘要。
-   勾选/展开状态按 scope 记忆，所以多包多卷各改各的、互不串。 */
+/* 一张标准图表卡：包序号 + 卷号 + 本卷容量 + 全选 + 树 + 勾选摘要。
+   导入/导出序号在卡片 DOM 内；每一级（卡/分类/子目录）都可全选/全不选/反选。 */
 function chartCardHtml(o){
   const collapsed = state.collapsedVol[o.key]!==undefined ? !!state.collapsedVol[o.key] : !!o.defaultCollapsed;
   syncAncestors(o.nodes,o.scope);
   const sum=sumSelected(o.nodes,o.scope);
   const dis = !!o.disabled;
   return '<div class="vol-card'+(collapsed?' is-collapsed':'')+(dis?' is-disabled':'')+'" data-scope="'+o.scope+'" data-volkey="'+o.key+'"'+(dis?' aria-disabled="true"':'')+'>'
-    +(o.hideHead?'':'<div class="vol-head">'
+    +'<div class="vol-head">'
       +'<span class="vol-idx">'+o.idxText+'</span>'
+      +(o.volText?'<span class="vol-cap">'+o.volText+'</span>':'')
       +(o.capText?'<span class="vol-cap'+(o.over?' is-over':'')+'">'+o.capText+'</span>':'')
       +(o.over?'<span class="vol-flag">超单卷上限</span>':'')
       +'<span class="vol-spacer"></span>'
       +(o.totalText?'<span class="vol-total">'+o.totalText+'</span>':'')
-      +'<button class="vol-collapse" data-voltoggle="'+o.key+'" aria-label="展开或收起">'
-      +'<svg class="chev" viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5l7 7-7 7"/></svg></button>'
-    +'</div>')
-    +'<div class="vol-body">'
-      +(o.noticeHtml||'')
-      +(dis?'':'<div class="tree-tools">'
+      +(dis || o.readonly ? '' : '<span class="vol-bulk">'
         +'<button data-treeall="1">全选</button>'
         +'<button data-treenone="1">全不选</button>'
         +'<button data-treeinvert="1">反选</button>'
-        +'<span class="spacer"></span><span class="hint">大类折叠到文件</span>'
-      +'</div>')
-      +'<div class="chart-tree">'+renderTreeRows(o.nodes,0,o.scope,o.readonly||dis)+'</div>'
+      +'</span>')
+      +(o.pkgId?'<button class="group-close" data-closegroup="'+o.pkgId+'" aria-label="关闭该包图表">×</button>':'')
+      +'<button class="vol-collapse" data-voltoggle="'+o.key+'" aria-label="展开或收起">'
+      +'<svg class="chev" viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5l7 7-7 7"/></svg></button>'
+    +'</div>'
+    +'<div class="vol-body">'
+      +(o.noticeHtml||'')
+      +'<div class="chart-tree">'+renderTreeRows(o.nodes,0,o.scope,o.readonly||dis,o.extToolsHtml)+'</div>'
       +(dis?'':'<div class="chart-foot"><span>已选 '+sum.count+' 项 · 预计 '+fmtMB(sum.mb)+'</span></div>')
     +'</div>'
   +'</div>';
+}
+
+/** 扩展组内的模式/ Git / 构建配置控件（只有完整扩展时才显示 Git）。 */
+function extensionToolsHtml(pkg){
+  const hasExt = (pkg?.extensions && pkg.extensions.length) || !!findNode(pkg?.nodes || [], 'group:extensions');
+  if(!hasExt) return '';
+  const full = state.extensionMode !== EXTENSION_MODES.MANIFEST;
+  return '<div class="extension-tools" data-exttools="1">'
+    +'<span class="et-label">扩展</span>'
+    +'<div class="segmented et-mode">'
+      +'<button class="seg-btn'+(full?' active':'')+'" data-extmode="full">完整扩展</button>'
+      +'<button class="seg-btn'+(full?'':' active')+'" data-extmode="manifest">仅清单</button>'
+    +'</div>'
+    +(full
+      ? '<label class="et-git"><span>Git</span><select class="text_pole" data-gitmode>'
+          +'<option value="keep"'+(state.gitMode===GIT_MODES.KEEP?' selected':'')+'>保留历史</option>'
+          +'<option value="minimal"'+(state.gitMode===GIT_MODES.MINIMAL?' selected':'')+'>只留更新所需</option>'
+          +'<option value="strip"'+(state.gitMode===GIT_MODES.STRIP?' selected':'')+'>不含历史</option>'
+        +'</select></label>'
+        +'<label class="check et-keepdev"><input type="checkbox" data-keepdev'+(state.keepDev?' checked':'')+'> 保留构建配置</label>'
+      : '')
+    +'</div>';
 }
 
 function renderBatchBar(targets){
   const bar=document.getElementById('batch-bar');
   const pkgs=targets.filter(t=>t.pkg).map(t=>t.pkg);
   if(pkgs.length<2){ bar.hidden=true; bar.innerHTML=''; return; }
-  const vols=pkgs.reduce((a,p)=>a+volumesOf(p,scaledNodes(p)).length,0);
+  const vols=pkgs.reduce((a,p)=>a+volumesOf(p,packageNodes(p).nodes).length,0);
   bar.hidden=false;
   bar.innerHTML='<span class="lbl"><span class="scope">已选 '+pkgs.length+' 个包</span> · 共 '+vols+' 张图表</span>'
     +'<button data-batchall="1">全选全部</button>'
@@ -422,26 +456,23 @@ function renderChart(){
       return;
     }
     const pkg=t.pkg;
-    const tree={ nodes: scaledNodes(pkg) };
+    const tree=packageNodes(pkg);
     const vols=volumesOf(pkg, tree.nodes);
     const multi=vols.length>1;
     const notice=tree.unrecognized ? '<div class="chart-unavailable"><b>未识别包</b><br>逐文件列出，不提供转换；只能存储、导出或删除。</div>' : '';
+    const extTools=extensionToolsHtml(pkg);
     html+='<div class="chart-group">'
-      +'<div class="chart-group-head">'
-        +'<span class="g-name">'+seqLabel(pkg)+'</span>'
-        +'<span>'+pkg.size+'</span>'
-        +(multi?'<span>· '+vols.length+' 卷</span>':'')
-        +'<span style="flex:1"></span>'
-        +'<button class="group-close" data-closegroup="'+pkg.id+'" aria-label="关闭该包图表">×</button>'
-      +'</div>'
       +'<div class="vol-grid" data-vols="'+vols.length+'">'
       + vols.map(v=>chartCardHtml({
           key:pkg.id+'-'+v.i, scope:'pkg:'+pkg.id, nodes:v.nodes,
-          idxText: multi ? ('卷 '+v.i+'/'+v.n) : '整包',
+          idxText: seqLabel(pkg),
+          volText: multi ? ('卷 '+v.i+'/'+v.n) : '整包',
           capText: fmtMB(v.mb),
           totalText: multi ? ('整包 '+pkg.size) : '',
           noticeHtml: notice, readonly: pkg.zone==='export',
-          over: !!v.over, hideHead: !multi,
+          over: !!v.over,
+          pkgId: pkg.id,
+          extToolsHtml: extTools,
           defaultCollapsed: state.view==='mobile' && multi && v.i>1
         })).join('')
       +'</div></div>';
@@ -977,6 +1008,11 @@ function bind(){
       renderChart(); toast('单卷容量限定 '+SPLIT_MIN+'–'+SPLIT_MAX+' MB');
     }
   });
+  const compressionSelect=document.getElementById('compression-select');
+  if(compressionSelect){
+    compressionSelect.value=state.compression;
+    compressionSelect.addEventListener('change',e=>{ state.compression=e.target.value; });
+  }
   document.getElementById('filename-template').addEventListener('input',renderFilenamePreview);
 
   const stackEl=document.getElementById('chart-stack');
@@ -988,8 +1024,9 @@ function bind(){
     }
     return hostNodes(state.host).nodes;
   };
-  const applyTreeAll=(scope,mode,quiet)=>{
-    walk(nodesForScope(scope),n=>{
+  const applyTreeAll=(scope,mode,quiet,rootNode)=>{
+    const nodes = rootNode ? [rootNode] : nodesForScope(scope);
+    walk(nodes,n=>{
       if(!n.children || !n.children.length){
         const cur=isChecked(n,scope);
         state.sel[treeKey(scope,n.id)] = mode==='all' ? true : mode==='none' ? false : !cur;
@@ -1004,6 +1041,19 @@ function bind(){
   };
 
   stackEl.addEventListener('click',e=>{
+    const extMode=e.target.closest('[data-extmode]');
+    if(extMode){
+      state.extensionMode = extMode.dataset.extmode==='manifest' ? EXTENSION_MODES.MANIFEST : EXTENSION_MODES.FULL;
+      renderChart();
+      return;
+    }
+    const sub=e.target.closest('[data-suball]');
+    if(sub){
+      const scope=scopeFromEl(sub); if(!scope) return;
+      const node=findNode(nodesForScope(scope),sub.dataset.subnode);
+      if(node) applyTreeAll(scope,sub.dataset.suball,false,node);
+      return;
+    }
     const bulk=e.target.closest('[data-treeall],[data-treenone],[data-treeinvert]');
     if(bulk){
       const scope=scopeFromEl(bulk); if(!scope) return;
@@ -1029,6 +1079,13 @@ function bind(){
     }
   });
   stackEl.addEventListener('change',e=>{
+    const git=e.target.closest('[data-gitmode]');
+    if(git){
+      state.gitMode = [GIT_MODES.KEEP,GIT_MODES.MINIMAL,GIT_MODES.STRIP].includes(git.value) ? git.value : GIT_MODES.KEEP;
+      return;
+    }
+    const keepDev=e.target.closest('[data-keepdev]');
+    if(keepDev){ state.keepDev = !!keepDev.checked; return; }
     const cb=e.target.closest('[data-check]'); if(!cb) return;
     const scope=scopeFromEl(cb); if(!scope) return;
     const n=findNode(nodesForScope(scope),cb.dataset.check); if(!n) return;
@@ -1186,12 +1243,27 @@ initSplitters();
   function getExcludedPaths(pkg) {
     const scope = 'pkg:' + pkg.id;
     const excluded = new Set();
-    walk(pkg.nodes || [], (n) => {
+    walk(packageNodes(pkg).nodes, (n) => {
       if (n.children && n.children.length) return;
       if (n.action === 'DROP') return;
       if (!isChecked(n, scope)) excluded.add(n.label && n.path ? n.path : n.id);
     });
     return excluded;
+  }
+
+  function getExportOptions(pkg) {
+    const scope = 'pkg:' + pkg.id;
+    return deriveExportOptions({
+      nodes: packageNodes(pkg).nodes,
+      isChecked: (n) => isChecked(n, scope),
+      ui: {
+        compression: state.compression,
+        extensionMode: state.extensionMode,
+        gitMode: state.gitMode,
+        keepDev: state.keepDev,
+        target: state.target,
+      },
+    });
   }
 
   return {
@@ -1240,7 +1312,8 @@ initSplitters();
     toast,
     renderAll,
     getExcludedPaths,
-    getVolumes(pkg) { return volumesOf(pkg, scaledNodes(pkg)); },
+    getExportOptions,
+    getVolumes(pkg) { return volumesOf(pkg, packageNodes(pkg).nodes); },
     getState() { return state; },
     openTutorial,
     renderLog,

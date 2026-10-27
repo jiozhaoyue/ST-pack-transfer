@@ -198,17 +198,16 @@ export function buildOfficialIndex(extensions) {
     (ext) => ext.availability === AVAILABILITY.INSTALLABLE && isInstallableUrl(ext.url),
   );
   if (usable.length === 0) return null;
-  return {
-    extension: usable.map(({ id, displayName, name, description, url, branch, commit, type }) => ({
-      id,
-      name: displayName || name,
-      description,
-      url,
-      branch,
-      commit,
-      type,
-    })),
-  };
+  // SillyTavern 官方 index.json 是**扁平数组**：downloadAssetsList 明确
+  // `if (!Array.isArray(json)) throw`；扩展条目只含 id/type/name/description/url。
+  // 不得包成 { extension: [...] }（2026-10-27 实测官方 index.json 形状）。
+  return usable.map(({ id, displayName, name, description, url }) => ({
+    id,
+    type: 'extension',
+    name: displayName || name,
+    description,
+    url,
+  }));
 }
 
 /**
