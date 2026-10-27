@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-2.md`
-- **Total Sessions**: 50
-- **Last Active**: 2026-10-26
+- **Total Sessions**: 58
+- **Last Active**: 2026-10-27
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-2.md` | ~233 | Active |
+| `journal-2.md` | ~575 | Active |
 | `journal-1.md` | ~2491 | Archived |
 <!-- @@@/auto:active-documents -->
 
@@ -30,6 +30,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 58 | 2026-10-27 | 宿主图表 / 设置收敛 / 图表唯一选择面 / i18n / 教程定位 | `00dc830`, `f5c02c2`, `9aed39a`, `e0cfdcd`, `53a7792` | `main` |
 | 50 | 2026-10-26 | r2 任务群全线推进：luker 取证/tt-cdp/e2e:instances 错峰模型/harness 回流四件套/Authority ST 适配器（交接） | `098e158` | `main` |
 | 49 | 2026-10-25 | B/C 线三子任务登记 + Luker selection 契约七轮取证定案（luker-selection-max 完结归档） | `2dd2055`, `a29fdc8` | `main` |
 | 48 | 2026-10-24 | A 线收口——四脚本入库、任务登记归档、journal 断档修复、spec index 补登记 | `f793e6c`, `1d5ae0d`, `cc16777`, `0057175`, `4b2734b` | `main` |

@@ -529,3 +529,47 @@ E2E 重写为两个独立上下文、3 MB + 64 KB 两包排队，**24/24 通过*
 - ② 等用户确认「打包选项回图表」的具体落点（尤其压缩）
 - ③ 再做 P0 修复与四宿主复跑
 
+
+
+## Session 58: 宿主图表 / 设置收敛 / 图表唯一选择面 / i18n / 教程定位
+<!-- trellis-session: v=2 fp=0d44c10c2bf2cb7c -->
+
+**Date**: 2026-10-27
+**Task**: 宿主图表 / 设置收敛 / 图表唯一选择面 / i18n / 教程定位
+**Branch**: `main`
+
+### Summary
+
+任务 1/2 已提交；任务 3 主 UI i18n 与教程锚点完成；交接迁入 Trellis 任务目录；剩余 LAN/导出区/二维码 i18n、截图、四宿主复验。
+
+### Main Changes
+
+- 任务 1：宿主图表置灰 + 设置只留 3 开关 + 齿轮 + 持久化
+- 任务 2：图表正向节点 + 扩展完整/仅清单 + 官方扁平 index.json
+- 任务 3：i18n zh-CN/en-US 293 键 + 教程锚点 + check:i18n 守卫
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `00dc830` | feat(ui): 宿主图表置灰与设置收敛 |
+| `f5c02c2` | feat(chart): 图表唯一选择面与官方扩展清单 |
+| `9aed39a` | feat(i18n): 主工作台 i18n 与教程锚点 |
+| `e0cfdcd` | docs(handover): 全面交接 i18n / 图表 / 设置与未完成项 |
+| `53a7792` | chore(trellis): 交接迁入任务目录 + 任务状态收口 |
+
+### Testing
+
+- [PARTIAL] npm test：903 passed / 1 failed / 2 skipped（隔离守卫全量失败，单跑 5/5）
+- [OK] 六守卫全绿（css/dom-injection/template/dom-scope/control-consumer/i18n）
+- [PENDING] UI 截图与四宿主复验未做（预览工具不可用）
+
+### Status
+
+[PARTIAL] **任务 1/2 代码完成；任务 3 主 UI i18n 完成；剩余 LAN/导出区/二维码 i18n、截图、四宿主复验、任务 archive**
+
+### Next Steps
+
+- 迁移 LAN/导出区/二维码 i18n 并扩 SCAN_FILES
+- 定位隔离守卫全量失败
+- UI 截图 + 四宿主复验 + 任务 archive
