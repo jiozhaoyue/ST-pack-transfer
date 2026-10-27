@@ -1,0 +1,2 @@
+{"file": ".trellis/spec/frontend/workbench-single-view.md", "reason": "验收核对单视图契约与视图 API 不被破坏"}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "验收执行质量门槛与守卫"}
