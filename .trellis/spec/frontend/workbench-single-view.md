@@ -185,6 +185,37 @@ TauriTavern 的阶段+进度事件 / 原子落盘 / 自然续传 / 地址发现�
 
 ---
 
+### 7.2 交互模型二次重做（2026-10-27 · demo 已完成、正式接线待做）
+
+用户四轮评审定稿，**推翻**「独立浮层 + 发送/接收两个绝对页签」：
+
+| 项 | 定稿 |
+| --- | --- |
+| 承载面 | **执行卡内可折叠区块**（`#lan-block`），不做独立弹窗；不设绝对页签 |
+| 一屏 | 发送在上、接收在下；移动端接收在上（CSS `order:-1`） |
+| 发送源 | **只发导入区当前勾选的包**；多选时逐个排队 |
+| 接收落地 | **直接进唯一的导入区**，自动选中；不弹确认 |
+| 来源徽标 | **不新造**「来自设备」；沿用文件名下 `.pkg-meta` 的徽标：`本地导入` / `远程导入` |
+| 宿主 | 接收后仍**扫包**判定 layout；图标角标显示 ST/L/TT/PT |
+| 二维码 | 文本码 + QR 同显；`getUserMedia({facingMode:'environment'})` + jsQR 解码；权限失败提示且粘贴始终可用 |
+| 扫码后 | 取件码自动 accept、应答码自动 apply（扫码即继续） |
+| 失败 | 新取件码 + 按 `fileId` 续传；显示已收比例 |
+| 同名 | 远程接收自动加序号，不覆盖 |
+
+**二维码来源**：`qrcode-generator` 2.0.4（MIT，编码）+ `jsQR` 1.4.0（Apache-2.0，解码），
+本地 vendor 到 `src/vendor/`；根许可证 **AGPL-3.0**。demo 用 classic `<script>` 加载（`file://` 可跑），
+正式侧需 `src/ui/qr.js` 适配（注意 qrcode-generator 在 ESM 下不自动挂 window）。
+
+**当前状态（交接时）**：demo 三区已完成并同步到 `style.css` / `workbench-template.js` /
+`workbench-view.js`；`index.js` 尚未提供 `actions.lan` / `qr`，旧 `lan-transfer-panel.js` 仍是浮层实现，
+正式插件内新 LAN 区块不可用。**下一步见 `10-14-lan-transfer/HANDOFF.md`。**
+
+**布局约束**：局域网展开时包区让出高度（`.col-side.lan-open > .zone-card{flex:0 0 28%}`），
+执行卡内部滚动；旧的 `inset:0` 全屏浮层在 TT 会塌陷（TT 的 `<html>` 有 transform 且高 0），
+全屏浮层一律 `100vw × 100vh`。
+
+---
+
 ## 9. UI 单一源（2026-10-27 用户裁定）
 
 **规则**：`src/ui/ui-demo.html` 是**唯一可编辑的 UI 源**；正式三件套

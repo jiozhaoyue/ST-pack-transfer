@@ -9,7 +9,7 @@
  *   · 动作：`actions.*`（拉取 / 生成 / 恢复 / 复制 / 删除 / 下载 / 设置 / 关闭）
  */
 
-export function createWorkbenchView({ actions = {} } = {}) {
+export function createWorkbenchView({ actions = {}, qr = null } = {}) {
 
 /* ═══════════════════════════════════════════════════════════════
    静态资源：四酒馆 icon（本地内置，无 CDN）
@@ -86,7 +86,12 @@ const state = {
   noTrafficPrompt:false, keepExport:true,
   storage:{ browser:null, host:null },
   sort:'time-desc', filter:'all', tutorialStep:0, tutorialOpen:false, tutorialKind:'basic',
-  sourceKey:'host:luker', seq:{}, libraryExport:false
+  sourceKey:'host:luker', seq:{}, libraryExport:false,
+  lan:{
+    open:false, scanning:null, scanError:'',
+    send:{ code:'', answer:'', phase:'准备就绪', pct:0, detail:'', busy:false, done:false },
+    recv:{ code:'', phase:'等待取件码', pct:0, detail:'', busy:false, done:false }
+  }
 };
 
 /* ── 工具 ── */
@@ -529,12 +534,16 @@ function renderZones(){
   if(state.zone==='import'){
     html+='<div class="dropzone" id="dropzone"><span class="big">选择数据包</span>上传 zip 或从宿主拉取</div>';
     html+='<div class="zone-toolbar">'+hostFilterHtml()+'<label>排序 <select id="sort-select">'
-      +'<option value="time-desc"'+(state.sort==='time-desc'?' selected':'')+'>导入时间倒序</option>'
+      +'<option value="time-desc"'+(state.sort==='time-desc'?' selected':'')+'>时间倒序</option>'
       +'<option value="name"'+(state.sort==='name'?' selected':'')+'>名称</option>'
       +'<option value="size"'+(state.sort==='size'?' selected':'')+'>大小</option>'
       +'</select></label><span class="spacer"></span></div>';
   }else{
-    html+='<div class="zone-toolbar">'+hostFilterHtml()+'<span class="spacer"></span></div>';
+    html+='<div class="zone-toolbar">'+hostFilterHtml()+'<label>排序 <select id="sort-select">'
+      +'<option value="time-desc"'+(state.sort==='time-desc'?' selected':'')+'>时间倒序</option>'
+      +'<option value="name"'+(state.sort==='name'?' selected':'')+'>名称</option>'
+      +'<option value="size"'+(state.sort==='size'?' selected':'')+'>大小</option>'
+      +'</select></label><span class="spacer"></span></div>';
   }
   if(list.length===0){
     html+='<div class="zone-empty">'+(state.zone==='import'?'导入区为空':'导出区为空')+'</div>';
@@ -579,7 +588,6 @@ function fitPackageNames(){
 function renderActions(){
   const row=document.getElementById('action-row');
   const hasSel=state.selectedPkgs.size>0;
-  const lanBtn='<button class="btn" id="btn-lan-send">'+svg('bolt','ico')+'发送到另一台设备</button>';
   const libBtn=state.libraryExport
     ? '<button class="btn" id="btn-library-export">'+svg('db','ico')+'从聊天库导出</button>'
     : '';
@@ -588,7 +596,7 @@ function renderActions(){
       '<button class="btn" id="btn-fetch">'+svg('cloud','ico')+'从宿主拉取</button>'
       +'<button class="btn accent" id="btn-generate"'+(hasSel?'':' disabled')+'>'+svg('archive','ico')+'生成导出包</button>'
       +'<button class="btn" id="btn-merge"'+(state.selectedPkgs.size>1?'':' disabled')+'>'+svg('copy','ico')+'合并上传</button>'
-      +libBtn+lanBtn;
+      +libBtn;
     row.querySelector('#btn-generate')?.addEventListener('click',()=>doGenerate());
     row.querySelector('#btn-merge')?.addEventListener('click',()=>doMerge());
     row.querySelector('#btn-library-export')?.addEventListener('click',()=>actions.libraryExport?.());
@@ -596,14 +604,126 @@ function renderActions(){
     row.innerHTML=
       '<button class="btn" id="btn-download"'+(hasSel?'':' disabled')+'>'+svg('file','ico')+'下载</button>'
       +'<button class="btn accent" id="btn-upload"'+(hasSel?'':' disabled')+'>'+svg('cloud','ico')+'回传宿主</button>'
-      +'<button class="btn" id="btn-copyback"'+(hasSel?'':' disabled')+'>'+svg('folder','ico')+'复制回导入区</button>'
-      +lanBtn;
+      +'<button class="btn" id="btn-copyback"'+(hasSel?'':' disabled')+'>'+svg('folder','ico')+'复制回导入区</button>';
     row.querySelector('#btn-download')?.addEventListener('click',()=>{ actions.download?.([...state.selectedPkgs]); });
     row.querySelector('#btn-upload')?.addEventListener('click',()=>doUploadHost());
     row.querySelector('#btn-copyback')?.addEventListener('click',()=>doCopyBack());
   }
   row.querySelector('#btn-fetch')?.addEventListener('click',()=>doFetch());
-  row.querySelector('#btn-lan-send')?.addEventListener('click',()=>actions.lan?.());
+  renderLan();
+}
+
+/* ── 渲染：局域网互传（执行卡内联） ── */
+function lanTargets(){
+  return [...state.selectedPkgs]
+    .map(id=>state.packages.find(p=>p.id===id))
+    .filter(p=>p && p.zone==='import');
+}
+function lanSummaryText(){
+  const t=lanTargets();
+  if(!t.length) return '在数据包区勾选要发送的包';
+  const mb=t.reduce((a,p)=>a+(p.mb||0),0);
+  return '已选 '+t.length+' 个包 · '+fmtMB(mb);
+}
+function setLanBar(fillId, pctId, pct){
+  const f=document.getElementById(fillId); if(f) f.style.width=Math.max(0,Math.min(100,Number(pct)||0))+'%';
+  const p=document.getElementById(pctId); if(p) p.textContent=Math.round(Number(pct)||0)+'%';
+}
+function setLanQr(id, text, show){
+  const box=document.getElementById(id); if(!box) return;
+  if(!show || !text || typeof qr?.encodeSvg!=='function'){ box.hidden=true; box.innerHTML=''; return; }
+  try { box.innerHTML=qr.encodeSvg(text); box.hidden=false; }
+  catch { box.hidden=true; box.innerHTML=''; }
+}
+function renderLan(){
+  const L=state.lan;
+  const body=document.getElementById('lan-body');
+  const toggle=document.getElementById('lan-toggle');
+  if(!body||!toggle) return;
+  toggle.setAttribute('aria-expanded',String(!!L.open));
+  body.hidden=!L.open;
+  document.querySelector('.col-side')?.classList.toggle('lan-open', !!L.open);
+  const hint=document.getElementById('lan-toggle-hint');
+  if(hint){
+    const s=L.send.busy?('发送 '+Math.round(L.send.pct)+'%'):'';
+    const r=L.recv.busy?('接收 '+Math.round(L.recv.pct)+'%'):'';
+    hint.textContent=[s,r].filter(Boolean).join(' · ') || '发送或接收数据包';
+  }
+  const targets=lanTargets();
+  const sum=document.getElementById('lan-send-summary'); if(sum) sum.textContent=lanSummaryText();
+  const gen=document.getElementById('lan-btn-generate');
+  if(gen) gen.disabled=!targets.length || L.send.busy;
+  const sendCode=document.getElementById('lan-send-code');
+  if(sendCode && document.activeElement!==sendCode) sendCode.value=L.send.code||'';
+  const copySend=document.getElementById('lan-btn-copy-send'); if(copySend) copySend.hidden=!L.send.code;
+  setLanQr('lan-send-qr',L.send.code,!!L.send.code);
+  const answer=document.getElementById('lan-answer-input');
+  if(answer && document.activeElement!==answer) answer.value=L.send.answer||'';
+  const apply=document.getElementById('lan-btn-apply-answer');
+  if(apply) apply.disabled=L.send.busy || !L.send.code;
+  const scanAnswer=document.getElementById('lan-btn-scan-answer');
+  if(scanAnswer) scanAnswer.hidden=!L.send.code;
+  const retry=document.getElementById('lan-btn-retry'); if(retry) retry.hidden=!L.send.error;
+  const cancel=document.getElementById('lan-btn-cancel'); if(cancel) cancel.hidden=!L.send.busy;
+  const sp=document.getElementById('lan-send-phase'); if(sp) sp.textContent=L.send.phase||'准备就绪';
+  const sd=document.getElementById('lan-send-detail'); if(sd) sd.textContent=L.send.detail||'';
+  setLanBar('lan-send-bar','lan-send-pct',L.send.pct);
+  const offer=document.getElementById('lan-offer-input');
+  if(offer && document.activeElement!==offer) offer.value=L.recv.offer||'';
+  const recvCode=document.getElementById('lan-recv-code');
+  if(recvCode && document.activeElement!==recvCode) recvCode.value=L.recv.code||'';
+  const copyRecv=document.getElementById('lan-btn-copy-recv'); if(copyRecv) copyRecv.hidden=!L.recv.code;
+  setLanQr('lan-recv-qr',L.recv.code,!!L.recv.code);
+  const accept=document.getElementById('lan-btn-accept'); if(accept) accept.disabled=L.recv.busy;
+  const abandon=document.getElementById('lan-btn-abandon'); if(abandon) abandon.hidden=!L.recv.busy;
+  const rp=document.getElementById('lan-recv-phase'); if(rp) rp.textContent=L.recv.phase||'等待取件码';
+  const rd=document.getElementById('lan-recv-detail'); if(rd) rd.textContent=L.recv.detail||'';
+  setLanBar('lan-recv-bar','lan-recv-pct',L.recv.pct);
+  const scanBox=document.getElementById('lan-scan'); if(scanBox) scanBox.hidden=!L.scanning;
+  const scanHint=document.getElementById('lan-scan-hint');
+  if(scanHint) scanHint.textContent=L.scanning==='answer'?'把应答码对准摄像头':'把取件码对准摄像头';
+  const err=document.getElementById('lan-scan-error');
+  if(err){ err.hidden=!L.scanError; err.textContent=L.scanError||''; }
+}
+
+let stopLanScan=null;
+function finishLanScan(){
+  if(stopLanScan){ try{ stopLanScan(); }catch{ /* 已停止 */ } stopLanScan=null; }
+  state.lan.scanning=null;
+  renderLan();
+}
+async function copyLanText(text){
+  if(!text) return;
+  try { await navigator.clipboard.writeText(text); toast('已复制'); }
+  catch { toast('复制失败，请手动选择'); }
+}
+async function startLanScan(kind){
+  if(typeof qr?.scan!=='function'){ toast('当前环境不支持扫码'); return; }
+  state.lan.scanError=''; state.lan.scanning=kind; renderLan();
+  try {
+    stopLanScan=await qr.scan({
+      video:document.getElementById('lan-scan-video'),
+      canvas:document.getElementById('lan-scan-canvas'),
+      onResult:(text)=>{
+        finishLanScan();
+        if(kind==='offer'){
+          const el=document.getElementById('lan-offer-input');
+          if(el) el.value=text;
+          state.lan.recv.offer=text;
+          actions.lan?.acceptOffer?.(text);
+        }else{
+          const el=document.getElementById('lan-answer-input');
+          if(el) el.value=text;
+          state.lan.send.answer=text;
+          actions.lan?.applyAnswer?.(text);
+        }
+      },
+      onError:(msg)=>{ state.lan.scanError=msg||'相机不可用'; finishLanScan(); },
+    });
+  } catch(err) {
+    state.lan.scanError=err?.message||'相机不可用';
+    finishLanScan();
+  }
 }
 
 /* ── 渲染：日志 ── */
@@ -783,6 +903,33 @@ function bind(){
   document.getElementById('btn-close')?.addEventListener('click',()=>actions.close?.());
 
   document.querySelectorAll('[data-help]').forEach(b=>b.addEventListener('click',e=>{ e.stopPropagation(); openHelp(b,b.dataset.help); }));
+
+  // ── 局域网互传（执行卡内联）──
+  document.getElementById('lan-toggle').addEventListener('click',()=>{
+    state.lan.open=!state.lan.open;
+    renderLan();
+  });
+  document.getElementById('lan-btn-generate').addEventListener('click',()=>actions.lan?.generate?.());
+  document.getElementById('lan-btn-copy-send').addEventListener('click',()=>{
+    copyLanText(document.getElementById('lan-send-code')?.value||'');
+  });
+  document.getElementById('lan-btn-apply-answer').addEventListener('click',()=>{
+    actions.lan?.applyAnswer?.(document.getElementById('lan-answer-input')?.value.trim()||'');
+  });
+  document.getElementById('lan-btn-accept').addEventListener('click',()=>{
+    actions.lan?.acceptOffer?.(document.getElementById('lan-offer-input')?.value.trim()||'');
+  });
+  document.getElementById('lan-btn-copy-recv').addEventListener('click',()=>{
+    copyLanText(document.getElementById('lan-recv-code')?.value||'');
+  });
+  document.getElementById('lan-btn-retry').addEventListener('click',()=>actions.lan?.retry?.());
+  document.getElementById('lan-btn-cancel').addEventListener('click',()=>{ finishLanScan(); actions.lan?.cancel?.(); });
+  document.getElementById('lan-btn-abandon').addEventListener('click',()=>actions.lan?.abandon?.());
+  document.getElementById('lan-btn-scan-offer').addEventListener('click',()=>startLanScan('offer'));
+  document.getElementById('lan-btn-scan-answer').addEventListener('click',()=>startLanScan('answer'));
+  document.getElementById('lan-scan-cancel').addEventListener('click',()=>finishLanScan());
+  document.getElementById('lan-answer-input').addEventListener('input',(e)=>{ state.lan.send.answer=e.target.value; });
+  document.getElementById('lan-offer-input').addEventListener('input',(e)=>{ state.lan.recv.offer=e.target.value; });
 
   document.getElementById('zone-tabs').addEventListener('click',e=>{
     const b=e.target.closest('.zone-tab'); if(!b) return;
@@ -1069,6 +1216,14 @@ initSplitters();
       }
     },
     setProgress,
+    setLan(next = {}) {
+      if ('open' in next) state.lan.open = !!next.open;
+      if (next.send) Object.assign(state.lan.send, next.send);
+      if (next.recv) Object.assign(state.lan.recv, next.recv);
+      if ('scanError' in next) state.lan.scanError = next.scanError;
+      renderLan();
+    },
+    getLan() { return state.lan; },
     setStorage(next) {
       state.storage = { ...state.storage, ...(next || {}) };
       renderQuota();

@@ -39,6 +39,34 @@
 - [x] E2 非安全上下文（TT/PT 若为 http 非 localhost）显示不可直连且按钮禁用（`probeDirectCapability` 单测覆盖；本轮四实例均为 localhost 安全上下文，未真机复现）
 - [x] E3 截图留证（独立 Web 生产页 / demo 页 / TT 矩阵截图）
 
+## G. 新 UI 二次重做（2026-10-27，执行卡内联 · 发送/接收同屏 · 二维码）
+
+> 详细交接：`.trellis/tasks/10-14-lan-transfer/HANDOFF.md`
+
+### G1 demo（已完成）
+
+- [x] G1.1 执行卡内可折叠「局域网互传」区块（`#lan-block` / `#lan-toggle`）
+- [x] G1.2 发送在上、接收在下；移动端接收在上（CSS `order:-1`）
+- [x] G1.3 发送源＝导入区勾选包（`#lan-send-summary`）
+- [x] G1.4 取件码/应答码文本 + 二维码同显
+- [x] G1.5 相机扫码（getUserMedia + jsQR），权限失败提示并保留粘贴
+- [x] G1.6 发送/接收各自行内进度 + 状态；折叠标题显示活动百分比
+- [x] G1.7 接收包直接进导入区，来源徽标 `远程导入`，自动选中
+- [x] G1.8 导出区也可排序（时间/名称/大小）
+- [x] G1.9 文本框走主题变量，全区块有内边距
+- [x] G1.10 浏览器探针零错误 + 桌面/移动端截图
+
+### G2 正式接线（未完成）
+
+- [ ] G2.1 `src/ui/qr.js` + `index.js` 传入 `qr`
+- [ ] G2.2 `lan-transfer-panel.js` 去浮层、绑定模板 id、`view.setLan`
+- [ ] G2.3 `index.js` 提供 `actions.lan` 与 `getSendTargets`
+- [ ] G2.4 `ORIGINS.LAN` + 徽标映射（本地导入/远程导入）
+- [ ] G2.5 远程接收自动加序号 + 扫包得宿主
+- [ ] G2.6 多包队列发送
+- [ ] G2.7 更新 LAN E2E 规格 + 四宿主/六对复跑
+- [ ] G2.8 PT 快照重装；真机双设备 AC-10
+
 ## F. 收口
 
 - [x] F1 更新 `.trellis/spec/frontend/workbench-single-view.md §7`（含 7.1 实现与落盘硬规则、§9 UI 单一源）

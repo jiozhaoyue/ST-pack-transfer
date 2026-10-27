@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "SillyTavern / Luker / PureTavern / TauriTavern 数据包转运工具",
   "type": "module",
-  "license": "GPL-3.0-or-later",
+  "license": "AGPL-3.0-or-later",
   "engines": {
     "node": ">=18"
   },

@@ -110,6 +110,81 @@ export function getWorkbenchHtml() {
             </div>
           </div>
           <div class="action-row" id="action-row"></div>
+
+          <div class="lan-block" id="lan-block">
+            <button class="lan-toggle" id="lan-toggle" aria-expanded="false">
+              <svg class="lan-toggle-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M13 3L5 14h6l-1 7 8-11h-6z"/></svg>
+              <span>局域网互传</span>
+              <span class="lan-toggle-hint" id="lan-toggle-hint">发送或接收数据包</span>
+              <svg class="lan-chev" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5l7 7-7 7"/></svg>
+            </button>
+            <div class="lan-body" id="lan-body" hidden>
+              <div class="lan-scan" id="lan-scan" hidden>
+                <video id="lan-scan-video" playsinline muted></video>
+                <div class="lan-scan-actions">
+                  <span id="lan-scan-hint">把取件码对准摄像头</span>
+                  <button type="button" id="lan-scan-cancel">取消</button>
+                </div>
+                <canvas id="lan-scan-canvas" hidden></canvas>
+              </div>
+              <p class="lan-scan-error" id="lan-scan-error" hidden></p>
+
+              <section class="lan-send" id="lan-send">
+                <div class="lan-sec-head">
+                  <span class="lan-sec-title">发送</span>
+                  <span class="lan-sec-note" id="lan-send-summary">在数据包区勾选要发送的包</span>
+                </div>
+                <div class="lan-field">
+                  <div class="lan-label"><span>取件码</span><button type="button" class="lan-link" id="lan-btn-copy-send" hidden>复制</button></div>
+                  <textarea class="text_pole lan-code" id="lan-send-code" rows="2" readonly placeholder="勾选包后生成"></textarea>
+                  <div class="lan-qr" id="lan-send-qr" hidden></div>
+                </div>
+                <div class="lan-row">
+                  <button type="button" class="menu_button" id="lan-btn-generate">生成取件码</button>
+                  <button type="button" class="menu_button" id="lan-btn-retry" hidden>重试</button>
+                  <button type="button" class="menu_button" id="lan-btn-cancel" hidden>取消</button>
+                </div>
+                <div class="lan-field">
+                  <div class="lan-label"><span>应答码</span><button type="button" class="lan-link" id="lan-btn-scan-answer" hidden>扫码</button></div>
+                  <textarea class="text_pole lan-code" id="lan-answer-input" rows="2" placeholder="粘贴或扫对方回传的应答码"></textarea>
+                </div>
+                <div class="lan-row">
+                  <button type="button" class="menu_button" id="lan-btn-apply-answer">开始传输</button>
+                </div>
+                <div class="lan-progress">
+                  <span class="lan-phase" id="lan-send-phase">准备就绪</span>
+                  <span class="lan-bar"><i id="lan-send-bar"></i></span>
+                  <span class="lan-pct" id="lan-send-pct">0%</span>
+                  <span class="lan-detail" id="lan-send-detail"></span>
+                </div>
+              </section>
+
+              <section class="lan-recv" id="lan-recv">
+                <div class="lan-sec-head"><span class="lan-sec-title">接收</span></div>
+                <div class="lan-field">
+                  <div class="lan-label"><span>取件码</span><button type="button" class="lan-link" id="lan-btn-scan-offer">扫码</button></div>
+                  <textarea class="text_pole lan-code" id="lan-offer-input" rows="2" placeholder="粘贴或扫对方发来的取件码"></textarea>
+                </div>
+                <div class="lan-row">
+                  <button type="button" class="menu_button" id="lan-btn-accept">生成应答码</button>
+                </div>
+                <div class="lan-field">
+                  <div class="lan-label"><span>应答码</span><button type="button" class="lan-link" id="lan-btn-copy-recv" hidden>复制</button></div>
+                  <textarea class="text_pole lan-code" id="lan-recv-code" rows="2" readonly placeholder="生成后交给发送端"></textarea>
+                  <div class="lan-qr" id="lan-recv-qr" hidden></div>
+                </div>
+                <div class="lan-progress">
+                  <span class="lan-phase" id="lan-recv-phase">等待取件码</span>
+                  <span class="lan-bar"><i id="lan-recv-bar"></i></span>
+                  <span class="lan-pct" id="lan-recv-pct">0%</span>
+                  <span class="lan-detail" id="lan-recv-detail"></span>
+                </div>
+                <div class="lan-row">
+                  <button type="button" class="menu_button" id="lan-btn-abandon" hidden>放弃半成品</button>
+                </div>
+              </section>
+            </div>
+          </div>
           <div class="progress">
             <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
             <div class="progress-text"><span id="progress-label">准备就绪</span><span id="progress-pct">0%</span></div>

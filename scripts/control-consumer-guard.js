@@ -52,6 +52,22 @@ export const CONTROL_CONSUMERS = Object.freeze({
   'group:.seg-btn': 'src/ui/workbench-view.js — 事件委托',
   'group:.log-level-btn': 'src/ui/workbench-view.js — 事件委托',
   'file-input': 'index.js — change 读取上传的 zip',
+  'lan-toggle': 'src/ui/workbench-view.js — 展开/收起局域网区块',
+  'lan-btn-generate': 'src/ui/workbench-view.js — 调 actions.lan.generate（读取已勾选导入包）',
+  'lan-send-code': 'src/ui/workbench-view.js — 展示取件码 / 复制',
+  'lan-btn-copy-send': 'src/ui/workbench-view.js — 读取 lan-send-code 复制',
+  'lan-btn-retry': 'src/ui/workbench-view.js — 调 actions.lan.retry',
+  'lan-btn-cancel': 'src/ui/workbench-view.js — 调 actions.lan.cancel',
+  'lan-btn-scan-answer': 'src/ui/workbench-view.js — 相机扫应答码',
+  'lan-answer-input': 'src/ui/workbench-view.js — 读取应答码并 applyAnswer',
+  'lan-btn-apply-answer': 'src/ui/workbench-view.js — 读取 lan-answer-input 开始传输',
+  'lan-btn-scan-offer': 'src/ui/workbench-view.js — 相机扫取件码',
+  'lan-offer-input': 'src/ui/workbench-view.js — 读取取件码并 acceptOffer',
+  'lan-btn-accept': 'src/ui/workbench-view.js — 读取 lan-offer-input 生成应答码',
+  'lan-recv-code': 'src/ui/workbench-view.js — 展示应答码 / 复制',
+  'lan-btn-copy-recv': 'src/ui/workbench-view.js — 读取 lan-recv-code 复制',
+  'lan-btn-abandon': 'src/ui/workbench-view.js — 调 actions.lan.abandon',
+  'lan-scan-cancel': 'src/ui/workbench-view.js — 停止相机并收起扫码区',
 });
 
 /** 从模板源码提取全部交互控件 */

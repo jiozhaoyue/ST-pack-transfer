@@ -94,7 +94,9 @@
   /* 右栏：数据包高度可拖，执行卡吃掉剩余高度 —— 两栏都贴到底，不留空白 */
   #app.app-container .col-side > .panel{flex:0 0 auto}
   #app.app-container .col-side > .zone-card{flex:0 0 var(--zone-h,56%);min-height:140px}
-  #app.app-container .col-side > .action-card{flex:1 1 auto;min-height:96px}
+  #app.app-container .col-side > .action-card{flex:1 1 auto;min-height:96px;overflow:auto}
+  /* 局域网展开时：包区让出高度，执行卡内部滚动，避免二维码/接收区被裁切 */
+  #app.app-container .col-side.lan-open > .zone-card{flex:0 0 28%;min-height:120px}
 
   /* 拖拽分隔条：拖中间改列宽，拖右栏内改上下高度 */
   #app.app-container .splitter-v{width:8px;cursor:col-resize;align-self:stretch;display:flex;align-items:center;
@@ -519,6 +521,44 @@
   max-height: 100%;
 }
 
+
+/* ── 局域网互传（执行卡内联 · 发送/接收同屏） ── */
+#app.app-container .lan-block{flex:0 0 auto;border-top:1px solid var(--border);margin-top:8px;padding:8px 4px 10px}
+#app.app-container .lan-toggle{display:flex;align-items:center;gap:7px;width:100%;padding:6px 2px;background:transparent;border:0;color:var(--text);font-size:12px}
+#app.app-container .lan-toggle-ico{width:13px;height:13px;color:var(--accent);flex:0 0 auto}
+#app.app-container .lan-toggle-hint{margin-left:auto;color:var(--muted-2);font-size:10px}
+#app.app-container .lan-chev{flex:0 0 auto;color:var(--muted);transition:transform .15s ease}
+#app.app-container .lan-toggle[aria-expanded="true"] .lan-chev{transform:rotate(90deg)}
+#app.app-container .lan-body{display:flex;flex-direction:column;gap:10px;overflow:visible;padding:2px 0 4px}
+#app.app-container .lan-send,#app.app-container .lan-recv{display:flex;flex-direction:column;gap:6px}
+#app.app-container .lan-recv{border-top:1px dashed var(--border);padding-top:8px}
+#app.app-container .lan-sec-head{display:flex;align-items:baseline;gap:8px}
+#app.app-container .lan-sec-title{font-size:11.5px;font-weight:600}
+#app.app-container .lan-sec-note{margin-left:auto;font-size:10px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:70%}
+#app.app-container .lan-field{display:flex;flex-direction:column;gap:3px}
+#app.app-container .lan-label{display:flex;align-items:center;justify-content:space-between;font-size:10px;color:var(--muted)}
+#app.app-container .lan-link{border:0;background:transparent;color:var(--accent);font-size:10px;padding:0;cursor:pointer}
+#app.app-container .text_pole{background:var(--panel-3);border:1px solid var(--border);border-radius:7px;color:var(--text);padding:6px 8px;font:inherit}
+#app.app-container .lan-code{width:100%;min-height:38px;max-height:72px;resize:vertical;font:inherit;line-height:1.5}
+#app.app-container .lan-row{display:flex;flex-wrap:wrap;gap:6px}
+#app.app-container .lan-row .menu_button{flex:1 1 auto;min-height:30px;padding:5px 10px;font-size:11px}
+#app.app-container .lan-qr{display:flex;justify-content:center;padding:6px;background:#fff;border-radius:8px;align-self:center}
+#app.app-container .lan-qr svg{width:150px;height:150px;display:block}
+#app.app-container .lan-progress{display:flex;align-items:center;gap:7px;flex-wrap:wrap;font-size:9.5px;color:var(--muted);margin-top:2px}
+#app.app-container .lan-phase{min-width:58px}
+#app.app-container .lan-bar{flex:1 1 100px;height:5px;border:1px solid var(--border);border-radius:999px;background:var(--panel-3);overflow:hidden}
+#app.app-container .lan-bar i{display:block;height:100%;width:0;background:var(--accent);transition:width .2s ease}
+#app.app-container .lan-pct{min-width:30px;text-align:right;font-variant-numeric:tabular-nums}
+#app.app-container .lan-detail{flex:1 0 100%;font-size:9px;color:var(--muted)}
+#app.app-container .lan-detail:empty{display:none}
+#app.app-container .lan-scan{display:flex;flex-direction:column;gap:6px;border:1px solid var(--border);border-radius:8px;padding:6px;background:var(--panel-3)}
+#app.app-container .lan-scan video{width:100%;max-height:220px;border-radius:6px;background:#000;object-fit:cover}
+#app.app-container .lan-scan-actions{display:flex;align-items:center;justify-content:space-between;font-size:10px;color:var(--muted)}
+#app.app-container .lan-scan-error{margin:0;font-size:10px;color:var(--optional)}
+@media (max-width:860px){
+  #app.app-container .lan-body{max-height:none}
+  #app.app-container .lan-recv{order:-1;border-top:0;border-bottom:1px dashed var(--border);padding-top:0;padding-bottom:8px}
+}
 
 /* ── 局域网互传面板（对标 Luker peer row / TT 阶段进度）── */
 #app.app-container .wb-lan-overlay{position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:9998;display:flex;align-items:center;justify-content:center;padding:16px;background:color-mix(in srgb,var(--panel) 78%,transparent)}

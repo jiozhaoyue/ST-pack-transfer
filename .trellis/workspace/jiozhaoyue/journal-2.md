@@ -383,3 +383,55 @@ PT 安装脚本 `--replace` 同时删除新旧两个名字。PT 规格从旧 UI 
 - ③ 清理仍按旧 UI 写的 `e2e/specs/matrix.e2e.cjs` / `vault.e2e.cjs`（当前矩阵已改用 newui）
 - ④ 归档 10-14-lan-transfer 与 storage-chart-workbench 子任务（按新实现回填验收）
 
+## Session 55: 六对互传 120/120 + TT 浮层修复 + 局域网 UI 二次重做（demo 完成、正式待接）
+<!-- trellis-session: v=2 fp=lan-ui-redesign-20261027 -->
+
+**Date**: 2026-10-27
+**Task**: 10-14-lan-transfer（in_progress）
+**Branch**: `main`
+
+### Summary
+
+补齐全网互传：四宿主 **6 对 × 双向 = 12 次**全部通过（120/120，3 MB、摘要一致、接收端落包）。
+排障发现 TT 两个真实缺陷并修复：① TT 的 `<html>` 带 `transform` 且高度 0，所有
+`position:fixed;inset:0` 浮层塌成 0/24px（局域网面板跑到屏幕外）⇒ 全屏浮层改 `100vw×100vh`；
+② TT 的「扩展更新」dialog 层级高于工作台，盖住且点不到 ⇒ 打开工作台前调
+`closeHostExtensionSurface()` 关闭宿主弹层。旧 `matrix/vault/library-inject` 规格移出
+`e2e/specs/`（运行器不再扫描）。
+
+随后按用户四轮评审重做局域网 UI（**demo 已完成**）：执行卡内联可折叠、发送/接收同屏、
+只发导入区勾选包、接收直接进唯一导入区、徽标区分 `本地导入/远程导入`、宿主仍扫包、
+多包排队、各自行内进度、二维码（qrcode-generator + jsQR，本地 vendor）、相机权限失败保粘贴、
+导出区也可排序、文本框走主题、内边距补齐。许可证改为 **AGPL-3.0**。
+
+**正式接线未完成**：`index.js` 未提供 `actions.lan`/`qr`，旧 `lan-transfer-panel.js` 仍是浮层，
+新 LAN 区块在插件内不可用；重复 `lan-*` id 待清理。详见
+`.trellis/tasks/10-14-lan-transfer/HANDOFF.md`。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `f5e2423` | fix(ui)+test(e2e): TT 固定浮层塌陷与宿主弹层遮挡；旧规格移出扫描目录 |
+| （本次） | feat(ui): 局域网 UI 二次重做（demo）+ 二维码 vendor + AGPL-3.0 + 交接文档 |
+
+### Testing
+
+- [OK] `npm test` 875 passed / 2 skipped；五守卫全绿（43 控件 / 35 声明）
+- [OK] `check:ui-sync` 三件套与 demo 逐字一致
+- [OK] 六对互传 120/120（旧浮层 UI；协议未改）
+- [OK] demo 探针：二维码/进度/远程徽标/移动端顺序/导出排序，零控制台错误
+- [PENDING] 新 UI 的正式接线、LAN E2E 规格更新、PT 快照重装、四宿主复跑、真机双设备
+
+### Status
+
+[PARTIAL] **中间态**：demo 完成并验证；正式插件内新 LAN 区块未接线，不要发版。
+
+### Next Steps
+
+- ① `src/ui/qr.js` + `index.js` 传 `qr`
+- ② `lan-transfer-panel.js` 去浮层、绑模板 id、`view.setLan`
+- ③ `ORIGINS.LAN` + 本地导入/远程导入徽标 + 远程自动加序号
+- ④ 多包队列；更新 LAN E2E；四宿主/六对复跑；PT 重装
+- ⑤ 真机双设备 AC-10
+

@@ -131,7 +131,9 @@ body{min-height:100vh;display:flex;justify-content:center;padding:18px}
   /* 右栏：数据包高度可拖，执行卡吃掉剩余高度 —— 两栏都贴到底，不留空白 */
   #app.app-container .col-side > .panel{flex:0 0 auto}
   #app.app-container .col-side > .zone-card{flex:0 0 var(--zone-h,56%);min-height:140px}
-  #app.app-container .col-side > .action-card{flex:1 1 auto;min-height:96px}
+  #app.app-container .col-side > .action-card{flex:1 1 auto;min-height:96px;overflow:auto}
+  /* 局域网展开时：包区让出高度，执行卡内部滚动，避免二维码/接收区被裁切 */
+  #app.app-container .col-side.lan-open > .zone-card{flex:0 0 28%;min-height:120px}
 
   /* 拖拽分隔条：拖中间改列宽，拖右栏内改上下高度 */
   #app.app-container .splitter-v{width:8px;cursor:col-resize;align-self:stretch;display:flex;align-items:center;
@@ -557,6 +559,44 @@ body{min-height:100vh;display:flex;justify-content:center;padding:18px}
 }
 
 
+/* ── 局域网互传（执行卡内联 · 发送/接收同屏） ── */
+#app.app-container .lan-block{flex:0 0 auto;border-top:1px solid var(--border);margin-top:8px;padding:8px 4px 10px}
+#app.app-container .lan-toggle{display:flex;align-items:center;gap:7px;width:100%;padding:6px 2px;background:transparent;border:0;color:var(--text);font-size:12px}
+#app.app-container .lan-toggle-ico{width:13px;height:13px;color:var(--accent);flex:0 0 auto}
+#app.app-container .lan-toggle-hint{margin-left:auto;color:var(--muted-2);font-size:10px}
+#app.app-container .lan-chev{flex:0 0 auto;color:var(--muted);transition:transform .15s ease}
+#app.app-container .lan-toggle[aria-expanded="true"] .lan-chev{transform:rotate(90deg)}
+#app.app-container .lan-body{display:flex;flex-direction:column;gap:10px;overflow:visible;padding:2px 0 4px}
+#app.app-container .lan-send,#app.app-container .lan-recv{display:flex;flex-direction:column;gap:6px}
+#app.app-container .lan-recv{border-top:1px dashed var(--border);padding-top:8px}
+#app.app-container .lan-sec-head{display:flex;align-items:baseline;gap:8px}
+#app.app-container .lan-sec-title{font-size:11.5px;font-weight:600}
+#app.app-container .lan-sec-note{margin-left:auto;font-size:10px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:70%}
+#app.app-container .lan-field{display:flex;flex-direction:column;gap:3px}
+#app.app-container .lan-label{display:flex;align-items:center;justify-content:space-between;font-size:10px;color:var(--muted)}
+#app.app-container .lan-link{border:0;background:transparent;color:var(--accent);font-size:10px;padding:0;cursor:pointer}
+#app.app-container .text_pole{background:var(--panel-3);border:1px solid var(--border);border-radius:7px;color:var(--text);padding:6px 8px;font:inherit}
+#app.app-container .lan-code{width:100%;min-height:38px;max-height:72px;resize:vertical;font:inherit;line-height:1.5}
+#app.app-container .lan-row{display:flex;flex-wrap:wrap;gap:6px}
+#app.app-container .lan-row .menu_button{flex:1 1 auto;min-height:30px;padding:5px 10px;font-size:11px}
+#app.app-container .lan-qr{display:flex;justify-content:center;padding:6px;background:#fff;border-radius:8px;align-self:center}
+#app.app-container .lan-qr svg{width:150px;height:150px;display:block}
+#app.app-container .lan-progress{display:flex;align-items:center;gap:7px;flex-wrap:wrap;font-size:9.5px;color:var(--muted);margin-top:2px}
+#app.app-container .lan-phase{min-width:58px}
+#app.app-container .lan-bar{flex:1 1 100px;height:5px;border:1px solid var(--border);border-radius:999px;background:var(--panel-3);overflow:hidden}
+#app.app-container .lan-bar i{display:block;height:100%;width:0;background:var(--accent);transition:width .2s ease}
+#app.app-container .lan-pct{min-width:30px;text-align:right;font-variant-numeric:tabular-nums}
+#app.app-container .lan-detail{flex:1 0 100%;font-size:9px;color:var(--muted)}
+#app.app-container .lan-detail:empty{display:none}
+#app.app-container .lan-scan{display:flex;flex-direction:column;gap:6px;border:1px solid var(--border);border-radius:8px;padding:6px;background:var(--panel-3)}
+#app.app-container .lan-scan video{width:100%;max-height:220px;border-radius:6px;background:#000;object-fit:cover}
+#app.app-container .lan-scan-actions{display:flex;align-items:center;justify-content:space-between;font-size:10px;color:var(--muted)}
+#app.app-container .lan-scan-error{margin:0;font-size:10px;color:var(--optional)}
+@media (max-width:860px){
+  #app.app-container .lan-body{max-height:none}
+  #app.app-container .lan-recv{order:-1;border-top:0;border-bottom:1px dashed var(--border);padding-top:0;padding-bottom:8px}
+}
+
 /* ── 局域网互传面板（对标 Luker peer row / TT 阶段进度）── */
 #app.app-container .wb-lan-overlay{position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:9998;display:flex;align-items:center;justify-content:center;padding:16px;background:color-mix(in srgb,var(--panel) 78%,transparent)}
 #app.app-container .wb-lan-overlay[hidden]{display:none}
@@ -731,6 +771,81 @@ body{min-height:100vh;display:flex;justify-content:center;padding:18px}
             </div>
           </div>
           <div class="action-row" id="action-row"></div>
+
+          <div class="lan-block" id="lan-block">
+            <button class="lan-toggle" id="lan-toggle" aria-expanded="false">
+              <svg class="lan-toggle-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M13 3L5 14h6l-1 7 8-11h-6z"/></svg>
+              <span>局域网互传</span>
+              <span class="lan-toggle-hint" id="lan-toggle-hint">发送或接收数据包</span>
+              <svg class="lan-chev" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5l7 7-7 7"/></svg>
+            </button>
+            <div class="lan-body" id="lan-body" hidden>
+              <div class="lan-scan" id="lan-scan" hidden>
+                <video id="lan-scan-video" playsinline muted></video>
+                <div class="lan-scan-actions">
+                  <span id="lan-scan-hint">把取件码对准摄像头</span>
+                  <button type="button" id="lan-scan-cancel">取消</button>
+                </div>
+                <canvas id="lan-scan-canvas" hidden></canvas>
+              </div>
+              <p class="lan-scan-error" id="lan-scan-error" hidden></p>
+
+              <section class="lan-send" id="lan-send">
+                <div class="lan-sec-head">
+                  <span class="lan-sec-title">发送</span>
+                  <span class="lan-sec-note" id="lan-send-summary">在数据包区勾选要发送的包</span>
+                </div>
+                <div class="lan-field">
+                  <div class="lan-label"><span>取件码</span><button type="button" class="lan-link" id="lan-btn-copy-send" hidden>复制</button></div>
+                  <textarea class="text_pole lan-code" id="lan-send-code" rows="2" readonly placeholder="勾选包后生成"></textarea>
+                  <div class="lan-qr" id="lan-send-qr" hidden></div>
+                </div>
+                <div class="lan-row">
+                  <button type="button" class="menu_button" id="lan-btn-generate">生成取件码</button>
+                  <button type="button" class="menu_button" id="lan-btn-retry" hidden>重试</button>
+                  <button type="button" class="menu_button" id="lan-btn-cancel" hidden>取消</button>
+                </div>
+                <div class="lan-field">
+                  <div class="lan-label"><span>应答码</span><button type="button" class="lan-link" id="lan-btn-scan-answer" hidden>扫码</button></div>
+                  <textarea class="text_pole lan-code" id="lan-answer-input" rows="2" placeholder="粘贴或扫对方回传的应答码"></textarea>
+                </div>
+                <div class="lan-row">
+                  <button type="button" class="menu_button" id="lan-btn-apply-answer">开始传输</button>
+                </div>
+                <div class="lan-progress">
+                  <span class="lan-phase" id="lan-send-phase">准备就绪</span>
+                  <span class="lan-bar"><i id="lan-send-bar"></i></span>
+                  <span class="lan-pct" id="lan-send-pct">0%</span>
+                  <span class="lan-detail" id="lan-send-detail"></span>
+                </div>
+              </section>
+
+              <section class="lan-recv" id="lan-recv">
+                <div class="lan-sec-head"><span class="lan-sec-title">接收</span></div>
+                <div class="lan-field">
+                  <div class="lan-label"><span>取件码</span><button type="button" class="lan-link" id="lan-btn-scan-offer">扫码</button></div>
+                  <textarea class="text_pole lan-code" id="lan-offer-input" rows="2" placeholder="粘贴或扫对方发来的取件码"></textarea>
+                </div>
+                <div class="lan-row">
+                  <button type="button" class="menu_button" id="lan-btn-accept">生成应答码</button>
+                </div>
+                <div class="lan-field">
+                  <div class="lan-label"><span>应答码</span><button type="button" class="lan-link" id="lan-btn-copy-recv" hidden>复制</button></div>
+                  <textarea class="text_pole lan-code" id="lan-recv-code" rows="2" readonly placeholder="生成后交给发送端"></textarea>
+                  <div class="lan-qr" id="lan-recv-qr" hidden></div>
+                </div>
+                <div class="lan-progress">
+                  <span class="lan-phase" id="lan-recv-phase">等待取件码</span>
+                  <span class="lan-bar"><i id="lan-recv-bar"></i></span>
+                  <span class="lan-pct" id="lan-recv-pct">0%</span>
+                  <span class="lan-detail" id="lan-recv-detail"></span>
+                </div>
+                <div class="lan-row">
+                  <button type="button" class="menu_button" id="lan-btn-abandon" hidden>放弃半成品</button>
+                </div>
+              </section>
+            </div>
+          </div>
           <div class="progress">
             <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
             <div class="progress-text"><span id="progress-label">准备就绪</span><span id="progress-pct">0%</span></div>
@@ -812,7 +927,7 @@ body{min-height:100vh;display:flex;justify-content:center;padding:18px}
  *   · 动作：`actions.*`（拉取 / 生成 / 恢复 / 复制 / 删除 / 下载 / 设置 / 关闭）
  */
 
-export function createWorkbenchView({ actions = {} } = {}) {
+export function createWorkbenchView({ actions = {}, qr = null } = {}) {
 
 /* ═══════════════════════════════════════════════════════════════
    静态资源：四酒馆 icon（本地内置，无 CDN）
@@ -889,7 +1004,12 @@ const state = {
   noTrafficPrompt:false, keepExport:true,
   storage:{ browser:null, host:null },
   sort:'time-desc', filter:'all', tutorialStep:0, tutorialOpen:false, tutorialKind:'basic',
-  sourceKey:'host:luker', seq:{}, libraryExport:false
+  sourceKey:'host:luker', seq:{}, libraryExport:false,
+  lan:{
+    open:false, scanning:null, scanError:'',
+    send:{ code:'', answer:'', phase:'准备就绪', pct:0, detail:'', busy:false, done:false },
+    recv:{ code:'', phase:'等待取件码', pct:0, detail:'', busy:false, done:false }
+  }
 };
 
 /* ── 工具 ── */
@@ -1332,12 +1452,16 @@ function renderZones(){
   if(state.zone==='import'){
     html+='<div class="dropzone" id="dropzone"><span class="big">选择数据包</span>上传 zip 或从宿主拉取</div>';
     html+='<div class="zone-toolbar">'+hostFilterHtml()+'<label>排序 <select id="sort-select">'
-      +'<option value="time-desc"'+(state.sort==='time-desc'?' selected':'')+'>导入时间倒序</option>'
+      +'<option value="time-desc"'+(state.sort==='time-desc'?' selected':'')+'>时间倒序</option>'
       +'<option value="name"'+(state.sort==='name'?' selected':'')+'>名称</option>'
       +'<option value="size"'+(state.sort==='size'?' selected':'')+'>大小</option>'
       +'</select></label><span class="spacer"></span></div>';
   }else{
-    html+='<div class="zone-toolbar">'+hostFilterHtml()+'<span class="spacer"></span></div>';
+    html+='<div class="zone-toolbar">'+hostFilterHtml()+'<label>排序 <select id="sort-select">'
+      +'<option value="time-desc"'+(state.sort==='time-desc'?' selected':'')+'>时间倒序</option>'
+      +'<option value="name"'+(state.sort==='name'?' selected':'')+'>名称</option>'
+      +'<option value="size"'+(state.sort==='size'?' selected':'')+'>大小</option>'
+      +'</select></label><span class="spacer"></span></div>';
   }
   if(list.length===0){
     html+='<div class="zone-empty">'+(state.zone==='import'?'导入区为空':'导出区为空')+'</div>';
@@ -1382,7 +1506,6 @@ function fitPackageNames(){
 function renderActions(){
   const row=document.getElementById('action-row');
   const hasSel=state.selectedPkgs.size>0;
-  const lanBtn='<button class="btn" id="btn-lan-send">'+svg('bolt','ico')+'发送到另一台设备</button>';
   const libBtn=state.libraryExport
     ? '<button class="btn" id="btn-library-export">'+svg('db','ico')+'从聊天库导出</button>'
     : '';
@@ -1391,7 +1514,7 @@ function renderActions(){
       '<button class="btn" id="btn-fetch">'+svg('cloud','ico')+'从宿主拉取</button>'
       +'<button class="btn accent" id="btn-generate"'+(hasSel?'':' disabled')+'>'+svg('archive','ico')+'生成导出包</button>'
       +'<button class="btn" id="btn-merge"'+(state.selectedPkgs.size>1?'':' disabled')+'>'+svg('copy','ico')+'合并上传</button>'
-      +libBtn+lanBtn;
+      +libBtn;
     row.querySelector('#btn-generate')?.addEventListener('click',()=>doGenerate());
     row.querySelector('#btn-merge')?.addEventListener('click',()=>doMerge());
     row.querySelector('#btn-library-export')?.addEventListener('click',()=>actions.libraryExport?.());
@@ -1399,14 +1522,126 @@ function renderActions(){
     row.innerHTML=
       '<button class="btn" id="btn-download"'+(hasSel?'':' disabled')+'>'+svg('file','ico')+'下载</button>'
       +'<button class="btn accent" id="btn-upload"'+(hasSel?'':' disabled')+'>'+svg('cloud','ico')+'回传宿主</button>'
-      +'<button class="btn" id="btn-copyback"'+(hasSel?'':' disabled')+'>'+svg('folder','ico')+'复制回导入区</button>'
-      +lanBtn;
+      +'<button class="btn" id="btn-copyback"'+(hasSel?'':' disabled')+'>'+svg('folder','ico')+'复制回导入区</button>';
     row.querySelector('#btn-download')?.addEventListener('click',()=>{ actions.download?.([...state.selectedPkgs]); });
     row.querySelector('#btn-upload')?.addEventListener('click',()=>doUploadHost());
     row.querySelector('#btn-copyback')?.addEventListener('click',()=>doCopyBack());
   }
   row.querySelector('#btn-fetch')?.addEventListener('click',()=>doFetch());
-  row.querySelector('#btn-lan-send')?.addEventListener('click',()=>actions.lan?.());
+  renderLan();
+}
+
+/* ── 渲染：局域网互传（执行卡内联） ── */
+function lanTargets(){
+  return [...state.selectedPkgs]
+    .map(id=>state.packages.find(p=>p.id===id))
+    .filter(p=>p && p.zone==='import');
+}
+function lanSummaryText(){
+  const t=lanTargets();
+  if(!t.length) return '在数据包区勾选要发送的包';
+  const mb=t.reduce((a,p)=>a+(p.mb||0),0);
+  return '已选 '+t.length+' 个包 · '+fmtMB(mb);
+}
+function setLanBar(fillId, pctId, pct){
+  const f=document.getElementById(fillId); if(f) f.style.width=Math.max(0,Math.min(100,Number(pct)||0))+'%';
+  const p=document.getElementById(pctId); if(p) p.textContent=Math.round(Number(pct)||0)+'%';
+}
+function setLanQr(id, text, show){
+  const box=document.getElementById(id); if(!box) return;
+  if(!show || !text || typeof qr?.encodeSvg!=='function'){ box.hidden=true; box.innerHTML=''; return; }
+  try { box.innerHTML=qr.encodeSvg(text); box.hidden=false; }
+  catch { box.hidden=true; box.innerHTML=''; }
+}
+function renderLan(){
+  const L=state.lan;
+  const body=document.getElementById('lan-body');
+  const toggle=document.getElementById('lan-toggle');
+  if(!body||!toggle) return;
+  toggle.setAttribute('aria-expanded',String(!!L.open));
+  body.hidden=!L.open;
+  document.querySelector('.col-side')?.classList.toggle('lan-open', !!L.open);
+  const hint=document.getElementById('lan-toggle-hint');
+  if(hint){
+    const s=L.send.busy?('发送 '+Math.round(L.send.pct)+'%'):'';
+    const r=L.recv.busy?('接收 '+Math.round(L.recv.pct)+'%'):'';
+    hint.textContent=[s,r].filter(Boolean).join(' · ') || '发送或接收数据包';
+  }
+  const targets=lanTargets();
+  const sum=document.getElementById('lan-send-summary'); if(sum) sum.textContent=lanSummaryText();
+  const gen=document.getElementById('lan-btn-generate');
+  if(gen) gen.disabled=!targets.length || L.send.busy;
+  const sendCode=document.getElementById('lan-send-code');
+  if(sendCode && document.activeElement!==sendCode) sendCode.value=L.send.code||'';
+  const copySend=document.getElementById('lan-btn-copy-send'); if(copySend) copySend.hidden=!L.send.code;
+  setLanQr('lan-send-qr',L.send.code,!!L.send.code);
+  const answer=document.getElementById('lan-answer-input');
+  if(answer && document.activeElement!==answer) answer.value=L.send.answer||'';
+  const apply=document.getElementById('lan-btn-apply-answer');
+  if(apply) apply.disabled=L.send.busy || !L.send.code;
+  const scanAnswer=document.getElementById('lan-btn-scan-answer');
+  if(scanAnswer) scanAnswer.hidden=!L.send.code;
+  const retry=document.getElementById('lan-btn-retry'); if(retry) retry.hidden=!L.send.error;
+  const cancel=document.getElementById('lan-btn-cancel'); if(cancel) cancel.hidden=!L.send.busy;
+  const sp=document.getElementById('lan-send-phase'); if(sp) sp.textContent=L.send.phase||'准备就绪';
+  const sd=document.getElementById('lan-send-detail'); if(sd) sd.textContent=L.send.detail||'';
+  setLanBar('lan-send-bar','lan-send-pct',L.send.pct);
+  const offer=document.getElementById('lan-offer-input');
+  if(offer && document.activeElement!==offer) offer.value=L.recv.offer||'';
+  const recvCode=document.getElementById('lan-recv-code');
+  if(recvCode && document.activeElement!==recvCode) recvCode.value=L.recv.code||'';
+  const copyRecv=document.getElementById('lan-btn-copy-recv'); if(copyRecv) copyRecv.hidden=!L.recv.code;
+  setLanQr('lan-recv-qr',L.recv.code,!!L.recv.code);
+  const accept=document.getElementById('lan-btn-accept'); if(accept) accept.disabled=L.recv.busy;
+  const abandon=document.getElementById('lan-btn-abandon'); if(abandon) abandon.hidden=!L.recv.busy;
+  const rp=document.getElementById('lan-recv-phase'); if(rp) rp.textContent=L.recv.phase||'等待取件码';
+  const rd=document.getElementById('lan-recv-detail'); if(rd) rd.textContent=L.recv.detail||'';
+  setLanBar('lan-recv-bar','lan-recv-pct',L.recv.pct);
+  const scanBox=document.getElementById('lan-scan'); if(scanBox) scanBox.hidden=!L.scanning;
+  const scanHint=document.getElementById('lan-scan-hint');
+  if(scanHint) scanHint.textContent=L.scanning==='answer'?'把应答码对准摄像头':'把取件码对准摄像头';
+  const err=document.getElementById('lan-scan-error');
+  if(err){ err.hidden=!L.scanError; err.textContent=L.scanError||''; }
+}
+
+let stopLanScan=null;
+function finishLanScan(){
+  if(stopLanScan){ try{ stopLanScan(); }catch{ /* 已停止 */ } stopLanScan=null; }
+  state.lan.scanning=null;
+  renderLan();
+}
+async function copyLanText(text){
+  if(!text) return;
+  try { await navigator.clipboard.writeText(text); toast('已复制'); }
+  catch { toast('复制失败，请手动选择'); }
+}
+async function startLanScan(kind){
+  if(typeof qr?.scan!=='function'){ toast('当前环境不支持扫码'); return; }
+  state.lan.scanError=''; state.lan.scanning=kind; renderLan();
+  try {
+    stopLanScan=await qr.scan({
+      video:document.getElementById('lan-scan-video'),
+      canvas:document.getElementById('lan-scan-canvas'),
+      onResult:(text)=>{
+        finishLanScan();
+        if(kind==='offer'){
+          const el=document.getElementById('lan-offer-input');
+          if(el) el.value=text;
+          state.lan.recv.offer=text;
+          actions.lan?.acceptOffer?.(text);
+        }else{
+          const el=document.getElementById('lan-answer-input');
+          if(el) el.value=text;
+          state.lan.send.answer=text;
+          actions.lan?.applyAnswer?.(text);
+        }
+      },
+      onError:(msg)=>{ state.lan.scanError=msg||'相机不可用'; finishLanScan(); },
+    });
+  } catch(err) {
+    state.lan.scanError=err?.message||'相机不可用';
+    finishLanScan();
+  }
 }
 
 /* ── 渲染：日志 ── */
@@ -1586,6 +1821,33 @@ function bind(){
   document.getElementById('btn-close')?.addEventListener('click',()=>actions.close?.());
 
   document.querySelectorAll('[data-help]').forEach(b=>b.addEventListener('click',e=>{ e.stopPropagation(); openHelp(b,b.dataset.help); }));
+
+  // ── 局域网互传（执行卡内联）──
+  document.getElementById('lan-toggle').addEventListener('click',()=>{
+    state.lan.open=!state.lan.open;
+    renderLan();
+  });
+  document.getElementById('lan-btn-generate').addEventListener('click',()=>actions.lan?.generate?.());
+  document.getElementById('lan-btn-copy-send').addEventListener('click',()=>{
+    copyLanText(document.getElementById('lan-send-code')?.value||'');
+  });
+  document.getElementById('lan-btn-apply-answer').addEventListener('click',()=>{
+    actions.lan?.applyAnswer?.(document.getElementById('lan-answer-input')?.value.trim()||'');
+  });
+  document.getElementById('lan-btn-accept').addEventListener('click',()=>{
+    actions.lan?.acceptOffer?.(document.getElementById('lan-offer-input')?.value.trim()||'');
+  });
+  document.getElementById('lan-btn-copy-recv').addEventListener('click',()=>{
+    copyLanText(document.getElementById('lan-recv-code')?.value||'');
+  });
+  document.getElementById('lan-btn-retry').addEventListener('click',()=>actions.lan?.retry?.());
+  document.getElementById('lan-btn-cancel').addEventListener('click',()=>{ finishLanScan(); actions.lan?.cancel?.(); });
+  document.getElementById('lan-btn-abandon').addEventListener('click',()=>actions.lan?.abandon?.());
+  document.getElementById('lan-btn-scan-offer').addEventListener('click',()=>startLanScan('offer'));
+  document.getElementById('lan-btn-scan-answer').addEventListener('click',()=>startLanScan('answer'));
+  document.getElementById('lan-scan-cancel').addEventListener('click',()=>finishLanScan());
+  document.getElementById('lan-answer-input').addEventListener('input',(e)=>{ state.lan.send.answer=e.target.value; });
+  document.getElementById('lan-offer-input').addEventListener('input',(e)=>{ state.lan.recv.offer=e.target.value; });
 
   document.getElementById('zone-tabs').addEventListener('click',e=>{
     const b=e.target.closest('.zone-tab'); if(!b) return;
@@ -1872,6 +2134,14 @@ initSplitters();
       }
     },
     setProgress,
+    setLan(next = {}) {
+      if ('open' in next) state.lan.open = !!next.open;
+      if (next.send) Object.assign(state.lan.send, next.send);
+      if (next.recv) Object.assign(state.lan.recv, next.recv);
+      if ('scanError' in next) state.lan.scanError = next.scanError;
+      renderLan();
+    },
+    getLan() { return state.lan; },
     setStorage(next) {
       state.storage = { ...state.storage, ...(next || {}) };
       renderQuota();
@@ -1895,6 +2165,9 @@ initSplitters();
 if (typeof window !== 'undefined') window.SZC_WORKBENCH_VIEW = createWorkbenchView;
 // SZC:UI:JS:END
 </script>
+<!-- 二维码：本地 vendor（classic script，file:// 下也能加载；正式插件由 index.js 导入同一份） -->
+<script src="../vendor/qrcode-generator.js"></script>
+<script src="../vendor/jsqr.js"></script>
 <script type="module">
 /* ═══════════════════════════════════════════════════════════════
    demo harness —— 只存在于 demo，不属于运行时。
@@ -2031,11 +2304,11 @@ function scaleNodesTo(arr,totalMb){
 }
 
 const DEMO_PACKAGES = [
-  { id:'p1', zone:'import', host:'luker', name:'Luker_搬家包_2026-10-26.zip', size:'1.8 GB', mb:1843, ts:2112, time:'10-26 21:12', origin:'宿主导出', split:0 },
-  { id:'p2', zone:'import', host:'st', name:'SillyTavern_default-user_part1_2026-10-26_21-30-05.zip', size:'420 MB', mb:420, ts:2130, time:'10-26 21:30', origin:'上传', split:0 },
-  { id:'p3', zone:'import', host:'tt', name:'TauriTavern_export_2026-10-26.zip', size:'960 MB', mb:960, ts:2138, time:'10-26 21:38', origin:'宿主导出', split:0 },
-  { id:'p4', zone:'import', host:'unknown', name:'unknown-archive.zip', size:'12 MB', mb:12, ts:2144, time:'10-26 21:44', origin:'上传', unrecognized:true, split:0 },
-  { id:'p5', zone:'import', host:'pt', name:'PureTavern_part1_2026-10-26_21-50-00.zip', size:'380 MB', mb:380, ts:2150, time:'10-26 21:50', origin:'上传', split:0 },
+  { id:'p1', zone:'import', host:'luker', name:'Luker_搬家包_2026-10-26.zip', size:'1.8 GB', mb:1843, ts:2112, time:'10-26 21:12', origin:'本地导入', split:0 },
+  { id:'p2', zone:'import', host:'st', name:'SillyTavern_default-user_part1_2026-10-26_21-30-05.zip', size:'420 MB', mb:420, ts:2130, time:'10-26 21:30', origin:'本地导入', split:0 },
+  { id:'p3', zone:'import', host:'tt', name:'TauriTavern_export_2026-10-26.zip', size:'960 MB', mb:960, ts:2138, time:'10-26 21:38', origin:'本地导入', split:0 },
+  { id:'p4', zone:'import', host:'unknown', name:'unknown-archive.zip', size:'12 MB', mb:12, ts:2144, time:'10-26 21:44', origin:'本地导入', unrecognized:true, split:0 },
+  { id:'p5', zone:'import', host:'pt', name:'PureTavern_part1_2026-10-26_21-50-00.zip', size:'380 MB', mb:380, ts:2150, time:'10-26 21:50', origin:'本地导入', split:0 },
   { id:'e1', zone:'export', host:'pt', name:'PureTavern_default-user_part1_2026-10-26_21-45-00.zip', size:'1.1 GB', mb:1126, ts:2145, time:'10-26 21:45', origin:'导出副本', readonly:true, split:0 }
 ];
 
@@ -2043,7 +2316,119 @@ const nowTime=()=>{ const d=new Date(); const p=n=>String(n).padStart(2,'0'); re
 const dtNow=()=>{ const d=new Date(); const p=n=>String(n).padStart(2,'0'); return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+'_'+p(d.getHours())+'-'+p(d.getMinutes())+'-'+p(d.getSeconds()); };
 const fmtMB=(mb)=> mb>=1024 ? (mb/1024).toFixed(1)+' GB' : mb+' MB';
 
+// ── 二维码（demo 用本地 vendor；正式插件由 index.js 导入同一份）──
+const demoQr = {
+  encodeSvg(text) {
+    if (typeof window.qrcode !== 'function') return '';
+    const q = window.qrcode(0, 'M');
+    q.addData(text);
+    q.make();
+    return q.createSvgTag({ cellSize: 3, margin: 2, scalable: true });
+  },
+  async scan({ video, canvas, onResult, onError }) {
+    if (!navigator.mediaDevices?.getUserMedia || typeof window.jsQR !== 'function') {
+      onError?.('相机或二维码解码不可用');
+      return () => {};
+    }
+    let stream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+    } catch (err) {
+      onError?.('相机不可用：' + (err?.message || '权限被拒绝'));
+      return () => {};
+    }
+    video.srcObject = stream;
+    await video.play().catch(() => {});
+    let stopped = false;
+    let raf = 0;
+    const stop = () => {
+      stopped = true;
+      cancelAnimationFrame(raf);
+      try { stream.getTracks().forEach((t) => t.stop()); } catch { /* 已停止 */ }
+      video.srcObject = null;
+    };
+    const tick = () => {
+      if (stopped) return;
+      if (video.readyState >= 2) {
+        const w = video.videoWidth;
+        const h = video.videoHeight;
+        if (w && h) {
+          canvas.width = w; canvas.height = h;
+          const ctx = canvas.getContext('2d', { willReadFrequently: true });
+          ctx.drawImage(video, 0, 0, w, h);
+          const img = ctx.getImageData(0, 0, w, h);
+          const hit = window.jsQR(img.data, w, h, { inversionAttempts: 'dontInvert' });
+          if (hit?.data) { stop(); onResult(hit.data); return; }
+        }
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return stop;
+  },
+};
+
+let demoTimers = [];
+const clearDemoTimers = () => { demoTimers.forEach(clearInterval); demoTimers = []; };
+const demoTargets = () => [...S().selectedPkgs]
+  .map((id) => S().packages.find((p) => p.id === id))
+  .filter((p) => p && p.zone === 'import');
+
+const demoLan = {
+  generate() {
+    const targets = demoTargets();
+    if (!targets.length) { view.toast('先在数据包区勾选要发送的包'); return; }
+    const code = 'SZC1.z.DEMO-OFFER-' + Math.random().toString(36).slice(2, 8).toUpperCase();
+    view.setLan({ send: { code, answer: '', phase: '把取件码交给对方', pct: 0, detail: targets.length + ' 个包排队', busy: false, done: false, error: false } });
+    view.pushLog('INFO', '取件码已生成（' + targets.length + ' 个包）');
+  },
+  applyAnswer(code) {
+    if (!/^SZC1\./.test(code)) { view.toast('不是应答码'); return; }
+    view.setLan({ send: { answer: code, busy: true, phase: '发送中', pct: 0 } });
+    let pct = 0;
+    const timer = setInterval(() => {
+      pct = Math.min(100, pct + 12);
+      view.setLan({ send: { pct, phase: pct < 100 ? '发送中' : '已发送', detail: pct < 100 ? ('已发送 ' + pct + '%') : '等待对端核对' } });
+      if (pct >= 100) {
+        clearInterval(timer);
+        view.setLan({ send: { busy: false, done: true, phase: '已发送', pct: 100, detail: '摘要一致' } });
+        view.pushLog('INFO', '已发送');
+      }
+    }, 350);
+    demoTimers.push(timer);
+  },
+  acceptOffer(code) {
+    if (!/^SZC1\./.test(code)) { view.toast('不是取件码'); return; }
+    const answer = 'SZC1.z.DEMO-ANSWER-' + Math.random().toString(36).slice(2, 8).toUpperCase();
+    view.setLan({ recv: { offer: code, code: answer, phase: '把应答码交给对方', pct: 0, detail: '', busy: true, done: false } });
+    const timer = setInterval(() => {
+      const pct = Math.min(100, (view.getLan().recv.pct || 0) + 10);
+      view.setLan({ recv: { pct, phase: pct < 100 ? '接收中' : '已接收', detail: pct < 100 ? ('已接收 ' + pct + '%') : '摘要一致' } });
+      if (pct >= 100) {
+        clearInterval(timer);
+        view.setLan({ recv: { busy: false, done: true, pct: 100, phase: '已接收 · 摘要一致' } });
+        const id = 'lan-' + Date.now();
+        const st = S();
+        const name = 'lan-received-' + Date.now() + '.zip';
+        st.packages.unshift({
+          id, zone: 'import', host: 'unknown', name, size: '3.0 MB', mb: 3,
+          ts: Date.now(), time: '10-27 ' + nowTime().slice(0, 5), origin: '远程导入', split: 0,
+          nodes: scaleNodesTo(demoTree(), 3),
+        });
+        st.selectedPkgs.add(id);
+        view.setPackages(st.packages);
+        view.toast('已接收并加入导入区');
+      }
+    }, 400);
+    demoTimers.push(timer);
+  },
+  cancel() { clearDemoTimers(); view.setLan({ send: { busy: false, phase: '已取消', pct: 0 } }); },
+  retry() { demoLan.generate(); },
+  abandon() { clearDemoTimers(); view.setLan({ recv: { busy: false, phase: '半成品已放弃', pct: 0, code: '' } }); },
+};
+
 const view = createWorkbenchView({
+  qr: demoQr,
   actions: {
     fetch: doFetch,
     generate: doGenerate,
@@ -2051,6 +2436,7 @@ const view = createWorkbenchView({
     copyBack: doCopyBack,
     deleteSelected: doDeleteSelected,
     uploadPrivate: doUploadPrivate,
+    lan: demoLan,
     settings: () => view.toast('演示模式：设置弹窗由运行时控制器提供'),
     close: () => view.toast('演示模式：关闭按钮在真实插件中关闭面板'),
     onTargetChange: (t) => view.pushLog('INFO','目标平台切换为 '+t),
@@ -2077,7 +2463,7 @@ function doFetch(){
   view.pushLog('INFO','向宿主 '+hostName(st.host)+' 请求数据包');
   const id='p'+Date.now();
   const name=hostName(st.host)+'_host-export_'+dtNow()+'.zip';
-  st.packages.push({ id, zone:'import', host:st.host, name, size:'1.2 GB', mb:1200, ts:Date.now(), time:'10-26 '+nowTime().slice(0,5), origin:'宿主导出', nodes:scaleNodesTo(demoTree(),1200) });
+  st.packages.push({ id, zone:'import', host:st.host, name, size:'1.2 GB', mb:1200, ts:Date.now(), time:'10-26 '+nowTime().slice(0,5), origin:'本地导入', nodes:scaleNodesTo(demoTree(),1200) });
   view.pushLog('INFO','宿主拉取完成: '+name);
   view.pushLog('INFO','宿主存储读数已加载 · '+hostName(st.host));
   view.renderAll(); view.toast('宿主拉取完成');
@@ -2125,7 +2511,7 @@ function doCopyBack(ids){
   for(const id of ids){
     const pkg=st.packages.find(p=>p.id===id);
     if(!pkg || pkg.zone!=='export') continue;
-    st.packages.push({...pkg, id:'p'+Date.now()+'_'+n, zone:'import', origin:'导出副本', readonly:false, ts:Date.now(), time:'10-26 '+nowTime().slice(0,5)});
+    st.packages.push({...pkg, id:'p'+Date.now()+'_'+n, zone:'import', origin:'本地导入', readonly:false, ts:Date.now(), time:'10-26 '+nowTime().slice(0,5)});
     n++;
   }
   view.pushLog('INFO','已复制 '+n+' 个包回导入区');
