@@ -12,7 +12,6 @@
 import { chartTreeFor, deriveExportOptions } from '../core/chart-model.js';
 import { mergeChartTrees } from '../core/merge-packages.js';
 import { actionsForZone, actionEnabled } from '../core/zone-model.js';
-import { CHANNEL, channelsFor, swapDirection } from '../core/transfer-matrix.js';
 import { EXTENSION_MODES, GIT_MODES } from '../core/export-modes.js';
 import { t } from '../i18n/index.js';
 
@@ -117,9 +116,7 @@ const state = {
   source:{ type:'host', pkgId:null }, target:'SillyTavern', delta:'overwrite', splitMb:'',
   compression:'5', extensionMode:'full', gitMode:'keep', keepDev:false,
   packages: INITIAL_PACKAGES.map(p=>({...p})),
-  selectedPkgs:new Set(), mergeMode:false, privateFiles:[],
-  transfer:{ direction:'send', host:'st', peers:[], webRtcAvailable:true, channels:[] },
-  expanded:{}, collapsedVol:{}, sel:{}, log:[], logLevel:'ALL',
+  selectedPkgs:new Set(), mergeMode:false, privateFiles:[], expanded:{}, collapsedVol:{}, sel:{}, log:[], logLevel:'ALL',
   noTrafficPrompt:false, keepExport:true,
   storage:{ browser:null, host:null },
   sort:'time-desc', filter:'all', tutorialStep:0, tutorialOpen:false, tutorialKind:'basic',
@@ -254,11 +251,11 @@ function renderTargetPicker(){
   const bi=document.getElementById('target-btn-icon');
   bi.src=hostIcon(cur.host); bi.dataset.host=cur.host;
   document.getElementById('target-btn-text').textContent=cur.value;
-  document.getElementById('target-pop').innerHTML=TARGETS.map(opt=>{
-    const isHost = state.mode!=='web' && opt.host===state.host;
-    return '<button class="picker-item" role="option" data-target="'+opt.value+'" aria-selected="'+(opt.value===state.target)+'">'
-      +'<img class="picker-ico" data-host="'+opt.host+'" src="'+hostIcon(opt.host)+'" alt="">'
-      +'<span>'+opt.value+'</span>'
+  document.getElementById('target-pop').innerHTML=TARGETS.map(t=>{
+    const isHost = state.mode!=='web' && t.host===state.host;
+    return '<button class="picker-item" role="option" data-target="'+t.value+'" aria-selected="'+(t.value===state.target)+'">'
+      +'<img class="picker-ico" data-host="'+t.host+'" src="'+hostIcon(t.host)+'" alt="">'
+      +'<span>'+t.value+'</span>'
       +(isHost?'<span class="host-tag">'+t('target.hostSuffix')+'</span>':'')
       +'</button>';
   }).join('');
@@ -545,77 +542,6 @@ async function onPrivateRowClick(event){
   toast(t('priv.deleted'));
 }
 
-/* ── 互传矩阵：通道列表 + 收发互换 ── */
-function renderTransferDirection(){
-  const el=document.getElementById('transfer-direction');
-  if(el) el.textContent=t(state.transfer.direction==='send'?'transfer.directionSend':'transfer.directionRecv');
-}
-function transferChannelName(id){
-  if(id===CHANNEL.LUKER_NATIVE) return t('transfer.channel.luker');
-  if(id===CHANNEL.TT_NATIVE) return t('transfer.channel.tt');
-  return t('transfer.channel.webrtc');
-}
-function setTransfer(next={}){
-  const merged={...state.transfer, ...next};
-  merged.channels=channelsFor({
-    senderHost:merged.host||'st',
-    nativePeers:merged.peers||[],
-    webRtcAvailable:merged.webRtcAvailable!==false,
-  });
-  state.transfer=merged;
-  renderTransferDirection();
-}
-function openTransferMatrix(){
-  const rows=state.transfer.channels.map((ch)=>{
-    const available=ch.available?t('transfer.available'):t(ch.reasonKey||'transfer.reason.hostPanel');
-    let body='';
-    if(ch.id===CHANNEL.LUKER_NATIVE){
-      body=(ch.peers&&ch.peers.length)
-        ? '<div class="transfer-peers">'+ch.peers.map((peer)=>'<span class="transfer-peer">'
-            +'<span class="tp-name">'+escapeHtml(peer.label||peer.id)+'</span>'
-            +'<button class="tree-mini" data-tpull="'+escapeHtml(peer.id)+'">'+t('transfer.action.pull')+'</button>'
-          +'</span>').join('')+'</div>'
-        : '<div class="transfer-note">'+t('transfer.noPeers')+'</div>';
-    } else if(ch.id===CHANNEL.TT_NATIVE){
-      body='<div class="transfer-note">'+t('transfer.hint.tt')+'</div>';
-    } else {
-      body='<div class="transfer-note">'+t('transfer.hint.webrtc')+'</div>'
-        +(ch.available?'<button class="tree-mini" data-twebrtc="1">'+t('transfer.action.useWebrtc')+'</button>':'');
-    }
-    return '<div class="transfer-row'+(ch.available?' is-on':' is-off')+'" data-channel="'+ch.id+'">'
-      +'<div class="tr-head"><span class="tr-name">'+transferChannelName(ch.id)+'</span>'
-      +'<span class="tr-state">'+available+'</span></div>'
-      +body+'</div>';
-  }).join('');
-  openModal(t('transfer.title'), t('transfer.desc'), ['<div class="transfer-matrix">'+rows+'</div>'], [
-    {label:t('modal.close'),onClick:closeModal},
-    {label:t('transfer.swap'),primary:true,onClick:()=>doSwapTransfer()},
-  ]);
-  document.getElementById('modal-extra').onclick=onTransferRowClick;
-}
-async function onTransferRowClick(event){
-  const pull=event.target.closest('[data-tpull]');
-  if(pull){
-    const peerId=pull.dataset.tpull;
-    const peerName=pull.parentElement?.querySelector('.tp-name')?.textContent||peerId;
-    pull.disabled=true;
-    toast(t('transfer.pulling',{peer:peerName}));
-    const result=await actions.transfer?.pull?.(peerId);
-    pull.disabled=false;
-    toast(result&&result.ok?t('transfer.pullDone'):t('transfer.pullFailed'));
-    return;
-  }
-  const webrtc=event.target.closest('[data-twebrtc]');
-  if(webrtc){ closeModal(); state.lan.open=true; renderLan(); }
-}
-function doSwapTransfer(){
-  state.transfer.direction=swapDirection(state.transfer.direction);
-  actions.transfer?.swap?.(state.transfer.direction);
-  renderTransferDirection(); renderLan();
-  toast(t('transfer.swapped'));
-  closeModal();
-}
-
 function renderBatchBar(targets){
   const bar=document.getElementById('batch-bar');
   const mergeTarget=targets.find(t=>t.merge);
@@ -646,8 +572,8 @@ function renderChart(){
   const stack=document.getElementById('chart-stack');
   const scroll=stack.scrollTop;
   let html='';
-  targets.forEach(target=>{
-    if(target.host){
+  targets.forEach(t=>{
+    if(t.host){
       const tree=hostNodes(state.host);
       const degraded = state.mode==='web' || !HOSTS[state.host].readable || !(state.hostTree && state.hostTree.length);
       html+='<div class="chart-group">'
@@ -659,19 +585,19 @@ function renderChart(){
           })+'</div></div>';
       return;
     }
-    if(target.merge){
-      const nodes=mergedNodes(target.pkgs);
-      const totalMb=mergedTotalMb(target.pkgs);
+    if(t.merge){
+      const nodes=mergedNodes(t.pkgs);
+      const totalMb=mergedTotalMb(t.pkgs);
       const vols=volumesFor(totalMb,nodes);
       const multi=vols.length>1;
-      const scope=mergeScope(target.pkgs);
-      const extOwner=target.pkgs.find(p=>p.extensions&&p.extensions.length)||target.pkgs[0];
+      const scope=mergeScope(t.pkgs);
+      const extOwner=t.pkgs.find(p=>p.extensions&&p.extensions.length)||t.pkgs[0];
       const extTools=extensionToolsHtml(extOwner);
       html+='<div class="chart-group is-merged">'
         +'<div class="vol-grid" data-vols="'+vols.length+'">'
         + vols.map(v=>chartCardHtml({
             key:'merge-'+v.i, scope, nodes:v.nodes,
-            idxText:t('chart.mergedBadge',{n:target.pkgs.length}),
+            idxText:t('chart.mergedBadge',{n:t.pkgs.length}),
             merged:true,
             volText: multi ? t('chart.volume',{i:v.i,n:v.n}) : t('chart.whole'),
             capText: fmtMB(v.mb),
@@ -683,7 +609,7 @@ function renderChart(){
         +'</div></div>';
       return;
     }
-    const pkg=target.pkg;
+    const pkg=t.pkg;
     const tree=packageNodes(pkg);
     const vols=volumesOf(pkg, tree.nodes);
     const multi=vols.length>1;
@@ -1173,9 +1099,6 @@ function bind(){
     state.lan.open=!state.lan.open;
     renderLan();
   });
-  document.getElementById('btn-matrix')?.addEventListener('click',()=>openTransferMatrix());
-  document.getElementById('btn-swap')?.addEventListener('click',()=>doSwapTransfer());
-  renderTransferDirection();
   document.getElementById('lan-btn-generate').addEventListener('click',()=>actions.lan?.generate?.());
   document.getElementById('lan-btn-copy-send').addEventListener('click',()=>{
     copyLanText(document.getElementById('lan-send-code')?.value||'');
@@ -1607,7 +1530,6 @@ initSplitters();
     },
     setLibraryExport(on) { state.libraryExport = !!on; renderActions(); },
     setPrivateFiles(list) { state.privateFiles = Array.isArray(list) ? list : []; renderChart(); },
-    setTransfer,
     setZone(zone) { state.zone = zone; state.selectedPkgs = new Set(); renderAll(); },
     setActivePackage(id) { state.source = { type: 'package', pkgId: id }; state.sourceKey = 'pkg:' + id; renderAll(); },
     pushLog(level, msg) { log(String(level || 'INFO').toUpperCase(), msg); },
