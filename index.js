@@ -21,9 +21,11 @@ import { createWorkbenchView } from './src/ui/workbench-view.js';
 import {
   detectHost, hostLayoutCode, fetchHostBackup, restoreToHost, restoreToLuker,
   confirmDialog, mountExtensionRowButton, closeHostExtensionSurface,
-  uploadUserFile, userFilesSupported, sanitizeUserFileName,
+  uploadUserFile, userFilesSupported, sanitizeUserFileName, verifyUserFiles, deleteUserFile,
 } from './src/ui/host-bridge.js';
 import { packPrivateContainer } from './src/core/private-container.js';
+import { loadPrivateFiles, addPrivateFile, removePrivateFile } from './src/ui/private-files-store.js';
+import { ORIGIN_ZONE, zoneOfOrigin, copyBackRecord } from './src/core/zone-model.js';
 import { exportLibraryToPack, importRestoredChatsIntoLibrary } from './src/ui/chat-store-inject.js';
 import { mountLanTransferPanel } from './src/ui/lan-transfer-panel.js';
 import { qr } from './src/ui/qr.js';
@@ -40,17 +42,6 @@ export {
   attachConversionProgress, runBatchItems, batchResumeVerdict, seedEntriesFor,
 } from './src/app/task-runtime.js';
 export { mountDebugProbe };
-
-const ZONE_OF_ORIGIN = {
-  [ORIGINS.UPLOAD]: 'import',
-  [ORIGINS.HOST_EXPORT]: 'import',
-  [ORIGINS.SOURCE_BACKUP]: 'import',
-  [ORIGINS.LAN]: 'import',
-  [ORIGINS.EXPORT_COPY]: 'import',
-  [ORIGINS.CONVERTED]: 'export',
-  [ORIGINS.DELTA]: 'export',
-  [ORIGINS.SPLIT_PART]: 'export',
-};
 
 const HOST_CODE = { st: 'st', luker: 'luker', l: 'luker', tt: 'tt', pt: 'pt' };
 const HOST_LABEL = { st: 'SillyTavern', luker: 'Luker', l: 'Luker', tt: 'TauriTavern', pt: 'PureTavern' };
@@ -122,7 +113,7 @@ async function main(root) {
   }
 
   function toPackage(record) {
-    const zone = ZONE_OF_ORIGIN[record.origin] || 'import';
+    const zone = zoneOfOrigin(record.origin);
     const layout = state.layoutById.get(record.id) || record.layout || 'unknown';
     const sizeBytes = record.size || 0;
     return {
@@ -152,7 +143,7 @@ async function main(root) {
     if (!isStorageSupported()) { state.packages = []; view.setPackages([]); return; }
     try {
       const records = await listStoredFiles();
-      state.packages = records.filter((r) => ZONE_OF_ORIGIN[r.origin]).map(toPackage);
+      state.packages = records.filter((r) => Object.hasOwn(ORIGIN_ZONE, r.origin)).map(toPackage);
       view.setPackages(state.packages);
     } catch (err) {
       logger.warn(t('log.workspaceReadFailed', { msg: err.message }));
@@ -283,10 +274,10 @@ async function main(root) {
       const pkg = pkgById(id);
       const blob = await blobOf(pkg);
       if (!blob) continue;
+      const plan = copyBackRecord(pkg);
       await saveFile({
-        id: `pkg-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-        name: pkg.name, size: blob.size, blob, role: 'source',
-        origin: ORIGINS.EXPORT_COPY, metadata: { copiedFrom: id },
+        ...plan,
+        size: blob.size, blob,
       });
       count += 1;
     }
@@ -680,6 +671,14 @@ async function main(root) {
         return;
       }
       logger.info(t('log.privateUploaded', { name: fileName, path: result.path }));
+      addPrivateFile({
+        name: fileName,
+        path: result.path,
+        uploadedAt: Date.now(),
+        sizeBytes: container.size,
+        sourceName: name || path,
+      });
+      view.setPrivateFiles(loadPrivateFiles());
       view.toast(t('toast.privateUploaded'));
     };
 
@@ -732,6 +731,28 @@ async function main(root) {
       settings: openSettings,
       uploadRequest: () => root.querySelector('#file-input')?.click(),
       uploadPrivate,
+      privateFiles: {
+        list: () => loadPrivateFiles(),
+        verify: async () => {
+          const entries = loadPrivateFiles();
+          if (!entries.length) return { ok: true, verified: {} };
+          const result = await verifyUserFiles(entries.map((entry) => entry.path), { platform: hostKey });
+          if (!result.ok) {
+            logger.error(t('priv.verifyFailed') + `: ${result.detail || result.reason}`);
+            return { ok: false };
+          }
+          return { ok: true, verified: result.verified || {} };
+        },
+        remove: async (path) => {
+          const result = await deleteUserFile(path, { platform: hostKey });
+          if (!result.ok) {
+            logger.error(t('priv.deleteFailed') + `: ${result.detail || result.reason}`);
+            return { ok: false };
+          }
+          removePrivateFile(path);
+          return { ok: true };
+        },
+      },
       onActivePackage: (id) => { ensurePlan(id).then(() => view.setActivePackage(id)); },
       onTargetChange: (name) => {
         const active = state.packages.find((p) => view.getState().source?.pkgId === p.id);
@@ -749,6 +770,7 @@ async function main(root) {
   });
 
   view.setHost(hostKey, host.isPlugin ? 'plugin' : 'web');
+  view.setPrivateFiles(loadPrivateFiles());
   applyI18n(root);
   root.querySelector('#btn-locale')?.addEventListener('click', () => {
     setLocale(getLocale() === 'zh-CN' ? 'en-US' : 'zh-CN');

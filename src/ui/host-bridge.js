@@ -786,7 +786,9 @@ export async function verifyUserFiles(urls, { platform = null, signal } = {}) {
       return { ok: false, reason: `http-${response.status}`, detail };
     }
     const data = await response.json().catch(() => ({}));
-    return { ok: true, urls: data.urls || list };
+    /* 宿主返回 `{ "<url>": true|false }`（见 `src/endpoints/files.js` 的 /verify）。 */
+    const verified = data && typeof data === 'object' && !Array.isArray(data) ? data : {};
+    return { ok: true, verified };
   } catch (err) {
     return { ok: false, reason: 'request-failed', detail: err?.message || String(err) };
   }

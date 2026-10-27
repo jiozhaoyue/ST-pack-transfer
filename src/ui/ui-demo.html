@@ -352,6 +352,20 @@ const view = createWorkbenchView({
     copyBack: doCopyBack,
     deleteSelected: doDeleteSelected,
     uploadPrivate: doUploadPrivate,
+    privateFiles: {
+      list: async () => demoPrivateFiles.slice(),
+      /* 演示「校验」：第二条标记为缺失，展示两态。 */
+      verify: async () => ({
+        ok: true,
+        verified: Object.fromEntries(demoPrivateFiles.map((entry, index) => [entry.path, index !== 1])),
+      }),
+      remove: async (path) => {
+        const index = demoPrivateFiles.findIndex((entry) => entry.path === path);
+        if (index >= 0) demoPrivateFiles.splice(index, 1);
+        view.setPrivateFiles(demoPrivateFiles.slice());
+        return { ok: true };
+      },
+    },
     lan: demoLan,
     settings: () => {
       view.openModal('设置', '', [buildSettingsHtml(demoSettings)], [
@@ -369,6 +383,7 @@ const view = createWorkbenchView({
   }
 });
 const S = () => view.getState();
+view.setPrivateFiles(demoPrivateFiles.slice());
 document.getElementById('btn-locale')?.addEventListener('click',()=>{
   setLocale(getLocale()==='zh-CN'?'en-US':'zh-CN');
 });
@@ -466,8 +481,21 @@ function doDeleteSelected(ids){
   ]);
 }
 
-function doUploadPrivate(name){
+const demoPrivateFiles = [
+  { name:'private_chat_sync_1730000000.zip', path:'/user/files/private_chat_sync_1730000000.zip', uploadedAt: Date.now()-3_600_000, sizeBytes: 1.4*1024*1024, sourceName:'…chat_sync.json' },
+  { name:'private_secrets_1730000900.zip', path:'/user/files/private_secrets_1730000900.zip', uploadedAt: Date.now()-1_800_000, sizeBytes: 0.02*1024*1024, sourceName:'secrets.json' },
+  { name:'private_memory_graph_1730001200.zip', path:'/user/files/private_memory_graph_1730001200.zip', uploadedAt: Date.now()-600_000, sizeBytes: 3.1*1024*1024, sourceName:'…memory_graph__meta.json' },
+];
+
+function doUploadPrivate(payload){
+  const name = (payload && payload.name) || '';
   trafficConfirm(()=>{
+    const file = 'private_' + String(name || 'file').replace(/\.json$/i,'').replace(/[^a-zA-Z0-9._-]/g,'_') + '_' + Date.now() + '.zip';
+    demoPrivateFiles.unshift({
+      name: file, path: '/user/files/' + file, uploadedAt: Date.now(),
+      sizeBytes: 0.4*1024*1024, sourceName: name,
+    });
+    view.setPrivateFiles(demoPrivateFiles.slice());
     view.pushLog('INFO','上传私有配置到宿主文件: '+name);
     view.toast('私有配置已上传到 user/files');
   });

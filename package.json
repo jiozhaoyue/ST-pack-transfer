@@ -32,6 +32,7 @@
     "check:dom-scope": "node scripts/dom-scope.js",
     "check:control-consumer": "node scripts/control-consumer-guard.js",
     "check:i18n": "node scripts/i18n-guard.js",
+    "check:copy": "node scripts/copy-audit.js",
     "gen-fixtures": "node fixtures/gen.js"
   }
 }
