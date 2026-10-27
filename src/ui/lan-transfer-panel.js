@@ -739,6 +739,26 @@ export function mountLanTransferPanel({ view, getSendTargets = null, onReceive =
     log('INFO', t('lan.log.abandoned'));
   }
 
+  /** 交换收发：关掉当前会话并清空两侧状态，方向由视图切换。 */
+  function swap() {
+    closeSession();
+    machine = createTransferMachine();
+    cancelRequested = false;
+    queue = [];
+    queueIndex = 0;
+    currentFile = null;
+    sendState = 'idle';
+    recvState = 'idle';
+    incoming = null;
+    pendingOffer = null;
+    setSend({
+      code: '', answer: '', phase: t('action.ready'), detail: '',
+      pct: 0, busy: false, waiting: false, done: false, error: false,
+    });
+    setRecv({ offer: '', code: '', phase: t('action.waiting'), detail: '', pct: 0, busy: false, done: false });
+    log('INFO', t('transfer.swapped'));
+  }
+
   const onPageHide = () => closeSession();
   if (typeof window !== 'undefined') window.addEventListener('pagehide', onPageHide);
 
@@ -747,5 +767,5 @@ export function mountLanTransferPanel({ view, getSendTargets = null, onReceive =
     closeSession();
   }
 
-  return { generate, applyAnswer, acceptOffer, retry, cancel, abandon, destroy };
+  return { generate, applyAnswer, acceptOffer, retry, cancel, abandon, swap, destroy };
 }
