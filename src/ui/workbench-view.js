@@ -11,6 +11,7 @@
 
 import { chartTreeFor, deriveExportOptions } from '../core/chart-model.js';
 import { mergeChartTrees } from '../core/merge-packages.js';
+import { actionsForZone, actionEnabled } from '../core/zone-model.js';
 import { EXTENSION_MODES, GIT_MODES } from '../core/export-modes.js';
 import { t } from '../i18n/index.js';
 
@@ -115,7 +116,7 @@ const state = {
   source:{ type:'host', pkgId:null }, target:'SillyTavern', delta:'overwrite', splitMb:'',
   compression:'5', extensionMode:'full', gitMode:'keep', keepDev:false,
   packages: INITIAL_PACKAGES.map(p=>({...p})),
-  selectedPkgs:new Set(), mergeMode:false, expanded:{}, collapsedVol:{}, sel:{}, log:[], logLevel:'ALL',
+  selectedPkgs:new Set(), mergeMode:false, privateFiles:[], expanded:{}, collapsedVol:{}, sel:{}, log:[], logLevel:'ALL',
   noTrafficPrompt:false, keepExport:true,
   storage:{ browser:null, host:null },
   sort:'time-desc', filter:'all', tutorialStep:0, tutorialOpen:false, tutorialKind:'basic',
@@ -383,10 +384,10 @@ function renderQuota(){
   head.innerHTML = row(t('quota.browser'),'db',state.storage.browser,t('quota.browserEmpty'))
     + row(t('quota.host'),'shield',hostReadable ? state.storage.host : null,t('quota.hostEmpty'));
 }
-function renderTreeRows(nodes,depth,scope,readonly,extToolsHtml){
+function renderTreeRows(nodes,depth,scope,readonly,tools){
   let out='';
   for(const n of nodes){
-    if(n.id==='group:extensions' && extToolsHtml) out+=extToolsHtml;
+    if(tools && tools[n.id]) out+=tools[n.id];
     const key=treeKey(scope,n.id);
     const expanded=state.expanded[key]!==undefined ? state.expanded[key] : !!n.expanded;
     const hasKids=n.children && n.children.length;
@@ -411,7 +412,7 @@ function renderTreeRows(nodes,depth,scope,readonly,extToolsHtml){
       +(n.uploadable?'<button class="tree-mini" data-upload="'+n.id+'">'+t('tree.upload')+'</button>':'')
       +'</div>';
     if(hasKids && expanded){
-      out+='<div class="tree-children">'+renderTreeRows(n.children,depth+1,scope,readonly)+'</div>';
+      out+='<div class="tree-children">'+renderTreeRows(n.children,depth+1,scope,readonly,tools)+'</div>';
     }
   }
   return out;
@@ -443,7 +444,7 @@ function chartCardHtml(o){
     +'</div>'
     +'<div class="vol-body">'
       +(o.noticeHtml||'')
-      +'<div class="chart-tree">'+renderTreeRows(o.nodes,0,o.scope,o.readonly||dis,o.extToolsHtml)+'</div>'
+      +'<div class="chart-tree">'+renderTreeRows(o.nodes,0,o.scope,o.readonly||dis,groupToolsOf(o))+'</div>'
       +(dis?'':'<div class="chart-foot"><span>'+t('chart.selected',{count:sum.count,size:fmtMB(sum.mb)})+'</span></div>')
     +'</div>'
   +'</div>';
@@ -471,6 +472,76 @@ function extensionToolsHtml(pkg){
     +'</div>';
 }
 
+/* ── 云端私有件（user/files）：宿主无列表端点，条目来自本地上传登记 ── */
+function userFilesAvailable(){
+  return state.mode!=='web' && (state.host==='st' || state.host==='luker');
+}
+function privateFilesHtml(){
+  if(!userFilesAvailable()) return '';
+  const n=state.privateFiles.length;
+  return '<div class="priv-tools" data-privtools="1">'
+    +'<button class="tree-mini" data-privfiles="open">'+t('priv.open')+(n?' ('+n+')':'')+'</button>'
+    +'</div>';
+}
+/* 组级工具条：扩展组放模式/Git，私有组放「云端私有件」入口。 */
+function groupToolsOf(o){
+  const tools={};
+  if(o.extToolsHtml) tools['group:extensions']=o.extToolsHtml;
+  const priv=privateFilesHtml();
+  if(priv) tools['group:private']=priv;
+  return tools;
+}
+function fmtStamp(ms){
+  const d=new Date(Number(ms)||0); const p=(n)=>String(n).padStart(2,'0');
+  if(!ms) return '';
+  return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes());
+}
+async function openPrivateFiles(){
+  const entries=await actions.privateFiles?.list?.();
+  const list=Array.isArray(entries)?entries:[];
+  state.privateFiles=list;
+  const rows=list.length
+    ? list.map((e)=>'<div class="priv-row" data-privrow="'+escapeHtml(e.path)+'">'
+        +'<span class="pf-name" title="'+escapeHtml(e.path)+'">'+escapeHtml(e.name)+'</span>'
+        +'<span class="pf-meta">'+fmtMB((Number(e.sizeBytes)||0)/1048576)+' · '+fmtStamp(e.uploadedAt)+'</span>'
+        +'<span class="pf-state" data-pfstate></span>'
+        +'<button class="tree-mini" data-privdel="'+escapeHtml(e.path)+'">'+t('priv.delete')+'</button>'
+      +'</div>').join('')
+    : '<div class="export-queue-empty">'+t('priv.empty')+'</div>';
+  openModal(t('priv.title'),t('priv.desc'),['<div class="priv-files">'+rows+'</div>'],[
+    {label:t('modal.close'),onClick:closeModal},
+    ...(list.length?[{label:t('priv.verify'),primary:true,onClick:()=>verifyPrivateFiles()}]:[])
+  ]);
+  document.getElementById('modal-extra').onclick=onPrivateRowClick;
+}
+async function verifyPrivateFiles(){
+  const result=await actions.privateFiles?.verify?.();
+  const box=document.getElementById('modal-extra');
+  if(!box) return;
+  if(!result || !result.ok){ toast(t('priv.verifyFailed')); return; }
+  const verified=result.verified||{};
+  box.querySelectorAll('[data-privrow]').forEach((row)=>{
+    const target=row.querySelector('[data-pfstate]');
+    if(!target) return;
+    const exists=verified[row.dataset.privrow]!==false;
+    target.textContent=exists?t('priv.present'):t('priv.missing');
+    target.classList.toggle('is-missing',!exists);
+  });
+}
+async function onPrivateRowClick(event){
+  const btn=event.target.closest('[data-privdel]');
+  if(!btn) return;
+  const path=btn.dataset.privdel;
+  btn.disabled=true;
+  const result=await actions.privateFiles?.remove?.(path);
+  btn.disabled=false;
+  if(!result || !result.ok){ toast(t('priv.deleteFailed')); return; }
+  btn.closest('[data-privrow]')?.remove();
+  state.privateFiles=state.privateFiles.filter((e)=>e.path!==path);
+  renderChart();
+  toast(t('priv.deleted'));
+}
+
 function renderBatchBar(targets){
   const bar=document.getElementById('batch-bar');
   const mergeTarget=targets.find(t=>t.merge);
@@ -487,7 +558,7 @@ function renderBatchBar(targets){
       +t(merged?'chart.mergeOff':'chart.mergeOn')+'</button>'
     +(merged?'<span class="merge-badge">'+t('chart.mergedBadge',{n:pkgs.length})+'</span>':'')
     +'<button data-batchall="1">'+t('chart.batchAll')+'</button>'
-    +'<button data-batchnone="1">'+t('chart.batchNone')+'</button>'
+    +'<button data-batchnone="1">'+t('chart.selectNone')+'</button>'
     +'<button data-batchinvert="1">'+t('chart.batchInvert')+'</button>'
     +'<span style="flex:1"></span>'
     +'<span style="color:var(--muted-2)">'+t(merged?'chart.mergeHint':'chart.batchHint')+'</span>';
@@ -666,10 +737,12 @@ function renderZones(){
   }else{
     html+='<div class="card-list">'+list.map(pkgCard).join('')+'</div>';
   }
-  if(state.zone==='import' && state.selectedPkgs.size>0){
+  const zoneActions=actionsForZone(state.zone);
+  const sel={selectedCount:state.selectedPkgs.size};
+  if(zoneActions.includes('generate') && state.selectedPkgs.size>0){
     html+='<div class="batch-bar"><span class="lbl">'+t('zones.selected',{n:state.selectedPkgs.size})+'</span>'
-      +'<button id="batch-generate">'+t('zones.batchGenerate')+'</button>'
-      +'<button id="batch-merge"'+(state.selectedPkgs.size<2?' disabled':'')+'>'+t('zones.batchMerge')+'</button>'
+      +'<button id="batch-generate"'+(!actionEnabled(state.zone,'generate',sel)?' disabled':'')+'>'+t('zones.batchGenerate')+'</button>'
+      +'<button id="batch-merge"'+(!actionEnabled(state.zone,'merge',sel)?' disabled':'')+'>'+t('zones.batchMerge')+'</button>'
       +'<button id="batch-delete">'+t('zones.batchDelete')+'</button></div>';
   }
   body.innerHTML=html;
@@ -704,14 +777,16 @@ function fitPackageNames(){
 function renderActions(){
   const row=document.getElementById('action-row');
   const hasSel=state.selectedPkgs.size>0;
-  const libBtn=state.libraryExport
+  const sel={selectedCount:state.selectedPkgs.size};
+  const zoneActions=actionsForZone(state.zone);
+  const libBtn=state.libraryExport && zoneActions.includes('libraryExport')
     ? '<button class="btn" id="btn-library-export">'+svg('db','ico')+t('action.libraryExport')+'</button>'
     : '';
-  if(state.zone==='import'){
+  if(zoneActions.includes('generate')){
     row.innerHTML=
       '<button class="btn" id="btn-fetch">'+svg('cloud','ico')+t('action.fetch')+'</button>'
-      +'<button class="btn accent" id="btn-generate"'+(hasSel?'':' disabled')+'>'+svg('archive','ico')+t('action.generatePack')+'</button>'
-      +'<button class="btn" id="btn-merge"'+(state.selectedPkgs.size>1?'':' disabled')+'>'+svg('copy','ico')+t('action.mergeUpload')+'</button>'
+      +'<button class="btn accent" id="btn-generate"'+(actionEnabled(state.zone,'generate',sel)?'':' disabled')+'>'+svg('archive','ico')+t('action.generatePack')+'</button>'
+      +'<button class="btn" id="btn-merge"'+(actionEnabled(state.zone,'merge',sel)?'':' disabled')+'>'+svg('copy','ico')+t('action.mergeUpload')+'</button>'
       +libBtn;
     row.querySelector('#btn-generate')?.addEventListener('click',()=>doGenerate());
     row.querySelector('#btn-merge')?.addEventListener('click',()=>doMerge());
@@ -1159,6 +1234,8 @@ function bind(){
       state.expanded[key]=state.expanded[key]!==undefined ? !state.expanded[key] : !row.classList.contains('expanded');
       renderChart(); return;
     }
+    const priv=e.target.closest('[data-privfiles]');
+    if(priv){ void openPrivateFiles(); return; }
     const up=e.target.closest('[data-upload]');
     if(up){
       const scope=scopeFromEl(up);
@@ -1452,6 +1529,7 @@ initSplitters();
       renderQuota();
     },
     setLibraryExport(on) { state.libraryExport = !!on; renderActions(); },
+    setPrivateFiles(list) { state.privateFiles = Array.isArray(list) ? list : []; renderChart(); },
     setZone(zone) { state.zone = zone; state.selectedPkgs = new Set(); renderAll(); },
     setActivePackage(id) { state.source = { type: 'package', pkgId: id }; state.sourceKey = 'pkg:' + id; renderAll(); },
     pushLog(level, msg) { log(String(level || 'INFO').toUpperCase(), msg); },

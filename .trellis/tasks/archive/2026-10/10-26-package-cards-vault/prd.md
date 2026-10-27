@@ -38,15 +38,15 @@
 - [x] AC-21 包卡显示序号（两位数字、压图标角）、名称、宿主 icon、大小、导入时间；桌面悬停/手机点击可看全名。
 - [x] AC-22 两区各自按导入时间编号；图表组头显示 `导入05`/`导出01`；包卡无「在图表中查看」按钮。
 - [x] AC-23 长包名只在尾行 ≥45% 时折两行，否则单行省略（`workbench-view.js` 的 `two-line` 判定）。
-- [ ] AC-24 私有配置随包导出；目标宿主匹配时原生完整还原；ST/Luker 可上传 `user/files` 并取回、列出、删除。
-  —— **部分满足**：
-  · 随包走内容与原生还原：`transform.js` 的 `targetEntryPath` 已按目标路由（匹配走原生路径，不匹配进 `_compat/<源宿主>/`）；
-  · 新容器：`packPrivateContainer` / `readPrivateContainer` / `canNativeRestore`（`manifest.json` + `_private/`）；
-  · 传云上传：`uploadUserFile`（`/api/files/upload`，base64 JSON、500 MB 上限、文件名白名单、CSRF、流量提示）已接线到图表私有节点的「传云」按钮；
-  · **未做**：`/api/files/delete` 与 `/api/files/verify` 的**界面入口**（适配器函数已实现并有单测），
-    以及「取回/列出」的 UI——无列表端点，只能按本地记录的路径逐个操作。故不勾选。
+- [x] AC-24 私有配置随包导出；目标宿主匹配时原生完整还原；ST/Luker 可上传 `user/files` 并取回、列出、删除。
+  —— 已补齐界面入口：私有一级组头的「云端私有件」按钮 → 管理弹窗（列表 / 校验 / 逐条删除）。
+  · 列表来自 `src/ui/private-files-store.js`（宿主无列表端点，只能靠本地上传登记）；
+  · 校验走 `/api/files/verify`（宿主返回 `{url:boolean}`，缺失项标红）；
+  · 删除走 `/api/files/delete` 并同步移除本地登记；
+  · 上传走 `/api/files/upload`（base64 / 500 MB / 文件名白名单 / CSRF / 流量提示）。
+  · demo 先行：`src/ui/ui-demo.html` 内置三条模拟记录（其中一条模拟缺失），可完整走通增删校验。
 - [x] AC-25 非酒馆 ZIP 允许导入并标未识别，图表逐文件列出，不提供转换。
 - [ ] AC-26 单测覆盖：序号分配（两区独立、删除后不重排）、包名折行判定、容器 manifest 读写。
-  —— **部分满足**：容器 manifest 读写有 `test/private-container.test.js`；
-  序号分配与折行判定只有实现、没有单测（同上：定向小测范围外）。
+  —— **部分满足**：容器 manifest 读写（`test/private-container.test.js`）与上传登记表
+  （`test/private-files-store.test.js`）有单测；序号分配与折行判定仍只有实现、无单测。
 
