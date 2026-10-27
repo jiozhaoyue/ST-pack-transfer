@@ -5,7 +5,7 @@
  * 不覆盖旧 UI（暂存列表 / 类目卡片 / 计划摘要条 / 待导出队列）——那些节点已删除。
  */
 
-const matrix = require('./matrix.e2e.cjs');
+const matrix = require('../lib/workbench-flow.cjs');
 
 async function dismissHostPopups(page) {
   await page.evaluate(() => {

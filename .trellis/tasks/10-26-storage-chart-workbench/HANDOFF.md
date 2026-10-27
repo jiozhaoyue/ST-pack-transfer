@@ -121,6 +121,8 @@
 4. **禁止与其它自动开浏览器的工具并行**；`browserLaunch.enabled` 必须为 `false`。
 5. **UI 只能改 `src/ui/ui-demo.html`**，然后 `npm run sync:ui`；正式三件套不得手改，也不得出现 demo / 演示 / DEMO_ 字样（`test/ui-demo-source.test.js` 会红）。
 6. **正式数据不得造假**：配额来自 `navigator.storage.estimate()`；宿主无读数就写「当前宿主无逐项读数」。
+7. **TT 的 `<html>` 带 `transform: matrix(...)` 且高度为 0**（2026-10-27 实测）：所有 `position:fixed;inset:0` 的浮层会塌成 0/24px，局域网面板直接跑到屏幕外。全屏浮层一律用 `top:0;left:0;width:100vw;height:100vh`，不要用 `inset:0`；`bottom` 锚点（toast）改用 `top:calc(100vh - X)`。
+8. **打开全屏工作台前必须关闭宿主扩展弹层**（TT 实测会多一个「扩展更新」dialog，层级高于工作台，用户点不到工作台）：`host-bridge.closeHostExtensionSurface()` 在入口按钮回调里先执行。
 
 ---
 
@@ -141,7 +143,8 @@
 
 **局域网互传**：
 - 独立 Web 双页面 3 MB 真互传 **18/18**（`npm run e2e:web -- --only lan-transfer --rebuild`）。
-- **跨宿主双向**：Dev ST ↔ Dev Luker **20/20**（ST→Luker、Luker→ST 各一遍，含摘要一致、接收端工作区出现同名包）。
+- **四宿主全部两两配对（6 对 × 双向 = 12 次）**：ST↔Luker、ST↔PT、ST↔TT、Luker↔PT、Luker↔TT、PT↔TT，
+  **120/120 断言通过**（摘要一致、接收端工作区出现同名包；真实点击优先）。
 
 **未覆盖（下一会话继续）**：
 - 两台**不同机器**的局域网互传（mDNS / 扫码 / 非安全上下文降级提示）。

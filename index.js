@@ -19,7 +19,7 @@ import { getWorkbenchHtml } from './src/ui/workbench-template.js';
 import { createWorkbenchView } from './src/ui/workbench-view.js';
 import {
   detectHost, hostLayoutCode, fetchHostBackup, restoreToHost, restoreToLuker,
-  confirmDialog, mountExtensionRowButton,
+  confirmDialog, mountExtensionRowButton, closeHostExtensionSurface,
 } from './src/ui/host-bridge.js';
 import { exportLibraryToPack, importRestoredChatsIntoLibrary } from './src/ui/chat-store-inject.js';
 import { mountLanTransferPanel } from './src/ui/lan-transfer-panel.js';
@@ -558,7 +558,10 @@ function bootstrap() {
   const host = detectHost();
   if (host.isPlugin) {
     ensureConverterModal();
-    mountExtensionRowButton(() => openConverterModal());
+    mountExtensionRowButton(() => {
+      closeHostExtensionSurface();
+      openConverterModal();
+    });
     return;
   }
   const app = document.getElementById('app');

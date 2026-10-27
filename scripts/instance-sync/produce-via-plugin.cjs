@@ -64,7 +64,7 @@
  *
  * 类目卡片（`.category-card`）是**计划渲染的产物**：空工作区下 `#category-checkboxes` 为空
  * （`availableCategories` 由 `renderCategoryStats(plan)` 填充，而宿主拉取路径的计划要到**拉取之后**才渲染，
- * `index.js:1648`）⇒ 必须先**喂一个探测夹具**把卡片渲染出来（手法同 `e2e/specs/library-inject.e2e.cjs`）。
+ * `index.js:1648`）⇒ 必须先**喂一个探测夹具**把卡片渲染出来（手法同 旧库注入规格（已随 UI 重写停用））。
  * 喂夹具只影响计划 / 类目 UI，**不影响拉取的字节来源**（字节始终来自宿主）。
  *
  * 故开关仍是 `--deselect <keys>`（把哪些**标准**键置 false），但其语义已从「收窄」变为
@@ -305,7 +305,7 @@ async function readSelection(page) {
  * 喂夹具只影响「计划 / 类目 UI」，**不影响拉取的字节来源**（字节始终来自宿主）。
  *
  * 夹具由 `fixtures/gen.js` 现场生成到 `test-results/fixtures`（`.gitignore` 覆盖，不入库），
- * 手法与 `e2e/specs/library-inject.e2e.cjs` 一致。
+ * 手法与 旧库注入规格（已随 UI 重写停用） 一致。
  */
 async function ensureProbeFixture() {
   const dir = path.join(REPO_ROOT, 'test-results', 'fixtures');

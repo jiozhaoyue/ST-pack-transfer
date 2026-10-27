@@ -110,7 +110,13 @@ async function ensureTtRuntime({ timeoutMs = 90_000 } = {}) {
   if (!(await portOpen(CDP_PORT))) {
     const exe = spawn(path.join(TT_ROOT, 'src-tauri', 'target', 'debug', 'tauritavern.exe'), [], {
       cwd: TT_ROOT, detached: true, stdio: 'ignore',
-      env: { ...process.env, WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${CDP_PORT}` },
+      // 关闭 mDNS 候选隐藏：跨进程/跨宿主局域网互传时，mDNS `.local` 候选在同机也不一定可解析；
+      // 用真实 host 候选最稳（本地 E2E 专用，不影响生产行为）。
+      env: {
+        ...process.env,
+        WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS:
+          `--remote-debugging-port=${CDP_PORT} --disable-features=WebRtcHideLocalIpsWithMdns`,
+      },
     });
     exe.unref();
     childProcesses.push(exe);
