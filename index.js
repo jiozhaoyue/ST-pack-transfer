@@ -23,6 +23,7 @@ import {
 } from './src/ui/host-bridge.js';
 import { exportLibraryToPack, importRestoredChatsIntoLibrary } from './src/ui/chat-store-inject.js';
 import { mountLanTransferPanel } from './src/ui/lan-transfer-panel.js';
+import { qr } from './src/ui/qr.js';
 import { probeChatStore } from './src/ui/chat-store-bridge.js';
 import { mountDebugProbe } from './src/app/task-runtime.js';
 
@@ -37,6 +38,7 @@ const ZONE_OF_ORIGIN = {
   [ORIGINS.UPLOAD]: 'import',
   [ORIGINS.HOST_EXPORT]: 'import',
   [ORIGINS.SOURCE_BACKUP]: 'import',
+  [ORIGINS.LAN]: 'import',
   [ORIGINS.CONVERTED]: 'export',
   [ORIGINS.DELTA]: 'export',
   [ORIGINS.SPLIT_PART]: 'export',
@@ -134,10 +136,10 @@ async function main(root) {
       mb: sizeBytes / (1024 * 1024),
       ts: record.createdAt || Date.now(),
       time: clockOf(record.createdAt),
-      origin: record.origin === ORIGINS.UPLOAD ? '上传'
-        : record.origin === ORIGINS.HOST_EXPORT ? '宿主导出'
-          : record.origin === ORIGINS.SPLIT_PART ? '分卷'
-            : '导出副本',
+      origin: record.origin === ORIGINS.LAN ? '远程导入'
+        : record.origin === ORIGINS.SPLIT_PART ? '分卷'
+          : zone === 'export' ? '导出副本'
+            : '本地导入',
       readonly: zone === 'export',
       unrecognized: layout === 'unknown',
       split: 0,
@@ -206,22 +208,54 @@ async function main(root) {
     }
   }
 
-  async function importFiles(files) {
+  /** 远程接收同名包自动加序号：`name.zip` → `name (2).zip`，绝不覆盖。 */
+  function uniqueRemoteName(name, used) {
+    if (!used.has(name)) return name;
+    const dot = name.lastIndexOf('.');
+    const base = dot > 0 ? name.slice(0, dot) : name;
+    const ext = dot > 0 ? name.slice(dot) : '';
+    for (let i = 2; i < 10_000; i += 1) {
+      const candidate = `${base} (${i})${ext}`;
+      if (!used.has(candidate)) return candidate;
+    }
+    return `${base} (${Date.now()})${ext}`;
+  }
+
+  async function importFiles(files, { remote = false } = {}) {
     const list = [...(files || [])];
     if (!list.length) return;
     if (!isStorageSupported()) { view.toast('当前浏览器不支持本地存储'); return; }
+    const used = new Set(state.packages.map((p) => p.name));
     for (const file of list) {
+      const name = remote ? uniqueRemoteName(file.name, used) : file.name;
+      used.add(name);
       const id = `pkg-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
       await saveFile({
-        id, name: file.name, size: file.size, blob: file, role: 'source',
-        origin: ORIGINS.UPLOAD, metadata: { importedAt: Date.now() },
+        id, name, size: file.size, blob: file, role: 'source',
+        origin: remote ? ORIGINS.LAN : ORIGINS.UPLOAD,
+        metadata: { importedAt: Date.now(), ...(remote ? { remote: true } : {}) },
       });
-      logger.info(`已导入 ${file.name}`);
+      logger.info(`${remote ? '已接收' : '已导入'} ${name}`);
     }
     await syncPackages();
+    if (remote) view.setZone('import');
     const newest = state.packages.filter((p) => p.zone === 'import').sort((a, b) => b.ts - a.ts)[0];
     if (newest) { await ensurePlan(newest.id); view.setActivePackage(newest.id); }
-    view.toast(`已导入 ${list.length} 个包`);
+    view.toast(remote ? `已接收 ${list.length} 个包` : `已导入 ${list.length} 个包`);
+  }
+
+  /** 局域网发送源：导入区当前勾选的包（控制器拿到的已是可 slice 的 File）。 */
+  async function getSendTargets() {
+    const selected = view.getState().selectedPkgs;
+    const targets = [];
+    for (const id of selected) {
+      const pkg = state.packages.find((p) => p.id === id);
+      if (!pkg || pkg.zone !== 'import') continue;
+      const blob = await blobOf(pkg);
+      if (!blob) { logger.warn(`发送跳过：${pkg.name} 的字节不在工作区`); continue; }
+      targets.push(new File([blob], pkg.name, { type: 'application/zip', lastModified: pkg.ts || Date.now() }));
+    }
+    return targets;
   }
 
   async function downloadSelected(ids) {
@@ -479,7 +513,17 @@ async function main(root) {
     ]);
   }
 
+  const lanActions = {
+    generate: () => lanPanel?.generate(),
+    applyAnswer: (code) => lanPanel?.applyAnswer(code),
+    acceptOffer: (code) => lanPanel?.acceptOffer(code),
+    retry: () => lanPanel?.retry(),
+    cancel: () => lanPanel?.cancel(),
+    abandon: () => lanPanel?.abandon(),
+  };
+
   const view = createWorkbenchView({
+    qr,
     actions: {
       fetch: fetchFromHost,
       generate,
@@ -488,7 +532,7 @@ async function main(root) {
       deleteSelected,
       download: downloadSelected,
       libraryExport: exportLibrary,
-      lan: () => lanPanel?.open?.(),
+      lan: lanActions,
       settings: openSettings,
       uploadRequest: () => root.querySelector('#file-input')?.click(),
       uploadPrivate: (name) => { logger.info(`私有配置上传请求：${name}`); view.toast(`私有配置：${name}`); },
@@ -527,8 +571,12 @@ async function main(root) {
   }
 
   lanPanel = mountLanTransferPanel({
-    root,
-    onReceive: async (blob, name) => importFiles([new File([blob], name || `lan-${Date.now()}.zip`)]),
+    view,
+    getSendTargets,
+    onReceive: async (blob, name) => {
+      const file = new File([blob], name || `lan-${Date.now()}.zip`, { type: 'application/zip' });
+      await importFiles([file], { remote: true });
+    },
   });
 
   await syncPackages();
