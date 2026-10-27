@@ -620,3 +620,56 @@ LAN / 导出区 / 二维码文案全量迁入 i18n 并纳入守卫；三个 10-2
 - `10-26-naming-injection` 仍卡在两处**非代码项**：本地目录改名（需关掉占用程序）、
   `AGENTS.md` / `CLAUDE.md` 自动生成规则块（真源仓 `tavern-harness` 控制）。
 - 生产 `index.js` 未调用 `setHostTree`，宿主真实树接线需单独立项。
+
+## Session 60: 六个子任务收口 + 合并模式 + 私有配置容器
+
+**Date**: 2026-10-27
+**Task**: 10-26-storage-chart-workbench 全部子任务（父任务 10/10，已归档）
+**Branch**: `main`
+
+### Summary
+
+用户要求「做完剩下 6 个 planning 子任务」。逐条核验后发现绝大多数已由 10-26/10-27 的提交实现；
+真正缺口是**多包合并**（用户追加裁定）与**私有配置容器 / 传云上传**，其余为小缺陷修正。
+六个子任务与父任务均已按证据收口并归档。
+
+### Main Changes
+
+- **合并模式**（用户裁定：默认仍多图表，切开关才是单图表）：
+  `src/core/merge-packages.js`（树合并 / 冲突检出 / 产物合并）、批量条开关 + 合并徽标、
+  `index.js` 的 `generateMerged`（各包按合并树勾选转换 → 合并 → 分卷）、同名即停弹窗。
+- **私有配置容器**：`src/core/private-container.js`（`manifest.json` + `_private/` + `nativeRestore`）。
+- **传云上传**：`host-bridge.js` 新增 `user/files` 适配器（upload/delete/verify，文件名白名单 / 500MB / CSRF），
+  图表私有节点「传云」按钮接到真实上传 + 流量提示。
+- **修正**：复制回导入区改 `origin: export-copy`；合并上传替换原假冲突桩；
+  教程第 3 步锚点由不存在的 `.tree-tools` 改为 `.chart-tree`，目标缺失隐藏高亮环；
+  未识别包说明句移入 `?`（`help.chart.p6`）。
+- **删除**：`src/storage/vault-store.js` 与其单测（用户授权），`ORIGINS.VAULT` 仅保留读历史。
+- 新增单测：`merge-packages` / `private-container` / `user-files-adapter`。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `1484f4c` | feat(chart): 多包合并模式 + 私有配置容器与传云上传 |
+| 6× | chore(task): archive 10-26-*（六子任务） |
+| `940c2e3` | chore(task): archive 10-26-storage-chart-workbench |
+
+### Testing
+
+- [OK] 六守卫全绿（css / dom-injection / template-source / dom-scope / control-consumer / i18n）
+- [OK] 定向小测：i18n / merge-packages / private-container / user-files-adapter / tutorial-anchor /
+  chart-model×2 / workbench-session / db-origin / plugin / git-mode / selection-defaults 全过
+- [OK] `npm run build` 通过
+- [SKIPPED] 四宿主复验、浏览器截图、真实宿主上传（用户 2026-10-27 指令禁止）
+
+### Status
+
+[DONE] 父任务 10/10 子任务已归档。遗留（如实未勾选）：zones-flow AC-20（分区状态机/复制解耦无独立单测）；
+package-cards-vault AC-24（`/api/files/delete|verify` 有适配器无界面入口；宿主无列表端点）、AC-26（序号/折行无单测）；
+tutorial-copy AC-31（无文案审查脚本）。
+
+### Next Steps
+
+- 剩余活跃任务：`10-01-safe-migration-productization`、`10-14-workbench-overhaul`（3 子）、`10-24-ui-orchestration-r2`。
+- 若要把「列出/删除 user/files」做成界面，需先定列表来源（只能靠本地索引）。
