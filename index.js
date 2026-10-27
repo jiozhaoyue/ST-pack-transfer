@@ -9,6 +9,7 @@ import { runConversionTask, runPlanTask } from './src/core/worker-client.js';
 import { logger } from './src/core/logger.js';
 import { zipIo } from './src/core/zip-io.js';
 import { splitArchiveEntries } from './src/core/splitter.js';
+import { mergeConvertedBlobs } from './src/core/merge-packages.js';
 import {
   ORIGINS, isStorageSupported, saveFile, getFile, deleteFile, listStoredFiles,
 } from './src/storage/db.js';
@@ -20,7 +21,9 @@ import { createWorkbenchView } from './src/ui/workbench-view.js';
 import {
   detectHost, hostLayoutCode, fetchHostBackup, restoreToHost, restoreToLuker,
   confirmDialog, mountExtensionRowButton, closeHostExtensionSurface,
+  uploadUserFile, userFilesSupported, sanitizeUserFileName,
 } from './src/ui/host-bridge.js';
+import { packPrivateContainer } from './src/core/private-container.js';
 import { exportLibraryToPack, importRestoredChatsIntoLibrary } from './src/ui/chat-store-inject.js';
 import { mountLanTransferPanel } from './src/ui/lan-transfer-panel.js';
 import { qr } from './src/ui/qr.js';
@@ -43,6 +46,7 @@ const ZONE_OF_ORIGIN = {
   [ORIGINS.HOST_EXPORT]: 'import',
   [ORIGINS.SOURCE_BACKUP]: 'import',
   [ORIGINS.LAN]: 'import',
+  [ORIGINS.EXPORT_COPY]: 'import',
   [ORIGINS.CONVERTED]: 'export',
   [ORIGINS.DELTA]: 'export',
   [ORIGINS.SPLIT_PART]: 'export',
@@ -131,6 +135,7 @@ async function main(root) {
       ts: record.createdAt || Date.now(),
       time: clockOf(record.createdAt),
       origin: record.origin === ORIGINS.LAN ? t('origin.remote')
+        : record.origin === ORIGINS.EXPORT_COPY ? t('origin.exportCopy')
         : record.origin === ORIGINS.SPLIT_PART ? t('origin.split')
           : zone === 'export' ? t('origin.exportCopy')
             : t('origin.local'),
@@ -281,7 +286,7 @@ async function main(root) {
       await saveFile({
         id: `pkg-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
         name: pkg.name, size: blob.size, blob, role: 'source',
-        origin: ORIGINS.UPLOAD, metadata: { copiedFrom: id },
+        origin: ORIGINS.EXPORT_COPY, metadata: { copiedFrom: id },
       });
       count += 1;
     }
@@ -388,9 +393,12 @@ async function main(root) {
     }
   }
 
-  async function generate({ packages, target, splitMb, filenameTemplate }) {
+  async function generate({ packages, merge = false, target, splitMb, filenameTemplate }) {
     if (state.busy) return;
     if (!packages?.length) { view.toast(t('toast.selectExportFirst')); return; }
+    if (merge && packages.length >= 2) {
+      return generateMerged({ packages, target, splitMb, filenameTemplate });
+    }
     state.busy = true;
     const code = targetCodeOf(target);
     const limit = splitLimitOf(splitMb);
@@ -443,28 +451,165 @@ async function main(root) {
         }
         logger.info(t('log.converted', { name: pkg.name }));
       }
-      if (settings.keepExport) {
-        for (const item of created) {
-          await saveFile({
-            id: `out-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-            name: item.name, size: item.blob.size, blob: namedBlob(item.blob, item.name),
-            layout: code, role: 'output', origin: ORIGINS.CONVERTED,
-            metadata: { convertedAt: Date.now() },
-          });
-        }
-        await syncPackages();
-        view.setProgress(100, t('progress.exportReady'));
-        view.toast(t('toast.generated', { n: created.length }));
-        if (created.length) view.setZone('export');
-      } else {
-        for (const item of created) downloadBlob(item.blob, item.name);
-        view.setProgress(100, t('progress.exportDownloaded'));
-        view.toast(t('toast.generatedDownloaded', { n: created.length }));
-      }
+      await deliverCreated(created, code);
     } catch (err) {
       logger.error(t('log.convertFailed', { msg: err.message }));
       view.setProgress(0, t('progress.convertFailed'));
       view.toast(t('toast.convertFailed'));
+    } finally {
+      state.busy = false;
+    }
+  }
+
+  /** 产物落地：按设置留在导出区，或直接下载。合并模式与非合并模式共用。 */
+  async function deliverCreated(created, layout = 'unknown') {
+    if (settings.keepExport) {
+      for (const item of created) {
+        await saveFile({
+          id: `out-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+          name: item.name, size: item.blob.size, blob: namedBlob(item.blob, item.name),
+          layout, role: 'output', origin: ORIGINS.CONVERTED,
+          metadata: { convertedAt: Date.now() },
+        });
+      }
+      await syncPackages();
+      view.setProgress(100, t('progress.exportReady'));
+      view.toast(t('toast.generated', { n: created.length }));
+      if (created.length) view.setZone('export');
+    } else {
+      for (const item of created) downloadBlob(item.blob, item.name);
+      view.setProgress(100, t('progress.exportDownloaded'));
+      view.toast(t('toast.generatedDownloaded', { n: created.length }));
+    }
+  }
+
+  function escapeText(value) {
+    return String(value).replace(/[&<>"']/g, (ch) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    }[ch]));
+  }
+
+  /** 同名即停：列出冲突路径与涉及份数，绝不静默覆盖。 */
+  function showMergeConflicts(conflicts) {
+    const rows = conflicts.slice(0, 50)
+      .map((c) => `${escapeText(c.path)} <span class="sub">×${c.sources.length}</span>`)
+      .join('<br>');
+    logger.error(t('log.mergeConflict', { n: conflicts.length }));
+    view.openModal(t('lan.mergeConflictTitle'), t('lan.mergeConflictBody'), [
+      `<div class="chart-unavailable" style="margin:0">${rows}</div>`,
+    ], [{ label: t('lan.gotIt'), primary: true, onClick: () => view.closeModal() }]);
+  }
+
+  /**
+   * 合并模式：各包先按合并树里自己的勾选转换，再把产物合并成一个包。
+   * 同名路径直接停止（用户 2026-10-27 裁定）。
+   */
+  async function generateMerged({ packages, target, splitMb, filenameTemplate }) {
+    const code = targetCodeOf(target);
+    const limit = splitLimitOf(splitMb);
+    const plan = view.getMergedPlan(packages);
+    const compression = Number(view.getState().compression) || 5;
+    const blobs = [];
+    try {
+      for (const pkg of packages) {
+        const blob = await blobOf(pkg);
+        if (!blob) continue;
+        if (!(await ensurePlan(pkg.id, target))) continue;
+        view.setProgress(3, t('progress.converting', { name: pkg.name }));
+        const { resultBlob } = await runConversionTask({
+          source: blob,
+          target: code,
+          options: { excludedPaths: plan.excludedByPkg[pkg.id], ...plan.optionsByPkg[pkg.id] },
+          onProgress: (current, total, filename) => {
+            const pct = total ? Math.round((current / total) * 50) : 10;
+            view.setProgress(pct, t('progress.convertingN', { current, total, file: filename ? ` · ${filename}` : '' }));
+          },
+        });
+        if (resultBlob) blobs.push(resultBlob);
+        logger.info(t('log.converted', { name: pkg.name }));
+      }
+      if (!blobs.length) { view.toast(t('toast.convertFailed')); return; }
+
+      view.setProgress(55, t('progress.merging'));
+      const merged = await mergeConvertedBlobs(blobs, {
+        compressionLevel: compression,
+        onProgress: (done, total) => {
+          view.setProgress(55 + Math.round((done / Math.max(1, total)) * 35), t('progress.merging'));
+        },
+      });
+      if (!merged.ok) {
+        view.setProgress(0, t('progress.convertFailed'));
+        showMergeConflicts(merged.conflicts);
+        return;
+      }
+
+      const created = [];
+      if (limit) {
+        const entries = [];
+        const reader = await zipIo.openReader(merged.blob);
+        try {
+          for await (const entry of reader.entries()) {
+            entries.push({ path: entry.fileName, blob: await entry.read() });
+            entry.skip();
+          }
+        } finally { await reader.close(); }
+        const split = await splitArchiveEntries(entries, {
+          thresholdMB: limit, target: code, handle: 'default-user',
+          filenameTemplate: filenameTemplate || DEFAULT_FILENAME_TEMPLATE,
+        });
+        for (const part of split.parts) created.push({ blob: part.blob, name: part.partName });
+      } else {
+        const name = resolveFilename(filenameTemplate || DEFAULT_FILENAME_TEMPLATE, {
+          sourceName: 'merged', target: code, handle: 'default-user',
+          part: 'part1', category: 'all', mode: 'single',
+        });
+        created.push({ blob: merged.blob, name });
+      }
+      logger.info(t('log.mergeDone', { n: packages.length, files: merged.fileCount }));
+      await deliverCreated(created, code);
+    } catch (err) {
+      logger.error(t('log.convertFailed', { msg: err.message }));
+      view.setProgress(0, t('progress.convertFailed'));
+      view.toast(t('toast.convertFailed'));
+    } finally {
+      state.busy = false;
+    }
+  }
+
+  /** 合并上传：多个导入包原样合并成一个新的导入包（不改内容，只并条目）。 */
+  async function mergeUpload(packages) {
+    if (state.busy) return;
+    if (!packages || packages.length < 2) { view.toast(t('lan.atLeastTwo')); return; }
+    state.busy = true;
+    try {
+      const blobs = [];
+      for (const pkg of packages) {
+        const blob = await blobOf(pkg);
+        if (blob) blobs.push(blob);
+      }
+      if (blobs.length < 2) { view.toast(t('toast.convertFailed')); return; }
+      view.setProgress(20, t('progress.merging'));
+      const merged = await mergeConvertedBlobs(blobs, { compressionLevel: 5 });
+      if (!merged.ok) {
+        view.setProgress(0, t('progress.convertFailed'));
+        showMergeConflicts(merged.conflicts);
+        return;
+      }
+      const id = `merged-${Date.now()}`;
+      const name = `merged_${packages.length}packs.zip`;
+      await saveFile({
+        id, name, size: merged.blob.size, blob: namedBlob(merged.blob, name),
+        layout: 'unknown', role: 'source', origin: ORIGINS.UPLOAD,
+        metadata: { mergedFrom: packages.map((p) => p.id) },
+      });
+      await syncPackages();
+      await ensurePlan(id);
+      view.setProgress(100, t('progress.exportReady'));
+      view.toast(t('toast.mergeDone', { n: packages.length }));
+      logger.info(t('log.mergeUpload', { n: packages.length, files: merged.fileCount }));
+    } catch (err) {
+      logger.error(t('log.mergeUploadFailed', { msg: err.message }));
+      view.setProgress(0, t('progress.convertFailed'));
     } finally {
       state.busy = false;
     }
@@ -486,6 +631,65 @@ async function main(root) {
     } catch (err) {
       logger.error(t('log.libraryExportFailed', { msg: err.message }));
     }
+  }
+
+  /** 从 zip 里取单个条目的字节（私有件传云用）。 */
+  async function readZipEntry(sourceBlob, path) {
+    if (!path) return null;
+    const reader = await zipIo.openReader(sourceBlob);
+    try {
+      for await (const entry of reader.entries()) {
+        if (entry.fileName === path) {
+          const data = await entry.read();
+          return new Blob([data], { type: 'application/octet-stream' });
+        }
+        entry.skip();
+      }
+      return null;
+    } finally {
+      await reader.close();
+    }
+  }
+
+  /**
+   * 私有件「传云」：把包内单个私有文件装进插件容器，上传到宿主 `user/files`。
+   * ST/Luker 原生 `/api/files/upload`（base64 JSON，上限 500 MB）；不可用时只提示，不阻塞。
+   */
+  async function uploadPrivate(payload) {
+    const { name = '', path = '', pkgId = null } = payload || {};
+    const activeId = view.getState?.().source?.pkgId || null;
+    const pkg = pkgById(pkgId) || pkgById(activeId) || state.packages[0];
+    if (!pkg || !path) { view.toast(t('toast.privateUploadMissing')); return; }
+    if (!userFilesSupported(hostKey)) { view.toast(t('toast.privateUploadUnsupported')); return; }
+
+    const run = async () => {
+      const blob = await blobOf(pkg);
+      if (!blob) { view.toast(t('toast.privateUploadMissing')); return; }
+      const entry = await readZipEntry(blob, path);
+      if (!entry) { view.toast(t('toast.privateUploadMissing')); return; }
+      const { blob: container } = await packPrivateContainer([{ path, blob: entry }], {
+        sourceLayout: pkg.host || 'unknown',
+        targetLayout: pkg.host || 'unknown',
+      });
+      const stem = sanitizeUserFileName(String(name || path.split('/').pop() || 'private').replace(/\.json$/i, '')) || 'private';
+      const fileName = `private_${stem}_${Date.now()}.zip`;
+      const result = await uploadUserFile(fileName, container, { platform: hostKey });
+      if (!result.ok) {
+        logger.error(t('log.privateUploadFailed', { msg: result.detail || result.reason }));
+        view.toast(t('toast.privateUploadFailed'));
+        return;
+      }
+      logger.info(t('log.privateUploaded', { name: fileName, path: result.path }));
+      view.toast(t('toast.privateUploaded'));
+    };
+
+    if (settings.trafficPrompt) {
+      view.confirmTraffic(run, {
+        onNever: () => { settings.trafficPrompt = false; saveSettings(settings); },
+      });
+      return;
+    }
+    await run();
   }
 
   function openSettings() {
@@ -518,6 +722,7 @@ async function main(root) {
     actions: {
       fetch: fetchFromHost,
       generate,
+      mergeUpload,
       restore: restoreSelected,
       copyBack,
       deleteSelected,
@@ -526,7 +731,7 @@ async function main(root) {
       lan: lanActions,
       settings: openSettings,
       uploadRequest: () => root.querySelector('#file-input')?.click(),
-      uploadPrivate: (name) => { logger.info(t('log.privateUpload', { name })); view.toast(t('toast.privateUpload', { name })); },
+      uploadPrivate,
       onActivePackage: (id) => { ensurePlan(id).then(() => view.setActivePackage(id)); },
       onTargetChange: (name) => {
         const active = state.packages.find((p) => view.getState().source?.pkgId === p.id);

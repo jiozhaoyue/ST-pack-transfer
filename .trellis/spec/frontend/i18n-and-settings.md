@@ -42,6 +42,19 @@
 - 逐级全选：根（卡头）/ 一级分类 / 子目录（`data-suball`）/ 卷卡。
   `导入01/导出01` 必须在图表卡 DOM 内；禁止「大类折叠到文件」文案。
 
+### 2.1 多包合并模式（2026-10-27 用户裁定，覆盖原 R2.1 / R12.8 冲突）
+
+- **默认仍是多图表**：勾选 N 个包 = N 组图表，各自产出（`generate` 按包循环）。
+- 勾选 ≥2 个包时批量条出现「合并模式」开关；开启后：
+  - 所有选中包合并成**一棵**图表（`mergeChartTrees`，叶子 id 带来源前缀 `leaf:<pkgId>|<path>`）；
+  - 共用一套 勾选 / 分卷 / 压缩 / 目标宿主；
+  - 卡头显示 `chart.mergedBadge`（`vol-idx.is-merged`）；
+  - 「生成导出包」产出**一个合并包**（分卷则多卷）。
+- **同名即停**：合并产物时跨包出现同一路径 → 立即停止，弹窗列出路径与份数
+  （`findEntryConflicts` / `mergeConvertedBlobs`），绝不覆盖、也不多留一份。
+- 合并上传（数据包区「合并上传」）走同一个原语：原样并条目，冲突同样即停。
+
+
 ## 3. i18n 契约
 
 - 唯一源：`src/i18n/locales/zh-CN.js` 与 `en-US.js`（**扁平 key**，两份键必须完全一致、无空值）。
@@ -80,7 +93,24 @@
   - 「浏览器配额」行照常显示；
   - **不新增宿主专用后端/端点**。
 
-## 6. 验证命令
+## 6. 私有配置容器与「传云」（2026-10-27）
+
+- 容器格式：`src/core/private-container.js`
+  - 根 `manifest.json`：`schemaVersion` / `kind` / `sourceLayout` / `targetLayout` / `nativeRestore` /
+    `files[]`（`path` + `type` + `sizeBytes`）。
+  - 成员一律在 `_private/<原路径>` 下原样保存。
+  - **不复用目标包根 `manifest.json`**（那是 Luker 自己的 schema）；容器是独立 artifact。
+- `canNativeRestore(manifest, targetLayout)`：只有 `nativeRestore===true` 且目标一致才可原生还原；
+  转换产物内的私有件路由仍由 `transform.js` 的 `targetEntryPath` 决定（匹配原生 / 不匹配 `_compat/<源宿主>/`）。
+- 宿主 files 适配器（`src/ui/host-bridge.js`）：
+  - `POST /api/files/upload` `{name, data:<原始 base64>}` → `{path}`；`/delete` `{path}`；`/verify` `{urls}`。
+  - 文件名白名单 `[a-zA-Z0-9._-]`；请求体上限 500 MB（`USER_FILE_MAX_BYTES`）；必须带 CSRF。
+  - 只有 `st` / `luker` 支持；其它宿主直接 `{ok:false, reason:'unsupported-host'}`，不阻塞主路径。
+  - 没有列表端点：下载走静态 `/user/files/<name>`；「列出」只能靠本地记录。
+- 上传前必须走流量提示（`view.confirmTraffic`），与后端上下传同一套设置开关。
+
+## 7. 验证命令
+
 
 ```bash
 npm test

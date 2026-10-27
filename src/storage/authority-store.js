@@ -126,10 +126,10 @@ async function kvSetCheckpoint(client, key, manifest) {
   await kvSet(client, key, manifest);
 }
 
-// ===== KV 公开接缝（vault-store 等同仓模块用）=====
+// ===== KV 公开接缝（供其它存储模块复用）=====
 //
 // KV 私有封装在上面，位置参数的坑也在上面注释里——导出这三个薄封装是为了让
-// vault-store 不必重新踩一遍签名坑。返回值约定：Get 失败/不可用返回 null，
+// 复用方不必重新踩一遍签名坑。返回值约定：Get 失败/不可用返回 null，
 // Set/Delete 不可用返回 false（调用方自行决定降级路径）。
 
 /** @returns {Promise<boolean>} 是否写入成功 */

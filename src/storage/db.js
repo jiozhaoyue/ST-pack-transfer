@@ -25,7 +25,9 @@ const STORES = {
  * converted     转换生成的产物
  * delta         增量补丁包（基于基准 ZIP 差量）
  * split-part    智能分卷切片（组内关联）
- * vault         私有格式仓条目（vault-store 的 IndexedDB 降级层）
+ * export-copy   导出区副本复制回导入区后的独立副本（与源解耦，删除互不影响）
+ * vault         历史私有格式仓条目（旧 vault-store 写入；模块 2026-10-27 已删除，
+ *               该取值仅用于读取旧记录，不再产生新条目）
  */
 export const ORIGINS = Object.freeze({
   UPLOAD: 'upload',
@@ -34,6 +36,7 @@ export const ORIGINS = Object.freeze({
   CONVERTED: 'converted',
   DELTA: 'delta',
   SPLIT_PART: 'split-part',
+  EXPORT_COPY: 'export-copy',
   SOURCE_BACKUP: 'source-backup',
   REPORT: 'report',
   TARGET_BACKUP: 'target-backup',
