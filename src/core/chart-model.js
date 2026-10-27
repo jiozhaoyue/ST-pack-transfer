@@ -8,6 +8,12 @@
  * 渲染在 `src/ui/chart-view.js`。
  */
 
+import { isTavernBuiltinAsset } from './builtin-assets.js';
+import { AVAILABILITY, deriveExtensionEntry } from './extension-manifest.js';
+import { EXTENSION_MODES, GIT_MODES } from './export-modes.js';
+
+export { EXTENSION_MODES, GIT_MODES };
+
 /** 建议保留度（与 demo 的四种图例一一对应）。 */
 export const SUGGEST = Object.freeze({
   KEEP: 'keep',
@@ -35,6 +41,7 @@ export const CHART_GROUPS = Object.freeze([
   { key: 'private', label: '私有配置', icon: 'lock', suggest: SUGGEST.KEEP },
   { key: 'backups', label: '备份快照', icon: 'archive', suggest: SUGGEST.DROP },
   { key: 'cache', label: '派生缓存', icon: 'bolt', suggest: SUGGEST.DROP },
+  { key: 'native', label: '原生资产', icon: 'shield', suggest: SUGGEST.DROP },
   { key: 'unknown', label: '未识别', icon: 'unknown', suggest: SUGGEST.UNKNOWN },
 ]);
 
@@ -76,6 +83,8 @@ export function isPrivateConfigPath(path) {
 export function groupKeyOf(item) {
   const path = item.hubPath || item.sourcePath || '';
   if (isPrivateConfigPath(path)) return 'private';
+  // 酒馆原生默认资产单独成组：正向勾选=保留，取消=不打包（不是「清理」反向开关）
+  if (isTavernBuiltinAsset(path)) return 'native';
   return CATEGORY_GROUP[item.category] || 'unknown';
 }
 
@@ -247,6 +256,94 @@ export function applySelection(nodes, selection) {
     return all;
   };
   for (const node of nodes || []) visit(node);
+}
+
+/** 按 id 查节点（深度优先）。 */
+export function findNode(nodes, id) {
+  for (const node of nodes || []) {
+    if (node.id === id) return node;
+    const hit = findNode(node.children, id);
+    if (hit) return hit;
+  }
+  return null;
+}
+
+/**
+ * 从图表节点派生转换器 options（纯函数）。
+ *
+ * 正向语义：组内任一叶子被勾选 ⇒ 该维度包含；`native` 组反过来映射
+ * `pruneBuiltinAssets`（勾选=保留原生资产 ⇒ 不清理）。
+ */
+export function deriveExportOptions({ nodes = [], isChecked = () => false, ui = {} } = {}) {
+  const anyChecked = (groupId) => {
+    const group = findNode(nodes, groupId);
+    if (!group) return false;
+    return leavesOf([group]).some((leaf) => isChecked(leaf));
+  };
+  const target = String(ui.target || '').toLowerCase();
+  const isTt = target === 'tt' || target === 'tauritavern';
+  const compression = Number(ui.compression);
+  return {
+    compressionLevel: Number.isFinite(compression) ? compression : 5,
+    extensionMode: ui.extensionMode === EXTENSION_MODES.MANIFEST ? EXTENSION_MODES.MANIFEST : EXTENSION_MODES.FULL,
+    gitMode: [GIT_MODES.KEEP, GIT_MODES.MINIMAL, GIT_MODES.STRIP].includes(ui.gitMode) ? ui.gitMode : GIT_MODES.KEEP,
+    keepDevFiles: !!ui.keepDev,
+    includeBackups: anyChecked('group:backups'),
+    includeCache: anyChecked('group:cache'),
+    includeAppPrivate: isTt && anyChecked('group:private'),
+    pruneBuiltinAssets: !anyChecked('group:native'),
+  };
+}
+
+function urlHost(url) {
+  try { return new URL(url).host; } catch { return ''; }
+}
+
+/** 仅清单模式的扩展子树：一行一个扩展（名称 + 来源可用性）。 */
+export function manifestExtensionGroup(extensions = []) {
+  const entries = (extensions || [])
+    .map((input) => deriveExtensionEntry({ ...input, mode: EXTENSION_MODES.MANIFEST }))
+    .filter((entry) => entry.name);
+  if (entries.length === 0) return null;
+  return {
+    id: 'group:extensions',
+    label: '扩展',
+    icon: 'puzzle',
+    suggest: SUGGEST.KEEP,
+    mb: 0,
+    leaf: false,
+    children: entries.map((entry) => {
+      const installable = entry.availability === AVAILABILITY.INSTALLABLE;
+      return {
+        id: `ext:${entry.name}`,
+        label: entry.displayName || entry.name,
+        icon: 'puzzle',
+        suggest: installable ? SUGGEST.KEEP : SUGGEST.UNKNOWN,
+        children: [],
+        mb: 0,
+        leaf: true,
+        path: `ext:${entry.name}`,
+        selected: installable,
+        checked: installable,
+        badge: installable ? urlHost(entry.url) : '无地址',
+        url: entry.url,
+        availability: entry.availability,
+      };
+    }),
+  };
+}
+
+/** 按扩展模式返回图表树：完整=原始树；仅清单=用扩展条目替换扩展组。 */
+export function chartTreeFor(pkg, extensionMode = EXTENSION_MODES.FULL) {
+  const nodes = pkg?.nodes || [];
+  if (extensionMode !== EXTENSION_MODES.MANIFEST) return nodes;
+  const manifest = manifestExtensionGroup(pkg?.extensions || []);
+  const idx = nodes.findIndex((node) => node.id === 'group:extensions');
+  if (!manifest) return nodes.filter((node) => node.id !== 'group:extensions');
+  const out = nodes.slice();
+  if (idx >= 0) out[idx] = manifest;
+  else out.push(manifest);
+  return out;
 }
 
 /** 选中汇总（只数叶子）。 */

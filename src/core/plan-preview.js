@@ -8,9 +8,10 @@ import { detectFromReader, LAYOUTS } from './detect.js';
 import { createPtNativeHubReader } from './pt-archive.js';
 import { CATEGORIES, CATEGORY_LABELS, categoryOfHubPath, isBackupChatOrSnapshot } from './inspect.js';
 import {
-  routeSource, targetEntryPath, TARGETS, isJunkOrDevFile, EXTENSION_MODES, parseJsonSafe,
-  GIT_MODES, normalizeGitMode, isGitEntry, isGitMinimalKept, gitDropReason, GIT_KEEP_PLACEHOLDER,
+  routeSource, targetEntryPath, TARGETS, isJunkOrDevFile, parseJsonSafe,
+  normalizeGitMode, isGitEntry, isGitMinimalKept, gitDropReason, GIT_KEEP_PLACEHOLDER,
 } from './transform.js';
+import { EXTENSION_MODES, GIT_MODES } from './export-modes.js';
 import {
   extensionFolderName,
   extensionRelativePath,

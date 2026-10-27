@@ -155,8 +155,7 @@ function demoTree(){
       node('n-presets-sys','sysprompt/',0.01,'optional',{icon:'folder',note:'共 14 个文件'}),
       node('n-presets-reason','reasoning/',0.01,'optional',{icon:'folder',note:'共 5 个文件'})
     ]}),
-    node('n-ext','扩展',170,'keep',{icon:'puzzle',children:[
-      node('n-ext-full','完整扩展包',0,'keep',{icon:'puzzle',checked:true,note:'不勾则仅导出清单'}),
+    node('group:extensions','扩展',170,'keep',{icon:'puzzle',children:[
       node('n-ext-lwb','LittleWhiteBox',40,'keep',{icon:'folder',children:[
         node('n-ext-lwb-1','extensions/LittleWhiteBox/manifest.json',0.01,'keep',{icon:'file'}),
         node('n-ext-lwb-2','extensions/LittleWhiteBox/index.js',0.2,'keep',{icon:'file'}),
@@ -168,9 +167,7 @@ function demoTree(){
         node('n-ext-jsr-2','extensions/JS-Slash-Runner/index.js',0.6,'keep',{icon:'file'}),
         node('n-ext-jsr-3','extensions/JS-Slash-Runner/dist/',88,'keep',{icon:'folder',note:'共 190 个文件'})
       ]}),
-      node('n-ext-yuzi','st-yuzi-phone',30,'keep',{icon:'folder',note:'共 384 个文件'}),
-      node('n-ext-git','保留 Git 历史',5,'keep',{icon:'archive',checked:true,note:'只留更新所需'}),
-      node('n-ext-build','保留构建配置',2,'optional',{icon:'sliders',checked:false})
+      node('n-ext-yuzi','st-yuzi-phone',30,'keep',{icon:'folder',note:'共 384 个文件'})
     ]}),
     node('n-plugindata','插件数据',160,'optional',{icon:'db',children:[
       node('n-pd-1','user/files/LittleWhiteBox_EnaPlanner.json',1.1,'optional',{icon:'file'}),
@@ -179,7 +176,7 @@ function demoTree(){
       node('n-pd-4','user/files/TavernDB_ACU_vector_-_2026-07-19_23h05m21s834ms_imported_snapshot',0.09,'optional',{icon:'file'}),
       node('n-pd-5','user/workflows/',140,'optional',{icon:'folder',note:'共 2 个文件，体积大'})
     ]}),
-    node('n-private','私有配置',14,'keep',{icon:'lock',children:[
+    node('group:private','私有配置',14,'keep',{icon:'lock',children:[
       node('n-priv-l','Luker 私有配置',12,'keep',{icon:'lock',badge:'L',children:[
         node('n-priv-l-1','chats/孤独摇滚3/…Branch #1.luker-state.chat_sync.json',2,'keep',{icon:'file',privateConfig:true,uploadable:true}),
         node('n-priv-l-2','chats/孤独摇滚3/…Branch #1.luker-state.memory_graph__meta.json',2,'keep',{icon:'file',privateConfig:true,uploadable:true}),
@@ -190,8 +187,11 @@ function demoTree(){
       node('n-priv-tt','TauriTavern 私有配置',1,'keep',{icon:'lock',badge:'TT',note:'本包未包含'}),
       node('n-priv-pt','PureTavern 私有配置',1,'keep',{icon:'lock',badge:'PT',note:'本包未包含'})
     ]}),
-    node('n-native','原生资产',0,'optional',{icon:'shield',note:'重复项'}),
-    node('n-backups','备份快照',107,'drop',{icon:'archive',children:[
+    node('group:native','原生资产',12,'drop',{icon:'shield',children:[
+      node('n-native-1','backgrounds/builtin-forest.png',8,'drop',{icon:'file'}),
+      node('n-native-2','themes/builtin-dark.json',4,'drop',{icon:'file'})
+    ]}),
+    node('group:backups','备份快照',107,'drop',{icon:'archive',children:[
       node('n-bk-1','backups/chat_____3_20260825-032035.jsonl',19.9,'drop',{icon:'file'}),
       node('n-bk-2','backups/chat_____3_20260821-133825.jsonl',16.6,'drop',{icon:'file'}),
       node('n-bk-3','backups/chat_____3_20260820-202325.jsonl',16.3,'drop',{icon:'file'}),
@@ -201,7 +201,9 @@ function demoTree(){
       node('n-bk-7','backups/chat_____3_20260726-235210.jsonl',12.7,'drop',{icon:'file'}),
       node('n-bk-8','backups/chat______20260705-005207.jsonl',0.9,'drop',{icon:'file'})
     ]}),
-    node('n-cache','派生缓存',0,'drop',{icon:'bolt',note:'未包含'})
+    node('group:cache','派生缓存',0.1,'drop',{icon:'bolt',children:[
+      node('n-cache-1','user/cache/derived.bin',0.1,'drop',{icon:'file'})
+    ]}
   ];
 }
 function scaleNodesTo(arr,totalMb){
@@ -464,8 +466,14 @@ function doUploadPrivate(name){
   });
 }
 
+const DEMO_EXTENSIONS = [
+  { name:'LittleWhiteBox', manifest:{ display_name:'LittleWhiteBox', description:'扩展示例 A', version:'1.2.0' }, gitMeta:{ remoteUrl:'https://github.com/example/LittleWhiteBox', branch:'main', commit:'' } },
+  { name:'JS-Slash-Runner', manifest:{ display_name:'JS-Slash-Runner', description:'扩展示例 B', version:'2.0.0' }, gitMeta:{ remoteUrl:'https://github.com/example/JS-Slash-Runner', branch:'main', commit:'' } },
+  { name:'st-yuzi-phone', manifest:{ display_name:'st-yuzi-phone', description:'无来源地址', version:'0.1.0' }, gitMeta:{ remoteUrl:'', branch:'', commit:'' } },
+];
+
 function setDemoPackages(){
-  view.setPackages(DEMO_PACKAGES.map(p=>({ ...p, nodes:scaleNodesTo(demoTree(), p.mb) })));
+  view.setPackages(DEMO_PACKAGES.map(p=>({ ...p, nodes:scaleNodesTo(demoTree(), p.mb), extensions:DEMO_EXTENSIONS })));
 }
 
 const DEMO_QUOTA = {
@@ -483,6 +491,7 @@ function resetDemo(){
   st.target='SillyTavern'; st.delta='overwrite'; st.splitMb='';
   st.host='luker'; st.mode='plugin'; st.view='desktop';
   st.tutorialKind='basic'; st.noTrafficPrompt=false; st.keepExport=true; st.filter='all';
+  st.compression='5'; st.extensionMode='full'; st.gitMode='keep'; st.keepDev=false;
   document.getElementById('split-input').value='';
   document.getElementById('app').dataset.view='desktop';
   document.querySelector('.app-main').style.removeProperty('--split-left');

@@ -179,6 +179,22 @@
   #app.app-container .tree-tools button:hover{color:var(--text);border-color:var(--accent)}
   #app.app-container .tree-tools .spacer{flex:1}
   #app.app-container .tree-tools .hint{font-size:10px;color:var(--muted-2)}
+  #app.app-container .vol-head .vol-bulk{display:inline-flex;gap:4px;margin-right:2px}
+  #app.app-container .vol-head .vol-bulk button{border:1px solid var(--border);background:var(--panel-3);border-radius:5px;
+    padding:1px 6px;font-size:10px;color:var(--muted);cursor:pointer}
+  #app.app-container .vol-head .vol-bulk button:hover{color:var(--text);border-color:var(--accent)}
+  #app.app-container .row-bulk{display:none;gap:2px;margin-left:4px}
+  #app.app-container .tree-row:hover .row-bulk{display:inline-flex}
+  #app.app-container .row-bulk button{border:1px solid var(--border);background:var(--panel-3);border-radius:4px;
+    padding:0 4px;font-size:9px;line-height:14px;color:var(--muted);cursor:pointer}
+  #app.app-container .row-bulk button:hover{color:var(--text);border-color:var(--accent)}
+  #app.app-container .extension-tools{display:flex;flex-wrap:wrap;align-items:center;gap:8px;
+    padding:6px 12px;border-bottom:1px solid var(--border);
+    background:color-mix(in srgb, var(--panel-3) 55%, transparent)}
+  #app.app-container .extension-tools .et-label{font-size:10.5px;color:var(--muted)}
+  #app.app-container .extension-tools .et-git{display:inline-flex;align-items:center;gap:4px;font-size:10.5px;color:var(--muted)}
+  #app.app-container .extension-tools .et-git select{font-size:11px;padding:2px 5px}
+  #app.app-container .extension-tools .et-keepdev{font-size:10.5px;color:var(--muted);margin:0}
   #app.app-container .chart-tree{flex:1 1 auto;min-height:120px;overflow:auto;padding:4px 6px 10px}
   #app.app-container .tree-row{display:flex;align-items:center;gap:5px;padding:4px 6px;border-radius:6px;min-height:28px}
   #app.app-container .tree-row:hover{background:rgba(255,255,255,.035)}

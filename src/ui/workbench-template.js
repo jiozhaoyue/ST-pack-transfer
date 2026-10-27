@@ -56,6 +56,14 @@ export function getWorkbenchHtml() {
               <span class="unit">MB</span>
               <span class="split-sim" id="split-sim"></span>
             </label>
+            <label class="field">压缩
+              <select id="compression-select" class="text_pole">
+                <option value="0">不压缩</option>
+                <option value="1">快速</option>
+                <option value="5" selected>标准</option>
+                <option value="9">最大</option>
+              </select>
+            </label>
           </div>
 
           <div class="filename-row">

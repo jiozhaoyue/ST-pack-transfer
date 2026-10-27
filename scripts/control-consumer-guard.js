@@ -42,6 +42,7 @@ export const CONTROL_CONSUMERS = Object.freeze({
   'log-close': 'src/ui/workbench-view.js — 事件绑定 / 读取（log-close）',
   'log-copy': 'src/ui/workbench-view.js — 事件绑定 / 读取（log-copy）',
   'split-input': 'src/ui/workbench-view.js — 事件绑定 / 读取（split-input）',
+  'compression-select': 'src/ui/workbench-view.js — change 读取压缩档位并透传给 getExportOptions',
   'target-btn': 'src/ui/workbench-view.js — 事件绑定 / 读取（target-btn）',
   'tutorial-adv': 'src/ui/workbench-view.js — 事件绑定 / 读取（tutorial-adv）',
   'tutorial-next': 'src/ui/workbench-view.js — 事件绑定 / 读取（tutorial-next）',

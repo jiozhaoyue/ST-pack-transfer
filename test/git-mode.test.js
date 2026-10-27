@@ -449,8 +449,15 @@ describe('gitMode UI 契约（设置页不再承载）', () => {
     expect(html).not.toMatch(/title="[^"]*重新 git clone[^"]*"/);
   });
 
-  it('index.js 仍把 Git 选项透传给转换器（待任务 2 改为图表派生）', async () => {
+  it('Git 选项由图表控件透传（设置页不再读取 settings.gitMode）', async () => {
     const src = await readFile(new URL('../index.js', import.meta.url), 'utf8');
-    expect((src.match(/gitMode: settings\.gitMode/g) || []).length).toBeGreaterThanOrEqual(2);
+    expect(src).not.toContain('settings.gitMode');
+    expect(src).toContain('view.getExportOptions');
+
+    const view = await readFile(new URL('../src/ui/workbench-view.js', import.meta.url), 'utf8');
+    expect(view).toContain('data-gitmode');
+    expect(view).toContain('保留历史');
+    expect(view).toContain('只留更新所需');
+    expect(view).toContain('不含历史');
   });
 });
