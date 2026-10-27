@@ -1,11 +1,11 @@
 /**
- * 数据包转运 - HTML 模板（由 UI 定稿 demo 原样搬运）
+ * 数据包转运 · HTML 模板
  *
- * 与 demo 的唯一差异：关闭按钮只在模态态渲染；末尾附一个隐藏文件输入供上传。
+ * 由 `npm run sync:ui` 从定稿 UI 页生成。**不要手改本文件**。
  */
 
-export function getWorkbenchHtml({ isModal = false } = {}) {
-  const html = `<header class="app-header">
+export function getWorkbenchHtml() {
+  return `<header class="app-header">
       <div class="app-title">
         <h1>数据包转运</h1>
         <span class="sub">ST-pack-transfer</span>
@@ -174,7 +174,5 @@ export function getWorkbenchHtml({ isModal = false } = {}) {
 </div>
 
 <div class="toast" id="toast"></div>
-<div class="fullname-pop" id="fullname-pop" hidden></div>`;
-  const bodyHtml = isModal ? html : html.replace('<button class="icon-btn" id="btn-close" title="关闭">×</button>', '');
-  return bodyHtml + '<input type="file" id="file-input" accept=".zip" multiple hidden>';
+<div class="fullname-pop" id="fullname-pop" hidden></div><input type="file" id="file-input" accept=".zip" multiple hidden>`;
 }

@@ -10,7 +10,7 @@ import { logger } from './src/core/logger.js';
 import { zipIo } from './src/core/zip-io.js';
 import { splitArchiveEntries } from './src/core/splitter.js';
 import {
-  ORIGINS, isStorageSupported, saveFile, getFile, deleteFile, listStoredFiles, getStorageUsage,
+  ORIGINS, isStorageSupported, saveFile, getFile, deleteFile, listStoredFiles,
 } from './src/storage/db.js';
 import { buildChartTree, fmtMB, splitLimitOf } from './src/core/chart-model.js';
 import { DEFAULT_FILENAME_TEMPLATE, TARGET_PLATFORMS, resolveFilename, namedBlob } from './src/core/naming.js';
@@ -532,11 +532,25 @@ async function main(root) {
   });
 
   await syncPackages();
-  if (isStorageSupported()) {
-    getStorageUsage().then((usage) => logger.info(`浏览器配额占用 ${((usage?.totalBytes || 0) / (1024 ** 3)).toFixed(2)} GB`)).catch(() => {});
-  }
+  view.setStorage({ browser: await readBrowserQuota(), host: null });
   view.setProgress(0, '准备就绪');
   logger.info(`工作台已就绪 · ${host.isPlugin ? (HOST_LABEL[host.platform] || '宿主') + ' 插件' : '独立 Web'}`);
+  try {
+    if (!sessionStorage.getItem('st-pack-transfer:tutorial-seen')) {
+      sessionStorage.setItem('st-pack-transfer:tutorial-seen', '1');
+      setTimeout(() => view.openTutorial(), 300);
+    }
+  } catch { /* 隐私模式 */ }
+}
+
+/** 浏览器真实配额（字节）。不可用时返回 null，界面显示「未提供读数」。 */
+async function readBrowserQuota() {
+  try {
+    const { usage, quota } = await navigator.storage.estimate();
+    return quota > 0 ? { used: usage || 0, total: quota } : null;
+  } catch {
+    return null;
+  }
 }
 
 function bootstrap() {

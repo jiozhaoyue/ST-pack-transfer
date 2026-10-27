@@ -9,15 +9,22 @@ import {
   CHUNK_SIZE,
   PICKUP_PREFIX,
   PICKUP_TTL_MS,
+  SIGNAL_VERSION,
   TRANSFER_PHASES,
+  buildSignalPayload,
   chunkCount,
   chunkRange,
   createTransferMachine,
   decodePickupCode,
   encodePickupCode,
+  fileIdentity,
+  formatBytes,
+  formatDuration,
+  formatRate,
   fromBase64Url,
   probeDirectCapability,
   progressPercent,
+  readSignalPayload,
   toBase64Url,
   verifyTransfer,
 } from '../src/core/lan-transfer.js';
@@ -174,6 +181,75 @@ describe('传输状态机', () => {
   });
 });
 
+describe('信令负载 v2', () => {
+  it('文件身份稳定，大小或时间变化即变', () => {
+    const a = fileIdentity({ name: 'p.zip', size: 10, lastModified: 1 });
+    expect(fileIdentity({ name: 'p.zip', size: 10, lastModified: 1 })).toBe(a);
+    expect(fileIdentity({ name: 'p.zip', size: 11, lastModified: 1 })).not.toBe(a);
+    expect(fileIdentity({ name: 'p.zip', size: 10, lastModified: 2 })).not.toBe(a);
+    expect(a).toMatch(/^f[0-9a-z]+$/);
+  });
+
+  it('offer 负载带文件元信息，answer 负载带续传偏移', async () => {
+    const file = { name: '数据包.zip', size: 2048, lastModified: 7 };
+    const offer = buildSignalPayload({ role: 'offer', sdp: 'v=0', file });
+    expect(offer.v).toBe(SIGNAL_VERSION);
+    expect(offer.file.id).toBe(fileIdentity(file));
+    expect(offer.file.name).toBe('数据包.zip');
+
+    const answer = buildSignalPayload({ role: 'answer', sdp: 'v=0', fileId: offer.file.id, resumeFrom: 512 });
+    expect(answer.resumeFrom).toBe(512);
+
+    const round = readSignalPayload(JSON.parse(JSON.stringify(answer)));
+    expect(round.role).toBe('answer');
+    expect(round.fileId).toBe(offer.file.id);
+    expect(round.resumeFrom).toBe(512);
+  });
+
+  it('经真实取件码往返后仍然等价', async () => {
+    const payload = buildSignalPayload({ role: 'offer', sdp: 'v=0\r\na=1\r\n'.repeat(20), file: { name: 'a.zip', size: 9 } });
+    const decoded = readSignalPayload(await decodePickupCode(await encodePickupCode(payload)));
+    expect(decoded.role).toBe('offer');
+    expect(decoded.file.name).toBe('a.zip');
+    expect(decoded.fileId).toBe(payload.file.id);
+  });
+
+  it('v1 旧码没有 v / file 也能读出，按无续传处理', () => {
+    const v1 = readSignalPayload({ role: 'answer', sdp: 'v=0' });
+    expect(v1.version).toBe(1);
+    expect(v1.fileId).toBe('');
+    expect(v1.resumeFrom).toBe(0);
+  });
+
+  it('未知角色或缺 SDP 一律抛错', () => {
+    expect(() => readSignalPayload({ role: 'x', sdp: 'v=0' })).toThrow('不是局域网互传的码');
+    expect(() => readSignalPayload({ role: 'offer' })).toThrow('没有连接信息');
+  });
+});
+
+describe('人读格式', () => {
+  it('体积按二进制单位进位', () => {
+    expect(formatBytes(0)).toBe('0 B');
+    expect(formatBytes(1023)).toBe('1023 B');
+    expect(formatBytes(1024)).toBe('1.0 KB');
+    expect(formatBytes(1536)).toBe('1.5 KB');
+    expect(formatBytes(1024 * 1024)).toBe('1.0 MB');
+    expect(formatBytes(150 * 1024 * 1024)).toBe('150 MB');
+  });
+
+  it('速率为零显示破折号', () => {
+    expect(formatRate(0)).toBe('—');
+    expect(formatRate(1024 * 1024)).toBe('1.0 MB/s');
+  });
+
+  it('时长在分钟处进位', () => {
+    expect(formatDuration(0)).toBe('0秒');
+    expect(formatDuration(59_000)).toBe('59秒');
+    expect(formatDuration(83_000)).toBe('1分23秒');
+    expect(formatDuration(120_000)).toBe('2分');
+  });
+});
+
 describe('传输核对', () => {
   it('条目数与字节数都一致才算通过', () => {
     expect(verifyTransfer({ files: 2, bytes: 100 }, { files: 2, bytes: 100 }).ok).toBe(true);
@@ -183,6 +259,21 @@ describe('传输核对', () => {
     const byBytes = verifyTransfer({ files: 2, bytes: 100 }, { files: 2, bytes: 99 });
     expect(byBytes.ok).toBe(false);
     expect(byBytes.reason).toContain('字节数不一致');
+  });
+
+  it('两端都有摘要时比对摘要', () => {
+    const pass = verifyTransfer({ files: 1, bytes: 10, digest: 'abc' }, { files: 1, bytes: 10, digest: 'abc' });
+    expect(pass).toEqual({ ok: true, reason: '', digestChecked: true });
+    const bad = verifyTransfer({ files: 1, bytes: 10, digest: 'abc' }, { files: 1, bytes: 10, digest: 'def' });
+    expect(bad.ok).toBe(false);
+    expect(bad.reason).toContain('摘要');
+    expect(bad.digestChecked).toBe(true);
+  });
+
+  it('缺任一端摘要时退回字节数核对，并如实标注未做摘要', () => {
+    const r = verifyTransfer({ files: 1, bytes: 10, digest: 'abc' }, { files: 1, bytes: 10 });
+    expect(r.ok).toBe(true);
+    expect(r.digestChecked).toBe(false);
   });
 });
 

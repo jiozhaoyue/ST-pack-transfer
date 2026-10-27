@@ -1,0 +1,5 @@
+{"file": ".trellis/tasks/10-14-lan-transfer/prd.md", "reason": "本任务 R-01~R-12 与 AC-01~AC-10；R-06/AC-04 本轮按未实现改写"}
+{"file": ".trellis/tasks/10-14-lan-transfer/design.md", "reason": "协议 v2、sink 落盘、背压、有界等待、续传与核对的实现契约"}
+{"file": ".trellis/spec/frontend/workbench-single-view.md", "reason": "§7 局域网互传既定契约：一次性取件码、两跳信令必须如实告知、降级判据"}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "五条 UI 守卫与转义层契约，DOM 注入守卫禁止 innerHTML"}
+{"file": ".trellis/spec/frontend/async-bounds.md", "reason": "每个 await 必须有界 settle（L1-MR-7），传输等待需超时兜底"}

@@ -161,7 +161,51 @@
 
 **借鉴来源**：Luker 的一次性配对链接 / 按条目核对 / 分场景报错；
 TauriTavern 的阶段+进度事件 / 原子落盘 / 自然续传 / 地址发现。
-本轮**未做**逐条哈希核对（`verifyTransfer` 只比条目数与字节数）——不谎称做了。
+
+### 7.1 当前实现（2026-10-27）
+
+| 能力 | 实现 | 证据 |
+| --- | --- | --- |
+| 信令负载 v2 | `buildSignalPayload` / `readSignalPayload`，含 `file.id`（`name:size:lastModified` 的 FNV-1a）与 `resumeFrom`；v1 旧码仍可读 | `test/lan-transfer.test.js` |
+| 分块 | 64 KB/块；发送端 `bufferedAmount` 高低水位 + 250ms 兜底 | 同上 |
+| 摘要核对 | SHA-256 + 字节数；**两端都有摘要才比摘要**，缺任一端退回字节数并在界面标注「仅核对大小」 | 同上 + E2E L12 |
+| 续传 | 接收端保留 `.part`，应答码携带已有字节数；失败重试生成新码 | 设计见 `design.md` |
+| 一次性 | 成功后先清空取件码/应答码并断链，再入库；旧码重复使用被明确拒绝 | E2E L14–L16 |
+| 降级 | 非安全上下文 `probeDirectCapability()` 返回不可直连，按钮禁用并给出「导出文件手动传入」 | 单测 + 探针 |
+| 信令中继 | **未实现**（没有可依赖的中继端点契约）；界面如实写「两跳」 | PRD R-06 收口 |
+
+**接收端落盘的硬规则（2026-10-27 实测事故）**：数据帧可能**先于 OPFS sink 打开**到达。
+旧实现直接丢弃这些块，产物字节数不足、摘要核对失败——表现像「传输坏了」，根因却被掩盖。
+现在 `meta` 帧建立 `sinkReady` promise，写链**等待 sink 就绪**，**绝不丢块**；
+`failRecv` 只认第一次失败（sink 打开失败 / 写链异常 / 通道关闭会竞争触发）。
+
+**自动化证据**：`npm run e2e:web -- --only lan-transfer --rebuild`
+两个页面真实互传 3 MB 合法 zip（跨越 64 KB 分块边界），**18/18 通过**：
+取件码/应答码生成 → 传输 → 摘要一致 → 接收端工作区出现同名包 → 一次性失效 → 坏码拒绝。
+
+---
+
+## 9. UI 单一源（2026-10-27 用户裁定）
+
+**规则**：`src/ui/ui-demo.html` 是**唯一可编辑的 UI 源**；正式三件套
+（`style.css`、`src/ui/workbench-template.js`、`src/ui/workbench-view.js`）
+由 `npm run sync:ui` **逐字复制** demo 的三个标记区，运行时不得手写第二份。
+
+**为什么放在 `src/ui/` 而不是任务目录**：Trellis `task.py archive` 会把任务目录整体移到
+`.trellis/tasks/archive/<月>/`；把唯一源放在任务目录会让归档后 `sync:ui` 与守卫静默失效。
+
+**demo 外圈不是产品代码**：演示工具条、演示数据（`demoTree` / `DEMO_PACKAGES` /
+`DEMO_QUOTA`）、演示重置、入口预览、演示专用 sessionStorage key，全部位于三个标记区**之外**。
+正式三件套**禁止**出现 `demo` / `演示` / `DEMO_` 字样或引用——`test/ui-demo-source.test.js`
+的「正式三件套不含任何 demo / 测试专用物」用例是硬门禁。
+
+**正式数据必须真实**：浏览器配额来自 `navigator.storage.estimate()`，不可用时显示
+「浏览器未提供配额读数」；宿主配额没有可靠 API 时显示「当前宿主无逐项读数」。
+**禁止**用演示数字冒充真实读数。教程自动弹出用正式 key `st-pack-transfer:tutorial-seen`，
+同一会话一次。
+
+**改动流程**：改 demo → 浏览器验证（`file://` 直接打开）→ `npm run sync:ui` →
+`npm test` + 五守卫。模板/视图/样式三件套**不得手改**。
 
 ---
 

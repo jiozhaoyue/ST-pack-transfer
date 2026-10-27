@@ -1,0 +1,3 @@
+{"file": ".trellis/tasks/10-14-lan-transfer/implement.md", "reason": "逐项勾选 A1~F4，收口时核对未完成项"}
+{"file": ".trellis/tasks/10-14-lan-transfer/design.md", "reason": "核对实现与设计契约：帧格式、sink、摘要、续传、非安全上下文禁用"}
+{"file": ".trellis/spec/frontend/workbench-single-view.md", "reason": "检查是否出现「一步配对」等谎称，以及 wb-lan-* 双前缀"}

@@ -7,9 +7,10 @@
 
 ## 一、一句话现状
 
-**UI 已按 `deliverables/ui-demo.html` 原样重写并落地**：旧 UI 层（布局 / 组件 / 兼容容器 / 旧测试）已全部删除，
-`src/ui/workbench-view.js` 是 demo 渲染脚本的逐行搬运，只在「数据来源 / 动作」两处接真实管线。
-`npm test` **859 passed / 2 skipped**，五个静态守卫全绿，`npm run build` 通过，独立 Web 的上传→图表→转换链路已实测。
+**UI 已按 `src/ui/ui-demo.html` 原样重写并落地**：该文件是**唯一可编辑的 UI 源**，
+正式三件套由 `npm run sync:ui` 逐字复制三个标记区（外圈的演示工具条 / 演示数据 / 入口预览
+不进正式代码）。`npm test` **875 passed / 2 skipped**，五个静态守卫全绿，
+`npm run build` 通过，独立 Web 的上传→图表→转换链路已实测。
 
 ---
 
@@ -20,7 +21,9 @@
 | 文件 | 作用 |
 | --- | --- |
 | `src/core/chart-model.js` | 真实计划 → demo 同款树；三态、勾选汇总、分卷下钻、序号、折行判定（纯逻辑） |
-| `src/ui/workbench-view.js` | **demo 的 `<script>` 原样搬运**：渲染 / 事件 / 教程 / 帮助 / 日志 / 分隔条；只注入 `actions.*` 与 `setPackages/setHost/setActivePackage` |
+| `src/ui/ui-demo.html` | **UI 唯一源**：演示工具条 / 演示数据在三个标记区之外；标记区内是正式 UI 全量代码 |
+| `scripts/sync-ui-from-demo.cjs` | demo → 正式三件套逐字同步（`npm run sync:ui` / `--check`），不引用、不转义 |
+| `test/ui-demo-source.test.js` | 逐字一致性 + 正式三件套**零 demo/测试字样**门禁 |
 | `src/app/task-runtime.js` | 从旧控制器抽出的**任务运行时**（批次 / 断点 / 半成品 / 调试探针），非 UI |
 | `.trellis/spec/guides/instance-testing-discipline.md` | 实例测试硬纪律（最多 2 个实例、只准 Dev、禁自动开浏览器） |
 
@@ -28,8 +31,9 @@
 
 | 文件 | 说明 |
 | --- | --- |
-| `src/ui/workbench-template.js` | 由 demo 的面板 HTML **逐字生成**（构建脚本 `test-results/mktemplate.cjs`，不手改） |
-| `style.css` | 由 demo 的 `<style>` **逐条搬运 + 容器作用域**（`test-results/mkstyle.cjs`）；固定深色令牌；独立页底色深色 |
+| `src/ui/workbench-template.js` | 由 `src/ui/ui-demo.html` 的 HTML 区**逐字生成**（`npm run sync:ui`，勿手改） |
+| `style.css` | 由 demo 的 CSS 区**逐字复制**（`npm run sync:ui`）；固定深色令牌；独立页底色深色 |
+| `src/ui/workbench-view.js` | 由 demo 的 JS 区**逐字复制**（`npm run sync:ui`，勿手改） |
 | `index.js` | 全新控制器：宿主探测 / 包仓库 / 计划 / 转换 / 恢复 / 局域网 / 设置，全部通过视图 API |
 
 ### 删除（不再保留任何旧 UI）
@@ -68,8 +72,9 @@
 1. **实例侧旧矩阵/仓规格仍按旧 UI 写**：`e2e/specs/matrix.e2e.cjs`、`vault.e2e.cjs` 仍引用已删除节点。
    **运行器已改用 `e2e/specs/newui.e2e.cjs`**（真实路径打开 → 上传 → 图表 → 四目标切换 → 生成导出包），
    `smoke` 也已改为新节点。旧矩阵文件保留在仓库里待归档，**不要再用它判定回归**。
-2. **局域网面板已按 Luker / TT 结构重写**（peer row / 角色切换 / 阶段+进度条 / 能力徽标），
-   并用两个浏览器上下文实测：offer/answer 交换成功、双方 100%、接收端得到同名包、零报错。
+2. **局域网互传已重写并真机取证**：一次性取件码 + v2 续传负载 + SHA-256 核对；
+   修掉「sink 未就绪时丢块导致产物缺字节」的真实缺陷。独立 Web 双页面 3 MB 真互传
+   **18/18 通过**（`npm run e2e:web -- --only lan-transfer --rebuild`）。
    仍需在**两台真实设备**（不同机器）复验 mDNS 与扫码形态。
 3. **宿主自动开浏览器**：Dev ST / Luker 的 `config.yaml` 已设 `browserLaunch.enabled: false`，
    但历史上实例已在运行时仍会开标签；需在**重启后**确认。禁止与其它自动开浏览器的工具同时运行。
@@ -96,13 +101,14 @@
 
 | 区域 | 文件 |
 | --- | --- |
-| 模板（唯一来源） | `src/ui/workbench-template.js`（由 demo 生成，勿手改） |
-| 视图（demo 渲染） | `src/ui/workbench-view.js`（勿改渲染逻辑，只接 `actions`） |
+| **UI 唯一源** | `src/ui/ui-demo.html`（改 UI 只改这里） |
+| 模板（生成物） | `src/ui/workbench-template.js`（勿手改） |
+| 视图（生成物） | `src/ui/workbench-view.js`（勿手改） |
 | 控制器 | `index.js` |
 | 图表模型 | `src/core/chart-model.js` |
 | 任务运行时 | `src/app/task-runtime.js` |
-| 样式 | `style.css`（demo 样式 + 容器作用域；固定深色） |
-| 生成脚本 | `test-results/mktemplate.cjs`、`test-results/mkstyle.cjs`（改了 demo 后重新生成） |
+| 样式（生成物） | `style.css`（勿手改） |
+| 同步器 | `scripts/sync-ui-from-demo.cjs`（`npm run sync:ui` / `check:ui-sync`） |
 | 实例纪律 | `.trellis/spec/guides/instance-testing-discipline.md` |
 
 ---
@@ -113,7 +119,8 @@
 2. **`[hidden]` 压不过同特异度 `display`**：默认隐藏容器若写了 `display`，必须另写 `[hidden]{display:none}`。
 3. **实例并发**：**最多 2 个**，默认 1 个；PT/TT 必须单独跑。
 4. **禁止与其它自动开浏览器的工具并行**；`browserLaunch.enabled` 必须为 `false`。
-5. 改 demo 后必须重新跑生成脚本，否则模板/样式与 demo 漂移。
+5. **UI 只能改 `src/ui/ui-demo.html`**，然后 `npm run sync:ui`；正式三件套不得手改，也不得出现 demo / 演示 / DEMO_ 字样（`test/ui-demo-source.test.js` 会红）。
+6. **正式数据不得造假**：配额来自 `navigator.storage.estimate()`；宿主无读数就写「当前宿主无逐项读数」。
 
 ---
 
