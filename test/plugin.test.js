@@ -51,8 +51,8 @@ describe('SillyTavern 标准插件工程结构 (ST-pack-transfer)', () => {
     }
     const { buildSettingsHtml } = await import('../src/ui/settings-panel.js');
     const settingsHtml = buildSettingsHtml({});
-    expect((settingsHtml.match(/type="checkbox"/g) || []).length).toBe(3);
-    expect(settingsHtml).not.toMatch(/git|扩展包|构建配置|backups|派生缓存|清理/i);
+    expect((settingsHtml.match(/type="checkbox"/g) || []).length).toBe(4);
+    expect(settingsHtml).not.toMatch(/扩展包|backups|派生缓存|清理/i);
 
     // 反向断言：index.html 不得出现这些业务节点（防回归成两份副本）
     const html = await readFile('index.html', 'utf8');

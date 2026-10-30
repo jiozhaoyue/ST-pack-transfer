@@ -10,7 +10,7 @@
  *
  * 本模块属 `src/core/`：禁止 DOM。
  */
-import * as zip from '@zip.js/zip.js';
+import * as zip from '../vendor/zip.js';
 import { zipIo } from './zip-io.js';
 
 export const CONTAINER_MANIFEST = 'manifest.json';
