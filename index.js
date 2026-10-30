@@ -57,6 +57,7 @@ function clockOf(ts) {
 }
 
 let initialized = false;
+let modalRefreshHook = null;
 
 function ensureConverterModal() {
   let overlay = document.getElementById('st-converter-modal-overlay');
@@ -81,6 +82,7 @@ function ensureConverterModal() {
 export function openConverterModal() {
   if (typeof document === 'undefined') return;
   ensureConverterModal().style.display = 'flex';
+  modalRefreshHook?.();
 }
 
 async function main(root) {
@@ -234,7 +236,12 @@ async function main(root) {
     await syncPackages();
     if (remote) view.setZone('import');
     const newest = state.packages.filter((p) => p.zone === 'import').sort((a, b) => b.ts - a.ts)[0];
-    if (newest) { await ensurePlan(newest.id); view.setActivePackage(newest.id); }
+    if (newest) {
+      await ensurePlan(newest.id);
+      Object.assign(settings, loadSettings());
+      view.applySettings?.(settings);
+      view.setActivePackage(newest.id);
+    }
     view.toast(t(remote ? 'toast.receivedCount' : 'toast.importedCount', { n: list.length }));
   }
 
@@ -373,6 +380,8 @@ async function main(root) {
       state.layoutById.set(id, hostLayoutCode(host.platform));
       await syncPackages();
       await ensurePlan(id);
+      Object.assign(settings, loadSettings());
+      view.applySettings?.(settings);
       view.setActivePackage(id);
       view.setProgress(100, t('progress.hostFetched'));
       view.toast(t('toast.hostFetched'));
@@ -701,6 +710,10 @@ async function main(root) {
           Object.assign(settings, readSettings(root));
           saveSettings(settings);
           view.applySettings?.(settings);
+  modalRefreshHook = () => {
+    Object.assign(settings, loadSettings());
+    view.applySettings?.(settings);
+  };
           view.closeModal();
           view.toast(t('settings.saved'));
         },
@@ -772,6 +785,10 @@ async function main(root) {
 
   view.setHost(hostKey, host.isPlugin ? 'plugin' : 'web');
   view.applySettings?.(settings);
+  modalRefreshHook = () => {
+    Object.assign(settings, loadSettings());
+    view.applySettings?.(settings);
+  };
   view.setPrivateFiles(loadPrivateFiles());
   applyI18n(root);
   root.querySelector('#btn-locale')?.addEventListener('click', () => {
