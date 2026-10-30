@@ -64,6 +64,7 @@ function ensureConverterModal() {
   if (overlay) return overlay;
   overlay = document.createElement('div');
   overlay.id = 'st-converter-modal-overlay';
+  overlay.style.display = 'none';
   const app = document.createElement('div');
   app.className = 'app-container';
   app.id = 'app';
@@ -847,7 +848,7 @@ function bootstrap() {
   mountDebugProbe();
   const host = detectHost();
   if (host.isPlugin) {
-    ensureConverterModal();
+
     mountExtensionRowButton(() => {
       closeHostExtensionSurface();
       openConverterModal();

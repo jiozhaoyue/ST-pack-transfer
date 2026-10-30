@@ -57,7 +57,8 @@ function makeEl(tag = 'div') {
       if (sel === '[data-st-pack-transfer-injected="1"]') return null;
       return null;
     },
-    querySelectorAll() {
+    querySelectorAll(sel) {
+      if (sel === '.inline-drawer') return this.children.filter((c) => c.className?.includes('inline-drawer'));
       return [];
     },
   };
@@ -65,7 +66,7 @@ function makeEl(tag = 'div') {
 
 /** 安装最小 DOM：anchors = .userBackupButton 锚点；row = Luker 备份管理器动作行；
  *  blocks = 宿主扩展列表行（`.extension_block[data-name*=ST-pack-transfer]`） */
-function installDom({ anchors = [], row = null, blocks = [] } = {}) {
+function installDom({ anchors = [], row = null, blocks = [], extensionsSettings = null } = {}) {
   const created = [];
   g.document = {
     readyState: 'complete',
@@ -76,7 +77,10 @@ function installDom({ anchors = [], row = null, blocks = [] } = {}) {
       return el;
     },
     // 宿主设置锚点：桩环境下一律缺失，注入函数安全早退
-    getElementById: () => null,
+    getElementById: (id) => {
+      if (id === 'extensions_settings') return extensionsSettings;
+      return byId(created, id);
+    },
     querySelector: (sel) => (sel === '.userBackupManager .backupActionRow' ? row : null),
     querySelectorAll: (sel) => {
       if (sel === '.userBackupButton') return anchors;
@@ -196,21 +200,26 @@ describe('makeHostButton 契约（经 mountLukerBackupManagerButton 注入）', 
  * 我们**只往那一行追加「打开」**，不再往 `#extensions_settings2` 塞内联抽屉。
  * 锁定三条：落点是宿主原生行、按钮走同一工厂、宿主重渲染时幂等不重复。
  */
-describe('mountExtensionRowButton 契约（扩展列表行内联下拉）', () => {
+describe('mountExtensionRowButton 契约（扩展设置列表抽屉注入）', () => {
   afterEach(() => {
     delete g.document;
     delete g.MutationObserver;
   });
 
-  it('只往宿主扩展行内追加一条内联下拉，内容只有「打开面板」', () => {
-    const block = makeEl('div');
-    installDom({ blocks: [block] });
+  it('往宿主 #extensions_settings 注入内联抽屉容器，内容包含「打开面板」', () => {
+    const extSettings = makeEl('div');
+    extSettings.id = 'extensions_settings';
+    installDom({ extensionsSettings: extSettings });
 
     mountExtensionRowButton(() => {});
 
     // 宿主行内只多一个节点：宿主同款 inline-drawer
-    expect(block.children).toHaveLength(1);
-    const drawer = block.children[0];
+    expect(extSettings.children).toHaveLength(1);
+    const container = extSettings.children[0];
+    expect(container.id).toBe('st-pack-transfer-container');
+    expect(container.className).toBe('extension_container');
+    expect(container.dataset.stPackTransferInjected).toBe('1');
+    const drawer = container.children[0];
     expect(drawer.className).toBe('inline-drawer');
     expect(drawer.dataset.stPackTransferInjected).toBe('1');
 
@@ -228,8 +237,9 @@ describe('mountExtensionRowButton 契约（扩展列表行内联下拉）', () =
   });
 
   it('click 后回调 onOpen（全屏打开工作台）', () => {
-    const block = makeEl('div');
-    const created = installDom({ blocks: [block] });
+    const extSettings = makeEl('div');
+    extSettings.id = 'extensions_settings';
+    const created = installDom({ extensionsSettings: extSettings });
     let opened = 0;
 
     mountExtensionRowButton(() => { opened += 1; });
@@ -242,8 +252,8 @@ describe('mountExtensionRowButton 契约（扩展列表行内联下拉）', () =
     expect(clickEffects.stopped).toBe(1);
   });
 
-  it('列表行不存在时静默不注入（宿主未渲染扩展弹层）', () => {
-    const created = installDom({ blocks: [] });
+  it('容器不存在时静默不注入', () => {
+    const created = installDom({ extensionsSettings: null });
 
     expect(() => mountExtensionRowButton(() => {})).not.toThrow();
     expect(created.length).toBe(0);

@@ -1917,7 +1917,9 @@ export async function incrementalMergeArchives(baseArchive, incomingArchive, { o
  */
 export function setupDrawerToggles(root) {
   if (!root) return;
-  const drawers = root.querySelectorAll('.inline-drawer');
+  const drawers = (root.matches?.('.inline-drawer') || (typeof root.className === 'string' && root.className.includes('inline-drawer')))
+    ? [root, ...(root.querySelectorAll?.('.inline-drawer') || [])]
+    : (root.querySelectorAll?.('.inline-drawer') || []);
   drawers.forEach((drawer) => {
     const toggle = drawer.querySelector(':scope > .inline-drawer-toggle');
     const content = drawer.querySelector(':scope > .inline-drawer-content');
@@ -1984,17 +1986,19 @@ function watchHostDom(injectFn) {
 /**
  * 宿主扩展列表「打开面板」入口注入。
  *
- * 形态（2026-10-27 R1.3）：宿主**自己**那一行 `.extension_block` 内追加一条与其它扩展
- * 一致的内联下拉，内容只有「打开面板」；点开后是全屏工作台（`openConverterModal()`）。
- * 扩展行仍只有宿主那一条，不在 `#extensions_settings2` 里另起第二个块。
+ * 注入主扩展设置抽屉列表（#extensions_settings / #extensions_settings2），
+ * 生成标准 extension_container + inline-drawer，内容提供「打开面板」按钮；
+ * 点击后打开全屏模态工作台（openConverterModal()）。
+
+
  *
- * 落点要兼容两类命名：Luker 的用户私有扩展是 `data-name="/ST-pack-transfer"`，
- * 全局扩展是 `data-name="ST-pack-transfer"`（宿主侧 `externalId = name.replace('third-party','')`），
- * 故用 `*=` 子串匹配。
+
+
+
  *
- * **该列表是宿主按需渲染的弹层**（点 `#extensions_details` 才出现，初始 DOM 里一个
- * `.extension_block` 都没有——2026-10-15 在 Dev Luker 8003 实测），
- * 所以必须挂 `watchHostDom`，不能在 boot 时只查一次。
+ * 宿主在初始化阶段可能会动态构建设置抽屉，故挂载 watchHostDom 确保注入口就绪。
+
+
  *
  * @param {() => void} [onOpen] 打开全屏工作台（应为 `openConverterModal`）
  */
@@ -2038,9 +2042,18 @@ export function mountExtensionRowButton(onOpen) {
   if (typeof document === 'undefined') return;
 
   const addBtn = () => {
-    document.querySelectorAll('.extension_block[data-name*="ST-pack-transfer"]').forEach((block) => {
+    const targets = [
+      document.getElementById('extensions_settings'),
+      document.getElementById('extensions_settings2'),
+    ].filter(Boolean);
+    targets.forEach((target) => {
       // 幂等：宿主重渲染会让标记随节点消失，observer 自动重注
-      if (block.querySelector('[data-st-pack-transfer-injected="1"]')) return;
+      if (document.getElementById('st-pack-transfer-container') || target.querySelector('[data-st-pack-transfer-injected="1"]')) return;
+
+      const container = document.createElement('div');
+      container.id = 'st-pack-transfer-container';
+      container.className = 'extension_container';
+      container.dataset.stPackTransferInjected = '1';
 
       const drawer = document.createElement('div');
       drawer.className = 'inline-drawer';
@@ -2070,8 +2083,9 @@ export function mountExtensionRowButton(onOpen) {
 
       drawer.appendChild(toggle);
       drawer.appendChild(content);
-      block.appendChild(drawer);
-      setupDrawerToggles(block);
+      container.appendChild(drawer);
+      target.appendChild(container);
+      setupDrawerToggles(container);
     });
   };
 
