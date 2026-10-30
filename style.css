@@ -619,7 +619,7 @@
   width: 100vw;
   height: 100vh;
   z-index: 10000;
-  display: flex;
+  display: none;
   align-items: stretch;
   justify-content: center;
   padding: 12px;
