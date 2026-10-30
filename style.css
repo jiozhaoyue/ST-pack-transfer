@@ -52,6 +52,27 @@
     --brand-luker-ring: color-mix(in srgb, var(--text) 54%, transparent);
     --brand-tt:#f2c75c;      --brand-tt-ink:#2b2100;  --brand-tt-ring:#f2c75c;
     --brand-pt:#7d5cb0;      --brand-pt-ink:#f7f3ff;  --brand-pt-ring:#a486d8;
+  }
+  #app.app-container[data-target-host="st"]{
+    --accent: var(--brand-st-ring);
+    --accent-soft: color-mix(in srgb, var(--brand-st) 18%, transparent);
+  }
+  #app.app-container[data-target-host="luker"]{
+    --accent: #8b9bb4;
+    --accent-soft: color-mix(in srgb, #8b9bb4 20%, transparent);
+  }
+  #app.app-container[data-target-host="tt"]{
+    --accent: var(--brand-tt-ring);
+    --accent-soft: color-mix(in srgb, var(--brand-tt) 18%, transparent);
+  }
+  #app.app-container[data-target-host="pt"]{
+    --accent: var(--brand-pt-ring);
+    --accent-soft: color-mix(in srgb, var(--brand-pt) 18%, transparent);
+  }
+  #app.app-container input[type="checkbox"], #app.app-container .tree-check{
+    accent-color: var(--accent);
+  }
+  #app.app-container{
     --radius:12px;
   }
   #app.app-container *{box-sizing:border-box}
@@ -195,6 +216,17 @@
   #app.app-container .extension-tools .et-git{display:inline-flex;align-items:center;gap:4px;font-size:10.5px;color:var(--muted)}
   #app.app-container .extension-tools .et-git select{font-size:11px;padding:2px 5px}
   #app.app-container .extension-tools .et-keepdev{font-size:10.5px;color:var(--muted);margin:0}
+  #app.app-container .vol-head .extension-tools{display:inline-flex;align-items:center;gap:6px;padding:2px 8px;margin:0 4px;border-radius:6px;border:1px solid var(--border);background:color-mix(in srgb, var(--panel-3) 55%, transparent)}
+  #app.app-container .vol-head .extension-tools .et-label{display:none}
+  #app.app-container .settings-divider{border:0;border-top:1px solid var(--border);margin:10px 0}
+  #app.app-container .settings-subhead{font-size:11.5px;font-weight:600;color:var(--text);margin-bottom:6px}
+  #app.app-container .settings-ext-tools{display:flex;flex-direction:column;align-items:flex-start;gap:8px;padding:8px 10px;border-radius:8px;background:var(--panel-3);border:1px solid var(--border)}
+  #app.app-container .settings-ext-tools .et-git select{font-size:11px;padding:2px 6px;background:var(--panel-2);border:1px solid var(--border);border-radius:4px}
+  #app.app-container .chart-empty-guide{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;padding:20px 8px;margin:auto 0}
+  #app.app-container .empty-guide-card{display:flex;flex-direction:column;align-items:center;text-align:center;gap:10px;padding:20px 16px;border-radius:12px;border:1px solid var(--border);background:var(--panel-2)}
+  #app.app-container .empty-guide-card .guide-icon{width:44px;height:44px;border-radius:50%;background:var(--panel-3);display:flex;align-items:center;justify-content:center;color:var(--accent)}
+  #app.app-container .empty-guide-card .guide-title{font-size:13.5px;font-weight:600;color:var(--text)}
+  #app.app-container .empty-guide-card .guide-desc{font-size:11.5px;color:var(--muted);line-height:1.45;min-height:34px}
   #app.app-container .chart-tree{flex:1 1 auto;min-height:120px;overflow:auto;padding:4px 6px 10px}
   #app.app-container .tree-row{display:flex;align-items:center;gap:5px;padding:4px 6px;border-radius:6px;min-height:28px}
   #app.app-container .tree-row:hover{background:rgba(255,255,255,.035)}

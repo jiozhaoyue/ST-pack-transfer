@@ -23,14 +23,28 @@ describe('settings-store 持久化', () => {
   });
 
   it('保存后读回', () => {
-    saveSettings({ keepExport: false, trafficPrompt: false, autoTutorial: true });
-    expect(loadSettings()).toEqual({ keepExport: false, trafficPrompt: false, autoTutorial: true });
+    saveSettings({
+      keepExport: false,
+      trafficPrompt: false,
+      autoTutorial: true,
+      defaultExtensionMode: 'manifest',
+      defaultGitMode: 'strip',
+      defaultKeepDev: true,
+    });
+    expect(loadSettings()).toEqual({
+      keepExport: false,
+      trafficPrompt: false,
+      autoTutorial: true,
+      defaultExtensionMode: 'manifest',
+      defaultGitMode: 'strip',
+      defaultKeepDev: true,
+    });
   });
 
-  it('只持久化 3 个白名单键，打包选项不落盘', () => {
-    saveSettings({ keepExport: false, compression: '9', gitMode: 'strip' });
+  it('只持久化白名单键，多余打包选项不落盘', () => {
+    saveSettings({ keepExport: false, compression: '9', invalidKey: 'strip' });
     const raw = JSON.parse(localStorage.getItem(SETTINGS_STORAGE_KEY));
-    expect(Object.keys(raw).sort()).toEqual(['autoTutorial', 'keepExport', 'trafficPrompt']);
+    expect(Object.keys(raw).sort()).toEqual(Object.keys(SETTINGS_DEFAULTS).sort());
   });
 
   it('非法 JSON 回默认', () => {

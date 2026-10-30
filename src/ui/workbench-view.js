@@ -14,6 +14,7 @@ import { mergeChartTrees } from '../core/merge-packages.js';
 import { actionsForZone, actionEnabled } from '../core/zone-model.js';
 import { EXTENSION_MODES, GIT_MODES } from '../core/export-modes.js';
 import { t } from '../i18n/index.js';
+import { loadSettings } from './settings-store.js';
 
 /**
  * 教程锚点纯几何：用 overlay 自身矩形做基准，兼容宿主容器的 transform。
@@ -114,7 +115,10 @@ const SPLIT_MIN = 32, SPLIT_MAX = 2048;
 const state = {
   host:'luker', mode:'plugin', view:'desktop', zone:'import',
   source:{ type:'host', pkgId:null }, target:'SillyTavern', delta:'overwrite', splitMb:'',
-  compression:'5', extensionMode:'full', gitMode:'keep', keepDev:false,
+  compression:'5',
+  extensionMode: typeof localStorage !== 'undefined' ? (loadSettings().defaultExtensionMode || 'full') : 'full',
+  gitMode: typeof localStorage !== 'undefined' ? (loadSettings().defaultGitMode || 'minimal') : 'minimal',
+  keepDev: typeof localStorage !== 'undefined' ? (loadSettings().defaultKeepDev || false) : false,
   packages: INITIAL_PACKAGES.map(p=>({...p})),
   selectedPkgs:new Set(), mergeMode:false, privateFiles:[], expanded:{}, collapsedVol:{}, sel:{}, log:[], logLevel:'ALL',
   noTrafficPrompt:false, keepExport:true,
@@ -251,6 +255,8 @@ function renderTargetPicker(){
   const bi=document.getElementById('target-btn-icon');
   bi.src=hostIcon(cur.host); bi.dataset.host=cur.host;
   document.getElementById('target-btn-text').textContent=cur.value;
+  const app=document.getElementById('app');
+  if(app) app.setAttribute('data-target-host', cur.host);
   document.getElementById('target-pop').innerHTML=TARGETS.map(opt=>{
     const isHost = state.mode!=='web' && opt.host===state.host;
     return '<button class="picker-item" role="option" data-target="'+opt.value+'" aria-selected="'+(opt.value===state.target)+'">'
@@ -430,6 +436,7 @@ function chartCardHtml(o){
       +'<span class="vol-idx'+(o.merged?' is-merged':'')+'">'+o.idxText+'</span>'
       +(o.volText?'<span class="vol-cap">'+o.volText+'</span>':'')
       +(o.capText?'<span class="vol-cap'+(o.over?' is-over':'')+'">'+o.capText+'</span>':'')
+      +(o.extToolsHtml ? o.extToolsHtml : '')
       +(o.over?'<span class="vol-flag">'+t('chart.overLimit')+'</span>':'')
       +'<span class="vol-spacer"></span>'
       +(o.totalText?'<span class="vol-total">'+o.totalText+'</span>':'')
@@ -486,7 +493,7 @@ function privateFilesHtml(){
 /* 组级工具条：扩展组放模式/Git，私有组放「云端私有件」入口。 */
 function groupToolsOf(o){
   const tools={};
-  if(o.extToolsHtml) tools['group:extensions']=o.extToolsHtml;
+
   const priv=privateFilesHtml();
   if(priv) tools['group:private']=priv;
   return tools;
@@ -570,12 +577,39 @@ function renderChart(){
   renderQuota();
   renderBatchBar(targets);
   const stack=document.getElementById('chart-stack');
-  const scroll=stack.scrollTop;
+  if(!stack) return;
+  const stackScroll = { top: stack.scrollTop, left: stack.scrollLeft };
+  const treeScrolls = {};
+  stack.querySelectorAll('.vol-card').forEach(card => {
+    const k = card.dataset.volkey;
+    const tree = card.querySelector('.chart-tree');
+    if(k && tree) treeScrolls[k] = { top: tree.scrollTop, left: tree.scrollLeft };
+  });
+  const appMain = document.querySelector('.app-main');
+  const mainScroll = appMain ? appMain.scrollTop : 0;
+  const winScroll = typeof window !== 'undefined' ? (window.scrollY || document.documentElement?.scrollTop || 0) : 0;
   let html='';
   targets.forEach(target=>{
     if(target.host){
       const tree=hostNodes(state.host);
       const degraded = state.mode==='web' || !HOSTS[state.host].readable || !(state.hostTree && state.hostTree.length);
+      if(degraded && state.packages.length === 0){
+        html += '<div class="chart-empty-guide">'
+          + '<div class="empty-guide-card guide-fetch">'
+            + '<div class="guide-icon"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="M12 12v9"/><path d="m8 17 4 4 4-4"/></svg></div>'
+            + '<div class="guide-title">' + t('empty.fetchTitle') + '</div>'
+            + '<div class="guide-desc">' + t('empty.fetchDesc') + '</div>'
+            + '<button type="button" class="btn accent" id="btn-empty-fetch">' + t('empty.fetchBtn') + '</button>'
+          + '</div>'
+          + '<div class="empty-guide-card guide-import">'
+            + '<div class="guide-icon"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></div>'
+            + '<div class="guide-title">' + t('empty.importTitle') + '</div>'
+            + '<div class="guide-desc">' + t('empty.importDesc') + '</div>'
+            + '<button type="button" class="btn" id="btn-empty-import">' + t('empty.importBtn') + '</button>'
+          + '</div>'
+        + '</div>';
+        return;
+      }
       html+='<div class="chart-group">'
         +'<div class="vol-grid" data-vols="1">'+chartCardHtml({
             key:'host', scope:'host:'+state.host, nodes:tree.nodes, idxText:t('chart.hostData'),
@@ -633,7 +667,20 @@ function renderChart(){
   });
   stack.innerHTML=html;
   stack.querySelectorAll('.tree-check[data-ind="1"]').forEach(el=>{ el.indeterminate=true; });
-  stack.scrollTop=scroll;
+  stack.scrollTop = stackScroll.top;
+  stack.scrollLeft = stackScroll.left;
+  stack.querySelectorAll('.vol-card').forEach(card => {
+    const k = card.dataset.volkey;
+    const tree = card.querySelector('.chart-tree');
+    if(k && tree && treeScrolls[k]){
+      tree.scrollTop = treeScrolls[k].top;
+      tree.scrollLeft = treeScrolls[k].left;
+    }
+  });
+  if(appMain && appMain.scrollTop !== mainScroll) appMain.scrollTop = mainScroll;
+  if(typeof window !== 'undefined' && (window.scrollY || document.documentElement?.scrollTop || 0) !== winScroll){
+    window.scrollTo(0, winScroll);
+  }
   renderFilenamePreview();
   updateSplitSim();
 }
@@ -1090,6 +1137,12 @@ function setProgress(pct,label){
 function bind(){
   document.getElementById('btn-guide').addEventListener('click',openTutorial);
   document.getElementById('btn-settings').addEventListener('click',()=>actions.settings?.());
+  document.getElementById('modal-extra')?.addEventListener('click', e => {
+    const extBtn = e.target.closest('[data-setting-extmode]');
+    if(extBtn){
+      extBtn.parentElement.querySelectorAll('[data-setting-extmode]').forEach(b => b.classList.toggle('active', b === extBtn));
+    }
+  });
   document.getElementById('btn-close')?.addEventListener('click',()=>actions.close?.());
 
   document.querySelectorAll('[data-help]').forEach(b=>b.addEventListener('click',e=>{ e.stopPropagation(); openHelp(b,b.dataset.help); }));
@@ -1203,6 +1256,19 @@ function bind(){
   };
 
   stackEl.addEventListener('click',e=>{
+    const emptyFetch=e.target.closest('#btn-empty-fetch');
+    if(emptyFetch){
+      const fetchBtn=document.getElementById('btn-fetch');
+      if(fetchBtn) fetchBtn.click();
+      else actions.fetch?.();
+      return;
+    }
+    const emptyImport=e.target.closest('#btn-empty-import');
+    if(emptyImport){
+      const fi=document.getElementById('file-input');
+      if(fi) fi.click();
+      return;
+    }
     const extMode=e.target.closest('[data-extmode]');
     if(extMode){
       state.extensionMode = extMode.dataset.extmode==='manifest' ? EXTENSION_MODES.MANIFEST : EXTENSION_MODES.FULL;
@@ -1543,6 +1609,13 @@ initSplitters();
     getMergedPlan,
     getVolumes(pkg) { return volumesOf(pkg, packageNodes(pkg).nodes); },
     getState() { return state; },
+    applySettings(s) {
+      if(!s) return;
+      if(s.defaultExtensionMode) state.extensionMode = s.defaultExtensionMode;
+      if(s.defaultGitMode) state.gitMode = s.defaultGitMode;
+      if(typeof s.defaultKeepDev === 'boolean') state.keepDev = s.defaultKeepDev;
+      renderChart();
+    },
     openTutorial,
     renderLog,
   };

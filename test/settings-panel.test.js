@@ -6,27 +6,53 @@ import {
 function fakeRoot(values) {
   return {
     querySelector(selector) {
-      const match = /data-setting="([^"]+)"/.exec(selector);
-      if (!match) return null;
-      return { checked: !!values[match[1]] };
+      const matchSetting = /data-setting="([^"]+)"/.exec(selector);
+      if (matchSetting) return { checked: !!values[matchSetting[1]] };
+      if (selector === '[data-setting-extmode].active') {
+        return values.defaultExtensionMode ? { dataset: { settingExtmode: values.defaultExtensionMode } } : null;
+      }
+      if (selector === '[data-setting-gitmode]') {
+        return values.defaultGitMode ? { value: values.defaultGitMode } : null;
+      }
+      return null;
     },
   };
 }
 
 describe('settings-panel 设置面板', () => {
-  it('恰好 3 个开关，不含 git / 压缩 / 扩展包 / 构建 / 备份 / 缓存 / 私有 / 清理', () => {
+  it('包含 3 个基础行为开关与导出默认偏好项', () => {
     const html = buildSettingsHtml(SETTINGS_DEFAULTS);
-    expect((html.match(/type="checkbox"/g) || []).length).toBe(3);
-    expect(html).not.toMatch(/git|压缩|扩展包|构建|backups|缓存|私有|清理/i);
+    expect((html.match(/type="checkbox"/g) || []).length).toBe(4);
+    expect(html).toContain('data-setting-extmode');
+    expect(html).toContain('data-setting-gitmode');
   });
 
-  it('从 DOM 读回 3 个开关', () => {
-    expect(readSettings(fakeRoot({ keepExport: false, trafficPrompt: true, autoTutorial: false })))
-      .toEqual({ keepExport: false, trafficPrompt: true, autoTutorial: false });
+  it('从 DOM 读回设置与导出偏好', () => {
+    expect(readSettings(fakeRoot({
+      keepExport: false,
+      trafficPrompt: true,
+      autoTutorial: false,
+      defaultExtensionMode: 'manifest',
+      defaultGitMode: 'strip',
+      defaultKeepDev: true,
+    }))).toEqual({
+      keepExport: false,
+      trafficPrompt: true,
+      autoTutorial: false,
+      defaultExtensionMode: 'manifest',
+      defaultGitMode: 'strip',
+      defaultKeepDev: true,
+    });
   });
 
-  it('归一忽略非布尔值', () => {
-    expect(normalizeSettings({ keepExport: 'x', trafficPrompt: false }))
-      .toEqual({ keepExport: true, trafficPrompt: false, autoTutorial: true });
+  it('归一化非法值并回退默认值', () => {
+    expect(normalizeSettings({ keepExport: 'x', trafficPrompt: false, defaultExtensionMode: 'invalid' }))
+      .toEqual({
+        ...SETTINGS_DEFAULTS,
+        keepExport: true,
+        trafficPrompt: false,
+        autoTutorial: true,
+        defaultExtensionMode: 'full',
+      });
   });
 });
