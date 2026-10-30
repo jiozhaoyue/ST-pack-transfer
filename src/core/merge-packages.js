@@ -7,7 +7,7 @@
  *
  * 本模块属 `src/core/`：禁止 DOM；zip 读写走 `zip-io.js`（vendor zip.js 封装）。
  */
-import * as zip from '@zip.js/zip.js';
+import * as zip from '../vendor/zip.js';
 import { zipIo } from './zip-io.js';
 import { buildGroupNodeFromItems, leavesOf } from './chart-model.js';
 

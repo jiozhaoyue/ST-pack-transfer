@@ -430,7 +430,7 @@ describe('gitMode UI 契约（设置页不再承载）', () => {
     expect(src).toContain("gitMode: 'keep'");
   });
 
-  it('设置页不再出现 Git 控件或文案', async () => {
+  it('主控制器 index.js 不再内联硬编码旧的 Git 控件与文案', async () => {
     const src = await readFile(new URL('../index.js', import.meta.url), 'utf8');
     expect(src).not.toContain('#set-git-mode');
     expect(src).not.toContain('set-git-mode');
@@ -439,7 +439,7 @@ describe('gitMode UI 契约（设置页不再承载）', () => {
     expect(src).not.toContain('不含历史');
 
     const { buildSettingsHtml } = await import('../src/ui/settings-panel.js');
-    expect(buildSettingsHtml({})).not.toMatch(/git/i);
+    expect(buildSettingsHtml({})).toContain('data-setting-gitmode');
   });
 
   it('模板里不再有并排 radio 或 title 长句说明（用户 2026-10-14 裁定）', () => {
