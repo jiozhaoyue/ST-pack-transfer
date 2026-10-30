@@ -700,6 +700,7 @@ async function main(root) {
         onClick: () => {
           Object.assign(settings, readSettings(root));
           saveSettings(settings);
+          view.applySettings?.(settings);
           view.closeModal();
           view.toast(t('settings.saved'));
         },
@@ -770,6 +771,7 @@ async function main(root) {
   });
 
   view.setHost(hostKey, host.isPlugin ? 'plugin' : 'web');
+  view.applySettings?.(settings);
   view.setPrivateFiles(loadPrivateFiles());
   applyI18n(root);
   root.querySelector('#btn-locale')?.addEventListener('click', () => {

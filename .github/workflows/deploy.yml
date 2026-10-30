@@ -1,8 +1,9 @@
 name: Deploy to GitHub Pages
 
-# 2026-10-27：UI 重写期间暂停自动部署，避免旧界面随 push 对外上线。
-# 重写完成并验收后再恢复 push 触发。
+# 仅在正式发版（Release）或手动触发时部署，杜绝日常开发 push 污染线上 Pages
 on:
+  release:
+    types: [published]
   workflow_dispatch:
 
 permissions:
