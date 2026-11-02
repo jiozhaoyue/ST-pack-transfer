@@ -542,6 +542,31 @@ export async function openStorageInspector() {
 }
 
 /**
+ * 读取当前宿主的存储用量与配额（只读）。
+ *
+ * 经宿主自己的 Storage Inspector 模块（`RestProvider`），**不臆造端点**：
+ * 只有提供 `/scripts/storage-inspector.js` 的宿主（当前为 Luker）能读到；
+ * 模块不存在、导出缺失或调用失败一律返回 `null`，调用方按「宿主未提供读数」显示。
+ *
+ * @returns {Promise<{ used: number, total: number|null }|null>}
+ */
+export async function readHostStorageQuota() {
+  const mod = await loadStorageInspectorModule();
+  if (typeof mod?.RestProvider !== 'function') return null;
+  try {
+    const provider = new mod.RestProvider({ kind: 'self' });
+    const resp = await provider.fetch([]);
+    const used = resp?.quota?.usedBytes;
+    if (typeof used !== 'number' || used < 0) return null;
+    const total = typeof resp.quota.quotaBytes === 'number' ? resp.quota.quotaBytes : null;
+    return { used, total };
+  } catch (err) {
+    logger.warn(`宿主存储配额读取失败: ${err.message}`);
+    return null;
+  }
+}
+
+/**
  * 通过服务端 /version 端点二次校验宿主类型（第 2 级复核，R-A4）
  *
  * 实测响应形状（research/host-probe-results.md + 2026-10-14 四宿主取证）：
@@ -1495,13 +1520,15 @@ export async function renderExtensionInstallerModal(extensions, onFinish, option
   ]);
   const installedNames = new Set(installedList);
 
-  // 2. 构造模态弹窗容器
+  // 2. 构造面板内安装器（禁止浮出工作台；找不到面板才回退全屏）
+  const panel = document.getElementById('app');
+  const installHost = panel || document.body;
   const modalOverlay = document.createElement('div');
   modalOverlay.id = 'ext-installer-modal';
   modalOverlay.style.cssText = `
-    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-    background: rgba(0, 0, 0, 0.75); backdrop-filter: blur(8px);
-    z-index: 99999; display: flex; align-items: center; justify-content: center;
+    position: ${panel ? 'absolute' : 'fixed'}; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0, 0, 0, 0.75);
+    z-index: 30; display: flex; align-items: center; justify-content: center;
     padding: 20px; font-family: system-ui, -apple-system, sans-serif;
   `;
 
@@ -1578,7 +1605,7 @@ export async function renderExtensionInstallerModal(extensions, onFinish, option
   `;
 
   modalOverlay.appendChild(modalBox);
-  document.body.appendChild(modalOverlay); // dom-scope:allow 自绘模态覆盖层必须挂 body 才能全页覆盖（放进扩展抽屉会被其 overflow/transform 裁剪）
+  installHost.appendChild(modalOverlay); // dom-scope:allow 安装器挂在工作台面板内，禁止浮出面板（panel 缺失时才回退 body）
 
   const listEl = modalBox.querySelector('#ext-list-container');
   const itemsState = [];

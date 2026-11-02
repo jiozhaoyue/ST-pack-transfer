@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/frontend/workbench-single-view.md", "reason": "单视图约束：所有设置/日志/确认只能在工作台内，不得新造浮层"}
+{"file": ".trellis/spec/frontend/host-capabilities.md", "reason": "宿主能力只能经 getContext() 或宿主官方模块取用；配额读取走 Storage Inspector 模块"}
+{"file": ".trellis/spec/frontend/i18n-and-settings.md", "reason": "文案与设置的唯一来源，文案体检依据"}
+{"file": ".trellis/spec/frontend/dom-write-scope.md", "reason": "DOM 写入作用域与锚点白名单"}

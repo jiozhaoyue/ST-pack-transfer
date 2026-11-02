@@ -128,7 +128,8 @@ export default {
   'quota.browser': 'Browser quota',
   'quota.host': 'Host quota',
   'quota.browserEmpty': 'Browser quota unavailable',
-  'quota.hostEmpty': 'No per-item host reading',
+  'quota.hostEmpty': 'Host provides no storage reading',
+  'quota.unlimited': 'Unlimited',
 
   'modal.close': 'Close',
   'modal.save': 'Save',

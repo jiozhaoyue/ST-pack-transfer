@@ -723,3 +723,35 @@ tutorial-copy AC-31（无文案审查脚本）。
 ### Status
 
 [OK] 守卫全绿（i18n、DOM 注入、Control Consumer、文案审查）；定向单元测试与 Vite 构建全部通过。
+
+---
+
+## Session 2026-11-02
+
+**Date**: 2026-11-02
+**Branch**: `main`
+**Task**: `11-02-zero-overlay-runtime-correctness`
+
+### Summary
+
+用户裁定「取消全部面板内浮层」：设置 / 日志 / 帮助 / 确认（流量 / 删除 / 恢复 / 合并冲突 /
+私有件 / 清空队列）全部从 `position:fixed` 浮层改为 `#app` 内 `.view-card` 视图切换。
+根因是宿主 `html` 带 transform 时嵌套固定定位失效（Luker `public/style.css:143`；
+TT 同类见 Session 55），表现为设置只剩暗遮罩、日志跑到左上角。
+教程全屏引导按用户裁定保留。宿主配额接通 Luker 的 `/scripts/storage-inspector.js`
+（`RestProvider` 只读读取 used/quota）；ST/PT/TT 读不到时显示「宿主未提供存储读数」。
+恢复后的扩展安装器也收进面板（absolute）。仓库侧按用户命令取消跟踪
+测试 / E2E / 守卫脚本 / 测试固件与 6 个运行时零引用模块（`05ac9eb`），本地文件全部保留。
+
+### Testing
+
+- [OK] `npm test` 926 passed / 2 skipped（隔离测试并行超时、单跑通过）
+- [OK] 七项守卫全绿
+- [OK] `npm run build`
+- [OK] 浏览器实测：设置/日志/帮助均为面板内 static 视图，旧浮层节点为 0，零控制台错误
+- [N/A] `e2e:web`：23 个 spec 是 10-27 UI 重写前的旧设计，与现行图表工作台不符，待单独重写
+- [PENDING] Luker 8003 实机复验（两个拉取按钮 / 配额真实读数）
+
+### Status
+
+[PARTIAL] 代码与独立 Web 已验证；Luker 实机待复验。

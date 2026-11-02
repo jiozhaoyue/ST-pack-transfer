@@ -253,8 +253,9 @@ ESM `import` 在 `file://` 下会被 CORS 拒绝，因此 **demo 不再支持双
 正式产品的 `file://` 支持不受影响（`index.html` + `public/file-protocol-notice.js`）。
 
 **正式数据必须真实**：浏览器配额来自 `navigator.storage.estimate()`，不可用时显示
-「浏览器未提供配额读数」；宿主配额没有可靠 API 时显示「当前宿主无逐项读数」。
-**禁止**用演示数字冒充真实读数。
+「浏览器未提供配额读数」；宿主配额经宿主官方 Storage Inspector 模块
+（`/scripts/storage-inspector.js` 的 `RestProvider`）读取，读不到时显示
+「宿主未提供存储读数」，**禁止**用演示数字冒充真实读数。
 
 **改动流程**：改正式三件套 → `npm test` + 五守卫 → 需要看交互时在 demo harness 里调整演示数据。
 
@@ -268,3 +269,43 @@ ESM `import` 在 `file://` 下会被 CORS 拒绝，因此 **demo 不再支持双
   `check:dom-scope`、`check:control-consumer`。
 - `npm run e2e:web -- --rebuild` 通过。
 - `impeccable detect` 对模板与两个新模块：**零命中**。
+
+---
+
+## 9. 零浮层：设置 / 日志 / 帮助 / 确认一律面板内视图（2026-11-02）
+
+**契约**：工作台内**不得**出现 `position:fixed` 的业务浮层。设置、日志、帮助、确认
+（流量 / 删除 / 恢复 / 合并冲突 / 私有件 / 清空队列）全部是 `.app-body` 内的
+`.view-card`，同一时刻只显示一个；顶栏按钮进入，视图内关闭按钮或 Esc 返回工作台。
+
+**为什么**：2026-11-02 在 Luker 实测——`#modal-overlay` / `#log-overlay` 这类嵌套在面板里的
+`position:fixed` 浮层定位失效：设置与流量确认只剩暗色遮罩、内容不可见（用户表现为
+「两个从宿主拉取按钮点了没反应」），日志浮层跑到左上角。宿主 `html` 带
+`-webkit-transform: translateZ(0)`（Luker `public/style.css:143`）会改变固定定位的
+包含块；TauriTavern 已在 journal Session 55 记录同类塌陷。根因不修浮层，直接取消浮层。
+
+**结构**：
+
+```
+#app.app-container
+  header.app-header   （btn-guide / btn-log / btn-settings / btn-close）
+  div.app-body
+    main.app-main#view-workbench
+    section.view-card#view-settings / #view-log / #view-help / #view-confirm （hidden）
+  div.toast（absolute，面板内裁剪）
+  div.tutorial-overlay（保留：全屏引导，用户 2026-11-02 裁定）
+```
+
+**API**：`workbench-view.js` 的 `showPane(name)` / `backToWorkbench()`；
+`openModal(title, desc, extraHtml, actions)` 签名不变，内部改为渲染 `#view-confirm`；
+`openSettingsView(html, { onSave })` 渲染 `#view-settings`。
+
+**守卫**：
+- `check:template-source` 的业务节点清单必须包含 `view-*` 与 `settings-*`，且**不得**再包含
+  `modal-overlay` / `log-overlay` / `help-popover` / `fullname-pop`。
+- `check:control-consumer` 必须为 `settings-save` / `settings-cancel` / `settings-close` /
+  `help-close` / `modal-close` 各写一条真实消费点。
+- 浏览器实测：三个视图的 `getComputedStyle(el).position === 'static'`，且 DOM 中不存在旧浮层节点。
+
+**例外**：教程全屏引导、`#st-converter-modal-overlay`（插件外壳）仍是固定定位；
+新增**任何**业务浮层前必须先过用户裁定。
