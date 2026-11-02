@@ -60,3 +60,21 @@ CLAUDE.md.bak
 # 摘要结论见同目录 *.md 报告；原始数据可由 *.cjs 脚本重跑，勿入库
 .trellis/tasks/**/research/*.json
 
+# ── 非运行时：本地保留，不随仓库分发（2026-11-02 用户裁定） ──
+# 测试 / E2E / 守卫脚本 / 测试固件
+/test/
+/e2e/
+/scripts/
+/fixtures/
+
+# 运行时零引用的死代码（仅测试引用）
+/src/ui/host-icons.js
+/src/core/delta.js
+/src/core/restore-batch.js
+/src/core/migration-verification.js
+/src/ui/migration-controller.js
+/src/ui/workbench-session.js
+
+# 开发期预览页（非运行时）
+/src/ui/ui-demo.html
+
