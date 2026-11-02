@@ -24,7 +24,8 @@ export function getWorkbenchHtml() {
       </div>
     </header>
 
-    <main class="app-main">
+    <div class="app-body">
+    <main class="app-main" id="view-workbench">
       <div class="col-chart">
         <section class="panel chart-card" id="chart-card">
           <div class="panel-head">
@@ -204,8 +205,58 @@ export function getWorkbenchHtml() {
       </div>
     </main>
 
-<!-- Help popover: mounted on body to avoid panel overflow clipping -->
-<div class="help-popover" id="help-popover" hidden></div>
+    <section class="panel view-card" id="view-settings" hidden>
+      <div class="view-head">
+        <h3 data-i18n="settings.title"></h3>
+        <button class="icon-btn" id="settings-close" data-i18n-title="header.close">×</button>
+      </div>
+      <div class="view-body" id="settings-body"></div>
+      <div class="view-actions">
+        <button class="btn" id="settings-cancel" data-i18n="modal.close"></button>
+        <button class="btn accent" id="settings-save" data-i18n="modal.save"></button>
+      </div>
+    </section>
+
+    <section class="panel view-card" id="view-log" hidden>
+      <div class="view-head">
+        <h3 data-i18n="log.title"></h3>
+        <button class="help-btn" data-help="log" data-i18n-title="log.help">?</button>
+        <span class="latest" id="log-latest" data-i18n="log.empty"></span>
+        <button class="icon-btn" id="log-close" data-i18n-title="header.close">×</button>
+      </div>
+      <div class="log-toolbar" id="log-toolbar">
+        <button class="log-level-btn active" data-level="ALL" data-i18n="log.all"></button>
+        <button class="log-level-btn" data-level="INFO" data-i18n="log.info"></button>
+        <button class="log-level-btn" data-level="WARN" data-i18n="log.warn"></button>
+        <button class="log-level-btn" data-level="ERROR" data-i18n="log.error"></button>
+        <span style="flex:1"></span>
+        <span class="log-badge" id="log-count-info">0 INFO</span>
+        <span class="log-badge warn" id="log-count-warn">0 WARN</span>
+        <span class="log-badge err" id="log-count-err">0 ERR</span>
+        <button id="log-copy" data-i18n="log.copy"></button>
+        <button id="log-clear" data-i18n="log.clear"></button>
+      </div>
+      <div class="log-body" id="log-body"><div id="log-lines"></div></div>
+    </section>
+
+    <section class="panel view-card" id="view-help" hidden>
+      <div class="view-head">
+        <h3 id="help-title"></h3>
+        <button class="icon-btn" id="help-close" data-i18n-title="header.close">×</button>
+      </div>
+      <div class="view-body help-view-body" id="help-body"></div>
+    </section>
+
+    <section class="panel view-card" id="view-confirm" hidden>
+      <div class="view-head">
+        <h3 id="modal-title"></h3>
+        <button class="icon-btn" id="modal-close" data-i18n-title="header.close">×</button>
+      </div>
+      <p class="view-desc" id="modal-desc"></p>
+      <div class="view-body" id="modal-extra"></div>
+      <div class="view-actions" id="modal-actions"></div>
+    </section>
+    </div>
 
 <!-- Tutorial -->
 <div class="tutorial-overlay" id="tutorial-overlay">
@@ -223,41 +274,6 @@ export function getWorkbenchHtml() {
   </div>
 </div>
 
-<!-- Generic modal -->
-<div class="modal-overlay" id="modal-overlay">
-  <div class="modal" id="modal">
-    <h3 id="modal-title"></h3>
-    <p id="modal-desc"></p>
-    <div id="modal-extra"></div>
-    <div class="actions" id="modal-actions"></div>
-  </div>
-</div>
-
-<!-- Log: opened from the header button; no persistent log block in the panel -->
-<div class="modal-overlay" id="log-overlay">
-  <div class="modal log-modal">
-    <div class="log-modal-head">
-      <h3 data-i18n="log.title"></h3>
-      <button class="help-btn" data-help="log" data-i18n-title="log.help">?</button>
-      <span class="latest" id="log-latest" data-i18n="log.empty"></span>
-      <button class="icon-btn" id="log-close" data-i18n-title="header.close">×</button>
-    </div>
-    <div class="log-toolbar" id="log-toolbar">
-      <button class="log-level-btn active" data-level="ALL" data-i18n="log.all"></button>
-      <button class="log-level-btn" data-level="INFO" data-i18n="log.info"></button>
-      <button class="log-level-btn" data-level="WARN" data-i18n="log.warn"></button>
-      <button class="log-level-btn" data-level="ERROR" data-i18n="log.error"></button>
-      <span style="flex:1"></span>
-      <span class="log-badge" id="log-count-info">0 INFO</span>
-      <span class="log-badge warn" id="log-count-warn">0 WARN</span>
-      <span class="log-badge err" id="log-count-err">0 ERR</span>
-      <button id="log-copy" data-i18n="log.copy"></button>
-      <button id="log-clear" data-i18n="log.clear"></button>
-    </div>
-    <div class="log-body" id="log-body"><div id="log-lines"></div></div>
-  </div>
-</div>
-
 <div class="toast" id="toast"></div>
-<div class="fullname-pop" id="fullname-pop" hidden></div><input type="file" id="file-input" accept=".zip" multiple hidden>`;
+<input type="file" id="file-input" accept=".zip" multiple hidden>`;
 }

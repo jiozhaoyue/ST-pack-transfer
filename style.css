@@ -85,6 +85,7 @@
   #app.app-container{
     width:100%;height:min(860px,calc(100vh - 110px));display:flex;flex-direction:column;
     background:var(--panel);border:1px solid var(--outline);border-radius:14px;
+    position:relative;
     overflow:hidden;
     box-shadow:0 0 0 1px color-mix(in srgb, var(--outline) 55%, transparent),
                0 0 0 7px color-mix(in srgb, var(--outline) 10%, transparent),
@@ -437,14 +438,9 @@
   #app.app-container .progress-fill{height:100%;width:0%;background:var(--accent);transition:width .3s ease}
   #app.app-container .progress-text{display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-top:4px}
 
-  /* 日志 */
-  #app.app-container .log-modal{width:min(620px,100%);max-height:82vh;display:flex;flex-direction:column;gap:9px}
-  #app.app-container .log-modal-head{display:flex;align-items:center;gap:8px}
-  #app.app-container .log-modal-head h3{margin:0}
-  #app.app-container .log-modal-head .latest{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;
-    white-space:nowrap;color:var(--muted);font-size:11px;padding-right:4px}
-  #app.app-container .log-modal .log-toolbar{flex-wrap:wrap;padding:0}
-  #app.app-container .log-modal .log-body{display:block;max-height:56vh;overflow:auto;padding:8px 10px;
+  /* 日志视图 */
+  #app.app-container #view-log .log-toolbar{flex-wrap:wrap;padding:0}
+  #app.app-container #view-log .log-body{flex:1 1 auto;max-height:none;overflow:auto;padding:8px 10px;
     border:1px solid var(--border);border-radius:8px;background:var(--panel-2)}
   #app.app-container .log-badge{font-size:9px;padding:1px 5px;border-radius:999px;border:1px solid var(--border);color:var(--muted)}
   #app.app-container .log-badge.warn{color:var(--optional);border-color:var(--optional)}
@@ -463,28 +459,26 @@
   #app.app-container .log-line.info .lv{color:var(--keep)} #app.app-container .log-line.warn .lv{color:var(--optional)}
   #app.app-container .log-line.error .lv{color:var(--drop)}
 
-  /* 帮助浮层 / 弹窗 / toast */
-  #app.app-container .help-popover{position:fixed;z-index:140;width:min(280px,calc(100vw - 24px));background:var(--panel);
-    border:1px solid var(--border-strong);border-radius:10px;padding:10px 12px;box-shadow:var(--shadow)}
-  #app.app-container .help-popover h4{margin:0 0 6px;font-size:12px}
-  #app.app-container .help-popover ul{margin:0;padding-left:16px;font-size:11px;color:var(--muted);line-height:1.7}
-  #app.app-container .modal-overlay{position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,.55);z-index:100;display:none;
-    align-items:center;justify-content:center;padding:16px}
-  #app.app-container .modal-overlay.open{display:flex}
-  #app.app-container .modal{width:min(430px,100%);background:var(--panel);border:1px solid var(--border-strong);
-    border-radius:12px;padding:15px;box-shadow:var(--shadow)}
-  #app.app-container .modal h3{margin:0 0 6px;font-size:14px}
-  #app.app-container .modal p{margin:0 0 10px;font-size:11.5px;color:var(--muted);line-height:1.6}
-  #app.app-container .modal .check{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);margin:8px 0}
-  #app.app-container .modal .actions{display:flex;justify-content:flex-end;gap:6px;margin-top:12px}
-  #app.app-container .toast{position:fixed;left:50%;top:calc(100vh - 26px);bottom:auto;transform:translate(-50%,calc(-100% + 10px));z-index:120;
+  /* 面板内视图 / toast */
+  #app.app-container .app-body{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;overflow:hidden}
+  #app.app-container .view-card{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;gap:10px;padding:12px 14px;overflow:auto}
+  #app.app-container .view-card[hidden]{display:none}
+  #app.app-container .view-head{display:flex;align-items:center;gap:8px;flex:0 0 auto}
+  #app.app-container .view-head h3{margin:0;font-size:14px}
+  #app.app-container .view-head .latest{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;
+    white-space:nowrap;color:var(--muted);font-size:11px;padding-right:4px}
+  #app.app-container .view-head .icon-btn:last-child{margin-left:auto}
+  #app.app-container .view-desc{margin:0;font-size:11.5px;color:var(--muted);line-height:1.6}
+  #app.app-container .view-body{flex:1 1 auto;min-height:0;overflow:auto}
+  #app.app-container .view-actions{flex:0 0 auto;display:flex;justify-content:flex-end;gap:6px;padding-top:4px}
+  #app.app-container .help-view-body ul{margin:0;padding-left:16px;font-size:11.5px;color:var(--muted);line-height:1.8}
+  #app.app-container .view-body .check{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);margin:8px 0}
+  #app.app-container .settings-grid{display:flex;flex-direction:column;gap:2px}
+  #app.app-container .toast{position:absolute;left:50%;top:calc(100% - 18px);bottom:auto;transform:translate(-50%,calc(-100% + 10px));z-index:120;
     background:var(--panel);border:1px solid var(--accent);border-radius:9px;padding:8px 13px;
     font-size:11.5px;color:var(--text);box-shadow:var(--shadow);opacity:0;pointer-events:none;
-    transition:opacity .18s ease,transform .18s ease;max-width:calc(100vw - 32px)}
+    transition:opacity .18s ease,transform .18s ease;max-width:calc(100% - 32px)}
   #app.app-container .toast.show{opacity:1;transform:translate(-50%,-100%)}
-  #app.app-container .fullname-pop{position:fixed;z-index:110;width:min(320px,calc(100vw - 24px));background:var(--panel);
-    border:1px solid var(--accent);border-radius:9px;padding:9px 11px;font-size:11.5px;
-    color:var(--text);box-shadow:var(--shadow);word-break:break-all;line-height:1.6}
 
   /* 教程 */
   #app.app-container .tutorial-overlay{position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:95;display:none}

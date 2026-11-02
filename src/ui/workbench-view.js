@@ -113,7 +113,7 @@ const INITIAL_PACKAGES = [];
 const SPLIT_MIN = 32, SPLIT_MAX = 2048;
 
 const state = {
-  host:'luker', mode:'plugin', view:'desktop', zone:'import',
+  host:'luker', mode:'plugin', view:'desktop', pane:'workbench', zone:'import',
   source:{ type:'host', pkgId:null }, target:'SillyTavern', delta:'overwrite', splitMb:'',
   compression:'5',
   extensionMode: typeof localStorage !== 'undefined' ? (loadSettings().defaultExtensionMode || 'full') : 'full',
@@ -375,16 +375,22 @@ function volumesFor(totalMb,nodes){
 function renderQuota(){
   const head=document.getElementById('quota-head');
   if(!head) return;
+  const gb=bytes=>(bytes/1073741824).toFixed(1)+' GB';
   const row=(label,ico,cell,emptyText)=>{
-    if(!cell || !(cell.total>0)) return '<div class="quota-row is-disabled">'
+    if(!cell || typeof cell.used!=='number') return '<div class="quota-row is-disabled">'
       +'<span class="q-label">'+svg(ico,'tree-ico')+label+'</span>'
       +'<span class="quota-bar"><span class="quota-fill" style="width:0%"></span></span>'
       +'<span class="quota-val">'+emptyText+'</span></div>';
-    const p=Math.max(0,Math.min(100,Math.round(cell.used/cell.total*100)));
+    const total=typeof cell.total==='number'?cell.total:0;
+    if(total<=0) return '<div class="quota-row">'
+      +'<span class="q-label">'+svg(ico,'tree-ico')+label+'</span>'
+      +'<span class="quota-bar"><span class="quota-fill" style="width:0%"></span></span>'
+      +'<span class="quota-val">'+gb(cell.used)+' · '+t('quota.unlimited')+'</span></div>';
+    const p=Math.max(0,Math.min(100,Math.round(cell.used/total*100)));
     return '<div class="quota-row">'
       +'<span class="q-label">'+svg(ico,'tree-ico')+label+'</span>'
       +'<span class="quota-bar"><span class="quota-fill '+(p>85?'warn':'')+'" style="width:'+p+'%"></span></span>'
-      +'<span class="quota-val">'+(cell.used/1073741824).toFixed(1)+' / '+(cell.total/1073741824).toFixed(1)+' GB · '+p+'%</span></div>';
+      +'<span class="quota-val">'+gb(cell.used)+' / '+gb(total)+' · '+p+'%</span></div>';
   };
   const hostReadable=!!(HOSTS[state.host]||{}).readable;
   head.innerHTML = row(t('quota.browser'),'db',state.storage.browser,t('quota.browserEmpty'))
@@ -998,7 +1004,37 @@ function doCopyBack(){ actions.copyBack?.([...state.selectedPkgs]); }
 function doDeleteSelected(){ actions.deleteSelected?.([...state.selectedPkgs]); }
 function doUploadPrivate(payload){ actions.uploadPrivate?.(payload); }
 
-/* ── 弹窗 ── */
+/* ── 面板内视图（设置 / 日志 / 帮助 / 确认） ── */
+const PANES=['workbench','settings','log','help','confirm'];
+function showPane(name){
+  state.pane=PANES.includes(name)?name:'workbench';
+  const main=document.getElementById('view-workbench');
+  if(main) main.hidden=state.pane!=='workbench';
+  PANES.slice(1).forEach(p=>{
+    const el=document.getElementById('view-'+p);
+    if(el) el.hidden=state.pane!==p;
+  });
+  document.querySelectorAll('.app-header .icon-btn').forEach(b=>b.classList.remove('active-view'));
+  if(state.pane==='settings') document.getElementById('btn-settings')?.classList.add('active-view');
+  if(state.pane==='log') document.getElementById('btn-log')?.classList.add('active-view');
+}
+function backToWorkbench(){ showPane('workbench'); }
+
+function openSettingsView(html,{onSave,onClose}={}){
+  const body=document.getElementById('settings-body');
+  if(!body) return;
+  body.innerHTML=html||'';
+  const done=()=>{ onClose?.(); backToWorkbench(); };
+  const save=document.getElementById('settings-save');
+  if(save) save.onclick=()=>{ onSave?.(body); };
+  ['settings-cancel','settings-close'].forEach(id=>{
+    const b=document.getElementById(id);
+    if(b) b.onclick=done;
+  });
+  showPane('settings');
+}
+
+/* ── 确认视图（签名沿用原弹窗，调用方零改动） ── */
 function openModal(title,desc,extraHtml,actions){
   document.getElementById('modal-title').textContent=title;
   document.getElementById('modal-desc').textContent=desc;
@@ -1012,9 +1048,9 @@ function openModal(title,desc,extraHtml,actions){
     b.addEventListener('click',a.onClick);
     acts.appendChild(b);
   });
-  document.getElementById('modal-overlay').classList.add('open');
+  showPane('confirm');
 }
-function closeModal(){ document.getElementById('modal-overlay').classList.remove('open'); }
+function closeModal(){ backToWorkbench(); }
 function openTrafficModal(onConfirm, { enabled = true, onNever } = {}){
   if(!enabled || state.noTrafficPrompt){ onConfirm(); return; }
   openModal(t('traffic.title'),t('traffic.desc'),[
@@ -1029,32 +1065,27 @@ function openTrafficModal(onConfirm, { enabled = true, onNever } = {}){
   ]);
 }
 
-function openSettings(){ actions.settings?.(); }
-/* ── 帮助浮层 ── */const HELP={
+/* ── 帮助视图 ── */const HELP={
   chart:{ title:'help.chart.title', points:['help.chart.p1','help.chart.p2','help.chart.p3','help.chart.p4','help.chart.p5','help.chart.p6'] },
   zone:{ title:'help.zone.title', points:['help.zone.p1','help.zone.p2','help.zone.p3','help.zone.p4'] },
   action:{ title:'help.action.title', points:['help.action.p1','help.action.p2','help.action.p3'] },
   log:{ title:'help.log.title', points:['help.log.p1','help.log.p2','help.log.p3'] }
 };
-let helpOpenFor=null;
-function closeHelp(){ const p=document.getElementById('help-popover'); p.hidden=true; p.innerHTML=''; helpOpenFor=null; }
-function openHelp(btn,key){
-  const p=document.getElementById('help-popover');
-  if(helpOpenFor===key){ closeHelp(); return; }
+function closeHelp(){
+  const title=document.getElementById('help-title');
+  const body=document.getElementById('help-body');
+  if(title) title.textContent='';
+  if(body) body.innerHTML='';
+  if(state.pane==='help') backToWorkbench();
+}
+function openHelp(key){
   const topic=HELP[key]; if(!topic) return;
-  p.innerHTML='<h4>'+t(topic.title)+'</h4><ul>'+topic.points.map(x=>'<li>'+t(x)+'</li>').join('')+'</ul>';
-  p.hidden=false; helpOpenFor=key;
-  const r=btn.getBoundingClientRect();
-  const w=Math.min(280,window.innerWidth-24);
-  let left=Math.min(Math.max(12,r.right-w),window.innerWidth-w-12);
-  let top=r.bottom+6;
-  const h=p.offsetHeight;
-  if(top+h>window.innerHeight-12) top=Math.max(12,r.top-h-6);
-  p.style.left=left+'px'; p.style.top=top+'px';
-  setTimeout(()=>{
-    const onDoc=(e)=>{ if(!p.contains(e.target) && e.target!==btn){ closeHelp(); document.removeEventListener('click',onDoc); } };
-    document.addEventListener('click',onDoc);
-  },0);
+  const title=document.getElementById('help-title');
+  const body=document.getElementById('help-body');
+  if(!title||!body) return;
+  title.textContent=t(topic.title);
+  body.innerHTML='<ul>'+topic.points.map(x=>'<li>'+t(x)+'</li>').join('')+'</ul>';
+  showPane('help');
 }
 
 /* ── 教程 ── */
@@ -1109,21 +1140,10 @@ function renderTutorial(){
   }
 }
 
-/* ── 全名查看（手机点击） ── */
+/* ── 全名查看（面板内提示，不使用固定定位浮层） ── */
 function showFullName(el){
   const name=decodeURIComponent(el.dataset.fullname||'');
-  const p=document.getElementById('fullname-pop');
-  p.textContent=name; p.hidden=false;
-  const r=el.getBoundingClientRect();
-  const w=Math.min(320,window.innerWidth-24);
-  p.style.left=Math.min(Math.max(12,r.left),window.innerWidth-w-12)+'px';
-  let top=r.bottom+6; const h=p.offsetHeight;
-  if(top+h>window.innerHeight-12) top=Math.max(12,r.top-h-6);
-  p.style.top=top+'px';
-  setTimeout(()=>{
-    const onDoc=(e)=>{ if(!p.contains(e.target)){ p.hidden=true; document.removeEventListener('click',onDoc); } };
-    document.addEventListener('click',onDoc);
-  },0);
+  if(name) toast(name);
 }
 
 /* ── 进度 ── */
@@ -1137,15 +1157,16 @@ function setProgress(pct,label){
 function bind(){
   document.getElementById('btn-guide').addEventListener('click',openTutorial);
   document.getElementById('btn-settings').addEventListener('click',()=>actions.settings?.());
-  document.getElementById('modal-extra')?.addEventListener('click', e => {
+  const extModeClick = (e) => {
     const extBtn = e.target.closest('[data-setting-extmode]');
     if(extBtn){
       extBtn.parentElement.querySelectorAll('[data-setting-extmode]').forEach(b => b.classList.toggle('active', b === extBtn));
     }
-  });
+  };
+  ['modal-extra','settings-body'].forEach(id => document.getElementById(id)?.addEventListener('click', extModeClick));
   document.getElementById('btn-close')?.addEventListener('click',()=>actions.close?.());
 
-  document.querySelectorAll('[data-help]').forEach(b=>b.addEventListener('click',e=>{ e.stopPropagation(); openHelp(b,b.dataset.help); }));
+  document.querySelectorAll('[data-help]').forEach(b=>b.addEventListener('click',e=>{ e.stopPropagation(); openHelp(b.dataset.help); }));
 
   // ── 局域网互传（执行卡内联）──
   document.getElementById('lan-toggle').addEventListener('click',()=>{
@@ -1377,10 +1398,10 @@ function bind(){
     }
   });
 
-  const logOverlay=document.getElementById('log-overlay');
-  document.getElementById('btn-log').addEventListener('click',()=>{ renderLog(); logOverlay.classList.add('open'); });
-  document.getElementById('log-close').addEventListener('click',()=>logOverlay.classList.remove('open'));
-  logOverlay.addEventListener('click',e=>{ if(e.target===logOverlay) logOverlay.classList.remove('open'); });
+  document.getElementById('btn-log').addEventListener('click',()=>{ renderLog(); showPane('log'); });
+  document.getElementById('log-close').addEventListener('click',backToWorkbench);
+  document.getElementById('help-close').addEventListener('click',closeHelp);
+  document.getElementById('modal-close').addEventListener('click',closeModal);
   document.getElementById('log-toolbar').addEventListener('click',e=>{
     const b=e.target.closest('[data-level]'); if(!b) return;
     document.querySelectorAll('#log-toolbar [data-level]').forEach(x=>x.classList.toggle('active',x===b));
@@ -1392,7 +1413,6 @@ function bind(){
     navigator.clipboard?.writeText(txt).then(()=>toast(t('toast.logCopied'))).catch(()=>toast(t('toast.copyFailed')));
   });
 
-  document.getElementById('modal-overlay').addEventListener('click',e=>{ if(e.target.id==='modal-overlay') closeModal(); });
   document.getElementById('tutorial-skip').addEventListener('click',closeTutorial);
   document.getElementById('tutorial-prev').addEventListener('click',()=>{ if(state.tutorialStep>0){ state.tutorialStep--; renderTutorial(); } });
   document.getElementById('tutorial-next').addEventListener('click',()=>{
@@ -1404,14 +1424,17 @@ function bind(){
     state.tutorialKind = state.tutorialKind==='adv' ? 'basic' : 'adv';
     state.tutorialStep=0; renderTutorial();
   });
-  document.addEventListener('keydown',(e)=>{ if(e.key!=='Escape') return; closeModal(); document.getElementById('log-overlay')?.classList.remove('open'); closeTutorial(); closeHelp(); });
+  document.addEventListener('keydown',(e)=>{ if(e.key!=='Escape') return;
+    if(state.pane!=='workbench'){ backToWorkbench(); return; }
+    closeTutorial();
+  });
   let tutorialRaf=0;
   const scheduleTutorial=()=>{
     if(!state.tutorialOpen || tutorialRaf) return;
     tutorialRaf=requestAnimationFrame(()=>{ tutorialRaf=0; renderTutorial(); });
   };
   document.addEventListener('scroll',scheduleTutorial,true);
-  window.addEventListener('resize',()=>{ scheduleTutorial(); closeHelp(); fitPackageNames(); });
+  window.addEventListener('resize',()=>{ scheduleTutorial(); fitPackageNames(); });
   if(typeof ResizeObserver!=='undefined'){
     const ro=new ResizeObserver(scheduleTutorial);
     const stack=document.getElementById('chart-stack');
@@ -1601,6 +1624,9 @@ initSplitters();
     pushLog(level, msg) { log(String(level || 'INFO').toUpperCase(), msg); },
     openModal,
     closeModal,
+    openSettingsView,
+    showPane,
+    backToWorkbench,
     confirmTraffic(onConfirm, opts) { openTrafficModal(onConfirm, opts); },
     toast,
     renderAll,

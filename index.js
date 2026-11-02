@@ -22,6 +22,7 @@ import {
   detectHost, hostLayoutCode, fetchHostBackup, restoreToHost, restoreToLuker,
   confirmDialog, mountExtensionRowButton, closeHostExtensionSurface,
   uploadUserFile, userFilesSupported, sanitizeUserFileName, verifyUserFiles, deleteUserFile,
+  readHostStorageQuota,
 } from './src/ui/host-bridge.js';
 import { packPrivateContainer } from './src/core/private-container.js';
 import { loadPrivateFiles, addPrivateFile, removePrivateFile } from './src/ui/private-files-store.js';
@@ -702,24 +703,15 @@ async function main(root) {
   }
 
   function openSettings() {
-    view.openModal(t('settings.title'), '', [buildSettingsHtml(settings)], [
-      { label: t('modal.close'), onClick: () => view.closeModal() },
-      {
-        label: t('modal.save'),
-        primary: true,
-        onClick: () => {
-          Object.assign(settings, readSettings(root));
-          saveSettings(settings);
-          view.applySettings?.(settings);
-  modalRefreshHook = () => {
-    Object.assign(settings, loadSettings());
-    view.applySettings?.(settings);
-  };
-          view.closeModal();
-          view.toast(t('settings.saved'));
-        },
+    view.openSettingsView(buildSettingsHtml(settings), {
+      onSave: (body) => {
+        Object.assign(settings, readSettings(body));
+        saveSettings(settings);
+        view.applySettings?.(settings);
+        view.backToWorkbench();
+        view.toast(t('settings.saved'));
       },
-    ]);
+    });
   }
 
   const lanActions = {
@@ -823,7 +815,8 @@ async function main(root) {
   });
 
   await syncPackages();
-  view.setStorage({ browser: await readBrowserQuota(), host: null });
+  const hostQuota = host.platform === 'luker' ? await readHostStorageQuota() : null;
+  view.setStorage({ browser: await readBrowserQuota(), host: hostQuota });
   view.setProgress(0, t('progress.ready'));
   logger.info(t('log.workbenchReady', { host: host.isPlugin ? t('header.plugin', { host: HOST_LABEL[host.platform] || t('host.fallback') }) : t('header.web') }));
   try {

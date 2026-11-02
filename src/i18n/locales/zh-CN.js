@@ -131,7 +131,8 @@ export default {
   'quota.browser': '浏览器配额',
   'quota.host': '宿主配额',
   'quota.browserEmpty': '浏览器未提供配额读数',
-  'quota.hostEmpty': '当前宿主无逐项读数',
+  'quota.hostEmpty': '宿主未提供存储读数',
+  'quota.unlimited': '不限',
 
   'modal.close': '关闭',
   'modal.save': '保存',
