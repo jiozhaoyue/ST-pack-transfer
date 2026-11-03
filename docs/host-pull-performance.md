@@ -191,4 +191,34 @@ const selection = { ...FULL_SELECTION, settingsBackups: false };
 - [x] `npm run build`。
 - [x] 独立 Web：确认框为原生 `dialog` 顶层（440×140 居中，遮罩正常）。
 - [x] 日志：刷新后仍保留，导出按钮可用。
-- [ ] Luker 8003 实机：需要用户启动实例后点一次「从宿主拉取」，把导出的审计日志回传。
+- [x] Luker 8003 实机（2026-11-04，见 §7）。
+
+## 7. 2026-11-04 实机复验（Dev Luker 8003）
+
+环境：`Instance/Dev/Luker` 2.7.0，`data/default-user` 全量；插件走 9 类目 `settings:false`。
+
+| 场景 | 包体 | 耗时 | 吞吐 | 备注 |
+| --- | --- | --- | --- | --- |
+| 插件整包拉取（空闲态） | 974.9 MB | 70.9s（传输 63.42s） | **15.4 MB/s** | 读等待 49.62s · OPFS写 6.95s/122块 |
+| 同端点原生 `fetch`（同选择、不落盘） | 975 MB | 53.4s | **18.3 MB/s** | 上限基线 |
+| 插件首次测量（上一次中断请求仍在服务端打包） | 974.9 MB | 251.2s | 4.0 MB/s | **受污染读数，勿引用** |
+| 循环拆解 raw / 8MB 拷贝 / 拷贝+OPFS 写（各 25s） | — | — | 18.2 / 20.6 / 22.1 MB/s | 证明客户端循环不是瓶颈 |
+
+结论：
+
+1. **客户端已不是瓶颈**：拷贝 152ms/25s、OPFS 写 2.7s/25s；插件与原生基线的差距（70.9s vs 53.4s）
+   主要来自 settings 单独拉取+拼包与形状校验，而非传输循环。
+2. **上限在宿主 `/api/users/backup` 的流式打包**：同一端点整包只有 15–18 MB/s，`TTFB` 仅 0.2s
+   （chunked，边打包边发），所以慢在**逐文件 deflate + 读盘**，不在等待首字节。
+3. **10 秒目标在当前链路上不可达**：975 MB ÷ 18 MB/s ≈ 54s 已是宿主上限；
+   要 10s 需 ≈100 MB/s，或把包体压到 ≈180 MB 以内（见下方减量/换通道两条路）。
+4. **测量纪律**：被中断的拉取会让服务端继续打包，此后所有测量都会变慢（本轮 4.0 vs 15.4 MB/s）。
+   复测前必须确认宿主空闲。
+
+已知问题（待修）：
+
+- **settings.json 拼入失败（OPFS 配额）**：975 MB 包写入后追加 21.5 MB 的 `settings.json` 时抛
+  `The operation failed because it would cause the application to exceed its storage quota.`，
+  包内最终**不含 settings.json**，仅留 WARN 继续。`navigator.storage.estimate()` 显示配额 6 GB、
+  用量 0，理论上足够 ⇒ 需进一步定位（`createWritable({keepExistingData:true})` 的复制开销/配额计量）。
+
