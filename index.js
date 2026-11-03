@@ -380,11 +380,12 @@ async function main(root) {
       const fetched = await fetchHostBackup(host.platform, selection, {
         taskId: id,
         opfsDirName: 'packages',
-        onPhase: (phase, received, total) => {
+        onPhase: (phase, received, total, _opfsName, bps) => {
           if (phase === 'host-generating') view.setProgress(12, t('progress.hostPacking'));
           else if (phase === 'transferring') {
             const pct = total > 0 ? 15 + Math.round((received / total) * 20) : 20;
-            view.setProgress(pct, t('progress.receiving', { size: (received / 1048576).toFixed(1) }));
+            const speed = bps > 0 ? `${(bps / 1048576).toFixed(1)} MB/s` : '—';
+            view.setProgress(pct, t('progress.receiving', { size: (received / 1048576).toFixed(1), speed }));
           }
         },
       });

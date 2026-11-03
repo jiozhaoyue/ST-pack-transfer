@@ -310,7 +310,7 @@ export default {
   'progress.restoreFailed': '恢复失败',
   'progress.hostRequest': '正在请求宿主打包...',
   'progress.hostPacking': '宿主打包中...',
-  'progress.receiving': '接收中 {size} MB',
+  'progress.receiving': '接收中 {size} MB · {speed}',
   'progress.hostFetched': '宿主拉取完成',
   'progress.hostFetchFailed': '宿主拉取失败',
   'progress.converting': '转换中 · {name}',

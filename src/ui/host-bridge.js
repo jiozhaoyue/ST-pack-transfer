@@ -1174,6 +1174,8 @@ export async function fetchHostBackup(platform, selection = null, {
       // 实测速度采样（滑动窗口 500ms）：onPhase 直传，非估算
       let speedWindowBytes = 0;
       let speedWindowStart = performance.now();
+      let lastBps = 0;
+      const fmtSpeed = (bps) => (bps > 0 ? `${(bps / 1048576).toFixed(1)} MB/s` : '—');
       for (;;) {
         // 停滞守卫：只守「两次字节之间的间隔」，不守总时长（见 async-bounds.md）
         const readStart = nowMs();
@@ -1196,9 +1198,9 @@ export async function fetchHostBackup(platform, selection = null, {
         speedWindowBytes += value.length;
         const now = performance.now();
         const windowMs = now - speedWindowStart;
-        let currentBps = null;
+        const liveBps = windowMs >= 500 ? (speedWindowBytes * 1000) / windowMs : lastBps;
         if (windowMs >= 500) {
-          currentBps = (speedWindowBytes * 1000) / windowMs; // bytes per second
+          lastBps = liveBps;
           speedWindowBytes = 0;
           speedWindowStart = now;
         }
@@ -1206,14 +1208,14 @@ export async function fetchHostBackup(platform, selection = null, {
           const pct = Math.round((received / transferTotal) * 100);
           if (pct >= lastLoggedPct + 10) {
             lastLoggedPct = pct;
-            logger.info(`数据包传输中: ${pct}% (${(received / 1048576).toFixed(1)} / ${(transferTotal / 1048576).toFixed(1)} MB)`);
+            logger.info(`数据包传输中: ${pct}% (${(received / 1048576).toFixed(1)} / ${(transferTotal / 1048576).toFixed(1)} MB) · ${fmtSpeed(liveBps)}`);
           }
         } else if (received >= lastLoggedPct + 4194304) {
           // chunked 响应无 Content-Length：按 4MB 步进汇报
           lastLoggedPct = received - (received % 4194304);
-          logger.info(`数据包传输中: 已接收 ${(received / 1048576).toFixed(1)} MB`);
+          logger.info(`数据包传输中: 已接收 ${(received / 1048576).toFixed(1)} MB · ${fmtSpeed(liveBps)}`);
         }
-        onPhase?.('transferring', received, transferTotal, opfsHandle ? opfsName : undefined, currentBps);
+        onPhase?.('transferring', received, transferTotal, opfsHandle ? opfsName : undefined, liveBps);
       }
       if (writable) await flushPending();
       const transferMs = nowMs() - transferStart;

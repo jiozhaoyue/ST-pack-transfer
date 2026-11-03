@@ -307,7 +307,7 @@ export default {
   'progress.restoreFailed': 'Restore failed',
   'progress.hostRequest': 'Requesting host pack...',
   'progress.hostPacking': 'Host is packing...',
-  'progress.receiving': 'Receiving {size} MB',
+  'progress.receiving': 'Receiving {size} MB · {speed}',
   'progress.hostFetched': 'Host fetch complete',
   'progress.hostFetchFailed': 'Host fetch failed',
   'progress.converting': 'Converting · {name}',
