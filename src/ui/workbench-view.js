@@ -123,7 +123,10 @@ function loadPersistedLog() {
     const raw = localStorage.getItem(LOG_STORAGE_KEY);
     if (!raw) return [];
     const list = JSON.parse(raw);
-    return Array.isArray(list) ? list.slice(-LOG_MAX_ENTRIES) : [];
+    if (!Array.isArray(list)) return [];
+    return list
+      .filter((e) => e && typeof e.msg === 'string' && typeof e.level === 'string')
+      .slice(-LOG_MAX_ENTRIES);
   } catch {
     return [];
   }
