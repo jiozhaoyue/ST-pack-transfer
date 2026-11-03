@@ -8,6 +8,7 @@
  */
 
 import { SESSION_SCHEMA_VERSION } from '../core/migration-session.js';
+import { opfsReadFile, opfsRemove, opfsClearDir } from './opfs-files.js';
 
 const DB_NAME = 'st_zip_converter_db';
 const DB_VERSION = 2;
@@ -192,17 +193,22 @@ const LARGE_BLOB_THRESHOLD = 16 * 1024 * 1024; // 16MB 以上视为大包，走�
  * @param {'source'|'output'} [item.role='source'] 文件角色（v1 兼容字段）
  * @param {string} [item.origin] 来源标记 (ORIGINS 枚举)，未提供时按 role 推断
  * @param {string} [item.group] 分卷组/增量链归属 id
+ * @param {string} [item.opfsName] OPFS 文件名（提供时 `blob` 可为空，读取时按需打开）
+ * @param {string} [item.opfsDir] OPFS 目录名（默认 packages）
  * @param {object} [item.metadata] 附加元数据
  * @returns {Promise<string|null>}
  */
-export async function saveFile({ id, name, size, blob, layout, role = 'source', origin, group = null, metadata = {} }) {
+export async function saveFile({
+  id, name, size, blob, layout, role = 'source', origin, group = null,
+  opfsName = null, opfsDir = null, metadata = {},
+}) {
   if (!isStorageSupported()) return null;
   const fileId = id || `${role}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   const record = {
     id: fileId,
     name,
     size: size || blob?.size || 0,
-    blob,
+    blob: opfsName ? null : blob,
     layout: layout || 'unknown',
     role,
     origin: origin || migrateRoleToOrigin({ role, metadata }),
@@ -210,10 +216,15 @@ export async function saveFile({ id, name, size, blob, layout, role = 'source', 
     metadata,
     createdAt: Date.now(),
   };
+  if (opfsName) {
+    record.opfsName = opfsName;
+    record.opfsDir = opfsDir || 'packages';
+  }
 
   const doPut = () => runTransaction(STORES.FILES, 'readwrite', (store) => store.put(record));
 
-  if (record.size >= LARGE_BLOB_THRESHOLD) {
+  // OPFS 索引记录本身没有大 blob，无需进入大包串行队列
+  if (record.size >= LARGE_BLOB_THRESHOLD && !opfsName) {
     // 大包串行排队：前一个大包写完再写下一个，IO 与转换管线解耦
     const task = writeQueue.then(doPut, doPut);
     writeQueue = task.catch(() => {});
@@ -231,17 +242,25 @@ export async function saveFile({ id, name, size, blob, layout, role = 'source', 
  */
 export async function getFile(id) {
   if (!isStorageSupported() || !id) return null;
-  const record = await runTransaction(STORES.FILES, 'readonly', (store) => store.get(id));
-  return normalizeRecord(record);
+  const record = normalizeRecord(await runTransaction(STORES.FILES, 'readonly', (store) => store.get(id)));
+  if (record && !record.blob && record.opfsName) {
+    const file = await opfsReadFile(record.opfsDir || 'packages', record.opfsName);
+    if (file) record.blob = file;
+  }
+  return record;
 }
 
 /**
- * 删除指定暂存的数据包
+ * 删除指定暂存的数据包（OPFS 索引记录连同底层文件一起删除）
  * @param {string} id
  */
 export async function deleteFile(id) {
   if (!isStorageSupported() || !id) return;
-  return runTransaction(STORES.FILES, 'readwrite', (store) => store.delete(id));
+  const record = await runTransaction(STORES.FILES, 'readonly', (store) => store.get(id));
+  await runTransaction(STORES.FILES, 'readwrite', (store) => store.delete(id));
+  if (record?.opfsName) {
+    await opfsRemove(record.opfsDir || 'packages', record.opfsName);
+  }
 }
 
 /**
@@ -428,7 +447,9 @@ export async function clearAll() {
     const tx = db.transaction([STORES.FILES, STORES.WORKSPACE], 'readwrite');
     tx.objectStore(STORES.FILES).clear();
     tx.objectStore(STORES.WORKSPACE).clear();
-    tx.oncomplete = () => resolve();
+    tx.oncomplete = () => {
+      opfsClearDir('packages').catch(() => {}).finally(resolve);
+    };
     tx.onerror = () => reject(tx.error);
   });
 }

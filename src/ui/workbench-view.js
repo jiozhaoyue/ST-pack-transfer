@@ -112,6 +112,41 @@ const INITIAL_PACKAGES = [];
 /* 分卷单个卷容量上下限（MB）。低于下限没有意义，高于上限没必要再拆。 */
 const SPLIT_MIN = 32, SPLIT_MAX = 2048;
 
+const LOG_STORAGE_KEY = 'st-pack-transfer:audit-log';
+const LOG_MAX_ENTRIES = 500;
+const LOG_MAX_CHARS = 400_000;
+let logPersistTimer = 0;
+
+function loadPersistedLog() {
+  try {
+    if (typeof localStorage === 'undefined') return [];
+    const raw = localStorage.getItem(LOG_STORAGE_KEY);
+    if (!raw) return [];
+    const list = JSON.parse(raw);
+    return Array.isArray(list) ? list.slice(-LOG_MAX_ENTRIES) : [];
+  } catch {
+    return [];
+  }
+}
+
+function persistLog() {
+  if (typeof localStorage === 'undefined' || logPersistTimer) return;
+  logPersistTimer = setTimeout(() => {
+    logPersistTimer = 0;
+    try {
+      let list = state.log.slice(-LOG_MAX_ENTRIES);
+      let raw = JSON.stringify(list);
+      while (raw.length > LOG_MAX_CHARS && list.length > 1) {
+        list = list.slice(1);
+        raw = JSON.stringify(list);
+      }
+      localStorage.setItem(LOG_STORAGE_KEY, raw);
+    } catch {
+      // 配额不足/隐私模式：日志仍在内存中，不影响本次会话
+    }
+  }, 250);
+}
+
 const state = {
   host:'luker', mode:'plugin', view:'desktop', pane:'workbench', zone:'import',
   source:{ type:'host', pkgId:null }, target:'SillyTavern', delta:'overwrite', splitMb:'',
@@ -120,7 +155,7 @@ const state = {
   gitMode: typeof localStorage !== 'undefined' ? (loadSettings().defaultGitMode || 'minimal') : 'minimal',
   keepDev: typeof localStorage !== 'undefined' ? (loadSettings().defaultKeepDev || false) : false,
   packages: INITIAL_PACKAGES.map(p=>({...p})),
-  selectedPkgs:new Set(), mergeMode:false, privateFiles:[], expanded:{}, collapsedVol:{}, sel:{}, log:[], logLevel:'ALL',
+  selectedPkgs:new Set(), mergeMode:false, privateFiles:[], expanded:{}, collapsedVol:{}, sel:{}, log:loadPersistedLog(), logLevel:'ALL',
   noTrafficPrompt:false, keepExport:true,
   storage:{ browser:null, host:null },
   sort:'time-desc', filter:'all', tutorialStep:0, tutorialOpen:false, tutorialKind:'basic',
@@ -151,8 +186,36 @@ function dtNow(){
 }
 function log(level,msg){
   state.log.push({ level, msg, time:nowTime() });
-  if(state.log.length>200) state.log.shift();
+  if(state.log.length>LOG_MAX_ENTRIES) state.log.shift();
+  persistLog();
   renderLog();
+}
+function logText(){
+  const ua = typeof navigator !== 'undefined' ? (navigator.userAgent || '') : '';
+  const lang = typeof navigator !== 'undefined' ? (navigator.language || '') : '';
+  const head = [
+    t('log.auditTitle'),
+    t('log.auditExportedAt', { time: new Date().toISOString() }),
+    t('log.auditContext', { host: state.host || '', mode: state.mode || '' }),
+    t('log.auditLocale', { lang }),
+    t('log.auditUa', { ua }),
+    t('log.auditCount', { n: state.log.length }),
+    '---',
+  ].join('\n');
+  return head + '\n' + state.log.map(l=>'['+l.time+'] ['+l.level+'] '+l.msg).join('\n');
+}
+function exportLog(){
+  if (typeof document === 'undefined' || typeof URL === 'undefined') return;
+  const blob = new Blob([logText()], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'ST-pack-transfer-log_' + dtNow() + '.txt';
+  document.body.appendChild(a); // dom-scope:allow 下载锚点：临时 <a> 必须挂进文档 click() 才会触发下载
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  toast(t('toast.logExported'));
 }
 function toast(msg){
   const el=document.getElementById('toast');
@@ -1004,8 +1067,8 @@ function doCopyBack(){ actions.copyBack?.([...state.selectedPkgs]); }
 function doDeleteSelected(){ actions.deleteSelected?.([...state.selectedPkgs]); }
 function doUploadPrivate(payload){ actions.uploadPrivate?.(payload); }
 
-/* ── 面板内视图（设置 / 日志 / 帮助 / 确认） ── */
-const PANES=['workbench','settings','log','help','confirm'];
+/* ── 面板内视图（设置 / 日志 / 帮助；确认框为顶层 dialog） ── */
+const PANES=['workbench','settings','log','help'];
 function showPane(name){
   state.pane=PANES.includes(name)?name:'workbench';
   const main=document.getElementById('view-workbench');
@@ -1034,8 +1097,11 @@ function openSettingsView(html,{onSave,onClose}={}){
   showPane('settings');
 }
 
-/* ── 确认视图（签名沿用原弹窗，调用方零改动） ── */
+/* ── 确认浮层（原生 dialog 顶层；签名沿用原弹窗，调用方零改动） ── */
+function confirmDialogEl(){ return document.getElementById('confirm-dialog'); }
 function openModal(title,desc,extraHtml,actions){
+  const dlg=confirmDialogEl();
+  if(!dlg) return;
   document.getElementById('modal-title').textContent=title;
   document.getElementById('modal-desc').textContent=desc;
   document.getElementById('modal-extra').innerHTML=(extraHtml||[]).join('');
@@ -1048,9 +1114,20 @@ function openModal(title,desc,extraHtml,actions){
     b.addEventListener('click',a.onClick);
     acts.appendChild(b);
   });
-  showPane('confirm');
+  if(typeof dlg.showModal==='function'){
+    if(!dlg.open) dlg.showModal();
+  }else{
+    dlg.setAttribute('open','');
+  }
 }
-function closeModal(){ backToWorkbench(); }
+function closeModal(){
+  const dlg=confirmDialogEl();
+  if(!dlg) return;
+  if(typeof dlg.close==='function' && dlg.open) dlg.close();
+  else dlg.removeAttribute('open');
+  const acts=document.getElementById('modal-actions');
+  if(acts) acts.innerHTML='';
+}
 function openTrafficModal(onConfirm, { enabled = true, onNever } = {}){
   if(!enabled || state.noTrafficPrompt){ onConfirm(); return; }
   openModal(t('traffic.title'),t('traffic.desc'),[
@@ -1147,10 +1224,23 @@ function showFullName(el){
 }
 
 /* ── 进度 ── */
-function setProgress(pct,label){
+let pendingProgress = null;
+let progressRaf = 0;
+function applyProgress(pct, label){
   document.getElementById('progress-fill').style.width=Math.max(0,Math.min(100,pct))+'%';
   document.getElementById('progress-pct').textContent=Math.round(pct)+'%';
   if(label) document.getElementById('progress-label').textContent=label;
+}
+function setProgress(pct,label){
+  pendingProgress = { pct, label };
+  if(progressRaf) return;
+  if(typeof requestAnimationFrame !== 'function'){ applyProgress(pct,label); return; }
+  progressRaf = requestAnimationFrame(()=>{
+    progressRaf = 0;
+    const next = pendingProgress;
+    pendingProgress = null;
+    if(next) applyProgress(next.pct, next.label);
+  });
 }
 
 /* ── 事件绑定 ── */
@@ -1402,15 +1492,24 @@ function bind(){
   document.getElementById('log-close').addEventListener('click',backToWorkbench);
   document.getElementById('help-close').addEventListener('click',closeHelp);
   document.getElementById('modal-close').addEventListener('click',closeModal);
+  const dlg=confirmDialogEl();
+  if(dlg){
+    dlg.addEventListener('click',e=>{ if(e.target===dlg) closeModal(); });
+    dlg.addEventListener('close',()=>{ const acts=document.getElementById('modal-actions'); if(acts) acts.innerHTML=''; });
+  }
   document.getElementById('log-toolbar').addEventListener('click',e=>{
     const b=e.target.closest('[data-level]'); if(!b) return;
     document.querySelectorAll('#log-toolbar [data-level]').forEach(x=>x.classList.toggle('active',x===b));
     state.logLevel=b.dataset.level; renderLog();
   });
-  document.getElementById('log-clear').addEventListener('click',()=>{ state.log=[]; renderLog(); });
+  document.getElementById('log-clear').addEventListener('click',()=>{
+    state.log=[];
+    try{ if(typeof localStorage!=='undefined') localStorage.removeItem(LOG_STORAGE_KEY); }catch{}
+    renderLog();
+  });
+  document.getElementById('log-export').addEventListener('click',exportLog);
   document.getElementById('log-copy').addEventListener('click',()=>{
-    const txt=state.log.map(l=>'['+l.time+'] ['+l.level+'] '+l.msg).join('\n');
-    navigator.clipboard?.writeText(txt).then(()=>toast(t('toast.logCopied'))).catch(()=>toast(t('toast.copyFailed')));
+    navigator.clipboard?.writeText(logText()).then(()=>toast(t('toast.logCopied'))).catch(()=>toast(t('toast.copyFailed')));
   });
 
   document.getElementById('tutorial-skip').addEventListener('click',closeTutorial);
@@ -1425,6 +1524,7 @@ function bind(){
     state.tutorialStep=0; renderTutorial();
   });
   document.addEventListener('keydown',(e)=>{ if(e.key!=='Escape') return;
+    if(confirmDialogEl()?.open) return; // 原生 dialog 自行处理 Esc
     if(state.pane!=='workbench'){ backToWorkbench(); return; }
     closeTutorial();
   });

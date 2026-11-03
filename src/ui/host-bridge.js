@@ -839,6 +839,41 @@ export async function getHandle({ signal } = {}) {
 }
 
 /**
+ * 读取当前用户的**原始设置 JSON**（`/api/settings/get` 的 `settings` 字段，是宿主运行态的
+ * 权威设置文档；DB 存储模式下比磁盘上的旧 settings.json 更准确）。
+ *
+ * 用途：拉取时传 `settings:false`，避开 Luker 服务端「settings 隐含打包 backups/」的
+ * GB 级历史快照，再把设置单独拼回包内。失败由调用方降级，不阻塞主路径。
+ *
+ * @param {{signal?: AbortSignal}} [options]
+ * @returns {Promise<string>} JSON 文本
+ */
+export async function fetchHostSettingsJson({ signal } = {}) {
+  const startedAt = performance.now();
+  const token = await getCsrfToken({ signal });
+  const response = await fetchWithTimeout('/api/settings/get', {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRF-Token': token,
+    },
+    body: '{}',
+  }, {
+    timeoutMs: 60_000,
+    signal,
+    label: '读取宿主设置',
+  });
+  if (!response.ok) throw new Error(`读取宿主设置失败 (${response.status})`);
+  const data = await readJsonBounded(response, { timeoutMs: 60_000, signal, label: '读取宿主设置' });
+  const settings = data?.settings;
+  const text = typeof settings === 'string' ? settings : JSON.stringify(settings ?? {});
+  const bytes = new TextEncoder().encode(text).length;
+  logger.info(`已读取宿主设置 JSON · ${(bytes / 1048576).toFixed(2)} MB · ${Math.round(performance.now() - startedAt)}ms`);
+  return text;
+}
+
+/**
  * OPFS 可用性特性检测（仅浏览器；Node/Vitest 环境直接 false）
  * @returns {boolean}
  */
@@ -852,34 +887,36 @@ export function supportsOpfs() {
 }
 
 /**
- * 打开 OPFS 临时目录（fetch-tmp）中的文件句柄
+ * 打开 OPFS 临时目录（默认 fetch-tmp）中的文件句柄
  * @param {string} name
  * @param {boolean} [create=true]
+ * @param {string} [dirName='fetch-tmp']
  * @returns {Promise<FileSystemFileHandle|null>} OPFS 不可用时返回 null
  */
-export async function opfsTmpHandle(name, create = true) {
+export async function opfsTmpHandle(name, create = true, dirName = 'fetch-tmp') {
   if (!supportsOpfs()) return null;
   try {
     const root = await navigator.storage.getDirectory();
-    const dir = await root.getDirectoryHandle('fetch-tmp', { create: true });
+    const dir = await root.getDirectoryHandle(dirName, { create: true });
     return await dir.getFileHandle(name, { create });
   } catch (err) {
-    logger.warn(`OPFS 临时文件句柄获取失败 (${err.message})，回退内存模式`);
+    logger.warn(`OPFS 文件句柄获取失败 (${err.message})，回退内存模式`);
     return null;
   }
 }
 
 /**
- * 清理 OPFS fetch-tmp 目录下的临时文件（不存在时静默）
+ * 清理 OPFS 目录下的临时文件（不存在时静默）
  * @param {string} name
+ * @param {string} [dirName='fetch-tmp']
  */
-export async function opfsTmpCleanup(name) {
+export async function opfsTmpCleanup(name, dirName = 'fetch-tmp') {
   if (!supportsOpfs()) return;
   try {
     const root = await navigator.storage.getDirectory();
-    const dir = await root.getDirectoryHandle('fetch-tmp', { create: false });
+    const dir = await root.getDirectoryHandle(dirName, { create: false });
     await dir.removeEntry(name);
-    logger.info(`OPFS 临时包已清理: ${name}`);
+    logger.info(`OPFS 临时包已清理: ${dirName}/${name}`);
   } catch {
     // 文件不存在或目录不可达：无需清理
   }
@@ -920,7 +957,10 @@ export async function opfsHandleToFile(handle) {
  *   不传即零行为变化。标记 `credentials` / `host-generate` / `transfer` 三段。
  * @param {number} [options.stallTimeoutMs] 传输**停滞**上限（两次字节之间的最大间隔）；
  *   默认 `DOWNLOAD_STALL_TIMEOUT_MS`，传 `0` 关闭守卫。
- * @returns {Promise<Blob|{kind:'opfs', name:string, size:number, handle:FileSystemFileHandle}>}
+ * @param {string} [options.opfsDirName='fetch-tmp'] OPFS 目录（`packages` 用于持久化的宿主导出包）。
+ * @param {number} [options.writeBlockBytes=8388608] OPFS 合并写块大小；把逐块小写合并成大块，
+ *   避免 Windows/Chromium 下每次 16–64KB 写入的固定开销把吞吐压到 1MB/s 量级。
+ * @returns {Promise<Blob|{kind:'opfs', name:string, dir:string, size:number, handle:FileSystemFileHandle}>}
  */
 /**
  * Authority ST 选择性备份增强——特性检测（L0-11 唯一探测点）。
@@ -954,13 +994,21 @@ export async function probeAuthorityStBackup({ signal } = {}) {
 export async function fetchHostBackup(platform, selection = null, {
   onPhase, taskId, signal, resumeCheckpoint,
   timings = null, stallTimeoutMs = DOWNLOAD_STALL_TIMEOUT_MS,
+  opfsDirName = 'fetch-tmp', writeBlockBytes = 8 * 1024 * 1024,
 } = {}) {
+  const t0 = performance.now();
+  const nowMs = () => performance.now();
+  const fmtMs = (ms) => (ms < 1000 ? `${Math.round(ms)}ms` : `${(ms / 1000).toFixed(2)}s`);
   logger.info(`正在连接宿主 [${platform.toUpperCase()}] 获取授权凭证...`);
+  const credStart = nowMs();
   timings?.begin(STAGE_LABELS.CREDENTIALS);
   const [token, handle] = await Promise.all([getCsrfToken(), getHandle()]);
+  const credMs = nowMs() - credStart;
   timings?.end(STAGE_LABELS.CREDENTIALS);
 
   const sel = selection ? { ...selection } : { ...FULL_SELECTION };
+  const selectedKeys = Object.keys(sel).filter((key) => sel[key]);
+  logger.info(`宿主拉取开始 [${platform}] · 用户 ${handle} · 选择 ${selectedKeys.length} 类: ${selectedKeys.join(',') || '无'} · 凭证 ${fmtMs(credMs)}`);
   const body = platform === 'luker'
     ? { handle, selection: sel }
     : { handle, selection: sel };
@@ -998,6 +1046,7 @@ export async function fetchHostBackup(platform, selection = null, {
     }
   }
 
+  const requestStart = nowMs();
   let response = await fetch(requestUrl, {
     method: 'POST',
     credentials: 'same-origin',
@@ -1033,6 +1082,10 @@ export async function fetchHostBackup(platform, selection = null, {
     throw err;
   }
 
+  const ttfbMs = nowMs() - requestStart;
+  const declaredLength = Number(response.headers.get('Content-Length')) || 0;
+  logger.info(`宿主已响应 · HTTP ${response.status} · TTFB(打包) ${fmtMs(ttfbMs)} · ${declaredLength > 0 ? `包体 ${(declaredLength / 1048576).toFixed(1)} MB` : '无 Content-Length（chunked）'}`);
+
   let appendFromByte = 0;
   let opfsName = '';
   if (useRangeResume) {
@@ -1059,10 +1112,13 @@ export async function fetchHostBackup(platform, selection = null, {
   let opfsHandle = null;
   if (supportsOpfs()) {
     opfsName = opfsName || `${taskId || `backup_${Date.now()}`}.zip`;
-    opfsHandle = await opfsTmpHandle(opfsName, true);
+    const targetDir = useRangeResume ? 'fetch-tmp' : opfsDirName;
+    opfsHandle = await opfsTmpHandle(opfsName, true, targetDir);
     if (opfsHandle) {
-      logger.info(`OPFS 可用，数据包流式直写临时文件: fetch-tmp/${opfsName}`);
+      logger.info(`OPFS 可用，数据包流式直写: ${targetDir}/${opfsName}`);
     }
+  } else {
+    logger.warn('OPFS 不可用（非 localhost 的 http 访问或浏览器不支持）——整包将读入内存；GB 级包会显著变慢');
   }
 
   let blob = null;
@@ -1072,6 +1128,33 @@ export async function fetchHostBackup(platform, selection = null, {
     await writable.truncate(0);
   }
 
+  // 合并写块：逐块 16–64KB 直写 OPFS 在 Windows/Chromium 上固定开销极高（实测把吞吐压到 ~1MB/s）。
+  const WRITE_BLOCK = Math.max(1024 * 1024, writeBlockBytes || 0);
+  let pendingChunks = [];
+  let pendingBytes = 0;
+  let writeMs = 0;
+  let writeCalls = 0;
+  const flushPending = async () => {
+    if (!pendingBytes) return;
+    let block;
+    if (pendingChunks.length === 1) {
+      block = pendingChunks[0];
+    } else {
+      block = new Uint8Array(pendingBytes);
+      let at = 0;
+      for (const chunkBytes of pendingChunks) {
+        block.set(chunkBytes, at);
+        at += chunkBytes.length;
+      }
+    }
+    pendingChunks = [];
+    pendingBytes = 0;
+    const writeStart = nowMs();
+    await writable.write(block);
+    writeMs += nowMs() - writeStart;
+    writeCalls += 1;
+  };
+
   try {
     if (response.body && typeof response.body.getReader === 'function') {
       onPhase?.('transferring', appendFromByte, transferTotal, opfsHandle ? opfsName : undefined);
@@ -1080,19 +1163,29 @@ export async function fetchHostBackup(platform, selection = null, {
       const reader = response.body.getReader();
       const chunks = writable ? null : [];
       let received = appendFromByte;
+      let chunkCount = 0;
+      let readWaitMs = 0;
+      let firstChunkBytes = 0;
       let lastLoggedPct = -1;
-      // 实测速度采样（滑动窗口 2s）：onPhase 直传，非估算
+      const transferStart = nowMs();
+      // 实测速度采样（滑动窗口 500ms）：onPhase 直传，非估算
       let speedWindowBytes = 0;
       let speedWindowStart = performance.now();
       for (;;) {
         // 停滞守卫：只守「两次字节之间的间隔」，不守总时长（见 async-bounds.md）
+        const readStart = nowMs();
         const { done, value } = await readStreamChunkBounded(reader, {
           timeoutMs: stallTimeoutMs,
           label: '接收宿主数据包',
         });
+        readWaitMs += nowMs() - readStart;
         if (done) break;
+        if (!firstChunkBytes) firstChunkBytes = value.length;
+        chunkCount += 1;
         if (writable) {
-          await writable.write(value);
+          pendingChunks.push(value);
+          pendingBytes += value.length;
+          if (pendingBytes >= WRITE_BLOCK) await flushPending();
         } else {
           chunks.push(value);
         }
@@ -1119,19 +1212,29 @@ export async function fetchHostBackup(platform, selection = null, {
         }
         onPhase?.('transferring', received, transferTotal, opfsHandle ? opfsName : undefined, currentBps);
       }
+      if (writable) await flushPending();
+      const transferMs = nowMs() - transferStart;
       timings?.end(STAGE_LABELS.TRANSFER); // 读完即闭合（两个 return 分支之前）
       if (writable) {
+        const closeStart = nowMs();
         await writable.close();
+        const closeMs = nowMs() - closeStart;
         const file = await opfsHandle.getFile();
-        logger.success(`成功从宿主拉取数据包 (OPFS 直写)，大小: ${(file.size / 1024 / 1024).toFixed(2)} MB`);
+        const mb = file.size / 1048576;
+        const throughput = transferMs > 0 ? mb / (transferMs / 1000) : 0;
+        logger.info(`传输完成 · ${mb.toFixed(1)} MB · ${fmtMs(transferMs)} · ${throughput.toFixed(1)} MB/s · 块 ${chunkCount}（首块 ${firstChunkBytes}B）· 读等待 ${fmtMs(readWaitMs)} · OPFS写 ${fmtMs(writeMs)}/${writeCalls}块 · close ${fmtMs(closeMs)} · 累计 ${fmtMs(nowMs() - t0)}`);
+        const validateStart = nowMs();
         await validateBackupShape(file, platform);
-        return { kind: 'opfs', name: opfsName, size: file.size, handle: opfsHandle };
+        logger.info(`包形状校验 ${fmtMs(nowMs() - validateStart)}`);
+        return { kind: 'opfs', name: opfsName, dir: opfsDirName, size: file.size, handle: opfsHandle };
       }
       blob = new Blob(chunks, { type: 'application/zip' });
+      logger.info(`传输完成(内存) · ${(blob.size / 1048576).toFixed(1)} MB · ${fmtMs(transferMs)} · 块 ${chunkCount} · 累计 ${fmtMs(nowMs() - t0)}`);
     } else {
       // 响应体不可流式：整体读取（无法逐块检测停滞，故只记一段「传输」）
       timings?.end(STAGE_LABELS.HOST_GENERATE);
       timings?.begin(STAGE_LABELS.TRANSFER);
+      const transferStart = nowMs();
       blob = await response.blob();
       timings?.end(STAGE_LABELS.TRANSFER);
       if (writable) {
@@ -1139,8 +1242,9 @@ export async function fetchHostBackup(platform, selection = null, {
         await writable.write(blob);
         await writable.close();
         const file = await opfsHandle.getFile();
+        logger.info(`传输完成(非流式) · ${(file.size / 1048576).toFixed(1)} MB · ${fmtMs(nowMs() - transferStart)}`);
         await validateBackupShape(file, platform);
-        return { kind: 'opfs', name: opfsName, size: file.size, handle: opfsHandle };
+        return { kind: 'opfs', name: opfsName, dir: opfsDirName, size: file.size, handle: opfsHandle };
       }
     }
   } catch (err) {
@@ -1149,14 +1253,14 @@ export async function fetchHostBackup(platform, selection = null, {
       if (writable) {
         try { await writable.close(); } catch { /* 已关闭 */ }
       }
-      logger.info(`传输被暂停/中止，OPFS 半成品已保留: fetch-tmp/${opfsName}`);
+      logger.info(`传输被暂停/中止，OPFS 半成品已保留: ${opfsDirName}/${opfsName}`);
       throw err;
     }
     // 真实错误：半成品清理（内存路径无状态；OPFS 路径删临时文件）
     if (writable) {
       try { await writable.abort(err); } catch { /* 已关闭/中止 */ }
     }
-    if (opfsHandle) await opfsTmpCleanup(opfsName);
+    if (opfsHandle) await opfsTmpCleanup(opfsName, opfsDirName);
     throw err;
   }
 
