@@ -19,11 +19,13 @@ import { trustedStaticMarkup } from './src/ui/escape.js';
 import { getWorkbenchHtml } from './src/ui/workbench-template.js';
 import { createWorkbenchView } from './src/ui/workbench-view.js';
 import {
-  detectHost, hostLayoutCode, fetchHostBackup, restoreToHost, restoreToLuker,
+  detectHost, hostLayoutCode, fetchHostBackup, fetchHostSettingsJson, FULL_SELECTION,
+  restoreToHost, restoreToLuker,
   confirmDialog, mountExtensionRowButton, closeHostExtensionSurface,
   uploadUserFile, userFilesSupported, sanitizeUserFileName, verifyUserFiles, deleteUserFile,
   readHostStorageQuota,
 } from './src/ui/host-bridge.js';
+import { appendStoredEntryToBlob, appendStoredEntryToOpfs } from './src/core/zip-append.js';
 import { packPrivateContainer } from './src/core/private-container.js';
 import { loadPrivateFiles, addPrivateFile, removePrivateFile } from './src/ui/private-files-store.js';
 import { ORIGIN_ZONE, zoneOfOrigin, copyBackRecord } from './src/core/zone-model.js';
@@ -361,9 +363,23 @@ async function main(root) {
   async function fetchFromHostConfirmed() {
     if (state.busy) return;
     state.busy = true;
+    const pullStart = performance.now();
     try {
+      const id = `pkg-${Date.now()}`;
+      /**
+       * Luker 的 `/api/users/backup` 只要 `settings:true` 就把 `backups/` 历史快照
+       * 一起打包（本机实测 2.5GB / 308 个 22MB 设置快照）。默认改为 `settings:false`
+       * 拉取，随后单独取运行态设置并拼回 `settings.json`。
+       */
+      const excludeHistoryBackups = host.platform === 'luker';
+      const selection = excludeHistoryBackups ? { ...FULL_SELECTION, settings: false } : null;
+      if (excludeHistoryBackups) {
+        logger.info(t('log.pullStrategyReduced'));
+      }
       view.setProgress(5, t('progress.hostRequest'));
-      const blob = await fetchHostBackup(host.platform, null, {
+      const fetched = await fetchHostBackup(host.platform, selection, {
+        taskId: id,
+        opfsDirName: 'packages',
         onPhase: (phase, received, total) => {
           if (phase === 'host-generating') view.setProgress(12, t('progress.hostPacking'));
           else if (phase === 'transferring') {
@@ -372,13 +388,44 @@ async function main(root) {
           }
         },
       });
+
+      let packBlob = fetched;
+      let packSize = fetched?.size || 0;
+      if (excludeHistoryBackups) {
+        const graftStart = performance.now();
+        try {
+          const settingsJson = await fetchHostSettingsJson();
+          const bytes = new TextEncoder().encode(settingsJson);
+          if (fetched?.kind === 'opfs') {
+            const appended = await appendStoredEntryToOpfs(fetched.handle, 'settings.json', bytes);
+            packSize = appended.size;
+          } else if (fetched && typeof fetched.slice === 'function') {
+            packBlob = await appendStoredEntryToBlob(fetched, 'settings.json', bytes);
+            packSize = packBlob.size;
+          }
+          logger.info(t('log.settingsGrafted', {
+            size: (bytes.length / 1048576).toFixed(2),
+            ms: Math.round(performance.now() - graftStart),
+          }));
+        } catch (err) {
+          logger.warn(t('log.settingsGraftFailed', { msg: err.message }));
+        }
+      }
+
       const name = `${HOST_LABEL[host.platform] || 'Host'}_host-export_${Date.now()}.zip`;
-      const id = `pkg-${Date.now()}`;
+      const opfsName = fetched?.kind === 'opfs' ? fetched.name : null;
+      const opfsDir = fetched?.kind === 'opfs' ? (fetched.dir || 'packages') : null;
+      const storeStart = performance.now();
       await saveFile({
-        id, name, size: blob.size, blob: namedBlob(blob, name),
+        id, name, size: packSize, blob: opfsName ? null : namedBlob(packBlob, name),
+        opfsName, opfsDir,
         layout: hostLayoutCode(host.platform), role: 'source',
         origin: ORIGINS.HOST_EXPORT, metadata: { fetchedAt: Date.now() },
       });
+      logger.info(t('log.packStored', {
+        target: opfsName ? `OPFS ${opfsDir}/${opfsName}` : 'IndexedDB',
+        ms: Math.round(performance.now() - storeStart),
+      }));
       state.layoutById.set(id, hostLayoutCode(host.platform));
       await syncPackages();
       await ensurePlan(id);
@@ -387,6 +434,10 @@ async function main(root) {
       view.setActivePackage(id);
       view.setProgress(100, t('progress.hostFetched'));
       view.toast(t('toast.hostFetched'));
+      logger.success(t('log.hostPullDone', {
+        sec: (Math.round(performance.now() - pullStart) / 1000).toFixed(1),
+        size: (packSize / 1048576).toFixed(1),
+      }));
     } catch (err) {
       logger.error(t('log.hostFetchFailed', { msg: err.message }));
       view.setProgress(0, t('progress.hostFetchFailed'));

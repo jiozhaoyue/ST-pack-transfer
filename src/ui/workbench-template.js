@@ -233,6 +233,7 @@ export function getWorkbenchHtml() {
         <span class="log-badge" id="log-count-info">0 INFO</span>
         <span class="log-badge warn" id="log-count-warn">0 WARN</span>
         <span class="log-badge err" id="log-count-err">0 ERR</span>
+        <button id="log-export" data-i18n="log.export"></button>
         <button id="log-copy" data-i18n="log.copy"></button>
         <button id="log-clear" data-i18n="log.clear"></button>
       </div>
@@ -247,7 +248,7 @@ export function getWorkbenchHtml() {
       <div class="view-body help-view-body" id="help-body"></div>
     </section>
 
-    <section class="panel view-card" id="view-confirm" hidden>
+    <dialog class="confirm-dialog" id="confirm-dialog">
       <div class="view-head">
         <h3 id="modal-title"></h3>
         <button class="icon-btn" id="modal-close" data-i18n-title="header.close">×</button>
@@ -255,7 +256,7 @@ export function getWorkbenchHtml() {
       <p class="view-desc" id="modal-desc"></p>
       <div class="view-body" id="modal-extra"></div>
       <div class="view-actions" id="modal-actions"></div>
-    </section>
+    </dialog>
     </div>
 
 <!-- Tutorial -->

@@ -471,6 +471,16 @@
   #app.app-container .view-desc{margin:0;font-size:11.5px;color:var(--muted);line-height:1.6}
   #app.app-container .view-body{flex:1 1 auto;min-height:0;overflow:auto}
   #app.app-container .view-actions{flex:0 0 auto;display:flex;justify-content:flex-end;gap:6px;padding-top:4px}
+  /* 确认框：原生 <dialog> 顶层（top layer），不受宿主 html transform 影响，也不占面板 DOM 流 */
+  #app.app-container .confirm-dialog{
+    position:fixed;inset:0;margin:auto;width:min(440px,calc(100vw - 32px));height:fit-content;
+    max-height:min(72vh,560px);padding:14px;border:1px solid var(--outline);border-radius:14px;
+    background:var(--panel);color:var(--text);box-shadow:var(--shadow);
+    display:none;flex-direction:column;gap:10px;overflow:auto
+  }
+  #app.app-container .confirm-dialog[open]{display:flex}
+  #app.app-container .confirm-dialog .view-body{flex:0 1 auto;max-height:calc(72vh - 96px)}
+  #app.app-container .confirm-dialog::backdrop{background:rgba(0,0,0,.55);backdrop-filter:blur(2px)}
   #app.app-container .help-view-body ul{margin:0;padding-left:16px;font-size:11.5px;color:var(--muted);line-height:1.8}
   #app.app-container .view-body .check{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);margin:8px 0}
   #app.app-container .settings-grid{display:flex;flex-direction:column;gap:2px}

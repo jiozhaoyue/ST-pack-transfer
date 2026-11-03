@@ -755,3 +755,47 @@ TT 同类见 Session 55），表现为设置只剩暗遮罩、日志跑到左上
 ### Status
 
 [PARTIAL] 代码与独立 Web 已验证；Luker 实机待复验。
+
+---
+
+## Session 2026-11-03
+
+**Date**: 2026-11-03
+**Branch**: `main`
+**Task**: 宿主拉取性能 / 确认浮层 / 审计日志
+
+### Summary
+
+Dev Luker 实测「从宿主拉取 ~1MB/s，比原生慢 20 倍」。取证确认三条主因：
+① Luker `selection.settings` 在 `getUserBackupTargets()` 里隐式加入 `<user>/backups/`
+（本机 2.5GB / 308 个 22MB 设置快照）；② OPFS 逐 16–64KB 块 `await write`；
+③ 拉取完成后整包再写 IndexedDB。另发现工作台重写后丢失了 OPFS 描述符归一，
+`namedBlob({kind:'opfs'})` 会产出 `"[object Object]"` 文件。
+
+修复：拉取改 `settings:false` + `/api/settings/get` 取运行态设置 +
+`src/core/zip-append.js` 原地追加 `settings.json`（不重写旧字节）；OPFS 8MB 合并写；
+宿主导出包改 OPFS 索引（IDB 只存 opfsName/size）；进度 rAF 合帧；
+确认框改为原生 `<dialog>` 顶层（440×140 居中，top layer 不受宿主 html transform 影响）；
+日志视图新增导出 `.txt` 与 localStorage 持久化，宿主导出链路写分段 TTFB/吞吐/读写耗时。
+
+### Upstream PR
+
+- <https://github.com/funnycups/Luker/pull/54>
+- 分支 `jiozhaoyue:feat/backups-decouple`，提交 `97e47da`
+- 新增 `settingsBackups` 选择键（默认 true 保持旧行为），`settings` 只管 `settings.json`。
+
+### Testing
+
+- [OK] `npm test` 926 passed / 2 skipped（含新增 `zip-append` / `host-fetch-buffered` 用例）
+- [OK] 七项守卫全绿
+- [OK] `npm run build`
+- [OK] 独立 Web：dialog 顶层实测（1280×800 下 440×140 居中）、日志持久化与导出
+- [PENDING] Luker 8003 实机复验：点一次「从宿主拉取」后导出审计日志，依据
+  `TTFB / 传输 / OPFS写` 三段读数判断是否达到 10s 目标
+
+### Notes
+
+- 4.7GB → 约 2.2GB（排除 backups）后，10s 是否可达取决于宿主 deflate 与磁盘；
+  审计日志是唯一判据，不再凭经验设阈值。
+- 原生下载与插件拉取共用 `/api/users/backup`，插件拉取越快，对原生的占用窗口越短。
+
