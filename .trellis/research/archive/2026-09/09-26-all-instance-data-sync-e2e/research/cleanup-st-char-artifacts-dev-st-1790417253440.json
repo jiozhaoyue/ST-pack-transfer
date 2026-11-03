@@ -1,0 +1,340 @@
+{
+ "instance": "dev-st",
+ "at": "2026-09-26T10:07:33.304Z",
+ "apply": false,
+ "preManifest": "research\\t2-pre-dev-st.json",
+ "keepList": "test-results\\dev-st-avatars.json",
+ "expectedCount": 26,
+ "entries": [
+  {
+   "name": "1.png.png",
+   "bytes": 78469,
+   "sha256": "15f91660362ea696892fc2a3b830647e0009f04f638211870311796c2c25bfef"
+  },
+  {
+   "name": "1af0ff58efe74f846ee3016d426b98ff.png",
+   "bytes": 161293,
+   "sha256": "b94155caf6ea8984ee033f419e9e6767dcb85a29a3e1940f702448f30f8aa5c2"
+  },
+  {
+   "name": "2b01476222d89f3d6555503d62fcc23b.png",
+   "bytes": 113029,
+   "sha256": "3b6332a977b22404580460160f658c40020e26df24b93a8e43dc76e810413318"
+  },
+  {
+   "name": "35bc2ec29f5a32976d99a79361e5dccc.png",
+   "bytes": 8736941,
+   "sha256": "080cb0786d3fbbf9d8060d3877070b47b8a4a1fd427e2b8f1c4a002bcdd0e40e"
+  },
+  {
+   "name": "45d7623bd6219b12b5a57ec18c372494.png",
+   "bytes": 1216317,
+   "sha256": "f0c9899315b14f4b23839f675be5cb7b74c894337f72c44ba06b9a4a9d1368bd"
+  },
+  {
+   "name": "83d5cf497c6b46c125ad6732a34e299c.png",
+   "bytes": 161293,
+   "sha256": "ca7008907eedfa054235c4b78bcdecf2f497e014fc1ae059beae3a232ed1c2a3"
+  },
+  {
+   "name": "a5279aa304960200f1a5b417df207b8e.png",
+   "bytes": 593301,
+   "sha256": "93cc55ca535831b7bf5c1739ff9c9d446d6b56ad79aa7393e035abd58b671009"
+  },
+  {
+   "name": "aa65b490f530c167bc1c886761a747fa.png",
+   "bytes": 577269,
+   "sha256": "8cd3752a3ade75d07a6788bcc1da4bff1d3ff2a43d332d4708d317b70b465924"
+  },
+  {
+   "name": "ab3107e9e9cb80a23b7cff87b1bd0612.png",
+   "bytes": 107725,
+   "sha256": "9ae34ec9f54e22ffce2b334fddf380cf2768b292d71380a264198968e9f1501b"
+  },
+  {
+   "name": "BanG! City NSFW（紫）·全绿灯.png.png",
+   "bytes": 1995399,
+   "sha256": "a2dc5d4e1f54c590482b3be2b2f87fea9933b2804edf182106703b5d6080d26a"
+  },
+  {
+   "name": "BanG! City NSFW（青）.png.png",
+   "bytes": 3794592,
+   "sha256": "78be59aab686db89ed16b78fe2f95c311b47b1bfc5bc64e4faef0ce9bf503ce1"
+  },
+  {
+   "name": "default_Seraphina.png-1771390176000.png",
+   "bytes": 116941,
+   "sha256": "26635f22534b7ad1705c9cf206673456b342f10beb0586d791ef55e5d342a312"
+  },
+  {
+   "name": "default_Seraphina.png-1775713938000.png",
+   "bytes": 116941,
+   "sha256": "1831b88456b05f1c9443b13596050ea51775658ecd8467371202894dec02f00f"
+  },
+  {
+   "name": "default_Seraphina.png.png",
+   "bytes": 119573,
+   "sha256": "b26e659f35aed80b7ef45f329205b6bef770fd9f6e1f7a275897c992e5c9e044"
+  },
+  {
+   "name": "e7166d1f545ef2aba7f3b30114bce014.png",
+   "bytes": 2441405,
+   "sha256": "76a92f0dbf647e2f683b9931a9b97f51daec426524565d5dcc68335f6d02859e"
+  },
+  {
+   "name": "eb481fb751233315783ff3921ce45603.png",
+   "bytes": 2657069,
+   "sha256": "b736d006191a1aedc5d77810ce5019e130dc227e82e5f9febdd90b185d518b14"
+  },
+  {
+   "name": "f3de63803a7de9a98a0e596653b8580c.png",
+   "bytes": 539349,
+   "sha256": "df1ae8084d45630648fb05bd2f6e154035f27ce38f63756d4833f311b99ba091"
+  },
+  {
+   "name": "Izumi 用户画像3.png.png",
+   "bytes": 82957,
+   "sha256": "c571a502465219f158ef3ff24d97cd08b2e7649d377d920ff3283873006e6612"
+  },
+  {
+   "name": "_t2probe.png",
+   "bytes": 78509,
+   "sha256": "a9daa8e77958d2788f596f69c7b6dc8f06e8421cd49e29670885284487066724"
+  },
+  {
+   "name": "《绝区零》角色扮演游戏.png-1771398628000.png",
+   "bytes": 8736941,
+   "sha256": "39869eaf55e9f6952f0675cb67d88f861979971df5a0d8f7b8f514e5ccc60491"
+  },
+  {
+   "name": "《绝区零》角色扮演游戏.png-1775577420000.png",
+   "bytes": 8736941,
+   "sha256": "410ab3e6d7490cf4290ef0f9cc5c198120d65829ff43684f22bd56f370d6cc7b"
+  },
+  {
+   "name": "《绝区零》角色扮演游戏.png.png",
+   "bytes": 12063025,
+   "sha256": "0108357e3be1911af890d3d30bb5754094db92511be61eb89060b0fe31a7bdfd"
+  },
+  {
+   "name": "【Sgw】又看一集.png-1775053338000.png",
+   "bytes": 2657093,
+   "sha256": "f8521328ae7c23489498952c2886bae2f8fa60ea3b533cb4fad014a902a19f44"
+  },
+  {
+   "name": "【Sgw】又看一集.png.png",
+   "bytes": 3242684,
+   "sha256": "3bd3dd2875a7b04ace3b3e60ca5073a31c0ceb705918095ed725cb10571d3a61"
+  },
+  {
+   "name": "【Sgw】邦↘多↗利↗.png-1771398628000.png",
+   "bytes": 2441405,
+   "sha256": "ef165606b1ab86a9c8ab6bb800c3f728c708545d9d41f560e8b5d5cc907340cd"
+  },
+  {
+   "name": "【Sgw】邦↘多↗利↗.png.png",
+   "bytes": 1318509,
+   "sha256": "00fcf58484d0cff070ee5aed3bbc2b14492c5d29a5764a949467ae1dd4ebe4ec"
+  },
+  {
+   "name": "【Sgw】邦多利~.png.png",
+   "bytes": 3556543,
+   "sha256": "be1280b002af8d3d0ca4c39beceeb296fe7e50db13ab284f690ff61c09d0495c"
+  },
+  {
+   "name": "原始人？.png.png",
+   "bytes": 898965,
+   "sha256": "510732b0b74719fe395af1b56b3bb0bd8fa583e3d433fe026f7bdaec7320e1fc"
+  },
+  {
+   "name": "塞拉菲亚与薇尔莉特.png-1775144780000.png",
+   "bytes": 1216317,
+   "sha256": "70ab726d9a7a5c7961afe3578767b544abc07469a3e3a44213d1e0968724d385"
+  },
+  {
+   "name": "塞拉菲亚与薇尔莉特.png-1775577420000.png",
+   "bytes": 1216317,
+   "sha256": "e1ee5563bc82381d58539bdba74f5c9523d9bafdc8b880de2586e37350160554"
+  },
+  {
+   "name": "塞拉菲亚与薇尔莉特.png.png",
+   "bytes": 1690241,
+   "sha256": "9f37c51e1717198746e445555a73ec41b060c0aa57bf931005865eac1bc91975"
+  },
+  {
+   "name": "孤独摇滚-轻前端.png.png",
+   "bytes": 78509,
+   "sha256": "0f6daafbcf58032ad628bcbaa3d4b656919ca4a0a72ccd12ca4f1d1e7d08c44e"
+  },
+  {
+   "name": "孤独摇滚.png-1772471288000.png",
+   "bytes": 214893,
+   "sha256": "7ef1272cef1812b8301d9b3e1da4bf3d2852af1b922a43efa20beb6c9e4e937a"
+  },
+  {
+   "name": "孤独摇滚.png-1772699124000.png",
+   "bytes": 261845,
+   "sha256": "61a2612974978818f93323efce65c1784a990a017b85ef1bbb7342372cc1f58a"
+  },
+  {
+   "name": "孤独摇滚.png.png",
+   "bytes": 825746,
+   "sha256": "229499c0aeaca7ebf8c12998e9a92386683e38bc44fceb7cf2314fcf23ea1546"
+  },
+  {
+   "name": "孤独摇滚1.png-1774886220000.png",
+   "bytes": 574477,
+   "sha256": "3adba37c9eef7b852cd12e288fd5e0ddffae52f41b35ed2ba9bb826dceed3e46"
+  },
+  {
+   "name": "孤独摇滚1.png-1775577420000.png",
+   "bytes": 574477,
+   "sha256": "2a535d7138a1c9150d96728abf887918270e172021443b52e6c6bf1edc6c185a"
+  },
+  {
+   "name": "孤独摇滚1.png.png",
+   "bytes": 1078037,
+   "sha256": "d2d0e1395d9dbc65e635d031728ea95b8a8970b39295fe81fea237bbfcbf0c2e"
+  },
+  {
+   "name": "孤独摇滚2.png-1775053334000.png",
+   "bytes": 161293,
+   "sha256": "af07f21575fb600b48ddd8611f1a7245b0e6766e1162f98390bd272ab97b6df8"
+  },
+  {
+   "name": "孤独摇滚2.png-1775577420000.png",
+   "bytes": 161293,
+   "sha256": "ba73efd9f2b9890ede8b2b2595004083c529db9a12af3b267f2277f18fa9b522"
+  },
+  {
+   "name": "孤独摇滚2.png.png",
+   "bytes": 779810,
+   "sha256": "c4cf1039c10cd61fa947c0a657cbd2ede6dca0fbaf292f0263bd47ed8fd29de6"
+  },
+  {
+   "name": "孤独摇滚2_1.png",
+   "bytes": 779810,
+   "sha256": "b584e84918c606d3babe8162ba14a59de856bf9199b533d47f49adab9016c524"
+  },
+  {
+   "name": "孤独摇滚2_1.png.png",
+   "bytes": 779810,
+   "sha256": "44b8c01a4c2ae86d355f0f422c51e59937f4225783ec461d5ed04dd80b421367"
+  },
+  {
+   "name": "孤独摇滚3.png",
+   "bytes": 867905,
+   "sha256": "28f0a3ccf00abaaca7ec55e8ad62e9a98297f32a40bc11cfc50b77c6bb828f60"
+  },
+  {
+   "name": "孤独摇滚3.png.png",
+   "bytes": 867905,
+   "sha256": "0ce97da3d1320ae820b32f19d2ebabf322d3494849d8b0b022a43b06d62df79b"
+  },
+  {
+   "name": "孤独摇滚3_1.png",
+   "bytes": 804201,
+   "sha256": "154d2d5eeb5f4b46f2e6c607406736268aca7316655237d708816cba4f4f9f5f"
+  },
+  {
+   "name": "孤独摇滚3_1.png.png",
+   "bytes": 804201,
+   "sha256": "ed527c50234efbcc9e10a595e9f9c2da3758775eb87ae3145f8f58de75496f28"
+  },
+  {
+   "name": "孤独摇滚写卡.png.png",
+   "bytes": 779858,
+   "sha256": "ca6102a674fcac81d60690e5194a045c10abaa1f8a6dd72c60be8ea92fc9f1b3"
+  },
+  {
+   "name": "恋爱饥饿症4.1.png.png",
+   "bytes": 1489486,
+   "sha256": "7f62dfb7d26a5f410a9d49dcbc449b1767730b565096493a712b0096e6f29241"
+  },
+  {
+   "name": "恋爱饥饿症4.11.png",
+   "bytes": 1488798,
+   "sha256": "ab483b2e9324cca28d4aca32b6ab4b056ad56d7723399de93feda4699576c0dc"
+  },
+  {
+   "name": "恋爱饥饿症4.11.png.png",
+   "bytes": 1488798,
+   "sha256": "dc51b34bb4dcda171b15a112bd24b8415bb763954814f3b0755ef3cf32408208"
+  },
+  {
+   "name": "房东模拟器Z5.20.png.png",
+   "bytes": 5429792,
+   "sha256": "acc0fc556c446f47790c9910f792b4b41930a0eb7bf1e9d5482bc9d655c6cc1a"
+  },
+  {
+   "name": "新艾利都.png-1771398628000.png",
+   "bytes": 539349,
+   "sha256": "06f66922fddee756ea7e97127515f600d345268458ce4fd79157944f8132ca40"
+  },
+  {
+   "name": "新艾利都.png-1775577420000.png",
+   "bytes": 539349,
+   "sha256": "22257f8c2524dee0cec642e01eb4f83bbd85442bc25a511ad35addc265d5aef3"
+  },
+  {
+   "name": "新艾利都.png.png",
+   "bytes": 1092096,
+   "sha256": "e7f91be7ba15ed169cc4062d45f82442962f97b89786ce5c8a83082b7592ca9e"
+  },
+  {
+   "name": "新艾利都1.png-1771398628000.png",
+   "bytes": 593301,
+   "sha256": "72fb01347ac9419cbdfc7c05cf3e274963d9121a15cdf8ad46e134c521bbf33d"
+  },
+  {
+   "name": "新艾利都1.png-1775577420000.png",
+   "bytes": 593301,
+   "sha256": "17c9b024fad3f972cffc48e8b00d7011e5bf0f4fde65d2d685b548abf58da70d"
+  },
+  {
+   "name": "新艾利都1.png.png",
+   "bytes": 1112797,
+   "sha256": "ec6ab8a68e77d31967a4fe95184d6a19e18ba9d9ba4ecf0378f2f1e7aa097cad"
+  },
+  {
+   "name": "武藏信浓.png-1771398628000.png",
+   "bytes": 113101,
+   "sha256": "6c72a347816563495824c755cda1d726edff0056501aca01ba58f9ca2be12840"
+  },
+  {
+   "name": "武藏信浓.png-1775577420000.png",
+   "bytes": 113101,
+   "sha256": "c54b56dcd21a02b1f019fcdc835c65939387e65c6f466c58b89e6d35f39b7301"
+  },
+  {
+   "name": "武藏信浓.png.png",
+   "bytes": 790292,
+   "sha256": "f7a05c00f8e0fb7fda1477952e2b8b5df009fc26b1e29ec44f0515b931d29119"
+  },
+  {
+   "name": "角色卡管理 (路西法酱改版0206).png.png",
+   "bytes": 78725,
+   "sha256": "a8dd31a0bc61b4056c4e386177609f3c16b536675efc45c035f40e10a1282ea9"
+  },
+  {
+   "name": "角色画像.png.png",
+   "bytes": 78461,
+   "sha256": "bd5000ed6c16627a370c2831e5bbee46519ac2661280a394a535bdb7d1a864ef"
+  },
+  {
+   "name": "錦木千束和井之上泷奈.png-1771398628000.png",
+   "bytes": 107725,
+   "sha256": "6ce5da4e8d30aefe0ec37e0069f87ee2b73bd910e97e0a3f857df3315bdcaac6"
+  },
+  {
+   "name": "錦木千束和井之上泷奈.png-1775577420000.png",
+   "bytes": 107725,
+   "sha256": "c3213af3fe3e2a0d7a07da227fc2edd6c19b6b1820d55f4f19461ddd8c09a0e4"
+  },
+  {
+   "name": "錦木千束和井之上泷奈.png.png",
+   "bytes": 357935,
+   "sha256": "1b27c560a05eb2d65287d7d2a041bc81d0084ff43c6bebf08fc120053c726589"
+  }
+ ]
+}

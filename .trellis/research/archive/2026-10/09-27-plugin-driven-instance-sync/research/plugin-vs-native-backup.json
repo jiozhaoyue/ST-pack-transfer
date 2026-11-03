@@ -1,0 +1,68 @@
+{
+  "tool": "diff-packs.cjs",
+  "label": "插件原样产物 vs 宿主原生备份（Dev Luker）",
+  "a": {
+    "file": "l_default-user_part1_2026-09-29.zip",
+    "bytes": 1271907095,
+    "aEntries": 8061,
+    "bEntries": 8061,
+    "aDirs": 0,
+    "bDirs": 0,
+    "same": 8060,
+    "changed": 0,
+    "onlyInA": 0,
+    "onlyInB": 0,
+    "changedRequestMetadata": 1,
+    "dirOnlyInA": 0,
+    "dirOnlyInB": 0,
+    "dirs": 0
+  },
+  "b": {
+    "file": "backup-dev-luker-20260929-124354.zip",
+    "bytes": 1271907099
+  },
+  "selfTest": null,
+  "counts": {
+    "aEntries": 8061,
+    "bEntries": 8061,
+    "aDirs": 0,
+    "bDirs": 0,
+    "same": 8060,
+    "changed": 0,
+    "onlyInA": 0,
+    "onlyInB": 0,
+    "changedRequestMetadata": 1,
+    "dirOnlyInA": 0,
+    "dirOnlyInB": 0
+  },
+  "bytes": {
+    "aUncompressed": 2938792289,
+    "bUncompressed": 2938792289
+  },
+  "onlyInAByTop": [],
+  "onlyInBByTop": [],
+  "changedByTop": [],
+  "changedRequestMetadata": [
+    {
+      "path": "manifest.json",
+      "crcA": 3822981589,
+      "crcB": 87848199,
+      "sizeA": 343,
+      "sizeB": 343,
+      "differingFields": [
+        "createdAt"
+      ],
+      "exemption": "仅请求期字段不同（createdAt）⇒ 豁免"
+    }
+  ],
+  "samples": {
+    "onlyInA": [],
+    "onlyInB": [],
+    "changed": [],
+    "dirOnlyInA": [],
+    "dirOnlyInB": []
+  },
+  "verdict": "IDENTICAL",
+  "verdictDetail": "条目路径集合与逐条 crc32 全等（另有 1 条请求期元数据按设计不同，已单列）",
+  "comparedAt": "2026-09-29T05:44:15.215Z"
+}

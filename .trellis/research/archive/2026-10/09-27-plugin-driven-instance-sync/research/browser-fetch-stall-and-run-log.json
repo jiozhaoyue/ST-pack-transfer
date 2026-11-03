@@ -1,0 +1,73 @@
+{
+  "task": "09-27-plugin-driven-instance-sync",
+  "step": "§3 产包器实跑观测（含一条**新的功能性缺陷**）",
+  "finding_1_browser_fetch_stalls_on_gb_scale_backups": {
+    "severity": "阻塞级（使本工具在真源上不可用；非数据损坏）",
+    "statement": "插件在浏览器里拉取**含 GB 级 `backups/`** 的宿主包时**功能性停滞** —— 不是慢，是字节流停住。",
+    "measurement": {
+      "instance": "real-luker（:8004，真源）",
+      "command": "node scripts/instance-sync/produce-via-plugin.cjs --source real-luker --layout l --raw",
+      "observed": [
+        "t+505.6 s 已接收 1275.5 MB",
+        "t+525.6 s 已接收 1281.9 MB",
+        "t+545.6 s / t+565.6 s / t+585.6 s / t+605.6 s / t+625.6 s / t+645.6 s / t+665.6 s —— **连续 140 s 零字节**",
+        "已接收停在 1281.9 MB，阶段文案仍是「[2/3 传输中]」"
+      ],
+      "nodeSideControl": "**同一端点**经 Node 侧 https 流式接收：`export-backups.cjs --id real-luker` 337.5 s 收完 **1605.3 MB**（含 backups/）⇒ 停滞发生在**浏览器路径**，不是端点。",
+      "devControl": "dev-luker（几乎无 backups）同一条代码路径：1.21 GB 在 316 s 内收完 ⇒ 与 payload 里是否有 backups 强相关。"
+    },
+    "relationToExistingSpec": "规范 `instance-e2e-and-data-sync.md` §3.5 记过「速率从 7 MB/s 塌到 0.9 MB/s」，并给出结论「同步载荷若已排除 backups/ 则不受影响」。**本轮把这条推进了一步**：塌方在真源规模上会走到**完全停滞（0 B/s）**，即『排除 backups 』不只是省时间，而是**浏览器路径能否跑完的前提**。",
+    "consequenceForThisTask": "⇒ 产包器在真源上**必须**收窄 selection（`--deselect settings`，因为 Luker 的 `settings` 隐含打包 `backups/`）——已实现为 `--deselect`（喂探测夹具渲染类目卡片 → 取消勾选 → 回读断言）。",
+    "notDiagnosed": "未定位到浏览器侧的根因（是 OPFS 写入、checkpoint 持久化、还是流式背压），本轮只做到「可复现 + 已绕开」。留作后续（若要修，判据应是「含 2.5 GB backups 的包能在浏览器路径收完」）。",
+    "evidenceFiles": [
+      "C:/Users/caocaobi/AppData/Local/Temp/claude/.../tasks/b232swtwn.output（本轮实测输出，已停止该进程）",
+      "Downloads/backup-real-luker-20260929-123607.zip（Node 侧对照，337.5 s 成功）"
+    ]
+  },
+  "finding_2_artifact_naming_collision": {
+    "statement": "插件按 `#filename-template-input` 默认模板 `{target}_{user}_{part}_{date}.zip` 命名产物 ⇒ **原样包与转换包同名**（本次两者都是 `l_default-user_part1_2026-09-29.zip`）。",
+    "consequence": "同一目录里放不下两次产物的同布局结果；核对时必须以**目录 + sha256** 区分，不能只看文件名。本轮的处置：原样包落 `Downloads/`，目标包与基线落 `Downloads/szc-produce/`。",
+    "notFixedHere": "是否要给产物名加入「是否转换」标记属产品决策，未改（C：本任务 src/** 零改动）。"
+  },
+  "finding_3_stash_cleanup_removed_three_records": {
+    "statement": "第一次 Dev `--raw` 跑完后的入库清理删掉了 **3 条**同名记录，而本轮只产出 1 个产物。",
+    "consequence": "`files` store 里本来就有同名残留（dev 档案与 E2E 共用）。已把清理动作**留痕**（脚本 `cleanupStash` 现在返回 `deleted:[{id,name,size,origin}]`），不再静默删。",
+    "action": "下一轮起读数 JSON 的 `stashCleanup` 字段会带出被删条目清单。"
+  },
+  "runLog": {
+    "produce-dev-luker-raw": {
+      "artifact": "l_default-user_part1_2026-09-29.zip",
+      "bytes": 1271907095,
+      "entryCount": 8061,
+      "sha256": "55f8d65018e6fd7c4ccf3a854fe4768f26be15bc87dd9e5df8aff52f48f31230",
+      "elapsedSeconds": 347.8,
+      "timings": { "pluginReady": 23, "fetchStart": 23.7, "treeConfirmShown": 339.8, "enqueued": 339.9, "downloaded": 343.4 },
+      "pluginErrors": 0,
+      "readings": "research/produce-dev-luker-raw.json"
+    },
+    "produce-real-luker-raw": {
+      "status": "已中止（见 finding_1），未产出",
+      "note": "中止于 t+665 s / 已接收 1281.9 MB"
+    },
+    "build-packs-from-plugin-raw": {
+      "source": "Downloads/l_default-user_part1_2026-09-29.zip（= 插件自己的原样包 ⇒ 两侧同源、零漂移）",
+      "outputs": {
+        "l": { "file": "pack-luker-nodate.zip", "bytes": 544871446, "copied": 6526, "dropped": 1534, "synthesized": 37, "elapsedSeconds": 58.7 },
+        "st": { "file": "pack-st-nodate.zip", "bytes": 544871893, "copied": 6526, "dropped": 1535, "synthesized": 38, "elapsedSeconds": 49.5 },
+        "tt": { "file": "pack-tt-nodate.zip", "bytes": 545098501, "copied": 6523, "dropped": 1538, "synthesized": 72, "elapsedSeconds": 59.9 }
+      },
+      "note": "文件名带 `nodate` —— 因为源包名里的时间戳段在插件产物名里是 `2026-09-29`（不含 `-hhmmss`），`build-packs` 的 stamp 正则 `\\d{8}-\\d{6}` 未命中 ⇒ 落到 'nodate'。不影响比对（比对按条目与 crc32）。",
+      "readings": ".trellis/tasks/09-26-all-instance-data-sync-e2e/research/pack-build-readings.json（注意：build-packs.cjs 把读数目录**硬编码**成上一轮任务目录 —— 这是已登记的腐化点，本任务 §9 要在 spec 里写明可用 --readings-dir 的替代形态）"
+    }
+  },
+  "expectedOQ2Verdict": {
+    "prediction": "三个目标都应报 **IDENTICAL**（条目路径集合 + 逐条 crc32 全等）",
+    "reasoning": [
+      "两侧喂的是**同一份字节**（基线源 = 插件自己的原样包）",
+      "转换走**同一份 core `convert()`**（浏览器经 `runConversionTask` → worker，Node 经 `options.io` 注入）",
+      "旋钮已显式对齐并经**回读断言**：gitMode=minimal、extensionMode=full、pruneBuiltin=false、keepDevFiles=false、includeBackups=false、compression=5",
+      "目标 `l` 的合成 `manifest.json` 用 **`FIXED_TIMESTAMP`**（`transform.js:134/986`），且两侧 selection 都映射到同一个 `L_SELECTION`（`transform.js:223-234`，10 键全 true）⇒ 逐字相同"
+    ],
+    "howToFalsify": "若某目标报 DIFFERENT，则差异**必须**归因到：① 源在两次运行之间变动（用 mtime 快照判）、② 旋钮未真正对齐（读回断言已排除）、③ selection 映射差异（`_convert/**` 或条目级）、或 ④ 浏览器/Node 侧 IO 实现差异。四条各自可查。"
+  }
+}

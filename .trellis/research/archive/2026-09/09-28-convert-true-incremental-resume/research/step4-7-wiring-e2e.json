@@ -1,0 +1,46 @@
+{
+  "step": "4-7 协作式暂停 · index 接线 · E2E 翻转",
+  "date": "2026-09-28",
+  "discriminativeProofs": {
+    "step4_timeout_fallback": {
+      "mutation": "注掉 worker-client.js 的 setTimeout 有界兜底",
+      "result": "convert-pause-protocol ②③ **两项挂死超时转红**（正是「等不到半成品又不终止」的形态）",
+      "restored": "6 passed"
+    },
+    "step7_e2e": {
+      "mutation": "忠实复刻旧管线两条：① 跳过门 `appendedNames.has(skipOut)` → 旧语义 `resumedCrc && doneCrc === entry.crc32`；② index.js `appendFrom` → `null`（不搬运半成品）",
+      "result": "R12 转红「源=3000 **产物=2826** 跳过=175」；R13 转红「首=false」",
+      "meaning": "跳过 175 项却少了 174 条聊天 ⇒ 与用户实际遇到的残缺包**逐数字同构**（当年是 1500→1437、跳过 64）",
+      "restored": "21/21 全绿；两文件 diff 逐字节一致",
+      "note": "**只注掉存在门不会转红**：半成品仍在被搬运、条目仍在产物里。要复刻缺陷必须同时撤掉「搬运半成品」——这本身说明**两半是联合必要的**（门保证不误跳过，搬运保证跳过的字节真的在）"
+    }
+  },
+  "e2eGreen": {
+    "command": "npm run e2e:web -- --only pause-resume --rebuild",
+    "readings": "21 项 / 21 通过 / 0 失败",
+    "key": "R7 已保留半成品（175 条）· R9/R10 跳过 175 项 · R12 源=3000 产物=3000 跳过=175 · R13 首尾条目都在"
+  },
+  "bugsFoundAndFixed": [
+    {
+      "bug": "`const targetWriter` 声明在 try 块内、catch 里引用 ⇒ `ReferenceError: targetWriter is not defined`",
+      "symptom": "浏览器里暂停后「跳过 0 项」：产物完整但增量失效（降级成完整重做）",
+      "whyHidden": "worker 的收尾段写成 `catch { partialBlob = null }` —— **吞掉了错误**，主线程只看到「没有半成品」",
+      "fix": "① `let targetWriter = null` 移到 try **外**（同形教训本仓已有：`index.js` 的 `opfsName` 亦为此在 try 外声明）；② 收尾失败**回报原因**（PAUSED 带 `partialError`），主线程日志带上它",
+      "lesson": "**降级路径的 catch 不得吞错** —— 吞错的代价是「功能静默降级 + 根因不可见」，排查只能从『跳过 0 项』倒推",
+      "howFound": "给 `persistPartial` 的 `no-partial` 分支补一行日志 + worker 回报 `partialError` ⇒ 一次复跑就拿到了 `getData: targetWriter is not defined`"
+    },
+    {
+      "bug": "清单读取失败会**连累**已经收好的半成品（`partialBlob` 与 `manifest` 在同一个 try 里一起被置空）",
+      "fix": "拆成两段：`getData()` 与 `readZipEntryManifest()` 各自 try；清单只是读数，读不出来不得丢掉 zip",
+      "note": "顺带补：空包（size 0）视同没有半成品（没有可搬运的字节，留着只会误导）"
+    },
+    {
+      "bug": "【spec 自身】`e2e/standalone/specs/pause-resume.e2e.cjs` 的暂停窗口太窄（1500 条 ≈ 4s）",
+      "symptom": "`page.click('#tc-pause')` 30s 超时 ⇒ 假红",
+      "isolation": "**还原全部改动后同形失败** ⇒ 与本次实现无关，纯属夹具窗口竞态",
+      "fix": "夹具 1500 → 3000 条（窗口拓宽一倍有余）；且**文件名带条目数**（`pause-many-3000.zip`）——原按文件名缓存，改了条数却沿用旧名会静默复用旧夹具",
+      "whyItMatters": "前两次能绿是机器被占、转得慢的侥幸；机器一空闲就必红。这类「靠负载才绿」的用例是假绿温床"
+    }
+  ],
+  "fullUnitSuite": "npx vitest run --maxWorkers=2 ⇒ 64 文件 / 610 passed / 2 skipped / 0 failed"
+}

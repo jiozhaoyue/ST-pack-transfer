@@ -1,0 +1,22 @@
+{
+  "step": "0.1 基线读数（本轮开工时实测，2026-09-28）",
+  "note": "读数由 Session 35 实测并记于 implement.md §9.1；此处按 §0.1 要求补落 research/（原先只留在 §9.1 正文，未单独成文件）。命令为 --maxWorkers=2 限并发跑，避免本机满载的 5s 超时抖动。",
+  "npm_test": {
+    "command": "npx vitest run --maxWorkers=2",
+    "files": 60,
+    "passed": 581,
+    "skipped": 2,
+    "failed": 0
+  },
+  "compare_after": {
+    "files": 64,
+    "passed": 610,
+    "skipped": 2,
+    "failed": 0,
+    "delta": "净增 29 项守护（zip-append 5 · convert-append 10 · convert-pause-protocol 6 · persist-partial 4 · task-manager +3 · convert-resume 判据翻转 +1）"
+  },
+  "e2e_web": {
+    "command": "npm run e2e:web -- --rebuild",
+    "baseline": "见 §9.3：连续两轮 337 / 337 / 0 失败 exit 0"
+  }
+}

@@ -1,0 +1,73 @@
+{
+  "tool": "diff-packs.cjs",
+  "label": "OQ-2：插件一步直出 l vs build-packs(l)",
+  "a": {
+    "file": "l_default-user_part1_2026-09-29.zip",
+    "bytes": 544871450,
+    "aEntries": 6562,
+    "bEntries": 6562,
+    "aDirs": 0,
+    "bDirs": 0,
+    "same": 6561,
+    "changed": 1,
+    "onlyInA": 0,
+    "onlyInB": 0,
+    "changedRequestMetadata": 0,
+    "dirOnlyInA": 0,
+    "dirOnlyInB": 0,
+    "dirs": 0
+  },
+  "b": {
+    "file": "pack-luker-nodate.zip",
+    "bytes": 544871446
+  },
+  "selfTest": null,
+  "counts": {
+    "aEntries": 6562,
+    "bEntries": 6562,
+    "aDirs": 0,
+    "bDirs": 0,
+    "same": 6561,
+    "changed": 1,
+    "onlyInA": 0,
+    "onlyInB": 0,
+    "changedRequestMetadata": 0,
+    "dirOnlyInA": 0,
+    "dirOnlyInB": 0
+  },
+  "bytes": {
+    "aUncompressed": 1278993744,
+    "bUncompressed": 1278993742
+  },
+  "onlyInAByTop": [],
+  "onlyInBByTop": [],
+  "changedByTop": [
+    {
+      "top": "(根文件)",
+      "count": 1
+    }
+  ],
+  "changedRequestMetadata": [],
+  "samples": {
+    "onlyInA": [],
+    "onlyInB": [],
+    "changed": [
+      {
+        "path": "manifest.json",
+        "crcA": 815930937,
+        "crcB": 3121760226,
+        "sizeA": 343,
+        "sizeB": 341,
+        "differingFields": [
+          "selection"
+        ],
+        "exemption": "结构化元数据，但差异**不止**请求期字段 ⇒ 照实计入 changed"
+      }
+    ],
+    "dirOnlyInA": [],
+    "dirOnlyInB": []
+  },
+  "verdict": "DIFFERENT",
+  "verdictDetail": "0 条仅 A / 0 条仅 B / 1 条内容不同（已剔除请求期元数据）",
+  "comparedAt": "2026-09-29T05:44:16.309Z"
+}

@@ -1,0 +1,110 @@
+{
+  "target": "dev-luker",
+  "targetRoot": "D:\\Repo\\Tavern-repo\\Instance\\Dev\\Luker\\data\\default-user",
+  "pack": "C:\\Users\\caocaobi\\Downloads\\pack-luker-20260926-010422.zip",
+  "takenAt": "2026-09-26T07:57:07.683Z",
+  "T1_packCoverage": {
+    "packEntries": 7180,
+    "presentInTarget": 7180,
+    "missingCount": 0,
+    "coverage": 1,
+    "pass": true,
+    "missingSample": [],
+    "hostMetadataSkipped": {
+      "count": 1,
+      "entries": [
+        "_convert/extensions-manifest.json"
+      ]
+    }
+  },
+  "T2_targetUnique": {
+    "count": 4963,
+    "sample": [
+      ".cfsys-backup-20260926-001615/chatfilesys-old/chatfilesys/core/branches.js",
+      ".cfsys-backup-20260926-001615/chatfilesys-old/chatfilesys/core/chat-writer.js",
+      ".cfsys-backup-20260926-001615/chatfilesys-old/chatfilesys/core/projection.js",
+      ".cfsys-backup-20260926-001615/chatfilesys-old/chatfilesys/index.js",
+      ".cfsys-backup-20260926-001615/chatfilesys-old/chatfilesys/manifest.json",
+      ".cfsys-backup-20260926-001615/chatfilesys-old/chatfilesys/package.json",
+      ".cfsys-backup-20260926-001615/chatfilesys-old/chatfilesys/settings.html",
+      ".cfsys-backup-20260926-001615/chatfilesys-old/chatfilesys/style.css",
+      ".cfsys-backup-20260926-001615/chatfilesys-old/chatfilesys/ui/badge.js",
+      ".cfsys-backup-20260926-001615/chatfilesys-old/chatfilesys/ui/common.js",
+      ".cfsys-backup-20260926-001615/chatfilesys-old/chatfilesys/ui/marker.js",
+      ".cfsys-backup-20260926-001615/chatfilesys-old/chatfilesys/ui/popup.js",
+      ".cfsys-backup-20260926-001615/chatfilesys-old/chatfilesys/ui/tree.js",
+      ".cfsys-backup-20260926-001615/chatfilesys-old/core/branches.js",
+      ".cfsys-backup-20260926-001615/chatfilesys-old/core/chat-writer.js",
+      ".cfsys-backup-20260926-001615/chatfilesys-old/core/importer.js",
+      ".cfsys-backup-20260926-001615/chatfilesys-old/core/integrity.js",
+      ".cfsys-backup-20260926-001615/chatfilesys-old/core/merge.js",
+      ".cfsys-backup-20260926-001615/chatfilesys-old/core/mirror.js",
+      ".cfsys-backup-20260926-001615/chatfilesys-old/core/mode.js",
+      ".cfsys-backup-20260926-001615/chatfilesys-old/core/ops-apply.js",
+      ".cfsys-backup-20260926-001615/chatfilesys-old/core/patch-rows.js",
+      ".cfsys-backup-20260926-001615/chatfilesys-old/core/projection.js",
+      ".cfsys-backup-20260926-001615/chatfilesys-old/core/seam.js",
+      ".cfsys-backup-20260926-001615/chatfilesys-old/core/storage/adapter.js",
+      ".cfsys-backup-20260926-001615/chatfilesys-old/core/storage/authority.js",
+      ".cfsys-backup-20260926-001615/chatfilesys-old/core/storage/idb.js",
+      ".cfsys-backup-20260926-001615/chatfilesys-old/core/storage/official.js",
+      ".cfsys-backup-20260926-001615/chatfilesys-old/core/store-bridge.js",
+      ".cfsys-backup-20260926-001615/chatfilesys-old/core/takeover.js",
+      ".cfsys-backup-20260926-001615/chatfilesys-old/core/trash.js",
+      ".cfsys-backup-20260926-001615/chatfilesys-old/index.js",
+      ".cfsys-backup-20260926-001615/chatfilesys-old/manifest.json",
+      ".cfsys-backup-20260926-001615/chatfilesys-old/package.json",
+      ".cfsys-backup-20260926-001615/chatfilesys-old/settings.html",
+      ".cfsys-backup-20260926-001615/chatfilesys-old/style.css",
+      ".cfsys-backup-20260926-001615/chatfilesys-old/ui/badge.js",
+      ".cfsys-backup-20260926-001615/chatfilesys-old/ui/common.js",
+      ".cfsys-backup-20260926-001615/chatfilesys-old/ui/marker.js",
+      ".cfsys-backup-20260926-001615/chatfilesys-old/ui/popup.js",
+      ".cfsys-backup-20260926-001615/chatfilesys-old/ui/tree.js",
+      "backgrounds/favicon.ico",
+      "backgrounds/legacy-seed.html",
+      "backgrounds/st-bg-loader-manifest.json",
+      "backgrounds/st-bg-loader-settings.json",
+      "backgrounds/test-animation.html",
+      "backgrounds/test-animation_1790408343657.html",
+      "backgrounds/test-animation_1790408445130.html",
+      "backups/chat_bang__city_nsfw____20260905-135623.jsonl",
+      "backups/chat_bang__city_nsfw____20260905-182123.jsonl"
+    ],
+    "deletionCheck": null,
+    "preManifestCheck": {
+      "manifest": ".trellis/tasks/09-26-all-instance-data-sync-e2e/research/t2-pre-dev-luker.json",
+      "takenAt": "2026-09-26T07:51:09.188Z",
+      "declared": 6492,
+      "stillPresent": 6492,
+      "deletedCount": 0,
+      "deletedSample": [],
+      "hostRotatedBackups": [
+        "backups/settings_default-user_20260925-181642.json"
+      ]
+    }
+  },
+  "T3_content": {
+    "pack": {
+      "characters": 430,
+      "chats": 1029,
+      "worlds": 21,
+      "groups": 0,
+      "themes": 5,
+      "backgrounds": 23,
+      "extensions": 5204,
+      "other": 468
+    },
+    "target": {
+      "characters": 431,
+      "chats": 1220,
+      "worlds": 24,
+      "groups": 0,
+      "themes": 5,
+      "backgrounds": 30,
+      "extensions": 9581,
+      "other": 851
+    }
+  },
+  "targetFileCount": 12142
+}

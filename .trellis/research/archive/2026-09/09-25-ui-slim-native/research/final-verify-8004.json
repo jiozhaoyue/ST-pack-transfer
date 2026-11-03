@@ -1,0 +1,65 @@
+{
+  "sampledAt": "2026-09-25T10:02:27.103Z",
+  "url": "https://127.0.0.1:8003",
+  "pluginLoaded": {
+    "hasDrawerApp": true,
+    "settingsBlock": true,
+    "extensionsBlock": true
+  },
+  "adapter": {
+    "hasGetContext": true,
+    "popupShowConfirm": "function",
+    "affirmative": 1,
+    "negative": 0
+  },
+  "roundTrip": {
+    "affirmative": 1,
+    "negative": 0,
+    "popupFound": true,
+    "cancelButtonText": "否",
+    "hidden": [],
+    "settled": true,
+    "result": 0
+  },
+  "injectedButtons": {
+    "openedBy": "#user-settings-button",
+    "anchors": 0,
+    "injectedCount": 0,
+    "injected": []
+  },
+  "opened": {
+    "blockDisplay": "block",
+    "appHeight": 925,
+    "appWidth": 394
+  },
+  "uiFacts": {
+    "nodeCount": 267,
+    "buttonsTotal": 29,
+    "buttonsVisible": 4,
+    "inputs": 17,
+    "checkboxes": 6,
+    "radios": 4,
+    "details": 0,
+    "labels": 13,
+    "scrollHeight": 925,
+    "clientHeight": 925,
+    "inlineDrawers": 5,
+    "buttonLabels": [
+      "存储",
+      "从宿主拉取",
+      "开始转换",
+      "展开日志 ▲"
+    ]
+  },
+  "consoleErrors": [
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "pageerror: SyntaxError: Unexpected reserved word",
+    "pageerror: TypeError: $(...) is not a function",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "pageerror: Uncaught SyntaxError: Identifier 'SPresetSettings' has already been declared"
+  ]
+}

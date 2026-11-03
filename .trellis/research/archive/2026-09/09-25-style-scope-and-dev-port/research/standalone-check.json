@@ -1,0 +1,21 @@
+{
+  "sampledAt": "2026-09-25T13:18:26.506Z",
+  "result": {
+    "title": "st-zip-converter",
+    "hasStandaloneMarker": true,
+    "bodyBgImage": "none",
+    "bodyBgColor": "rgba(0, 0, 0, 0)",
+    "bodyFont": "\"Times New Roman\"",
+    "rootWidth": 864,
+    "rootLeft": 288,
+    "rootRightGap": 288,
+    "rootFont": "-apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, sans-serif",
+    "rootLineHeight": "24px",
+    "rootColor": "rgb(242, 244, 248)",
+    "rootMinHeight": "900px",
+    "rootPadding": "20px 12px",
+    "beforePosition": "fixed",
+    "beforeInset": "0px/0px/0px/0px",
+    "beforeBg": "rgb(20, 22, 28)"
+  }
+}

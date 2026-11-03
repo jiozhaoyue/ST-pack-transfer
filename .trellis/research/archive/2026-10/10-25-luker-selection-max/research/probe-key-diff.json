@@ -1,0 +1,48 @@
+{
+  "probedAt": "2026-10-25T07:06:05.860Z",
+  "target": "https://dev-luker.localhost:8003",
+  "variants": [
+    {
+      "name": "V2-ext-off",
+      "offKey": "extensions",
+      "selection": {
+        "characters": true,
+        "chats": true,
+        "lorebooks": true,
+        "presets": true,
+        "settings": true,
+        "secrets": true,
+        "assets": true,
+        "extensions": [
+          "*.probe-off"
+        ],
+        "globalExtensions": true,
+        "vectors": true
+      },
+      "status": 200,
+      "totalBytes": 1794012697,
+      "ms": 155276
+    },
+    {
+      "name": "V3-chats-off",
+      "offKey": "chats",
+      "selection": {
+        "characters": true,
+        "chats": [
+          "*.probe-off"
+        ],
+        "lorebooks": true,
+        "presets": true,
+        "settings": true,
+        "secrets": true,
+        "assets": true,
+        "extensions": true,
+        "globalExtensions": true,
+        "vectors": true
+      },
+      "status": 200,
+      "totalBytes": 1794066397,
+      "ms": 113717
+    }
+  ]
+}

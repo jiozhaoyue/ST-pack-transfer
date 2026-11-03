@@ -1,0 +1,45 @@
+{
+  "takenAt": "2026-10-13T14:57:00+08:00",
+  "task": "09-27-plugin-driven-instance-sync",
+  "scope": "U-3：只 Luker 两处；ST 两处不备份（沿用上一轮 R-7 的用户知情风险接受，本轮不解除）",
+  "orderDiscipline": "design.md D3：产包 → 备份 → 只读快照 → 灌入。本文件的两份备份**均在 §5 任何写入之前**完成。",
+  "channel": "宿主原生 POST /api/users/backup（export-backups.cjs），非插件路径",
+  "backups": [
+    {
+      "instance": "real-luker",
+      "side": "real",
+      "host": "luker",
+      "port": 8004,
+      "file": "backup-real-luker-20261013-145533.zip",
+      "location": "%USERPROFILE%/Downloads/",
+      "bytes": 1836086489,
+      "mb": 1750.9,
+      "entries": 8797,
+      "seconds": 84.9,
+      "sha256": "7a34401867eab78abceff1dfa052b12ff454b004dff45c63fa6818d5f37e165a",
+      "exitCode": 0,
+      "verify": "脚本内已做 sha256 + 中央目录条目数校验",
+      "prevRound": { "date": "2026-09-29", "mb": 1605.3, "entries": 8698, "note": "本轮 +192 条 —— 真源在使用中（当日 14:20/14:31/14:39/14:41 均有新备份落盘，见 §7.2）" }
+    },
+    {
+      "instance": "dev-luker",
+      "side": "dev",
+      "host": "luker",
+      "port": 8003,
+      "file": "backup-dev-luker-20261013-145705.zip",
+      "location": "%USERPROFILE%/Downloads/",
+      "bytes": 1272633085,
+      "mb": 1213.8,
+      "entries": 8167,
+      "seconds": 166.7,
+      "sha256": "f4b535648582f426d5fb28ca424f1845a6a20da7aebb3b25600a3711e33af4f2",
+      "exitCode": 0,
+      "verify": "脚本内已做 sha256 + 中央目录条目数校验",
+      "prevRound": { "date": "2026-09-29", "mb": 1213.0, "entries": 8061, "note": "Dev Luker 于 2026-09-29 首次获得回滚能力（U-9 之后新增）" }
+    }
+  ],
+  "notBackedUp": [
+    { "instance": "dev-st", "port": 8001, "reason": "U-3：ST 两处不备份（用户知情风险接受，R-7）；缓解 = merge 不删独有 + 写入前只读快照 + 逐目标零删除核对" },
+    { "instance": "real-st", "port": 8002, "reason": "同上" }
+  ]
+}

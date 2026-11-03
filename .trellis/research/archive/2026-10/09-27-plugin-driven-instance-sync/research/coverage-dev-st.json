@@ -1,0 +1,184 @@
+{
+  "target": "dev-st",
+  "targetRoot": "D:\\Repo\\Tavern-repo\\Instance\\Dev\\SillyTavern\\data\\default-user",
+  "pack": "D:\\Repo\\Tavern-repo\\My-repo\\ST-zip-converter\\test-results\\produce-real\\st_default-user_part1_2026-10-13.zip",
+  "takenAt": "2026-10-13T07:16:00.686Z",
+  "T1_packCoverage": {
+    "rule": "path+st-character-name",
+    "nameRuleHits": 380,
+    "packEntries": 7380,
+    "denominator": 7376,
+    "presentInTarget": 7375,
+    "missingCount": 1,
+    "coverage": 0.999864,
+    "pass": false,
+    "missingSample": [
+      "public/scripts/extensions/third-party/.gitkeep"
+    ],
+    "hostMetadataSkipped": {
+      "count": 3,
+      "entries": [
+        "_convert/extensions-manifest.json",
+        "_convert/INSTALL.md",
+        "_convert/meta.json"
+      ]
+    },
+    "hostPrivateSkipped": {
+      "count": 1,
+      "entries": [
+        "characters/【Sgw】又看一集.state.character_editor_assistant.json"
+      ]
+    },
+    "linkedExternalDrift": {
+      "count": 0,
+      "roots": [],
+      "entries": []
+    },
+    "stCharacterMap": {
+      "cardEntries": 401,
+      "distinctNames": 26,
+      "sprites": 28,
+      "stateFiles": 1
+    }
+  },
+  "T2_targetUnique": {
+    "count": 949,
+    "sample": [
+      "backups/chat______ca8a6660_20260928-023850.jsonl",
+      "backups/chat______ca8a6660_20260928-024455.jsonl",
+      "backups/chat______ca8a6660_20260928-024505.jsonl",
+      "backups/chat______ca8a6660_20260928-024617.jsonl",
+      "backups/chat______ca8a6660_20260928-024627.jsonl",
+      "backups/chat______ca8a6660_20260928-031523.jsonl",
+      "backups/chat______ca8a6660_20260928-031533.jsonl",
+      "backups/chat______ca8a6660_20260928-050020.jsonl",
+      "backups/chat______ca8a6660_20260928-051125.jsonl",
+      "backups/chat______ca8a6660_20260928-051247.jsonl",
+      "backups/chat______ca8a6660_20260928-051840.jsonl",
+      "backups/chat______ca8a6660_20260928-052451.jsonl",
+      "backups/chat______ca8a6660_20260928-052605.jsonl",
+      "backups/chat______ca8a6660_20260928-052615.jsonl",
+      "backups/chat______ca8a6660_20260928-202557.jsonl",
+      "backups/chat______ca8a6660_20260928-202841.jsonl",
+      "backups/chat______ca8a6660_20260928-204601.jsonl",
+      "backups/chat______ca8a6660_20260928-204611.jsonl",
+      "backups/chat______ca8a6660_20260929-004920.jsonl",
+      "backups/chat______ca8a6660_20260929-004930.jsonl",
+      "backups/chat______ca8a6660_20260929-010214.jsonl",
+      "backups/chat______ca8a6660_20260929-010224.jsonl",
+      "backups/chat______ca8a6660_20260929-011028.jsonl",
+      "backups/chat______ca8a6660_20260929-011112.jsonl",
+      "backups/chat______ca8a6660_20260929-011200.jsonl",
+      "backups/chat______ca8a6660_20260929-011712.jsonl",
+      "backups/chat______ca8a6660_20260929-012122.jsonl",
+      "backups/chat______ca8a6660_20260929-012645.jsonl",
+      "backups/chat______ca8a6660_20260929-012804.jsonl",
+      "backups/chat______ca8a6660_20260929-012909.jsonl",
+      "backups/chat______ca8a6660_20260929-012919.jsonl",
+      "backups/chat______ca8a6660_20260929-013111.jsonl",
+      "backups/chat______ca8a6660_20260929-013121.jsonl",
+      "backups/chat______ca8a6660_20260929-013334.jsonl",
+      "backups/chat______ca8a6660_20260929-013433.jsonl",
+      "backups/chat______ca8a6660_20260929-013841.jsonl",
+      "backups/chat______ca8a6660_20260929-013935.jsonl",
+      "backups/chat______ca8a6660_20260929-015037.jsonl",
+      "backups/chat______ca8a6660_20260929-015131.jsonl",
+      "backups/chat______ca8a6660_20260929-015254.jsonl",
+      "backups/chat______ca8a6660_20260929-015355.jsonl",
+      "backups/chat______ca8a6660_20260929-130132.jsonl",
+      "backups/chat______ca8a6660_20260929-130142.jsonl",
+      "backups/chat______ca8a6660_20260929-130502.jsonl",
+      "backups/chat______ca8a6660_20260929-130512.jsonl",
+      "backups/chat______ca8a6660_20260929-210709.jsonl",
+      "backups/chat______ca8a6660_20260929-210755.jsonl",
+      "backups/chat______ca8a6660_20260929-210805.jsonl",
+      "backups/chat______ca8a6660_20260929-210927.jsonl",
+      "backups/chat______ca8a6660_20260929-212000.jsonl"
+    ],
+    "deletionCheck": null,
+    "preManifestCheck": {
+      "manifest": ".trellis/tasks/09-27-plugin-driven-instance-sync/research/pre-dev-st-20261013-133409.json",
+      "takenAt": "2026-10-13T05:34:10.348Z",
+      "declared": 1812,
+      "stillPresent": 1812,
+      "deletedCount": 0,
+      "deletedSample": [],
+      "hostManagedCache": [
+        {
+          "prefix": "backups/",
+          "reason": "宿主 restore 前自动轮换（删最旧一条）",
+          "entries": [
+            "backups/settings_default-user_20260926-162133.json"
+          ]
+        },
+        {
+          "prefix": "thumbnails/",
+          "reason": "宿主导入成功即失效该缩略图（派生缓存，取图时重建）",
+          "entries": [
+            "thumbnails/avatar/1.png",
+            "thumbnails/avatar/BanG! City NSFW（紫）·全绿灯.png",
+            "thumbnails/avatar/BanG! City NSFW（青）.png",
+            "thumbnails/avatar/default_Seraphina.png",
+            "thumbnails/avatar/Izumi 用户画像3.png",
+            "thumbnails/avatar/Seraphina.png",
+            "thumbnails/avatar/《绝区零》角色扮演游戏.png",
+            "thumbnails/avatar/【Sgw】又看一集.png",
+            "thumbnails/avatar/【Sgw】邦↘多↗利↗.png",
+            "thumbnails/avatar/【Sgw】邦多利~.png",
+            "thumbnails/avatar/原始人？.png",
+            "thumbnails/avatar/塞拉菲亚与薇尔莉特.png",
+            "thumbnails/avatar/孤独摇滚-轻前端.png",
+            "thumbnails/avatar/孤独摇滚.png",
+            "thumbnails/avatar/孤独摇滚1.png",
+            "thumbnails/avatar/孤独摇滚2.png",
+            "thumbnails/avatar/孤独摇滚写卡.png",
+            "thumbnails/avatar/恋爱饥饿症4.1.png",
+            "thumbnails/avatar/房东模拟器Z5.20.png",
+            "thumbnails/avatar/新艾利都.png",
+            "thumbnails/avatar/新艾利都1.png",
+            "thumbnails/avatar/朝月.png",
+            "thumbnails/avatar/武藏信浓.png",
+            "thumbnails/avatar/角色卡管理 (路西法酱改版0206).png",
+            "thumbnails/avatar/角色画像.png",
+            "thumbnails/avatar/錦木千束和井之上泷奈.png",
+            "thumbnails/persona/1771101142353-.png",
+            "thumbnails/persona/1777122892443-.png",
+            "thumbnails/persona/1777892538778-.png",
+            "thumbnails/persona/1777892786176-.png",
+            "thumbnails/persona/1777892834110-.png",
+            "thumbnails/persona/1777892903767-.png",
+            "thumbnails/persona/1784914897623-.png",
+            "thumbnails/persona/1785087737224-.png",
+            "thumbnails/persona/user-default.png"
+          ]
+        }
+      ],
+      "hostRotatedBackups": [
+        "backups/settings_default-user_20260926-162133.json"
+      ]
+    }
+  },
+  "T3_content": {
+    "pack": {
+      "characters": 430,
+      "chats": 1029,
+      "worlds": 21,
+      "groups": 0,
+      "themes": 5,
+      "backgrounds": 23,
+      "extensions": 5402,
+      "other": 470
+    },
+    "target": {
+      "characters": 54,
+      "chats": 1032,
+      "worlds": 21,
+      "groups": 0,
+      "themes": 5,
+      "backgrounds": 23,
+      "extensions": 6189,
+      "other": 620
+    }
+  },
+  "targetFileCount": 7944
+}

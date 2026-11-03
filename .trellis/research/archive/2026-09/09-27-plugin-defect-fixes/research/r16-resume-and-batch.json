@@ -1,0 +1,66 @@
+{
+  "任务": "R-16 转换路径接入断点续传（单包 + 批量）",
+  "日期": "2026-09-27",
+  "判别力证明": {
+    "说明": "本仓纪律「先证明判定能抓到违规，再相信它报 0」。四处关键判定各注入一个改坏，验证对应用例真的转红。",
+    "注入项": [
+      {
+        "注入": "convertExitForAbort 去掉 AbortError 特判（当成普通错误）",
+        "转红用例": [
+          "⭐⭐ AbortError + PAUSED ⇒ paused，绝不是 fail",
+          "AbortError + ABORTED ⇒ aborted",
+          "AbortError 但任务已不在 PAUSED/ABORTED ⇒ none"
+        ],
+        "条数": 3,
+        "意义": "暂停误走 fail() ⇒ fail 会 adapter.remove(id) 清掉刚落盘的断点 ⇒ 续传当场失效"
+      },
+      {
+        "注入": "runBatchItems 不 rethrow AbortError（当成普通错误、记日志继续）",
+        "转红用例": ["⭐ 第 k 个子项抛 AbortError ⇒ 后续子项一律不得被处理"],
+        "条数": 1,
+        "意义": "现状 catch 会吞掉 AbortError 并继续跑下一个包 ⇒ 界面显示「已暂停」而后台还在跑，游标与实际进度脱节"
+      },
+      {
+        "注入": "batchResumeVerdict 恒返回 valid（去掉跨重载失效检测）",
+        "转红用例": [
+          "⚠️ 前提不成立（产物已不在内存）⇒ 作废，且原因里带两个数字",
+          "产物被清空（页面重载后队列为空）⇒ 作废，不得硬续"
+        ],
+        "条数": 2,
+        "意义": "硬续会跳过产物已丢失的子项 ⇒ **静默产出残缺批次**（无回滚，只能前置拦截）"
+      },
+      {
+        "注入": "attachConversionProgress 去掉 maybeCheckpoint 调用（模拟「只挂 onEntryDone」的写法）",
+        "转红用例": [
+          "⭐ 只调 onProgress（模拟 Worker 路径）⇒ 断点仍被喂到",
+          "⭐ 方向纪律：断点内容 ⊆ 已完成条目"
+        ],
+        "条数": 2,
+        "意义": "onEntryDone 在 Worker 路径永不触发（worker-client.js:89）⇒ 浏览器里断点永不落盘，而 npm test 全绿"
+      }
+    ],
+    "合计转红": 8,
+    "还原后": "30 passed（3 文件）"
+  },
+  "测试结果": {
+    "R-16 新增三文件": {
+      "test/task-kind.test.js": "6 项",
+      "test/convert-resume-wiring.test.js": "13 项",
+      "test/batch-convert.test.js": "11 项"
+    },
+    "全量 npm test": {
+      "基线（开工）": "48 passed / 1 skipped（49 文件）、460 passed / 2 skipped（462 用例）",
+      "修复后": "53 passed / 1 skipped（54 文件）、496 passed / 2 skipped（498 用例）",
+      "结论": "零回退；新增 5 文件 / 36 用例"
+    },
+    "五条静态守卫": "css-scope / dom-injection / template-source / dom-scope / control-consumer 全 exit 0"
+  },
+  "代码改动面": {
+    "index.js": "TASK_KINDS/TASK_PREFIX/taskKindOf、createCheckpointThrottle、attachConversionProgress、convertExitForAbort、runBatchItems、batchResumeVerdict、seedEntriesFor；btnConvert→handleExternalConvert 接线；runBatchConversion→handleBatchConvert 重写（游标/失效检测/中止停）；onResume 查表分派；mountDebugProbe",
+    "src/ui/host-bridge.js": "getRestoreProbe()",
+    "src/ui/export-queue.js": "enqueue 加可选 taskId（加性）",
+    "src/ui/stash-list.js": "批量栏加「批量转换」入口 + onBatchConvert 接缝 + canBatchConvert 判据",
+    "src/core/**": "**零改动**（本设计最重要的性质，已守住）"
+  },
+  "依赖实例": false
+}

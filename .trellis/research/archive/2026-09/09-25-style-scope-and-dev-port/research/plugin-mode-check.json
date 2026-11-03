@@ -1,0 +1,22 @@
+{
+  "sampledAt": "2026-09-25T13:20:32.446Z",
+  "result": {
+    "drawerPresent": true,
+    "settingsDrawer": true,
+    "menuItem": true,
+    "cardsInDrawer": 2,
+    "dropzoneVisible": true,
+    "cardBackground": "color(srgb 0.862745 0.862745 0.823529 / 0.45)",
+    "cardBorder": "color(srgb 0 0 0 / 0.5)",
+    "cardRadius": "10px",
+    "bodyUntouched": {
+      "bgImage": "none",
+      "bgColor": "color(srgb 0.0901961 0.0901961 0.0901961)"
+    }
+  },
+  "consoleErrors": [
+    "PAGEERROR: SyntaxError: Unexpected reserved word",
+    "PAGEERROR: TypeError: $(...) is not a function",
+    "PAGEERROR: Uncaught SyntaxError: Identifier 'SPresetSettings' has already been declared"
+  ]
+}

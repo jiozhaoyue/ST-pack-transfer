@@ -1,0 +1,65 @@
+{
+  "task": "09-27-chatfilesys-pure-db-adapter",
+  "date": "2026-09-27",
+  "baseline": {
+    "npm_test": "56 files / 522 passed / 2 skipped",
+    "guards": "5/5 exit=0",
+    "note": "会话开始时的基线，作为 6.1 零回退的比对基准"
+  },
+  "new_tests": {
+    "test/pack-inject.test.js": "13 项",
+    "test/zip-augment.test.js": "8 项",
+    "test/chat-store-bridge.test.js": "16 项",
+    "test/chat-store-inject.test.js": "11 项",
+    "合计": "48 项（首轮 5 红，全部是**真缺陷**，逐条如下）"
+  },
+  "findings_first_run": [
+    {
+      "id": "F1",
+      "severity": "高",
+      "what": "zip-augment 同名冲突处理方向写反：源条目命中注入名时 `continue` 跳过**源条目**",
+      "effect": "原聊天被同名注入项**顶替**（内容被改写）—— 本模块最不能犯的错",
+      "caught_by": "test/zip-augment.test.js「同名 ⇒ 源包优先」",
+      "fix": "改为 `pending.delete(name)`，源条目照常写入，注入作废"
+    },
+    {
+      "id": "F2",
+      "severity": "中",
+      "what": "`zipIo.createWriter().close()` 返回的是**落点对象**（路径/自定义流），不是产物数据",
+      "effect": "把 BlobWriter 实例当 Blob 用 ⇒ 下游 `BlobReader` 读不了（`s.arrayBuffer is not a function`）",
+      "caught_by": "test/chat-store-inject.test.js 的增强包回读",
+      "fix": "自行持有 BlobWriter，落点省略时 `await destination.getData()` 交出 Blob"
+    },
+    {
+      "id": "F3",
+      "severity": "中",
+      "what": "`new Uint8Array('字符串')` **不报错但长度 0** ⇒ `zipIo` 的 `add(name, '文本')` 写出**空条目**",
+      "effect": "包看着完整、条目名在、内容为空，调用方无从察觉",
+      "caught_by": "测试夹具用字符串建包，回读内容为空",
+      "fix": "`zip-io.js` 的 `add` 显式收口：字符串走 `TextEncoder`（生产路径传的都是 Uint8Array，故此前未暴露）"
+    },
+    {
+      "id": "F4",
+      "severity": "中",
+      "what": "隐藏容器 `__cfsys__` 只查 basename ⇒ 漏掉「文件不带前缀但在隐藏目录里」的形态",
+      "effect": "库自身的伴生文件会被当作聊天补进包/当作已有条目跳过真聊天",
+      "caught_by": "test/pack-inject.test.js「隐藏容器」",
+      "fix": "改为**逐段查路径**（实测真机形态：目录与文件名两处都带前缀）"
+    },
+    {
+      "id": "F5",
+      "severity": "低",
+      "what": "`collectSourceChatFileNames` 把聊天目录下的**伴生非聊天文件**（`.luker-state.chat_sync.json`）也计入「已有」集合",
+      "effect": "只制造与库条目永不相同的噪音条目（库侧必然是 .jsonl）",
+      "caught_by": "测试夹具加入伴生文件后计数不符",
+      "fix": "只认 `.jsonl`"
+    }
+  ],
+  "probes": {
+    "vendor_zip_writable_target": "探针 `.trellis/tasks/09-27-chatfilesys-pure-db-adapter/research/probe-writable-writer.mjs` 证明 vendor zip.js **接受自定义 `{writable}` 落点**（WROTE_BYTES 157 / 回读一致）⇒ OPFS 落点在技术上可行；本任务因**生命周期**取舍仍选内存 Blob（见 design.md D4）"
+  },
+  "concurrency_guard": {
+    "observed": "另一会话在本仓跑 `node e2e/run.cjs`（pid 56244，含 `--only matrix` 子进程）",
+    "action": "本任务**不写** `e2e/specs/**` 与另一任务目录；**不在矩阵运行期间跑重型测试**（本仓已有明文纪律）"
+  }
+}

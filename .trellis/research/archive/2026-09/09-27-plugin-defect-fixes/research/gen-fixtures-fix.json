@@ -1,0 +1,40 @@
+{
+  "缺陷": "R-17 · fixtures/gen.js 入口守卫 URL 拼接（静默空操作）",
+  "修复日期": "2026-09-27",
+  "修复前": {
+    "命令": "node fixtures/gen.js <tmpdir>",
+    "退出码": 0,
+    "stdout": "(零行输出)",
+    "产物": "(目录为空)",
+    "判定": "npm run gen-fixtures 自存在起从未产出过夹具 —— 静默空操作",
+    "根因": "import.meta.url 在 Windows 上是 file:///D:/…（三斜杠），模板 `file://${argv[1]}` 拼出 file://D:/…（两斜杠）⇒ 永不相等"
+  },
+  "修复后": {
+    "命令": "node fixtures/gen.js <tmpdir>",
+    "退出码": 0,
+    "stdout": [
+      "generated fixture-st.zip -> <tmpdir>\\fixture-st.zip",
+      "generated fixture-l.zip -> <tmpdir>\\fixture-l.zip",
+      "generated fixture-tt.zip -> <tmpdir>\\fixture-tt.zip"
+    ],
+    "产物": {
+      "fixture-st.zip": 2479,
+      "fixture-l.zip": 2782,
+      "fixture-tt.zip": 3554,
+      "文件数": 3,
+      "合计字节": 8815
+    }
+  },
+  "修法": "改用 node:url 的 pathToFileURL(process.argv[1]).href 与 import.meta.url 比较（不引新依赖，L1-MR-11）",
+  "附加加固": [
+    "process.argv[1] 存在性守卫（pathToFileURL(undefined) 会抛）",
+    "Windows 大小写不敏感回退（node FIXTURES/gen.js 不应被误判为非 CLI）",
+    "generateAll(...).catch 显式收口失败并置 process.exitCode = 1（原为裸 .then ⇒ 未处理拒绝、无归因）"
+  ],
+  "OQ-3 排查结论": {
+    "问题": "npm test 中是否有用例依赖「CLI 不产出」这个错误前提",
+    "结论": "零命中",
+    "证据": "全部消费者都走模块导入路径（import { stEntries } from '../fixtures/gen.js'，共 11 个测试文件）；e2e/specs/matrix.e2e.cjs 用动态 import() 直调 generateAll() 绕过 CLI；无任何地方把 npm run gen-fixtures 当作前置步骤"
+  },
+  "依赖实例": false
+}

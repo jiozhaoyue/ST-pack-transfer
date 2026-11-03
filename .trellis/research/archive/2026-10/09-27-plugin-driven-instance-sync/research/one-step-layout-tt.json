@@ -1,0 +1,105 @@
+{
+  "tool": "diff-packs.cjs",
+  "label": "OQ-2：插件一步直出 tt vs build-packs(tt)",
+  "a": {
+    "file": "tt_default-user_part1_2026-09-29.zip",
+    "bytes": 545126178,
+    "aEntries": 6597,
+    "bEntries": 6595,
+    "aDirs": 0,
+    "bDirs": 0,
+    "same": 6590,
+    "changed": 5,
+    "onlyInA": 2,
+    "onlyInB": 0,
+    "changedRequestMetadata": 0,
+    "dirOnlyInA": 0,
+    "dirOnlyInB": 0,
+    "dirs": 0
+  },
+  "b": {
+    "file": "pack-tt-nodate.zip",
+    "bytes": 545098501
+  },
+  "selfTest": null,
+  "counts": {
+    "aEntries": 6597,
+    "bEntries": 6595,
+    "aDirs": 0,
+    "bDirs": 0,
+    "same": 6590,
+    "changed": 5,
+    "onlyInA": 2,
+    "onlyInB": 0,
+    "changedRequestMetadata": 0,
+    "dirOnlyInA": 0,
+    "dirOnlyInB": 0
+  },
+  "bytes": {
+    "aUncompressed": 1279023243,
+    "bUncompressed": 1278951643
+  },
+  "onlyInAByTop": [
+    {
+      "top": "data/",
+      "count": 2
+    }
+  ],
+  "onlyInBByTop": [],
+  "changedByTop": [
+    {
+      "top": "data/",
+      "count": 5
+    }
+  ],
+  "changedRequestMetadata": [],
+  "samples": {
+    "onlyInA": [
+      "data/extensions/third-party/st-zip-converter/scripts/instance-sync/diff-packs.cjs",
+      "data/extensions/third-party/st-zip-converter/scripts/instance-sync/produce-via-plugin.cjs"
+    ],
+    "onlyInB": [],
+    "changed": [
+      {
+        "path": "data/extensions/third-party/st-zip-converter/.git/index",
+        "crcA": 2152741678,
+        "crcB": 1448850153,
+        "sizeA": 102260,
+        "sizeB": 102044
+      },
+      {
+        "path": "data/extensions/third-party/st-zip-converter/.git/refs/heads/main",
+        "crcA": 803178783,
+        "crcB": 1974835142,
+        "sizeA": 41,
+        "sizeB": 41
+      },
+      {
+        "path": "data/extensions/third-party/st-zip-converter/.trellis/tasks/09-27-plugin-driven-instance-sync/implement.md",
+        "crcA": 2428140970,
+        "crcB": 2809026618,
+        "sizeA": 32242,
+        "sizeB": 16635
+      },
+      {
+        "path": "data/extensions/third-party/st-zip-converter/.trellis/tasks/09-27-plugin-driven-instance-sync/task.json",
+        "crcA": 571664806,
+        "crcB": 3737254659,
+        "sizeA": 766,
+        "sizeB": 761
+      },
+      {
+        "path": "data/_tauritavern/extension-sources/global/st-zip-converter.json",
+        "crcA": 894873782,
+        "crcB": 2678303209,
+        "sizeA": 161,
+        "sizeB": 161
+      }
+    ],
+    "dirOnlyInA": [],
+    "dirOnlyInB": []
+  },
+  "verdict": "DIFFERENT",
+  "verdictDetail": "2 条仅 A / 0 条仅 B / 5 条内容不同（已剔除请求期元数据）",
+  "comparedAt": "2026-09-29T11:38:17.595Z"
+}

@@ -1,0 +1,37 @@
+{
+  "task": "09-27-plugin-driven-instance-sync",
+  "step": "§1.3 R-20 实例插件版本核对与更新（2026-09-29 现场取证）",
+  "workspace": {
+    "repo": "D:\\Repo\\Tavern-repo\\My-repo\\ST-zip-converter",
+    "head": "f75c68e",
+    "originMain": "f75c68e",
+    "aheadBehind": "0/0（HEAD 与 origin/main 同步）",
+    "origin": "https://github.com/jiozhaoyue/st-zip-converter.git"
+  },
+  "before": {
+    "dev-st_8001": { "path": "Instance/Dev/SillyTavern/public/scripts/extensions/third-party/st-zip-converter", "head": "137d4f3", "dirty": 0, "behind": 37 },
+    "dev-luker_8003": { "path": "Instance/Dev/Luker/data/default-user/extensions/st-zip-converter", "head": "137d4f3", "dirty": 0, "behind": 37 },
+    "real-st_8002": { "path": "Instance/Real/SillyTavern/public/scripts/extensions/third-party/st-zip-converter", "head": "1640118", "dirty": 0, "behind": 94 },
+    "real-luker_8004": { "path": "Instance/Real/Luker/data/default-user/extensions/st-zip-converter", "head": "1640118", "dirty": 0, "behind": 94 }
+  },
+  "after": {
+    "dev-st_8001": { "head": "f75c68e", "dirty": 0 },
+    "dev-luker_8003": { "head": "f75c68e", "dirty": 0 },
+    "real-st_8002": { "head": "f75c68e", "dirty": 0 },
+    "real-luker_8004": { "head": "f75c68e", "dirty": 0 }
+  },
+  "channel": "git pull --ff-only（U-5 裁决的通道；两目录本就干净、origin = 本仓非上游 → P-12 无风险）",
+  "updatedAt": "2026-09-29T12:35+08:00",
+  "r20Verdict": "四实例插件 HEAD == 工作区 HEAD == f75c68e ⇒ R-20 满足（统一更新）",
+  "findings": [
+    "prd.md「Dev 两实例的插件代码等于工作区」已失效：137d4f3..HEAD 含真插件代码提交 b26e8af（真增量续传），Dev 落后 37 提交。⇒ §0.3 的 E2E 基线 281/281 量的是 137d4f3 而非工作区代码（正是 R-20 要拦的形态）。",
+    "减轻因素：src/ui/host-bridge.js（fetchHostBackup 所在）在 137d4f3..HEAD 区间零改动 ⇒ 对 §1.1 宿主拉取路径无实质影响。",
+    "用户裁决（2026-09-29）：更新范围取「四个实例全更新」，而非 implement.md §1.3.2 字面的「只 Real 两处」。"
+  ],
+  "originCheck": {
+    "real-luker_8004": "https://github.com/jiozhaoyue/st-zip-converter.git（本仓，非上游）",
+    "real-st_8002": "https://github.com/jiozhaoyue/st-zip-converter.git（本仓，非上游）",
+    "verdict": "P-12「origin 误指上游」风险不存在"
+  },
+  "cloneShape": "两 Real 克隆均为 shallow（is-shallow-repository: true）、branch main"
+}

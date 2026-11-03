@@ -1,0 +1,87 @@
+{
+  "sampledAt": "2026-09-25T12:09:54.017Z",
+  "base": "https://127.0.0.1:8003",
+  "result": {
+    "bodyHasAppContainer": false,
+    "appContainerCount": 0,
+    "appContainerDetail": [],
+    "bodyBackgroundImage": "none",
+    "bodyBackgroundColor": "rgb(23, 23, 23)",
+    "bodyFontFamily": "\"Noto Sans\", sans-serif",
+    "ourCssPresent": false,
+    "bodyLevelRules": [
+      {
+        "sheet": "(inline)",
+        "selector": "body",
+        "matches": true,
+        "bgImage": ""
+      },
+      {
+        "sheet": "https://127.0.0.1:8003/style.css",
+        "selector": "body",
+        "matches": true,
+        "bgImage": ""
+      },
+      {
+        "sheet": "https://127.0.0.1:8003/style.css",
+        "selector": "body #toast-container .toast-success",
+        "matches": false,
+        "bgImage": ""
+      },
+      {
+        "sheet": "https://127.0.0.1:8003/style.css",
+        "selector": "body #toast-container .toast-error",
+        "matches": false,
+        "bgImage": ""
+      },
+      {
+        "sheet": "https://127.0.0.1:8003/style.css",
+        "selector": "body #toast-container .toast-info",
+        "matches": false,
+        "bgImage": ""
+      },
+      {
+        "sheet": "https://127.0.0.1:8003/style.css",
+        "selector": "body #toast-container .toast-warning",
+        "matches": false,
+        "bgImage": ""
+      },
+      {
+        "sheet": "https://127.0.0.1:8003/style.css",
+        "selector": "body .ui-slider-handle",
+        "matches": false,
+        "bgImage": ""
+      },
+      {
+        "sheet": "https://127.0.0.1:8003/style.css",
+        "selector": "body .ui-widget-content",
+        "matches": false,
+        "bgImage": ""
+      },
+      {
+        "sheet": "https://127.0.0.1:8003/style.css",
+        "selector": "body .ui-widget-content .ui-menu-item-wrapper",
+        "matches": false,
+        "bgImage": "unset"
+      },
+      {
+        "sheet": "https://127.0.0.1:8003/css/toggle-dependent.css",
+        "selector": "body.bubblechat .mes",
+        "matches": false,
+        "bgImage": ""
+      },
+      {
+        "sheet": "https://127.0.0.1:8003/css/toggle-dependent.css",
+        "selector": "body.bubblechat .mes[is_user=\"true\"]",
+        "matches": false,
+        "bgImage": ""
+      },
+      {
+        "sheet": "https://127.0.0.1:8003/css/toggle-dependent.css",
+        "selector": "body.no-blur #top-bar, body.no-blur #send_form",
+        "matches": false,
+        "bgImage": ""
+      }
+    ]
+  }
+}

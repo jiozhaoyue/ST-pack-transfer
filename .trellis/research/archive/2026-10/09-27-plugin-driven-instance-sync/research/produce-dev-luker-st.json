@@ -1,0 +1,109 @@
+{
+  "tool": "produce-via-plugin.cjs",
+  "task": "09-27-plugin-driven-instance-sync",
+  "mode": "转换（目标布局 st）",
+  "source": {
+    "id": "dev-luker",
+    "side": "dev",
+    "host": "luker",
+    "port": 8003,
+    "url": "https://127.0.0.1:8003",
+    "profile": ".pw-profile-dev"
+  },
+  "r20": {
+    "pluginDir": "D:\\Repo\\Tavern-repo\\Instance\\Dev\\Luker\\data\\default-user\\extensions\\st-zip-converter",
+    "instanceHead": "f75c68e",
+    "workspaceHead": "f75c68e",
+    "instancePluginDir": "..\\..\\Instance\\Dev\\Luker\\data\\default-user\\extensions\\st-zip-converter"
+  },
+  "knobs": {
+    "requested": {
+      "layout": "st",
+      "compression": "5",
+      "gitMode": "minimal",
+      "extensionMode": "full",
+      "includeBackups": false,
+      "pruneBuiltin": false,
+      "keepDevFiles": false
+    },
+    "readBack": {
+      "target": "st",
+      "compression": "5",
+      "gitMode": "minimal",
+      "extensionMode": "full",
+      "includeBackups": false,
+      "pruneBuiltin": false,
+      "keepDevFiles": false,
+      "splitInput": "",
+      "filenameTemplate": "{target}_{user}_{part}_{date}.zip"
+    },
+    "warnings": []
+  },
+  "selection": {
+    "hasCategoryCards": false,
+    "categories": {},
+    "note": "无类目卡片（未渲染计划）⇒ selection 取模块默认：除 cache / appPrivate 外全选（category-filter.js:22-36）",
+    "deselected": [],
+    "narrowing": null
+  },
+  "workbench": {
+    "drawer": true,
+    "app": true,
+    "badge": "Luker 插件"
+  },
+  "artifact": {
+    "file": "st_default-user_part1_2026-09-29.zip",
+    "path": "C:\\Users\\caocaobi\\Downloads\\szc-produce\\st_default-user_part1_2026-09-29.zip",
+    "bytes": 544871893,
+    "entryCount": 6563,
+    "sha256": "ddae0fcdaebe4b5d74d2a8a282b52ec16c22466c282888b0f7d5315c79760f4c",
+    "suggestedFilename": "st_default-user_part1_2026-09-29.zip"
+  },
+  "stashCleanup": {
+    "ok": true,
+    "removed": 4,
+    "deleted": [
+      {
+        "id": "output_1790615003327_b3bgwp",
+        "name": "st_default-user_part1_2026-09-29.zip",
+        "size": 3568,
+        "origin": "converted"
+      },
+      {
+        "id": "output_1790616915419_mtj8pw",
+        "name": "st_default-user_part1_2026-09-29.zip",
+        "size": 3568,
+        "origin": "converted"
+      },
+      {
+        "id": "output_1790617214397_howtju",
+        "name": "st_default-user_part1_2026-09-29.zip",
+        "size": 3568,
+        "origin": "converted"
+      },
+      {
+        "id": "output_1790660820710_8hyic0",
+        "name": "st_default-user_part1_2026-09-29.zip",
+        "size": 544871893,
+        "origin": "host-export"
+      }
+    ]
+  },
+  "timings": {
+    "totalSeconds": 416.8,
+    "phases": {
+      "splash": 1,
+      "pluginReady": 13.1,
+      "fetchStart": 13.3,
+      "treeConfirmShown": 350.8,
+      "enqueued": 410.4,
+      "downloaded": 412.7,
+      "done": 416.8
+    }
+  },
+  "logTail": "to deserialize the JSON body into the target type: missing field `value` at line 1 column 178\",\n    \"code\": \"validation_error\",\n    \"category\": \"validation\",\n    \"details\": {\n      \"requestPath\": \"/v1/storage/kv/set\",\n      \"source\": \"core\",\n      \"statusCode\": 422\n    }\n  },\n  \"code\": \"validation_error\",\n  \"category\": \"validation\",\n  \"details\": {\n    \"requestPath\": \"/v1/storage/kv/set\",\n    \"source\": \"core\",\n    \"statusCode\": 422\n  },\n  \"name\": \"AuthorityValidationError\"\n}\n    \n      [13:45:57.274]\n      [WARN]\n      [task-manager] 断点节流落盘失败（不影响任务推进）:\n      {\n  \"status\": 422,\n  \"payload\": {\n    \"error\": \"Failed to deserialize the JSON body into the target type: missing field `value` at line 1 column 178\",\n    \"code\": \"validation_error\",\n    \"category\": \"validation\",\n    \"details\": {\n      \"requestPath\": \"/v1/storage/kv/set\",\n      \"source\": \"core\",\n      \"statusCode\": 422\n    }\n  },\n  \"code\": \"validation_error\",\n  \"category\": \"validation\",\n  \"details\": {\n    \"requestPath\": \"/v1/storage/kv/set\",\n    \"source\": \"core\",\n    \"statusCode\": 422\n  },\n  \"name\": \"AuthorityValidationError\"\n}\n    \n      [13:45:57.275]\n      [WARN]\n      [task-manager] 断点节流落盘失败（不影响任务推进）:\n      {\n  \"status\": 422,\n  \"payload\": {\n    \"error\": \"Failed to deserialize the JSON body into the target type: missing field `value` at line 1 column 178\",\n    \"code\": \"validation_error\",\n    \"category\": \"validation\",\n    \"details\": {\n      \"requestPath\": \"/v1/storage/kv/set\",\n      \"source\": \"core\",\n      \"statusCode\": 422\n    }\n  },\n  \"code\": \"validation_error\",\n  \"category\": \"validation\",\n  \"details\": {\n    \"requestPath\": \"/v1/storage/kv/set\",\n    \"source\": \"core\",\n    \"statusCode\": 422\n  },\n  \"name\": \"AuthorityValidationError\"\n}\n    \n      [13:45:57.275]\n      [WARN]\n      [task-manager] 断点节流落盘失败（不影响任务推进）:\n      {\n  \"status\": 422,\n  \"payload\": {\n    \"error\": \"Failed to deserialize the JSON body into the target type: missing field `value` at line 1 column 178\",\n    \"code\": \"validation_error\",\n    \"category\": \"validation\",\n    \"details\": {\n      \"requestPath\": \"/v1/storage/kv/set\",\n      \"source\": \"core\",\n      \"statusCode\": 422\n    }\n  },\n  \"code\": \"validation_error\",\n  \"category\": \"validation\",\n  \"details\": {\n    \"requestPath\": \"/v1/storage/kv/set\",\n    \"source\": \"core\",\n    \"statusCode\": 422\n  },\n  \"name\": \"AuthorityValidationError\"\n}\n    \n      [13:45:57.276]\n      [WARN]\n      [task-manager] 断点节流落盘失败（不影响任务推进）:\n      {\n  \"status\": 422,\n  \"payload\": {\n    \"error\": \"Failed to deserialize the JSON body into the target type: missing field `value` at line 1 column 178\",\n    \"code\": \"validation_error\",\n    \"category\": \"validation\",\n    \"details\": {\n      \"requestPath\": \"/v1/storage/kv/set\",\n      \"source\": \"core\",\n      \"statusCode\": 422\n    }\n  },\n  \"code\": \"validation_error\",\n  \"category\": \"validation\",\n  \"details\": {\n    \"requestPath\": \"/v1/storage/kv/set\",\n    \"source\": \"core\",\n    \"statusCode\": 422\n  },\n  \"name\": \"AuthorityValidationError\"\n}\n    \n      [13:45:58.643]\n      [SUCCESS]\n      成功从宿主拉取数据包 (OPFS 直写)，大小: 1212.99 MB\n      \n    \n      [13:46:00.515]\n      [INFO]\n      统一文件树就绪: 8061 个文件，可展开类目明细逐文件勾选，确认后继续转换\n      \n    \n      [13:46:00.927]\n      [INFO]\n      进行直出格式与资产过滤处理: LUKER -> ST (包含备份聊天: false, 逐文件排除: 0)\n      \n    \n      [13:47:00.269]\n      [SUCCESS]\n      宿主拉取完成: st_default-user_part1_2026-09-29.zip (519.6 MB) —— 可在待导出区下载、选位置导出、存入工作区或写回宿主\n      \n    \n      [13:47:00.381]\n      [WARN]\n      [task-manager] 断点清理失败，任务已完成:\n      {\n  \"status\": 422,\n  \"payload\": {\n    \"error\": \"Failed to deserialize the JSON body into the target type: missing field `value` at line 1 column 178\",\n    \"code\": \"validation_error\",\n    \"category\": \"validation\",\n    \"details\": {\n      \"requestPath\": \"/v1/storage/kv/set\",\n      \"source\": \"core\",\n      \"statusCode\": 422\n    }\n  },\n  \"code\": \"validation_error\",\n  \"category\": \"validation\",\n  \"details\": {\n    \"requestPath\": \"/v1/storage/kv/set\",\n    \"source\": \"core\",\n    \"statusCode\": 422\n  },\n  \"name\": \"AuthorityValidationError\"\n}\n    ",
+  "pluginConsoleErrors": [],
+  "pluginFailures": [],
+  "playwright": "1.62.1",
+  "finishedAt": "2026-09-29T05:47:06.889Z"
+}

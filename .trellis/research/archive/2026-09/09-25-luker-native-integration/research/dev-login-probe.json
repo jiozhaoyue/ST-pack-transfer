@@ -1,0 +1,135 @@
+{
+  "sampledAt": "2026-09-25T09:14:29.093Z",
+  "url": "https://127.0.0.1:8003",
+  "landing": {
+    "url": "https://127.0.0.1:8003/",
+    "title": "Luker",
+    "hasLoginForm": true,
+    "inputs": [
+      {
+        "type": "checkbox",
+        "id": "lm_button_panel_pin",
+        "name": "",
+        "placeholder": null
+      },
+      {
+        "type": "file",
+        "id": "",
+        "name": "",
+        "placeholder": null
+      },
+      {
+        "type": "file",
+        "id": "",
+        "name": "",
+        "placeholder": null
+      },
+      {
+        "type": "file",
+        "id": "openai_preset_import_file",
+        "name": "",
+        "placeholder": null
+      },
+      {
+        "type": "file",
+        "id": "",
+        "name": "",
+        "placeholder": null
+      },
+      {
+        "type": "range",
+        "id": "amount_gen",
+        "name": "volume",
+        "placeholder": null
+      },
+      {
+        "type": "number",
+        "id": "amount_gen_counter",
+        "name": "",
+        "placeholder": null
+      },
+      {
+        "type": "checkbox",
+        "id": "streaming_textgenerationwebui",
+        "name": "",
+        "placeholder": null
+      },
+      {
+        "type": "checkbox",
+        "id": "streaming_kobold",
+        "name": "",
+        "placeholder": null
+      },
+      {
+        "type": "checkbox",
+        "id": "streaming_novel",
+        "name": "",
+        "placeholder": null
+      }
+    ],
+    "buttons": [
+      {
+        "id": "character_context_menu_favorite",
+        "text": "星标"
+      },
+      {
+        "id": "character_context_menu_tag",
+        "text": "标签"
+      },
+      {
+        "id": "character_context_menu_duplicate",
+        "text": "复制"
+      },
+      {
+        "id": "character_context_menu_persona",
+        "text": "用户设定"
+      },
+      {
+        "id": "character_context_menu_delete",
+        "text": "删除"
+      },
+      {
+        "id": "immersiveExitButton",
+        "text": ""
+      },
+      {
+        "id": "",
+        "text": ""
+      },
+      {
+        "id": "",
+        "text": ""
+      },
+      {
+        "id": "",
+        "text": ""
+      },
+      {
+        "id": "",
+        "text": ""
+      },
+      {
+        "id": "",
+        "text": ""
+      },
+      {
+        "id": "",
+        "text": ""
+      }
+    ]
+  },
+  "loginAttempt": null,
+  "after": {
+    "url": "https://127.0.0.1:8003/",
+    "apiUsersMe": {
+      "status": 200
+    },
+    "hasMainUi": true,
+    "hasExtensionsBlock": true,
+    "hasPluginSettings": true,
+    "hasDrawerApp": true,
+    "hasMenuInjection": true,
+    "injectedNodes": 0
+  },
+  "consoleErrors": []
+}

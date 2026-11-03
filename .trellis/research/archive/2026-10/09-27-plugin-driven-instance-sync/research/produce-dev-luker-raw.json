@@ -1,0 +1,76 @@
+{
+  "tool": "produce-via-plugin.cjs",
+  "task": "09-27-plugin-driven-instance-sync",
+  "mode": "raw（原样宿主包）",
+  "source": {
+    "id": "dev-luker",
+    "side": "dev",
+    "host": "luker",
+    "port": 8003,
+    "url": "https://127.0.0.1:8003",
+    "profile": ".pw-profile-dev"
+  },
+  "r20": {
+    "pluginDir": "D:\\Repo\\Tavern-repo\\Instance\\Dev\\Luker\\data\\default-user\\extensions\\st-zip-converter",
+    "instanceHead": "f75c68e",
+    "workspaceHead": "f75c68e",
+    "instancePluginDir": "..\\..\\Instance\\Dev\\Luker\\data\\default-user\\extensions\\st-zip-converter"
+  },
+  "knobs": {
+    "requested": {
+      "layout": "l",
+      "compression": "5",
+      "gitMode": "minimal",
+      "extensionMode": "full",
+      "includeBackups": true,
+      "pruneBuiltin": false,
+      "keepDevFiles": false
+    },
+    "readBack": {
+      "target": "l",
+      "compression": "5",
+      "gitMode": "minimal",
+      "extensionMode": "full",
+      "includeBackups": true,
+      "pruneBuiltin": false,
+      "keepDevFiles": false,
+      "splitInput": "",
+      "filenameTemplate": "{target}_{user}_{part}_{date}.zip"
+    },
+    "warnings": []
+  },
+  "selection": {
+    "hasCategoryCards": false,
+    "categories": {},
+    "note": "无类目卡片（未渲染计划）⇒ selection 取模块默认：除 cache / appPrivate 外全选（category-filter.js:22-36）"
+  },
+  "workbench": {
+    "drawer": true,
+    "app": true,
+    "badge": "Luker 插件"
+  },
+  "artifact": {
+    "file": "l_default-user_part1_2026-09-29.zip",
+    "path": "C:\\Users\\caocaobi\\Downloads\\l_default-user_part1_2026-09-29.zip",
+    "bytes": 1271907095,
+    "entryCount": 8061,
+    "sha256": "55f8d65018e6fd7c4ccf3a854fe4768f26be15bc87dd9e5df8aff52f48f31230"
+  },
+  "timings": {
+    "totalSeconds": 347.8,
+    "phases": {
+      "splash": 1.4,
+      "pluginReady": 23,
+      "fetchStart": 23.7,
+      "treeConfirmShown": 339.8,
+      "enqueued": 339.9,
+      "downloaded": 343.4,
+      "done": 347.8
+    }
+  },
+  "logTail": "]\n      [task-manager] 断点节流落盘失败（不影响任务推进）:\n      {\n  \"status\": 422,\n  \"payload\": {\n    \"error\": \"Failed to deserialize the JSON body into the target type: missing field `value` at line 1 column 178\",\n    \"code\": \"validation_error\",\n    \"category\": \"validation\",\n    \"details\": {\n      \"requestPath\": \"/v1/storage/kv/set\",\n      \"source\": \"core\",\n      \"statusCode\": 422\n    }\n  },\n  \"code\": \"validation_error\",\n  \"category\": \"validation\",\n  \"details\": {\n    \"requestPath\": \"/v1/storage/kv/set\",\n    \"source\": \"core\",\n    \"statusCode\": 422\n  },\n  \"name\": \"AuthorityValidationError\"\n}\n    \n      [13:00:33.432]\n      [WARN]\n      [task-manager] 断点节流落盘失败（不影响任务推进）:\n      {\n  \"status\": 422,\n  \"payload\": {\n    \"error\": \"Failed to deserialize the JSON body into the target type: missing field `value` at line 1 column 178\",\n    \"code\": \"validation_error\",\n    \"category\": \"validation\",\n    \"details\": {\n      \"requestPath\": \"/v1/storage/kv/set\",\n      \"source\": \"core\",\n      \"statusCode\": 422\n    }\n  },\n  \"code\": \"validation_error\",\n  \"category\": \"validation\",\n  \"details\": {\n    \"requestPath\": \"/v1/storage/kv/set\",\n    \"source\": \"core\",\n    \"statusCode\": 422\n  },\n  \"name\": \"AuthorityValidationError\"\n}\n    \n      [13:00:33.432]\n      [WARN]\n      [task-manager] 断点节流落盘失败（不影响任务推进）:\n      {\n  \"status\": 422,\n  \"payload\": {\n    \"error\": \"Failed to deserialize the JSON body into the target type: missing field `value` at line 1 column 178\",\n    \"code\": \"validation_error\",\n    \"category\": \"validation\",\n    \"details\": {\n      \"requestPath\": \"/v1/storage/kv/set\",\n      \"source\": \"core\",\n      \"statusCode\": 422\n    }\n  },\n  \"code\": \"validation_error\",\n  \"category\": \"validation\",\n  \"details\": {\n    \"requestPath\": \"/v1/storage/kv/set\",\n    \"source\": \"core\",\n    \"statusCode\": 422\n  },\n  \"name\": \"AuthorityValidationError\"\n}\n    \n      [13:00:33.433]\n      [WARN]\n      [task-manager] 断点节流落盘失败（不影响任务推进）:\n      {\n  \"status\": 422,\n  \"payload\": {\n    \"error\": \"Failed to deserialize the JSON body into the target type: missing field `value` at line 1 column 178\",\n    \"code\": \"validation_error\",\n    \"category\": \"validation\",\n    \"details\": {\n      \"requestPath\": \"/v1/storage/kv/set\",\n      \"source\": \"core\",\n      \"statusCode\": 422\n    }\n  },\n  \"code\": \"validation_error\",\n  \"category\": \"validation\",\n  \"details\": {\n    \"requestPath\": \"/v1/storage/kv/set\",\n    \"source\": \"core\",\n    \"statusCode\": 422\n  },\n  \"name\": \"AuthorityValidationError\"\n}\n    \n      [13:00:33.433]\n      [WARN]\n      [task-manager] 断点节流落盘失败（不影响任务推进）:\n      {\n  \"status\": 422,\n  \"payload\": {\n    \"error\": \"Failed to deserialize the JSON body into the target type: missing field `value` at line 1 column 178\",\n    \"code\": \"validation_error\",\n    \"category\": \"validation\",\n    \"details\": {\n      \"requestPath\": \"/v1/storage/kv/set\",\n      \"source\": \"core\",\n      \"statusCode\": 422\n    }\n  },\n  \"code\": \"validation_error\",\n  \"category\": \"validation\",\n  \"details\": {\n    \"requestPath\": \"/v1/storage/kv/set\",\n    \"source\": \"core\",\n    \"statusCode\": 422\n  },\n  \"name\": \"AuthorityValidationError\"\n}\n    \n      [13:00:33.433]\n      [WARN]\n      [task-manager] 断点节流落盘失败（不影响任务推进）:\n      {\n  \"status\": 422,\n  \"payload\": {\n    \"error\": \"Failed to deserialize the JSON body into the target type: missing field `value` at line 1 column 178\",\n    \"code\": \"validation_error\",\n    \"category\": \"validation\",\n    \"details\": {\n      \"requestPath\": \"/v1/storage/kv/set\",\n      \"source\": \"core\",\n      \"statusCode\": 422\n    }\n  },\n  \"code\": \"validation_error\",\n  \"category\": \"validation\",\n  \"details\": {\n    \"requestPath\": \"/v1/storage/kv/set\",\n    \"source\": \"core\",\n    \"statusCode\": 422\n  },\n  \"name\": \"AuthorityValidationError\"\n}\n    \n      [13:00:33.649]\n      [SUCCESS]\n      成功从宿主拉取数据包 (OPFS 直写)，大小: 1212.99 MB\n      \n    \n      [13:00:34.851]\n      [INFO]\n      统一文件树就绪: 8061 个文件，可展开类目明细逐文件勾选，确认后继续转换\n      \n    \n      [13:00:35.091]\n      [SUCCESS]\n      宿主拉取完成: l_default-user_part1_2026-09-29.zip (1.2 GB) —— 可在待导出区下载、选位置导出、存入工作区或写回宿主\n      \n    ",
+  "pluginConsoleErrors": [],
+  "pluginFailures": [],
+  "playwright": "1.62.1",
+  "finishedAt": "2026-09-29T05:00:43.095Z"
+}

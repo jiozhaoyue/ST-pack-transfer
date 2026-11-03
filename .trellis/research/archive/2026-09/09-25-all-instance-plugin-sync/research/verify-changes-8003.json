@@ -1,0 +1,90 @@
+{
+  "sampledAt": "2026-09-25T16:33:42.306Z",
+  "url": "https://127.0.0.1:8003",
+  "source": {
+    "pluginDir": "D:\\Repo\\Tavern-repo\\Instance\\Dev\\Luker\\data\\default-user\\extensions\\st-zip-converter",
+    "head": "1640118a0a5e6e850ed0046fab73c1a51764be37",
+    "r5_alertDialogExported": true,
+    "r5_usesPopupShowText": true,
+    "r5_noFabricatedAlert": true,
+    "r5_bareAlertInIndex": 0,
+    "r6_noMainDefaultFallback": true,
+    "r6_hostFirstBranchLine": 759,
+    "r6_appLookupCodeLines": [
+      1786
+    ],
+    "r6_appLookupOnlyAfterHostBranch": true,
+    "r4_actionColorsPresent": true,
+    "r4_splitModalDeleted": true,
+    "r4_archiveManagerDeleted": true,
+    "r7_domScopeGuardPresent": true
+  },
+  "runtime": {
+    "pluginLoaded": true,
+    "settingsPanel": true,
+    "menuItem": true,
+    "actionCopyVar": "#10b981",
+    "actionSynthVar": "rgba(225, 138, 36, 1)",
+    "hostQuoteColor": "rgba(225, 138, 36, 1)",
+    "accentVar": "rgba(225, 138, 36, 1)",
+    "bodySig": "body|--ac-font-scale: 0.8;",
+    "htmlCls": "luker-no-android",
+    "injectedInPopup": {
+      "nativeBtn": true,
+      "quickFetch": true
+    }
+  },
+  "pluginResources": [
+    "200 /scripts/extensions/third-party/st-zip-converter/index.js",
+    "200 /scripts/extensions/third-party/st-zip-converter/manifest.json",
+    "200 /scripts/extensions/third-party/st-zip-converter/src/core/builtin-assets.js",
+    "200 /scripts/extensions/third-party/st-zip-converter/src/core/delta.js",
+    "200 /scripts/extensions/third-party/st-zip-converter/src/core/detect.js",
+    "200 /scripts/extensions/third-party/st-zip-converter/src/core/extension-manifest.js",
+    "200 /scripts/extensions/third-party/st-zip-converter/src/core/filename-template.js",
+    "200 /scripts/extensions/third-party/st-zip-converter/src/core/inspect.js",
+    "200 /scripts/extensions/third-party/st-zip-converter/src/core/logger.js",
+    "200 /scripts/extensions/third-party/st-zip-converter/src/core/null-writer.js",
+    "200 /scripts/extensions/third-party/st-zip-converter/src/core/plan-preview.js",
+    "200 /scripts/extensions/third-party/st-zip-converter/src/core/report.js",
+    "200 /scripts/extensions/third-party/st-zip-converter/src/core/restore-batch.js",
+    "200 /scripts/extensions/third-party/st-zip-converter/src/core/splitter.js",
+    "200 /scripts/extensions/third-party/st-zip-converter/src/core/task-manager.js",
+    "200 /scripts/extensions/third-party/st-zip-converter/src/core/transform.js",
+    "200 /scripts/extensions/third-party/st-zip-converter/src/core/worker-client.js",
+    "200 /scripts/extensions/third-party/st-zip-converter/src/core/zip-io.js",
+    "200 /scripts/extensions/third-party/st-zip-converter/src/storage/authority-store.js",
+    "200 /scripts/extensions/third-party/st-zip-converter/src/storage/db.js",
+    "200 /scripts/extensions/third-party/st-zip-converter/src/ui/action-colors.js",
+    "200 /scripts/extensions/third-party/st-zip-converter/src/ui/category-filter.js",
+    "200 /scripts/extensions/third-party/st-zip-converter/src/ui/escape.js",
+    "200 /scripts/extensions/third-party/st-zip-converter/src/ui/export-queue.js",
+    "200 /scripts/extensions/third-party/st-zip-converter/src/ui/fetch-bounds.js",
+    "200 /scripts/extensions/third-party/st-zip-converter/src/ui/file-drop.js",
+    "200 /scripts/extensions/third-party/st-zip-converter/src/ui/file-tree-picker.js",
+    "200 /scripts/extensions/third-party/st-zip-converter/src/ui/host-bridge.js",
+    "200 /scripts/extensions/third-party/st-zip-converter/src/ui/log-console.js",
+    "200 /scripts/extensions/third-party/st-zip-converter/src/ui/stash-list.js",
+    "200 /scripts/extensions/third-party/st-zip-converter/src/ui/task-controls.js",
+    "200 /scripts/extensions/third-party/st-zip-converter/src/ui/usage-dashboard.js",
+    "200 /scripts/extensions/third-party/st-zip-converter/src/ui/view.js",
+    "200 /scripts/extensions/third-party/st-zip-converter/src/ui/workbench-template.js",
+    "200 /scripts/extensions/third-party/st-zip-converter/src/vendor/fzstd.js",
+    "200 /scripts/extensions/third-party/st-zip-converter/src/vendor/zip.js",
+    "200 /scripts/extensions/third-party/st-zip-converter/style.css"
+  ],
+  "failedRequests": [
+    "404 https://127.0.0.1:8003/api/plugins/command-exec/sandbox/get",
+    "404 https://127.0.0.1:8003/api/plugins/server-plugin-manager/probe",
+    "404 https://127.0.0.1:8003/scripts/extensions/popup.js"
+  ],
+  "pluginOwnFailedRequests": [],
+  "consoleErrors": [
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "PAGEERROR: SyntaxError: Unexpected reserved word",
+    "PAGEERROR: TypeError: $(...) is not a function",
+    "PAGEERROR: Uncaught SyntaxError: Identifier 'SPresetSettings' has already been declared"
+  ]
+}

@@ -1,0 +1,141 @@
+{
+  "target": "real-st",
+  "targetRoot": "D:\\Repo\\Tavern-repo\\Instance\\Real\\SillyTavern\\data\\default-user",
+  "pack": "D:\\Repo\\Tavern-repo\\My-repo\\ST-zip-converter\\test-results\\produce-real\\st_default-user_part1_2026-10-13.zip",
+  "takenAt": "2026-10-13T07:16:11.138Z",
+  "T1_packCoverage": {
+    "rule": "path+st-character-name",
+    "nameRuleHits": 380,
+    "packEntries": 7380,
+    "denominator": 7376,
+    "presentInTarget": 7375,
+    "missingCount": 1,
+    "coverage": 0.999864,
+    "pass": false,
+    "missingSample": [
+      "public/scripts/extensions/third-party/.gitkeep"
+    ],
+    "hostMetadataSkipped": {
+      "count": 3,
+      "entries": [
+        "_convert/extensions-manifest.json",
+        "_convert/INSTALL.md",
+        "_convert/meta.json"
+      ]
+    },
+    "hostPrivateSkipped": {
+      "count": 1,
+      "entries": [
+        "characters/【Sgw】又看一集.state.character_editor_assistant.json"
+      ]
+    },
+    "linkedExternalDrift": {
+      "count": 0,
+      "roots": [],
+      "entries": []
+    },
+    "stCharacterMap": {
+      "cardEntries": 401,
+      "distinctNames": 26,
+      "sprites": 28,
+      "stateFiles": 1
+    }
+  },
+  "T2_targetUnique": {
+    "count": 262,
+    "sample": [
+      "backups/settings_default-user_20260828-151439.json",
+      "backups/settings_default-user_20260926-161026.json",
+      "backups/settings_default-user_20260926-162536.json",
+      "backups/settings_default-user_20260926-180111.json",
+      "backups/settings_default-user_20260929-020226.json",
+      "backups/settings_default-user_20261013-150620.json",
+      "characters/1.png",
+      "characters/Seraphina.png",
+      "characters/【Sgw】邦↘多↗利↗.png",
+      "characters/朝月.png",
+      "characters/角色卡管理 (路西法酱改版0206).png",
+      "content.log",
+      "image-metadata.json",
+      "stats.json",
+      "extensions/Acsus-Paws-Puffs/.git/FETCH_HEAD",
+      "extensions/Extension-QuickPersona/.git/FETCH_HEAD",
+      "extensions/Extension-Silence/.git/FETCH_HEAD",
+      "extensions/Extension-TopInfoBar/.git/FETCH_HEAD",
+      "extensions/JS-Slash-Runner/.git/FETCH_HEAD",
+      "extensions/JS-Slash-Runner/.git/logs/refs/remotes/origin/HEAD",
+      "extensions/JS-Slash-Runner/.git/logs/refs/remotes/origin/main",
+      "extensions/JS-Slash-Runner/.git/objects/info/commit-graphs/commit-graph-chain",
+      "extensions/JS-Slash-Runner/.git/objects/info/commit-graphs/graph-382990a981c798c005c9a95ba2c3739a9705d81f.graph",
+      "extensions/JS-Slash-Runner/.git/objects/pack/pack-73d50ddcc53551443c3ace4c783848f5769bae50.idx",
+      "extensions/JS-Slash-Runner/.git/objects/pack/pack-73d50ddcc53551443c3ace4c783848f5769bae50.pack",
+      "extensions/JS-Slash-Runner/.git/objects/pack/pack-73d50ddcc53551443c3ace4c783848f5769bae50.rev",
+      "extensions/JS-Slash-Runner/.git/packed-refs",
+      "extensions/JS-Slash-Runner/.git/refs/remotes/origin/HEAD",
+      "extensions/shujuku-rebuild/.git/FETCH_HEAD",
+      "extensions/SillytarvenSwipes/.git/FETCH_HEAD",
+      "extensions/SillytarvenSwipes/.git/logs/refs/remotes/origin/HEAD",
+      "extensions/SillytarvenSwipes/.git/logs/refs/remotes/origin/main",
+      "extensions/SillytarvenSwipes/.git/objects/01/520bd6064651750ce4095d955d9a97b1efd62a",
+      "extensions/SillytarvenSwipes/.git/objects/01/5e0e6010b073a64684890e3e532f474c41a8ad",
+      "extensions/SillytarvenSwipes/.git/objects/08/1b7afefb43dcc7cec19e3d64c4b3f51574ea95",
+      "extensions/SillytarvenSwipes/.git/objects/08/ec860c9d09ce8e60e4229f6f4acfafd619aeab",
+      "extensions/SillytarvenSwipes/.git/objects/09/2950ab8b6f5e0fe23d3dc0e286d38025e72863",
+      "extensions/SillytarvenSwipes/.git/objects/0a/b7527b63562ea0325005439b4f8bc5f0ab835c",
+      "extensions/SillytarvenSwipes/.git/objects/0b/77256a7a7b6d664525d54529f41e9e34e8c5cb",
+      "extensions/SillytarvenSwipes/.git/objects/0c/efe78c557a3601adbaa1960bd8b283d11d3820",
+      "extensions/SillytarvenSwipes/.git/objects/0f/a311e7c8b895fe14418b7dcfacbdc48de7c42d",
+      "extensions/SillytarvenSwipes/.git/objects/0f/f29815b2284eef2f62c3443ecace9f7478f3d9",
+      "extensions/SillytarvenSwipes/.git/objects/13/2f9b36ba2a0a8dd1c92fc363b229450cfac1b9",
+      "extensions/SillytarvenSwipes/.git/objects/14/fbe105afad3c0e525d26c4879941fb853ad4aa",
+      "extensions/SillytarvenSwipes/.git/objects/15/6c4db576de4e5386b5eaf77c1b874285643501",
+      "extensions/SillytarvenSwipes/.git/objects/1d/9efb35b8719a13d5aab9198b2cb28b19e7984d",
+      "extensions/SillytarvenSwipes/.git/objects/24/4834185d559a26fb3227bb3b8c1171658e935c",
+      "extensions/SillytarvenSwipes/.git/objects/27/5a5101b81abb42f51cea55ec6fe776ce4c890f",
+      "extensions/SillytarvenSwipes/.git/objects/2b/3f7c853a90ce9ca79a0398f1d9f87481a8f82c",
+      "extensions/SillytarvenSwipes/.git/objects/2f/748ff3b00fe4373c48b1c7a6d16d05f3a39ab9"
+    ],
+    "deletionCheck": null,
+    "preManifestCheck": {
+      "manifest": ".trellis/tasks/09-27-plugin-driven-instance-sync/research/pre-real-st-20261013-133409.json",
+      "takenAt": "2026-10-13T05:34:10.740Z",
+      "declared": 1606,
+      "stillPresent": 1606,
+      "deletedCount": 0,
+      "deletedSample": [],
+      "hostManagedCache": [
+        {
+          "prefix": "thumbnails/",
+          "reason": "宿主导入成功即失效该缩略图（派生缓存，取图时重建）",
+          "entries": [
+            "thumbnails/persona/user-default.png"
+          ]
+        }
+      ],
+      "hostRotatedBackups": []
+    }
+  },
+  "T3_content": {
+    "pack": {
+      "characters": 430,
+      "chats": 1029,
+      "worlds": 21,
+      "groups": 0,
+      "themes": 5,
+      "backgrounds": 23,
+      "extensions": 5402,
+      "other": 470
+    },
+    "target": {
+      "characters": 54,
+      "chats": 1029,
+      "worlds": 21,
+      "groups": 0,
+      "themes": 5,
+      "backgrounds": 23,
+      "extensions": 5650,
+      "other": 475
+    }
+  },
+  "targetFileCount": 7257
+}

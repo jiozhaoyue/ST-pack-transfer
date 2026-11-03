@@ -1,0 +1,1690 @@
+{
+  "sampledAt": "2026-09-25T08:08:54.775Z",
+  "url": "https://127.0.0.1:8004",
+  "sampleMs": 45000,
+  "timeline": [
+    {
+      "at": 5047,
+      "status": "[2/3 传输中] 正在接收宿主打包的 ZIP 流 (无 Content-Length) · 已接收 14.6 MB",
+      "pct": "18%",
+      "lt": 29,
+      "ltMs": 8668
+    },
+    {
+      "at": 10061,
+      "status": "[2/3 传输中] 正在接收宿主打包的 ZIP 流 (无 Content-Length) · 已接收 54.4 MB",
+      "pct": "18%",
+      "lt": 42,
+      "ltMs": 11821
+    },
+    {
+      "at": 15105,
+      "status": "[2/3 传输中] 正在接收宿主打包的 ZIP 流 (无 Content-Length) · 已接收 148.9 MB",
+      "pct": "18%",
+      "lt": 44,
+      "ltMs": 12078
+    },
+    {
+      "at": 20127,
+      "status": "[2/3 传输中] 正在接收宿主打包的 ZIP 流 (无 Content-Length) · 已接收 206.5 MB",
+      "pct": "18%",
+      "lt": 45,
+      "ltMs": 12130
+    },
+    {
+      "at": 25156,
+      "status": "[2/3 传输中] 正在接收宿主打包的 ZIP 流 (无 Content-Length) · 已接收 307.0 MB",
+      "pct": "18%",
+      "lt": 46,
+      "ltMs": 12190
+    },
+    {
+      "at": 30158,
+      "status": "[2/3 传输中] 正在接收宿主打包的 ZIP 流 (无 Content-Length) · 已接收 368.0 MB",
+      "pct": "18%",
+      "lt": 47,
+      "ltMs": 12243
+    },
+    {
+      "at": 35189,
+      "status": "[2/3 传输中] 正在接收宿主打包的 ZIP 流 (无 Content-Length) · 已接收 467.9 MB",
+      "pct": "18%",
+      "lt": 47,
+      "ltMs": 12243
+    },
+    {
+      "at": 40193,
+      "status": "[2/3 传输中] 正在接收宿主打包的 ZIP 流 (无 Content-Length) · 已接收 570.2 MB",
+      "pct": "18%",
+      "lt": 47,
+      "ltMs": 12243
+    },
+    {
+      "at": 45197,
+      "status": "[2/3 传输中] 正在接收宿主打包的 ZIP 流 (无 Content-Length) · 已接收 621.2 MB",
+      "pct": "18%",
+      "lt": 48,
+      "ltMs": 12297
+    }
+  ],
+  "longtasks": [
+    {
+      "start": 13580,
+      "dur": 111,
+      "name": "self",
+      "attribution": [
+        {
+          "name": "unknown",
+          "entryType": "taskattribution",
+          "containerType": "window",
+          "containerSrc": "",
+          "containerId": "",
+          "containerName": ""
+        }
+      ]
+    },
+    {
+      "start": 13691,
+      "dur": 56,
+      "name": "self",
+      "attribution": [
+        {
+          "name": "unknown",
+          "entryType": "taskattribution",
+          "containerType": "window",
+          "containerSrc": "",
+          "containerId": "",
+          "containerName": ""
+        }
+      ]
+    },
+    {
+      "start": 13872,
+      "dur": 71,
+      "name": "self",
+      "attribution": [
+        {
+          "name": "unknown",
+          "entryType": "taskattribution",
+          "containerType": "window",
+          "containerSrc": "",
+          "containerId": "",
+          "containerName": ""
+        }
+      ]
+    },
+    {
+      "start": 14043,
+      "dur": 5177,
+      "name": "self",
+      "attribution": [
+        {
+          "name": "unknown",
+          "entryType": "taskattribution",
+          "containerType": "window",
+          "containerSrc": "",
+          "containerId": "",
+          "containerName": ""
+        }
+      ]
+    },
+    {
+      "start": 19287,
+      "dur": 53,
+      "name": "self",
+      "attribution": [
+        {
+          "name": "unknown",
+          "entryType": "taskattribution",
+          "containerType": "window",
+          "containerSrc": "",
+          "containerId": "",
+          "containerName": ""
+        }
+      ]
+    },
+    {
+      "start": 19383,
+      "dur": 87,
+      "name": "self",
+      "attribution": [
+        {
+          "name": "unknown",
+          "entryType": "taskattribution",
+          "containerType": "window",
+          "containerSrc": "",
+          "containerId": "",
+          "containerName": ""
+        }
+      ]
+    },
+    {
+      "start": 19475,
+      "dur": 137,
+      "name": "self",
+      "attribution": [
+        {
+          "name": "unknown",
+          "entryType": "taskattribution",
+          "containerType": "window",
+          "containerSrc": "",
+          "containerId": "",
+          "containerName": ""
+        }
+      ]
+    },
+    {
+      "start": 19665,
+      "dur": 59,
+      "name": "self",
+      "attribution": [
+        {
+          "name": "unknown",
+          "entryType": "taskattribution",
+          "containerType": "window",
+          "containerSrc": "",
+          "containerId": "",
+          "containerName": ""
+        }
+      ]
+    },
+    {
+      "start": 20070,
+      "dur": 51,
+      "name": "self",
+      "attribution": [
+        {
+          "name": "unknown",
+          "entryType": "taskattribution",
+          "containerType": "window",
+          "containerSrc": "",
+          "containerId": "",
+          "containerName": ""
+        }
+      ]
+    },
+    {
+      "start": 20210,
+      "dur": 87,
+      "name": "self",
+      "attribution": [
+        {
+          "name": "unknown",
+          "entryType": "taskattribution",
+          "containerType": "window",
+          "containerSrc": "",
+          "containerId": "",
+          "containerName": ""
+        }
+      ]
+    },
+    {
+      "start": 20614,
+      "dur": 78,
+      "name": "self",
+      "attribution": [
+        {
+          "name": "unknown",
+          "entryType": "taskattribution",
+          "containerType": "window",
+          "containerSrc": "",
+          "containerId": "",
+          "containerName": ""
+        }
+      ]
+    },
+    {
+      "start": 20902,
+      "dur": 90,
+      "name": "self",
+      "attribution": [
+        {
+          "name": "unknown",
+          "entryType": "taskattribution",
+          "containerType": "window",
+          "containerSrc": "",
+          "containerId": "",
+          "containerName": ""
+        }
+      ]
+    },
+    {
+      "start": 21053,
+      "dur": 98,
+      "name": "self",
+      "attribution": [
+        {
+          "name": "unknown",
+          "entryType": "taskattribution",
+          "containerType": "window",
+          "containerSrc": "",
+          "containerId": "",
+          "containerName": ""
+        }
+      ]
+    },
+    {
+      "start": 21221,
+      "dur": 359,
+      "name": "self",
+      "attribution": [
+        {
+          "name": "unknown",
+          "entryType": "taskattribution",
+          "containerType": "window",
+          "containerSrc": "",
+          "containerId": "",
+          "containerName": ""
+        }
+      ]
+    },
+    {
+      "start": 21806,
+      "dur": 99,
+      "name": "self",
+      "attribution": [
+        {
+          "name": "unknown",
+          "entryType": "taskattribution",
+          "containerType": "window",
+          "containerSrc": "",
+          "containerId": "",
+          "containerName": ""
+        }
+      ]
+    },
+    {
+      "start": 21994,
+      "dur": 242,
+      "name": "self",
+      "attribution": [
+        {
+          "name": "unknown",
+          "entryType": "taskattribution",
+          "containerType": "window",
+          "containerSrc": "",
+          "containerId": "",
+          "containerName": ""
+        }
+      ]
+    },
+    {
+      "start": 22365,
+      "dur": 53,
+      "name": "self",
+      "attribution": [
+        {
+          "name": "unknown",
+          "entryType": "taskattribution",
+          "containerType": "window",
+          "containerSrc": "",
+          "containerId": "",
+          "containerName": ""
+        }
+      ]
+    },
+    {
+      "start": 22515,
+      "dur": 137,
+      "name": "self",
+      "attribution": [
+        {
+          "name": "unknown",
+          "entryType": "taskattribution",
+          "containerType": "window",
+          "containerSrc": "",
+          "containerId": "",
+          "containerName": ""
+        }
+      ]
+    },
+    {
+      "start": 22653,
+      "dur": 70,
+      "name": "self",
+      "attribution": [
+        {
+          "name": "unknown",
+          "entryType": "taskattribution",
+          "containerType": "window",
+          "containerSrc": "",
+          "containerId": "",
+          "containerName": ""
+        }
+      ]
+    },
+    {
+      "start": 22745,
+      "dur": 160,
+      "name": "self",
+      "attribution": [
+        {
+          "name": "unknown",
+          "entryType": "taskattribution",
+          "containerType": "window",
+          "containerSrc": "",
+          "containerId": "",
+          "containerName": ""
+        }
+      ]
+    },
+    {
+      "start": 22932,
+      "dur": 155,
+      "name": "self",
+      "attribution": [
+        {
+          "name": "unknown",
+          "entryType": "taskattribution",
+          "containerType": "window",
+          "containerSrc": "",
+          "containerId": "",
+          "containerName": ""
+        }
+      ]
+    },
+    {
+      "start": 23145,
+      "dur": 52,
+      "name": "self",
+      "attribution": [
+        {
+          "name": "unknown",
+          "entryType": "taskattribution",
+          "containerType": "window",
+          "containerSrc": "",
+          "containerId": "",
+          "containerName": ""
+        }
+      ]
+    },
+    {
+      "start": 23200,
+      "dur": 54,
+      "name": "self",
+      "attribution": [
+        {
+          "name": "unknown",
+          "entryType": "taskattribution",
+          "containerType": "window",
+          "containerSrc": "",
+          "containerId": "",
+          "containerName": ""
+        }
+      ]
+    },
+    {
+      "start": 23264,
+      "dur": 385,
+      "name": "self",
+      "attribution": [
+        {
+          "name": "unknown",
+          "entryType": "taskattribution",
+          "containerType": "window",
+          "containerSrc": "",
+          "containerId": "",
+          "containerName": ""
+        }
+      ]
+    },
+    {
+      "start": 23833,
+      "dur": 136,
+      "name": "self",
+      "attribution": [
+        {
+          "name": "unknown",
+          "entryType": "taskattribution",
+          "containerType": "window",
+          "containerSrc": "",
+          "containerId": "",
+          "containerName": ""
+        }
+      ]
+    },
+    {
+      "start": 23970,
+      "dur": 83,
+      "name": "self",
+      "attribution": [
+        {
+          "name": "unknown",
+          "entryType": "taskattribution",
+          "containerType": "window",
+          "containerSrc": "",
+          "containerId": "",
+          "containerName": ""
+        }
+      ]
+    },
+    {
+      "start": 24053,
+      "dur": 253,
+      "name": "self",
+      "attribution": [
+        {
+          "name": "unknown",
+          "entryType": "taskattribution",
+          "containerType": "window",
+          "containerSrc": "",
+          "containerId": "",
+          "containerName": ""
+        }
+      ]
+    },
+    {
+      "start": 24489,
+      "dur": 208,
+      "name": "self",
+      "attribution": [
+        {
+          "name": "unknown",
+          "entryType": "taskattribution",
+          "containerType": "window",
+          "containerSrc": "",
+          "containerId": "",
+          "containerName": ""
+        }
+      ]
+    },
+    {
+      "start": 24837,
+      "dur": 67,
+      "name": "self",
+      "attribution": [
+        {
+          "name": "unknown",
+          "entryType": "taskattribution",
+          "containerType": "window",
+          "containerSrc": "",
+          "containerId": "",
+          "containerName": ""
+        }
+      ]
+    },
+    {
+      "start": 25013,
+      "dur": 72,
+      "name": "self",
+      "attribution": [
+        {
+          "name": "unknown",
+          "entryType": "taskattribution",
+          "containerType": "window",
+          "containerSrc": "",
+          "containerId": "",
+          "containerName": ""
+        }
+      ]
+    },
+    {
+      "start": 25468,
+      "dur": 1027,
+      "name": "self",
+      "attribution": [
+        {
+          "name": "unknown",
+          "entryType": "taskattribution",
+          "containerType": "window",
+          "containerSrc": "",
+          "containerId": "",
+          "containerName": ""
+        }
+      ]
+    },
+    {
+      "start": 26520,
+      "dur": 170,
+      "name": "self",
+      "attribution": [
+        {
+          "name": "unknown",
+          "entryType": "taskattribution",
+          "containerType": "window",
+          "containerSrc": "",
+          "containerId": "",
+          "containerName": ""
+        }
+      ]
+    },
+    {
+      "start": 26714,
+      "dur": 129,
+      "name": "self",
+      "attribution": [
+        {
+          "name": "unknown",
+          "entryType": "taskattribution",
+          "containerType": "window",
+          "containerSrc": "",
+          "containerId": "",
+          "containerName": ""
+        }
+      ]
+    },
+    {
+      "start": 26941,
+      "dur": 204,
+      "name": "self",
+      "attribution": [
+        {
+          "name": "unknown",
+          "entryType": "taskattribution",
+          "containerType": "window",
+          "containerSrc": "",
+          "containerId": "",
+          "containerName": ""
+        }
+      ]
+    },
+    {
+      "start": 27472,
+      "dur": 100,
+      "name": "self",
+      "attribution": [
+        {
+          "name": "unknown",
+          "entryType": "taskattribution",
+          "containerType": "window",
+          "containerSrc": "",
+          "containerId": "",
+          "containerName": ""
+        }
+      ]
+    },
+    {
+      "start": 27876,
+      "dur": 53,
+      "name": "self",
+      "attribution": [
+        {
+          "name": "unknown",
+          "entryType": "taskattribution",
+          "containerType": "window",
+          "containerSrc": "",
+          "containerId": "",
+          "containerName": ""
+        }
+      ]
+    },
+    {
+      "start": 28084,
+      "dur": 111,
+      "name": "self",
+      "attribution": [
+        {
+          "name": "unknown",
+          "entryType": "taskattribution",
+          "containerType": "window",
+          "containerSrc": "",
+          "containerId": "",
+          "containerName": ""
+        }
+      ]
+    },
+    {
+      "start": 28527,
+      "dur": 999,
+      "name": "self",
+      "attribution": [
+        {
+          "name": "unknown",
+          "entryType": "taskattribution",
+          "containerType": "window",
+          "containerSrc": "",
+          "containerId": "",
+          "containerName": ""
+        }
+      ]
+    },
+    {
+      "start": 29526,
+      "dur": 51,
+      "name": "self",
+      "attribution": [
+        {
+          "name": "unknown",
+          "entryType": "taskattribution",
+          "containerType": "window",
+          "containerSrc": "",
+          "containerId": "",
+          "containerName": ""
+        }
+      ]
+    },
+    {
+      "start": 29579,
+      "dur": 52,
+      "name": "self",
+      "attribution": [
+        {
+          "name": "unknown",
+          "entryType": "taskattribution",
+          "containerType": "window",
+          "containerSrc": "",
+          "containerId": "",
+          "containerName": ""
+        }
+      ]
+    }
+  ],
+  "analysis": {
+    "segments": [
+      {
+        "segStartMs": 0,
+        "segEndMs": 5000,
+        "totalSampledMs": 3056,
+        "byOrigin": {
+          "native/unknown": {
+            "ms": 1775
+          },
+          "host-or-other-ext": {
+            "ms": 1252
+          },
+          "remote": {
+            "ms": 26
+          },
+          "plugin": {
+            "ms": 3
+          }
+        },
+        "pluginSharePct": 0.1,
+        "top": [
+          {
+            "fn": "(anonymous)",
+            "url": "/lib/jquery-3.5.1.min.js",
+            "line": 1,
+            "origin": "host-or-other-ext",
+            "ms": 136,
+            "samples": 136
+          },
+          {
+            "fn": "getMeasurableMes",
+            "url": "/scripts/extensions/third-party/st-acu-visualizer/index.js",
+            "line": 3566,
+            "origin": "host-or-other-ext",
+            "ms": 131,
+            "samples": 131
+          },
+          {
+            "fn": "serializeFrontendLogValue",
+            "url": "/scripts/frontend-log-manager.js",
+            "line": 25,
+            "origin": "host-or-other-ext",
+            "ms": 109,
+            "samples": 109
+          },
+          {
+            "fn": "cloneJsonValue",
+            "url": "/script.js",
+            "line": 11727,
+            "origin": "host-or-other-ext",
+            "ms": 73,
+            "samples": 73
+          },
+          {
+            "fn": "updateIconDisplay",
+            "url": "/scripts/extensions/third-party/QR/settings.js",
+            "line": 57,
+            "origin": "host-or-other-ext",
+            "ms": 72,
+            "samples": 72
+          },
+          {
+            "fn": "getEmbeddedTargetBlock",
+            "url": "/scripts/extensions/third-party/st-acu-visualizer/index.js",
+            "line": 3592,
+            "origin": "host-or-other-ext",
+            "ms": 59,
+            "samples": 59
+          }
+        ],
+        "topNative": [
+          {
+            "fn": "(program)",
+            "url": "",
+            "line": -1,
+            "origin": "native/unknown",
+            "ms": 1039,
+            "samples": 1039
+          },
+          {
+            "fn": "getPropertyValue",
+            "url": "",
+            "line": -1,
+            "origin": "native/unknown",
+            "ms": 148,
+            "samples": 148
+          },
+          {
+            "fn": "(idle)",
+            "url": "",
+            "line": -1,
+            "origin": "native/unknown",
+            "ms": 123,
+            "samples": 123
+          },
+          {
+            "fn": "getBoundingClientRect",
+            "url": "",
+            "line": -1,
+            "origin": "native/unknown",
+            "ms": 102,
+            "samples": 102
+          }
+        ]
+      },
+      {
+        "segStartMs": 5000,
+        "segEndMs": 10000,
+        "totalSampledMs": 3169,
+        "byOrigin": {
+          "native/unknown": {
+            "ms": 1515
+          },
+          "(<options>.*?<\\/options>)": {
+            "ms": 770
+          },
+          "host-or-other-ext": {
+            "ms": 833
+          },
+          "plugin": {
+            "ms": 24
+          },
+          "remote": {
+            "ms": 25
+          },
+          "": {
+            "ms": 2
+          }
+        },
+        "pluginSharePct": 0.76,
+        "top": [
+          {
+            "fn": "RegExp: (<disclaimer>.*?<\\/disclaimer>)",
+            "url": "(<guifan>.*?<\\/guifan>)",
+            "line": null,
+            "origin": "(<options>.*?<\\/options>)",
+            "ms": 770,
+            "samples": 770
+          },
+          {
+            "fn": "serializeFrontendLogValue",
+            "url": "/scripts/frontend-log-manager.js",
+            "line": 25,
+            "origin": "host-or-other-ext",
+            "ms": 313,
+            "samples": 313
+          },
+          {
+            "fn": "cloneJsonValue",
+            "url": "/script.js",
+            "line": 11727,
+            "origin": "host-or-other-ext",
+            "ms": 109,
+            "samples": 109
+          },
+          {
+            "fn": "(anonymous)",
+            "url": "/script.js",
+            "line": 11915,
+            "origin": "host-or-other-ext",
+            "ms": 42,
+            "samples": 42
+          },
+          {
+            "fn": "emitConsoleToBase",
+            "url": "/scripts/frontend-log-manager.js",
+            "line": 452,
+            "origin": "host-or-other-ext",
+            "ms": 28,
+            "samples": 28
+          },
+          {
+            "fn": "getEmbeddedTargetBlock",
+            "url": "/scripts/extensions/third-party/st-acu-visualizer/index.js",
+            "line": 3592,
+            "origin": "host-or-other-ext",
+            "ms": 28,
+            "samples": 28
+          }
+        ],
+        "topNative": [
+          {
+            "fn": "(program)",
+            "url": "",
+            "line": -1,
+            "origin": "native/unknown",
+            "ms": 1082,
+            "samples": 1082
+          },
+          {
+            "fn": "RegExp: ([\\s\\S]*?)(<progress>[\\s\\S]*?<\\/progress>)([\\s\\S]*?$)",
+            "url": "",
+            "line": -1,
+            "origin": "native/unknown",
+            "ms": 148,
+            "samples": 148
+          },
+          {
+            "fn": "(idle)",
+            "url": "",
+            "line": -1,
+            "origin": "native/unknown",
+            "ms": 62,
+            "samples": 62
+          },
+          {
+            "fn": "querySelectorAll",
+            "url": "",
+            "line": -1,
+            "origin": "native/unknown",
+            "ms": 60,
+            "samples": 60
+          }
+        ]
+      },
+      {
+        "segStartMs": 10000,
+        "segEndMs": 15000,
+        "totalSampledMs": 3261,
+        "byOrigin": {
+          "native/unknown": {
+            "ms": 3042
+          },
+          "plugin": {
+            "ms": 91
+          },
+          "host-or-other-ext": {
+            "ms": 118
+          },
+          "remote": {
+            "ms": 10
+          }
+        },
+        "pluginSharePct": 2.79,
+        "top": [
+          {
+            "fn": "fetchHostBackup",
+            "url": "/scripts/extensions/third-party/st-zip-converter/src/ui/host-bridge.js",
+            "line": 253,
+            "origin": "plugin",
+            "ms": 83,
+            "samples": 83
+          },
+          {
+            "fn": "cloneJsonValue",
+            "url": "/script.js",
+            "line": 11727,
+            "origin": "host-or-other-ext",
+            "ms": 67,
+            "samples": 67
+          },
+          {
+            "fn": "(anonymous)",
+            "url": "/script.js",
+            "line": 11915,
+            "origin": "host-or-other-ext",
+            "ms": 22,
+            "samples": 22
+          },
+          {
+            "fn": "serializeFrontendLogValue",
+            "url": "/scripts/frontend-log-manager.js",
+            "line": 25,
+            "origin": "host-or-other-ext",
+            "ms": 9,
+            "samples": 9
+          },
+          {
+            "fn": "getContext",
+            "url": "/scripts/st-context.js",
+            "line": 2409,
+            "origin": "host-or-other-ext",
+            "ms": 8,
+            "samples": 8
+          },
+          {
+            "fn": "(anonymous)",
+            "url": "https://jnai2d9kgnbs6xzx5c.com/regex_bind/inject.js",
+            "line": 374,
+            "origin": "remote",
+            "ms": 7,
+            "samples": 7
+          }
+        ],
+        "topNative": [
+          {
+            "fn": "(program)",
+            "url": "",
+            "line": -1,
+            "origin": "native/unknown",
+            "ms": 2707,
+            "samples": 2707
+          },
+          {
+            "fn": "(idle)",
+            "url": "",
+            "line": -1,
+            "origin": "native/unknown",
+            "ms": 159,
+            "samples": 159
+          },
+          {
+            "fn": "querySelectorAll",
+            "url": "",
+            "line": -1,
+            "origin": "native/unknown",
+            "ms": 126,
+            "samples": 126
+          },
+          {
+            "fn": "(garbage collector)",
+            "url": "",
+            "line": -1,
+            "origin": "native/unknown",
+            "ms": 40,
+            "samples": 40
+          }
+        ]
+      },
+      {
+        "segStartMs": 15000,
+        "segEndMs": 20000,
+        "totalSampledMs": 3324,
+        "byOrigin": {
+          "native/unknown": {
+            "ms": 3203
+          },
+          "plugin": {
+            "ms": 97
+          },
+          "remote": {
+            "ms": 10
+          },
+          "host-or-other-ext": {
+            "ms": 14
+          }
+        },
+        "pluginSharePct": 2.92,
+        "top": [
+          {
+            "fn": "fetchHostBackup",
+            "url": "/scripts/extensions/third-party/st-zip-converter/src/ui/host-bridge.js",
+            "line": 253,
+            "origin": "plugin",
+            "ms": 88,
+            "samples": 88
+          },
+          {
+            "fn": "(anonymous)",
+            "url": "https://jnai2d9kgnbs6xzx5c.com/regex_bind/inject.js",
+            "line": 374,
+            "origin": "remote",
+            "ms": 7,
+            "samples": 7
+          },
+          {
+            "fn": "getContext",
+            "url": "/scripts/st-context.js",
+            "line": 2409,
+            "origin": "host-or-other-ext",
+            "ms": 7,
+            "samples": 7
+          },
+          {
+            "fn": "applyProgress",
+            "url": "/scripts/extensions/third-party/st-zip-converter/src/ui/view.js",
+            "line": 35,
+            "origin": "plugin",
+            "ms": 6,
+            "samples": 6
+          },
+          {
+            "fn": "se",
+            "url": "/lib/jquery-3.5.1.min.js",
+            "line": 1,
+            "origin": "host-or-other-ext",
+            "ms": 3,
+            "samples": 3
+          },
+          {
+            "fn": "updateHidden",
+            "url": "https://jnai2d9kgnbs6xzx5c.com/regex_bind/inject.js",
+            "line": 370,
+            "origin": "remote",
+            "ms": 3,
+            "samples": 3
+          }
+        ],
+        "topNative": [
+          {
+            "fn": "(program)",
+            "url": "",
+            "line": -1,
+            "origin": "native/unknown",
+            "ms": 2814,
+            "samples": 2814
+          },
+          {
+            "fn": "(idle)",
+            "url": "",
+            "line": -1,
+            "origin": "native/unknown",
+            "ms": 270,
+            "samples": 270
+          },
+          {
+            "fn": "querySelectorAll",
+            "url": "",
+            "line": -1,
+            "origin": "native/unknown",
+            "ms": 115,
+            "samples": 115
+          },
+          {
+            "fn": "matches",
+            "url": "",
+            "line": -1,
+            "origin": "native/unknown",
+            "ms": 3,
+            "samples": 3
+          }
+        ]
+      },
+      {
+        "segStartMs": 20000,
+        "segEndMs": 25000,
+        "totalSampledMs": 3256,
+        "byOrigin": {
+          "native/unknown": {
+            "ms": 3128
+          },
+          "plugin": {
+            "ms": 104
+          },
+          "host-or-other-ext": {
+            "ms": 16
+          },
+          "remote": {
+            "ms": 8
+          }
+        },
+        "pluginSharePct": 3.19,
+        "top": [
+          {
+            "fn": "fetchHostBackup",
+            "url": "/scripts/extensions/third-party/st-zip-converter/src/ui/host-bridge.js",
+            "line": 253,
+            "origin": "plugin",
+            "ms": 98,
+            "samples": 98
+          },
+          {
+            "fn": "getContext",
+            "url": "/scripts/st-context.js",
+            "line": 2409,
+            "origin": "host-or-other-ext",
+            "ms": 7,
+            "samples": 7
+          },
+          {
+            "fn": "updateHidden",
+            "url": "https://jnai2d9kgnbs6xzx5c.com/regex_bind/inject.js",
+            "line": 370,
+            "origin": "remote",
+            "ms": 5,
+            "samples": 5
+          },
+          {
+            "fn": "se",
+            "url": "/lib/jquery-3.5.1.min.js",
+            "line": 1,
+            "origin": "host-or-other-ext",
+            "ms": 3,
+            "samples": 3
+          },
+          {
+            "fn": "(anonymous)",
+            "url": "https://jnai2d9kgnbs6xzx5c.com/regex_bind/inject.js",
+            "line": 374,
+            "origin": "remote",
+            "ms": 3,
+            "samples": 3
+          },
+          {
+            "fn": "onCheckpoint",
+            "url": "/scripts/extensions/third-party/st-zip-converter/src/core/task-manager.js",
+            "line": 99,
+            "origin": "plugin",
+            "ms": 2,
+            "samples": 2
+          }
+        ],
+        "topNative": [
+          {
+            "fn": "(program)",
+            "url": "",
+            "line": -1,
+            "origin": "native/unknown",
+            "ms": 2754,
+            "samples": 2754
+          },
+          {
+            "fn": "(idle)",
+            "url": "",
+            "line": -1,
+            "origin": "native/unknown",
+            "ms": 240,
+            "samples": 240
+          },
+          {
+            "fn": "querySelectorAll",
+            "url": "",
+            "line": -1,
+            "origin": "native/unknown",
+            "ms": 127,
+            "samples": 127
+          },
+          {
+            "fn": "matches",
+            "url": "",
+            "line": -1,
+            "origin": "native/unknown",
+            "ms": 2,
+            "samples": 2
+          }
+        ]
+      },
+      {
+        "segStartMs": 25000,
+        "segEndMs": 30000,
+        "totalSampledMs": 3269,
+        "byOrigin": {
+          "native/unknown": {
+            "ms": 3160
+          },
+          "plugin": {
+            "ms": 89
+          },
+          "host-or-other-ext": {
+            "ms": 15
+          },
+          "remote": {
+            "ms": 5
+          }
+        },
+        "pluginSharePct": 2.72,
+        "top": [
+          {
+            "fn": "fetchHostBackup",
+            "url": "/scripts/extensions/third-party/st-zip-converter/src/ui/host-bridge.js",
+            "line": 253,
+            "origin": "plugin",
+            "ms": 87,
+            "samples": 87
+          },
+          {
+            "fn": "getContext",
+            "url": "/scripts/st-context.js",
+            "line": 2409,
+            "origin": "host-or-other-ext",
+            "ms": 7,
+            "samples": 7
+          },
+          {
+            "fn": "(anonymous)",
+            "url": "https://jnai2d9kgnbs6xzx5c.com/regex_bind/inject.js",
+            "line": 374,
+            "origin": "remote",
+            "ms": 5,
+            "samples": 5
+          },
+          {
+            "fn": "processPopups",
+            "url": "/scripts/extensions/third-party/persona-tags/index.js",
+            "line": 1807,
+            "origin": "host-or-other-ext",
+            "ms": 2,
+            "samples": 2
+          },
+          {
+            "fn": "se",
+            "url": "/lib/jquery-3.5.1.min.js",
+            "line": 1,
+            "origin": "host-or-other-ext",
+            "ms": 2,
+            "samples": 2
+          },
+          {
+            "fn": "(anonymous)",
+            "url": "/lib/jquery-3.5.1.min.js",
+            "line": 1,
+            "origin": "host-or-other-ext",
+            "ms": 2,
+            "samples": 2
+          }
+        ],
+        "topNative": [
+          {
+            "fn": "(program)",
+            "url": "",
+            "line": -1,
+            "origin": "native/unknown",
+            "ms": 2796,
+            "samples": 2796
+          },
+          {
+            "fn": "(idle)",
+            "url": "",
+            "line": -1,
+            "origin": "native/unknown",
+            "ms": 246,
+            "samples": 246
+          },
+          {
+            "fn": "querySelectorAll",
+            "url": "",
+            "line": -1,
+            "origin": "native/unknown",
+            "ms": 104,
+            "samples": 104
+          },
+          {
+            "fn": "requestAnimationFrame",
+            "url": "",
+            "line": -1,
+            "origin": "native/unknown",
+            "ms": 6,
+            "samples": 6
+          }
+        ]
+      },
+      {
+        "segStartMs": 30000,
+        "segEndMs": 35000,
+        "totalSampledMs": 3305,
+        "byOrigin": {
+          "native/unknown": {
+            "ms": 3184
+          },
+          "plugin": {
+            "ms": 93
+          },
+          "remote": {
+            "ms": 11
+          },
+          "host-or-other-ext": {
+            "ms": 17
+          }
+        },
+        "pluginSharePct": 2.81,
+        "top": [
+          {
+            "fn": "fetchHostBackup",
+            "url": "/scripts/extensions/third-party/st-zip-converter/src/ui/host-bridge.js",
+            "line": 253,
+            "origin": "plugin",
+            "ms": 86,
+            "samples": 86
+          },
+          {
+            "fn": "(anonymous)",
+            "url": "https://jnai2d9kgnbs6xzx5c.com/regex_bind/inject.js",
+            "line": 374,
+            "origin": "remote",
+            "ms": 8,
+            "samples": 8
+          },
+          {
+            "fn": "getContext",
+            "url": "/scripts/st-context.js",
+            "line": 2409,
+            "origin": "host-or-other-ext",
+            "ms": 6,
+            "samples": 6
+          },
+          {
+            "fn": "emitConsoleToBase",
+            "url": "/scripts/frontend-log-manager.js",
+            "line": 452,
+            "origin": "host-or-other-ext",
+            "ms": 3,
+            "samples": 3
+          },
+          {
+            "fn": "se",
+            "url": "/lib/jquery-3.5.1.min.js",
+            "line": 1,
+            "origin": "host-or-other-ext",
+            "ms": 3,
+            "samples": 3
+          },
+          {
+            "fn": "applyProgress",
+            "url": "/scripts/extensions/third-party/st-zip-converter/src/ui/view.js",
+            "line": 35,
+            "origin": "plugin",
+            "ms": 3,
+            "samples": 3
+          }
+        ],
+        "topNative": [
+          {
+            "fn": "(program)",
+            "url": "",
+            "line": -1,
+            "origin": "native/unknown",
+            "ms": 2831,
+            "samples": 2831
+          },
+          {
+            "fn": "(idle)",
+            "url": "",
+            "line": -1,
+            "origin": "native/unknown",
+            "ms": 215,
+            "samples": 215
+          },
+          {
+            "fn": "querySelectorAll",
+            "url": "",
+            "line": -1,
+            "origin": "native/unknown",
+            "ms": 124,
+            "samples": 124
+          },
+          {
+            "fn": "add",
+            "url": "",
+            "line": -1,
+            "origin": "native/unknown",
+            "ms": 5,
+            "samples": 5
+          }
+        ]
+      },
+      {
+        "segStartMs": 35000,
+        "segEndMs": 40000,
+        "totalSampledMs": 3203,
+        "byOrigin": {
+          "native/unknown": {
+            "ms": 3094
+          },
+          "plugin": {
+            "ms": 87
+          },
+          "host-or-other-ext": {
+            "ms": 15
+          },
+          "remote": {
+            "ms": 7
+          }
+        },
+        "pluginSharePct": 2.72,
+        "top": [
+          {
+            "fn": "fetchHostBackup",
+            "url": "/scripts/extensions/third-party/st-zip-converter/src/ui/host-bridge.js",
+            "line": 253,
+            "origin": "plugin",
+            "ms": 80,
+            "samples": 80
+          },
+          {
+            "fn": "getContext",
+            "url": "/scripts/st-context.js",
+            "line": 2409,
+            "origin": "host-or-other-ext",
+            "ms": 8,
+            "samples": 8
+          },
+          {
+            "fn": "(anonymous)",
+            "url": "https://jnai2d9kgnbs6xzx5c.com/regex_bind/inject.js",
+            "line": 374,
+            "origin": "remote",
+            "ms": 4,
+            "samples": 4
+          },
+          {
+            "fn": "updateHidden",
+            "url": "https://jnai2d9kgnbs6xzx5c.com/regex_bind/inject.js",
+            "line": 370,
+            "origin": "remote",
+            "ms": 3,
+            "samples": 3
+          },
+          {
+            "fn": "se",
+            "url": "/lib/jquery-3.5.1.min.js",
+            "line": 1,
+            "origin": "host-or-other-ext",
+            "ms": 2,
+            "samples": 2
+          },
+          {
+            "fn": "applyProgress",
+            "url": "/scripts/extensions/third-party/st-zip-converter/src/ui/view.js",
+            "line": 35,
+            "origin": "plugin",
+            "ms": 2,
+            "samples": 2
+          }
+        ],
+        "topNative": [
+          {
+            "fn": "(program)",
+            "url": "",
+            "line": -1,
+            "origin": "native/unknown",
+            "ms": 2763,
+            "samples": 2763
+          },
+          {
+            "fn": "(idle)",
+            "url": "",
+            "line": -1,
+            "origin": "native/unknown",
+            "ms": 214,
+            "samples": 214
+          },
+          {
+            "fn": "querySelectorAll",
+            "url": "",
+            "line": -1,
+            "origin": "native/unknown",
+            "ms": 106,
+            "samples": 106
+          },
+          {
+            "fn": "matches",
+            "url": "",
+            "line": -1,
+            "origin": "native/unknown",
+            "ms": 2,
+            "samples": 2
+          }
+        ]
+      },
+      {
+        "segStartMs": 40000,
+        "segEndMs": 45000,
+        "totalSampledMs": 3338,
+        "byOrigin": {
+          "native/unknown": {
+            "ms": 3242
+          },
+          "plugin": {
+            "ms": 81
+          },
+          "host-or-other-ext": {
+            "ms": 11
+          },
+          "remote": {
+            "ms": 4
+          }
+        },
+        "pluginSharePct": 2.43,
+        "top": [
+          {
+            "fn": "fetchHostBackup",
+            "url": "/scripts/extensions/third-party/st-zip-converter/src/ui/host-bridge.js",
+            "line": 253,
+            "origin": "plugin",
+            "ms": 75,
+            "samples": 75
+          },
+          {
+            "fn": "getContext",
+            "url": "/scripts/st-context.js",
+            "line": 2409,
+            "origin": "host-or-other-ext",
+            "ms": 4,
+            "samples": 4
+          },
+          {
+            "fn": "applyProgress",
+            "url": "/scripts/extensions/third-party/st-zip-converter/src/ui/view.js",
+            "line": 35,
+            "origin": "plugin",
+            "ms": 4,
+            "samples": 4
+          },
+          {
+            "fn": "updateHidden",
+            "url": "https://jnai2d9kgnbs6xzx5c.com/regex_bind/inject.js",
+            "line": 370,
+            "origin": "remote",
+            "ms": 2,
+            "samples": 2
+          },
+          {
+            "fn": "(anonymous)",
+            "url": "https://jnai2d9kgnbs6xzx5c.com/regex_bind/inject.js",
+            "line": 374,
+            "origin": "remote",
+            "ms": 2,
+            "samples": 2
+          },
+          {
+            "fn": "onCheckpoint",
+            "url": "/scripts/extensions/third-party/st-zip-converter/src/core/task-manager.js",
+            "line": 99,
+            "origin": "plugin",
+            "ms": 2,
+            "samples": 2
+          }
+        ],
+        "topNative": [
+          {
+            "fn": "(program)",
+            "url": "",
+            "line": -1,
+            "origin": "native/unknown",
+            "ms": 2867,
+            "samples": 2867
+          },
+          {
+            "fn": "(idle)",
+            "url": "",
+            "line": -1,
+            "origin": "native/unknown",
+            "ms": 233,
+            "samples": 233
+          },
+          {
+            "fn": "querySelectorAll",
+            "url": "",
+            "line": -1,
+            "origin": "native/unknown",
+            "ms": 133,
+            "samples": 133
+          },
+          {
+            "fn": "resolve",
+            "url": "",
+            "line": -1,
+            "origin": "native/unknown",
+            "ms": 2,
+            "samples": 2
+          }
+        ]
+      },
+      {
+        "segStartMs": 45000,
+        "segEndMs": 50000,
+        "totalSampledMs": 285,
+        "byOrigin": {
+          "native/unknown": {
+            "ms": 278
+          },
+          "plugin": {
+            "ms": 6
+          },
+          "host-or-other-ext": {
+            "ms": 1
+          }
+        },
+        "pluginSharePct": 2.11,
+        "top": [
+          {
+            "fn": "fetchHostBackup",
+            "url": "/scripts/extensions/third-party/st-zip-converter/src/ui/host-bridge.js",
+            "line": 253,
+            "origin": "plugin",
+            "ms": 5,
+            "samples": 5
+          },
+          {
+            "fn": "getContext",
+            "url": "/scripts/st-context.js",
+            "line": 2409,
+            "origin": "host-or-other-ext",
+            "ms": 1,
+            "samples": 1
+          },
+          {
+            "fn": "applyProgress",
+            "url": "/scripts/extensions/third-party/st-zip-converter/src/ui/view.js",
+            "line": 35,
+            "origin": "plugin",
+            "ms": 1,
+            "samples": 1
+          }
+        ],
+        "topNative": [
+          {
+            "fn": "(program)",
+            "url": "",
+            "line": -1,
+            "origin": "native/unknown",
+            "ms": 250,
+            "samples": 250
+          },
+          {
+            "fn": "(idle)",
+            "url": "",
+            "line": -1,
+            "origin": "native/unknown",
+            "ms": 17,
+            "samples": 17
+          },
+          {
+            "fn": "querySelectorAll",
+            "url": "",
+            "line": -1,
+            "origin": "native/unknown",
+            "ms": 11,
+            "samples": 11
+          }
+        ]
+      }
+    ],
+    "totalSamples": 29466,
+    "totalMs": 29466
+  },
+  "aborted": "abort-clicked"
+}

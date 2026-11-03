@@ -1,0 +1,100 @@
+{
+  "sampledAt": "2026-09-25T15:21:47.738Z",
+  "url": "https://127.0.0.1:8003",
+  "popup": {
+    "zIndex": "auto",
+    "position": "fixed",
+    "className": "popup vertical_scrolling_dialogue_popup popup--animation-fast"
+  },
+  "overlay": {
+    "tag": "BODY",
+    "id": "",
+    "zIndex": "auto",
+    "position": "static"
+  },
+  "topZ": [
+    {
+      "z": 999999,
+      "sig": "div#stcj-root.stcj-root"
+    },
+    {
+      "z": 999999,
+      "sig": "div#toast-container.toast-top-center"
+    },
+    {
+      "z": 100000,
+      "sig": "div.magic-panel-wrapper"
+    },
+    {
+      "z": 99999,
+      "sig": "div#hide-helper-modal-overlay.hide-modal-overlay"
+    },
+    {
+      "z": 99999,
+      "sig": "div#qr-assistant-modal-overlay.qr-modal-overlay"
+    },
+    {
+      "z": 99998,
+      "sig": "button#chatvault_dock_tab"
+    },
+    {
+      "z": 29999,
+      "sig": "div#options.font-family-reset"
+    },
+    {
+      "z": 29999,
+      "sig": "div#extensionsMenu.options-content"
+    },
+    {
+      "z": 12000,
+      "sig": "div#st-panel-reset-overlay"
+    },
+    {
+      "z": 10002,
+      "sig": "div#merger-full-preview-overlay"
+    },
+    {
+      "z": 10001,
+      "sig": "div#merger-result-overlay"
+    },
+    {
+      "z": 10000,
+      "sig": "div#immersiveExitButton.menu_button_icon"
+    }
+  ],
+  "ctxApi": {
+    "popupPresent": true,
+    "showType": "object",
+    "showKeys": [
+      "confirm",
+      "input",
+      "text"
+    ],
+    "showMethodTypes": {
+      "input": "function",
+      "confirm": "function",
+      "text": "function"
+    },
+    "resultKeys": [
+      "AFFIRMATIVE",
+      "CANCELLED",
+      "CUSTOM1",
+      "CUSTOM2",
+      "CUSTOM3",
+      "CUSTOM4",
+      "CUSTOM5",
+      "CUSTOM6",
+      "CUSTOM7",
+      "CUSTOM8",
+      "CUSTOM9",
+      "NEGATIVE"
+    ],
+    "typeKeys": [
+      "CONFIRM",
+      "CROP",
+      "DISPLAY",
+      "INPUT",
+      "TEXT"
+    ]
+  }
+}

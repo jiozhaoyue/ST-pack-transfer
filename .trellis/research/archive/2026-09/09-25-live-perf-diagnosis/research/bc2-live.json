@@ -1,0 +1,159 @@
+{
+  "sampledAt": "2026-09-25T07:32:37.661Z",
+  "url": "https://127.0.0.1:8004",
+  "stable": {
+    "ok": true,
+    "waitedMs": 13151,
+    "nodes": 21886
+  },
+  "pageFacts": {
+    "domNodes": 22237,
+    "chatMessages": 10,
+    "pluginNodes": 276,
+    "pluginButtons": 36,
+    "pluginInputs": 19,
+    "pluginDetails": 3,
+    "pluginLabels": 12,
+    "outerDrawerOpen": false
+  },
+  "openFacts": {
+    "contentDisplay": "block",
+    "contentHeight": 0,
+    "appHeight": 0,
+    "appWidth": 0,
+    "visibleButtons": 0
+  },
+  "closedState": {
+    "label": "关闭态 12s",
+    "wallMs": 12003,
+    "probe": {
+      "longtaskCount": 15,
+      "longtaskTotalMs": 3567,
+      "longtaskMaxMs": 912,
+      "longtaskSamples": [
+        {
+          "start": 20391,
+          "dur": 95
+        },
+        {
+          "start": 20575,
+          "dur": 151
+        },
+        {
+          "start": 20884,
+          "dur": 120
+        },
+        {
+          "start": 21053,
+          "dur": 433
+        },
+        {
+          "start": 21612,
+          "dur": 71
+        },
+        {
+          "start": 21906,
+          "dur": 66
+        },
+        {
+          "start": 21998,
+          "dur": 213
+        },
+        {
+          "start": 22426,
+          "dur": 59
+        },
+        {
+          "start": 23335,
+          "dur": 129
+        },
+        {
+          "start": 23880,
+          "dur": 53
+        },
+        {
+          "start": 23934,
+          "dur": 112
+        },
+        {
+          "start": 24071,
+          "dur": 166
+        },
+        {
+          "start": 24315,
+          "dur": 912
+        },
+        {
+          "start": 25812,
+          "dur": 875
+        },
+        {
+          "start": 27743,
+          "dur": 112
+        }
+      ],
+      "domMutations": 4520,
+      "domBatches": 80
+    },
+    "metrics": {
+      "TaskDuration": 6.0871,
+      "ScriptDuration": 0.6129,
+      "LayoutDuration": 0.4721,
+      "RecalcStyleDuration": 1.332,
+      "LayoutCount": 28,
+      "RecalcStyleCount": 517,
+      "JSHeapUsedSize": 361421848,
+      "Nodes": 86174
+    }
+  },
+  "openState": {
+    "label": "展开态 12s",
+    "wallMs": 12005,
+    "probe": {
+      "longtaskCount": 0,
+      "longtaskTotalMs": 0,
+      "longtaskMaxMs": 0,
+      "longtaskSamples": [],
+      "domMutations": 0,
+      "domBatches": 0
+    },
+    "metrics": {
+      "TaskDuration": 1.0943,
+      "ScriptDuration": 0.0148,
+      "LayoutDuration": 0,
+      "RecalcStyleDuration": 0.0999,
+      "LayoutCount": 0,
+      "RecalcStyleCount": 716,
+      "JSHeapUsedSize": 322019260,
+      "Nodes": 85588
+    }
+  },
+  "selfHeal": {
+    "times": 10,
+    "gapMs": 260,
+    "bodyMutations": {
+      "TaskDuration": 0.6628,
+      "ScriptDuration": 0.0828,
+      "LayoutDuration": 0,
+      "RecalcStyleDuration": 0.3705,
+      "LayoutCount": 0,
+      "RecalcStyleCount": 193,
+      "JSHeapUsedSize": 321850148,
+      "Nodes": 85661
+    },
+    "detachedMutations": {
+      "TaskDuration": 0.2429,
+      "ScriptDuration": 0.0042,
+      "LayoutDuration": 0,
+      "RecalcStyleDuration": 0.0256,
+      "LayoutCount": 0,
+      "RecalcStyleCount": 192,
+      "JSHeapUsedSize": 322050808,
+      "Nodes": 85697
+    },
+    "netScriptS": 0.0786,
+    "netTaskS": 0.4199,
+    "netRecalcStyleS": 0.3449,
+    "note": "净值 = body 变动组 − detached 变动组；netScriptS/1000/times ≈ 单次自愈回调脚本成本(ms)"
+  }
+}

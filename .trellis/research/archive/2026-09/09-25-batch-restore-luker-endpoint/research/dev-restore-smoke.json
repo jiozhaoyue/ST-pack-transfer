@@ -1,0 +1,102 @@
+{
+  "sampledAt": "2026-09-25T11:59:58.545Z",
+  "base": "https://127.0.0.1:8003",
+  "restoreResponse": {
+    "url": "https://127.0.0.1:8003/api/users/restore-backup",
+    "status": 200
+  },
+  "result": {
+    "moduleLoaded": true,
+    "capabilityBefore": "unknown",
+    "restoreResult": {
+      "mode": "merge",
+      "restoredCount": 0,
+      "failedCount": 0,
+      "skippedCount": 2,
+      "rejectedCount": 0,
+      "preflight": {
+        "totalEntries": 2,
+        "fileEntries": 2,
+        "directoryEntries": 0,
+        "targetableEntries": 0,
+        "skippedEntries": 2,
+        "rejectedEntries": 0,
+        "engineDumpEntries": 0,
+        "categoryStats": {
+          "settings": {
+            "targetableEntries": 0,
+            "restoredEntries": 0,
+            "failedEntries": 0
+          },
+          "secrets": {
+            "targetableEntries": 0,
+            "restoredEntries": 0,
+            "failedEntries": 0
+          },
+          "characters": {
+            "targetableEntries": 0,
+            "restoredEntries": 0,
+            "failedEntries": 0
+          },
+          "chats": {
+            "targetableEntries": 0,
+            "restoredEntries": 0,
+            "failedEntries": 0
+          },
+          "lorebooks": {
+            "targetableEntries": 0,
+            "restoredEntries": 0,
+            "failedEntries": 0
+          },
+          "presets": {
+            "targetableEntries": 0,
+            "restoredEntries": 0,
+            "failedEntries": 0
+          },
+          "assets": {
+            "targetableEntries": 0,
+            "restoredEntries": 0,
+            "failedEntries": 0
+          },
+          "extensions": {
+            "targetableEntries": 0,
+            "restoredEntries": 0,
+            "failedEntries": 0
+          },
+          "globalExtensions": {
+            "targetableEntries": 0,
+            "restoredEntries": 0,
+            "failedEntries": 0
+          },
+          "vectors": {
+            "targetableEntries": 0,
+            "restoredEntries": 0,
+            "failedEntries": 0
+          }
+        },
+        "sampleSkippedEntries": [
+          {
+            "entry": "manifest.json",
+            "reason": "path_not_in_selected_categories"
+          },
+          {
+            "entry": "lorebooks/zz-probe-a.json",
+            "reason": "path_not_in_selected_categories"
+          },
+          {
+            "entry": "(archive)",
+            "reason": "no_restorable_entries_detected"
+          }
+        ]
+      },
+      "nothingRestored": true
+    },
+    "capabilityAfter": "available"
+  },
+  "restoreCalls": [
+    {
+      "url": "https://127.0.0.1:8003/api/users/restore-backup",
+      "method": "POST"
+    }
+  ]
+}

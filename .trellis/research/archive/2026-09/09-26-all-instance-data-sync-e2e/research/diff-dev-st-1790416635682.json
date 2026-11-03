@@ -1,0 +1,128 @@
+{
+  "target": "dev-st",
+  "targetRoot": "D:\\Repo\\Tavern-repo\\Instance\\Dev\\SillyTavern\\data\\default-user",
+  "pack": "C:\\Users\\caocaobi\\Downloads\\pack-st-20260926-010422.zip",
+  "takenAt": "2026-09-26T09:57:15.679Z",
+  "T1_packCoverage": {
+    "rule": "path+st-character-name",
+    "nameRuleHits": 376,
+    "packEntries": 7181,
+    "denominator": 7177,
+    "presentInTarget": 7177,
+    "missingCount": 0,
+    "coverage": 1,
+    "pass": true,
+    "missingSample": [],
+    "hostMetadataSkipped": {
+      "count": 3,
+      "entries": [
+        "_convert/extensions-manifest.json",
+        "_convert/INSTALL.md",
+        "_convert/meta.json"
+      ]
+    },
+    "hostPrivateSkipped": {
+      "count": 1,
+      "entries": [
+        "characters/【Sgw】又看一集.state.character_editor_assistant.json"
+      ]
+    },
+    "stCharacterMap": {
+      "cardEntries": 401,
+      "distinctNames": 26,
+      "sprites": 28,
+      "stateFiles": 1
+    }
+  },
+  "T2_targetUnique": {
+    "count": 189,
+    "sample": [
+      "backups/settings_default-user_20260828-151439.json",
+      "backups/settings_default-user_20260926-021241.json",
+      "backups/settings_default-user_20260926-161431.json",
+      "backups/settings_default-user_20260926-162133.json",
+      "characters/1.png",
+      "characters/1.png.png",
+      "characters/1af0ff58efe74f846ee3016d426b98ff.png",
+      "characters/2b01476222d89f3d6555503d62fcc23b.png",
+      "characters/35bc2ec29f5a32976d99a79361e5dccc.png",
+      "characters/45d7623bd6219b12b5a57ec18c372494.png",
+      "characters/83d5cf497c6b46c125ad6732a34e299c.png",
+      "characters/a5279aa304960200f1a5b417df207b8e.png",
+      "characters/aa65b490f530c167bc1c886761a747fa.png",
+      "characters/ab3107e9e9cb80a23b7cff87b1bd0612.png",
+      "characters/BanG! City NSFW（紫）·全绿灯.png.png",
+      "characters/BanG! City NSFW（青）.png.png",
+      "characters/default_Seraphina.png-1771390176000.png",
+      "characters/default_Seraphina.png-1775713938000.png",
+      "characters/default_Seraphina.png.png",
+      "characters/e7166d1f545ef2aba7f3b30114bce014.png",
+      "characters/eb481fb751233315783ff3921ce45603.png",
+      "characters/f3de63803a7de9a98a0e596653b8580c.png",
+      "characters/Izumi 用户画像3.png.png",
+      "characters/Seraphina.png",
+      "characters/_t2probe.png",
+      "characters/《绝区零》角色扮演游戏.png-1771398628000.png",
+      "characters/《绝区零》角色扮演游戏.png-1775577420000.png",
+      "characters/《绝区零》角色扮演游戏.png.png",
+      "characters/【Sgw】又看一集.png-1775053338000.png",
+      "characters/【Sgw】又看一集.png.png",
+      "characters/【Sgw】邦↘多↗利↗.png",
+      "characters/【Sgw】邦↘多↗利↗.png-1771398628000.png",
+      "characters/【Sgw】邦↘多↗利↗.png.png",
+      "characters/【Sgw】邦多利~.png.png",
+      "characters/原始人？.png.png",
+      "characters/塞拉菲亚与薇尔莉特.png-1775144780000.png",
+      "characters/塞拉菲亚与薇尔莉特.png-1775577420000.png",
+      "characters/塞拉菲亚与薇尔莉特.png.png",
+      "characters/孤独摇滚-轻前端.png.png",
+      "characters/孤独摇滚.png-1772471288000.png",
+      "characters/孤独摇滚.png-1772699124000.png",
+      "characters/孤独摇滚.png.png",
+      "characters/孤独摇滚1.png-1774886220000.png",
+      "characters/孤独摇滚1.png-1775577420000.png",
+      "characters/孤独摇滚1.png.png",
+      "characters/孤独摇滚2.png-1775053334000.png",
+      "characters/孤独摇滚2.png-1775577420000.png",
+      "characters/孤独摇滚2.png.png",
+      "characters/孤独摇滚2_1.png.png",
+      "characters/孤独摇滚3.png.png"
+    ],
+    "deletionCheck": null,
+    "preManifestCheck": {
+      "manifest": ".trellis/tasks/09-26-all-instance-data-sync-e2e/research/t2-pre-dev-st.json",
+      "takenAt": "2026-09-26T08:04:23.406Z",
+      "declared": 198,
+      "stillPresent": 196,
+      "deletedCount": 2,
+      "deletedSample": [
+        "thumbnails/avatar/default_Seraphina.png",
+        "thumbnails/persona/user-default.png"
+      ],
+      "hostRotatedBackups": []
+    }
+  },
+  "T3_content": {
+    "pack": {
+      "characters": 430,
+      "chats": 1029,
+      "worlds": 21,
+      "groups": 0,
+      "themes": 5,
+      "backgrounds": 23,
+      "extensions": 5204,
+      "other": 469
+    },
+    "target": {
+      "characters": 120,
+      "chats": 1029,
+      "worlds": 21,
+      "groups": 0,
+      "themes": 5,
+      "backgrounds": 23,
+      "extensions": 5319,
+      "other": 473
+    }
+  },
+  "targetFileCount": 6990
+}

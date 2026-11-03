@@ -1,0 +1,25 @@
+{
+  "sampledAt": "2026-09-25T11:57:31.272Z",
+  "base": "https://127.0.0.1:8003",
+  "result": {
+    "hostVersion": "",
+    "headerKeys": [
+      "Content-Type",
+      "X-CSRF-Token"
+    ],
+    "csrfEndpointStatus": 200,
+    "ctxTokenPrefix": "01d8653d5165",
+    "netTokenPrefix": "01d8653d5165",
+    "sameToken": true,
+    "probeWithCtxToken": {
+      "label": "getRequestHeaders()",
+      "status": 400,
+      "body": "{\"error\":\"Missing required fields\"}"
+    },
+    "probeWithNetToken": {
+      "label": "/csrf-token",
+      "status": 400,
+      "body": "{\"error\":\"Missing required fields\"}"
+    }
+  }
+}

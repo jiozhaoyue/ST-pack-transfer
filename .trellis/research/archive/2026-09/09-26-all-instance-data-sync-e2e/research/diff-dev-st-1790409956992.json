@@ -1,0 +1,119 @@
+{
+  "target": "dev-st",
+  "targetRoot": "D:\\Repo\\Tavern-repo\\Instance\\Dev\\SillyTavern\\data\\default-user",
+  "pack": "C:\\Users\\caocaobi\\Downloads\\pack-st-20260926-010422.zip",
+  "takenAt": "2026-09-26T08:05:56.991Z",
+  "T1_packCoverage": {
+    "packEntries": 7181,
+    "presentInTarget": 224,
+    "missingCount": 6957,
+    "coverage": 0.031193,
+    "pass": false,
+    "missingSample": [
+      "KoboldAI Settings/Ace of Spades.json",
+      "OpenAI Settings/-Meowssiah-1.0_2.json",
+      "TextGen Settings/Asterism.json",
+      "characters/0155848eb69063b0249274e5f4f73a543e615d2f10fa8e995aa4e10a53f7c73d",
+      "extensions/.gitkeep",
+      "user/files/acsus-paws-puffs-variables-v2.json",
+      "chats/BanG! City NSFW（紫）·全绿灯/BanG! City NSFW（紫）·全绿灯 - 2026-07-25@01h31m37s531ms.jsonl",
+      "KoboldAI Settings/Basic Coherence.json",
+      "OpenAI Settings/-Meowssiah-1.0_2最佳.json",
+      "TextGen Settings/Beam Search.json",
+      "QuickReplies/超级大百科_QR.json",
+      "characters/03155d43c847f3b40b403606948e9760d4f7b502421450343c53ae0db883fa8d",
+      "user/images/chatu8_config/ai_chat_data_chat_1778347290814_ew5mt.png",
+      "user/files/LittleWhiteBox_EnaPlanner.json",
+      "chats/BanG! City NSFW（紫）·全绿灯/BanG! City NSFW（紫）·全绿灯 - 2026-07-25@01h31m37s531ms.luker-state.chat_sync.json",
+      "KoboldAI Settings/Best Guess.json",
+      "chats/BanG! City NSFW（紫）·全绿灯/BanG! City NSFW（紫）·全绿灯 - 2026-07-25@01h31m37s531ms.luker-state.luker_orchestrator_anchors__schema.json",
+      "OpenAI Settings/7.15【可待-标】_乙亥_拾陆.json",
+      "TextGen Settings/Big O.json",
+      "characters/03ea6ff9a0ab343453c09e64f82b099c1c9ba600f126dd81fb98fbd682e7590b",
+      "user/images/chatu8_config/ai_chat_index.png",
+      "user/files/LittleWhiteBox_NovelDraw.json",
+      "KoboldAI Settings/Coherent Creativity.json",
+      "OpenAI Settings/agent-non-director.json",
+      "TextGen Settings/Contrastive Search.json",
+      "characters/03f97de3c653e468a98e89f3043376c846b94dfdae8bce8a54fe5cdda5b7fbb2",
+      "user/images/chatu8_config/log_session_data_log_33f490b1-e181-4445-becf-6e02993e9c34.png",
+      "extensions/Acsus-Paws-Puffs/.git/config",
+      "user/files/LittleWhiteBox_StoryOutline.json",
+      "chats/BanG! City NSFW（紫）·全绿灯/BanG! City NSFW（紫）·全绿灯 - 2026-07-25@01h31m37s531ms.luker-state.luker_search_tools_anchors__meta.json",
+      "user/images/chatu8_config/log_session_index.png",
+      "characters/05248862bff9a3ba1561050ac0b6311adba3db666631a818ac54df48986cff26",
+      "user/files/LittleWhiteBox_Tasks.json",
+      "chats/BanG! City NSFW（紫）·全绿灯/BanG! City NSFW（紫）·全绿灯 - 2026-07-25@01h31m37s531ms.luker-state.memory_graph__meta.json",
+      "KoboldAI Settings/Genesis.json",
+      "OpenAI Settings/Izumi 0825.json",
+      "characters/054da28e55f3dbeb61f5d8b71edc76c45bd1f38a7723ea757499a8582039909e",
+      "extensions/Acsus-Paws-Puffs/.git/HEAD",
+      "user/files/st-theme-engine.json",
+      "chats/BanG! City NSFW（紫）·全绿灯/BanG! City NSFW（紫）·全绿灯 - 2026-07-25@01h50m02s347ms.jsonl",
+      "user/files/TavernDB_ACU_vector_-_2026-07-19_23h05m21s834ms_imported_snapshot",
+      "KoboldAI Settings/Godlike.json",
+      "OpenAI Settings/Izumi 0828.json",
+      "TextGen Settings/Divine Intellect.json",
+      "characters/0553f099281bd108ef567ab85c61087d0444b8575d4be6632927d297627248fc",
+      "chats/BanG! City NSFW（紫）·全绿灯/BanG! City NSFW（紫）·全绿灯 - 2026-07-25@01h50m02s347ms.luker-state.chat_sync.json",
+      "user/files/TavernDB_ACU_vector_-_2026-07-28_00h40m48s989ms_-_Branch_1_snapshot",
+      "KoboldAI Settings/Good Winds.json",
+      "OpenAI Settings/Izumi_0503.json",
+      "TextGen Settings/Kobold (Godlike).json"
+    ],
+    "hostMetadataSkipped": {
+      "count": 3,
+      "entries": [
+        "_convert/extensions-manifest.json",
+        "_convert/INSTALL.md",
+        "_convert/meta.json"
+      ]
+    }
+  },
+  "T2_targetUnique": {
+    "count": 6,
+    "sample": [
+      "backups/settings_default-user_20260828-151439.json",
+      "backups/settings_default-user_20260926-021241.json",
+      "content.log",
+      "image-metadata.json",
+      "stats.json",
+      "thumbnails/avatar/default_Seraphina.png"
+    ],
+    "deletionCheck": null,
+    "preManifestCheck": {
+      "manifest": ".trellis/tasks/09-26-all-instance-data-sync-e2e/research/t2-pre-dev-st.json",
+      "takenAt": "2026-09-26T08:04:23.406Z",
+      "declared": 198,
+      "stillPresent": 197,
+      "deletedCount": 1,
+      "deletedSample": [
+        "thumbnails/persona/user-default.png"
+      ],
+      "hostRotatedBackups": []
+    }
+  },
+  "T3_content": {
+    "pack": {
+      "characters": 430,
+      "chats": 1029,
+      "worlds": 21,
+      "groups": 0,
+      "themes": 5,
+      "backgrounds": 23,
+      "extensions": 5204,
+      "other": 469
+    },
+    "target": {
+      "characters": 29,
+      "chats": 0,
+      "worlds": 21,
+      "groups": 0,
+      "themes": 5,
+      "backgrounds": 23,
+      "extensions": 0,
+      "other": 149
+    }
+  },
+  "targetFileCount": 227
+}

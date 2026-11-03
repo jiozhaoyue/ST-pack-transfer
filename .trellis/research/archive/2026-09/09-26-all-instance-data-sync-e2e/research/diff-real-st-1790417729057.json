@@ -1,0 +1,131 @@
+{
+  "target": "real-st",
+  "targetRoot": "D:\\Repo\\Tavern-repo\\Instance\\Real\\SillyTavern\\data\\default-user",
+  "pack": "C:\\Users\\caocaobi\\Downloads\\pack-st-20260926-010422.zip",
+  "takenAt": "2026-09-26T10:15:29.055Z",
+  "T1_packCoverage": {
+    "rule": "path+st-character-name",
+    "nameRuleHits": 380,
+    "packEntries": 7181,
+    "denominator": 7177,
+    "presentInTarget": 7177,
+    "missingCount": 0,
+    "coverage": 1,
+    "pass": true,
+    "missingSample": [],
+    "hostMetadataSkipped": {
+      "count": 3,
+      "entries": [
+        "_convert/extensions-manifest.json",
+        "_convert/INSTALL.md",
+        "_convert/meta.json"
+      ]
+    },
+    "hostPrivateSkipped": {
+      "count": 1,
+      "entries": [
+        "characters/【Sgw】又看一集.state.character_editor_assistant.json"
+      ]
+    },
+    "linkedExternalDrift": {
+      "count": 0,
+      "roots": [],
+      "entries": []
+    },
+    "stCharacterMap": {
+      "cardEntries": 401,
+      "distinctNames": 26,
+      "sprites": 28,
+      "stateFiles": 1
+    }
+  },
+  "T2_targetUnique": {
+    "count": 127,
+    "sample": [
+      "backups/settings_default-user_20260828-151439.json",
+      "backups/settings_default-user_20260926-161026.json",
+      "backups/settings_default-user_20260926-162536.json",
+      "backups/settings_default-user_20260926-180111.json",
+      "characters/1.png",
+      "characters/Seraphina.png",
+      "characters/【Sgw】邦↘多↗利↗.png",
+      "characters/朝月.png",
+      "characters/角色卡管理 (路西法酱改版0206).png",
+      "content.log",
+      "image-metadata.json",
+      "stats.json",
+      "extensions/st-zip-converter/.git/description",
+      "extensions/st-zip-converter/.git/FETCH_HEAD",
+      "extensions/st-zip-converter/.git/hooks/applypatch-msg.sample",
+      "extensions/st-zip-converter/.git/hooks/commit-msg.sample",
+      "extensions/st-zip-converter/.git/hooks/fsmonitor-watchman.sample",
+      "extensions/st-zip-converter/.git/hooks/post-update.sample",
+      "extensions/st-zip-converter/.git/hooks/pre-applypatch.sample",
+      "extensions/st-zip-converter/.git/hooks/pre-commit.sample",
+      "extensions/st-zip-converter/.git/hooks/pre-merge-commit.sample",
+      "extensions/st-zip-converter/.git/hooks/pre-push.sample",
+      "extensions/st-zip-converter/.git/hooks/pre-rebase.sample",
+      "extensions/st-zip-converter/.git/hooks/pre-receive.sample",
+      "extensions/st-zip-converter/.git/hooks/prepare-commit-msg.sample",
+      "extensions/st-zip-converter/.git/hooks/push-to-checkout.sample",
+      "extensions/st-zip-converter/.git/hooks/sendemail-validate.sample",
+      "extensions/st-zip-converter/.git/hooks/update.sample",
+      "extensions/st-zip-converter/.git/info/exclude",
+      "extensions/st-zip-converter/.git/logs/HEAD",
+      "extensions/st-zip-converter/.git/logs/refs/heads/main",
+      "extensions/st-zip-converter/.git/logs/refs/remotes/origin/HEAD",
+      "extensions/st-zip-converter/.git/logs/refs/remotes/origin/main",
+      "extensions/st-zip-converter/.git/objects/05/507a9eaa856effa872c7836e807ab78723a26c",
+      "extensions/st-zip-converter/.git/objects/13/9e66589468ff57e1269683036e10ba129b8b06",
+      "extensions/st-zip-converter/.git/objects/14/204ec7ecdd7285d85688b7ee82d6fdacfe5b22",
+      "extensions/st-zip-converter/.git/objects/15/e6784e085943591ea1bd3c2d401575093e7142",
+      "extensions/st-zip-converter/.git/objects/16/40118a0a5e6e850ed0046fab73c1a51764be37",
+      "extensions/st-zip-converter/.git/objects/20/846c65c978c7233fbd1b08b6638e72532e97d9",
+      "extensions/st-zip-converter/.git/objects/23/5fde262204494dcd80f27c6584e8854bff73b9",
+      "extensions/st-zip-converter/.git/objects/27/ec92cf38a99379c6a100ad37d75349f0b6d2c6",
+      "extensions/st-zip-converter/.git/objects/2e/211dffb3eb397340a1707136fe880a962abba2",
+      "extensions/st-zip-converter/.git/objects/2e/e943d9510e4596ece8de807264b852e19bf062",
+      "extensions/st-zip-converter/.git/objects/42/c100598040762aa871ea84926e1c7ed19ec9e0",
+      "extensions/st-zip-converter/.git/objects/4e/5f4c7d9717d63cba358cc80420f1f5be4cc000",
+      "extensions/st-zip-converter/.git/objects/56/abf1e16b8231e49e84e93c6eb2f805ed7d6aaa",
+      "extensions/st-zip-converter/.git/objects/59/2c457cd3b3c19ed028fa50f3861eb24683c29f",
+      "extensions/st-zip-converter/.git/objects/65/f40a6bda2209f3711bb2dbdbc274b29589235f",
+      "extensions/st-zip-converter/.git/objects/67/257b744806e2f3abbe0618472d6af0b38d1d78",
+      "extensions/st-zip-converter/.git/objects/77/fa42718f54d25568ac9fc133859537d4cad652"
+    ],
+    "deletionCheck": null,
+    "preManifestCheck": {
+      "manifest": ".trellis/tasks/09-26-all-instance-data-sync-e2e/research/t2-pre-real-st.json",
+      "takenAt": "2026-09-26T08:09:40.064Z",
+      "declared": 195,
+      "stillPresent": 195,
+      "deletedCount": 0,
+      "deletedSample": [],
+      "hostManagedCache": [],
+      "hostRotatedBackups": []
+    }
+  },
+  "T3_content": {
+    "pack": {
+      "characters": 430,
+      "chats": 1029,
+      "worlds": 21,
+      "groups": 0,
+      "themes": 5,
+      "backgrounds": 23,
+      "extensions": 5204,
+      "other": 469
+    },
+    "target": {
+      "characters": 54,
+      "chats": 1029,
+      "worlds": 21,
+      "groups": 0,
+      "themes": 5,
+      "backgrounds": 23,
+      "extensions": 5319,
+      "other": 473
+    }
+  },
+  "targetFileCount": 6924
+}

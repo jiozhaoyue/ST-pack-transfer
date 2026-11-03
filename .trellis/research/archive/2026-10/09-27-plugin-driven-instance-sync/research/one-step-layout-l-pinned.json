@@ -1,0 +1,99 @@
+{
+  "tool": "diff-packs.cjs",
+  "label": "OQ-2 复核（钉死+清初态后）：插件 l vs build-packs(l)【同源：b87033e】",
+  "a": {
+    "file": "l_default-user_part1_2026-09-29.zip",
+    "bytes": 622822315,
+    "aEntries": 6887,
+    "bEntries": 6564,
+    "aDirs": 0,
+    "bDirs": 0,
+    "same": 6563,
+    "changed": 1,
+    "onlyInA": 323,
+    "onlyInB": 0,
+    "changedRequestMetadata": 0,
+    "dirOnlyInA": 0,
+    "dirOnlyInB": 0,
+    "dirs": 0
+  },
+  "b": {
+    "file": "pack-luker-nodate.zip",
+    "bytes": 544899054
+  },
+  "selfTest": null,
+  "counts": {
+    "aEntries": 6887,
+    "bEntries": 6564,
+    "aDirs": 0,
+    "bDirs": 0,
+    "same": 6563,
+    "changed": 1,
+    "onlyInA": 323,
+    "onlyInB": 0,
+    "changedRequestMetadata": 0,
+    "dirOnlyInA": 0,
+    "dirOnlyInB": 0
+  },
+  "bytes": {
+    "aUncompressed": 1392072810,
+    "bUncompressed": 1279065342
+  },
+  "onlyInAByTop": [
+    {
+      "top": "public/",
+      "count": 323
+    }
+  ],
+  "onlyInBByTop": [],
+  "changedByTop": [
+    {
+      "top": "(根文件)",
+      "count": 1
+    }
+  ],
+  "changedRequestMetadata": [],
+  "samples": {
+    "onlyInA": [
+      "public/scripts/extensions/third-party/Extension-VideoBackgroundLoader/.git/config",
+      "public/scripts/extensions/third-party/Extension-VideoBackgroundLoader/.git/HEAD",
+      "public/scripts/extensions/third-party/Extension-VideoBackgroundLoader/.git/index",
+      "public/scripts/extensions/third-party/Extension-VideoBackgroundLoader/.git/objects/pack/pack-1cf937a87923232ccb822c5d303f191657783058.idx",
+      "public/scripts/extensions/third-party/Extension-VideoBackgroundLoader/.git/objects/pack/pack-1cf937a87923232ccb822c5d303f191657783058.pack",
+      "public/scripts/extensions/third-party/Extension-VideoBackgroundLoader/.git/refs/heads/main",
+      "public/scripts/extensions/third-party/Extension-VideoBackgroundLoader/.git/refs/remotes/origin/HEAD",
+      "public/scripts/extensions/third-party/Extension-VideoBackgroundLoader/.git/refs/remotes/origin/main",
+      "public/scripts/extensions/third-party/Extension-VideoBackgroundLoader/.git/shallow",
+      "public/scripts/extensions/third-party/Extension-VideoBackgroundLoader/.gitignore",
+      "public/scripts/extensions/third-party/Extension-VideoBackgroundLoader/dist/138.index.js",
+      "public/scripts/extensions/third-party/Extension-VideoBackgroundLoader/dist/ffmpeg-core.js",
+      "public/scripts/extensions/third-party/Extension-VideoBackgroundLoader/dist/ffmpeg-core.wasm",
+      "public/scripts/extensions/third-party/Extension-VideoBackgroundLoader/dist/index.js",
+      "public/scripts/extensions/third-party/Extension-VideoBackgroundLoader/eslint.config.mjs",
+      "public/scripts/extensions/third-party/Extension-VideoBackgroundLoader/globals.d.ts",
+      "public/scripts/extensions/third-party/Extension-VideoBackgroundLoader/LICENSE",
+      "public/scripts/extensions/third-party/Extension-VideoBackgroundLoader/manifest.json",
+      "public/scripts/extensions/third-party/Extension-VideoBackgroundLoader/package-lock.json",
+      "public/scripts/extensions/third-party/Extension-VideoBackgroundLoader/package.json"
+    ],
+    "onlyInB": [],
+    "changed": [
+      {
+        "path": "manifest.json",
+        "crcA": 3788678335,
+        "crcB": 3121760226,
+        "sizeA": 342,
+        "sizeB": 341,
+        "differingFields": [
+          "selection"
+        ],
+        "exemption": "结构化元数据，但差异**不止**请求期字段 ⇒ 照实计入 changed"
+      }
+    ],
+    "dirOnlyInA": [],
+    "dirOnlyInB": []
+  },
+  "verdict": "DIFFERENT",
+  "verdictDetail": "323 条仅 A / 0 条仅 B / 1 条内容不同（已剔除请求期元数据）",
+  "comparedAt": "2026-09-29T12:49:21.605Z"
+}

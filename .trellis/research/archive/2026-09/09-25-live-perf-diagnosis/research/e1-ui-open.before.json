@@ -1,0 +1,230 @@
+{
+  "sampledAt": "2026-09-25T07:35:27.089Z",
+  "url": "https://127.0.0.1:8004",
+  "opened": {
+    "blockDisplay": "block",
+    "appHeight": 1237,
+    "appWidth": 474
+  },
+  "uiFacts": {
+    "nodeCount": 276,
+    "buttonsTotal": 36,
+    "buttonsVisible": 13,
+    "inputs": 19,
+    "checkboxes": 8,
+    "radios": 4,
+    "details": 3,
+    "labels": 12,
+    "scrollHeight": 1237,
+    "clientHeight": 1237,
+    "buttonLabels": [
+      "+ {part}",
+      "+ {user}",
+      "+ {date}",
+      "+ {category}",
+      "+ {mode}",
+      "+ {target}",
+      "分卷标准",
+      "核心备份",
+      "全量备份",
+      "开始转换",
+      "从宿主拉取",
+      "恢复到当前用户",
+      "展开日志 ▲"
+    ]
+  },
+  "staticVisibleState": {
+    "metrics": {}
+  },
+  "interactionProfile": {
+    "windowMs": 500,
+    "totalSampledMs": 566.78,
+    "byOrigin": {
+      "native/unknown": {
+        "ms": 555.41
+      },
+      "host-or-other-ext": {
+        "ms": 10.95
+      },
+      "plugin": {
+        "ms": 0.32
+      },
+      "remote": {
+        "ms": 0.1
+      }
+    },
+    "pluginSharePct": 0.06,
+    "topFunctions": [
+      {
+        "fn": "(idle)",
+        "url": "",
+        "line": -1,
+        "origin": "native/unknown",
+        "ms": 425.43
+      },
+      {
+        "fn": "(program)",
+        "url": "",
+        "line": -1,
+        "origin": "native/unknown",
+        "ms": 102.65
+      },
+      {
+        "fn": "(garbage collector)",
+        "url": "",
+        "line": -1,
+        "origin": "native/unknown",
+        "ms": 16.93
+      },
+      {
+        "fn": "(anonymous)",
+        "url": "/lib/jquery-3.5.1.min.js",
+        "line": 1,
+        "origin": "host-or-other-ext",
+        "ms": 2.88
+      },
+      {
+        "fn": "querySelectorAll",
+        "url": "",
+        "line": -1,
+        "origin": "native/unknown",
+        "ms": 2.85
+      },
+      {
+        "fn": "querySelector",
+        "url": "",
+        "line": -1,
+        "origin": "native/unknown",
+        "ms": 2.08
+      },
+      {
+        "fn": "se",
+        "url": "/lib/jquery-3.5.1.min.js",
+        "line": 1,
+        "origin": "host-or-other-ext",
+        "ms": 2.08
+      },
+      {
+        "fn": "querySelector",
+        "url": "",
+        "line": -1,
+        "origin": "native/unknown",
+        "ms": 1.8
+      },
+      {
+        "fn": "querySelectorAll",
+        "url": "",
+        "line": -1,
+        "origin": "native/unknown",
+        "ms": 0.85
+      },
+      {
+        "fn": "handlers",
+        "url": "/lib/jquery-3.5.1.min.js",
+        "line": 1,
+        "origin": "host-or-other-ext",
+        "ms": 0.82
+      },
+      {
+        "fn": "querySelectorAll",
+        "url": "",
+        "line": -1,
+        "origin": "native/unknown",
+        "ms": 0.82
+      },
+      {
+        "fn": "(anonymous)",
+        "url": "/lib/jquery-3.5.1.min.js",
+        "line": 1,
+        "origin": "host-or-other-ext",
+        "ms": 0.8
+      },
+      {
+        "fn": "(anonymous)",
+        "url": "/lib/jquery-3.5.1.min.js",
+        "line": 1,
+        "origin": "host-or-other-ext",
+        "ms": 0.63
+      },
+      {
+        "fn": "e",
+        "url": "/lib/jquery-3.5.1.min.js",
+        "line": 1,
+        "origin": "host-or-other-ext",
+        "ms": 0.6
+      },
+      {
+        "fn": "e",
+        "url": "/lib/jquery-3.5.1.min.js",
+        "line": 1,
+        "origin": "host-or-other-ext",
+        "ms": 0.53
+      },
+      {
+        "fn": "querySelectorAll",
+        "url": "",
+        "line": -1,
+        "origin": "native/unknown",
+        "ms": 0.35
+      },
+      {
+        "fn": "(anonymous)",
+        "url": "/lib/jquery-3.5.1.min.js",
+        "line": 1,
+        "origin": "host-or-other-ext",
+        "ms": 0.33
+      },
+      {
+        "fn": "CLASS",
+        "url": "/lib/jquery-3.5.1.min.js",
+        "line": 1,
+        "origin": "host-or-other-ext",
+        "ms": 0.3
+      },
+      {
+        "fn": "(anonymous)",
+        "url": "/lib/jquery-3.5.1.min.js",
+        "line": 1,
+        "origin": "host-or-other-ext",
+        "ms": 0.3
+      },
+      {
+        "fn": "getAttribute",
+        "url": "",
+        "line": -1,
+        "origin": "native/unknown",
+        "ms": 0.3
+      }
+    ],
+    "pluginFunctions": [
+      {
+        "fn": "updateFilenamePreview",
+        "url": "/scripts/extensions/third-party/st-zip-converter/index.js",
+        "line": 92,
+        "origin": "plugin",
+        "ms": 0.13
+      },
+      {
+        "fn": "resolveFilename",
+        "url": "/scripts/extensions/third-party/st-zip-converter/src/core/filename-template.js",
+        "line": 51,
+        "origin": "plugin",
+        "ms": 0.13
+      },
+      {
+        "fn": "(anonymous)",
+        "url": "/scripts/extensions/third-party/st-zip-converter/index.js",
+        "line": 162,
+        "origin": "plugin",
+        "ms": 0.03
+      },
+      {
+        "fn": "formatDate",
+        "url": "/scripts/extensions/third-party/st-zip-converter/src/core/filename-template.js",
+        "line": 30,
+        "origin": "plugin",
+        "ms": 0.03
+      }
+    ]
+  }
+}

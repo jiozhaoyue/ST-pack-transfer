@@ -1,0 +1,56 @@
+{
+  "tool": "diff-packs.cjs",
+  "label": "OQ-2：插件一步直出 st vs build-packs(st)",
+  "a": {
+    "file": "st_default-user_part1_2026-09-29.zip",
+    "bytes": 544871893,
+    "aEntries": 6563,
+    "bEntries": 6563,
+    "aDirs": 0,
+    "bDirs": 0,
+    "same": 6563,
+    "changed": 0,
+    "onlyInA": 0,
+    "onlyInB": 0,
+    "changedRequestMetadata": 0,
+    "dirOnlyInA": 0,
+    "dirOnlyInB": 0,
+    "dirs": 0
+  },
+  "b": {
+    "file": "pack-st-nodate.zip",
+    "bytes": 544871893
+  },
+  "selfTest": null,
+  "counts": {
+    "aEntries": 6563,
+    "bEntries": 6563,
+    "aDirs": 0,
+    "bDirs": 0,
+    "same": 6563,
+    "changed": 0,
+    "onlyInA": 0,
+    "onlyInB": 0,
+    "changedRequestMetadata": 0,
+    "dirOnlyInA": 0,
+    "dirOnlyInB": 0
+  },
+  "bytes": {
+    "aUncompressed": 1278993964,
+    "bUncompressed": 1278993964
+  },
+  "onlyInAByTop": [],
+  "onlyInBByTop": [],
+  "changedByTop": [],
+  "changedRequestMetadata": [],
+  "samples": {
+    "onlyInA": [],
+    "onlyInB": [],
+    "changed": [],
+    "dirOnlyInA": [],
+    "dirOnlyInB": []
+  },
+  "verdict": "IDENTICAL",
+  "verdictDetail": "条目路径集合与逐条 crc32 全等",
+  "comparedAt": "2026-09-29T05:49:10.832Z"
+}

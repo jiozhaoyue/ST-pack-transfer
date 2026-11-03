@@ -1,0 +1,34 @@
+{
+  "probedAt": "2026-10-25T06:58:52.809Z",
+  "target": "https://dev-luker.localhost:8003",
+  "variants": [
+    {
+      "name": "qA-total-std10",
+      "status": 200,
+      "contentLength": null,
+      "totalBytes": 1794066398,
+      "ms": 316548
+    },
+    {
+      "name": "qB-total-13-exclude",
+      "status": 200,
+      "contentLength": null,
+      "totalBytes": 1794012698,
+      "ms": 129186
+    },
+    {
+      "name": "qC-total-13-all",
+      "status": 200,
+      "contentLength": null,
+      "totalBytes": 1794012697,
+      "ms": 96282
+    },
+    {
+      "name": "qD-total-array",
+      "status": 200,
+      "contentLength": null,
+      "totalBytes": 1714545035,
+      "ms": 90433
+    }
+  ]
+}

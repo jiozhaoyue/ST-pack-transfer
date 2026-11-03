@@ -1,0 +1,41 @@
+{
+  "sampledAt": "2026-09-25T12:00:49.629Z",
+  "base": "https://127.0.0.1:8003",
+  "package": "worlds/zz-probe-a.json（合成）",
+  "result": {
+    "viaPlugin": {
+      "restoredCount": 1,
+      "skippedCount": 1,
+      "failedCount": 0,
+      "rejectedCount": 0,
+      "mode": "merge",
+      "firstSkipped": "path_not_in_selected_categories",
+      "error": null
+    },
+    "directNoSelection": {
+      "status": 200,
+      "restoredCount": 1,
+      "skippedCount": 1,
+      "failedCount": 0,
+      "rejectedCount": 0,
+      "mode": "merge",
+      "firstSkipped": "path_not_in_selected_categories",
+      "error": null
+    },
+    "directWithSelection": {
+      "status": 200,
+      "restoredCount": 1,
+      "skippedCount": 1,
+      "failedCount": 0,
+      "rejectedCount": 0,
+      "mode": "merge",
+      "firstSkipped": "path_not_in_selected_categories",
+      "error": null
+    }
+  },
+  "restoreCalls": [
+    "https://127.0.0.1:8003/api/users/restore-backup",
+    "https://127.0.0.1:8003/api/users/restore-backup",
+    "https://127.0.0.1:8003/api/users/restore-backup"
+  ]
+}

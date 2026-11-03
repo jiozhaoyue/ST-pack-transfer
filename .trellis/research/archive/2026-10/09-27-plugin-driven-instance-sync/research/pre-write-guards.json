@@ -1,0 +1,125 @@
+{
+  "takenAt": "2026-10-13T06:55:41.137Z",
+  "pack": "test-results/produce-real/run2/l_default-user_part1_2026-10-13.zip",
+  "targets": [
+    {
+      "instance": "dev-st",
+      "side": "dev",
+      "host": "st",
+      "port": 8001,
+      "repoDir": "D:\\Repo\\Tavern-repo\\Instance\\Dev\\SillyTavern",
+      "userDir": "D:\\Repo\\Tavern-repo\\Instance\\Dev\\SillyTavern\\data\\default-user",
+      "writeRoots": [
+        "data/default-user",
+        "public/scripts/extensions/third-party"
+      ],
+      "linkGuard": {
+        "linked": [],
+        "count": 0
+      },
+      "sourceFace": {
+        "violations": [],
+        "pass": true
+      },
+      "gitObjects": {
+        "applicable": true,
+        "gitObjectsEntries": 32,
+        "targetFilesExisting": 32,
+        "readonlyHits": [],
+        "pass": true
+      }
+    },
+    {
+      "instance": "real-st",
+      "side": "real",
+      "host": "st",
+      "port": 8002,
+      "repoDir": "D:\\Repo\\Tavern-repo\\Instance\\Real\\SillyTavern",
+      "userDir": "D:\\Repo\\Tavern-repo\\Instance\\Real\\SillyTavern\\data\\default-user",
+      "writeRoots": [
+        "data/default-user",
+        "public/scripts/extensions/third-party"
+      ],
+      "linkGuard": {
+        "linked": [],
+        "count": 0
+      },
+      "sourceFace": {
+        "violations": [],
+        "pass": true
+      },
+      "gitObjects": {
+        "applicable": true,
+        "gitObjectsEntries": 32,
+        "targetFilesExisting": 32,
+        "readonlyHits": [],
+        "pass": true
+      }
+    },
+    {
+      "instance": "dev-luker",
+      "side": "dev",
+      "host": "luker",
+      "port": 8003,
+      "repoDir": "D:\\Repo\\Tavern-repo\\Instance\\Dev\\Luker",
+      "userDir": "D:\\Repo\\Tavern-repo\\Instance\\Dev\\Luker\\data\\default-user",
+      "writeRoots": [
+        "data/default-user"
+      ],
+      "linkGuard": {
+        "linked": [
+          {
+            "root": "data/default-user",
+            "rel": "data/default-user/extensions/ST-BgLoader",
+            "target": "D:\\Repo\\Tavern-repo\\My-repo\\ST-BgLoader"
+          }
+        ],
+        "count": 1
+      },
+      "sourceFace": {
+        "violations": [],
+        "pass": true
+      },
+      "gitObjects": {
+        "applicable": true,
+        "gitObjectsEntries": 32,
+        "targetFilesExisting": 32,
+        "readonlyHits": [],
+        "pass": true
+      }
+    },
+    {
+      "instance": "real-luker",
+      "side": "real",
+      "host": "luker",
+      "port": 8004,
+      "repoDir": "D:\\Repo\\Tavern-repo\\Instance\\Real\\Luker",
+      "userDir": "D:\\Repo\\Tavern-repo\\Instance\\Real\\Luker\\data\\default-user",
+      "writeRoots": [
+        "data/default-user"
+      ],
+      "linkGuard": {
+        "linked": [],
+        "count": 0
+      },
+      "sourceFace": {
+        "violations": [],
+        "pass": true
+      },
+      "gitObjects": {
+        "applicable": true,
+        "gitObjectsEntries": 32,
+        "targetFilesExisting": 32,
+        "readonlyHits": [],
+        "pass": true
+      }
+    }
+  ],
+  "summary": {
+    "targets": 4,
+    "linkRootsTotal": 1,
+    "sourceFaceViolations": 0,
+    "gitObjectsReadonlyHits": 0,
+    "ok": true
+  }
+}

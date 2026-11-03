@@ -1,0 +1,239 @@
+{
+  "sampledAt": "2026-09-25T07:36:28.870Z",
+  "url": "https://127.0.0.1:8004",
+  "startup": {
+    "wallMs": 36094,
+    "profile": {
+      "windowMs": 36094,
+      "totalSampledMs": 16866.5,
+      "byOrigin": {
+        "native/unknown": {
+          "ms": 6710.5
+        },
+        "remote": {
+          "ms": 4956
+        },
+        "host-or-other-ext": {
+          "ms": 5192
+        },
+        "plugin": {
+          "ms": 8
+        }
+      },
+      "pluginSharePct": 0.05,
+      "topFunctions": [
+        {
+          "fn": "(idle)",
+          "url": "",
+          "line": -1,
+          "origin": "native/unknown",
+          "ms": 3094
+        },
+        {
+          "fn": "(program)",
+          "url": "",
+          "line": -1,
+          "origin": "native/unknown",
+          "ms": 2477
+        },
+        {
+          "fn": "oe",
+          "url": "https://esm.sh/@chenglou/pretext@0.0.9/es2022/dist/analysis.mjs",
+          "line": 4,
+          "origin": "remote",
+          "ms": 2048.5
+        },
+        {
+          "fn": "serializeFrontendLogValue",
+          "url": "/scripts/frontend-log-manager.js",
+          "line": 25,
+          "origin": "host-or-other-ext",
+          "ms": 1438.5
+        },
+        {
+          "fn": "p",
+          "url": "https://esm.sh/@chenglou/pretext@0.0.9/es2022/dist/measurement.mjs",
+          "line": 1,
+          "origin": "remote",
+          "ms": 601.5
+        },
+        {
+          "fn": "ie",
+          "url": "https://esm.sh/@chenglou/pretext@0.0.9/es2022/dist/analysis.mjs",
+          "line": 4,
+          "origin": "remote",
+          "ms": 501
+        },
+        {
+          "fn": "u",
+          "url": "https://esm.sh/@chenglou/pretext@0.0.9/es2022/pretext.mjs",
+          "line": 1,
+          "origin": "remote",
+          "ms": 389
+        },
+        {
+          "fn": "cloneJsonValue",
+          "url": "/script.js",
+          "line": 11727,
+          "origin": "host-or-other-ext",
+          "ms": 287
+        },
+        {
+          "fn": "(garbage collector)",
+          "url": "",
+          "line": -1,
+          "origin": "native/unknown",
+          "ms": 219
+        },
+        {
+          "fn": "Be",
+          "url": "/lib/jquery-3.5.1.min.js",
+          "line": 1,
+          "origin": "host-or-other-ext",
+          "ms": 177.5
+        },
+        {
+          "fn": "V",
+          "url": "https://esm.sh/@chenglou/pretext@0.0.9/es2022/dist/analysis.mjs",
+          "line": 3,
+          "origin": "remote",
+          "ms": 157.5
+        },
+        {
+          "fn": "settingsGetRequestInterceptor",
+          "url": "/script.js",
+          "line": 15160,
+          "origin": "host-or-other-ext",
+          "ms": 143.5
+        },
+        {
+          "fn": "(anonymous)",
+          "url": "/script.js",
+          "line": 11915,
+          "origin": "host-or-other-ext",
+          "ms": 129
+        },
+        {
+          "fn": "Nt",
+          "url": "https://esm.sh/@chenglou/pretext@0.0.9/es2022/dist/analysis.mjs",
+          "line": 3,
+          "origin": "remote",
+          "ms": 127.5
+        },
+        {
+          "fn": "se",
+          "url": "https://esm.sh/@chenglou/pretext@0.0.9/es2022/dist/analysis.mjs",
+          "line": 4,
+          "origin": "remote",
+          "ms": 109.5
+        }
+      ],
+      "pluginFunctions": [
+        {
+          "fn": "(anonymous)",
+          "url": "/scripts/extensions/third-party/st-zip-converter/src/vendor/zip.js",
+          "line": 0,
+          "origin": "plugin",
+          "ms": 1
+        },
+        {
+          "fn": "mount",
+          "url": "/scripts/extensions/third-party/st-zip-converter/src/ui/host-bridge.js",
+          "line": 975,
+          "origin": "plugin",
+          "ms": 1
+        },
+        {
+          "fn": "(anonymous)",
+          "url": "/scripts/extensions/third-party/st-zip-converter/index.js",
+          "line": 1380,
+          "origin": "plugin",
+          "ms": 0.5
+        },
+        {
+          "fn": "info",
+          "url": "/scripts/extensions/third-party/st-zip-converter/src/core/logger.js",
+          "line": 75,
+          "origin": "plugin",
+          "ms": 0.5
+        },
+        {
+          "fn": "main",
+          "url": "/scripts/extensions/third-party/st-zip-converter/index.js",
+          "line": 70,
+          "origin": "plugin",
+          "ms": 0.5
+        },
+        {
+          "fn": "applyPluginUi",
+          "url": "/scripts/extensions/third-party/st-zip-converter/index.js",
+          "line": 484,
+          "origin": "plugin",
+          "ms": 0.5
+        },
+        {
+          "fn": "resolveFilename",
+          "url": "/scripts/extensions/third-party/st-zip-converter/src/core/filename-template.js",
+          "line": 51,
+          "origin": "plugin",
+          "ms": 0.5
+        },
+        {
+          "fn": "renderStashList",
+          "url": "/scripts/extensions/third-party/st-zip-converter/src/ui/stash-list.js",
+          "line": 71,
+          "origin": "plugin",
+          "ms": 0.5
+        },
+        {
+          "fn": "renderUsageDashboard",
+          "url": "/scripts/extensions/third-party/st-zip-converter/src/ui/usage-dashboard.js",
+          "line": 44,
+          "origin": "plugin",
+          "ms": 0.5
+        },
+        {
+          "fn": "renderUsageDashboard",
+          "url": "/scripts/extensions/third-party/st-zip-converter/src/ui/usage-dashboard.js",
+          "line": 44,
+          "origin": "plugin",
+          "ms": 0.5
+        },
+        {
+          "fn": "updateWorkspaceUI",
+          "url": "/scripts/extensions/third-party/st-zip-converter/index.js",
+          "line": 399,
+          "origin": "plugin",
+          "ms": 0.5
+        },
+        {
+          "fn": "verifyHostPlatform",
+          "url": "/scripts/extensions/third-party/st-zip-converter/src/ui/host-bridge.js",
+          "line": 83,
+          "origin": "plugin",
+          "ms": 0.5
+        },
+        {
+          "fn": "applyHostBadge",
+          "url": "/scripts/extensions/third-party/st-zip-converter/index.js",
+          "line": 467,
+          "origin": "plugin",
+          "ms": 0.5
+        },
+        {
+          "fn": "flushPendingEntries",
+          "url": "/scripts/extensions/third-party/st-zip-converter/src/ui/log-console.js",
+          "line": 249,
+          "origin": "plugin",
+          "ms": 0.5
+        }
+      ]
+    }
+  },
+  "panelOpenCost": {},
+  "size": {
+    "appHeight": 1237,
+    "appWidth": 474,
+    "domNodes": 22652
+  }
+}

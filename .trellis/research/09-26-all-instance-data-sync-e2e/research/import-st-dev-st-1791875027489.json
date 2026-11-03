@@ -1,0 +1,167 @@
+{
+  "instance": "dev-st",
+  "pack": "st_default-user_part1_2026-10-13.zip",
+  "categories": {
+    "characters": {
+      "ok": 26,
+      "fail": 0,
+      "scanned": 401,
+      "distinct": 26,
+      "versionsSkipped": 375,
+      "seconds": 5.5
+    },
+    "characters/sprites": {
+      "ok": 28,
+      "fail": 0,
+      "mode": "raw-write",
+      "targetRoot": "D:\\Repo\\Tavern-repo\\Instance\\Dev\\SillyTavern\\data\\default-user\\characters",
+      "units": 1,
+      "seconds": 0.2
+    },
+    "worlds": {
+      "ok": 21,
+      "fail": 0,
+      "seconds": 1.2
+    },
+    "backgrounds": {
+      "ok": 23,
+      "fail": 0,
+      "seconds": 2.2
+    },
+    "User Avatars": {
+      "ok": 9,
+      "fail": 0,
+      "seconds": 0.4
+    },
+    "settings": {
+      "ok": 1,
+      "fail": 0,
+      "targetKeysBefore": 21,
+      "packKeys": 23,
+      "mergedKeys": 21,
+      "foreignKeysSkipped": 23,
+      "note": "整份替换语义 ⇒ 先读回目标，**只在目标已有的键内**做同名覆盖；陌生键不写"
+    },
+    "extensions": {
+      "ok": 5402,
+      "fail": 0,
+      "mode": "raw-write",
+      "targetRoot": "D:\\Repo\\Tavern-repo\\Instance\\Dev\\SillyTavern\\public\\scripts\\extensions\\third-party",
+      "units": 32,
+      "seconds": 14
+    },
+    "user": {
+      "ok": 191,
+      "fail": 0,
+      "mode": "raw-write",
+      "targetRoot": "D:\\Repo\\Tavern-repo\\Instance\\Dev\\SillyTavern\\data\\default-user\\user",
+      "units": 3,
+      "seconds": 1.3
+    },
+    "chats": {
+      "ok": 1029,
+      "fail": 0,
+      "mode": "raw-write",
+      "targetRoot": "D:\\Repo\\Tavern-repo\\Instance\\Dev\\SillyTavern\\data\\default-user\\chats",
+      "units": 23,
+      "seconds": 7.2
+    },
+    "OpenAI Settings": {
+      "ok": 76,
+      "fail": 0,
+      "mode": "raw-write",
+      "targetRoot": "D:\\Repo\\Tavern-repo\\Instance\\Dev\\SillyTavern\\data\\default-user\\OpenAI Settings",
+      "seconds": 0.6
+    },
+    "NovelAI Settings": {
+      "ok": 24,
+      "fail": 0,
+      "mode": "raw-write",
+      "targetRoot": "D:\\Repo\\Tavern-repo\\Instance\\Dev\\SillyTavern\\data\\default-user\\NovelAI Settings",
+      "seconds": 0.2
+    },
+    "KoboldAI Settings": {
+      "ok": 28,
+      "fail": 0,
+      "mode": "raw-write",
+      "targetRoot": "D:\\Repo\\Tavern-repo\\Instance\\Dev\\SillyTavern\\data\\default-user\\KoboldAI Settings",
+      "seconds": 0.2
+    },
+    "TextGen Settings": {
+      "ok": 36,
+      "fail": 0,
+      "mode": "raw-write",
+      "targetRoot": "D:\\Repo\\Tavern-repo\\Instance\\Dev\\SillyTavern\\data\\default-user\\TextGen Settings",
+      "seconds": 0.2
+    },
+    "instruct": {
+      "ok": 41,
+      "fail": 0,
+      "mode": "raw-write",
+      "targetRoot": "D:\\Repo\\Tavern-repo\\Instance\\Dev\\SillyTavern\\data\\default-user\\instruct",
+      "seconds": 0.2
+    },
+    "context": {
+      "ok": 37,
+      "fail": 0,
+      "mode": "raw-write",
+      "targetRoot": "D:\\Repo\\Tavern-repo\\Instance\\Dev\\SillyTavern\\data\\default-user\\context",
+      "seconds": 0.2
+    },
+    "sysprompt": {
+      "ok": 14,
+      "fail": 0,
+      "mode": "raw-write",
+      "targetRoot": "D:\\Repo\\Tavern-repo\\Instance\\Dev\\SillyTavern\\data\\default-user\\sysprompt",
+      "seconds": 0.2
+    },
+    "reasoning": {
+      "ok": 5,
+      "fail": 0,
+      "mode": "raw-write",
+      "targetRoot": "D:\\Repo\\Tavern-repo\\Instance\\Dev\\SillyTavern\\data\\default-user\\reasoning",
+      "seconds": 0.1
+    },
+    "QuickReplies": {
+      "ok": 2,
+      "fail": 0,
+      "mode": "raw-write",
+      "targetRoot": "D:\\Repo\\Tavern-repo\\Instance\\Dev\\SillyTavern\\data\\default-user\\QuickReplies",
+      "seconds": 0.1
+    },
+    "movingUI": {
+      "ok": 1,
+      "fail": 0,
+      "mode": "raw-write",
+      "targetRoot": "D:\\Repo\\Tavern-repo\\Instance\\Dev\\SillyTavern\\data\\default-user\\movingUI",
+      "seconds": 0.2
+    },
+    "themes": {
+      "ok": 5,
+      "fail": 0,
+      "mode": "raw-write",
+      "targetRoot": "D:\\Repo\\Tavern-repo\\Instance\\Dev\\SillyTavern\\data\\default-user\\themes",
+      "seconds": 0.2
+    }
+  },
+  "failures": [],
+  "unreachable": [
+    {
+      "key": "_convert",
+      "count": 3
+    },
+    {
+      "key": "public",
+      "count": 1
+    },
+    {
+      "key": "secrets.json",
+      "count": 1
+    }
+  ],
+  "totals": {
+    "packTotal": 7380,
+    "reachableTotal": 7374,
+    "unreachableTotal": 6
+  }
+}

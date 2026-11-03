@@ -1,0 +1,95 @@
+{
+  "sampledAt": "2026-09-25T14:46:11.085Z",
+  "url": "https://127.0.0.1:8004",
+  "withFetch": false,
+  "injected": {
+    "nativeBtnParent": "flex-container",
+    "quickFetchPresent": true,
+    "managerBtnPresent": true,
+    "menuItemParent": "extensionsMenu",
+    "drawerPresent": true,
+    "toastContainer": "toast-container"
+  },
+  "steps": [
+    {
+      "step": "A 打开账号弹层",
+      "outcome": {
+        "clicked": true
+      },
+      "toasts": [
+        {
+          "at": "2026-09-25T14:45:45.841Z",
+          "kind": "toastr",
+          "level": "success",
+          "args": [
+            "数据库已加载！",
+            "数据库",
+            "[object Object]"
+          ],
+          "stack": "    at stackOf (<anonymous>:5:32) |     at v.<computed> (<anonymous>:26:24) |     at window.toastr.success (https://127.0.0.1:8004/scripts/extensions/third-party/Zero/index.js:39:28) |     at showToastr_ACU (https://127.0.0.1:8004/scripts/extensions/third-party/shujuku-rebuild/index.js:99221:34) |     at mainInitialize_ACU (https://127.0.0.1:8004/scripts/extensions/third-party/shujuku-rebuild/index.js:130578:9) |     at extensionMain (https://127.0.0.1:8004/scripts/extensions/third-party/shujuku-rebuild/index.js:192694:5)"
+        },
+        {
+          "at": "2026-09-25T14:45:45.861Z",
+          "kind": "toast-dom",
+          "container": "(body)",
+          "className": "toast acu-toast acu-toast--success toast-success interactable",
+          "title": "数据库",
+          "message": "数据库已加载！"
+        }
+      ]
+    },
+    {
+      "step": "B 点注入按钮·数据包互转",
+      "outcome": {
+        "clicked": true
+      },
+      "toasts": []
+    },
+    {
+      "step": "C 点扩展菜单插件项",
+      "outcome": {
+        "clicked": true,
+        "visible": false
+      },
+      "toasts": []
+    },
+    {
+      "step": "D 点宿主原生备份按钮",
+      "outcome": {
+        "clicked": true
+      },
+      "toasts": []
+    },
+    {
+      "step": "E 点注入按钮·备份管理器",
+      "outcome": {
+        "clicked": true
+      },
+      "toasts": []
+    }
+  ],
+  "consoleErrors": [
+    "Failed to load resource: the server responded with a status of 500 (Internal Server Error)",
+    "Failed to load resource: the server responded with a status of 500 (Internal Server Error)",
+    "[22:45:36.790] Error: SD WebUI returned an error.\n    at getAutoRemoteModel (https://127.0.0.1:8004/scripts/extensions/stable-diffusion/index.js:1537:19)\n    at async loadAutoModels (https://127.0.0.1",
+    "Failed to load resource: the server responded with a status of 500 (Internal Server Error)",
+    "[22:45:36.791] Error: SD WebUI returned an error.\n    at getAutoRemoteSchedulers (https://127.0.0.1:8004/scripts/extensions/stable-diffusion/index.js:1598:19)\n    at async loadSchedulers (https://127.",
+    "Failed to load resource: the server responded with a status of 500 (Internal Server Error)",
+    "Failed to load resource: the server responded with a status of 500 (Internal Server Error)",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "[22:45:47.759] Error: Couldn't find 'thumbnail?type=persona&file=user-default.png' in persona list.\n    at validateAvatarName (https://127.0.0.1:8004/scripts/extensions/third-party/SillyTavern-Dialogu",
+    "[22:45:47.760] Error: Couldn't find 'thumbnail?type=persona&file=user-default.png' in persona list.\n    at validateAvatarName (https://127.0.0.1:8004/scripts/extensions/third-party/SillyTavern-Dialogu",
+    "[22:45:47.760] Error: Couldn't find 'thumbnail?type=persona&file=user-default.png' in persona list.\n    at validateAvatarName (https://127.0.0.1:8004/scripts/extensions/third-party/SillyTavern-Dialogu",
+    "[22:45:47.761] Error: Couldn't find 'thumbnail?type=persona&file=user-default.png' in persona list.\n    at validateAvatarName (https://127.0.0.1:8004/scripts/extensions/third-party/SillyTavern-Dialogu",
+    "[22:45:47.761] Error: Couldn't find 'thumbnail?type=persona&file=user-default.png' in persona list.\n    at validateAvatarName (https://127.0.0.1:8004/scripts/extensions/third-party/SillyTavern-Dialogu",
+    "PAGEERROR: TypeError: $(...) is not a function",
+    "[22:45:58.845] [shujuku_v120] [全局] 未捕获异常: （资源加载失败）Script error.",
+    "PAGEERROR: Uncaught SyntaxError: Identifier 'SPresetSettings' has already been declared",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)"
+  ]
+}

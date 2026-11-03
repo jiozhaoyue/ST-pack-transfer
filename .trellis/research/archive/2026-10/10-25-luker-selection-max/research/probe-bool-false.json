@@ -1,0 +1,43 @@
+{
+  "probedAt": "2026-10-25T07:16:26.151Z",
+  "variants": [
+    {
+      "name": "V4-chats-false",
+      "offKey": "chats",
+      "selection": {
+        "characters": true,
+        "chats": false,
+        "lorebooks": true,
+        "presets": true,
+        "settings": true,
+        "secrets": true,
+        "assets": true,
+        "extensions": true,
+        "globalExtensions": true,
+        "vectors": true
+      },
+      "status": 200,
+      "totalBytes": 1567132325,
+      "ms": 107219
+    },
+    {
+      "name": "V5-assets-false",
+      "offKey": "assets",
+      "selection": {
+        "characters": true,
+        "chats": true,
+        "lorebooks": true,
+        "presets": true,
+        "settings": true,
+        "secrets": true,
+        "assets": false,
+        "extensions": true,
+        "globalExtensions": true,
+        "vectors": true
+      },
+      "status": 200,
+      "totalBytes": 1634856144,
+      "ms": 91215
+    }
+  ]
+}

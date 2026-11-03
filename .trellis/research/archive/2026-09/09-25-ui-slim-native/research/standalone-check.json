@@ -1,0 +1,23 @@
+{
+  "appExists": true,
+  "appClass": "app-container",
+  "appChildCount": 15,
+  "appNodeCount": 273,
+  "missingIds": [],
+  "presentCount": 41,
+  "totalIds": 41,
+  "sections": {
+    "header": true,
+    "footer": true,
+    "dropzone": true,
+    "stashList": true,
+    "exportQueue": true,
+    "progress": true,
+    "taskControls": true,
+    "categoryPanel": true,
+    "unifiedOptions": false,
+    "logMount": true
+  },
+  "badgeText": "独立 Web 模式",
+  "consoleErrors": []
+}

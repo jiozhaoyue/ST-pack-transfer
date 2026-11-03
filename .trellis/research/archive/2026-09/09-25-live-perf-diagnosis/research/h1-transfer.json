@@ -1,0 +1,698 @@
+{
+  "sampledAt": "2026-09-25T08:07:05.413Z",
+  "url": "https://127.0.0.1:8004",
+  "sampleMs": 90000,
+  "before": {
+    "categoryCount": 0,
+    "checked": [],
+    "includeBackups": false,
+    "includeCache": false,
+    "includePrivate": false,
+    "target": "native",
+    "compression": "5",
+    "split": "none",
+    "extMode": "manifest"
+  },
+  "adjusted": {
+    "unchecked": []
+  },
+  "treeConfirmAppeared": false,
+  "timeline": [
+    {
+      "at": 3018,
+      "status": "[2/3 传输中] 正在接收宿主打包的 ZIP 流 (无 Content-Length) · 已接收 427.5 MB",
+      "pct": "18%",
+      "longtasks": 63,
+      "longtaskMs": 18186,
+      "halted": true
+    },
+    {
+      "at": 6023,
+      "status": "[2/3 传输中] 正在接收宿主打包的 ZIP 流 (无 Content-Length) · 已接收 461.5 MB",
+      "pct": "18%",
+      "longtasks": 64,
+      "longtaskMs": 18236,
+      "halted": true
+    },
+    {
+      "at": 9027,
+      "status": "[2/3 传输中] 正在接收宿主打包的 ZIP 流 (无 Content-Length) · 已接收 490.4 MB",
+      "pct": "18%",
+      "longtasks": 66,
+      "longtaskMs": 18349,
+      "halted": true
+    },
+    {
+      "at": 12029,
+      "status": "[2/3 传输中] 正在接收宿主打包的 ZIP 流 (无 Content-Length) · 已接收 570.8 MB",
+      "pct": "18%",
+      "longtasks": 66,
+      "longtaskMs": 18349,
+      "halted": true
+    },
+    {
+      "at": 15063,
+      "status": "[2/3 传输中] 正在接收宿主打包的 ZIP 流 (无 Content-Length) · 已接收 599.7 MB",
+      "pct": "18%",
+      "longtasks": 66,
+      "longtaskMs": 18349,
+      "halted": true
+    },
+    {
+      "at": 18091,
+      "status": "[2/3 传输中] 正在接收宿主打包的 ZIP 流 (无 Content-Length) · 已接收 630.0 MB",
+      "pct": "18%",
+      "longtasks": 67,
+      "longtaskMs": 18399,
+      "halted": true
+    },
+    {
+      "at": 21121,
+      "status": "[2/3 传输中] 正在接收宿主打包的 ZIP 流 (无 Content-Length) · 已接收 720.8 MB",
+      "pct": "18%",
+      "longtasks": 69,
+      "longtaskMs": 18507,
+      "halted": true
+    },
+    {
+      "at": 24124,
+      "status": "[2/3 传输中] 正在接收宿主打包的 ZIP 流 (无 Content-Length) · 已接收 746.0 MB",
+      "pct": "18%",
+      "longtasks": 77,
+      "longtaskMs": 18927,
+      "halted": true
+    },
+    {
+      "at": 27129,
+      "status": "[2/3 传输中] 正在接收宿主打包的 ZIP 流 (无 Content-Length) · 已接收 783.3 MB",
+      "pct": "18%",
+      "longtasks": 77,
+      "longtaskMs": 18927,
+      "halted": true
+    },
+    {
+      "at": 30139,
+      "status": "[2/3 传输中] 正在接收宿主打包的 ZIP 流 (无 Content-Length) · 已接收 864.0 MB",
+      "pct": "18%",
+      "longtasks": 77,
+      "longtaskMs": 18927,
+      "halted": true
+    },
+    {
+      "at": 33160,
+      "status": "[2/3 传输中] 正在接收宿主打包的 ZIP 流 (无 Content-Length) · 已接收 890.6 MB",
+      "pct": "18%",
+      "longtasks": 77,
+      "longtaskMs": 18927,
+      "halted": true
+    },
+    {
+      "at": 36193,
+      "status": "[2/3 传输中] 正在接收宿主打包的 ZIP 流 (无 Content-Length) · 已接收 915.3 MB",
+      "pct": "18%",
+      "longtasks": 77,
+      "longtaskMs": 18927,
+      "halted": true
+    },
+    {
+      "at": 39209,
+      "status": "[2/3 传输中] 正在接收宿主打包的 ZIP 流 (无 Content-Length) · 已接收 934.2 MB",
+      "pct": "18%",
+      "longtasks": 79,
+      "longtaskMs": 19034,
+      "halted": true
+    },
+    {
+      "at": 42247,
+      "status": "[2/3 传输中] 正在接收宿主打包的 ZIP 流 (无 Content-Length) · 已接收 1002.2 MB",
+      "pct": "18%",
+      "longtasks": 84,
+      "longtaskMs": 19296,
+      "halted": true
+    },
+    {
+      "at": 45254,
+      "status": "[2/3 传输中] 正在接收宿主打包的 ZIP 流 (无 Content-Length) · 已接收 1040.6 MB",
+      "pct": "18%",
+      "longtasks": 86,
+      "longtaskMs": 19404,
+      "halted": true
+    },
+    {
+      "at": 48294,
+      "status": "[2/3 传输中] 正在接收宿主打包的 ZIP 流 (无 Content-Length) · 已接收 1057.6 MB",
+      "pct": "18%",
+      "longtasks": 87,
+      "longtaskMs": 19454,
+      "halted": true
+    },
+    {
+      "at": 51315,
+      "status": "[2/3 传输中] 正在接收宿主打包的 ZIP 流 (无 Content-Length) · 已接收 1070.1 MB",
+      "pct": "18%",
+      "longtasks": 90,
+      "longtaskMs": 19610,
+      "halted": true
+    },
+    {
+      "at": 54321,
+      "status": "[2/3 传输中] 正在接收宿主打包的 ZIP 流 (无 Content-Length) · 已接收 1076.7 MB",
+      "pct": "18%",
+      "longtasks": 91,
+      "longtaskMs": 19667,
+      "halted": true
+    },
+    {
+      "at": 57362,
+      "status": "[2/3 传输中] 正在接收宿主打包的 ZIP 流 (无 Content-Length) · 已接收 1096.6 MB",
+      "pct": "18%",
+      "longtasks": 92,
+      "longtaskMs": 19719,
+      "halted": true
+    },
+    {
+      "at": 60371,
+      "status": "[2/3 传输中] 正在接收宿主打包的 ZIP 流 (无 Content-Length) · 已接收 1112.5 MB",
+      "pct": "18%",
+      "longtasks": 92,
+      "longtaskMs": 19719,
+      "halted": true
+    },
+    {
+      "at": 63411,
+      "status": "[2/3 传输中] 正在接收宿主打包的 ZIP 流 (无 Content-Length) · 已接收 1187.6 MB",
+      "pct": "18%",
+      "longtasks": 93,
+      "longtaskMs": 19770,
+      "halted": true
+    },
+    {
+      "at": 66441,
+      "status": "[2/3 传输中] 正在接收宿主打包的 ZIP 流 (无 Content-Length) · 已接收 1214.0 MB",
+      "pct": "18%",
+      "longtasks": 94,
+      "longtaskMs": 19823,
+      "halted": true
+    },
+    {
+      "at": 69451,
+      "status": "[2/3 传输中] 正在接收宿主打包的 ZIP 流 (无 Content-Length) · 已接收 1220.8 MB",
+      "pct": "18%",
+      "longtasks": 98,
+      "longtaskMs": 20054,
+      "halted": true
+    },
+    {
+      "at": 72454,
+      "status": "[2/3 传输中] 正在接收宿主打包的 ZIP 流 (无 Content-Length) · 已接收 1221.8 MB",
+      "pct": "18%",
+      "longtasks": 98,
+      "longtaskMs": 20054,
+      "halted": true
+    },
+    {
+      "at": 75456,
+      "status": "[2/3 传输中] 正在接收宿主打包的 ZIP 流 (无 Content-Length) · 已接收 1221.8 MB",
+      "pct": "18%",
+      "longtasks": 98,
+      "longtaskMs": 20054,
+      "halted": true
+    },
+    {
+      "at": 78461,
+      "status": "[2/3 传输中] 正在接收宿主打包的 ZIP 流 (无 Content-Length) · 已接收 1221.8 MB",
+      "pct": "18%",
+      "longtasks": 98,
+      "longtaskMs": 20054,
+      "halted": true
+    },
+    {
+      "at": 81464,
+      "status": "[2/3 传输中] 正在接收宿主打包的 ZIP 流 (无 Content-Length) · 已接收 1221.8 MB",
+      "pct": "18%",
+      "longtasks": 98,
+      "longtaskMs": 20054,
+      "halted": true
+    },
+    {
+      "at": 84468,
+      "status": "[2/3 传输中] 正在接收宿主打包的 ZIP 流 (无 Content-Length) · 已接收 1221.8 MB",
+      "pct": "18%",
+      "longtasks": 98,
+      "longtaskMs": 20054,
+      "halted": true
+    },
+    {
+      "at": 87470,
+      "status": "[2/3 传输中] 正在接收宿主打包的 ZIP 流 (无 Content-Length) · 已接收 1221.8 MB",
+      "pct": "18%",
+      "longtasks": 98,
+      "longtaskMs": 20054,
+      "halted": true
+    },
+    {
+      "at": 90472,
+      "status": "[2/3 传输中] 正在接收宿主打包的 ZIP 流 (无 Content-Length) · 已接收 1221.8 MB",
+      "pct": "18%",
+      "longtasks": 98,
+      "longtaskMs": 20054,
+      "halted": true
+    }
+  ],
+  "after": {
+    "longtaskCount": 98,
+    "longtaskTotalMs": 20054,
+    "longtaskMaxMs": 5536,
+    "samples": [
+      {
+        "start": 13769,
+        "dur": 169
+      },
+      {
+        "start": 14012,
+        "dur": 82
+      },
+      {
+        "start": 14100,
+        "dur": 133
+      },
+      {
+        "start": 14314,
+        "dur": 50
+      },
+      {
+        "start": 14465,
+        "dur": 203
+      },
+      {
+        "start": 14877,
+        "dur": 55
+      },
+      {
+        "start": 15069,
+        "dur": 57
+      },
+      {
+        "start": 15528,
+        "dur": 244
+      },
+      {
+        "start": 15861,
+        "dur": 325
+      },
+      {
+        "start": 16187,
+        "dur": 89
+      },
+      {
+        "start": 16292,
+        "dur": 58
+      },
+      {
+        "start": 16633,
+        "dur": 56
+      },
+      {
+        "start": 16832,
+        "dur": 54
+      },
+      {
+        "start": 16999,
+        "dur": 211
+      },
+      {
+        "start": 17513,
+        "dur": 55
+      },
+      {
+        "start": 17581,
+        "dur": 96
+      },
+      {
+        "start": 17859,
+        "dur": 51
+      },
+      {
+        "start": 17979,
+        "dur": 87
+      },
+      {
+        "start": 18573,
+        "dur": 172
+      },
+      {
+        "start": 19105,
+        "dur": 73
+      },
+      {
+        "start": 19269,
+        "dur": 4725
+      },
+      {
+        "start": 23996,
+        "dur": 63
+      },
+      {
+        "start": 24145,
+        "dur": 89
+      },
+      {
+        "start": 24240,
+        "dur": 66
+      },
+      {
+        "start": 24392,
+        "dur": 162
+      },
+      {
+        "start": 24678,
+        "dur": 5536
+      },
+      {
+        "start": 30306,
+        "dur": 107
+      },
+      {
+        "start": 30528,
+        "dur": 76
+      },
+      {
+        "start": 30713,
+        "dur": 103
+      },
+      {
+        "start": 30990,
+        "dur": 95
+      }
+    ],
+    "progressText": "[2/3 传输中] 正在接收宿主打包的 ZIP 流 (无 Content-Length) · 已接收 1221.8 MB"
+  },
+  "transferMetrics": {},
+  "transferProfile": {
+    "totalSampledMs": 57827,
+    "byOrigin": {
+      "native/unknown": {
+        "ms": 57202
+      },
+      "plugin": {
+        "ms": 343
+      },
+      "remote": {
+        "ms": 85
+      },
+      "host-or-other-ext": {
+        "ms": 197
+      }
+    },
+    "pluginSharePct": 0.59,
+    "topFunctions": [
+      {
+        "fn": "(program)",
+        "url": "",
+        "line": -1,
+        "origin": "native/unknown",
+        "ms": 39731
+      },
+      {
+        "fn": "(idle)",
+        "url": "",
+        "line": -1,
+        "origin": "native/unknown",
+        "ms": 14644
+      },
+      {
+        "fn": "querySelectorAll",
+        "url": "",
+        "line": -1,
+        "origin": "native/unknown",
+        "ms": 1266
+      },
+      {
+        "fn": "write",
+        "url": "",
+        "line": -1,
+        "origin": "native/unknown",
+        "ms": 498
+      },
+      {
+        "fn": "querySelectorAll",
+        "url": "",
+        "line": -1,
+        "origin": "native/unknown",
+        "ms": 449
+      },
+      {
+        "fn": "read",
+        "url": "",
+        "line": -1,
+        "origin": "native/unknown",
+        "ms": 306
+      },
+      {
+        "fn": "fetchHostBackup",
+        "url": "/scripts/extensions/third-party/st-zip-converter/src/ui/host-bridge.js",
+        "line": 253,
+        "origin": "plugin",
+        "ms": 252
+      },
+      {
+        "fn": "(garbage collector)",
+        "url": "",
+        "line": -1,
+        "origin": "native/unknown",
+        "ms": 161
+      },
+      {
+        "fn": "(anonymous)",
+        "url": "https://jnai2d9kgnbs6xzx5c.com/regex_bind/inject.js",
+        "line": 374,
+        "origin": "remote",
+        "ms": 60
+      },
+      {
+        "fn": "applyProgress",
+        "url": "/scripts/extensions/third-party/st-zip-converter/src/ui/view.js",
+        "line": 35,
+        "origin": "plugin",
+        "ms": 52
+      },
+      {
+        "fn": "matches",
+        "url": "",
+        "line": -1,
+        "origin": "native/unknown",
+        "ms": 39
+      },
+      {
+        "fn": "getContext",
+        "url": "/scripts/st-context.js",
+        "line": 2409,
+        "origin": "host-or-other-ext",
+        "ms": 38
+      },
+      {
+        "fn": "se",
+        "url": "/lib/jquery-3.5.1.min.js",
+        "line": 1,
+        "origin": "host-or-other-ext",
+        "ms": 33
+      },
+      {
+        "fn": "querySelectorAll",
+        "url": "",
+        "line": -1,
+        "origin": "native/unknown",
+        "ms": 24
+      },
+      {
+        "fn": "updateHidden",
+        "url": "https://jnai2d9kgnbs6xzx5c.com/regex_bind/inject.js",
+        "line": 370,
+        "origin": "remote",
+        "ms": 23
+      },
+      {
+        "fn": "add",
+        "url": "",
+        "line": -1,
+        "origin": "native/unknown",
+        "ms": 21
+      },
+      {
+        "fn": "emitConsoleToBase",
+        "url": "/scripts/frontend-log-manager.js",
+        "line": 452,
+        "origin": "host-or-other-ext",
+        "ms": 20
+      },
+      {
+        "fn": "(anonymous)",
+        "url": "",
+        "line": -1,
+        "origin": "native/unknown",
+        "ms": 19
+      }
+    ],
+    "pluginFunctions": [
+      {
+        "fn": "fetchHostBackup",
+        "url": "/scripts/extensions/third-party/st-zip-converter/src/ui/host-bridge.js",
+        "line": 253,
+        "origin": "plugin",
+        "ms": 252
+      },
+      {
+        "fn": "applyProgress",
+        "url": "/scripts/extensions/third-party/st-zip-converter/src/ui/view.js",
+        "line": 35,
+        "origin": "plugin",
+        "ms": 52
+      },
+      {
+        "fn": "onPhase",
+        "url": "/scripts/extensions/third-party/st-zip-converter/index.js",
+        "line": 737,
+        "origin": "plugin",
+        "ms": 12
+      },
+      {
+        "fn": "onCheckpoint",
+        "url": "/scripts/extensions/third-party/st-zip-converter/src/core/task-manager.js",
+        "line": 99,
+        "origin": "plugin",
+        "ms": 9
+      },
+      {
+        "fn": "updateBadges",
+        "url": "/scripts/extensions/third-party/st-zip-converter/src/ui/log-console.js",
+        "line": 78,
+        "origin": "plugin",
+        "ms": 3
+      },
+      {
+        "fn": "setProgress",
+        "url": "/scripts/extensions/third-party/st-zip-converter/src/ui/view.js",
+        "line": 51,
+        "origin": "plugin",
+        "ms": 3
+      },
+      {
+        "fn": "flushPendingEntries",
+        "url": "/scripts/extensions/third-party/st-zip-converter/src/ui/log-console.js",
+        "line": 249,
+        "origin": "plugin",
+        "ms": 3
+      },
+      {
+        "fn": "log",
+        "url": "/scripts/extensions/third-party/st-zip-converter/src/core/logger.js",
+        "line": 38,
+        "origin": "plugin",
+        "ms": 2
+      },
+      {
+        "fn": "setProgress",
+        "url": "/scripts/extensions/third-party/st-zip-converter/src/ui/view.js",
+        "line": 51,
+        "origin": "plugin",
+        "ms": 2
+      },
+      {
+        "fn": "save",
+        "url": "/scripts/extensions/third-party/st-zip-converter/src/core/task-manager.js",
+        "line": 47,
+        "origin": "plugin",
+        "ms": 2
+      },
+      {
+        "fn": "getStats",
+        "url": "/scripts/extensions/third-party/st-zip-converter/src/core/logger.js",
+        "line": 116,
+        "origin": "plugin",
+        "ms": 1
+      },
+      {
+        "fn": "pad",
+        "url": "/scripts/extensions/third-party/st-zip-converter/src/core/logger.js",
+        "line": 19,
+        "origin": "plugin",
+        "ms": 1
+      },
+      {
+        "fn": "onPhase",
+        "url": "/scripts/extensions/third-party/st-zip-converter/index.js",
+        "line": 737,
+        "origin": "plugin",
+        "ms": 1
+      }
+    ]
+  },
+  "aborted": "abort-clicked",
+  "networkLog": [
+    {
+      "t": 1790323477409,
+      "kind": "req",
+      "url": "https://127.0.0.1:8004/api/users/announcements/me/list",
+      "method": "POST"
+    },
+    {
+      "t": 1790323477432,
+      "kind": "resp",
+      "url": "https://127.0.0.1:8004/api/users/announcements/me/list",
+      "status": 200,
+      "length": "43"
+    },
+    {
+      "t": 1790323483256,
+      "kind": "req",
+      "url": "https://127.0.0.1:8004/api/users/me",
+      "method": "GET"
+    },
+    {
+      "t": 1790323483587,
+      "kind": "resp",
+      "url": "https://127.0.0.1:8004/api/users/me",
+      "status": 200,
+      "length": null
+    },
+    {
+      "t": 1790323483628,
+      "kind": "req",
+      "url": "https://127.0.0.1:8004/api/users/storage/inspect",
+      "method": "POST"
+    },
+    {
+      "t": 1790323484614,
+      "kind": "resp",
+      "url": "https://127.0.0.1:8004/api/users/storage/inspect",
+      "status": 200,
+      "length": null
+    },
+    {
+      "t": 1790323486892,
+      "kind": "req",
+      "url": "https://127.0.0.1:8004/api/users/me",
+      "method": "GET"
+    },
+    {
+      "t": 1790323487048,
+      "kind": "resp",
+      "url": "https://127.0.0.1:8004/api/users/me",
+      "status": 200,
+      "length": null
+    },
+    {
+      "t": 1790323487292,
+      "kind": "req",
+      "url": "https://127.0.0.1:8004/api/users/backup",
+      "method": "POST"
+    },
+    {
+      "t": 1790323487592,
+      "kind": "resp",
+      "url": "https://127.0.0.1:8004/api/users/backup",
+      "status": 200,
+      "length": null
+    }
+  ]
+}

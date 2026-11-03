@@ -1,0 +1,220 @@
+{
+  "instance": "dev-st",
+  "pack": "pack-st-20260926-010422.zip",
+  "categories": {
+    "characters": {
+      "ok": 0,
+      "fail": 430,
+      "seconds": 11.4
+    }
+  },
+  "failures": [
+    {
+      "n": "characters/0155848eb69063b0249274e5f4f73a543e615d2f10fa8e995aa4e10a53f7c73d",
+      "status": 400,
+      "reason": "HTTP 400",
+      "parsed": null,
+      "body": "Bad Request"
+    },
+    {
+      "n": "characters/03155d43c847f3b40b403606948e9760d4f7b502421450343c53ae0db883fa8d",
+      "status": 400,
+      "reason": "HTTP 400",
+      "parsed": null,
+      "body": "Bad Request"
+    },
+    {
+      "n": "characters/03ea6ff9a0ab343453c09e64f82b099c1c9ba600f126dd81fb98fbd682e7590b",
+      "status": 400,
+      "reason": "HTTP 400",
+      "parsed": null,
+      "body": "Bad Request"
+    },
+    {
+      "n": "characters/03f97de3c653e468a98e89f3043376c846b94dfdae8bce8a54fe5cdda5b7fbb2",
+      "status": 400,
+      "reason": "HTTP 400",
+      "parsed": null,
+      "body": "Bad Request"
+    },
+    {
+      "n": "characters/05248862bff9a3ba1561050ac0b6311adba3db666631a818ac54df48986cff26",
+      "status": 400,
+      "reason": "HTTP 400",
+      "parsed": null,
+      "body": "Bad Request"
+    },
+    {
+      "n": "characters/054da28e55f3dbeb61f5d8b71edc76c45bd1f38a7723ea757499a8582039909e",
+      "status": 400,
+      "reason": "HTTP 400",
+      "parsed": null,
+      "body": "Bad Request"
+    },
+    {
+      "n": "characters/0553f099281bd108ef567ab85c61087d0444b8575d4be6632927d297627248fc",
+      "status": 400,
+      "reason": "HTTP 400",
+      "parsed": null,
+      "body": "Bad Request"
+    },
+    {
+      "n": "characters/056370f63cd9f4ea0dd00765e8e5ca765b87abf2b31f8fc47c3976b12d8f66e4",
+      "status": 400,
+      "reason": "HTTP 400",
+      "parsed": null,
+      "body": "Bad Request"
+    },
+    {
+      "n": "characters/058d353fa5240daf2b3cafd96dc433f80a16fc55c735bbec43bb24c046522dbb",
+      "status": 400,
+      "reason": "HTTP 400",
+      "parsed": null,
+      "body": "Bad Request"
+    },
+    {
+      "n": "characters/059214a563a3e13171e8f0956e872abb876dff22ef2d26370a703734ce0db222",
+      "status": 400,
+      "reason": "HTTP 400",
+      "parsed": null,
+      "body": "Bad Request"
+    },
+    {
+      "n": "characters/0673ef2f8e8653c2bf003125b9872bf4ebcd207f06f1b45879a2f64b83cb4585",
+      "status": 400,
+      "reason": "HTTP 400",
+      "parsed": null,
+      "body": "Bad Request"
+    },
+    {
+      "n": "characters/06e617491fc86dcadfdbbf3c87cd88267876d90737b763694c9a5909db8a7893",
+      "status": 400,
+      "reason": "HTTP 400",
+      "parsed": null,
+      "body": "Bad Request"
+    },
+    {
+      "n": "characters/089f4e768b2a61e15d916dcd6bb152d1b53e3b413f0b9ec86c83391dd226ddc8",
+      "status": 400,
+      "reason": "HTTP 400",
+      "parsed": null,
+      "body": "Bad Request"
+    },
+    {
+      "n": "characters/08b9ea2159f6b94e04a4726d88fa64ea1f75fedd670c5ba390084288f964e97e",
+      "status": 400,
+      "reason": "HTTP 400",
+      "parsed": null,
+      "body": "Bad Request"
+    },
+    {
+      "n": "characters/0b50b20ec064019e2d95fd7bcf58b4c013195cb83ca48ae24f8130e161894926",
+      "status": 400,
+      "reason": "HTTP 400",
+      "parsed": null,
+      "body": "Bad Request"
+    },
+    {
+      "n": "characters/0ca03f83edefd71fbd0c999aa322f3fbff2c31cb302b2f6b838e6569352749d8",
+      "status": 400,
+      "reason": "HTTP 400",
+      "parsed": null,
+      "body": "Bad Request"
+    },
+    {
+      "n": "characters/0d46e2f53bd3d8879ee2bb605e068085fdbfdcf994410173c6302995f40af3a0",
+      "status": 400,
+      "reason": "HTTP 400",
+      "parsed": null,
+      "body": "Bad Request"
+    },
+    {
+      "n": "characters/0d5cd57816e8616fc8407cbb0b0201f4e585f8bd7e8ea524a2b9cdada43a1a80",
+      "status": 400,
+      "reason": "HTTP 400",
+      "parsed": null,
+      "body": "Bad Request"
+    },
+    {
+      "n": "characters/0dc93e74fc7d965dcc3bc73316551bc45e49d4b1a03d4613e67c12da5e6a2d35",
+      "status": 400,
+      "reason": "HTTP 400",
+      "parsed": null,
+      "body": "Bad Request"
+    },
+    {
+      "n": "characters/0eecdf6d9469075b8b0a0f011b5da9bbc8b45a0b97729d100cbea006a9a85f50",
+      "status": 400,
+      "reason": "HTTP 400",
+      "parsed": null,
+      "body": "Bad Request"
+    }
+  ],
+  "unreachable": [
+    {
+      "key": "_convert",
+      "count": 3
+    },
+    {
+      "key": "context",
+      "count": 37
+    },
+    {
+      "key": "extensions",
+      "count": 5204
+    },
+    {
+      "key": "instruct",
+      "count": 41
+    },
+    {
+      "key": "KoboldAI Settings",
+      "count": 28
+    },
+    {
+      "key": "movingUI",
+      "count": 1
+    },
+    {
+      "key": "NovelAI Settings",
+      "count": 24
+    },
+    {
+      "key": "OpenAI Settings",
+      "count": 76
+    },
+    {
+      "key": "QuickReplies",
+      "count": 2
+    },
+    {
+      "key": "reasoning",
+      "count": 5
+    },
+    {
+      "key": "secrets.json",
+      "count": 1
+    },
+    {
+      "key": "sysprompt",
+      "count": 14
+    },
+    {
+      "key": "TextGen Settings",
+      "count": 36
+    },
+    {
+      "key": "themes",
+      "count": 5
+    },
+    {
+      "key": "user",
+      "count": 191
+    }
+  ],
+  "totals": {
+    "packTotal": 7181,
+    "reachableTotal": 727,
+    "unreachableTotal": 6454
+  }
+}

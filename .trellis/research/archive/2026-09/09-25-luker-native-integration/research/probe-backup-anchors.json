@@ -1,0 +1,238 @@
+{
+  "sampledAt": "2026-09-25T09:24:22.908Z",
+  "url": "https://127.0.0.1:8003",
+  "sourceDerivedPath": [
+    "user.js:3469 $('#account_button').on('click', () => openUserProfile())",
+    "user.js:2350 openUserProfile() → renderTemplateAsync('userProfile')",
+    "user.js:2372 template.find('.userBackupButton').on('click', …)",
+    "user.js:1136 openBackupManager() → renderTemplateAsync(userBackupManager)"
+  ],
+  "opened": {
+    "clicked": true,
+    "id": "account_button",
+    "cls": "margin0 menu_button_icon menu_button interactable"
+  },
+  "openedMgr": {
+    "clicked": true,
+    "cls": "userBackupButton menu_button menu_button_icon interactable disabled"
+  },
+  "steps": [
+    {
+      "label": "初始",
+      "userBackupButton": 0,
+      "backupManager": 0,
+      "backupActionRow": 0,
+      "injectedCount": 0,
+      "injected": [],
+      "candidateOpeners": [
+        {
+          "sel": "#account_button",
+          "present": true
+        },
+        {
+          "sel": "#admin_button",
+          "present": true
+        },
+        {
+          "sel": "#logout_button",
+          "present": true
+        },
+        {
+          "sel": "#server_logs_button",
+          "present": true
+        }
+      ]
+    },
+    {
+      "label": "账号弹层已开",
+      "userBackupButton": 1,
+      "backupManager": 0,
+      "backupActionRow": 0,
+      "injectedCount": 2,
+      "injected": [
+        {
+          "id": "st-zip-converter-native-btn",
+          "tag": "DIV",
+          "cls": "menu_button menu_button_icon interactable",
+          "title": "打开酒馆数据包互转工坊（在扩展设置中）",
+          "text": "数据包互转",
+          "childOrder": [
+            "I",
+            "SPAN"
+          ],
+          "iconCls": "fa-fw fa-solid fa-right-left",
+          "prevIsAnchor": true,
+          "nextIsAnchor": false
+        },
+        {
+          "id": "st-zip-converter-native-btn-quick-fetch",
+          "tag": "DIV",
+          "cls": "menu_button menu_button_icon interactable",
+          "title": "一键拉取宿主数据包并进入待导出区（走完整拉取/转换流程）",
+          "text": "一键拉取",
+          "childOrder": [
+            "I",
+            "SPAN"
+          ],
+          "iconCls": "fa-fw fa-solid fa-cloud-arrow-down",
+          "prevIsAnchor": false,
+          "nextIsAnchor": false
+        }
+      ],
+      "candidateOpeners": [
+        {
+          "sel": "#account_button",
+          "present": true
+        },
+        {
+          "sel": "#admin_button",
+          "present": true
+        },
+        {
+          "sel": "#logout_button",
+          "present": true
+        },
+        {
+          "sel": "#server_logs_button",
+          "present": true
+        }
+      ]
+    },
+    {
+      "label": "备份管理器已开",
+      "userBackupButton": 1,
+      "backupManager": 1,
+      "backupActionRow": 5,
+      "injectedCount": 3,
+      "injected": [
+        {
+          "id": "st-zip-converter-native-btn",
+          "tag": "DIV",
+          "cls": "menu_button menu_button_icon interactable",
+          "title": "打开酒馆数据包互转工坊（在扩展设置中）",
+          "text": "数据包互转",
+          "childOrder": [
+            "I",
+            "SPAN"
+          ],
+          "iconCls": "fa-fw fa-solid fa-right-left",
+          "prevIsAnchor": true,
+          "nextIsAnchor": false
+        },
+        {
+          "id": "st-zip-converter-native-btn-quick-fetch",
+          "tag": "DIV",
+          "cls": "menu_button menu_button_icon interactable",
+          "title": "一键拉取宿主数据包并进入待导出区（走完整拉取/转换流程）",
+          "text": "一键拉取",
+          "childOrder": [
+            "I",
+            "SPAN"
+          ],
+          "iconCls": "fa-fw fa-solid fa-cloud-arrow-down",
+          "prevIsAnchor": false,
+          "nextIsAnchor": false
+        },
+        {
+          "id": "st-zip-converter-luker-manager-btn",
+          "tag": "DIV",
+          "cls": "menu_button menu_button_icon interactable",
+          "title": "打开酒馆数据包互转工坊（在扩展设置中）",
+          "text": "数据包互转",
+          "childOrder": [
+            "I",
+            "SPAN"
+          ],
+          "iconCls": "fa-fw fa-solid fa-right-left",
+          "prevIsAnchor": false,
+          "nextIsAnchor": false
+        }
+      ],
+      "candidateOpeners": [
+        {
+          "sel": "#account_button",
+          "present": true
+        },
+        {
+          "sel": "#admin_button",
+          "present": true
+        },
+        {
+          "sel": "#logout_button",
+          "present": true
+        },
+        {
+          "sel": "#server_logs_button",
+          "present": true
+        }
+      ]
+    }
+  ],
+  "backupActionRows": [
+    {
+      "index": 0,
+      "cls": "backupActionRow flex-container flexGap10 marginBot10",
+      "text": "数据包互转 下载备份 ZIP",
+      "hasNativeZipDownload": true,
+      "injectedHere": true,
+      "childTags": [
+        "DIV#st-zip-converter-luker-manager-btn",
+        "DIV"
+      ]
+    },
+    {
+      "index": 1,
+      "cls": "backupActionRow flex-container flexGap10 marginBot5",
+      "text": "选择 ZIP 恢复备份",
+      "hasNativeZipDownload": false,
+      "injectedHere": false,
+      "childTags": [
+        "DIV",
+        "DIV"
+      ]
+    },
+    {
+      "index": 2,
+      "cls": "backupActionRow flex-container flexGap10 marginBot10",
+      "text": "打开局域网同步",
+      "hasNativeZipDownload": false,
+      "injectedHere": false,
+      "childTags": [
+        "DIV"
+      ]
+    },
+    {
+      "index": 3,
+      "cls": "backupActionRow flex-container flexGap10 marginBot5",
+      "text": "创建迁移链接 复制链接",
+      "hasNativeZipDownload": false,
+      "injectedHere": false,
+      "childTags": [
+        "DIV",
+        "DIV"
+      ]
+    },
+    {
+      "index": 4,
+      "cls": "backupActionRow flex-container flexGap10 marginBot5",
+      "text": "从链接迁移",
+      "hasNativeZipDownload": false,
+      "injectedHere": false,
+      "childTags": [
+        "INPUT",
+        "DIV"
+      ]
+    }
+  ],
+  "consoleErrors": [
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "pageerror: SyntaxError: Unexpected reserved word",
+    "pageerror: TypeError: $(...) is not a function",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "pageerror: Uncaught SyntaxError: Identifier 'SPresetSettings' has already been declared",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)"
+  ]
+}

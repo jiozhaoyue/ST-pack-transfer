@@ -1,0 +1,180 @@
+{
+  "url": "https://127.0.0.1:8004/",
+  "title": "Luker",
+  "nodeCount": 15172,
+  "stylesheets": 137,
+  "totalCssRules": 10760,
+  "pluginCssRules": 365,
+  "pluginSheets": [
+    {
+      "href": "(inline)",
+      "rules": 990,
+      "pluginHits": 58
+    },
+    {
+      "href": "https://127.0.0.1:8004/scripts/extensions/third-party/st-zip-converter/style.css",
+      "rules": 310,
+      "pluginHits": 307
+    }
+  ],
+  "pluginDrawerNodes": 1,
+  "appContainers": 0,
+  "injectedMarkers": 0,
+  "dashboards": 1,
+  "badges": 1,
+  "workbenchHosts": 1,
+  "hasLukerContext": true,
+  "hasSillyTavern": true,
+  "runningAnimations": 0,
+  "animationsByType": {},
+  "animationsByOwner": {},
+  "drawerCandidates": [
+    {
+      "title": "下载扩展和资源菜单",
+      "hasPlugin": false
+    },
+    {
+      "title": "角色表情",
+      "hasPlugin": false
+    },
+    {
+      "title": "图像生成\n                \n                    ?",
+      "hasPlugin": false
+    },
+    {
+      "title": "图像提示模板",
+      "hasPlugin": false
+    },
+    {
+      "title": "TTS",
+      "hasPlugin": false
+    },
+    {
+      "title": "快速回复",
+      "hasPlugin": false
+    },
+    {
+      "title": "QR助手\n                    NEW",
+      "hasPlugin": false
+    },
+    {
+      "title": "聊天翻译",
+      "hasPlugin": false
+    },
+    {
+      "title": "图像描述",
+      "hasPlugin": false
+    },
+    {
+      "title": "正则",
+      "hasPlugin": false
+    },
+    {
+      "title": "正则预设",
+      "hasPlugin": false
+    },
+    {
+      "title": "全局正则脚本",
+      "hasPlugin": false
+    },
+    {
+      "title": "预设正则脚本",
+      "hasPlugin": false
+    },
+    {
+      "title": "局部正则脚本",
+      "hasPlugin": false
+    },
+    {
+      "title": "插件正则脚本",
+      "hasPlugin": false
+    },
+    {
+      "title": "向量存储",
+      "hasPlugin": false
+    },
+    {
+      "title": "提示词模板",
+      "hasPlugin": false
+    },
+    {
+      "title": "ST API Wrapper",
+      "hasPlugin": false
+    },
+    {
+      "title": "酒馆菜单管理器",
+      "hasPlugin": false
+    },
+    {
+      "title": "Silence Player",
+      "hasPlugin": false
+    },
+    {
+      "title": "羁绊助手",
+      "hasPlugin": false
+    },
+    {
+      "title": "˚₊·⸅ 毛球点心铺 ⸅·₊˚",
+      "hasPlugin": false
+    },
+    {
+      "title": "酒馆助手",
+      "hasPlugin": false
+    },
+    {
+      "title": "手动保存",
+      "hasPlugin": false
+    },
+    {
+      "title": "Dialogue Colorizer",
+      "hasPlugin": false
+    },
+    {
+      "title": "酒馆消息提醒",
+      "hasPlugin": false
+    },
+    {
+      "title": "输入助手",
+      "hasPlugin": false
+    },
+    {
+      "title": "ST Chat Jumper",
+      "hasPlugin": false
+    },
+    {
+      "title": "酒馆数据包互转工坊",
+      "hasPlugin": true
+    },
+    {
+      "title": "搜索工具",
+      "hasPlugin": false
+    }
+  ],
+  "extensionMenuItems": [
+    "打开数据库",
+    "附加文件",
+    "生成图片",
+    "生成图片说明",
+    "展示图库",
+    "TTS 重播",
+    "朗读全部聊天",
+    "词符计数器",
+    "翻译聊天",
+    "翻译输入",
+    "数据包互转工坊",
+    "提示词查看器",
+    "变量管理器",
+    "日志查看器"
+  ],
+  "consoleErrors": [
+    "Failed to load resource: the server responded with a status of 500 (Internal Server Error)",
+    "Failed to load resource: the server responded with a status of 500 (Internal Server Error)",
+    "[15:29:08.959] Error: SD WebUI returned an error.\n    at getAutoRemoteModel (https://127.0.0.1:8004/scripts/extensions/stable-diffusion/index.js:1537:19)\n    at async loadAutoModels (https://127.0.0.1:8004/scripts/extensions/stable-diffusion/index.js:2258:30)\n    at async loadModels (https://127.0.0",
+    "Failed to load resource: the server responded with a status of 500 (Internal Server Error)",
+    "[15:29:08.961] Error: SD WebUI returned an error.\n    at getAutoRemoteSchedulers (https://127.0.0.1:8004/scripts/extensions/stable-diffusion/index.js:1598:19)\n    at async loadSchedulers (https://127.0.0.1:8004/scripts/extensions/stable-diffusion/index.js:2525:26)\n    at async Promise.all (index 2)\n",
+    "Failed to load resource: the server responded with a status of 500 (Internal Server Error)",
+    "Failed to load resource: the server responded with a status of 500 (Internal Server Error)",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)"
+  ]
+}

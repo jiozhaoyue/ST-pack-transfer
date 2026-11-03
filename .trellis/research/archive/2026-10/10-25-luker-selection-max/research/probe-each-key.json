@@ -1,0 +1,70 @@
+{
+  "probedAt": "2026-10-25T07:28:55.385Z",
+  "baseline": 1794066397,
+  "results": [
+    {
+      "name": "off-characters",
+      "offKey": "characters",
+      "status": 200,
+      "total": 1731258521,
+      "saved": 62807876,
+      "ms": 1792912766691.8987
+    },
+    {
+      "name": "off-lorebooks",
+      "offKey": "lorebooks",
+      "status": 200,
+      "total": 1785826305,
+      "saved": 8240092,
+      "ms": 1792912733754.5398
+    },
+    {
+      "name": "off-presets",
+      "offKey": "presets",
+      "status": 200,
+      "total": 1781654777,
+      "saved": 12411620,
+      "ms": 1792912728077.3003
+    },
+    {
+      "name": "off-settings",
+      "offKey": "settings",
+      "status": 200,
+      "total": 894775735,
+      "saved": 899290662,
+      "ms": 1792912682522.221
+    },
+    {
+      "name": "off-secrets",
+      "offKey": "secrets",
+      "status": 200,
+      "total": 1794010557,
+      "saved": 55840,
+      "ms": 1792912706468.5154
+    },
+    {
+      "name": "off-extensions",
+      "offKey": "extensions",
+      "status": 200,
+      "total": 1448149954,
+      "saved": 345916443,
+      "ms": 1792912695357.043
+    },
+    {
+      "name": "off-globalExtensions",
+      "offKey": "globalExtensions",
+      "status": 200,
+      "total": 1714545035,
+      "saved": 79521362,
+      "ms": 1792912708435.922
+    },
+    {
+      "name": "off-vectors",
+      "offKey": "vectors",
+      "status": 200,
+      "total": 1794012700,
+      "saved": 53697,
+      "ms": 1792912707896.0142
+    }
+  ]
+}

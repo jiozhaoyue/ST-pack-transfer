@@ -1,0 +1,56 @@
+{
+  "tool": "diff-packs.cjs",
+  "label": "OQ-2 复核：插件一步直出 tt vs build-packs(tt)【同源重基线：两侧同为 b87033e 源状态】",
+  "a": {
+    "file": "tt_default-user_part1_2026-09-29.zip",
+    "bytes": 545126178,
+    "aEntries": 6597,
+    "bEntries": 6597,
+    "aDirs": 0,
+    "bDirs": 0,
+    "same": 6597,
+    "changed": 0,
+    "onlyInA": 0,
+    "onlyInB": 0,
+    "changedRequestMetadata": 0,
+    "dirOnlyInA": 0,
+    "dirOnlyInB": 0,
+    "dirs": 0
+  },
+  "b": {
+    "file": "pack-tt-nodate.zip",
+    "bytes": 545126178
+  },
+  "selfTest": null,
+  "counts": {
+    "aEntries": 6597,
+    "bEntries": 6597,
+    "aDirs": 0,
+    "bDirs": 0,
+    "same": 6597,
+    "changed": 0,
+    "onlyInA": 0,
+    "onlyInB": 0,
+    "changedRequestMetadata": 0,
+    "dirOnlyInA": 0,
+    "dirOnlyInB": 0
+  },
+  "bytes": {
+    "aUncompressed": 1279023243,
+    "bUncompressed": 1279023243
+  },
+  "onlyInAByTop": [],
+  "onlyInBByTop": [],
+  "changedByTop": [],
+  "changedRequestMetadata": [],
+  "samples": {
+    "onlyInA": [],
+    "onlyInB": [],
+    "changed": [],
+    "dirOnlyInA": [],
+    "dirOnlyInB": []
+  },
+  "verdict": "IDENTICAL",
+  "verdictDetail": "条目路径集合与逐条 crc32 全等",
+  "comparedAt": "2026-09-29T11:58:06.797Z"
+}

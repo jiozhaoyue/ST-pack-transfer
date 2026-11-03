@@ -1,0 +1,60 @@
+{
+  "sampledAt": "2026-09-25T14:40:52.217Z",
+  "url": "https://127.0.0.1:8003",
+  "withPanelOpen": true,
+  "result": {
+    "toastLog": [
+      {
+        "at": "2026-09-25T14:40:24.744Z",
+        "kind": "toastr-wrapped",
+        "levels": [
+          "success",
+          "info",
+          "warning",
+          "error",
+          "clear"
+        ]
+      },
+      {
+        "at": "2026-09-25T14:40:24.753Z",
+        "kind": "dom-watcher-attached",
+        "id": "(body)"
+      }
+    ],
+    "toastrPresent": true,
+    "toastContainerExists": true,
+    "pluginPresent": {
+      "drawer": true,
+      "settingsPanel": true,
+      "menuItem": true
+    },
+    "injectedButtons": [
+      {
+        "id": "st-zip-converter-native-btn",
+        "tag": "DIV",
+        "parent": "flex-container"
+      },
+      {
+        "id": "st-zip-converter-native-btn-quick-fetch",
+        "tag": "DIV",
+        "parent": "flex-container"
+      }
+    ],
+    "panelOpen": {
+      "opened": true,
+      "id": "account_button"
+    }
+  },
+  "consoleErrors": [
+    "Failed to load resource: the server responded with a status of 404 (Not Found) @ https://127.0.0.1:8003/api/plugins/server-plugin-manager/probe:0",
+    "Failed to load resource: the server responded with a status of 404 (Not Found) @ https://127.0.0.1:8003/api/plugins/command-exec/sandbox/get:0",
+    "PAGEERROR: SyntaxError: Unexpected reserved word",
+    "PAGEERROR: TypeError: $(...) is not a function",
+    "PAGEERROR: Uncaught SyntaxError: Identifier 'SPresetSettings' has already been declared"
+  ],
+  "requestFailures": [
+    "HTTP 404 https://127.0.0.1:8003/api/plugins/server-plugin-manager/probe",
+    "HTTP 404 https://127.0.0.1:8003/api/plugins/command-exec/sandbox/get",
+    "GET https://files.catbox.moe/wmv5bd.mp4 → net::ERR_ABORTED"
+  ]
+}

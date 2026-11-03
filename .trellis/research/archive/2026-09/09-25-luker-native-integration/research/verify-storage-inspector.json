@@ -1,0 +1,39 @@
+{
+  "sampledAt": "2026-09-25T10:02:46.033Z",
+  "url": "https://127.0.0.1:8003",
+  "negativeMode": false,
+  "before": {
+    "exists": true,
+    "hiddenAttr": false,
+    "display": "flex",
+    "rectHeight": 32,
+    "text": "存储",
+    "settingsBlock": true,
+    "drawerApp": true,
+    "extBlock": true,
+    "extBlockDisplay": "block",
+    "statusRow": true
+  },
+  "after": {
+    "inspectorWrapperFound": true,
+    "wrapperVisible": true,
+    "hasLoading": true,
+    "hasError": true,
+    "errorVisible": false,
+    "errorMessage": null,
+    "rowishCount": 0,
+    "textSample": "存储 1.1 GiB / 无限制 聊天 · 457.8 MiB角色卡 · 28.5 MiB世界书 · 3.1 MiB图片资源 · 163.4 MiB附件与工作流 · 1.1 MiB预设与设置 · 16.5 MiB扩展 · 275.6 MiB备份 · 225.0 MiB其他 · 362.2 KiB 聊天457.8 MiB角色卡28.5 MiB世界书3.1 MiB图片资源163.4 MiB附件与工作流",
+    "popupFound": true
+  },
+  "consoleErrors": [
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "pageerror: SyntaxError: Unexpected reserved word",
+    "pageerror: TypeError: $(...) is not a function",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "pageerror: Uncaught SyntaxError: Identifier 'SPresetSettings' has already been declared"
+  ]
+}

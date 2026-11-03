@@ -1,0 +1,98 @@
+{
+  "tool": "diff-packs.cjs",
+  "label": "AC-A2 run1-vs-run2",
+  "a": {
+    "file": "l_default-user_part1_2026-10-13.run1.zip",
+    "bytes": 536571474,
+    "aEntries": 7379,
+    "bEntries": 7379,
+    "aDirs": 0,
+    "bDirs": 0,
+    "same": 7375,
+    "changed": 4,
+    "onlyInA": 0,
+    "onlyInB": 0,
+    "changedRequestMetadata": 0,
+    "dirOnlyInA": 0,
+    "dirOnlyInB": 0,
+    "dirs": 0
+  },
+  "b": {
+    "file": "l_default-user_part1_2026-10-13.zip",
+    "bytes": 536571768
+  },
+  "selfTest": null,
+  "counts": {
+    "aEntries": 7379,
+    "bEntries": 7379,
+    "aDirs": 0,
+    "bDirs": 0,
+    "same": 7375,
+    "changed": 4,
+    "onlyInA": 0,
+    "onlyInB": 0,
+    "changedRequestMetadata": 0,
+    "dirOnlyInA": 0,
+    "dirOnlyInB": 0
+  },
+  "bytes": {
+    "aUncompressed": 1250422230,
+    "bUncompressed": 1250425609
+  },
+  "onlyInAByTop": [],
+  "onlyInBByTop": [],
+  "changedByTop": [
+    {
+      "top": "chats/",
+      "count": 2
+    },
+    {
+      "top": "(根文件)",
+      "count": 1
+    },
+    {
+      "top": "user/",
+      "count": 1
+    }
+  ],
+  "changedRequestMetadata": [],
+  "samples": {
+    "onlyInA": [],
+    "onlyInB": [],
+    "changed": [
+      {
+        "path": "settings.json",
+        "crcA": 1094059220,
+        "crcB": 3218328434,
+        "sizeA": 22843284,
+        "sizeB": 22843284
+      },
+      {
+        "path": "user/files/usb_global_achievements_c505c8bed7de3dcc8f16005c.json",
+        "crcA": 4187650967,
+        "crcB": 3206985963,
+        "sizeA": 17602,
+        "sizeB": 17602
+      },
+      {
+        "path": "chats/孤独摇滚3/孤独摇滚 - 2026-07-19@23h05m21s834ms imported - Branch #8.jsonl",
+        "crcA": 3519968306,
+        "crcB": 2720160113,
+        "sizeA": 28048253,
+        "sizeB": 28051632
+      },
+      {
+        "path": "chats/孤独摇滚3/孤独摇滚 - 2026-07-19@23h05m21s834ms imported - Branch #8.luker-state.chat_sync.json",
+        "crcA": 3948786026,
+        "crcB": 2201518653,
+        "sizeA": 79,
+        "sizeB": 79
+      }
+    ],
+    "dirOnlyInA": [],
+    "dirOnlyInB": []
+  },
+  "verdict": "DIFFERENT",
+  "verdictDetail": "0 条仅 A / 0 条仅 B / 4 条内容不同（已剔除请求期元数据）",
+  "comparedAt": "2026-10-13T06:44:26.581Z"
+}

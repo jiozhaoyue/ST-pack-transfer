@@ -1,0 +1,30 @@
+{
+  "step": "2-3 跳过门与搬运/同源校验/中止收尾（src/core/transform.js）",
+  "date": "2026-09-28",
+  "green": "npx vitest run --maxWorkers=2 ⇒ 62 文件 / 597 passed / 2 skipped / 0 failed（基线 60 文件 / 581 passed ⇒ 净增 16 项）",
+  "discriminativeProofs": {
+    "command": "对 src/core/transform.js 逐条变异（python 精确替换，锚点命中数必须 ==1），跑 convert-resume + convert-append 两个文件，再还原",
+    "baseline": "17 passed",
+    "M1_注掉存在门（if (appendedNames.has(skipOut)) → if (resumedCrc)）": {
+      "result": "5 failed | 12 passed",
+      "meaning": "退回「只看台账」⇒ 台账命中即跳过 ⇒ 产物缺条目。这就是用户实际遇到的残缺包形态"
+    },
+    "M2_注掉同源校验（if (!verdict.ok) → if (false)）": {
+      "result": "3 failed | 14 passed",
+      "meaning": "源已变/半成品有孤儿/布局真错位时仍搬运 ⇒ 产物混入陈旧条目或不完整"
+    },
+    "M3_让真失败也收尾（去掉 isAbort 条件）": {
+      "result": "1 failed | 16 passed",
+      "meaning": "「失败」被伪装成「暂停产物」——必须只有 AbortError 才允许收尾"
+    },
+    "restoreCheck": "diff -q 与备份逐字节一致；恢复后 17 passed"
+  },
+  "trapFoundByFullSuite": {
+    "name": "「已在产物里」有两个含义，混用会让同名输出被误跳过",
+    "symptom": "全量跑时 test/convert.test.js 的「st→pt:与 third-party 同名的用户级扩展被丢弃并保留第三方副本」转红：告警里少了 dupe",
+    "rootCause": "首版把存在门写成 `writer.has(outPath)`（writer 的名单）。该名单含「本轮已受理/已写入」的条目；而**两个不同的源条目可能映射到同一个产物路径** —— PT 目标下用户级 `extensions/dupe/**` 与第三方 `extensions/third-party/dupe/**` 都映射到 `data/extensions/third-party/dupe/**`。第三方那份先写 ⇒ 用户级那份被存在门误判为「已有」而提前 continue ⇒ 后文「与第三方同名时保留第三方副本」分支根本没走到。且 `resumedCrc` 为 null 时 `undefined == null` 为真，所以连台账都不需要就给跳过了",
+    "fix": "存在门改用 `appendFrom` **回传的清单**（appendedNames）——它只含「来自半成品」的条目，一个概念一个用途；并撤掉 `wrapper.has()`（它正是把两个概念混起来的入口）",
+    "whyThisMatters": "单跑 test/convert-append.test.js 全绿、单跑 test/convert.test.js 也不会红——**只有全量一起跑才暴露**（因为它是别的测试文件覆盖的场景）。教训：新判据落地后必须跑全量，不能只跑新用例",
+    "isolation": "用 git stash 把 transform.js 单独还原 ⇒ test/convert.test.js 30/30 通过 ⇒ 确认是本改动引入的回归，而非既有 flake"
+  }
+}

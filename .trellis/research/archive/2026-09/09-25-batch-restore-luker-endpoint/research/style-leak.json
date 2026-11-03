@@ -1,0 +1,22 @@
+{
+  "sampledAt": "2026-09-25T11:49:47.716Z",
+  "base": "https://127.0.0.1:8003",
+  "result": {
+    "ourSheets": [
+      {
+        "href": "",
+        "id": "dynamic-styles",
+        "ruleCount": 439
+      },
+      {
+        "href": "https://127.0.0.1:8003/scripts/extensions/third-party/st-zip-converter/style.css",
+        "id": "third-party_st-zip-converter-css",
+        "ruleCount": 323
+      }
+    ],
+    "bareRules": [],
+    "bareRulesMatchingHost": [],
+    "inlineOnHost": [],
+    "hostPopupsPresent": []
+  }
+}

@@ -1,0 +1,125 @@
+{
+  "tool": "produce-via-plugin.cjs",
+  "task": "09-27-plugin-driven-instance-sync",
+  "mode": "转换（目标布局 tt）",
+  "source": {
+    "id": "real-luker",
+    "side": "real",
+    "host": "luker",
+    "port": 8004,
+    "url": "https://127.0.0.1:8004",
+    "profile": ".pw-profile"
+  },
+  "r20": {
+    "pluginDir": "D:\\Repo\\Tavern-repo\\Instance\\Real\\Luker\\data\\default-user\\extensions\\st-zip-converter",
+    "instanceHead": "4cada1f",
+    "workspaceHead": "4cada1f",
+    "instancePluginDir": "..\\..\\Instance\\Real\\Luker\\data\\default-user\\extensions\\st-zip-converter"
+  },
+  "knobs": {
+    "requested": {
+      "layout": "tt",
+      "compression": "5",
+      "gitMode": "minimal",
+      "extensionMode": "full",
+      "includeBackups": false,
+      "pruneBuiltin": false,
+      "keepDevFiles": false
+    },
+    "readBack": {
+      "target": "tt",
+      "compression": "5",
+      "gitMode": "minimal",
+      "extensionMode": "full",
+      "includeBackups": false,
+      "pruneBuiltin": false,
+      "keepDevFiles": false,
+      "splitInput": "",
+      "filenameTemplate": "{target}_{user}_{part}_{date}.zip"
+    },
+    "warnings": []
+  },
+  "selection": {
+    "mode": "module-default-no-fixture",
+    "hasCategoryCards": false,
+    "categories": {},
+    "deselected": [],
+    "pinnedStandardKeys": [
+      "characters",
+      "chats",
+      "lorebooks",
+      "presets",
+      "settings",
+      "secrets",
+      "assets",
+      "extensions",
+      "globalExtensions",
+      "vectors"
+    ],
+    "sentByPlugin": [
+      "characters",
+      "chats",
+      "lorebooks",
+      "presets",
+      "settings",
+      "secrets",
+      "assets",
+      "extensions",
+      "globalExtensions",
+      "vectors",
+      "backups"
+    ],
+    "note": "未要求收窄 ⇒ **不喂夹具**（喂夹具会按「夹具的」类目可用性把缺失类目置 false，可能误伤宿主真实存在的类目）；selection 取「清初态」之后的模块默认值（`src/ui/category-filter.js:22-36`：除 cache / appPrivate 外全选）",
+    "initialStateCleared": {
+      "existed": false,
+      "deleted": true
+    },
+    "pinning": {
+      "mode": "module-default-no-fixture",
+      "ok": true,
+      "note": "未要求收窄 ⇒ **不喂夹具**（喂夹具会按「夹具的」类目可用性把缺失类目置 false，可能误伤宿主真实存在的类目）；selection 取「清初态」之后的模块默认值（`src/ui/category-filter.js:22-36`：除 cache / appPrivate 外全选）"
+    }
+  },
+  "workbench": {
+    "drawer": true,
+    "app": true,
+    "badge": "Luker 插件 · v2.7.0"
+  },
+  "artifact": {
+    "file": "tt_default-user_part1_2026-10-13.zip",
+    "path": "D:\\Repo\\Tavern-repo\\My-repo\\ST-zip-converter\\test-results\\produce-real\\tt_default-user_part1_2026-10-13.zip",
+    "bytes": 536874325,
+    "entryCount": 7408,
+    "sha256": "dacab3480d0b3450a1076c697dc8a2022072baa879f8d10f49fc2a99e905880b",
+    "suggestedFilename": "tt_default-user_part1_2026-10-13.zip"
+  },
+  "stashCleanup": {
+    "ok": true,
+    "removed": 1,
+    "deleted": [
+      {
+        "id": "output_1791874491828_625a40",
+        "name": "tt_default-user_part1_2026-10-13.zip",
+        "size": 536874325,
+        "origin": "converted"
+      }
+    ]
+  },
+  "timings": {
+    "totalSeconds": 234,
+    "phases": {
+      "splash": 2.8,
+      "pluginReady": 9.8,
+      "fetchStart": 10,
+      "treeConfirmShown": 184.5,
+      "enqueued": 231,
+      "downloaded": 232.5,
+      "done": 234
+    }
+  },
+  "logTail": "1536.0 MB\n      \n    \n      [14:53:36.082]\n      [INFO]\n      数据包传输中: 已接收 1540.0 MB\n      \n    \n      [14:53:36.207]\n      [INFO]\n      数据包传输中: 已接收 1544.0 MB\n      \n    \n      [14:53:36.336]\n      [INFO]\n      数据包传输中: 已接收 1548.0 MB\n      \n    \n      [14:53:36.498]\n      [INFO]\n      数据包传输中: 已接收 1552.0 MB\n      \n    \n      [14:53:36.655]\n      [INFO]\n      数据包传输中: 已接收 1556.0 MB\n      \n    \n      [14:53:37.038]\n      [INFO]\n      数据包传输中: 已接收 1560.0 MB\n      \n    \n      [14:53:37.420]\n      [INFO]\n      数据包传输中: 已接收 1564.0 MB\n      \n    \n      [14:53:37.781]\n      [INFO]\n      数据包传输中: 已接收 1568.0 MB\n      \n    \n      [14:53:38.120]\n      [INFO]\n      数据包传输中: 已接收 1572.0 MB\n      \n    \n      [14:53:39.319]\n      [INFO]\n      数据包传输中: 已接收 1576.0 MB\n      \n    \n      [14:53:41.041]\n      [INFO]\n      数据包传输中: 已接收 1580.0 MB\n      \n    \n      [14:53:41.562]\n      [INFO]\n      数据包传输中: 已接收 1584.0 MB\n      \n    \n      [14:53:42.427]\n      [INFO]\n      数据包传输中: 已接收 1588.0 MB\n      \n    \n      [14:53:43.104]\n      [INFO]\n      数据包传输中: 已接收 1592.0 MB\n      \n    \n      [14:53:45.522]\n      [INFO]\n      数据包传输中: 已接收 1596.0 MB\n      \n    \n      [14:53:49.196]\n      [INFO]\n      数据包传输中: 已接收 1600.0 MB\n      \n    \n      [14:53:51.561]\n      [INFO]\n      数据包传输中: 已接收 1604.0 MB\n      \n    \n      [14:53:51.777]\n      [INFO]\n      数据包传输中: 已接收 1608.0 MB\n      \n    \n      [14:53:51.921]\n      [INFO]\n      数据包传输中: 已接收 1612.0 MB\n      \n    \n      [14:53:52.313]\n      [INFO]\n      数据包传输中: 已接收 1616.0 MB\n      \n    \n      [14:53:52.901]\n      [INFO]\n      数据包传输中: 已接收 1620.0 MB\n      \n    \n      [14:53:53.383]\n      [INFO]\n      数据包传输中: 已接收 1624.0 MB\n      \n    \n      [14:53:53.803]\n      [INFO]\n      数据包传输中: 已接收 1628.0 MB\n      \n    \n      [14:53:54.066]\n      [INFO]\n      数据包传输中: 已接收 1632.0 MB\n      \n    \n      [14:53:54.271]\n      [INFO]\n      数据包传输中: 已接收 1636.0 MB\n      \n    \n      [14:53:54.861]\n      [INFO]\n      数据包传输中: 已接收 1640.0 MB\n      \n    \n      [14:53:55.438]\n      [INFO]\n      数据包传输中: 已接收 1644.0 MB\n      \n    \n      [14:53:56.089]\n      [INFO]\n      数据包传输中: 已接收 1648.0 MB\n      \n    \n      [14:53:56.234]\n      [INFO]\n      数据包传输中: 已接收 1652.0 MB\n      \n    \n      [14:53:56.347]\n      [INFO]\n      数据包传输中: 已接收 1656.0 MB\n      \n    \n      [14:53:56.428]\n      [INFO]\n      数据包传输中: 已接收 1660.0 MB\n      \n    \n      [14:53:56.548]\n      [INFO]\n      数据包传输中: 已接收 1664.0 MB\n      \n    \n      [14:53:56.663]\n      [INFO]\n      数据包传输中: 已接收 1668.0 MB\n      \n    \n      [14:53:56.783]\n      [INFO]\n      数据包传输中: 已接收 1672.0 MB\n      \n    \n      [14:53:56.864]\n      [INFO]\n      数据包传输中: 已接收 1676.0 MB\n      \n    \n      [14:53:56.948]\n      [INFO]\n      数据包传输中: 已接收 1680.0 MB\n      \n    \n      [14:53:57.027]\n      [INFO]\n      数据包传输中: 已接收 1684.0 MB\n      \n    \n      [14:53:57.147]\n      [INFO]\n      数据包传输中: 已接收 1688.0 MB\n      \n    \n      [14:53:57.228]\n      [INFO]\n      数据包传输中: 已接收 1692.0 MB\n      \n    \n      [14:53:57.348]\n      [INFO]\n      数据包传输中: 已接收 1696.0 MB\n      \n    \n      [14:53:57.425]\n      [INFO]\n      数据包传输中: 已接收 1700.0 MB\n      \n    \n      [14:53:57.545]\n      [INFO]\n      数据包传输中: 已接收 1704.0 MB\n      \n    \n      [14:53:57.663]\n      [INFO]\n      数据包传输中: 已接收 1708.0 MB\n      \n    \n      [14:53:57.949]\n      [INFO]\n      数据包传输中: 已接收 1712.0 MB\n      \n    \n      [14:53:59.537]\n      [INFO]\n      数据包传输中: 已接收 1716.0 MB\n      \n    \n      [14:54:00.221]\n      [INFO]\n      数据包传输中: 已接收 1720.0 MB\n      \n    \n      [14:54:01.263]\n      [INFO]\n      数据包传输中: 已接收 1724.0 MB\n      \n    \n      [14:54:03.887]\n      [INFO]\n      数据包传输中: 已接收 1728.0 MB\n      \n    \n      [14:54:04.000]\n      [SUCCESS]\n      成功从宿主拉取数据包 (OPFS 直写)，大小: 1728.15 MB\n      \n    \n      [14:54:05.051]\n      [INFO]\n      统一文件树就绪: 8796 个文件，可展开类目明细逐文件勾选，确认后继续转换\n      \n    \n      [14:54:05.275]\n      [INFO]\n      进行直出格式与资产过滤处理: LUKER -> TT (包含备份聊天: false, 逐文件排除: 0)\n      \n    \n      [14:54:51.692]\n      [SUCCESS]\n      宿主拉取完成: tt_default-user_part1_2026-10-13.zip (512.0 MB) —— 可在待导出区下载、选位置导出、存入工作区或写回宿主\n      \n    ",
+  "pluginConsoleErrors": [],
+  "pluginFailures": [],
+  "playwright": "1.62.1",
+  "finishedAt": "2026-10-13T06:54:54.781Z"
+}

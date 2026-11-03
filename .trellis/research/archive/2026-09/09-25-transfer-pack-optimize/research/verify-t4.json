@@ -1,0 +1,63 @@
+{
+  "sampledAt": "2026-09-25T10:02:02.192Z",
+  "url": "https://127.0.0.1:8003",
+  "facts": {
+    "deadSwitchPresent": false,
+    "jRegionCheckboxes": [
+      "host-incremental-export"
+    ],
+    "compressionOptions": [
+      {
+        "value": "0",
+        "text": "存储",
+        "selected": false
+      },
+      {
+        "value": "1",
+        "text": "快速",
+        "selected": false
+      },
+      {
+        "value": "5",
+        "text": "标准",
+        "selected": true
+      },
+      {
+        "value": "9",
+        "text": "最大",
+        "selected": false
+      }
+    ],
+    "splitValue": "",
+    "splitPlaceholder": "不分卷",
+    "splitMin": "1",
+    "restoreModes": [
+      {
+        "value": "merge",
+        "checked": true,
+        "label": "合并写入"
+      },
+      {
+        "value": "overwrite",
+        "checked": false,
+        "label": "覆盖写入"
+      }
+    ],
+    "nodeCount": 267,
+    "buttonsTotal": 29,
+    "inlineDrawers": 5,
+    "details": 0,
+    "appHeight": 925
+  },
+  "consoleErrors": [
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "pageerror: SyntaxError: Unexpected reserved word",
+    "pageerror: TypeError: $(...) is not a function",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "pageerror: Uncaught SyntaxError: Identifier 'SPresetSettings' has already been declared"
+  ]
+}

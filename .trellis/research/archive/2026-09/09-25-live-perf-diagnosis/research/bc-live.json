@@ -1,0 +1,227 @@
+{
+  "sampledAt": "2026-09-25T07:31:02.223Z",
+  "url": "https://127.0.0.1:8004",
+  "styleIdentity": [
+    {
+      "href": "(inline)",
+      "ownerTag": "STYLE",
+      "ownerId": "dynamic-styles",
+      "ownerInPluginDir": false,
+      "totalRules": 990,
+      "pluginRules": 58,
+      "firstRule": ".app-container .category-chip-label:focus-visible, .st-converter-drawer-app .category-chip-label:focus-visible { background: color-mix(in srgb, var(--accent) 10",
+      "lastRule": ".app-container .menu_button:focus-visible:not(:disabled), .st-converter-drawer-app .menu_button:focus-visible:not(:disabled) { background: color-mix(in srgb, va"
+    },
+    {
+      "href": "https://127.0.0.1:8004/scripts/extensions/third-party/st-zip-converter/style.css",
+      "ownerTag": "LINK",
+      "ownerId": "third-party_st-zip-converter-css",
+      "ownerInPluginDir": true,
+      "totalRules": 310,
+      "pluginRules": 307,
+      "firstRule": ".app-container, .st-converter-drawer-app { --bg-primary: var(--SmartThemeBodyColor, #14161c); --bg-secondary: var(--SmartThemeChatTintColor, #1b1e27); --bg-card",
+      "lastRule": ".app-container .usage-quota-fill-page, .st-converter-drawer-app .usage-quota-fill-page { background: color-mix(in srgb, var(--accent) 45%, transparent); }"
+    }
+  ],
+  "closedState": {
+    "wallMs": 15994,
+    "probe": {
+      "longtaskCount": 16,
+      "longtaskTotalMs": 13761,
+      "longtaskMaxMs": 8142,
+      "longtaskSamples": [
+        {
+          "start": 12742,
+          "dur": 90
+        },
+        {
+          "start": 13265,
+          "dur": 109
+        },
+        {
+          "start": 13375,
+          "dur": 54
+        },
+        {
+          "start": 13439,
+          "dur": 199
+        },
+        {
+          "start": 13989,
+          "dur": 276
+        },
+        {
+          "start": 14446,
+          "dur": 58
+        },
+        {
+          "start": 15130,
+          "dur": 62
+        },
+        {
+          "start": 15460,
+          "dur": 55
+        },
+        {
+          "start": 15521,
+          "dur": 4007
+        },
+        {
+          "start": 19533,
+          "dur": 55
+        },
+        {
+          "start": 19780,
+          "dur": 162
+        },
+        {
+          "start": 19943,
+          "dur": 75
+        },
+        {
+          "start": 20044,
+          "dur": 273
+        },
+        {
+          "start": 20318,
+          "dur": 65
+        },
+        {
+          "start": 20392,
+          "dur": 79
+        },
+        {
+          "start": 20552,
+          "dur": 8142
+        }
+      ],
+      "domMutations": 4569,
+      "domMutationBatches": 91
+    },
+    "metrics": {
+      "TaskDuration": 11.741,
+      "ScriptDuration": 5.1685,
+      "LayoutDuration": 0.6423,
+      "RecalcStyleDuration": 1.2685,
+      "LayoutCount": 45,
+      "RecalcStyleCount": 135,
+      "JSHeapUsedSize": 424891620,
+      "Nodes": 92946
+    },
+    "drawer": {
+      "found": true,
+      "hasToggle": true,
+      "contentDisplay": "none",
+      "contentHeight": 0
+    }
+  },
+  "openState": {
+    "wallMs": 12008,
+    "probe": {
+      "longtaskCount": 17,
+      "longtaskTotalMs": 6020,
+      "longtaskMaxMs": 1753,
+      "longtaskSamples": [
+        {
+          "start": 33652,
+          "dur": 144
+        },
+        {
+          "start": 33807,
+          "dur": 289
+        },
+        {
+          "start": 34515,
+          "dur": 112
+        },
+        {
+          "start": 34936,
+          "dur": 1753
+        },
+        {
+          "start": 36721,
+          "dur": 219
+        },
+        {
+          "start": 36977,
+          "dur": 179
+        },
+        {
+          "start": 37229,
+          "dur": 73
+        },
+        {
+          "start": 37310,
+          "dur": 357
+        },
+        {
+          "start": 37927,
+          "dur": 54
+        },
+        {
+          "start": 37981,
+          "dur": 169
+        },
+        {
+          "start": 38280,
+          "dur": 105
+        },
+        {
+          "start": 38467,
+          "dur": 196
+        },
+        {
+          "start": 38685,
+          "dur": 1692
+        },
+        {
+          "start": 40571,
+          "dur": 245
+        },
+        {
+          "start": 41057,
+          "dur": 120
+        },
+        {
+          "start": 41211,
+          "dur": 81
+        },
+        {
+          "start": 42287,
+          "dur": 232
+        }
+      ],
+      "domMutations": 1325,
+      "domMutationBatches": 38
+    },
+    "metrics": {
+      "TaskDuration": 7.6265,
+      "ScriptDuration": 0.8436,
+      "LayoutDuration": 0.1889,
+      "RecalcStyleDuration": 0.8781,
+      "LayoutCount": 10,
+      "RecalcStyleCount": 343,
+      "JSHeapUsedSize": 985986876,
+      "Nodes": 126294
+    },
+    "drawer": {
+      "contentDisplay": "block",
+      "contentHeight": 0,
+      "appHeight": 0,
+      "appNodeCount": 276,
+      "appHeavyNodes": {
+        "buttons": 36,
+        "inputs": 19,
+        "details": 3,
+        "labels": 12
+      }
+    }
+  },
+  "injectSelfHealCost": {
+    "scriptDurationDelta": 0.0214,
+    "taskDurationDelta": 0.2914,
+    "recalcStyleDelta": 0.0914,
+    "layoutDelta": 0,
+    "newLongtasks": 0
+  }
+}

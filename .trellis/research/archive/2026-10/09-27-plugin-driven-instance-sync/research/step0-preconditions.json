@@ -1,0 +1,31 @@
+{
+  "task": "09-27-plugin-driven-instance-sync",
+  "step": "§0 前置条件（2026-09-29 现场取证）",
+  "0.1_task_state": { "status": "planning → in_progress（task.py start 已执行）", "current": ".trellis/tasks/09-27-plugin-driven-instance-sync" },
+  "0.2_slot_order": { "blocker": "兄弟任务 09-27-plugin-defect-fixes（子任务B）", "state": "已于 2026-09-29 归档（archive/2026-09），AC-B1~B8 全部达成 ⇒ 本任务可开工（design.md D7.1）" },
+  "0.3_baseline": {
+    "npm_test": { "command": "npx vitest run --maxWorkers=2", "files": 64, "passed": 610, "skipped": 2, "failed": 0, "exit": 0 },
+    "npm_e2e": { "command": "node e2e/run.cjs", "assertions": 281, "passed": 281, "failed": 0, "exit": 0, "note": "与子任务B 收口同读数（连续两轮）" }
+  },
+  "0.4_guards_build": {
+    "result": "五条守卫全 EXIT=0（css-scope / dom-injection-guard / single-template-source / dom-scope / control-consumer-guard）；npm run build EXIT=0",
+    "踩点": "首次自测把脚本名写错（用 dom-injection 而非 dom-injection-guard、template-source 而非 single-template-source），得到 3 个假的 EXIT=1 —— 记此以免误判为回归"
+  },
+  "0.5_instances": {
+    "dev-st_8001": "HTTP 200",
+    "real-st_8002": "HTTP 200（本轮启动）",
+    "dev-luker_8003": "HTTPS 302",
+    "real-luker_8004": "HTTPS 200（本轮启动）",
+    "pt-web_8899": "HTTP 200（§PT 段落需要，已启动）"
+  },
+  "0.6_research_dir": "已建（本文件即落此处；.gitignore 不覆盖 ⇒ 不入版本库）",
+  "0.7_gitignore": { "test-results/": ".gitignore:24", ".pw-profile*": "通配规则", ".trellis/tasks/**/research/*.json": ".gitignore:59" },
+  "0.8_link_scan": {
+    "method": "scripts/instance-sync/lib/link-guard.cjs 的 findLinkedRoots(每个目标 data/default-user)",
+    "dev-st": { "links": 0 },
+    "real-st": { "links": 0 },
+    "dev-luker": { "links": 1, "detail": "extensions/ST-BgLoader -> D:\\Repo\\Tavern-repo\\My-repo\\ST-BgLoader（即 P-19 记录的那条 junction；link-guard 默认跳过/前置拒绝，重跑须显式 --allow-links）" },
+    "real-luker": { "links": 0 },
+    "verdict": "无需人工前置处置：唯一链接正是 link-guard 的既定防护对象（用户 2026-09-26 已裁决「默认跳过链接子树」）"
+  }
+}

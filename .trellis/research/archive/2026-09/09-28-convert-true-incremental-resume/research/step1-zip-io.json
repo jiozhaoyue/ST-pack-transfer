@@ -1,0 +1,18 @@
+{
+  "step": "1 存在门与半成品搬运（src/core/zip-io.js）",
+  "date": "2026-09-28",
+  "green": "npx vitest run test/zip-append.test.js ⇒ 5 passed / 0 failed",
+  "discriminativeProof": {
+    "mutation": "appendFrom 里 `new zip.BlobReader(await toBlob(source))` 改成裸 `await toBlob(source)`",
+    "result": "5 项中 4 项转红（① ② ③ ⑤），报错 `TypeError: Cannot read properties of undefined (reading 'getReader')`",
+    "whyItMatchesProbe": "与 research/appendzip-probe.json 的 wrongForms 记录完全同形 ⇒ 探针结论可复现，不是一次性观察",
+    "restored": "恢复后 5 passed"
+  },
+  "contractsLocked": [
+    "搬运后产物含半成品全部条目且 has() 为真（存在门的前提）",
+    "字节级保持：compressedSize / compressionMethod / crc32 逐条相等 ⇒ 零重压缩；且带前置门（样本 compressedSize 均 >0、方法种类 >1），避免「两侧同为 0 时恒真」",
+    "搬运后继续 add 新条目 ⇒ 顺序为「搬运在前」",
+    "坏包 / 空包在中央目录读取阶段就抛错（尚未写入任何字节），且**不登记**名字进 written",
+    "互锁：搬运后 add 同名条目是静默早返（产物仍是半成品内容）—— 这正是「同源校验必须前置」的机理"
+  ]
+}

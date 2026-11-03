@@ -1,0 +1,64 @@
+{
+  "task": "09-27-plugin-driven-instance-sync",
+  "step": "§1.2 OQ-1 / OQ-3 —— 插件产包与宿主原生备份的口径比对",
+  "device": "scripts/instance-sync/diff-packs.cjs（条目路径集合 + 逐条 crc32，取自 zip 中央目录，不解压）",
+  "question": "「插件在实例内拉取」与「Node 侧直调 POST /api/users/backup」拿到的是不是同一份东西？",
+  "experiment": {
+    "instance": "dev-luker（:8003，Dev 侧）",
+    "pluginProduct": {
+      "file": "l_default-user_part1_2026-09-29.zip",
+      "how": "node scripts/instance-sync/produce-via-plugin.cjs --source dev-luker --layout l --raw",
+      "mode": "--raw（目标布局 == 宿主布局 l 且不剪内置资产、含 backups ⇒ 插件原样透传，不做任何转换）",
+      "bytes": 1271907099,
+      "megabytes": 1213.0,
+      "entryCount": 8061,
+      "sha256": "55f8d65018e6fd7c4ccf3a854fe4768f26be15bc87dd9e5df8aff52f48f31230"
+    },
+    "nativeBackup": {
+      "file": "backup-dev-luker-20260929-124354.zip",
+      "how": "node scripts/instance-sync/export-backups.cjs --id dev-luker",
+      "bytes": 1271907099,
+      "megabytes": 1213.0,
+      "entryCount": 8061,
+      "sha256": "5cadfa39552301b92be11dea3f1a06c62f2cd7dcd9f2f8ca54c77bcb3f269fd8"
+    }
+  },
+  "verdict": {
+    "diffPacks": "IDENTICAL",
+    "sameCrc32": 8060,
+    "changed": 0,
+    "onlyInPlugin": 0,
+    "onlyInNative": 0,
+    "changedRequestMetadata": 1,
+    "uncompressedTotalBoth": "2802.7 MB",
+    "reading": "research/plugin-vs-native-backup.json"
+  },
+  "theOnlyDifference_explained": {
+    "path": "manifest.json",
+    "whyNotAContentDifference": "它是**宿主（Luker `POST /api/users/backup`）在请求时生成**的元数据；两份同为 343 B，`schemaVersion`/`handle`/`selection` 三个字段**逐字相同**，唯一差异是 `createdAt` —— 各自请求的**时刻**。",
+    "evidence": {
+      "plugin": { "createdAt": "2026-09-29T04:55:19.179Z" },
+      "native": { "createdAt": "2026-09-29T04:43:54.279Z" },
+      "selectionIdentical": "settings/secrets/characters/chats/lorebooks/presets/assets/extensions 均 true；globalExtensions/vectors 均 false"
+    },
+    "consequence": "**条目级比对必须把这类「带生成时刻的请求期元数据」单列**，否则判据恒假（每次都报 1 条不同）。已固化为 diff-packs.cjs 的 REQUEST_TIME_METADATA（当前仅 manifest.json）。"
+  },
+  "oq3_handle_secrets_and_settings": {
+    "secrets.json": { "presentInPack": true, "uncompressedBytes": 4452, "path": "secrets.json" },
+    "settings.json": { "presentInPack": true, "uncompressedBytes": 23422236, "path": "settings.json", "note": "22.3 MiB。§6.6 的「settings.json 体积不得异常增长」断言以此为基线参考（注意这是**源包内**的体积，不是目标实例落盘体积）" },
+    "conclusion": "**两者都被插件拉取原样覆盖、未被排除**（与宿主原生备份逐条一致）；差异为零，故不需要「显式登记的差异项」。"
+  },
+  "finding_host_default_selection_excludes_two_categories": {
+    "statement": "Luker 的宿主原生备份**默认不打包** `globalExtensions`（全局/第三方扩展）与 `vectors`（向量库），这是**宿主**的默认 selection，不是插件的裁剪。",
+    "evidence": [
+      "宿主写进 manifest.json 的 selection 实录：globalExtensions=false, vectors=false（插件与原生备份两份**完全一致**）",
+      "实测包内扫掠：`vectors/` 条目 **0** 条；匹配 `extensions/third-party/**` 或 `data/extensions/**` 的条目**仅 1 条** = `extensions/third-party/.gitkeep`"
+    ],
+    "consequence": "⇒ 本同步链的载荷**不含全局第三方扩展实体与向量库**（只有 `.gitkeep` 骨架）。上一轮走 Node 原生端点导出，默认 selection 相同 ⇒ **两轮口径一致，非本轮引入的缺口**。",
+    "notFixedHere": "是否要把 globalExtensions/vectors 纳入同步，属需求变更（不在本任务范围）；此处只登记事实。"
+  },
+  "whyThisMatters": [
+    "它把 ACL/能力问题变简单：**「插件能产包」不再是待验推论**，而是与既有原生通道**逐条等价**的既定事实。",
+    "它使 OQ-2 的对照实验**同源**：两侧只要喂同一份源字节，任何差异都可归因到「转换」环节，而不是「取数」环节。"
+  ]
+}

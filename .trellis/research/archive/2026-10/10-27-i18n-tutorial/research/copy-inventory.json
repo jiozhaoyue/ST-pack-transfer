@@ -1,0 +1,5007 @@
+[
+  {
+    "file": "index.js",
+    "line": 139,
+    "kind": "text",
+    "raw": "远程导入",
+    "key": "index.text.001"
+  },
+  {
+    "file": "index.js",
+    "line": 140,
+    "kind": "text",
+    "raw": "分卷",
+    "key": "index.text.002"
+  },
+  {
+    "file": "index.js",
+    "line": 141,
+    "kind": "text",
+    "raw": "导出副本",
+    "key": "index.text.003"
+  },
+  {
+    "file": "index.js",
+    "line": 142,
+    "kind": "text",
+    "raw": "本地导入",
+    "key": "index.text.004"
+  },
+  {
+    "file": "index.js",
+    "line": 158,
+    "kind": "text",
+    "raw": "读取工作区失败:",
+    "key": "index.text.005"
+  },
+  {
+    "file": "index.js",
+    "line": 171,
+    "kind": "text",
+    "raw": "扫描跳过：",
+    "key": "index.text.006"
+  },
+  {
+    "file": "index.js",
+    "line": 171,
+    "kind": "text",
+    "raw": "的字节不在工作区",
+    "key": "index.text.007"
+  },
+  {
+    "file": "index.js",
+    "line": 172,
+    "kind": "text",
+    "raw": "扫描中 ·",
+    "key": "index.text.008"
+  },
+  {
+    "file": "index.js",
+    "line": 173,
+    "kind": "text",
+    "raw": "扫描开始：",
+    "key": "index.text.009"
+  },
+  {
+    "file": "index.js",
+    "line": 201,
+    "kind": "text",
+    "raw": "扫描完成",
+    "key": "index.text.010"
+  },
+  {
+    "file": "index.js",
+    "line": 202,
+    "kind": "text",
+    "raw": "扫描完成：",
+    "key": "index.text.011"
+  },
+  {
+    "file": "index.js",
+    "line": 202,
+    "kind": "text",
+    "raw": "个文件 ·",
+    "key": "index.text.012"
+  },
+  {
+    "file": "index.js",
+    "line": 202,
+    "kind": "text",
+    "raw": "个分组",
+    "key": "index.text.013"
+  },
+  {
+    "file": "index.js",
+    "line": 205,
+    "kind": "text",
+    "raw": "扫描失败：",
+    "key": "index.text.014"
+  },
+  {
+    "file": "index.js",
+    "line": 206,
+    "kind": "text",
+    "raw": "扫描失败",
+    "key": "index.text.015"
+  },
+  {
+    "file": "index.js",
+    "line": 227,
+    "kind": "toast",
+    "raw": "当前浏览器不支持本地存储",
+    "key": "index.toast.016"
+  },
+  {
+    "file": "index.js",
+    "line": 244,
+    "kind": "toast",
+    "raw": "已接收",
+    "key": "index.toast.017"
+  },
+  {
+    "file": "index.js",
+    "line": 244,
+    "kind": "toast",
+    "raw": "个包",
+    "key": "index.toast.018"
+  },
+  {
+    "file": "index.js",
+    "line": 244,
+    "kind": "toast",
+    "raw": "已导入",
+    "key": "index.toast.019"
+  },
+  {
+    "file": "index.js",
+    "line": 244,
+    "kind": "toast",
+    "raw": "个包",
+    "key": "index.toast.020"
+  },
+  {
+    "file": "index.js",
+    "line": 255,
+    "kind": "text",
+    "raw": "发送跳过：",
+    "key": "index.text.021"
+  },
+  {
+    "file": "index.js",
+    "line": 255,
+    "kind": "text",
+    "raw": "的字节不在工作区",
+    "key": "index.text.022"
+  },
+  {
+    "file": "index.js",
+    "line": 287,
+    "kind": "toast",
+    "raw": "已复制",
+    "key": "index.toast.023"
+  },
+  {
+    "file": "index.js",
+    "line": 287,
+    "kind": "toast",
+    "raw": "个包回导入区",
+    "key": "index.toast.024"
+  },
+  {
+    "file": "index.js",
+    "line": 291,
+    "kind": "toast",
+    "raw": "先选择要删除的包",
+    "key": "index.toast.025"
+  },
+  {
+    "file": "index.js",
+    "line": 292,
+    "kind": "log",
+    "raw": "确定删除选中的",
+    "key": "index.log.026"
+  },
+  {
+    "file": "index.js",
+    "line": 292,
+    "kind": "log",
+    "raw": "个包吗？此操作不可撤销。",
+    "key": "index.log.027"
+  },
+  {
+    "file": "index.js",
+    "line": 300,
+    "kind": "toast",
+    "raw": "已删除",
+    "key": "index.toast.028"
+  },
+  {
+    "file": "index.js",
+    "line": 304,
+    "kind": "toast",
+    "raw": "只有插件形态可以回传宿主",
+    "key": "index.toast.029"
+  },
+  {
+    "file": "index.js",
+    "line": 306,
+    "kind": "toast",
+    "raw": "先选择一个导出包",
+    "key": "index.toast.030"
+  },
+  {
+    "file": "index.js",
+    "line": 307,
+    "kind": "log",
+    "raw": "将",
+    "key": "index.log.031"
+  },
+  {
+    "file": "index.js",
+    "line": 307,
+    "kind": "log",
+    "raw": "恢复到当前宿主？覆盖前请确认已备份。",
+    "key": "index.log.032"
+  },
+  {
+    "file": "index.js",
+    "line": 312,
+    "kind": "text",
+    "raw": "正在回传宿主...",
+    "key": "index.text.033"
+  },
+  {
+    "file": "index.js",
+    "line": 317,
+    "kind": "text",
+    "raw": "宿主未写入任何条目",
+    "key": "index.text.034"
+  },
+  {
+    "file": "index.js",
+    "line": 319,
+    "kind": "text",
+    "raw": "恢复完成",
+    "key": "index.text.035"
+  },
+  {
+    "file": "index.js",
+    "line": 320,
+    "kind": "text",
+    "raw": "已恢复",
+    "key": "index.text.036"
+  },
+  {
+    "file": "index.js",
+    "line": 321,
+    "kind": "toast",
+    "raw": "恢复完成",
+    "key": "index.toast.037"
+  },
+  {
+    "file": "index.js",
+    "line": 323,
+    "kind": "text",
+    "raw": "恢复失败：",
+    "key": "index.text.038"
+  },
+  {
+    "file": "index.js",
+    "line": 324,
+    "kind": "text",
+    "raw": "恢复失败",
+    "key": "index.text.039"
+  },
+  {
+    "file": "index.js",
+    "line": 331,
+    "kind": "toast",
+    "raw": "独立 Web 模式没有宿主数据源",
+    "key": "index.toast.040"
+  },
+  {
+    "file": "index.js",
+    "line": 335,
+    "kind": "text",
+    "raw": "正在请求宿主打包...",
+    "key": "index.text.041"
+  },
+  {
+    "file": "index.js",
+    "line": 338,
+    "kind": "text",
+    "raw": "宿主打包中...",
+    "key": "index.text.042"
+  },
+  {
+    "file": "index.js",
+    "line": 341,
+    "kind": "text",
+    "raw": "接收中",
+    "key": "index.text.043"
+  },
+  {
+    "file": "index.js",
+    "line": 356,
+    "kind": "text",
+    "raw": "宿主拉取完成",
+    "key": "index.text.044"
+  },
+  {
+    "file": "index.js",
+    "line": 357,
+    "kind": "toast",
+    "raw": "宿主拉取完成",
+    "key": "index.toast.045"
+  },
+  {
+    "file": "index.js",
+    "line": 359,
+    "kind": "text",
+    "raw": "宿主拉取失败：",
+    "key": "index.text.046"
+  },
+  {
+    "file": "index.js",
+    "line": 360,
+    "kind": "text",
+    "raw": "宿主拉取失败",
+    "key": "index.text.047"
+  },
+  {
+    "file": "index.js",
+    "line": 368,
+    "kind": "toast",
+    "raw": "先选择要导出的包",
+    "key": "index.toast.048"
+  },
+  {
+    "file": "index.js",
+    "line": 380,
+    "kind": "text",
+    "raw": "转换中 ·",
+    "key": "index.text.049"
+  },
+  {
+    "file": "index.js",
+    "line": 397,
+    "kind": "text",
+    "raw": "转换中",
+    "key": "index.text.050"
+  },
+  {
+    "file": "index.js",
+    "line": 425,
+    "kind": "text",
+    "raw": "已转换",
+    "key": "index.text.051"
+  },
+  {
+    "file": "index.js",
+    "line": 436,
+    "kind": "text",
+    "raw": "导出包已就绪",
+    "key": "index.text.052"
+  },
+  {
+    "file": "index.js",
+    "line": 437,
+    "kind": "toast",
+    "raw": "已生成",
+    "key": "index.toast.053"
+  },
+  {
+    "file": "index.js",
+    "line": 437,
+    "kind": "toast",
+    "raw": "个导出包",
+    "key": "index.toast.054"
+  },
+  {
+    "file": "index.js",
+    "line": 440,
+    "kind": "text",
+    "raw": "转换失败：",
+    "key": "index.text.055"
+  },
+  {
+    "file": "index.js",
+    "line": 441,
+    "kind": "text",
+    "raw": "转换失败",
+    "key": "index.text.056"
+  },
+  {
+    "file": "index.js",
+    "line": 442,
+    "kind": "toast",
+    "raw": "转换失败，详见日志",
+    "key": "index.toast.057"
+  },
+  {
+    "file": "index.js",
+    "line": 451,
+    "kind": "toast",
+    "raw": "没有可导出的聊天",
+    "key": "index.toast.058"
+  },
+  {
+    "file": "index.js",
+    "line": 460,
+    "kind": "toast",
+    "raw": "聊天库已导出到导入区",
+    "key": "index.toast.059"
+  },
+  {
+    "file": "index.js",
+    "line": 462,
+    "kind": "text",
+    "raw": "聊天库导出失败：",
+    "key": "index.text.060"
+  },
+  {
+    "file": "index.js",
+    "line": 468,
+    "kind": "modal",
+    "raw": "设置",
+    "key": "index.modal.061"
+  },
+  {
+    "file": "index.js",
+    "line": 468,
+    "kind": "modal",
+    "raw": "这些选项会记住。",
+    "key": "index.modal.062"
+  },
+  {
+    "file": "index.js",
+    "line": 470,
+    "kind": "markup",
+    "raw": "<label class=\"set-row\"><span>压缩</span><select id=\"set-compression\" class=\"text_pole\">",
+    "key": "index.markup.063"
+  },
+  {
+    "file": "index.js",
+    "line": 471,
+    "kind": "text",
+    "raw": "0|不压缩",
+    "key": "index.text.064"
+  },
+  {
+    "file": "index.js",
+    "line": 471,
+    "kind": "text",
+    "raw": "1|快速",
+    "key": "index.text.065"
+  },
+  {
+    "file": "index.js",
+    "line": 471,
+    "kind": "text",
+    "raw": "5|标准",
+    "key": "index.text.066"
+  },
+  {
+    "file": "index.js",
+    "line": 471,
+    "kind": "text",
+    "raw": "9|最大",
+    "key": "index.text.067"
+  },
+  {
+    "file": "index.js",
+    "line": 473,
+    "kind": "markup",
+    "raw": "<label class=\"set-row\"><span>扩展包</span><select id=\"set-extension-mode\" class=\"text_pole\">",
+    "key": "index.markup.068"
+  },
+  {
+    "file": "index.js",
+    "line": 474,
+    "kind": "markup",
+    "raw": ">只导出清单</option>",
+    "key": "index.markup.069"
+  },
+  {
+    "file": "index.js",
+    "line": 475,
+    "kind": "markup",
+    "raw": ">完整扩展包</option>",
+    "key": "index.markup.070"
+  },
+  {
+    "file": "index.js",
+    "line": 477,
+    "kind": "markup",
+    "raw": "<label class=\"set-row\"><span>Git 历史</span><select id=\"set-git-mode\" class=\"text_pole\">",
+    "key": "index.markup.071"
+  },
+  {
+    "file": "index.js",
+    "line": 478,
+    "kind": "markup",
+    "raw": ">保留历史</option>",
+    "key": "index.markup.072"
+  },
+  {
+    "file": "index.js",
+    "line": 479,
+    "kind": "markup",
+    "raw": ">只留更新所需</option>",
+    "key": "index.markup.073"
+  },
+  {
+    "file": "index.js",
+    "line": 480,
+    "kind": "markup",
+    "raw": ">不含历史</option>",
+    "key": "index.markup.074"
+  },
+  {
+    "file": "index.js",
+    "line": 482,
+    "kind": "markup",
+    "raw": "> 保留构建配置</label>",
+    "key": "index.markup.075"
+  },
+  {
+    "file": "index.js",
+    "line": 483,
+    "kind": "markup",
+    "raw": "> 打包 backups 快照</label>",
+    "key": "index.markup.076"
+  },
+  {
+    "file": "index.js",
+    "line": 484,
+    "kind": "markup",
+    "raw": "> 打包派生缓存</label>",
+    "key": "index.markup.077"
+  },
+  {
+    "file": "index.js",
+    "line": 485,
+    "kind": "markup",
+    "raw": "> 打包私有配置</label>",
+    "key": "index.markup.078"
+  },
+  {
+    "file": "index.js",
+    "line": 486,
+    "kind": "markup",
+    "raw": "> 清理原生重复资产</label>",
+    "key": "index.markup.079"
+  },
+  {
+    "file": "index.js",
+    "line": 487,
+    "kind": "markup",
+    "raw": "> 导出后在导出区保留包</label>",
+    "key": "index.markup.080"
+  },
+  {
+    "file": "index.js",
+    "line": 488,
+    "kind": "markup",
+    "raw": "> 后端上下传流量提示</label>",
+    "key": "index.markup.081"
+  },
+  {
+    "file": "index.js",
+    "line": 489,
+    "kind": "markup",
+    "raw": "> 基础教程自动打开</label>",
+    "key": "index.markup.082"
+  },
+  {
+    "file": "index.js",
+    "line": 492,
+    "kind": "modal",
+    "raw": "关闭",
+    "key": "index.modal.083"
+  },
+  {
+    "file": "index.js",
+    "line": 494,
+    "kind": "text",
+    "raw": "保存",
+    "key": "index.text.084"
+  },
+  {
+    "file": "index.js",
+    "line": 510,
+    "kind": "toast",
+    "raw": "设置已保存",
+    "key": "index.toast.085"
+  },
+  {
+    "file": "index.js",
+    "line": 538,
+    "kind": "toast",
+    "raw": "私有配置上传请求：",
+    "key": "index.toast.086"
+  },
+  {
+    "file": "index.js",
+    "line": 538,
+    "kind": "toast",
+    "raw": "私有配置：",
+    "key": "index.toast.087"
+  },
+  {
+    "file": "index.js",
+    "line": 584,
+    "kind": "text",
+    "raw": "准备就绪",
+    "key": "index.text.088"
+  },
+  {
+    "file": "index.js",
+    "line": 585,
+    "kind": "text",
+    "raw": "工作台已就绪 ·",
+    "key": "index.text.089"
+  },
+  {
+    "file": "src/ui/workbench-template.js",
+    "line": 11,
+    "kind": "markup",
+    "raw": "<h1>数据包转运</h1>",
+    "key": "workbench-template.markup.001"
+  },
+  {
+    "file": "src/ui/workbench-template.js",
+    "line": 15,
+    "kind": "a11y",
+    "raw": "<span class=\"badge accent\" id=\"host-badge\"><img class=\"host-icon\" id=\"host-badge-icon\" alt=\"\"><svg class=\"gh-icon\" id=\"host-badge-gh\" viewBox=\"0 0 24 24\" width=\"14\" height=\"14\" fill=\"currentColor\" hidden><path d=\"M12 2A10 10 0 0 0 2 12c0 4.42 2.87 8.17 6.84 9.5.5.09.68-.22.68-.48v-1.7c-2.78.6-3.37-1.34-3.37-1.34-.45-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.89 1.53 2.34 1.09 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.56-1.11-4.56-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02a9.5 9.5 0 0 1 5 0c1.9-1.29 2.74-1.02 2.74-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.69-4.57 4.94.36.31.68.92.68 1.85v2.74c0 .27.18.58.69.48A10 10 0 0 0 22 12A10 10 0 0 0 12 2z\"/></svg><span id=\"host-badge-text\">Luker 插件</span></span>",
+    "key": "workbench-template.a11y.002"
+  },
+  {
+    "file": "src/ui/workbench-template.js",
+    "line": 16,
+    "kind": "title",
+    "raw": "<button class=\"icon-btn\" id=\"btn-guide\" title=\"基础教程\">?</button>",
+    "key": "workbench-template.title.003"
+  },
+  {
+    "file": "src/ui/workbench-template.js",
+    "line": 17,
+    "kind": "title",
+    "raw": "<button class=\"icon-btn\" id=\"btn-log\" title=\"日志\">",
+    "key": "workbench-template.title.004"
+  },
+  {
+    "file": "src/ui/workbench-template.js",
+    "line": 21,
+    "kind": "title",
+    "raw": "<button class=\"icon-btn\" id=\"btn-settings\" title=\"设置\"><svg viewBox=\"0 0 24 24\" width=\"14\" height=\"14\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\"><circle cx=\"12\" cy=\"12\" r=\"3\"/><path d=\"M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9L17 7M7 17l-2.1 2.1\"/></svg></button>",
+    "key": "workbench-template.title.005"
+  },
+  {
+    "file": "src/ui/workbench-template.js",
+    "line": 22,
+    "kind": "title",
+    "raw": "<button class=\"icon-btn\" id=\"btn-close\" title=\"关闭\">×</button>",
+    "key": "workbench-template.title.006"
+  },
+  {
+    "file": "src/ui/workbench-template.js",
+    "line": 32,
+    "kind": "markup",
+    "raw": "<span>存储图表</span>",
+    "key": "workbench-template.markup.007"
+  },
+  {
+    "file": "src/ui/workbench-template.js",
+    "line": 35,
+    "kind": "title",
+    "raw": "<button class=\"help-btn\" data-help=\"chart\" title=\"图表帮助\">?</button>",
+    "key": "workbench-template.title.008"
+  },
+  {
+    "file": "src/ui/workbench-template.js",
+    "line": 40,
+    "kind": "markup",
+    "raw": "<div class=\"field\">目标平台",
+    "key": "workbench-template.markup.009"
+  },
+  {
+    "file": "src/ui/workbench-template.js",
+    "line": 50,
+    "kind": "title",
+    "raw": "<div class=\"segmented\" id=\"delta-toggle\" title=\"覆盖 / 增量\">",
+    "key": "workbench-template.title.010"
+  },
+  {
+    "file": "src/ui/workbench-template.js",
+    "line": 51,
+    "kind": "markup",
+    "raw": "<button class=\"seg-btn active\" data-delta=\"overwrite\">覆盖</button>",
+    "key": "workbench-template.markup.011"
+  },
+  {
+    "file": "src/ui/workbench-template.js",
+    "line": 52,
+    "kind": "markup",
+    "raw": "<button class=\"seg-btn\" data-delta=\"incremental\">增量</button>",
+    "key": "workbench-template.markup.012"
+  },
+  {
+    "file": "src/ui/workbench-template.js",
+    "line": 54,
+    "kind": "markup",
+    "raw": "<label class=\"field\">分卷",
+    "key": "workbench-template.markup.013"
+  },
+  {
+    "file": "src/ui/workbench-template.js",
+    "line": 55,
+    "kind": "placeholder",
+    "raw": "<input type=\"number\" id=\"split-input\" min=\"32\" max=\"2048\" step=\"1\" placeholder=\"不分卷\">",
+    "key": "workbench-template.placeholder.014"
+  },
+  {
+    "file": "src/ui/workbench-template.js",
+    "line": 62,
+    "kind": "markup",
+    "raw": "<label class=\"field\" for=\"filename-template\">包名</label>",
+    "key": "workbench-template.markup.015"
+  },
+  {
+    "file": "src/ui/workbench-template.js",
+    "line": 69,
+    "kind": "markup",
+    "raw": "<span class=\"item\"><i class=\"dot keep\"></i>建议保留</span>",
+    "key": "workbench-template.markup.016"
+  },
+  {
+    "file": "src/ui/workbench-template.js",
+    "line": 70,
+    "kind": "markup",
+    "raw": "<span class=\"item\"><i class=\"dot optional\"></i>可选</span>",
+    "key": "workbench-template.markup.017"
+  },
+  {
+    "file": "src/ui/workbench-template.js",
+    "line": 71,
+    "kind": "markup",
+    "raw": "<span class=\"item\"><i class=\"dot drop\"></i>建议清理</span>",
+    "key": "workbench-template.markup.018"
+  },
+  {
+    "file": "src/ui/workbench-template.js",
+    "line": 72,
+    "kind": "markup",
+    "raw": "<span class=\"item\"><i class=\"dot unknown\"></i>未识别</span>",
+    "key": "workbench-template.markup.019"
+  },
+  {
+    "file": "src/ui/workbench-template.js",
+    "line": 73,
+    "kind": "markup",
+    "raw": "<span class=\"item\" style=\"margin-left:auto\">勾选即导出范围</span>",
+    "key": "workbench-template.markup.020"
+  },
+  {
+    "file": "src/ui/workbench-template.js",
+    "line": 80,
+    "kind": "title",
+    "raw": "<div class=\"splitter-v\" id=\"split-v\" role=\"separator\" aria-orientation=\"vertical\" title=\"拖动调整左右宽度\"></div>",
+    "key": "workbench-template.title.021"
+  },
+  {
+    "file": "src/ui/workbench-template.js",
+    "line": 83,
+    "kind": "title",
+    "raw": "<div class=\"splitter-corner\" id=\"split-corner\" title=\"拖动同时调整宽度与高度\"></div>",
+    "key": "workbench-template.title.022"
+  },
+  {
+    "file": "src/ui/workbench-template.js",
+    "line": 88,
+    "kind": "markup",
+    "raw": "<span>数据包</span>",
+    "key": "workbench-template.markup.023"
+  },
+  {
+    "file": "src/ui/workbench-template.js",
+    "line": 91,
+    "kind": "title",
+    "raw": "<button class=\"help-btn\" data-help=\"zone\" title=\"数据包帮助\">?</button>",
+    "key": "workbench-template.title.024"
+  },
+  {
+    "file": "src/ui/workbench-template.js",
+    "line": 95,
+    "kind": "markup",
+    "raw": "<button class=\"zone-tab active\" data-zone=\"import\">导入<span class=\"count\" id=\"count-import\">4</span></button>",
+    "key": "workbench-template.markup.025"
+  },
+  {
+    "file": "src/ui/workbench-template.js",
+    "line": 96,
+    "kind": "markup",
+    "raw": "<button class=\"zone-tab\" data-zone=\"export\">导出<span class=\"count\" id=\"count-export\">1</span></button>",
+    "key": "workbench-template.markup.026"
+  },
+  {
+    "file": "src/ui/workbench-template.js",
+    "line": 101,
+    "kind": "title",
+    "raw": "<div class=\"splitter-h\" id=\"split-h\" role=\"separator\" aria-orientation=\"horizontal\" title=\"拖动调整高度\"></div>",
+    "key": "workbench-template.title.027"
+  },
+  {
+    "file": "src/ui/workbench-template.js",
+    "line": 107,
+    "kind": "markup",
+    "raw": "<span>执行</span>",
+    "key": "workbench-template.markup.028"
+  },
+  {
+    "file": "src/ui/workbench-template.js",
+    "line": 110,
+    "kind": "title",
+    "raw": "<button class=\"help-btn\" data-help=\"action\" title=\"执行帮助\">?</button>",
+    "key": "workbench-template.title.029"
+  },
+  {
+    "file": "src/ui/workbench-template.js",
+    "line": 118,
+    "kind": "markup",
+    "raw": "<span>局域网互传</span>",
+    "key": "workbench-template.markup.030"
+  },
+  {
+    "file": "src/ui/workbench-template.js",
+    "line": 119,
+    "kind": "markup",
+    "raw": "<span class=\"lan-toggle-hint\" id=\"lan-toggle-hint\">发送或接收数据包</span>",
+    "key": "workbench-template.markup.031"
+  },
+  {
+    "file": "src/ui/workbench-template.js",
+    "line": 126,
+    "kind": "markup",
+    "raw": "<span id=\"lan-scan-hint\">把取件码对准摄像头</span>",
+    "key": "workbench-template.markup.032"
+  },
+  {
+    "file": "src/ui/workbench-template.js",
+    "line": 127,
+    "kind": "markup",
+    "raw": "<button type=\"button\" id=\"lan-scan-cancel\">取消</button>",
+    "key": "workbench-template.markup.033"
+  },
+  {
+    "file": "src/ui/workbench-template.js",
+    "line": 135,
+    "kind": "title",
+    "raw": "<span class=\"lan-sec-title\">发送</span>",
+    "key": "workbench-template.title.034"
+  },
+  {
+    "file": "src/ui/workbench-template.js",
+    "line": 136,
+    "kind": "markup",
+    "raw": "<span class=\"lan-sec-note\" id=\"lan-send-summary\">在数据包区勾选要发送的包</span>",
+    "key": "workbench-template.markup.035"
+  },
+  {
+    "file": "src/ui/workbench-template.js",
+    "line": 139,
+    "kind": "markup",
+    "raw": "<div class=\"lan-label\"><span>取件码</span><button type=\"button\" class=\"lan-link\" id=\"lan-btn-copy-send\" hidden>复制</button></div>",
+    "key": "workbench-template.markup.036"
+  },
+  {
+    "file": "src/ui/workbench-template.js",
+    "line": 140,
+    "kind": "placeholder",
+    "raw": "<textarea class=\"text_pole lan-code\" id=\"lan-send-code\" rows=\"2\" readonly placeholder=\"勾选包后生成\"></textarea>",
+    "key": "workbench-template.placeholder.037"
+  },
+  {
+    "file": "src/ui/workbench-template.js",
+    "line": 144,
+    "kind": "markup",
+    "raw": "<button type=\"button\" class=\"menu_button\" id=\"lan-btn-generate\">生成取件码</button>",
+    "key": "workbench-template.markup.038"
+  },
+  {
+    "file": "src/ui/workbench-template.js",
+    "line": 145,
+    "kind": "markup",
+    "raw": "<button type=\"button\" class=\"menu_button\" id=\"lan-btn-retry\" hidden>重试</button>",
+    "key": "workbench-template.markup.039"
+  },
+  {
+    "file": "src/ui/workbench-template.js",
+    "line": 146,
+    "kind": "markup",
+    "raw": "<button type=\"button\" class=\"menu_button\" id=\"lan-btn-cancel\" hidden>取消</button>",
+    "key": "workbench-template.markup.040"
+  },
+  {
+    "file": "src/ui/workbench-template.js",
+    "line": 149,
+    "kind": "markup",
+    "raw": "<div class=\"lan-label\"><span>应答码</span><button type=\"button\" class=\"lan-link\" id=\"lan-btn-scan-answer\" hidden>扫码</button></div>",
+    "key": "workbench-template.markup.041"
+  },
+  {
+    "file": "src/ui/workbench-template.js",
+    "line": 150,
+    "kind": "placeholder",
+    "raw": "<textarea class=\"text_pole lan-code\" id=\"lan-answer-input\" rows=\"2\" placeholder=\"粘贴或扫对方回传的应答码\"></textarea>",
+    "key": "workbench-template.placeholder.042"
+  },
+  {
+    "file": "src/ui/workbench-template.js",
+    "line": 153,
+    "kind": "markup",
+    "raw": "<button type=\"button\" class=\"menu_button\" id=\"lan-btn-apply-answer\">开始传输</button>",
+    "key": "workbench-template.markup.043"
+  },
+  {
+    "file": "src/ui/workbench-template.js",
+    "line": 156,
+    "kind": "markup",
+    "raw": "<span class=\"lan-phase\" id=\"lan-send-phase\">准备就绪</span>",
+    "key": "workbench-template.markup.044"
+  },
+  {
+    "file": "src/ui/workbench-template.js",
+    "line": 164,
+    "kind": "title",
+    "raw": "<div class=\"lan-sec-head\"><span class=\"lan-sec-title\">接收</span></div>",
+    "key": "workbench-template.title.045"
+  },
+  {
+    "file": "src/ui/workbench-template.js",
+    "line": 166,
+    "kind": "markup",
+    "raw": "<div class=\"lan-label\"><span>取件码</span><button type=\"button\" class=\"lan-link\" id=\"lan-btn-scan-offer\">扫码</button></div>",
+    "key": "workbench-template.markup.046"
+  },
+  {
+    "file": "src/ui/workbench-template.js",
+    "line": 167,
+    "kind": "placeholder",
+    "raw": "<textarea class=\"text_pole lan-code\" id=\"lan-offer-input\" rows=\"2\" placeholder=\"粘贴或扫对方发来的取件码\"></textarea>",
+    "key": "workbench-template.placeholder.047"
+  },
+  {
+    "file": "src/ui/workbench-template.js",
+    "line": 170,
+    "kind": "markup",
+    "raw": "<button type=\"button\" class=\"menu_button\" id=\"lan-btn-accept\">生成应答码</button>",
+    "key": "workbench-template.markup.048"
+  },
+  {
+    "file": "src/ui/workbench-template.js",
+    "line": 173,
+    "kind": "markup",
+    "raw": "<div class=\"lan-label\"><span>应答码</span><button type=\"button\" class=\"lan-link\" id=\"lan-btn-copy-recv\" hidden>复制</button></div>",
+    "key": "workbench-template.markup.049"
+  },
+  {
+    "file": "src/ui/workbench-template.js",
+    "line": 174,
+    "kind": "placeholder",
+    "raw": "<textarea class=\"text_pole lan-code\" id=\"lan-recv-code\" rows=\"2\" readonly placeholder=\"生成后交给发送端\"></textarea>",
+    "key": "workbench-template.placeholder.050"
+  },
+  {
+    "file": "src/ui/workbench-template.js",
+    "line": 178,
+    "kind": "markup",
+    "raw": "<span class=\"lan-phase\" id=\"lan-recv-phase\">等待取件码</span>",
+    "key": "workbench-template.markup.051"
+  },
+  {
+    "file": "src/ui/workbench-template.js",
+    "line": 184,
+    "kind": "markup",
+    "raw": "<button type=\"button\" class=\"menu_button\" id=\"lan-btn-abandon\" hidden>放弃半成品</button>",
+    "key": "workbench-template.markup.052"
+  },
+  {
+    "file": "src/ui/workbench-template.js",
+    "line": 191,
+    "kind": "markup",
+    "raw": "<div class=\"progress-text\"><span id=\"progress-label\">准备就绪</span><span id=\"progress-pct\">0%</span></div>",
+    "key": "workbench-template.markup.053"
+  },
+  {
+    "file": "src/ui/workbench-template.js",
+    "line": 198,
+    "kind": "markup",
+    "raw": "<!-- 帮助浮层：挂在 body，避免被面板 overflow 裁切 -->",
+    "key": "workbench-template.markup.054"
+  },
+  {
+    "file": "src/ui/workbench-template.js",
+    "line": 201,
+    "kind": "markup",
+    "raw": "<!-- 教程 -->",
+    "key": "workbench-template.markup.055"
+  },
+  {
+    "file": "src/ui/workbench-template.js",
+    "line": 209,
+    "kind": "markup",
+    "raw": "<button id=\"tutorial-adv\" class=\"link\">进阶教程</button>",
+    "key": "workbench-template.markup.056"
+  },
+  {
+    "file": "src/ui/workbench-template.js",
+    "line": 210,
+    "kind": "markup",
+    "raw": "<button id=\"tutorial-skip\">跳过</button>",
+    "key": "workbench-template.markup.057"
+  },
+  {
+    "file": "src/ui/workbench-template.js",
+    "line": 211,
+    "kind": "markup",
+    "raw": "<button id=\"tutorial-prev\">上一步</button>",
+    "key": "workbench-template.markup.058"
+  },
+  {
+    "file": "src/ui/workbench-template.js",
+    "line": 212,
+    "kind": "markup",
+    "raw": "<button id=\"tutorial-next\" class=\"primary\">下一步</button>",
+    "key": "workbench-template.markup.059"
+  },
+  {
+    "file": "src/ui/workbench-template.js",
+    "line": 217,
+    "kind": "markup",
+    "raw": "<!-- 通用弹窗 -->",
+    "key": "workbench-template.markup.060"
+  },
+  {
+    "file": "src/ui/workbench-template.js",
+    "line": 227,
+    "kind": "markup",
+    "raw": "<!-- 日志：顶栏按钮打开，面板里不再常驻日志块 -->",
+    "key": "workbench-template.markup.061"
+  },
+  {
+    "file": "src/ui/workbench-template.js",
+    "line": 231,
+    "kind": "markup",
+    "raw": "<h3>日志</h3>",
+    "key": "workbench-template.markup.062"
+  },
+  {
+    "file": "src/ui/workbench-template.js",
+    "line": 232,
+    "kind": "title",
+    "raw": "<button class=\"help-btn\" data-help=\"log\" title=\"日志帮助\">?</button>",
+    "key": "workbench-template.title.063"
+  },
+  {
+    "file": "src/ui/workbench-template.js",
+    "line": 233,
+    "kind": "markup",
+    "raw": "<span class=\"latest\" id=\"log-latest\">暂无日志</span>",
+    "key": "workbench-template.markup.064"
+  },
+  {
+    "file": "src/ui/workbench-template.js",
+    "line": 234,
+    "kind": "title",
+    "raw": "<button class=\"icon-btn\" id=\"log-close\" title=\"关闭\">×</button>",
+    "key": "workbench-template.title.065"
+  },
+  {
+    "file": "src/ui/workbench-template.js",
+    "line": 237,
+    "kind": "markup",
+    "raw": "<button class=\"log-level-btn active\" data-level=\"ALL\">全部</button>",
+    "key": "workbench-template.markup.066"
+  },
+  {
+    "file": "src/ui/workbench-template.js",
+    "line": 238,
+    "kind": "markup",
+    "raw": "<button class=\"log-level-btn\" data-level=\"INFO\">信息</button>",
+    "key": "workbench-template.markup.067"
+  },
+  {
+    "file": "src/ui/workbench-template.js",
+    "line": 239,
+    "kind": "markup",
+    "raw": "<button class=\"log-level-btn\" data-level=\"WARN\">警告</button>",
+    "key": "workbench-template.markup.068"
+  },
+  {
+    "file": "src/ui/workbench-template.js",
+    "line": 240,
+    "kind": "markup",
+    "raw": "<button class=\"log-level-btn\" data-level=\"ERROR\">错误</button>",
+    "key": "workbench-template.markup.069"
+  },
+  {
+    "file": "src/ui/workbench-template.js",
+    "line": 245,
+    "kind": "markup",
+    "raw": "<button id=\"log-copy\">复制</button>",
+    "key": "workbench-template.markup.070"
+  },
+  {
+    "file": "src/ui/workbench-template.js",
+    "line": 246,
+    "kind": "markup",
+    "raw": "<button id=\"log-clear\">清空</button>",
+    "key": "workbench-template.markup.071"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 92,
+    "kind": "text",
+    "raw": "准备就绪",
+    "key": "workbench-view.text.001"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 93,
+    "kind": "text",
+    "raw": "等待取件码",
+    "key": "workbench-view.text.002"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 103,
+    "kind": "text",
+    "raw": "未识别",
+    "key": "workbench-view.text.003"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 162,
+    "kind": "text",
+    "raw": "导入",
+    "key": "workbench-view.text.004"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 162,
+    "kind": "text",
+    "raw": "导出",
+    "key": "workbench-view.text.005"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 182,
+    "kind": "markup",
+    "raw": "<label>格式 <select id=\"host-filter\">",
+    "key": "workbench-view.markup.006"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 183,
+    "kind": "text",
+    "raw": "全部",
+    "key": "workbench-view.text.007"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 184,
+    "kind": "text",
+    "raw": "未识别",
+    "key": "workbench-view.text.008"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 205,
+    "kind": "title",
+    "raw": "独立 Web 形态：没有宿主数据源",
+    "key": "workbench-view.title.009"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 205,
+    "kind": "title",
+    "raw": "当前运行在",
+    "key": "workbench-view.title.010"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 205,
+    "kind": "title",
+    "raw": "插件内",
+    "key": "workbench-view.title.011"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 206,
+    "kind": "text",
+    "raw": "插件",
+    "key": "workbench-view.text.012"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 219,
+    "kind": "markup",
+    "raw": "<span class=\"host-tag\">（宿主）</span>",
+    "key": "workbench-view.markup.013"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 228,
+    "kind": "text",
+    "raw": "填 MB 数值",
+    "key": "workbench-view.text.014"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 229,
+    "kind": "text",
+    "raw": "最小",
+    "key": "workbench-view.text.015"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 230,
+    "kind": "text",
+    "raw": "最大",
+    "key": "workbench-view.text.016"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 233,
+    "kind": "text",
+    "raw": "按各包总量估算",
+    "key": "workbench-view.text.017"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 239,
+    "kind": "text",
+    "raw": "预计",
+    "key": "workbench-view.text.018"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 239,
+    "kind": "text",
+    "raw": "卷",
+    "key": "workbench-view.text.019"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 239,
+    "kind": "text",
+    "raw": "· 有单文件超限",
+    "key": "workbench-view.text.020"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 327,
+    "kind": "text",
+    "raw": "浏览器配额",
+    "key": "workbench-view.text.021"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 327,
+    "kind": "text",
+    "raw": "浏览器未提供配额读数",
+    "key": "workbench-view.text.022"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 328,
+    "kind": "text",
+    "raw": "宿主配额",
+    "key": "workbench-view.text.023"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 328,
+    "kind": "text",
+    "raw": "当前宿主无逐项读数",
+    "key": "workbench-view.text.024"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 340,
+    "kind": "text",
+    "raw": "建议保留",
+    "key": "workbench-view.text.025"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 340,
+    "kind": "text",
+    "raw": "可选",
+    "key": "workbench-view.text.026"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 340,
+    "kind": "text",
+    "raw": "建议清理",
+    "key": "workbench-view.text.027"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 340,
+    "kind": "text",
+    "raw": "未识别",
+    "key": "workbench-view.text.028"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 342,
+    "kind": "a11y",
+    "raw": "\" aria-label=\"展开\">",
+    "key": "workbench-view.a11y.029"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 349,
+    "kind": "markup",
+    "raw": "\">上传</button>",
+    "key": "workbench-view.markup.030"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 368,
+    "kind": "markup",
+    "raw": "<span class=\"vol-flag\">超单卷上限</span>",
+    "key": "workbench-view.markup.031"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 371,
+    "kind": "a11y",
+    "raw": "\" aria-label=\"展开或收起\">",
+    "key": "workbench-view.a11y.032"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 377,
+    "kind": "markup",
+    "raw": "<button data-treeall=\"1\">全选</button>",
+    "key": "workbench-view.markup.033"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 378,
+    "kind": "markup",
+    "raw": "<button data-treenone=\"1\">全不选</button>",
+    "key": "workbench-view.markup.034"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 379,
+    "kind": "markup",
+    "raw": "<button data-treeinvert=\"1\">反选</button>",
+    "key": "workbench-view.markup.035"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 380,
+    "kind": "markup",
+    "raw": "<span class=\"spacer\"></span><span class=\"hint\">大类折叠到文件</span>",
+    "key": "workbench-view.markup.036"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 383,
+    "kind": "markup",
+    "raw": "<div class=\"chart-foot\"><span>已选",
+    "key": "workbench-view.markup.037"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 383,
+    "kind": "text",
+    "raw": "项 · 预计",
+    "key": "workbench-view.text.038"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 394,
+    "kind": "markup",
+    "raw": "<span class=\"lbl\"><span class=\"scope\">已选",
+    "key": "workbench-view.markup.039"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 394,
+    "kind": "markup",
+    "raw": "个包</span> · 共",
+    "key": "workbench-view.markup.040"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 394,
+    "kind": "markup",
+    "raw": "张图表</span>",
+    "key": "workbench-view.markup.041"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 395,
+    "kind": "markup",
+    "raw": "<button data-batchall=\"1\">全选全部</button>",
+    "key": "workbench-view.markup.042"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 396,
+    "kind": "markup",
+    "raw": "<button data-batchnone=\"1\">全不选</button>",
+    "key": "workbench-view.markup.043"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 397,
+    "kind": "markup",
+    "raw": "<button data-batchinvert=\"1\">反选</button>",
+    "key": "workbench-view.markup.044"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 399,
+    "kind": "markup",
+    "raw": "<span style=\"color:var(--muted-2)\">目标平台 / 差量 / 分卷 同时作用于全部选中包</span>",
+    "key": "workbench-view.markup.045"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 416,
+    "kind": "text",
+    "raw": "宿主数据",
+    "key": "workbench-view.text.046"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 417,
+    "kind": "markup",
+    "raw": "<div class=\"chart-unavailable\"><b>当前形态没有存储清单端点</b><br>宿主图表置灰；下方仍可查看插件自身数据。不新增该宿主专用后端。</div>",
+    "key": "workbench-view.markup.047"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 426,
+    "kind": "markup",
+    "raw": "<div class=\"chart-unavailable\"><b>未识别包</b><br>逐文件列出，不提供转换；只能存储、导出或删除。</div>",
+    "key": "workbench-view.markup.048"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 431,
+    "kind": "markup",
+    "raw": "卷</span>",
+    "key": "workbench-view.markup.049"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 433,
+    "kind": "a11y",
+    "raw": "\" aria-label=\"关闭该包图表\">×</button>",
+    "key": "workbench-view.a11y.050"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 438,
+    "kind": "text",
+    "raw": "卷",
+    "key": "workbench-view.text.051"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 438,
+    "kind": "text",
+    "raw": "整包",
+    "key": "workbench-view.text.052"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 440,
+    "kind": "text",
+    "raw": "整包",
+    "key": "workbench-view.text.053"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 502,
+    "kind": "markup",
+    "raw": "<span class=\"pkg-badge unknown\">未识别包</span>",
+    "key": "workbench-view.markup.054"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 504,
+    "kind": "markup",
+    "raw": "<span class=\"pkg-badge warn\">分卷",
+    "key": "workbench-view.markup.055"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 505,
+    "kind": "markup",
+    "raw": "<span class=\"pkg-badge lock\">只读</span>",
+    "key": "workbench-view.markup.056"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 516,
+    "kind": "title",
+    "raw": "\" title=\"下载\">",
+    "key": "workbench-view.title.057"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 517,
+    "kind": "title",
+    "raw": "\" title=\"回传宿主\">",
+    "key": "workbench-view.title.058"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 518,
+    "kind": "title",
+    "raw": "\" title=\"复制回导入区\">",
+    "key": "workbench-view.title.059"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 519,
+    "kind": "title",
+    "raw": "\" title=\"删除\">",
+    "key": "workbench-view.title.060"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 535,
+    "kind": "markup",
+    "raw": "<div class=\"dropzone\" id=\"dropzone\"><span class=\"big\">选择数据包</span>上传 zip 或从宿主拉取</div>",
+    "key": "workbench-view.markup.061"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 536,
+    "kind": "markup",
+    "raw": "<label>排序 <select id=\"sort-select\">",
+    "key": "workbench-view.markup.062"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 537,
+    "kind": "markup",
+    "raw": ">时间倒序</option>",
+    "key": "workbench-view.markup.063"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 538,
+    "kind": "markup",
+    "raw": ">名称</option>",
+    "key": "workbench-view.markup.064"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 539,
+    "kind": "markup",
+    "raw": ">大小</option>",
+    "key": "workbench-view.markup.065"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 542,
+    "kind": "markup",
+    "raw": "<label>排序 <select id=\"sort-select\">",
+    "key": "workbench-view.markup.066"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 543,
+    "kind": "markup",
+    "raw": ">时间倒序</option>",
+    "key": "workbench-view.markup.067"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 544,
+    "kind": "markup",
+    "raw": ">名称</option>",
+    "key": "workbench-view.markup.068"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 545,
+    "kind": "markup",
+    "raw": ">大小</option>",
+    "key": "workbench-view.markup.069"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 549,
+    "kind": "text",
+    "raw": "导入区为空",
+    "key": "workbench-view.text.070"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 549,
+    "kind": "text",
+    "raw": "导出区为空",
+    "key": "workbench-view.text.071"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 554,
+    "kind": "markup",
+    "raw": "<div class=\"batch-bar\"><span class=\"lbl\">已选",
+    "key": "workbench-view.markup.072"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 554,
+    "kind": "markup",
+    "raw": "项</span>",
+    "key": "workbench-view.markup.073"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 555,
+    "kind": "markup",
+    "raw": "<button id=\"batch-generate\">生成导出包</button>",
+    "key": "workbench-view.markup.074"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 556,
+    "kind": "markup",
+    "raw": ">合并上传</button>",
+    "key": "workbench-view.markup.075"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 557,
+    "kind": "markup",
+    "raw": "<button id=\"batch-delete\">删除</button></div>",
+    "key": "workbench-view.markup.076"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 592,
+    "kind": "markup",
+    "raw": "从聊天库导出</button>",
+    "key": "workbench-view.markup.077"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 596,
+    "kind": "markup",
+    "raw": "从宿主拉取</button>",
+    "key": "workbench-view.markup.078"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 597,
+    "kind": "markup",
+    "raw": "生成导出包</button>",
+    "key": "workbench-view.markup.079"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 598,
+    "kind": "markup",
+    "raw": "合并上传</button>",
+    "key": "workbench-view.markup.080"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 605,
+    "kind": "markup",
+    "raw": "下载</button>",
+    "key": "workbench-view.markup.081"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 606,
+    "kind": "markup",
+    "raw": "回传宿主</button>",
+    "key": "workbench-view.markup.082"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 607,
+    "kind": "markup",
+    "raw": "复制回导入区</button>",
+    "key": "workbench-view.markup.083"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 624,
+    "kind": "text",
+    "raw": "在数据包区勾选要发送的包",
+    "key": "workbench-view.text.084"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 626,
+    "kind": "text",
+    "raw": "已选",
+    "key": "workbench-view.text.085"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 626,
+    "kind": "text",
+    "raw": "个包 ·",
+    "key": "workbench-view.text.086"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 648,
+    "kind": "text",
+    "raw": "发送",
+    "key": "workbench-view.text.087"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 649,
+    "kind": "text",
+    "raw": "接收",
+    "key": "workbench-view.text.088"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 650,
+    "kind": "text",
+    "raw": "发送或接收数据包",
+    "key": "workbench-view.text.089"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 668,
+    "kind": "text",
+    "raw": "准备就绪",
+    "key": "workbench-view.text.090"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 679,
+    "kind": "text",
+    "raw": "等待取件码",
+    "key": "workbench-view.text.091"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 684,
+    "kind": "text",
+    "raw": "把应答码对准摄像头",
+    "key": "workbench-view.text.092"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 684,
+    "kind": "text",
+    "raw": "把取件码对准摄像头",
+    "key": "workbench-view.text.093"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 697,
+    "kind": "toast",
+    "raw": "已复制",
+    "key": "workbench-view.toast.094"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 698,
+    "kind": "toast",
+    "raw": "复制失败，请手动选择",
+    "key": "workbench-view.toast.095"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 701,
+    "kind": "toast",
+    "raw": "当前环境不支持扫码",
+    "key": "workbench-view.toast.096"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 721,
+    "kind": "text",
+    "raw": "相机不可用",
+    "key": "workbench-view.text.097"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 724,
+    "kind": "text",
+    "raw": "相机不可用",
+    "key": "workbench-view.text.098"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 734,
+    "kind": "markup",
+    "raw": "<div class=\"log-line\">暂无日志</div>",
+    "key": "workbench-view.markup.099"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 736,
+    "kind": "text",
+    "raw": "暂无日志",
+    "key": "workbench-view.text.100"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 742,
+    "kind": "title",
+    "raw": "条警告/错误",
+    "key": "workbench-view.title.101"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 754,
+    "kind": "toast",
+    "raw": "至少选择两个包",
+    "key": "workbench-view.toast.102"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 756,
+    "kind": "log",
+    "raw": "合并上传检测到同名路径: characters/Seraphina.png",
+    "key": "workbench-view.log.103"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 757,
+    "kind": "modal",
+    "raw": "合并冲突",
+    "key": "workbench-view.modal.104"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 757,
+    "kind": "modal",
+    "raw": "以下路径在多个包中同名，已停止合并。请先在本地编辑或改名。",
+    "key": "workbench-view.modal.105"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 758,
+    "kind": "markup",
+    "raw": "<br><br>冲突: characters/Seraphina.png</div>",
+    "key": "workbench-view.markup.106"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 759,
+    "kind": "modal",
+    "raw": "知道了",
+    "key": "workbench-view.modal.107"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 785,
+    "kind": "modal",
+    "raw": "该操作会耗费大量流量",
+    "key": "workbench-view.modal.108"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 785,
+    "kind": "modal",
+    "raw": "向后端酒馆上传或下载会消耗大量流量，请确认当前网络环境。",
+    "key": "workbench-view.modal.109"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 786,
+    "kind": "markup",
+    "raw": "<label class=\"check\"><input type=\"checkbox\" id=\"traffic-nodisplay\"> 不再显示</label>",
+    "key": "workbench-view.markup.110"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 788,
+    "kind": "modal",
+    "raw": "取消",
+    "key": "workbench-view.modal.111"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 789,
+    "kind": "text",
+    "raw": "继续",
+    "key": "workbench-view.text.112"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 791,
+    "kind": "log",
+    "raw": "已关闭流量提示",
+    "key": "workbench-view.log.113"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 799,
+    "kind": "title",
+    "raw": "存储图表",
+    "key": "workbench-view.title.114"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 799,
+    "kind": "title",
+    "raw": "图表是唯一工作台",
+    "key": "workbench-view.title.115"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 799,
+    "kind": "title",
+    "raw": "顶部显示两处配额",
+    "key": "workbench-view.title.116"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 799,
+    "kind": "title",
+    "raw": "勾选即导出范围",
+    "key": "workbench-view.title.117"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 799,
+    "kind": "title",
+    "raw": "分卷后每卷一张图表",
+    "key": "workbench-view.title.118"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 799,
+    "kind": "title",
+    "raw": "多选包时同时显示多组图表",
+    "key": "workbench-view.title.119"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 800,
+    "kind": "title",
+    "raw": "数据包",
+    "key": "workbench-view.title.120"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 800,
+    "kind": "title",
+    "raw": "导入区存放未修改的包",
+    "key": "workbench-view.title.121"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 800,
+    "kind": "title",
+    "raw": "导出区只读",
+    "key": "workbench-view.title.122"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 800,
+    "kind": "title",
+    "raw": "生成导出包后进导出区",
+    "key": "workbench-view.title.123"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 800,
+    "kind": "title",
+    "raw": "可复制回导入区再编辑",
+    "key": "workbench-view.title.124"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 801,
+    "kind": "title",
+    "raw": "执行",
+    "key": "workbench-view.title.125"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 801,
+    "kind": "title",
+    "raw": "按所在区显示可用操作",
+    "key": "workbench-view.title.126"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 801,
+    "kind": "title",
+    "raw": "后端上下传会提示流量",
+    "key": "workbench-view.title.127"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 801,
+    "kind": "title",
+    "raw": "生成导出包不会删除导入区",
+    "key": "workbench-view.title.128"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 802,
+    "kind": "title",
+    "raw": "日志",
+    "key": "workbench-view.title.129"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 802,
+    "kind": "title",
+    "raw": "记录操作与错误",
+    "key": "workbench-view.title.130"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 802,
+    "kind": "title",
+    "raw": "可按级别筛选",
+    "key": "workbench-view.title.131"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 802,
+    "kind": "title",
+    "raw": "可复制或清空",
+    "key": "workbench-view.title.132"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 827,
+    "kind": "title",
+    "raw": "选择目标平台",
+    "key": "workbench-view.title.133"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 827,
+    "kind": "title",
+    "raw": "四个酒馆的英文全称，带各自图标；当前宿主那一项后面标（宿主）。",
+    "key": "workbench-view.title.134"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 828,
+    "kind": "title",
+    "raw": "看存储图表",
+    "key": "workbench-view.title.135"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 828,
+    "kind": "title",
+    "raw": "没有数据包时显示宿主；点包卡即切换成该包的图表。",
+    "key": "workbench-view.title.136"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 829,
+    "kind": "title",
+    "raw": "精简勾选",
+    "key": "workbench-view.title.137"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 829,
+    "kind": "title",
+    "raw": "建议保留用宿主下划线色，可选用引用色，建议清理用强调灰。备份、缓存、构建默认不勾。",
+    "key": "workbench-view.title.138"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 830,
+    "kind": "title",
+    "raw": "覆盖或增量",
+    "key": "workbench-view.title.139"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 830,
+    "kind": "title",
+    "raw": "差量不是独立区域，就在图表顶部切换。",
+    "key": "workbench-view.title.140"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 831,
+    "kind": "title",
+    "raw": "不分卷",
+    "key": "workbench-view.title.141"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 831,
+    "kind": "title",
+    "raw": "单位 MB，单卷限 32–2048 MB；留空即不分卷。填了之后图表会按卷变成多张。",
+    "key": "workbench-view.title.142"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 832,
+    "kind": "title",
+    "raw": "生成导出包",
+    "key": "workbench-view.title.143"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 832,
+    "kind": "title",
+    "raw": "把当前勾选落到包，并复制一份只读副本到导出区。",
+    "key": "workbench-view.title.144"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 833,
+    "kind": "title",
+    "raw": "导出完成",
+    "key": "workbench-view.title.145"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 833,
+    "kind": "title",
+    "raw": "导出区只读，可下载、回传宿主，或复制回导入区再编辑。",
+    "key": "workbench-view.title.146"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 836,
+    "kind": "title",
+    "raw": "上传数据包",
+    "key": "workbench-view.title.147"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 836,
+    "kind": "title",
+    "raw": "点选或拖入一个 zip 作为数据包。",
+    "key": "workbench-view.title.148"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 837,
+    "kind": "title",
+    "raw": "逐项确认勾选",
+    "key": "workbench-view.title.149"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 837,
+    "kind": "title",
+    "raw": "展开大类逐个确认：绿是建议保留、橙是可选、灰是建议清理。",
+    "key": "workbench-view.title.150"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 838,
+    "kind": "title",
+    "raw": "选目标平台",
+    "key": "workbench-view.title.151"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 838,
+    "kind": "title",
+    "raw": "四个英文全称，当前宿主那一项带（宿主）标记。",
+    "key": "workbench-view.title.152"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 839,
+    "kind": "title",
+    "raw": "要不要分卷",
+    "key": "workbench-view.title.153"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 839,
+    "kind": "title",
+    "raw": "单卷 32–2048 MB；填了会按卷拆成多个可独立导入的包。",
+    "key": "workbench-view.title.154"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 840,
+    "kind": "title",
+    "raw": "生成并核对",
+    "key": "workbench-view.title.155"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 840,
+    "kind": "title",
+    "raw": "导出区出现只读副本，可下载、回传宿主或复制回导入区。",
+    "key": "workbench-view.title.156"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 856,
+    "kind": "text",
+    "raw": "完成",
+    "key": "workbench-view.text.157"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 856,
+    "kind": "text",
+    "raw": "下一步",
+    "key": "workbench-view.text.158"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 857,
+    "kind": "text",
+    "raw": "基础教程",
+    "key": "workbench-view.text.159"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 857,
+    "kind": "text",
+    "raw": "进阶教程",
+    "key": "workbench-view.text.160"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 953,
+    "kind": "log",
+    "raw": "目标平台切换为",
+    "key": "workbench-view.log.161"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 962,
+    "kind": "log",
+    "raw": "导出方式:",
+    "key": "workbench-view.log.162"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 962,
+    "kind": "log",
+    "raw": "覆盖",
+    "key": "workbench-view.log.163"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 962,
+    "kind": "log",
+    "raw": "增量",
+    "key": "workbench-view.log.164"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 975,
+    "kind": "toast",
+    "raw": "单卷容量限定",
+    "key": "workbench-view.toast.165"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 1041,
+    "kind": "log",
+    "raw": "批量",
+    "key": "workbench-view.log.166"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 1041,
+    "kind": "log",
+    "raw": "全选",
+    "key": "workbench-view.log.167"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 1041,
+    "kind": "log",
+    "raw": "全不选",
+    "key": "workbench-view.log.168"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 1041,
+    "kind": "log",
+    "raw": "反选",
+    "key": "workbench-view.log.169"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 1041,
+    "kind": "log",
+    "raw": "个包",
+    "key": "workbench-view.log.170"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 1058,
+    "kind": "toast",
+    "raw": "已下载",
+    "key": "workbench-view.toast.171"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 1058,
+    "kind": "toast",
+    "raw": "已开始下载",
+    "key": "workbench-view.toast.172"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 1073,
+    "kind": "toast",
+    "raw": "图表已切换到该包",
+    "key": "workbench-view.toast.173"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 1089,
+    "kind": "toast",
+    "raw": "日志已复制",
+    "key": "workbench-view.toast.174"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 1089,
+    "kind": "toast",
+    "raw": "复制失败",
+    "key": "workbench-view.toast.175"
+  },
+  {
+    "file": "src/ui/workbench-view.js",
+    "line": 1097,
+    "kind": "toast",
+    "raw": "教程完成",
+    "key": "workbench-view.toast.176"
+  },
+  {
+    "file": "src/ui/export-queue.js",
+    "line": 80,
+    "kind": "text",
+    "raw": "上传",
+    "key": "export-queue.text.001"
+  },
+  {
+    "file": "src/ui/export-queue.js",
+    "line": 81,
+    "kind": "text",
+    "raw": "宿主导出",
+    "key": "export-queue.text.002"
+  },
+  {
+    "file": "src/ui/export-queue.js",
+    "line": 82,
+    "kind": "text",
+    "raw": "转换生成",
+    "key": "export-queue.text.003"
+  },
+  {
+    "file": "src/ui/export-queue.js",
+    "line": 83,
+    "kind": "text",
+    "raw": "增量补丁",
+    "key": "export-queue.text.004"
+  },
+  {
+    "file": "src/ui/export-queue.js",
+    "line": 84,
+    "kind": "text",
+    "raw": "分卷",
+    "key": "export-queue.text.005"
+  },
+  {
+    "file": "src/ui/export-queue.js",
+    "line": 85,
+    "kind": "text",
+    "raw": "源备份",
+    "key": "export-queue.text.006"
+  },
+  {
+    "file": "src/ui/export-queue.js",
+    "line": 86,
+    "kind": "text",
+    "raw": "目标保底备份",
+    "key": "export-queue.text.007"
+  },
+  {
+    "file": "src/ui/export-queue.js",
+    "line": 87,
+    "kind": "text",
+    "raw": "迁移报告",
+    "key": "export-queue.text.008"
+  },
+  {
+    "file": "src/ui/export-queue.js",
+    "line": 300,
+    "kind": "title",
+    "raw": "已有恢复任务正在进行，请等待其完成",
+    "key": "export-queue.title.009"
+  },
+  {
+    "file": "src/ui/export-queue.js",
+    "line": 308,
+    "kind": "title",
+    "raw": "<span class=\"eq-title\"><i class=\"fa-solid fa-file-export\"></i> 待导出 (",
+    "key": "export-queue.title.010"
+  },
+  {
+    "file": "src/ui/export-queue.js",
+    "line": 322,
+    "kind": "markup",
+    "raw": "<i class=\"fa-solid fa-download\"></i> 全部下载",
+    "key": "export-queue.markup.011"
+  },
+  {
+    "file": "src/ui/export-queue.js",
+    "line": 323,
+    "kind": "markup",
+    "raw": "<i class=\"fa-solid fa-box-archive\"></i> 全部存入工作区",
+    "key": "export-queue.markup.012"
+  },
+  {
+    "file": "src/ui/export-queue.js",
+    "line": 327,
+    "kind": "markup",
+    "raw": "<i class=\"fa-solid fa-trash\"></i> 清空",
+    "key": "export-queue.markup.013"
+  },
+  {
+    "file": "src/ui/export-queue.js",
+    "line": 328,
+    "kind": "modal",
+    "raw": "确定清空待导出区吗？临时产物将一并丢弃。",
+    "key": "export-queue.modal.014"
+  },
+  {
+    "file": "src/ui/export-queue.js",
+    "line": 352,
+    "kind": "text",
+    "raw": "确定取消正在进行的恢复写入吗？\\n宿主可能已收到部分数据，取消后请核对数据完整性。",
+    "key": "export-queue.text.015"
+  },
+  {
+    "file": "src/ui/export-queue.js",
+    "line": 362,
+    "kind": "text",
+    "raw": "已完成",
+    "key": "export-queue.text.016"
+  },
+  {
+    "file": "src/ui/export-queue.js",
+    "line": 362,
+    "kind": "text",
+    "raw": "（部分数据已生效）",
+    "key": "export-queue.text.017"
+  },
+  {
+    "file": "src/ui/export-queue.js",
+    "line": 365,
+    "kind": "markup",
+    "raw": "<i class=\"fa-solid fa-ban\"></i> 取消批量恢复",
+    "key": "export-queue.markup.018"
+  },
+  {
+    "file": "src/ui/export-queue.js",
+    "line": 366,
+    "kind": "text",
+    "raw": "中止本批恢复（宿主可能已收到部分数据，取消后请核对）",
+    "key": "export-queue.text.019"
+  },
+  {
+    "file": "src/ui/export-queue.js",
+    "line": 372,
+    "kind": "text",
+    "raw": "全部",
+    "key": "export-queue.text.020"
+  },
+  {
+    "file": "src/ui/export-queue.js",
+    "line": 372,
+    "kind": "text",
+    "raw": "项恢复完成",
+    "key": "export-queue.text.021"
+  },
+  {
+    "file": "src/ui/export-queue.js",
+    "line": 373,
+    "kind": "text",
+    "raw": "已中止：完成",
+    "key": "export-queue.text.022"
+  },
+  {
+    "file": "src/ui/export-queue.js",
+    "line": 373,
+    "kind": "text",
+    "raw": "（部分数据已生效）",
+    "key": "export-queue.text.023"
+  },
+  {
+    "file": "src/ui/export-queue.js",
+    "line": 375,
+    "kind": "text",
+    "raw": "完成",
+    "key": "export-queue.text.024"
+  },
+  {
+    "file": "src/ui/export-queue.js",
+    "line": 376,
+    "kind": "text",
+    "raw": "项失败",
+    "key": "export-queue.text.025"
+  },
+  {
+    "file": "src/ui/export-queue.js",
+    "line": 377,
+    "kind": "modal",
+    "raw": "项结果未确认",
+    "key": "export-queue.modal.026"
+  },
+  {
+    "file": "src/ui/export-queue.js",
+    "line": 378,
+    "kind": "text",
+    "raw": "部分数据已生效",
+    "key": "export-queue.text.027"
+  },
+  {
+    "file": "src/ui/export-queue.js",
+    "line": 383,
+    "kind": "markup",
+    "raw": "<i class=\"fa-solid fa-rotate-right\"></i> 重试失败项",
+    "key": "export-queue.markup.028"
+  },
+  {
+    "file": "src/ui/export-queue.js",
+    "line": 384,
+    "kind": "text",
+    "raw": "只重跑失败项；结果未确认的项不重跑（请求可能已落盘，重跑会重复写入）",
+    "key": "export-queue.text.029"
+  },
+  {
+    "file": "src/ui/export-queue.js",
+    "line": 390,
+    "kind": "markup",
+    "raw": "<i class=\"fa-solid fa-rotate\"></i> 刷新页面生效",
+    "key": "export-queue.markup.030"
+  },
+  {
+    "file": "src/ui/export-queue.js",
+    "line": 391,
+    "kind": "text",
+    "raw": "点击后才刷新页面，让宿主重新加载已恢复的数据",
+    "key": "export-queue.text.031"
+  },
+  {
+    "file": "src/ui/export-queue.js",
+    "line": 410,
+    "kind": "markup",
+    "raw": "<i class=\"fa-solid fa-ban\"></i> 取消恢复",
+    "key": "export-queue.markup.032"
+  },
+  {
+    "file": "src/ui/export-queue.js",
+    "line": 411,
+    "kind": "text",
+    "raw": "中止正在进行的恢复写入（宿主可能已收到部分数据，取消后请核对）",
+    "key": "export-queue.text.033"
+  },
+  {
+    "file": "src/ui/export-queue.js",
+    "line": 414,
+    "kind": "text",
+    "raw": "恢复写入进行中…",
+    "key": "export-queue.text.034"
+  },
+  {
+    "file": "src/ui/export-queue.js",
+    "line": 423,
+    "kind": "text",
+    "raw": "无产物",
+    "key": "export-queue.text.035"
+  },
+  {
+    "file": "src/ui/export-queue.js",
+    "line": 445,
+    "kind": "text",
+    "raw": "已选",
+    "key": "export-queue.text.036"
+  },
+  {
+    "file": "src/ui/export-queue.js",
+    "line": 445,
+    "kind": "text",
+    "raw": "项:",
+    "key": "export-queue.text.037"
+  },
+  {
+    "file": "src/ui/export-queue.js",
+    "line": 447,
+    "kind": "markup",
+    "raw": "<i class=\"fa-solid fa-download\"></i> 下载",
+    "key": "export-queue.markup.038"
+  },
+  {
+    "file": "src/ui/export-queue.js",
+    "line": 450,
+    "kind": "markup",
+    "raw": "<i class=\"fa-solid fa-folder-open\"></i> 选位置导出",
+    "key": "export-queue.markup.039"
+  },
+  {
+    "file": "src/ui/export-queue.js",
+    "line": 450,
+    "kind": "text",
+    "raw": "逐个弹出保存位置 (浏览器不支持时普通下载)",
+    "key": "export-queue.text.040"
+  },
+  {
+    "file": "src/ui/export-queue.js",
+    "line": 456,
+    "kind": "markup",
+    "raw": "<i class=\"fa-solid fa-box-archive\"></i> 存工作区",
+    "key": "export-queue.markup.041"
+  },
+  {
+    "file": "src/ui/export-queue.js",
+    "line": 464,
+    "kind": "markup",
+    "raw": "<i class=\"fa-solid fa-rotate\"></i> 写回宿主",
+    "key": "export-queue.markup.042"
+  },
+  {
+    "file": "src/ui/export-queue.js",
+    "line": 479,
+    "kind": "markup",
+    "raw": "<i class=\"fa-solid fa-trash\"></i> 移除",
+    "key": "export-queue.markup.043"
+  },
+  {
+    "file": "src/ui/export-queue.js",
+    "line": 505,
+    "kind": "markup",
+    "raw": "<span class=\"eq-stored\">已入库</span>",
+    "key": "export-queue.markup.044"
+  },
+  {
+    "file": "src/ui/export-queue.js",
+    "line": 506,
+    "kind": "markup",
+    "raw": "<span class=\"eq-ephemeral\">临时</span>",
+    "key": "export-queue.markup.045"
+  },
+  {
+    "file": "src/ui/export-queue.js",
+    "line": 532,
+    "kind": "text",
+    "raw": "下载",
+    "key": "export-queue.text.046"
+  },
+  {
+    "file": "src/ui/export-queue.js",
+    "line": 533,
+    "kind": "text",
+    "raw": "选位置导出",
+    "key": "export-queue.text.047"
+  },
+  {
+    "file": "src/ui/export-queue.js",
+    "line": 533,
+    "kind": "text",
+    "raw": "选择保存位置写出该文件",
+    "key": "export-queue.text.048"
+  },
+  {
+    "file": "src/ui/export-queue.js",
+    "line": 534,
+    "kind": "text",
+    "raw": "存工作区",
+    "key": "export-queue.text.049"
+  },
+  {
+    "file": "src/ui/export-queue.js",
+    "line": 541,
+    "kind": "markup",
+    "raw": "<i class=\"fa-solid fa-rotate\"></i> 写回宿主",
+    "key": "export-queue.markup.050"
+  },
+  {
+    "file": "src/ui/export-queue.js",
+    "line": 548,
+    "kind": "text",
+    "raw": "移除",
+    "key": "export-queue.text.051"
+  },
+  {
+    "file": "src/ui/export-queue.js",
+    "line": 571,
+    "kind": "title",
+    "raw": "展开",
+    "key": "export-queue.title.052"
+  },
+  {
+    "file": "src/ui/export-queue.js",
+    "line": 571,
+    "kind": "title",
+    "raw": "收起",
+    "key": "export-queue.title.053"
+  },
+  {
+    "file": "src/ui/export-queue.js",
+    "line": 578,
+    "kind": "title",
+    "raw": "展开",
+    "key": "export-queue.title.054"
+  },
+  {
+    "file": "src/ui/export-queue.js",
+    "line": 578,
+    "kind": "title",
+    "raw": "收起",
+    "key": "export-queue.title.055"
+  },
+  {
+    "file": "src/ui/export-queue.js",
+    "line": 584,
+    "kind": "title",
+    "raw": "组内全选",
+    "key": "export-queue.title.056"
+  },
+  {
+    "file": "src/ui/export-queue.js",
+    "line": 607,
+    "kind": "text",
+    "raw": "项 ·",
+    "key": "export-queue.text.057"
+  },
+  {
+    "file": "src/ui/lan-transfer-panel.js",
+    "line": 68,
+    "kind": "text",
+    "raw": "sha256 不可用（无 crypto.subtle）",
+    "key": "lan-transfer-panel.text.001"
+  },
+  {
+    "file": "src/ui/lan-transfer-panel.js",
+    "line": 73,
+    "kind": "text",
+    "raw": "sha256 失败",
+    "key": "lan-transfer-panel.text.002"
+  },
+  {
+    "file": "src/ui/lan-transfer-panel.js",
+    "line": 167,
+    "kind": "text",
+    "raw": "超时",
+    "key": "lan-transfer-panel.text.003"
+  },
+  {
+    "file": "src/ui/lan-transfer-panel.js",
+    "line": 203,
+    "kind": "text",
+    "raw": "请改用导出文件再手动传入",
+    "key": "lan-transfer-panel.text.004"
+  },
+  {
+    "file": "src/ui/lan-transfer-panel.js",
+    "line": 204,
+    "kind": "text",
+    "raw": "请改用导出文件再手动传入",
+    "key": "lan-transfer-panel.text.005"
+  },
+  {
+    "file": "src/ui/lan-transfer-panel.js",
+    "line": 219,
+    "kind": "text",
+    "raw": "连接已关闭",
+    "key": "lan-transfer-panel.text.006"
+  },
+  {
+    "file": "src/ui/lan-transfer-panel.js",
+    "line": 231,
+    "kind": "text",
+    "raw": "连接失败",
+    "key": "lan-transfer-panel.text.007"
+  },
+  {
+    "file": "src/ui/lan-transfer-panel.js",
+    "line": 234,
+    "kind": "text",
+    "raw": "连接中断",
+    "key": "lan-transfer-panel.text.008"
+  },
+  {
+    "file": "src/ui/lan-transfer-panel.js",
+    "line": 254,
+    "kind": "text",
+    "raw": "· 剩余",
+    "key": "lan-transfer-panel.text.009"
+  },
+  {
+    "file": "src/ui/lan-transfer-panel.js",
+    "line": 259,
+    "kind": "text",
+    "raw": "二维码库不可用",
+    "key": "lan-transfer-panel.text.010"
+  },
+  {
+    "file": "src/ui/lan-transfer-panel.js",
+    "line": 268,
+    "kind": "text",
+    "raw": "失败",
+    "key": "lan-transfer-panel.text.011"
+  },
+  {
+    "file": "src/ui/lan-transfer-panel.js",
+    "line": 272,
+    "kind": "log",
+    "raw": "局域网发送失败：",
+    "key": "lan-transfer-panel.log.012"
+  },
+  {
+    "file": "src/ui/lan-transfer-panel.js",
+    "line": 279,
+    "kind": "text",
+    "raw": "已发送",
+    "key": "lan-transfer-panel.text.013"
+  },
+  {
+    "file": "src/ui/lan-transfer-panel.js",
+    "line": 283,
+    "kind": "log",
+    "raw": "局域网发送完成：",
+    "key": "lan-transfer-panel.log.014"
+  },
+  {
+    "file": "src/ui/lan-transfer-panel.js",
+    "line": 299,
+    "kind": "text",
+    "raw": "已连接，准备传输",
+    "key": "lan-transfer-panel.text.015"
+  },
+  {
+    "file": "src/ui/lan-transfer-panel.js",
+    "line": 301,
+    "kind": "text",
+    "raw": "通道已关闭",
+    "key": "lan-transfer-panel.text.016"
+  },
+  {
+    "file": "src/ui/lan-transfer-panel.js",
+    "line": 302,
+    "kind": "text",
+    "raw": "通道错误",
+    "key": "lan-transfer-panel.text.017"
+  },
+  {
+    "file": "src/ui/lan-transfer-panel.js",
+    "line": 309,
+    "kind": "text",
+    "raw": "对端核对失败",
+    "key": "lan-transfer-panel.text.018"
+  },
+  {
+    "file": "src/ui/lan-transfer-panel.js",
+    "line": 314,
+    "kind": "text",
+    "raw": "没有可发送的包",
+    "key": "lan-transfer-panel.text.019"
+  },
+  {
+    "file": "src/ui/lan-transfer-panel.js",
+    "line": 323,
+    "kind": "text",
+    "raw": "第",
+    "key": "lan-transfer-panel.text.020"
+  },
+  {
+    "file": "src/ui/lan-transfer-panel.js",
+    "line": 323,
+    "kind": "text",
+    "raw": "个 ·",
+    "key": "lan-transfer-panel.text.021"
+  },
+  {
+    "file": "src/ui/lan-transfer-panel.js",
+    "line": 325,
+    "kind": "text",
+    "raw": "准备中",
+    "key": "lan-transfer-panel.text.022"
+  },
+  {
+    "file": "src/ui/lan-transfer-panel.js",
+    "line": 340,
+    "kind": "text",
+    "raw": "取件码已过期",
+    "key": "lan-transfer-panel.text.023"
+  },
+  {
+    "file": "src/ui/lan-transfer-panel.js",
+    "line": 353,
+    "kind": "text",
+    "raw": "把取件码交给对方",
+    "key": "lan-transfer-panel.text.024"
+  },
+  {
+    "file": "src/ui/lan-transfer-panel.js",
+    "line": 357,
+    "kind": "log",
+    "raw": "取件码已生成：",
+    "key": "lan-transfer-panel.log.025"
+  },
+  {
+    "file": "src/ui/lan-transfer-panel.js",
+    "line": 363,
+    "kind": "text",
+    "raw": "通道未建立",
+    "key": "lan-transfer-panel.text.026"
+  },
+  {
+    "file": "src/ui/lan-transfer-panel.js",
+    "line": 366,
+    "kind": "text",
+    "raw": "通道未打开",
+    "key": "lan-transfer-panel.text.027"
+  },
+  {
+    "file": "src/ui/lan-transfer-panel.js",
+    "line": 371,
+    "kind": "text",
+    "raw": "传输中",
+    "key": "lan-transfer-panel.text.028"
+  },
+  {
+    "file": "src/ui/lan-transfer-panel.js",
+    "line": 387,
+    "kind": "text",
+    "raw": "续传中",
+    "key": "lan-transfer-panel.text.029"
+  },
+  {
+    "file": "src/ui/lan-transfer-panel.js",
+    "line": 390,
+    "kind": "text",
+    "raw": "已取消",
+    "key": "lan-transfer-panel.text.030"
+  },
+  {
+    "file": "src/ui/lan-transfer-panel.js",
+    "line": 391,
+    "kind": "text",
+    "raw": "通道已关闭",
+    "key": "lan-transfer-panel.text.031"
+  },
+  {
+    "file": "src/ui/lan-transfer-panel.js",
+    "line": 398,
+    "kind": "text",
+    "raw": "通道已关闭",
+    "key": "lan-transfer-panel.text.032"
+  },
+  {
+    "file": "src/ui/lan-transfer-panel.js",
+    "line": 402,
+    "kind": "text",
+    "raw": "传输中",
+    "key": "lan-transfer-panel.text.033"
+  },
+  {
+    "file": "src/ui/lan-transfer-panel.js",
+    "line": 407,
+    "kind": "text",
+    "raw": "等待对端核对",
+    "key": "lan-transfer-panel.text.034"
+  },
+  {
+    "file": "src/ui/lan-transfer-panel.js",
+    "line": 415,
+    "kind": "text",
+    "raw": "等待对端确认超时",
+    "key": "lan-transfer-panel.text.035"
+  },
+  {
+    "file": "src/ui/lan-transfer-panel.js",
+    "line": 418,
+    "kind": "modal",
+    "raw": "对端未确认",
+    "key": "lan-transfer-panel.modal.036"
+  },
+  {
+    "file": "src/ui/lan-transfer-panel.js",
+    "line": 420,
+    "kind": "text",
+    "raw": "摘要一致",
+    "key": "lan-transfer-panel.text.037"
+  },
+  {
+    "file": "src/ui/lan-transfer-panel.js",
+    "line": 420,
+    "kind": "text",
+    "raw": "仅核对大小",
+    "key": "lan-transfer-panel.text.038"
+  },
+  {
+    "file": "src/ui/lan-transfer-panel.js",
+    "line": 425,
+    "kind": "toast",
+    "raw": "正在传输，请先取消或完成当前任务",
+    "key": "lan-transfer-panel.toast.039"
+  },
+  {
+    "file": "src/ui/lan-transfer-panel.js",
+    "line": 430,
+    "kind": "toast",
+    "raw": "读取包失败：",
+    "key": "lan-transfer-panel.toast.040"
+  },
+  {
+    "file": "src/ui/lan-transfer-panel.js",
+    "line": 433,
+    "kind": "toast",
+    "raw": "先在数据包区勾选要发送的包",
+    "key": "lan-transfer-panel.toast.041"
+  },
+  {
+    "file": "src/ui/lan-transfer-panel.js",
+    "line": 442,
+    "kind": "toast",
+    "raw": "已完成，再传请重新生成取件码",
+    "key": "lan-transfer-panel.toast.042"
+  },
+  {
+    "file": "src/ui/lan-transfer-panel.js",
+    "line": 443,
+    "kind": "toast",
+    "raw": "先生成取件码",
+    "key": "lan-transfer-panel.toast.043"
+  },
+  {
+    "file": "src/ui/lan-transfer-panel.js",
+    "line": 453,
+    "kind": "text",
+    "raw": "不是应答码",
+    "key": "lan-transfer-panel.text.044"
+  },
+  {
+    "file": "src/ui/lan-transfer-panel.js",
+    "line": 458,
+    "kind": "text",
+    "raw": "连接中",
+    "key": "lan-transfer-panel.text.045"
+  },
+  {
+    "file": "src/ui/lan-transfer-panel.js",
+    "line": 459,
+    "kind": "text",
+    "raw": "应用应答码",
+    "key": "lan-transfer-panel.text.046"
+  },
+  {
+    "file": "src/ui/lan-transfer-panel.js",
+    "line": 472,
+    "kind": "text",
+    "raw": "已取消",
+    "key": "lan-transfer-panel.text.047"
+  },
+  {
+    "file": "src/ui/lan-transfer-panel.js",
+    "line": 474,
+    "kind": "log",
+    "raw": "局域网发送已取消",
+    "key": "lan-transfer-panel.log.048"
+  },
+  {
+    "file": "src/ui/lan-transfer-panel.js",
+    "line": 493,
+    "kind": "text",
+    "raw": "失败",
+    "key": "lan-transfer-panel.text.049"
+  },
+  {
+    "file": "src/ui/lan-transfer-panel.js",
+    "line": 494,
+    "kind": "text",
+    "raw": "· 已收",
+    "key": "lan-transfer-panel.text.050"
+  },
+  {
+    "file": "src/ui/lan-transfer-panel.js",
+    "line": 498,
+    "kind": "log",
+    "raw": "局域网接收失败：",
+    "key": "lan-transfer-panel.log.051"
+  },
+  {
+    "file": "src/ui/lan-transfer-panel.js",
+    "line": 506,
+    "kind": "text",
+    "raw": "落盘不可用",
+    "key": "lan-transfer-panel.text.052"
+  },
+  {
+    "file": "src/ui/lan-transfer-panel.js",
+    "line": 511,
+    "kind": "text",
+    "raw": "落盘失败",
+    "key": "lan-transfer-panel.text.053"
+  },
+  {
+    "file": "src/ui/lan-transfer-panel.js",
+    "line": 518,
+    "kind": "text",
+    "raw": "digest 计算失败",
+    "key": "lan-transfer-panel.text.054"
+  },
+  {
+    "file": "src/ui/lan-transfer-panel.js",
+    "line": 531,
+    "kind": "text",
+    "raw": "核对失败",
+    "key": "lan-transfer-panel.text.055"
+  },
+  {
+    "file": "src/ui/lan-transfer-panel.js",
+    "line": 543,
+    "kind": "text",
+    "raw": "已接收 · 摘要一致",
+    "key": "lan-transfer-panel.text.056"
+  },
+  {
+    "file": "src/ui/lan-transfer-panel.js",
+    "line": 543,
+    "kind": "text",
+    "raw": "已接收 · 仅核对大小",
+    "key": "lan-transfer-panel.text.057"
+  },
+  {
+    "file": "src/ui/lan-transfer-panel.js",
+    "line": 544,
+    "kind": "text",
+    "raw": "正在保存",
+    "key": "lan-transfer-panel.text.058"
+  },
+  {
+    "file": "src/ui/lan-transfer-panel.js",
+    "line": 553,
+    "kind": "log",
+    "raw": "局域网接收完成：",
+    "key": "lan-transfer-panel.log.059"
+  },
+  {
+    "file": "src/ui/lan-transfer-panel.js",
+    "line": 555,
+    "kind": "text",
+    "raw": "已接收但入库失败",
+    "key": "lan-transfer-panel.text.060"
+  },
+  {
+    "file": "src/ui/lan-transfer-panel.js",
+    "line": 556,
+    "kind": "log",
+    "raw": "接收包入库失败：",
+    "key": "lan-transfer-panel.log.061"
+  },
+  {
+    "file": "src/ui/lan-transfer-panel.js",
+    "line": 583,
+    "kind": "text",
+    "raw": "接收中",
+    "key": "lan-transfer-panel.text.062"
+  },
+  {
+    "file": "src/ui/lan-transfer-panel.js",
+    "line": 592,
+    "kind": "text",
+    "raw": "续传中",
+    "key": "lan-transfer-panel.text.063"
+  },
+  {
+    "file": "src/ui/lan-transfer-panel.js",
+    "line": 592,
+    "kind": "text",
+    "raw": "接收中",
+    "key": "lan-transfer-panel.text.064"
+  },
+  {
+    "file": "src/ui/lan-transfer-panel.js",
+    "line": 598,
+    "kind": "text",
+    "raw": "落盘不可用",
+    "key": "lan-transfer-panel.text.065"
+  },
+  {
+    "file": "src/ui/lan-transfer-panel.js",
+    "line": 612,
+    "kind": "text",
+    "raw": "对方已取消",
+    "key": "lan-transfer-panel.text.066"
+  },
+  {
+    "file": "src/ui/lan-transfer-panel.js",
+    "line": 617,
+    "kind": "text",
+    "raw": "已连接，等待数据",
+    "key": "lan-transfer-panel.text.067"
+  },
+  {
+    "file": "src/ui/lan-transfer-panel.js",
+    "line": 618,
+    "kind": "text",
+    "raw": "通道已关闭",
+    "key": "lan-transfer-panel.text.068"
+  },
+  {
+    "file": "src/ui/lan-transfer-panel.js",
+    "line": 619,
+    "kind": "text",
+    "raw": "通道错误",
+    "key": "lan-transfer-panel.text.069"
+  },
+  {
+    "file": "src/ui/lan-transfer-panel.js",
+    "line": 630,
+    "kind": "text",
+    "raw": "chunk dropped: sink 不可用",
+    "key": "lan-transfer-panel.text.070"
+  },
+  {
+    "file": "src/ui/lan-transfer-panel.js",
+    "line": 636,
+    "kind": "text",
+    "raw": "接收中",
+    "key": "lan-transfer-panel.text.071"
+  },
+  {
+    "file": "src/ui/lan-transfer-panel.js",
+    "line": 649,
+    "kind": "toast",
+    "raw": "正在接收，请先放弃当前任务",
+    "key": "lan-transfer-panel.toast.072"
+  },
+  {
+    "file": "src/ui/lan-transfer-panel.js",
+    "line": 651,
+    "kind": "toast",
+    "raw": "先粘贴取件码",
+    "key": "lan-transfer-panel.toast.073"
+  },
+  {
+    "file": "src/ui/lan-transfer-panel.js",
+    "line": 658,
+    "kind": "text",
+    "raw": "解析取件码",
+    "key": "lan-transfer-panel.text.074"
+  },
+  {
+    "file": "src/ui/lan-transfer-panel.js",
+    "line": 667,
+    "kind": "text",
+    "raw": "不是取件码",
+    "key": "lan-transfer-panel.text.075"
+  },
+  {
+    "file": "src/ui/lan-transfer-panel.js",
+    "line": 683,
+    "kind": "text",
+    "raw": "应用取件码",
+    "key": "lan-transfer-panel.text.076"
+  },
+  {
+    "file": "src/ui/lan-transfer-panel.js",
+    "line": 697,
+    "kind": "text",
+    "raw": "把应答码回传，将从断点继续",
+    "key": "lan-transfer-panel.text.077"
+  },
+  {
+    "file": "src/ui/lan-transfer-panel.js",
+    "line": 697,
+    "kind": "text",
+    "raw": "把应答码回传给对方",
+    "key": "lan-transfer-panel.text.078"
+  },
+  {
+    "file": "src/ui/lan-transfer-panel.js",
+    "line": 702,
+    "kind": "log",
+    "raw": "应答码已生成：",
+    "key": "lan-transfer-panel.log.079"
+  },
+  {
+    "file": "src/ui/lan-transfer-panel.js",
+    "line": 718,
+    "kind": "text",
+    "raw": "半成品已放弃",
+    "key": "lan-transfer-panel.text.080"
+  },
+  {
+    "file": "src/ui/lan-transfer-panel.js",
+    "line": 719,
+    "kind": "log",
+    "raw": "局域网接收半成品已放弃",
+    "key": "lan-transfer-panel.log.081"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 139,
+    "kind": "text",
+    "raw": "本宿主未提供整包恢复接口（已探测：",
+    "key": "host-bridge.text.001"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 140,
+    "kind": "text",
+    "raw": "请改用宿主原生的导入方式恢复数据包。",
+    "key": "host-bridge.text.002"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 174,
+    "kind": "text",
+    "raw": "恢复数据包至宿主",
+    "key": "host-bridge.text.003"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 182,
+    "kind": "text",
+    "raw": "恢复端点不可用，尝试下一候选：",
+    "key": "host-bridge.text.004"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 302,
+    "kind": "text",
+    "raw": "宿主透传勾选",
+    "key": "host-bridge.text.005"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 302,
+    "kind": "text",
+    "raw": "全量导出后插件内过滤",
+    "key": "host-bridge.text.006"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 318,
+    "kind": "text",
+    "raw": "将拉取",
+    "key": "host-bridge.text.007"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 318,
+    "kind": "text",
+    "raw": "类目 ·",
+    "key": "host-bridge.text.008"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 378,
+    "kind": "title",
+    "raw": "数据包转运",
+    "key": "host-bridge.title.009"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 416,
+    "kind": "modal",
+    "raw": "[ST-pack-transfer] 宿主原生确认弹窗不可用，降级为原生 confirm：",
+    "key": "host-bridge.modal.010"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 454,
+    "kind": "text",
+    "raw": "[ST-pack-transfer] 宿主原生信息弹窗不可用，降级为原生 alert：",
+    "key": "host-bridge.text.011"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 493,
+    "kind": "text",
+    "raw": "[ST-pack-transfer] 宿主存储面板模块不可用，降级隐藏入口：",
+    "key": "host-bridge.text.012"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 539,
+    "kind": "text",
+    "raw": "[ST-pack-transfer] 唤起宿主存储面板失败：",
+    "key": "host-bridge.text.013"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 562,
+    "kind": "text",
+    "raw": "服务端 /version 校验不可达 (",
+    "key": "host-bridge.text.014"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 562,
+    "kind": "text",
+    "raw": ")，保留前端判定:",
+    "key": "host-bridge.text.015"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 597,
+    "kind": "text",
+    "raw": "宿主类型前端判定 (",
+    "key": "host-bridge.text.016"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 597,
+    "kind": "text",
+    "raw": ") 与服务端校验 (",
+    "key": "host-bridge.text.017"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 597,
+    "kind": "text",
+    "raw": ") 不一致，以服务端为准。版本:",
+    "key": "host-bridge.text.018"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 599,
+    "kind": "text",
+    "raw": "宿主类型服务端校验一致:",
+    "key": "host-bridge.text.019"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 599,
+    "kind": "text",
+    "raw": "(版本:",
+    "key": "host-bridge.text.020"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 627,
+    "kind": "text",
+    "raw": "宿主类型为 Luker，但导出数据包缺少 manifest.json —— 宿主识别可能有误，请检查宿主徽标",
+    "key": "host-bridge.text.021"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 629,
+    "kind": "text",
+    "raw": "宿主类型为 ST，但导出数据包含 manifest.json —— 宿主识别可能有误，请检查宿主徽标",
+    "key": "host-bridge.text.022"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 632,
+    "kind": "text",
+    "raw": "导出包形状软校验跳过:",
+    "key": "host-bridge.text.023"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 663,
+    "kind": "text",
+    "raw": "获取 CSRF token",
+    "key": "host-bridge.text.024"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 665,
+    "kind": "text",
+    "raw": "获取 CSRF token 失败:",
+    "key": "host-bridge.text.025"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 682,
+    "kind": "text",
+    "raw": "获取当前用户",
+    "key": "host-bridge.text.026"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 684,
+    "kind": "text",
+    "raw": "获取当前用户失败:",
+    "key": "host-bridge.text.027"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 715,
+    "kind": "text",
+    "raw": "OPFS 临时文件句柄获取失败 (",
+    "key": "host-bridge.text.028"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 715,
+    "kind": "text",
+    "raw": ")，回退内存模式",
+    "key": "host-bridge.text.029"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 730,
+    "kind": "text",
+    "raw": "OPFS 临时包已清理:",
+    "key": "host-bridge.text.030"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 791,
+    "kind": "text",
+    "raw": "探测 Authority 增强通道",
+    "key": "host-bridge.text.031"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 796,
+    "kind": "text",
+    "raw": "Authority 选择性备份",
+    "key": "host-bridge.text.032"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 796,
+    "kind": "text",
+    "raw": "无 stBackup 标记",
+    "key": "host-bridge.text.033"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 798,
+    "kind": "text",
+    "raw": "Authority 不可达",
+    "key": "host-bridge.text.034"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 806,
+    "kind": "text",
+    "raw": "正在连接宿主 [",
+    "key": "host-bridge.text.035"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 806,
+    "kind": "text",
+    "raw": "] 获取授权凭证...",
+    "key": "host-bridge.text.036"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 816,
+    "kind": "text",
+    "raw": "向宿主发起数据包导出请求 (用户:",
+    "key": "host-bridge.text.037"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 860,
+    "kind": "text",
+    "raw": "Authority 增强通道不可用 (",
+    "key": "host-bridge.text.038"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 860,
+    "kind": "text",
+    "raw": ")，回退宿主原生全量拉取",
+    "key": "host-bridge.text.039"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 879,
+    "kind": "text",
+    "raw": "备份请求失败 (",
+    "key": "host-bridge.text.040"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 880,
+    "kind": "text",
+    "raw": "宿主数据包导出失败",
+    "key": "host-bridge.text.041"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 891,
+    "kind": "text",
+    "raw": "宿主支持 Range 续传，从断点",
+    "key": "host-bridge.text.042"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 891,
+    "kind": "text",
+    "raw": "处继续接收",
+    "key": "host-bridge.text.043"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 894,
+    "kind": "text",
+    "raw": "宿主端点不支持 Range 续传（响应非 206），半成品作废，整包重拉",
+    "key": "host-bridge.text.044"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 912,
+    "kind": "text",
+    "raw": "OPFS 可用，数据包流式直写临时文件: fetch-tmp/",
+    "key": "host-bridge.text.045"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 939,
+    "kind": "text",
+    "raw": "接收宿主数据包",
+    "key": "host-bridge.text.046"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 961,
+    "kind": "text",
+    "raw": "数据包传输中:",
+    "key": "host-bridge.text.047"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 966,
+    "kind": "text",
+    "raw": "数据包传输中: 已接收",
+    "key": "host-bridge.text.048"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 974,
+    "kind": "text",
+    "raw": "成功从宿主拉取数据包 (OPFS 直写)，大小:",
+    "key": "host-bridge.text.049"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 1000,
+    "kind": "text",
+    "raw": "传输被暂停/中止，OPFS 半成品已保留: fetch-tmp/",
+    "key": "host-bridge.text.050"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 1011,
+    "kind": "text",
+    "raw": "成功从宿主拉取数据包，大小:",
+    "key": "host-bridge.text.051"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 1044,
+    "kind": "text",
+    "raw": "当前宿主不支持读取用户清单",
+    "key": "host-bridge.text.052"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 1050,
+    "kind": "text",
+    "raw": "宿主未返回可读数据包",
+    "key": "host-bridge.text.053"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 1054,
+    "kind": "text",
+    "raw": "目标预检：读取到宿主清单",
+    "key": "host-bridge.text.054"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 1054,
+    "kind": "text",
+    "raw": "条",
+    "key": "host-bridge.text.055"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 1059,
+    "kind": "text",
+    "raw": "目标预检未能读取宿主清单（",
+    "key": "host-bridge.text.056"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 1059,
+    "kind": "text",
+    "raw": "），本次按「冲突状态未知」处理",
+    "key": "host-bridge.text.057"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 1084,
+    "kind": "text",
+    "raw": "已有恢复任务正在进行，请等待其完成后再试",
+    "key": "host-bridge.text.058"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 1115,
+    "kind": "text",
+    "raw": "准备向宿主 [",
+    "key": "host-bridge.text.059"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 1115,
+    "kind": "text",
+    "raw": "] 恢复写入数据包 (模式:",
+    "key": "host-bridge.text.060"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 1140,
+    "kind": "text",
+    "raw": "读取恢复错误响应",
+    "key": "host-bridge.text.061"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 1146,
+    "kind": "text",
+    "raw": "恢复失败 (",
+    "key": "host-bridge.text.062"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 1147,
+    "kind": "text",
+    "raw": "恢复数据包至宿主酒馆失败",
+    "key": "host-bridge.text.063"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 1155,
+    "kind": "text",
+    "raw": "读取恢复结果",
+    "key": "host-bridge.text.064"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 1159,
+    "kind": "text",
+    "raw": "宿主恢复响应体读取失败，无法确认结果（请求已发出）:",
+    "key": "host-bridge.text.065"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 1160,
+    "kind": "modal",
+    "raw": "响应体不可解析",
+    "key": "host-bridge.modal.066"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 1167,
+    "kind": "text",
+    "raw": "宿主未写入任何条目：restored",
+    "key": "host-bridge.text.067"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 1168,
+    "kind": "text",
+    "raw": "（请核对包的类目是否被宿主接受）",
+    "key": "host-bridge.text.068"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 1170,
+    "kind": "text",
+    "raw": "宿主恢复条目计数：restored",
+    "key": "host-bridge.text.069"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 1174,
+    "kind": "text",
+    "raw": "数据包恢复至当前用户 (",
+    "key": "host-bridge.text.070"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 1174,
+    "kind": "text",
+    "raw": ") 成功！模式:",
+    "key": "host-bridge.text.071"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 1191,
+    "kind": "text",
+    "raw": "检测到包内",
+    "key": "host-bridge.text.072"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 1191,
+    "kind": "text",
+    "raw": "个扩展清单（可在线安装",
+    "key": "host-bridge.text.073"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 1191,
+    "kind": "text",
+    "raw": "个），正在呼出扩展安装面板...",
+    "key": "host-bridge.text.074"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 1197,
+    "kind": "text",
+    "raw": "本包含",
+    "key": "host-bridge.text.075"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 1197,
+    "kind": "text",
+    "raw": "个扩展，其中 0 个可在线安装",
+    "key": "host-bridge.text.076"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 1200,
+    "kind": "text",
+    "raw": "如需重装，请从扩展设置抽屉手动开始。",
+    "key": "host-bridge.text.077"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 1211,
+    "kind": "text",
+    "raw": "检查扩展清单失败 (非阻塞):",
+    "key": "host-bridge.text.078"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 1232,
+    "kind": "text",
+    "raw": "获取宿主扩展列表失败 (可能在独立环境运行):",
+    "key": "host-bridge.text.079"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 1263,
+    "kind": "text",
+    "raw": "安装失败 (",
+    "key": "host-bridge.text.080"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 1293,
+    "kind": "markup",
+    "raw": "检测到宿主本地用户目录下存在错误的 third-party 嵌套文件夹 (data/<user>/extensions/third-party/)，会导致其下插件无法被酒馆正常识别。",
+    "key": "host-bridge.markup.081"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 1397,
+    "kind": "markup",
+    "raw": "<i class=\"fa-solid fa-puzzle-piece\"></i> 扩展安装器",
+    "key": "host-bridge.markup.082"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 1400,
+    "kind": "markup",
+    "raw": "数据包已恢复。以下扩展将由酒馆以 <strong>depth: 1</strong> 浅克隆在线拉取，保留一键更新能力。",
+    "key": "host-bridge.markup.083"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 1403,
+    "kind": "markup",
+    "raw": "<i class=\"fa-solid fa-circle-info\"></i> 在线安装需要<b>网络连通</b>、宿主<b>扩展安装端点可用</b>（部分部署或权限配置会禁用它），",
+    "key": "host-bridge.markup.084"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 1404,
+    "kind": "markup",
+    "raw": "且<b>扩展仓库可访问</b>（私有仓需手动处理）。",
+    "key": "host-bridge.markup.085"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 1411,
+    "kind": "markup",
+    "raw": "<button id=\"ext-select-missing\" class=\"menu_button\" style=\"padding: 4px 10px; font-size: 0.8rem; cursor: pointer;\">仅选未安装</button>",
+    "key": "host-bridge.markup.086"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 1412,
+    "kind": "markup",
+    "raw": "<button id=\"ext-select-all\" class=\"menu_button\" style=\"padding: 4px 10px; font-size: 0.8rem; cursor: pointer;\">全选</button>",
+    "key": "host-bridge.markup.087"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 1413,
+    "kind": "markup",
+    "raw": "<button id=\"ext-deselect-all\" class=\"menu_button\" style=\"padding: 4px 10px; font-size: 0.8rem; cursor: pointer;\">全不选</button>",
+    "key": "host-bridge.markup.088"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 1417,
+    "kind": "markup",
+    "raw": "<span>强制覆盖已有扩展</span>",
+    "key": "host-bridge.markup.089"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 1434,
+    "kind": "markup",
+    "raw": "<span id=\"ext-progress-status\" style=\"color: var(--SmartThemeQuoteColor, #f59e0b);\">准备安装...</span>",
+    "key": "host-bridge.markup.090"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 1443,
+    "kind": "markup",
+    "raw": "<button id=\"ext-btn-cancel\" class=\"menu_button\" style=\"padding: 8px 16px; cursor: pointer;\">暂不安装</button>",
+    "key": "host-bridge.markup.091"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 1445,
+    "kind": "markup",
+    "raw": "<i class=\"fa-solid fa-play\"></i> <span>开始安装勾选项</span>",
+    "key": "host-bridge.markup.092"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 1448,
+    "kind": "markup",
+    "raw": "<i class=\"fa-solid fa-rotate\"></i> <span>刷新酒馆生效</span>",
+    "key": "host-bridge.markup.093"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 1496,
+    "kind": "text",
+    "raw": "未命名扩展",
+    "key": "host-bridge.text.094"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 1508,
+    "kind": "text",
+    "raw": "包内已含",
+    "key": "host-bridge.text.095"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 1511,
+    "kind": "text",
+    "raw": "无法在线安装",
+    "key": "host-bridge.text.096"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 1514,
+    "kind": "text",
+    "raw": "本地已安装",
+    "key": "host-bridge.text.097"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 1517,
+    "kind": "text",
+    "raw": "待安装",
+    "key": "host-bridge.text.098"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 1531,
+    "kind": "text",
+    "raw": "无远程 URL",
+    "key": "host-bridge.text.099"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 1537,
+    "kind": "text",
+    "raw": "分支:",
+    "key": "host-bridge.text.100"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 1589,
+    "kind": "text",
+    "raw": "清理中...",
+    "key": "host-bridge.text.101"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 1597,
+    "kind": "markup",
+    "raw": "<i class=\"fa-solid fa-circle-check\"></i> <strong>已成功清理残留 third-party 目录！</strong>",
+    "key": "host-bridge.markup.102"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 1600,
+    "kind": "text",
+    "raw": "重试清理",
+    "key": "host-bridge.text.103"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 1627,
+    "kind": "log",
+    "raw": "请至少勾选一个待安装的扩展",
+    "key": "host-bridge.log.104"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 1652,
+    "kind": "text",
+    "raw": "正在浅克隆:",
+    "key": "host-bridge.text.105"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 1653,
+    "kind": "text",
+    "raw": "克隆中...",
+    "key": "host-bridge.text.106"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 1658,
+    "kind": "text",
+    "raw": "缺少有效的 Git HTTP(S) URL",
+    "key": "host-bridge.text.107"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 1665,
+    "kind": "markup",
+    "raw": "<i class=\"fa-solid fa-circle-check\" style=\"color: #a6e3a1;\"></i> 已安装",
+    "key": "host-bridge.markup.108"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 1669,
+    "kind": "text",
+    "raw": "安装失败",
+    "key": "host-bridge.text.109"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 1671,
+    "kind": "text",
+    "raw": "扩展",
+    "key": "host-bridge.text.110"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 1671,
+    "kind": "text",
+    "raw": "安装失败:",
+    "key": "host-bridge.text.111"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 1676,
+    "kind": "text",
+    "raw": "安装完成：",
+    "key": "host-bridge.text.112"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 1676,
+    "kind": "text",
+    "raw": "成功，",
+    "key": "host-bridge.text.113"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 1676,
+    "kind": "text",
+    "raw": "失败",
+    "key": "host-bridge.text.114"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 1680,
+    "kind": "text",
+    "raw": "重试失败项 (",
+    "key": "host-bridge.text.115"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 1689,
+    "kind": "text",
+    "raw": "全部",
+    "key": "host-bridge.text.116"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 1689,
+    "kind": "text",
+    "raw": "个扩展安装成功！",
+    "key": "host-bridge.text.117"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 1724,
+    "kind": "text",
+    "raw": "启动数据包增量合并 (Incremental Archive Merge)...",
+    "key": "host-bridge.text.118"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 1777,
+    "kind": "text",
+    "raw": "数据包增量合并完成: 共计",
+    "key": "host-bridge.text.119"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 1777,
+    "kind": "text",
+    "raw": "个文件 (保留原有",
+    "key": "host-bridge.text.120"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 1777,
+    "kind": "text",
+    "raw": "项，新增/更新",
+    "key": "host-bridge.text.121"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 1777,
+    "kind": "text",
+    "raw": "项)",
+    "key": "host-bridge.text.122"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 1925,
+    "kind": "title",
+    "raw": "数据包转运",
+    "key": "host-bridge.title.123"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 1936,
+    "kind": "text",
+    "raw": "打开面板",
+    "key": "host-bridge.text.124"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 1937,
+    "kind": "title",
+    "raw": "打开数据包转运面板",
+    "key": "host-bridge.title.125"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 2019,
+    "kind": "text",
+    "raw": "数据包转运",
+    "key": "host-bridge.text.126"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 2020,
+    "kind": "title",
+    "raw": "打开数据包转运面板",
+    "key": "host-bridge.title.127"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 2060,
+    "kind": "text",
+    "raw": "数据包转运",
+    "key": "host-bridge.text.128"
+  },
+  {
+    "file": "src/ui/host-bridge.js",
+    "line": 2061,
+    "kind": "title",
+    "raw": "打开数据包转运面板",
+    "key": "host-bridge.title.129"
+  },
+  {
+    "file": "src/ui/chat-store-inject.js",
+    "line": 116,
+    "kind": "text",
+    "raw": "未提供聊天索引能力(list)",
+    "key": "chat-store-inject.text.001"
+  },
+  {
+    "file": "src/ui/chat-store-inject.js",
+    "line": 116,
+    "kind": "text",
+    "raw": "未提供聊天导出能力(export)",
+    "key": "chat-store-inject.text.002"
+  },
+  {
+    "file": "src/ui/chat-store-inject.js",
+    "line": 118,
+    "kind": "text",
+    "raw": "检测到聊天库（模式",
+    "key": "chat-store-inject.text.003"
+  },
+  {
+    "file": "src/ui/chat-store-inject.js",
+    "line": 118,
+    "kind": "text",
+    "raw": "）但",
+    "key": "chat-store-inject.text.004"
+  },
+  {
+    "file": "src/ui/chat-store-inject.js",
+    "line": 118,
+    "kind": "text",
+    "raw": "⇒ 本次不补聊天（若为纯库模式，请在插件弹窗手动导出）",
+    "key": "chat-store-inject.text.005"
+  },
+  {
+    "file": "src/ui/chat-store-inject.js",
+    "line": 125,
+    "kind": "text",
+    "raw": "聊天库索引不可用（",
+    "key": "chat-store-inject.text.006"
+  },
+  {
+    "file": "src/ui/chat-store-inject.js",
+    "line": 125,
+    "kind": "text",
+    "raw": "）⇒ 本次不补聊天",
+    "key": "chat-store-inject.text.007"
+  },
+  {
+    "file": "src/ui/chat-store-inject.js",
+    "line": 133,
+    "kind": "text",
+    "raw": "源包条目枚举失败：",
+    "key": "chat-store-inject.text.008"
+  },
+  {
+    "file": "src/ui/chat-store-inject.js",
+    "line": 134,
+    "kind": "text",
+    "raw": "源包条目枚举失败（",
+    "key": "chat-store-inject.text.009"
+  },
+  {
+    "file": "src/ui/chat-store-inject.js",
+    "line": 134,
+    "kind": "text",
+    "raw": "）⇒ 本次不补聊天",
+    "key": "chat-store-inject.text.010"
+  },
+  {
+    "file": "src/ui/chat-store-inject.js",
+    "line": 143,
+    "kind": "text",
+    "raw": "源包已含全部库中聊天",
+    "key": "chat-store-inject.text.011"
+  },
+  {
+    "file": "src/ui/chat-store-inject.js",
+    "line": 144,
+    "kind": "text",
+    "raw": "聊天库检查完毕：",
+    "key": "chat-store-inject.text.012"
+  },
+  {
+    "file": "src/ui/chat-store-inject.js",
+    "line": 144,
+    "kind": "text",
+    "raw": "⇒ 无需补齐",
+    "key": "chat-store-inject.text.013"
+  },
+  {
+    "file": "src/ui/chat-store-inject.js",
+    "line": 148,
+    "kind": "text",
+    "raw": "聊天库检测到",
+    "key": "chat-store-inject.text.014"
+  },
+  {
+    "file": "src/ui/chat-store-inject.js",
+    "line": 148,
+    "kind": "text",
+    "raw": "条源包缺失的聊天，开始导出：",
+    "key": "chat-store-inject.text.015"
+  },
+  {
+    "file": "src/ui/chat-store-inject.js",
+    "line": 155,
+    "kind": "text",
+    "raw": "聊天补齐已被中止/暂停",
+    "key": "chat-store-inject.text.016"
+  },
+  {
+    "file": "src/ui/chat-store-inject.js",
+    "line": 166,
+    "kind": "text",
+    "raw": "全部条目导出失败",
+    "key": "chat-store-inject.text.017"
+  },
+  {
+    "file": "src/ui/chat-store-inject.js",
+    "line": 167,
+    "kind": "text",
+    "raw": "聊天库",
+    "key": "chat-store-inject.text.018"
+  },
+  {
+    "file": "src/ui/chat-store-inject.js",
+    "line": 167,
+    "kind": "text",
+    "raw": "条全部导出失败（首因：",
+    "key": "chat-store-inject.text.019"
+  },
+  {
+    "file": "src/ui/chat-store-inject.js",
+    "line": 167,
+    "kind": "text",
+    "raw": "）⇒ 本次不补聊天",
+    "key": "chat-store-inject.text.020"
+  },
+  {
+    "file": "src/ui/chat-store-inject.js",
+    "line": 174,
+    "kind": "text",
+    "raw": "正在重写源包以并入聊天（源包",
+    "key": "chat-store-inject.text.021"
+  },
+  {
+    "file": "src/ui/chat-store-inject.js",
+    "line": 174,
+    "kind": "text",
+    "raw": "MB，落点",
+    "key": "chat-store-inject.text.022"
+  },
+  {
+    "file": "src/ui/chat-store-inject.js",
+    "line": 181,
+    "kind": "text",
+    "raw": "增强失败：",
+    "key": "chat-store-inject.text.023"
+  },
+  {
+    "file": "src/ui/chat-store-inject.js",
+    "line": 182,
+    "kind": "text",
+    "raw": "聊天补齐失败（",
+    "key": "chat-store-inject.text.024"
+  },
+  {
+    "file": "src/ui/chat-store-inject.js",
+    "line": 182,
+    "kind": "text",
+    "raw": "）⇒ 本次用原源包继续转换",
+    "key": "chat-store-inject.text.025"
+  },
+  {
+    "file": "src/ui/chat-store-inject.js",
+    "line": 189,
+    "kind": "text",
+    "raw": "已把",
+    "key": "chat-store-inject.text.026"
+  },
+  {
+    "file": "src/ui/chat-store-inject.js",
+    "line": 189,
+    "kind": "text",
+    "raw": "条库中聊天补入源包（落点",
+    "key": "chat-store-inject.text.027"
+  },
+  {
+    "file": "src/ui/chat-store-inject.js",
+    "line": 190,
+    "kind": "text",
+    "raw": "；另有",
+    "key": "chat-store-inject.text.028"
+  },
+  {
+    "file": "src/ui/chat-store-inject.js",
+    "line": 190,
+    "kind": "text",
+    "raw": "条导出失败",
+    "key": "chat-store-inject.text.029"
+  },
+  {
+    "file": "src/ui/chat-store-inject.js",
+    "line": 226,
+    "kind": "text",
+    "raw": "未检测到聊天库",
+    "key": "chat-store-inject.text.030"
+  },
+  {
+    "file": "src/ui/chat-store-inject.js",
+    "line": 231,
+    "kind": "text",
+    "raw": "聊天库未提供索引能力(list)",
+    "key": "chat-store-inject.text.031"
+  },
+  {
+    "file": "src/ui/chat-store-inject.js",
+    "line": 231,
+    "kind": "text",
+    "raw": "聊天库未提供导出能力(export)",
+    "key": "chat-store-inject.text.032"
+  },
+  {
+    "file": "src/ui/chat-store-inject.js",
+    "line": 237,
+    "kind": "text",
+    "raw": "库索引不可用：",
+    "key": "chat-store-inject.text.033"
+  },
+  {
+    "file": "src/ui/chat-store-inject.js",
+    "line": 244,
+    "kind": "text",
+    "raw": "库中没有可导出的聊天（或聊天类目已关闭）",
+    "key": "chat-store-inject.text.034"
+  },
+  {
+    "file": "src/ui/chat-store-inject.js",
+    "line": 247,
+    "kind": "text",
+    "raw": "聊天库导出：",
+    "key": "chat-store-inject.text.035"
+  },
+  {
+    "file": "src/ui/chat-store-inject.js",
+    "line": 273,
+    "kind": "text",
+    "raw": "全部",
+    "key": "chat-store-inject.text.036"
+  },
+  {
+    "file": "src/ui/chat-store-inject.js",
+    "line": 273,
+    "kind": "text",
+    "raw": "条导出失败（首因：",
+    "key": "chat-store-inject.text.037"
+  },
+  {
+    "file": "src/ui/chat-store-inject.js",
+    "line": 286,
+    "kind": "text",
+    "raw": "聊天库导出完成：",
+    "key": "chat-store-inject.text.038"
+  },
+  {
+    "file": "src/ui/chat-store-inject.js",
+    "line": 286,
+    "kind": "text",
+    "raw": "条聊天 →",
+    "key": "chat-store-inject.text.039"
+  },
+  {
+    "file": "src/ui/chat-store-inject.js",
+    "line": 286,
+    "kind": "text",
+    "raw": "目标包",
+    "key": "chat-store-inject.text.040"
+  },
+  {
+    "file": "src/ui/chat-store-inject.js",
+    "line": 287,
+    "kind": "text",
+    "raw": "（另有",
+    "key": "chat-store-inject.text.041"
+  },
+  {
+    "file": "src/ui/chat-store-inject.js",
+    "line": 287,
+    "kind": "text",
+    "raw": "条导出失败）",
+    "key": "chat-store-inject.text.042"
+  },
+  {
+    "file": "src/ui/chat-store-inject.js",
+    "line": 350,
+    "kind": "text",
+    "raw": "包内有",
+    "key": "chat-store-inject.text.043"
+  },
+  {
+    "file": "src/ui/chat-store-inject.js",
+    "line": 350,
+    "kind": "text",
+    "raw": "条聊天，但聊天库（模式",
+    "key": "chat-store-inject.text.044"
+  },
+  {
+    "file": "src/ui/chat-store-inject.js",
+    "line": 350,
+    "kind": "text",
+    "raw": "）未提供入库接入 API ⇒",
+    "key": "chat-store-inject.text.045"
+  },
+  {
+    "file": "src/ui/chat-store-inject.js",
+    "line": 351,
+    "kind": "text",
+    "raw": "这些聊天已落到磁盘；若处于纯库模式，请在插件弹窗用「转库」把它们录入数据库",
+    "key": "chat-store-inject.text.046"
+  },
+  {
+    "file": "src/ui/chat-store-bridge.js",
+    "line": 130,
+    "kind": "text",
+    "raw": "契约版本",
+    "key": "chat-store-bridge.text.001"
+  },
+  {
+    "file": "src/ui/chat-store-bridge.js",
+    "line": 130,
+    "kind": "text",
+    "raw": "高于本端支持的",
+    "key": "chat-store-bridge.text.002"
+  },
+  {
+    "file": "src/ui/chat-store-bridge.js",
+    "line": 130,
+    "kind": "text",
+    "raw": "（形状未知）",
+    "key": "chat-store-bridge.text.003"
+  },
+  {
+    "file": "src/ui/chat-store-bridge.js",
+    "line": 131,
+    "kind": "text",
+    "raw": "未检测到聊天库接入 API",
+    "key": "chat-store-bridge.text.004"
+  },
+  {
+    "file": "src/ui/chat-store-bridge.js",
+    "line": 177,
+    "kind": "text",
+    "raw": "list 能力不可用",
+    "key": "chat-store-bridge.text.005"
+  },
+  {
+    "file": "src/ui/chat-store-bridge.js",
+    "line": 185,
+    "kind": "text",
+    "raw": "listChats 超时",
+    "key": "chat-store-bridge.text.006"
+  },
+  {
+    "file": "src/ui/chat-store-bridge.js",
+    "line": 185,
+    "kind": "text",
+    "raw": "聊天库 listChats 超时（",
+    "key": "chat-store-bridge.text.007"
+  },
+  {
+    "file": "src/ui/chat-store-bridge.js",
+    "line": 185,
+    "kind": "text",
+    "raw": "ms），本次按「不可用」处理",
+    "key": "chat-store-bridge.text.008"
+  },
+  {
+    "file": "src/ui/chat-store-bridge.js",
+    "line": 194,
+    "kind": "text",
+    "raw": "聊天库 listChats 调用失败：",
+    "key": "chat-store-bridge.text.009"
+  },
+  {
+    "file": "src/ui/chat-store-bridge.js",
+    "line": 212,
+    "kind": "text",
+    "raw": "export 能力不可用",
+    "key": "chat-store-bridge.text.010"
+  },
+  {
+    "file": "src/ui/chat-store-bridge.js",
+    "line": 217,
+    "kind": "text",
+    "raw": "索引项缺 fileName",
+    "key": "chat-store-bridge.text.011"
+  },
+  {
+    "file": "src/ui/chat-store-bridge.js",
+    "line": 226,
+    "kind": "text",
+    "raw": "exportChat 超时",
+    "key": "chat-store-bridge.text.012"
+  },
+  {
+    "file": "src/ui/chat-store-bridge.js",
+    "line": 226,
+    "kind": "text",
+    "raw": "聊天库导出「",
+    "key": "chat-store-bridge.text.013"
+  },
+  {
+    "file": "src/ui/chat-store-bridge.js",
+    "line": 226,
+    "kind": "text",
+    "raw": "」超时（",
+    "key": "chat-store-bridge.text.014"
+  },
+  {
+    "file": "src/ui/chat-store-bridge.js",
+    "line": 226,
+    "kind": "text",
+    "raw": "ms），跳过该条",
+    "key": "chat-store-bridge.text.015"
+  },
+  {
+    "file": "src/ui/chat-store-bridge.js",
+    "line": 232,
+    "kind": "text",
+    "raw": "exportChat 返回空",
+    "key": "chat-store-bridge.text.016"
+  },
+  {
+    "file": "src/ui/chat-store-bridge.js",
+    "line": 232,
+    "kind": "text",
+    "raw": "聊天库导出「",
+    "key": "chat-store-bridge.text.017"
+  },
+  {
+    "file": "src/ui/chat-store-bridge.js",
+    "line": 232,
+    "kind": "text",
+    "raw": "」返回空内容，跳过该条",
+    "key": "chat-store-bridge.text.018"
+  },
+  {
+    "file": "src/ui/chat-store-bridge.js",
+    "line": 240,
+    "kind": "text",
+    "raw": "聊天库导出「",
+    "key": "chat-store-bridge.text.019"
+  },
+  {
+    "file": "src/ui/chat-store-bridge.js",
+    "line": 240,
+    "kind": "text",
+    "raw": "」失败：",
+    "key": "chat-store-bridge.text.020"
+  },
+  {
+    "file": "src/ui/chat-store-bridge.js",
+    "line": 265,
+    "kind": "text",
+    "raw": "import 能力不可用",
+    "key": "chat-store-bridge.text.021"
+  },
+  {
+    "file": "src/ui/chat-store-bridge.js",
+    "line": 280,
+    "kind": "text",
+    "raw": "缺 fileName",
+    "key": "chat-store-bridge.text.022"
+  },
+  {
+    "file": "src/ui/chat-store-bridge.js",
+    "line": 311,
+    "kind": "text",
+    "raw": "importChat 失败",
+    "key": "chat-store-bridge.text.023"
+  },
+  {
+    "file": "src/ui/chat-store-bridge.js",
+    "line": 311,
+    "kind": "text",
+    "raw": "条",
+    "key": "chat-store-bridge.text.024"
+  },
+  {
+    "file": "src/ui/chat-store-bridge.js",
+    "line": 312,
+    "kind": "text",
+    "raw": "聊天入库：成功",
+    "key": "chat-store-bridge.text.025"
+  },
+  {
+    "file": "src/ui/chat-store-bridge.js",
+    "line": 312,
+    "kind": "text",
+    "raw": "条，失败",
+    "key": "chat-store-bridge.text.026"
+  },
+  {
+    "file": "src/ui/chat-store-bridge.js",
+    "line": 312,
+    "kind": "text",
+    "raw": "条（首因：",
+    "key": "chat-store-bridge.text.027"
+  },
+  {
+    "file": "src/ui/chat-store-bridge.js",
+    "line": 314,
+    "kind": "text",
+    "raw": "聊天入库：成功",
+    "key": "chat-store-bridge.text.028"
+  },
+  {
+    "file": "src/ui/chat-store-bridge.js",
+    "line": 314,
+    "kind": "text",
+    "raw": "条",
+    "key": "chat-store-bridge.text.029"
+  },
+  {
+    "file": "src/ui/qr.js",
+    "line": 18,
+    "kind": "text",
+    "raw": "无 document",
+    "key": "qr.text.001"
+  },
+  {
+    "file": "src/ui/qr.js",
+    "line": 23,
+    "kind": "text",
+    "raw": "二维码库加载失败",
+    "key": "qr.text.002"
+  },
+  {
+    "file": "src/ui/qr.js",
+    "line": 31,
+    "kind": "text",
+    "raw": "无 window",
+    "key": "qr.text.003"
+  },
+  {
+    "file": "src/ui/qr.js",
+    "line": 38,
+    "kind": "text",
+    "raw": "二维码编码库不可用",
+    "key": "qr.text.004"
+  },
+  {
+    "file": "src/ui/qr.js",
+    "line": 39,
+    "kind": "text",
+    "raw": "二维码解码库不可用",
+    "key": "qr.text.005"
+  },
+  {
+    "file": "src/ui/qr.js",
+    "line": 68,
+    "kind": "text",
+    "raw": "二维码库不可用",
+    "key": "qr.text.006"
+  },
+  {
+    "file": "src/ui/qr.js",
+    "line": 72,
+    "kind": "text",
+    "raw": "扫码画布不可用",
+    "key": "qr.text.007"
+  },
+  {
+    "file": "src/ui/qr.js",
+    "line": 76,
+    "kind": "text",
+    "raw": "当前环境不支持摄像头",
+    "key": "qr.text.008"
+  },
+  {
+    "file": "src/ui/qr.js",
+    "line": 84,
+    "kind": "text",
+    "raw": "相机不可用：",
+    "key": "qr.text.009"
+  },
+  {
+    "file": "src/ui/qr.js",
+    "line": 84,
+    "kind": "text",
+    "raw": "权限被拒绝",
+    "key": "qr.text.010"
+  },
+  {
+    "file": "src/app/task-runtime.js",
+    "line": 122,
+    "kind": "text",
+    "raw": "[转换] 暂停收尾未产出半成品 ⇒ 续传将重做整包（产物仍会完整）",
+    "key": "task-runtime.text.001"
+  },
+  {
+    "file": "src/app/task-runtime.js",
+    "line": 127,
+    "kind": "text",
+    "raw": "[转换] 环境不支持 OPFS，无法保留半成品 ⇒ 续传将重做整包（产物仍会完整）",
+    "key": "task-runtime.text.002"
+  },
+  {
+    "file": "src/app/task-runtime.js",
+    "line": 131,
+    "kind": "text",
+    "raw": "[转换] 存储配额不足，跳过半成品持久化 ⇒ 续传将重做整包（产物仍会完整）",
+    "key": "task-runtime.text.003"
+  },
+  {
+    "file": "src/app/task-runtime.js",
+    "line": 139,
+    "kind": "text",
+    "raw": "[转换] 半成品文件句柄获取失败 ⇒ 续传将重做整包（产物仍会完整）",
+    "key": "task-runtime.text.004"
+  },
+  {
+    "file": "src/app/task-runtime.js",
+    "line": 146,
+    "kind": "text",
+    "raw": "[转换] 半成品落盘失败 ⇒ 续传将重做整包（产物仍会完整）:",
+    "key": "task-runtime.text.005"
+  },
+  {
+    "file": "src/app/task-runtime.js",
+    "line": 155,
+    "kind": "text",
+    "raw": "[转换] 已保留半成品",
+    "key": "task-runtime.text.006"
+  },
+  {
+    "file": "src/app/task-runtime.js",
+    "line": 155,
+    "kind": "text",
+    "raw": "条）—— 续传将原样搬运它，不重压缩、不丢条目",
+    "key": "task-runtime.text.007"
+  },
+  {
+    "file": "src/app/task-runtime.js",
+    "line": 228,
+    "kind": "text",
+    "raw": "（沿用断点跳过",
+    "key": "task-runtime.text.008"
+  },
+  {
+    "file": "src/app/task-runtime.js",
+    "line": 228,
+    "kind": "text",
+    "raw": "项）",
+    "key": "task-runtime.text.009"
+  },
+  {
+    "file": "src/app/task-runtime.js",
+    "line": 338,
+    "kind": "text",
+    "raw": "断点记",
+    "key": "task-runtime.text.010"
+  },
+  {
+    "file": "src/app/task-runtime.js",
+    "line": 338,
+    "kind": "text",
+    "raw": "个已完成产物，内存队列里只有",
+    "key": "task-runtime.text.011"
+  },
+  {
+    "file": "src/app/task-runtime.js",
+    "line": 338,
+    "kind": "text",
+    "raw": "个",
+    "key": "task-runtime.text.012"
+  },
+  {
+    "file": "src/app/task-runtime.js",
+    "line": 339,
+    "kind": "text",
+    "raw": "（产物已不在内存：可能被移除，或页面已重载过）",
+    "key": "task-runtime.text.013"
+  },
+  {
+    "file": "src/app/task-runtime.js",
+    "line": 383,
+    "kind": "text",
+    "raw": "已被占用，跳过挂载（不覆盖既有对象）",
+    "key": "task-runtime.text.014"
+  },
+  {
+    "file": "src/storage/db.js",
+    "line": 133,
+    "kind": "text",
+    "raw": "打开 IndexedDB 失败:",
+    "key": "db.text.001"
+  },
+  {
+    "file": "src/storage/authority-store.js",
+    "line": 34,
+    "kind": "text",
+    "raw": "数据包转运",
+    "key": "authority-store.text.001"
+  },
+  {
+    "file": "src/storage/authority-store.js",
+    "line": 43,
+    "kind": "text",
+    "raw": "[authority-store] Authority 初始化失败，降级为本地存储:",
+    "key": "authority-store.text.002"
+  },
+  {
+    "file": "src/storage/authority-store.js",
+    "line": 116,
+    "kind": "text",
+    "raw": "[authority-store] 断点清单",
+    "key": "authority-store.text.003"
+  },
+  {
+    "file": "src/storage/authority-store.js",
+    "line": 116,
+    "kind": "text",
+    "raw": "B 超 Authority KV 上限",
+    "key": "authority-store.text.004"
+  },
+  {
+    "file": "src/storage/authority-store.js",
+    "line": 117,
+    "kind": "text",
+    "raw": "⇒ 剥掉条目台账后存",
+    "key": "authority-store.text.005"
+  },
+  {
+    "file": "src/storage/authority-store.js",
+    "line": 117,
+    "kind": "text",
+    "raw": "B（续传仍由半成品字节判定，不漏条目）",
+    "key": "authority-store.text.006"
+  },
+  {
+    "file": "src/storage/authority-store.js",
+    "line": 122,
+    "kind": "text",
+    "raw": "[authority-store] 断点清单",
+    "key": "authority-store.text.007"
+  },
+  {
+    "file": "src/storage/authority-store.js",
+    "line": 122,
+    "kind": "text",
+    "raw": "B 精简后仍超 Authority KV 上限",
+    "key": "authority-store.text.008"
+  },
+  {
+    "file": "src/storage/authority-store.js",
+    "line": 123,
+    "kind": "text",
+    "raw": "⇒ 本次跳过 Authority 持久化（内存断点仍可用于本会话续传）",
+    "key": "authority-store.text.009"
+  },
+  {
+    "file": "src/storage/authority-store.js",
+    "line": 388,
+    "kind": "text",
+    "raw": "[authority-store] 产物已归档到 Authority:",
+    "key": "authority-store.text.010"
+  },
+  {
+    "file": "src/storage/authority-store.js",
+    "line": 388,
+    "kind": "text",
+    "raw": "块)",
+    "key": "authority-store.text.011"
+  },
+  {
+    "file": "src/storage/authority-store.js",
+    "line": 393,
+    "kind": "text",
+    "raw": "[authority-store] 产物镜像失败（不影响本地入库）:",
+    "key": "authority-store.text.012"
+  }
+]

@@ -1,0 +1,58 @@
+{
+  "sampledAt": "2026-09-25T14:47:27.953Z",
+  "url": "https://127.0.0.1:8003",
+  "withFetch": false,
+  "injected": {
+    "nativeBtnParent": "flex-container",
+    "quickFetchPresent": true,
+    "managerBtnPresent": true,
+    "menuItemParent": "extensionsMenu",
+    "drawerPresent": true,
+    "toastContainer": "toast-container"
+  },
+  "steps": [
+    {
+      "step": "A 打开账号弹层",
+      "outcome": {
+        "clicked": true
+      },
+      "toasts": []
+    },
+    {
+      "step": "B 点注入按钮·数据包互转",
+      "outcome": {
+        "clicked": true
+      },
+      "toasts": []
+    },
+    {
+      "step": "C 点扩展菜单插件项",
+      "outcome": {
+        "clicked": true,
+        "visible": false
+      },
+      "toasts": []
+    },
+    {
+      "step": "D 点宿主原生备份按钮",
+      "outcome": {
+        "clicked": true
+      },
+      "toasts": []
+    },
+    {
+      "step": "E 点注入按钮·备份管理器",
+      "outcome": {
+        "clicked": true
+      },
+      "toasts": []
+    }
+  ],
+  "consoleErrors": [
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "PAGEERROR: SyntaxError: Unexpected reserved word",
+    "PAGEERROR: TypeError: $(...) is not a function",
+    "PAGEERROR: Uncaught SyntaxError: Identifier 'SPresetSettings' has already been declared"
+  ]
+}

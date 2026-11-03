@@ -1,0 +1,429 @@
+{
+  "instance": "dev-st",
+  "pack": "pack-st-20260926-010422.zip",
+  "categories": {
+    "characters": {
+      "ok": 26,
+      "fail": 29,
+      "scanned": 430,
+      "distinct": 55,
+      "versionsSkipped": 375,
+      "seconds": 8.6
+    }
+  },
+  "failures": [
+    {
+      "n": "characters/Seraphina/anger.png",
+      "preservedName": "anger.png",
+      "human": "anger.png",
+      "isPng": true,
+      "status": 200,
+      "reason": "响应体为 {error:true}（ST 的 catch 分支，状态码仍是 200）",
+      "parsed": {
+        "error": true
+      },
+      "body": "{\"error\":true}"
+    },
+    {
+      "n": "characters/Seraphina/admiration.png",
+      "preservedName": "admiration.png",
+      "human": "admiration.png",
+      "isPng": true,
+      "status": 200,
+      "reason": "响应体为 {error:true}（ST 的 catch 分支，状态码仍是 200）",
+      "parsed": {
+        "error": true
+      },
+      "body": "{\"error\":true}"
+    },
+    {
+      "n": "characters/Seraphina/amusement.png",
+      "preservedName": "amusement.png",
+      "human": "amusement.png",
+      "isPng": true,
+      "status": 200,
+      "reason": "响应体为 {error:true}（ST 的 catch 分支，状态码仍是 200）",
+      "parsed": {
+        "error": true
+      },
+      "body": "{\"error\":true}"
+    },
+    {
+      "n": "characters/Seraphina/annoyance.png",
+      "preservedName": "annoyance.png",
+      "human": "annoyance.png",
+      "isPng": true,
+      "status": 200,
+      "reason": "响应体为 {error:true}（ST 的 catch 分支，状态码仍是 200）",
+      "parsed": {
+        "error": true
+      },
+      "body": "{\"error\":true}"
+    },
+    {
+      "n": "characters/Seraphina/approval.png",
+      "preservedName": "approval.png",
+      "human": "approval.png",
+      "isPng": true,
+      "status": 200,
+      "reason": "响应体为 {error:true}（ST 的 catch 分支，状态码仍是 200）",
+      "parsed": {
+        "error": true
+      },
+      "body": "{\"error\":true}"
+    },
+    {
+      "n": "characters/Seraphina/caring.png",
+      "preservedName": "caring.png",
+      "human": "caring.png",
+      "isPng": true,
+      "status": 200,
+      "reason": "响应体为 {error:true}（ST 的 catch 分支，状态码仍是 200）",
+      "parsed": {
+        "error": true
+      },
+      "body": "{\"error\":true}"
+    },
+    {
+      "n": "characters/Seraphina/confusion.png",
+      "preservedName": "confusion.png",
+      "human": "confusion.png",
+      "isPng": true,
+      "status": 200,
+      "reason": "响应体为 {error:true}（ST 的 catch 分支，状态码仍是 200）",
+      "parsed": {
+        "error": true
+      },
+      "body": "{\"error\":true}"
+    },
+    {
+      "n": "characters/Seraphina/curiosity.png",
+      "preservedName": "curiosity.png",
+      "human": "curiosity.png",
+      "isPng": true,
+      "status": 200,
+      "reason": "响应体为 {error:true}（ST 的 catch 分支，状态码仍是 200）",
+      "parsed": {
+        "error": true
+      },
+      "body": "{\"error\":true}"
+    },
+    {
+      "n": "characters/Seraphina/desire.png",
+      "preservedName": "desire.png",
+      "human": "desire.png",
+      "isPng": true,
+      "status": 200,
+      "reason": "响应体为 {error:true}（ST 的 catch 分支，状态码仍是 200）",
+      "parsed": {
+        "error": true
+      },
+      "body": "{\"error\":true}"
+    },
+    {
+      "n": "characters/Seraphina/disappointment.png",
+      "preservedName": "disappointment.png",
+      "human": "disappointment.png",
+      "isPng": true,
+      "status": 200,
+      "reason": "响应体为 {error:true}（ST 的 catch 分支，状态码仍是 200）",
+      "parsed": {
+        "error": true
+      },
+      "body": "{\"error\":true}"
+    },
+    {
+      "n": "characters/Seraphina/disapproval.png",
+      "preservedName": "disapproval.png",
+      "human": "disapproval.png",
+      "isPng": true,
+      "status": 200,
+      "reason": "响应体为 {error:true}（ST 的 catch 分支，状态码仍是 200）",
+      "parsed": {
+        "error": true
+      },
+      "body": "{\"error\":true}"
+    },
+    {
+      "n": "characters/Seraphina/disgust.png",
+      "preservedName": "disgust.png",
+      "human": "disgust.png",
+      "isPng": true,
+      "status": 200,
+      "reason": "响应体为 {error:true}（ST 的 catch 分支，状态码仍是 200）",
+      "parsed": {
+        "error": true
+      },
+      "body": "{\"error\":true}"
+    },
+    {
+      "n": "characters/Seraphina/embarrassment.png",
+      "preservedName": "embarrassment.png",
+      "human": "embarrassment.png",
+      "isPng": true,
+      "status": 200,
+      "reason": "响应体为 {error:true}（ST 的 catch 分支，状态码仍是 200）",
+      "parsed": {
+        "error": true
+      },
+      "body": "{\"error\":true}"
+    },
+    {
+      "n": "characters/Seraphina/excitement.png",
+      "preservedName": "excitement.png",
+      "human": "excitement.png",
+      "isPng": true,
+      "status": 200,
+      "reason": "响应体为 {error:true}（ST 的 catch 分支，状态码仍是 200）",
+      "parsed": {
+        "error": true
+      },
+      "body": "{\"error\":true}"
+    },
+    {
+      "n": "characters/Seraphina/fear.png",
+      "preservedName": "fear.png",
+      "human": "fear.png",
+      "isPng": true,
+      "status": 200,
+      "reason": "响应体为 {error:true}（ST 的 catch 分支，状态码仍是 200）",
+      "parsed": {
+        "error": true
+      },
+      "body": "{\"error\":true}"
+    },
+    {
+      "n": "characters/Seraphina/gratitude.png",
+      "preservedName": "gratitude.png",
+      "human": "gratitude.png",
+      "isPng": true,
+      "status": 200,
+      "reason": "响应体为 {error:true}（ST 的 catch 分支，状态码仍是 200）",
+      "parsed": {
+        "error": true
+      },
+      "body": "{\"error\":true}"
+    },
+    {
+      "n": "characters/Seraphina/grief.png",
+      "preservedName": "grief.png",
+      "human": "grief.png",
+      "isPng": true,
+      "status": 200,
+      "reason": "响应体为 {error:true}（ST 的 catch 分支，状态码仍是 200）",
+      "parsed": {
+        "error": true
+      },
+      "body": "{\"error\":true}"
+    },
+    {
+      "n": "characters/Seraphina/joy.png",
+      "preservedName": "joy.png",
+      "human": "joy.png",
+      "isPng": true,
+      "status": 200,
+      "reason": "响应体为 {error:true}（ST 的 catch 分支，状态码仍是 200）",
+      "parsed": {
+        "error": true
+      },
+      "body": "{\"error\":true}"
+    },
+    {
+      "n": "characters/Seraphina/love.png",
+      "preservedName": "love.png",
+      "human": "love.png",
+      "isPng": true,
+      "status": 200,
+      "reason": "响应体为 {error:true}（ST 的 catch 分支，状态码仍是 200）",
+      "parsed": {
+        "error": true
+      },
+      "body": "{\"error\":true}"
+    },
+    {
+      "n": "characters/Seraphina/nervousness.png",
+      "preservedName": "nervousness.png",
+      "human": "nervousness.png",
+      "isPng": true,
+      "status": 200,
+      "reason": "响应体为 {error:true}（ST 的 catch 分支，状态码仍是 200）",
+      "parsed": {
+        "error": true
+      },
+      "body": "{\"error\":true}"
+    },
+    {
+      "n": "characters/Seraphina/neutral.png",
+      "preservedName": "neutral.png",
+      "human": "neutral.png",
+      "isPng": true,
+      "status": 200,
+      "reason": "响应体为 {error:true}（ST 的 catch 分支，状态码仍是 200）",
+      "parsed": {
+        "error": true
+      },
+      "body": "{\"error\":true}"
+    },
+    {
+      "n": "characters/Seraphina/optimism.png",
+      "preservedName": "optimism.png",
+      "human": "optimism.png",
+      "isPng": true,
+      "status": 200,
+      "reason": "响应体为 {error:true}（ST 的 catch 分支，状态码仍是 200）",
+      "parsed": {
+        "error": true
+      },
+      "body": "{\"error\":true}"
+    },
+    {
+      "n": "characters/Seraphina/sadness.png",
+      "preservedName": "sadness.png",
+      "human": "sadness.png",
+      "isPng": true,
+      "status": 200,
+      "reason": "响应体为 {error:true}（ST 的 catch 分支，状态码仍是 200）",
+      "parsed": {
+        "error": true
+      },
+      "body": "{\"error\":true}"
+    },
+    {
+      "n": "characters/Seraphina/pride.png",
+      "preservedName": "pride.png",
+      "human": "pride.png",
+      "isPng": true,
+      "status": 200,
+      "reason": "响应体为 {error:true}（ST 的 catch 分支，状态码仍是 200）",
+      "parsed": {
+        "error": true
+      },
+      "body": "{\"error\":true}"
+    },
+    {
+      "n": "characters/Seraphina/realization.png",
+      "preservedName": "realization.png",
+      "human": "realization.png",
+      "isPng": true,
+      "status": 200,
+      "reason": "响应体为 {error:true}（ST 的 catch 分支，状态码仍是 200）",
+      "parsed": {
+        "error": true
+      },
+      "body": "{\"error\":true}"
+    },
+    {
+      "n": "characters/Seraphina/relief.png",
+      "preservedName": "relief.png",
+      "human": "relief.png",
+      "isPng": true,
+      "status": 200,
+      "reason": "响应体为 {error:true}（ST 的 catch 分支，状态码仍是 200）",
+      "parsed": {
+        "error": true
+      },
+      "body": "{\"error\":true}"
+    },
+    {
+      "n": "characters/Seraphina/remorse.png",
+      "preservedName": "remorse.png",
+      "human": "remorse.png",
+      "isPng": true,
+      "status": 200,
+      "reason": "响应体为 {error:true}（ST 的 catch 分支，状态码仍是 200）",
+      "parsed": {
+        "error": true
+      },
+      "body": "{\"error\":true}"
+    },
+    {
+      "n": "characters/Seraphina/surprise.png",
+      "preservedName": "surprise.png",
+      "human": "surprise.png",
+      "isPng": true,
+      "status": 200,
+      "reason": "响应体为 {error:true}（ST 的 catch 分支，状态码仍是 200）",
+      "parsed": {
+        "error": true
+      },
+      "body": "{\"error\":true}"
+    },
+    {
+      "n": "characters/【Sgw】又看一集.state.character_editor_assistant.json",
+      "preservedName": "【Sgw】又看一集.state.character_editor_assistant.json",
+      "human": "【Sgw】又看一集.state.character_editor_assistant.json",
+      "isPng": false,
+      "status": 400,
+      "reason": "HTTP 400",
+      "parsed": null,
+      "body": "Bad Request"
+    }
+  ],
+  "unreachable": [
+    {
+      "key": "_convert",
+      "count": 3
+    },
+    {
+      "key": "context",
+      "count": 37
+    },
+    {
+      "key": "extensions",
+      "count": 5204
+    },
+    {
+      "key": "instruct",
+      "count": 41
+    },
+    {
+      "key": "KoboldAI Settings",
+      "count": 28
+    },
+    {
+      "key": "movingUI",
+      "count": 1
+    },
+    {
+      "key": "NovelAI Settings",
+      "count": 24
+    },
+    {
+      "key": "OpenAI Settings",
+      "count": 76
+    },
+    {
+      "key": "QuickReplies",
+      "count": 2
+    },
+    {
+      "key": "reasoning",
+      "count": 5
+    },
+    {
+      "key": "secrets.json",
+      "count": 1
+    },
+    {
+      "key": "sysprompt",
+      "count": 14
+    },
+    {
+      "key": "TextGen Settings",
+      "count": 36
+    },
+    {
+      "key": "themes",
+      "count": 5
+    },
+    {
+      "key": "user",
+      "count": 191
+    }
+  ],
+  "totals": {
+    "packTotal": 7181,
+    "reachableTotal": 727,
+    "unreachableTotal": 6454
+  }
+}

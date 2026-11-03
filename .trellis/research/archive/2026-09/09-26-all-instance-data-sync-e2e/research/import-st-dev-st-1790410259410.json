@@ -1,0 +1,260 @@
+{
+  "instance": "dev-st",
+  "pack": "pack-st-20260926-010422.zip",
+  "categories": {
+    "chats": {
+      "ok": 0,
+      "fail": 223,
+      "seconds": 18.9
+    }
+  },
+  "failures": [
+    {
+      "n": "chats/BanG! City NSFW（紫）·全绿灯/BanG! City NSFW（紫）·全绿灯 - 2026-07-25@01h31m37s531ms.jsonl",
+      "status": 200,
+      "reason": "响应体为 {error:true}（ST 的 catch 分支，状态码仍是 200）",
+      "parsed": {
+        "error": true
+      },
+      "body": "{\"error\":true}"
+    },
+    {
+      "n": "chats/BanG! City NSFW（紫）·全绿灯/BanG! City NSFW（紫）·全绿灯 - 2026-07-25@01h50m02s347ms.jsonl",
+      "status": 200,
+      "reason": "响应体为 {error:true}（ST 的 catch 分支，状态码仍是 200）",
+      "parsed": {
+        "error": true
+      },
+      "body": "{\"error\":true}"
+    },
+    {
+      "n": "chats/BanG! City NSFW（紫）·全绿灯/BanG! City NSFW（紫）·全绿灯 - 2026-07-25@19h22m31s441ms.jsonl",
+      "status": 200,
+      "reason": "响应体为 {error:true}（ST 的 catch 分支，状态码仍是 200）",
+      "parsed": {
+        "error": true
+      },
+      "body": "{\"error\":true}"
+    },
+    {
+      "n": "chats/BanG! City NSFW（青）/BanG! City NSFW（青） - 2026-06-22@19h19m35s080ms.jsonl",
+      "status": 200,
+      "reason": "响应体为 {error:true}（ST 的 catch 分支，状态码仍是 200）",
+      "parsed": {
+        "error": true
+      },
+      "body": "{\"error\":true}"
+    },
+    {
+      "n": "chats/BanG! City NSFW（青）/BanG! City NSFW（青） - 2026-06-24@00h36m24s355ms.jsonl",
+      "status": 200,
+      "reason": "响应体为 {error:true}（ST 的 catch 分支，状态码仍是 200）",
+      "parsed": {
+        "error": true
+      },
+      "body": "{\"error\":true}"
+    },
+    {
+      "n": "chats/BanG! City NSFW（青）/BanG! City NSFW（青） - 2026-06-24@12h36m05s666ms.jsonl",
+      "status": 200,
+      "reason": "响应体为 {error:true}（ST 的 catch 分支，状态码仍是 200）",
+      "parsed": {
+        "error": true
+      },
+      "body": "{\"error\":true}"
+    },
+    {
+      "n": "chats/BanG! City NSFW（青）/BanG! City NSFW（青） - 2026-06-24@12h37m36s965ms.jsonl",
+      "status": 200,
+      "reason": "响应体为 {error:true}（ST 的 catch 分支，状态码仍是 200）",
+      "parsed": {
+        "error": true
+      },
+      "body": "{\"error\":true}"
+    },
+    {
+      "n": "chats/BanG! City NSFW（青）/BanG! City NSFW（青） - 2026-06-24@12h38m44s730ms.jsonl",
+      "status": 200,
+      "reason": "响应体为 {error:true}（ST 的 catch 分支，状态码仍是 200）",
+      "parsed": {
+        "error": true
+      },
+      "body": "{\"error\":true}"
+    },
+    {
+      "n": "chats/BanG! City NSFW（青）/BanG! City NSFW（青） - 2026-06-24@12h39m31s777ms.jsonl",
+      "status": 200,
+      "reason": "响应体为 {error:true}（ST 的 catch 分支，状态码仍是 200）",
+      "parsed": {
+        "error": true
+      },
+      "body": "{\"error\":true}"
+    },
+    {
+      "n": "chats/BanG! City NSFW（青）/BanG! City NSFW（青） - 2026-06-24@20h23m02s015ms.jsonl",
+      "status": 200,
+      "reason": "响应体为 {error:true}（ST 的 catch 分支，状态码仍是 200）",
+      "parsed": {
+        "error": true
+      },
+      "body": "{\"error\":true}"
+    },
+    {
+      "n": "chats/BanG! City NSFW（青）/BanG! City NSFW（青） - 2026-06-24@20h28m42s154ms.jsonl",
+      "status": 200,
+      "reason": "响应体为 {error:true}（ST 的 catch 分支，状态码仍是 200）",
+      "parsed": {
+        "error": true
+      },
+      "body": "{\"error\":true}"
+    },
+    {
+      "n": "chats/BanG! City NSFW（青）/BanG! City NSFW（青） - 2026-06-24@20h33m26s698ms.jsonl",
+      "status": 200,
+      "reason": "响应体为 {error:true}（ST 的 catch 分支，状态码仍是 200）",
+      "parsed": {
+        "error": true
+      },
+      "body": "{\"error\":true}"
+    },
+    {
+      "n": "chats/BanG! City NSFW（青）/BanG! City NSFW（青） - 2026-06-24@20h46m24s858ms.jsonl",
+      "status": 200,
+      "reason": "响应体为 {error:true}（ST 的 catch 分支，状态码仍是 200）",
+      "parsed": {
+        "error": true
+      },
+      "body": "{\"error\":true}"
+    },
+    {
+      "n": "chats/BanG! City NSFW（青）/BanG! City NSFW（青） - 2026-06-24@20h46m51s376ms.jsonl",
+      "status": 200,
+      "reason": "响应体为 {error:true}（ST 的 catch 分支，状态码仍是 200）",
+      "parsed": {
+        "error": true
+      },
+      "body": "{\"error\":true}"
+    },
+    {
+      "n": "chats/BanG! City NSFW（青）/BanG! City NSFW（青） - 2026-06-24@22h49m11s558ms.jsonl",
+      "status": 200,
+      "reason": "响应体为 {error:true}（ST 的 catch 分支，状态码仍是 200）",
+      "parsed": {
+        "error": true
+      },
+      "body": "{\"error\":true}"
+    },
+    {
+      "n": "chats/BanG! City NSFW（青）/BanG! City NSFW（青） - 2026-06-24@22h51m20s120ms.jsonl",
+      "status": 200,
+      "reason": "响应体为 {error:true}（ST 的 catch 分支，状态码仍是 200）",
+      "parsed": {
+        "error": true
+      },
+      "body": "{\"error\":true}"
+    },
+    {
+      "n": "chats/BanG! City NSFW（青）/BanG! City NSFW（青） - 2026-06-25@17h35m12s890ms.jsonl",
+      "status": 200,
+      "reason": "响应体为 {error:true}（ST 的 catch 分支，状态码仍是 200）",
+      "parsed": {
+        "error": true
+      },
+      "body": "{\"error\":true}"
+    },
+    {
+      "n": "chats/BanG! City NSFW（青）/BanG! City NSFW（青） - 2026-06-25@20h59m48s747ms.jsonl",
+      "status": 200,
+      "reason": "响应体为 {error:true}（ST 的 catch 分支，状态码仍是 200）",
+      "parsed": {
+        "error": true
+      },
+      "body": "{\"error\":true}"
+    },
+    {
+      "n": "chats/BanG! City NSFW（青）/BanG! City NSFW（青） - 2026-06-25@21h59m49s318ms.jsonl",
+      "status": 200,
+      "reason": "响应体为 {error:true}（ST 的 catch 分支，状态码仍是 200）",
+      "parsed": {
+        "error": true
+      },
+      "body": "{\"error\":true}"
+    },
+    {
+      "n": "chats/BanG! City NSFW（青）/BanG! City NSFW（青） - 2026-06-25@22h05m33s536ms.jsonl",
+      "status": 200,
+      "reason": "响应体为 {error:true}（ST 的 catch 分支，状态码仍是 200）",
+      "parsed": {
+        "error": true
+      },
+      "body": "{\"error\":true}"
+    }
+  ],
+  "unreachable": [
+    {
+      "key": "_convert",
+      "count": 3
+    },
+    {
+      "key": "context",
+      "count": 37
+    },
+    {
+      "key": "extensions",
+      "count": 5204
+    },
+    {
+      "key": "instruct",
+      "count": 41
+    },
+    {
+      "key": "KoboldAI Settings",
+      "count": 28
+    },
+    {
+      "key": "movingUI",
+      "count": 1
+    },
+    {
+      "key": "NovelAI Settings",
+      "count": 24
+    },
+    {
+      "key": "OpenAI Settings",
+      "count": 76
+    },
+    {
+      "key": "QuickReplies",
+      "count": 2
+    },
+    {
+      "key": "reasoning",
+      "count": 5
+    },
+    {
+      "key": "secrets.json",
+      "count": 1
+    },
+    {
+      "key": "sysprompt",
+      "count": 14
+    },
+    {
+      "key": "TextGen Settings",
+      "count": 36
+    },
+    {
+      "key": "themes",
+      "count": 5
+    },
+    {
+      "key": "user",
+      "count": 191
+    }
+  ],
+  "totals": {
+    "packTotal": 7181,
+    "reachableTotal": 727,
+    "unreachableTotal": 6454
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "task": "09-27-plugin-defect-fixes",
+  "step": "§4.3 / §4.3b / §2.5 —— 2026-09-29 收口复跑读数",
+  "environment": {
+    "note": "跑 E2E 时独占机器（guides §11.6）：无其它 vitest / run.cjs 在跑。",
+    "instances_up": ["dev-st :8001 (HTTP 200)", "dev-luker :8003 (HTTPS 302)", "pt-web :8899 (HTTP 200)"],
+    "real_instances": "未启动（8002 / 8004 down）—— 符合 E2E 只连 Dev（L1-MF-10 / P-11）",
+    "dev_instance_plugin_version": "137d4f3（Dev ST 与 Dev Luker 均是）。比对：137d4f3 ⊇ 4b5511f ⇒ 已含本任务全部插件代码（R-16/R-17/R-19）；与工作区 HEAD 的差额是**另一任务** 09-28 的续传重构（该任务明文把实例列为非目标，走独立形态 e2e:web 验证）"
+  },
+  "smoke_timeout_change": {
+    "file": "e2e/specs/smoke.e2e.cjs",
+    "change": "20_000 → 60_000（挂载等待窗口）",
+    "basis": "§4.3b 的 (b) 分支，用户裁决 U-3（记于 09-28 任务 prd.md）",
+    "assertion_unchanged": true
+  },
+  "full_e2e": {
+    "round1": { "command": "node e2e/run.cjs", "assertions": 281, "passed": 281, "failed": 0, "exit": 0 },
+    "round2": { "command": "node e2e/run.cjs", "assertions": 281, "passed": 281, "failed": 0, "exit": 0 },
+    "verdict": "AC-B7 达成（连续两轮全绿 exit 0）"
+  },
+  "third_party_blocker": {
+    "what": "ChatFilesys 的「入库提醒」模态弹窗（`.chatfilesys-import-prompt`，宿主 dialog）拦截全页指针事件",
+    "symptom": "矩阵 @ dev-st 在第一次点 #btn-convert 时超时：`<dialog open class=\"popup popup--animation-fast\"> intercepts pointer events` ⇒ 整段假红",
+    "asymmetry": "dev-luker 不发生（其 import_prompt.never = true 已静音）⇒ 同一份代码、两个宿主、一绿一红",
+    "first_attempt_failed_reason": "① 按 id 找（`getElementById('chatfilesys-import-prompt')`）—— 实测它是**类名不是 id**；② 只查 `<button>` —— 实测按钮是宿主的 `.menu_button` **div**；③ 在 goto() 之后点一次 —— 实测弹窗**18 s 才出现**（宿主把聊天载进来之后），比 goto 返回晚，所以 count()=0 直接空过",
+    "fix": "e2e/lib/harness.cjs 新增 installChatFilesysPromptGuard(ctx)：init script + MutationObserver，页面内任何时刻弹出即点「不入库」",
+    "side_effect": "无：点「不入库」= 「这次照常走聊天文件」（不写库）；**不勾**「这个聊天不再提醒 / 全部不再提醒」⇒ 不留持久设置。已核 dev-st 的 extension_settings.chatfilesys.import_prompt = {never:false, mutedKeys:[]}，**未被改动**",
+    "discrimination": {
+      "guard_absent": { "matrix@dev-st": "EXIT=1，断言 34 项 / 通过 33 / 失败 1（未抛异常 失败）" },
+      "guard_present": { "matrix@dev-st": "EXIT=0，断言 91 项 / 通过 91" }
+    },
+    "timeline_observed": "splash 至 ~16 s；ChatFilesys 弹窗 ~18 s 出现；守卫 20 s 前清掉（计数 7→9）"
+  },
+  "step_2_5_r19_discrimination": {
+    "method": "把 Dev ST 实例插件 index.js 的 `mountDebugProbe();` 注掉（临时，跑完 git checkout 还原）",
+    "removed": { "command": "node e2e/run.cjs --only matrix --instance dev-st", "assertions": 91, "passed": 87, "failed": 4, "exit": 1, "red_assertions": ["R-19 只读探针存在", "R-19 未探测时三态为 unknown", "R-19 探针快照冻结且改不动", "R-19 命名空间对象本身也冻结"] },
+    "restored": { "command": "node e2e/run.cjs --only matrix --instance dev-st", "assertions": 91, "passed": 91, "failed": 0, "exit": 0 },
+    "instance_state_after": "git -C <实例插件目录> checkout -- index.js ⇒ status 干净（已核）"
+  },
+  "npm_test": {
+    "command": "npx vitest run --maxWorkers=2",
+    "files": 64, "passed": 610, "skipped": 2, "failed": 0, "exit": 0,
+    "note": "本任务收口时 573 项；其后由 09-28 任务净增 37 项守护 —— 零回退"
+  }
+}

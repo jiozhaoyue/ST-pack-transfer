@@ -1,0 +1,1165 @@
+{
+  "sampledAt": "2026-09-25T08:03:44.916Z",
+  "url": "https://127.0.0.1:8004",
+  "uiText": {
+    "found": true,
+    "sections": [
+      {
+        "raw": "浏览器配额 1.4 GB / 11.4 GB (12.2%)",
+        "barWidth": "12.2%"
+      },
+      {
+        "raw": "用户配额 3.6 GB / 无限制",
+        "barWidth": "0%"
+      }
+    ]
+  },
+  "estimate": {
+    "usage": 1496802884,
+    "quota": 12234221124,
+    "usageDetails": {
+      "fileSystem": 1484045587,
+      "indexedDB": 12757297
+    }
+  },
+  "inspect": {
+    "status": 200,
+    "body": {
+      "target": {
+        "type": "self",
+        "handle": "default-user"
+      },
+      "quota": {
+        "usedBytes": 3862526856,
+        "quotaBytes": null,
+        "over": false
+      },
+      "path": [],
+      "breadcrumbs": [
+        {
+          "label": "Storage",
+          "path": []
+        }
+      ],
+      "isLeaf": false,
+      "entries": [
+        {
+          "key": "chats",
+          "label": "Chats",
+          "icon": "comment",
+          "kind": "category",
+          "sizeBytes": 699780005,
+          "mtimeMs": null,
+          "childCount": 23,
+          "canDrill": true,
+          "note": null
+        },
+        {
+          "key": "characters",
+          "label": "Characters",
+          "icon": "user",
+          "kind": "category",
+          "sizeBytes": 113148452,
+          "mtimeMs": null,
+          "childCount": 403,
+          "canDrill": true,
+          "note": null
+        },
+        {
+          "key": "worlds",
+          "label": "Worldbooks",
+          "icon": "book",
+          "kind": "category",
+          "sizeBytes": 21865758,
+          "mtimeMs": null,
+          "childCount": 21,
+          "canDrill": true,
+          "note": null
+        },
+        {
+          "key": "images",
+          "label": "Images",
+          "icon": "image",
+          "kind": "category",
+          "sizeBytes": 171067610,
+          "mtimeMs": null,
+          "childCount": 34,
+          "canDrill": true,
+          "note": null
+        },
+        {
+          "key": "attachments",
+          "label": "Attachments",
+          "icon": "paperclip",
+          "kind": "category",
+          "sizeBytes": 1409272,
+          "mtimeMs": null,
+          "childCount": 17,
+          "canDrill": true,
+          "note": null
+        },
+        {
+          "key": "presets",
+          "label": "Presets & Settings",
+          "icon": "sliders",
+          "kind": "category",
+          "sizeBytes": 61609983,
+          "mtimeMs": null,
+          "childCount": 270,
+          "canDrill": true,
+          "note": null
+        },
+        {
+          "key": "extensions",
+          "label": "Extensions",
+          "icon": "puzzle-piece",
+          "kind": "category",
+          "sizeBytes": 355123394,
+          "mtimeMs": null,
+          "childCount": 33,
+          "canDrill": true,
+          "note": null
+        },
+        {
+          "key": "vectors",
+          "label": "Vector Stores",
+          "icon": "brain",
+          "kind": "category",
+          "sizeBytes": 0,
+          "mtimeMs": null,
+          "childCount": 0,
+          "canDrill": true,
+          "note": null
+        },
+        {
+          "key": "backups",
+          "label": "Backups",
+          "icon": "clock-rotate-left",
+          "kind": "category",
+          "sizeBytes": 2438015867,
+          "mtimeMs": null,
+          "childCount": 106,
+          "canDrill": true,
+          "note": null
+        },
+        {
+          "key": "other",
+          "label": "Other",
+          "icon": "box",
+          "kind": "category",
+          "sizeBytes": 506515,
+          "mtimeMs": null,
+          "childCount": 7,
+          "canDrill": true,
+          "note": null
+        }
+      ]
+    }
+  },
+  "inspectSub": {
+    "chats": {
+      "status": 200,
+      "body": {
+        "target": {
+          "type": "self",
+          "handle": "default-user"
+        },
+        "quota": null,
+        "path": [
+          "chats"
+        ],
+        "breadcrumbs": [
+          {
+            "label": "Storage",
+            "path": []
+          },
+          {
+            "label": "Chats",
+            "path": [
+              "chats"
+            ]
+          }
+        ],
+        "isLeaf": false,
+        "entries": [
+          {
+            "key": "孤独摇滚",
+            "label": "孤独摇滚",
+            "icon": "user",
+            "kind": "character-chat-group",
+            "sizeBytes": 485548497,
+            "mtimeMs": null,
+            "childCount": 131,
+            "canDrill": true,
+            "note": null
+          },
+          {
+            "key": "孤独摇滚3",
+            "label": "孤独摇滚3",
+            "icon": "user",
+            "kind": "character-chat-group",
+            "sizeBytes": 171970082,
+            "mtimeMs": null,
+            "childCount": 22,
+            "canDrill": true,
+            "note": null
+          },
+          {
+            "key": "孤独摇滚1",
+            "label": "孤独摇滚1",
+            "icon": "user",
+            "kind": "character-chat-group",
+            "sizeBytes": 14780461,
+            "mtimeMs": null,
+            "childCount": 9,
+            "canDrill": true,
+            "note": null
+          },
+          {
+            "key": "原始人？",
+            "label": "原始人？",
+            "icon": "user",
+            "kind": "character-chat-group",
+            "sizeBytes": 8082300,
+            "mtimeMs": null,
+            "childCount": 5,
+            "canDrill": true,
+            "note": null
+          },
+          {
+            "key": "【Sgw】又看一集",
+            "label": "【Sgw】又看一集",
+            "icon": "user",
+            "kind": "character-chat-group",
+            "sizeBytes": 4507335,
+            "mtimeMs": null,
+            "childCount": 2,
+            "canDrill": true,
+            "note": null
+          },
+          {
+            "key": "【Sgw】邦多利~",
+            "label": "【Sgw】邦多利~",
+            "icon": "user",
+            "kind": "character-chat-group",
+            "sizeBytes": 4329261,
+            "mtimeMs": null,
+            "childCount": 2,
+            "canDrill": true,
+            "note": null
+          },
+          {
+            "key": "BanG! City NSFW（紫）·全绿灯",
+            "label": "BanG! City NSFW（紫）·全绿灯",
+            "icon": "user",
+            "kind": "character-chat-group",
+            "sizeBytes": 3804472,
+            "mtimeMs": null,
+            "childCount": 3,
+            "canDrill": true,
+            "note": null
+          },
+          {
+            "key": "角色画像",
+            "label": "角色画像",
+            "icon": "user",
+            "kind": "character-chat-group",
+            "sizeBytes": 2851300,
+            "mtimeMs": null,
+            "childCount": 2,
+            "canDrill": true,
+            "note": null
+          },
+          {
+            "key": "chat_5a515a002c914ed7",
+            "label": "chat_5a515a002c914ed7",
+            "icon": "user",
+            "kind": "character-chat-group",
+            "sizeBytes": 1982601,
+            "mtimeMs": null,
+            "childCount": 0,
+            "canDrill": false,
+            "note": null
+          },
+          {
+            "key": "Izumi 用户画像3",
+            "label": "Izumi 用户画像3",
+            "icon": "user",
+            "kind": "character-chat-group",
+            "sizeBytes": 744376,
+            "mtimeMs": null,
+            "childCount": 3,
+            "canDrill": true,
+            "note": null
+          },
+          {
+            "key": "BanG! City NSFW（青）",
+            "label": "BanG! City NSFW（青）",
+            "icon": "user",
+            "kind": "character-chat-group",
+            "sizeBytes": 543269,
+            "mtimeMs": null,
+            "childCount": 22,
+            "canDrill": true,
+            "note": null
+          },
+          {
+            "key": "《绝区零》角色扮演游戏",
+            "label": "《绝区零》角色扮演游戏",
+            "icon": "user",
+            "kind": "character-chat-group",
+            "sizeBytes": 125790,
+            "mtimeMs": null,
+            "childCount": 1,
+            "canDrill": true,
+            "note": null
+          },
+          {
+            "key": "武藏信浓",
+            "label": "武藏信浓",
+            "icon": "user",
+            "kind": "character-chat-group",
+            "sizeBytes": 120529,
+            "mtimeMs": null,
+            "childCount": 9,
+            "canDrill": true,
+            "note": null
+          },
+          {
+            "key": "塞拉菲亚与薇尔莉特",
+            "label": "塞拉菲亚与薇尔莉特",
+            "icon": "user",
+            "kind": "character-chat-group",
+            "sizeBytes": 105794,
+            "mtimeMs": null,
+            "childCount": 1,
+            "canDrill": true,
+            "note": null
+          },
+          {
+            "key": "新艾利都1",
+            "label": "新艾利都1",
+            "icon": "user",
+            "kind": "character-chat-group",
+            "sizeBytes": 70577,
+            "mtimeMs": null,
+            "childCount": 1,
+            "canDrill": true,
+            "note": null
+          },
+          {
+            "key": "恋爱饥饿症4.1",
+            "label": "恋爱饥饿症4.1",
+            "icon": "user",
+            "kind": "character-chat-group",
+            "sizeBytes": 39972,
+            "mtimeMs": null,
+            "childCount": 1,
+            "canDrill": true,
+            "note": null
+          },
+          {
+            "key": "孤独摇滚-轻前端",
+            "label": "孤独摇滚-轻前端",
+            "icon": "user",
+            "kind": "character-chat-group",
+            "sizeBytes": 36265,
+            "mtimeMs": null,
+            "childCount": 1,
+            "canDrill": true,
+            "note": null
+          },
+          {
+            "key": "房东模拟器Z5.20",
+            "label": "房东模拟器Z5.20",
+            "icon": "user",
+            "kind": "character-chat-group",
+            "sizeBytes": 35064,
+            "mtimeMs": null,
+            "childCount": 1,
+            "canDrill": true,
+            "note": null
+          },
+          {
+            "key": "孤独摇滚2_1",
+            "label": "孤独摇滚2_1",
+            "icon": "user",
+            "kind": "character-chat-group",
+            "sizeBytes": 32035,
+            "mtimeMs": null,
+            "childCount": 1,
+            "canDrill": true,
+            "note": null
+          },
+          {
+            "key": "錦木千束和井之上泷奈",
+            "label": "錦木千束和井之上泷奈",
+            "icon": "user",
+            "kind": "character-chat-group",
+            "sizeBytes": 29965,
+            "mtimeMs": null,
+            "childCount": 1,
+            "canDrill": true,
+            "note": null
+          },
+          {
+            "key": "孤独摇滚2",
+            "label": "孤独摇滚2",
+            "icon": "user",
+            "kind": "character-chat-group",
+            "sizeBytes": 25273,
+            "mtimeMs": null,
+            "childCount": 1,
+            "canDrill": true,
+            "note": null
+          },
+          {
+            "key": "角色卡管理 (路西法酱改版0206)",
+            "label": "角色卡管理 (路西法酱改版0206)",
+            "icon": "user",
+            "kind": "character-chat-group",
+            "sizeBytes": 12680,
+            "mtimeMs": null,
+            "childCount": 1,
+            "canDrill": true,
+            "note": null
+          },
+          {
+            "key": "孤独摇滚3_1",
+            "label": "孤独摇滚3_1",
+            "icon": "user",
+            "kind": "character-chat-group",
+            "sizeBytes": 2107,
+            "mtimeMs": null,
+            "childCount": 1,
+            "canDrill": true,
+            "note": null
+          },
+          {
+            "key": "__group_chats__",
+            "label": "Group Chats",
+            "icon": "users",
+            "kind": "group-chats-virtual",
+            "sizeBytes": 0,
+            "mtimeMs": null,
+            "childCount": 0,
+            "canDrill": false,
+            "note": null
+          }
+        ]
+      }
+    },
+    "characters": {
+      "status": 200,
+      "body": {
+        "target": {
+          "type": "self",
+          "handle": "default-user"
+        },
+        "quota": null,
+        "path": [
+          "characters"
+        ],
+        "breadcrumbs": [
+          {
+            "label": "Storage",
+            "path": []
+          },
+          {
+            "label": "Characters",
+            "path": [
+              "characters"
+            ]
+          }
+        ],
+        "isLeaf": false,
+        "entries": [
+          {
+            "key": "《绝区零》角色扮演游戏",
+            "label": "《绝区零》角色扮演游戏",
+            "icon": "user",
+            "kind": "character-group",
+            "sizeBytes": 12063025,
+            "mtimeMs": 315504000000,
+            "childCount": 1,
+            "canDrill": true,
+            "note": null
+          },
+          {
+            "key": "房东模拟器Z5.20",
+            "label": "房东模拟器Z5.20",
+            "icon": "user",
+            "kind": "character-group",
+            "sizeBytes": 5429792,
+            "mtimeMs": 315504000000,
+            "childCount": 1,
+            "canDrill": true,
+            "note": null
+          },
+          {
+            "key": "BanG! City NSFW（青）",
+            "label": "BanG! City NSFW（青）",
+            "icon": "user",
+            "kind": "character-group",
+            "sizeBytes": 3786776,
+            "mtimeMs": 315504000000,
+            "childCount": 1,
+            "canDrill": true,
+            "note": null
+          },
+          {
+            "key": "【Sgw】邦多利~",
+            "label": "【Sgw】邦多利~",
+            "icon": "user",
+            "kind": "character-group",
+            "sizeBytes": 3479255,
+            "mtimeMs": 315504000000,
+            "childCount": 1,
+            "canDrill": true,
+            "note": null
+          },
+          {
+            "key": "【Sgw】又看一集",
+            "label": "【Sgw】又看一集",
+            "icon": "user",
+            "kind": "character-group",
+            "sizeBytes": 3243320,
+            "mtimeMs": 315504000000,
+            "childCount": 2,
+            "canDrill": true,
+            "note": null
+          },
+          {
+            "key": "BanG! City NSFW（紫）·全绿灯",
+            "label": "BanG! City NSFW（紫）·全绿灯",
+            "icon": "user",
+            "kind": "character-group",
+            "sizeBytes": 1986927,
+            "mtimeMs": 315504000000,
+            "childCount": 1,
+            "canDrill": true,
+            "note": null
+          },
+          {
+            "key": "塞拉菲亚与薇尔莉特",
+            "label": "塞拉菲亚与薇尔莉特",
+            "icon": "user",
+            "kind": "character-group",
+            "sizeBytes": 1690241,
+            "mtimeMs": 315504000000,
+            "childCount": 1,
+            "canDrill": true,
+            "note": null
+          },
+          {
+            "key": "恋爱饥饿症4.1",
+            "label": "恋爱饥饿症4.1",
+            "icon": "user",
+            "kind": "character-group",
+            "sizeBytes": 1480966,
+            "mtimeMs": 315504000000,
+            "childCount": 1,
+            "canDrill": true,
+            "note": null
+          },
+          {
+            "key": "恋爱饥饿症4.11",
+            "label": "恋爱饥饿症4.11",
+            "icon": "user",
+            "kind": "character-group",
+            "sizeBytes": 1480278,
+            "mtimeMs": 315504000000,
+            "childCount": 1,
+            "canDrill": true,
+            "note": null
+          },
+          {
+            "key": "新艾利都1",
+            "label": "新艾利都1",
+            "icon": "user",
+            "kind": "character-group",
+            "sizeBytes": 1112797,
+            "mtimeMs": 315504000000,
+            "childCount": 1,
+            "canDrill": true,
+            "note": null
+          },
+          {
+            "key": "新艾利都",
+            "label": "新艾利都",
+            "icon": "user",
+            "kind": "character-group",
+            "sizeBytes": 1092096,
+            "mtimeMs": 315504000000,
+            "childCount": 1,
+            "canDrill": true,
+            "note": null
+          },
+          {
+            "key": "孤独摇滚1",
+            "label": "孤独摇滚1",
+            "icon": "user",
+            "kind": "character-group",
+            "sizeBytes": 1078093,
+            "mtimeMs": 315504000000,
+            "childCount": 1,
+            "canDrill": true,
+            "note": null
+          },
+          {
+            "key": "原始人？",
+            "label": "原始人？",
+            "icon": "user",
+            "kind": "character-group",
+            "sizeBytes": 898133,
+            "mtimeMs": 315504000000,
+            "childCount": 1,
+            "canDrill": true,
+            "note": null
+          },
+          {
+            "key": "孤独摇滚3",
+            "label": "孤独摇滚3",
+            "icon": "user",
+            "kind": "character-group",
+            "sizeBytes": 850641,
+            "mtimeMs": 1788723289038.8748,
+            "childCount": 1,
+            "canDrill": true,
+            "note": null
+          },
+          {
+            "key": "孤独摇滚",
+            "label": "孤独摇滚",
+            "icon": "user",
+            "kind": "character-group",
+            "sizeBytes": 808242,
+            "mtimeMs": 1788764724447.5542,
+            "childCount": 1,
+            "canDrill": true,
+            "note": null
+          },
+          {
+            "key": "武藏信浓",
+            "label": "武藏信浓",
+            "icon": "user",
+            "kind": "character-group",
+            "sizeBytes": 790260,
+            "mtimeMs": 315504000000,
+            "childCount": 1,
+            "canDrill": true,
+            "note": null
+          },
+          {
+            "key": "孤独摇滚3_1",
+            "label": "孤独摇滚3_1",
+            "icon": "user",
+            "kind": "character-group",
+            "sizeBytes": 785425,
+            "mtimeMs": 315504000000,
+            "childCount": 1,
+            "canDrill": true,
+            "note": null
+          },
+          {
+            "key": "孤独摇滚写卡",
+            "label": "孤独摇滚写卡",
+            "icon": "user",
+            "kind": "character-group",
+            "sizeBytes": 779842,
+            "mtimeMs": 315504000000,
+            "childCount": 1,
+            "canDrill": true,
+            "note": null
+          },
+          {
+            "key": "孤独摇滚2",
+            "label": "孤独摇滚2",
+            "icon": "user",
+            "kind": "character-group",
+            "sizeBytes": 779810,
+            "mtimeMs": 315504000000,
+            "childCount": 1,
+            "canDrill": true,
+            "note": null
+          },
+          {
+            "key": "孤独摇滚2_1",
+            "label": "孤独摇滚2_1",
+            "icon": "user",
+            "kind": "character-group",
+            "sizeBytes": 779810,
+            "mtimeMs": 315504000000,
+            "childCount": 1,
+            "canDrill": true,
+            "note": null
+          },
+          {
+            "key": "錦木千束和井之上泷奈",
+            "label": "錦木千束和井之上泷奈",
+            "icon": "user",
+            "kind": "character-group",
+            "sizeBytes": 357935,
+            "mtimeMs": 315504000000,
+            "childCount": 1,
+            "canDrill": true,
+            "note": null
+          },
+          {
+            "key": "Izumi 用户画像3",
+            "label": "Izumi 用户画像3",
+            "icon": "user",
+            "kind": "character-group",
+            "sizeBytes": 82549,
+            "mtimeMs": 315504000000,
+            "childCount": 1,
+            "canDrill": true,
+            "note": null
+          },
+          {
+            "key": "孤独摇滚-轻前端",
+            "label": "孤独摇滚-轻前端",
+            "icon": "user",
+            "kind": "character-group",
+            "sizeBytes": 77981,
+            "mtimeMs": 315504000000,
+            "childCount": 1,
+            "canDrill": true,
+            "note": null
+          },
+          {
+            "key": "角色画像",
+            "label": "角色画像",
+            "icon": "user",
+            "kind": "character-group",
+            "sizeBytes": 77957,
+            "mtimeMs": 315504000000,
+            "childCount": 1,
+            "canDrill": true,
+            "note": null
+          },
+          {
+            "key": "default_Seraphina",
+            "label": "default_Seraphina",
+            "icon": "user",
+            "kind": "character-group",
+            "sizeBytes": 69296,
+            "mtimeMs": 315504000000,
+            "childCount": 1,
+            "canDrill": true,
+            "note": null
+          }
+        ]
+      }
+    },
+    "extensions": {
+      "status": 200,
+      "body": {
+        "target": {
+          "type": "self",
+          "handle": "default-user"
+        },
+        "quota": null,
+        "path": [
+          "extensions"
+        ],
+        "breadcrumbs": [
+          {
+            "label": "Storage",
+            "path": []
+          },
+          {
+            "label": "Extensions",
+            "path": [
+              "extensions"
+            ]
+          }
+        ],
+        "isLeaf": true,
+        "entries": [
+          {
+            "key": "ST-Prompt-Template",
+            "label": "ST-Prompt-Template",
+            "icon": "folder",
+            "kind": "directory",
+            "sizeBytes": 84821245,
+            "mtimeMs": 1788685919678.554,
+            "childCount": 20,
+            "canDrill": true,
+            "note": null
+          },
+          {
+            "key": "LittleWhiteBox",
+            "label": "LittleWhiteBox",
+            "icon": "folder",
+            "kind": "directory",
+            "sizeBytes": 65906332,
+            "mtimeMs": 1788685858192.8286,
+            "childCount": 30,
+            "canDrill": true,
+            "note": null
+          },
+          {
+            "key": "st-chatu8",
+            "label": "st-chatu8",
+            "icon": "folder",
+            "kind": "directory",
+            "sizeBytes": 56359156,
+            "mtimeMs": 1788685865186.9045,
+            "childCount": 15,
+            "canDrill": true,
+            "note": null
+          },
+          {
+            "key": "st-yuzi-phone",
+            "label": "st-yuzi-phone",
+            "icon": "folder",
+            "kind": "directory",
+            "sizeBytes": 46195853,
+            "mtimeMs": 1788685868019.7327,
+            "childCount": 29,
+            "canDrill": true,
+            "note": null
+          },
+          {
+            "key": "shujuku-rebuild",
+            "label": "shujuku-rebuild",
+            "icon": "folder",
+            "kind": "directory",
+            "sizeBytes": 38832026,
+            "mtimeMs": 1788763464959.799,
+            "childCount": 8,
+            "canDrill": true,
+            "note": null
+          },
+          {
+            "key": "Extension-Silence",
+            "label": "Extension-Silence",
+            "icon": "folder",
+            "kind": "directory",
+            "sizeBytes": 13888425,
+            "mtimeMs": 1788685854377.443,
+            "childCount": 6,
+            "canDrill": true,
+            "note": null
+          },
+          {
+            "key": "JS-Slash-Runner",
+            "label": "JS-Slash-Runner",
+            "icon": "folder",
+            "kind": "directory",
+            "sizeBytes": 11525268,
+            "mtimeMs": 1788763462974.4873,
+            "childCount": 30,
+            "canDrill": true,
+            "note": null
+          },
+          {
+            "key": "st-zip-converter",
+            "label": "st-zip-converter",
+            "icon": "folder",
+            "kind": "directory",
+            "sizeBytes": 8487601,
+            "mtimeMs": 1788770010666.0696,
+            "childCount": 22,
+            "canDrill": true,
+            "note": null
+          },
+          {
+            "key": "ST-BgLoader",
+            "label": "ST-BgLoader",
+            "icon": "folder",
+            "kind": "directory",
+            "sizeBytes": 7799853,
+            "mtimeMs": 1788687249874.2537,
+            "childCount": 39,
+            "canDrill": true,
+            "note": null
+          },
+          {
+            "key": "chat-companion-stats",
+            "label": "chat-companion-stats",
+            "icon": "folder",
+            "kind": "directory",
+            "sizeBytes": 6245982,
+            "mtimeMs": 1788689719922.9995,
+            "childCount": 7,
+            "canDrill": true,
+            "note": null
+          },
+          {
+            "key": "Acsus-Paws-Puffs",
+            "label": "Acsus-Paws-Puffs",
+            "icon": "folder",
+            "kind": "directory",
+            "sizeBytes": 6206929,
+            "mtimeMs": 1788685854100.333,
+            "childCount": 29,
+            "canDrill": true,
+            "note": null
+          },
+          {
+            "key": "Novel-Auto-Generator",
+            "label": "Novel-Auto-Generator",
+            "icon": "folder",
+            "kind": "directory",
+            "sizeBytes": 2026972,
+            "mtimeMs": 1788685858590.9104,
+            "childCount": 22,
+            "canDrill": true,
+            "note": null
+          },
+          {
+            "key": "st-api-wrapper",
+            "label": "st-api-wrapper",
+            "icon": "folder",
+            "kind": "directory",
+            "sizeBytes": 1646868,
+            "mtimeMs": 1788685864145.2302,
+            "childCount": 14,
+            "canDrill": true,
+            "note": null
+          },
+          {
+            "key": "Zero",
+            "label": "Zero",
+            "icon": "folder",
+            "kind": "directory",
+            "sizeBytes": 1486561,
+            "mtimeMs": 1788685860798.4316,
+            "childCount": 6,
+            "canDrill": true,
+            "note": null
+          },
+          {
+            "key": "tavern-menu-manager",
+            "label": "tavern-menu-manager",
+            "icon": "folder",
+            "kind": "directory",
+            "sizeBytes": 533458,
+            "mtimeMs": 1788685868617.4968,
+            "childCount": 8,
+            "canDrill": true,
+            "note": null
+          },
+          {
+            "key": "st-acu-visualizer",
+            "label": "st-acu-visualizer",
+            "icon": "folder",
+            "kind": "directory",
+            "sizeBytes": 485197,
+            "mtimeMs": 1788686445209.422,
+            "childCount": 6,
+            "canDrill": true,
+            "note": null
+          },
+          {
+            "key": "QR",
+            "label": "QR",
+            "icon": "folder",
+            "kind": "directory",
+            "sizeBytes": 446284,
+            "mtimeMs": 1788685858810.1587,
+            "childCount": 14,
+            "canDrill": true,
+            "note": null
+          },
+          {
+            "key": "st-persona-weaver",
+            "label": "st-persona-weaver",
+            "icon": "folder",
+            "kind": "directory",
+            "sizeBytes": 435021,
+            "mtimeMs": 1788685865768.0068,
+            "childCount": 7,
+            "canDrill": true,
+            "note": null
+          },
+          {
+            "key": "ST-Chat-Jumper",
+            "label": "ST-Chat-Jumper",
+            "icon": "folder",
+            "kind": "directory",
+            "sizeBytes": 419590,
+            "mtimeMs": 1788685858852.45,
+            "childCount": 6,
+            "canDrill": true,
+            "note": null
+          },
+          {
+            "key": "hide",
+            "label": "hide",
+            "icon": "folder",
+            "kind": "directory",
+            "sizeBytes": 225743,
+            "mtimeMs": 1788685861111.8643,
+            "childCount": 6,
+            "canDrill": true,
+            "note": null
+          },
+          {
+            "key": "star",
+            "label": "star",
+            "icon": "folder",
+            "kind": "directory",
+            "sizeBytes": 214615,
+            "mtimeMs": 1788685868102.5457,
+            "childCount": 8,
+            "canDrill": true,
+            "note": null
+          },
+          {
+            "key": "SillyTavernSwipePreviewer",
+            "label": "SillyTavernSwipePreviewer",
+            "icon": "folder",
+            "kind": "directory",
+            "sizeBytes": 143098,
+            "mtimeMs": 1788685860625.6624,
+            "childCount": 6,
+            "canDrill": true,
+            "note": null
+          },
+          {
+            "key": "persona-tags",
+            "label": "persona-tags",
+            "icon": "folder",
+            "kind": "directory",
+            "sizeBytes": 133899,
+            "mtimeMs": 1788685861253.7788,
+            "childCount": 5,
+            "canDrill": true,
+            "note": null
+          },
+          {
+            "key": "st-jets",
+            "label": "st-jets",
+            "icon": "folder",
+            "kind": "directory",
+            "sizeBytes": 131406,
+            "mtimeMs": 1788685865378.3782,
+            "childCount": 8,
+            "canDrill": true,
+            "note": null
+          },
+          {
+            "key": "SillyTavern-Dialogue-Colorizer",
+            "label": "SillyTavern-Dialogue-Colorizer",
+            "icon": "folder",
+            "kind": "directory",
+            "sizeBytes": 121737,
+            "mtimeMs": 1788685860430.1533,
+            "childCount": 20,
+            "canDrill": true,
+            "note": null
+          },
+          {
+            "key": "silly-tavern-reminder",
+            "label": "silly-tavern-reminder",
+            "icon": "folder",
+            "kind": "directory",
+            "sizeBytes": 99741,
+            "mtimeMs": 1788685863574.563,
+            "childCount": 9,
+            "canDrill": true,
+            "note": null
+          },
+          {
+            "key": "Extension-TopInfoBar",
+            "label": "Extension-TopInfoBar",
+            "icon": "folder",
+            "kind": "directory",
+            "sizeBytes": 91148,
+            "mtimeMs": 1788685854523.4028,
+            "childCount": 8,
+            "canDrill": true,
+            "note": null
+          },
+          {
+            "key": "st-input-helper",
+            "label": "st-input-helper",
+            "icon": "folder",
+            "kind": "directory",
+            "sizeBytes": 80610,
+            "mtimeMs": 1788685865266.1726,
+            "childCount": 7,
+            "canDrill": true,
+            "note": null
+          },
+          {
+            "key": "Extension-QuickPersona",
+            "label": "Extension-QuickPersona",
+            "icon": "folder",
+            "kind": "directory",
+            "sizeBytes": 58535,
+            "mtimeMs": 1788685854312.3806,
+            "childCount": 6,
+            "canDrill": true,
+            "note": null
+          },
+          {
+            "key": "st-pretext-height-profiler",
+            "label": "st-pretext-height-profiler",
+            "icon": "folder",
+            "kind": "directory",
+            "sizeBytes": 38869,
+            "mtimeMs": 1788685865837.0947,
+            "childCount": 6,
+            "canDrill": true,
+            "note": null
+          },
+          {
+            "key": "SillytarvenSwipes",
+            "label": "SillytarvenSwipes",
+            "icon": "folder",
+            "kind": "directory",
+            "sizeBytes": 19273,
+            "mtimeMs": 1788685860688.9011,
+            "childCount": 4,
+            "canDrill": true,
+            "note": null
+          },
+          {
+            "key": "ST-Manual-Saver",
+            "label": "ST-Manual-Saver",
+            "icon": "folder",
+            "kind": "directory",
+            "sizeBytes": 16099,
+            "mtimeMs": 1788685858914.521,
+            "childCount": 4,
+            "canDrill": true,
+            "note": null
+          },
+          {
+            "key": ".gitkeep",
+            "label": ".gitkeep",
+            "icon": "file",
+            "kind": "file",
+            "sizeBytes": 0,
+            "mtimeMs": 315504000000,
+            "childCount": 0,
+            "canDrill": false,
+            "note": null
+          }
+        ]
+      }
+    },
+    "backups": {
+      "status": 400,
+      "body": {
+        "error": {
+          "code": "E_INVALID_PATH",
+          "message": "unsupported glob: chat_*.jsonl"
+        }
+      }
+    },
+    "settings.json": {
+      "status": 400,
+      "body": {
+        "error": {
+          "code": "E_INVALID_PATH",
+          "message": "unknown category: settings.json"
+        }
+      }
+    }
+  }
+}

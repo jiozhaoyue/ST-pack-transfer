@@ -1,0 +1,672 @@
+{
+  "source": "C:\\Users\\caocaobi\\Downloads\\backup-real-luker-20260926-010422.zip",
+  "sourceBytes": 1680542065,
+  "stamp": "20260926-010422",
+  "startedAt": "2026-09-26T07:48:28.248Z",
+  "targets": {
+    "l": {
+      "name": "pack-luker-20260926-010422.zip",
+      "purpose": "Luker 目标（原生 restore-backup）",
+      "dryRun": {
+        "elapsedSeconds": 0.7,
+        "totals": {
+          "copied": 7146,
+          "dropped": 1536,
+          "droppedBytes": 114513052,
+          "filtered": 0,
+          "synthesized": 34,
+          "resumed": 0,
+          "warnings": 2
+        },
+        "modules": {
+          "assets": {
+            "copied": 223,
+            "dropped": 0,
+            "synthesized": 0,
+            "filtered": 0,
+            "bytes": 172476882,
+            "droppedBytes": 0
+          },
+          "characters": {
+            "copied": 430,
+            "dropped": 0,
+            "synthesized": 0,
+            "filtered": 0,
+            "bytes": 113148452,
+            "droppedBytes": 0
+          },
+          "chats": {
+            "copied": 1029,
+            "dropped": 0,
+            "synthesized": 0,
+            "filtered": 0,
+            "bytes": 699785000,
+            "droppedBytes": 0
+          },
+          "extensions": {
+            "copied": 5172,
+            "dropped": 1425,
+            "synthesized": 32,
+            "filtered": 0,
+            "bytes": 179141622,
+            "droppedBytes": 114513052
+          },
+          "lorebooks": {
+            "copied": 21,
+            "dropped": 0,
+            "synthesized": 0,
+            "filtered": 0,
+            "bytes": 22128986,
+            "droppedBytes": 0
+          },
+          "meta": {
+            "copied": 0,
+            "dropped": 0,
+            "synthesized": 1,
+            "filtered": 0,
+            "bytes": 0,
+            "droppedBytes": 0
+          },
+          "other": {
+            "copied": 0,
+            "dropped": 111,
+            "synthesized": 1,
+            "filtered": 0,
+            "bytes": 0,
+            "droppedBytes": 0
+          },
+          "presets": {
+            "copied": 269,
+            "dropped": 0,
+            "synthesized": 0,
+            "filtered": 0,
+            "bytes": 38771237,
+            "droppedBytes": 0
+          },
+          "secrets": {
+            "copied": 1,
+            "dropped": 0,
+            "synthesized": 0,
+            "filtered": 0,
+            "bytes": 4452,
+            "droppedBytes": 0
+          },
+          "settings": {
+            "copied": 1,
+            "dropped": 0,
+            "synthesized": 0,
+            "filtered": 0,
+            "bytes": 22843284,
+            "droppedBytes": 0
+          }
+        },
+        "warnings": [
+          "已按 gitMode=minimal 精简 32 个扩展的 Git 历史：仅保留识别与更新所需元数据（config/HEAD/index/refs），对象存储全部剔除。接收方首次「检查更新」时会从 origin 重新拉取对象，此后仓库自愈为完整状态；若接收方无网络，请改用 keep 或 strip。",
+          "完整离线包已含 32 个扩展实体：包内同时写入 _convert/extensions-manifest.json，仅用于恢复后的更新引导（不生成 extensions-index.json，以免宿主重复在线安装）。"
+        ],
+        "dropped": [
+          {
+            "path": "backups/chat__sgw_又看一集_20260828-011422.jsonl.zst",
+            "reason": "备份聊天记录与快照(默认不包含)",
+            "bytes": 0
+          },
+          {
+            "path": "backups/chat__sgw_又看一集_20260828-012939.jsonl.zst",
+            "reason": "备份聊天记录与快照(默认不包含)",
+            "bytes": 0
+          },
+          {
+            "path": "backups/chat__sgw_又看一集_20260828-020101.jsonl.zst",
+            "reason": "备份聊天记录与快照(默认不包含)",
+            "bytes": 0
+          },
+          {
+            "path": "backups/chat_____3_20260906-172711.jsonl",
+            "reason": "备份聊天记录与快照(默认不包含)",
+            "bytes": 0
+          },
+          {
+            "path": "backups/chat_____3_20260906-172721.jsonl",
+            "reason": "备份聊天记录与快照(默认不包含)",
+            "bytes": 0
+          },
+          {
+            "path": "extensions/Acsus-Paws-Puffs/.git/description",
+            "reason": "gitMode=minimal：仅保留 Git 识别与更新所需最小集，剔除对象存储",
+            "bytes": 73
+          },
+          {
+            "path": "backups/chat_____3_20260906-173131.jsonl",
+            "reason": "备份聊天记录与快照(默认不包含)",
+            "bytes": 0
+          },
+          {
+            "path": "backups/chat_____3_20260906-173141.jsonl",
+            "reason": "备份聊天记录与快照(默认不包含)",
+            "bytes": 0
+          },
+          {
+            "path": "backups/chat_____3_20260906-173151.jsonl",
+            "reason": "备份聊天记录与快照(默认不包含)",
+            "bytes": 0
+          },
+          {
+            "path": "backups/chat_____3_20260906-173222.jsonl",
+            "reason": "备份聊天记录与快照(默认不包含)",
+            "bytes": 0
+          },
+          {
+            "path": "backups/chat_____3_20260906-173232.jsonl",
+            "reason": "备份聊天记录与快照(默认不包含)",
+            "bytes": 0
+          },
+          {
+            "path": "extensions/Acsus-Paws-Puffs/.git/info/exclude",
+            "reason": "gitMode=minimal：仅保留 Git 识别与更新所需最小集，剔除对象存储",
+            "bytes": 240
+          },
+          {
+            "path": "backups/chat_____3_20260906-173415.jsonl",
+            "reason": "备份聊天记录与快照(默认不包含)",
+            "bytes": 0
+          },
+          {
+            "path": "extensions/Acsus-Paws-Puffs/.git/info/refs",
+            "reason": "gitMode=minimal：仅保留 Git 识别与更新所需最小集，剔除对象存储",
+            "bytes": 189
+          },
+          {
+            "path": "backups/chat_____3_20260906-205039.jsonl",
+            "reason": "备份聊天记录与快照(默认不包含)",
+            "bytes": 0
+          },
+          {
+            "path": "backups/chat_____3_20260906-205516.jsonl",
+            "reason": "备份聊天记录与快照(默认不包含)",
+            "bytes": 0
+          },
+          {
+            "path": "backups/chat_____3_20260906-211254.jsonl",
+            "reason": "备份聊天记录与快照(默认不包含)",
+            "bytes": 0
+          },
+          {
+            "path": "extensions/Acsus-Paws-Puffs/.git/objects/info/packs",
+            "reason": "gitMode=minimal：仅保留 Git 识别与更新所需最小集，剔除对象存储",
+            "bytes": 54
+          },
+          {
+            "path": "backups/chat_____3_20260906-211318.jsonl",
+            "reason": "备份聊天记录与快照(默认不包含)",
+            "bytes": 0
+          },
+          {
+            "path": "backups/chat_____3_20260906-211533.jsonl",
+            "reason": "备份聊天记录与快照(默认不包含)",
+            "bytes": 0
+          }
+        ]
+      },
+      "output": {
+        "file": "pack-luker-20260926-010422.zip",
+        "bytes": 535366800,
+        "entryCountCopied": 7146,
+        "dropped": 1536,
+        "warnings": 2,
+        "elapsedSeconds": 49.9,
+        "totals": {
+          "copied": 7146,
+          "dropped": 1536,
+          "droppedBytes": 114513052,
+          "filtered": 0,
+          "synthesized": 34,
+          "resumed": 0,
+          "warnings": 2
+        }
+      }
+    },
+    "st": {
+      "name": "pack-st-20260926-010422.zip",
+      "purpose": "ST 目标（浏览器逐类目导入）",
+      "dryRun": {
+        "elapsedSeconds": 0.7,
+        "totals": {
+          "copied": 7146,
+          "dropped": 1537,
+          "droppedBytes": 114513052,
+          "filtered": 0,
+          "synthesized": 35,
+          "resumed": 0,
+          "warnings": 2
+        },
+        "modules": {
+          "assets": {
+            "copied": 223,
+            "dropped": 0,
+            "synthesized": 0,
+            "filtered": 0,
+            "bytes": 172476882,
+            "droppedBytes": 0
+          },
+          "characters": {
+            "copied": 430,
+            "dropped": 0,
+            "synthesized": 0,
+            "filtered": 0,
+            "bytes": 113148452,
+            "droppedBytes": 0
+          },
+          "chats": {
+            "copied": 1029,
+            "dropped": 0,
+            "synthesized": 0,
+            "filtered": 0,
+            "bytes": 699785000,
+            "droppedBytes": 0
+          },
+          "extensions": {
+            "copied": 5172,
+            "dropped": 1425,
+            "synthesized": 32,
+            "filtered": 0,
+            "bytes": 179141622,
+            "droppedBytes": 114513052
+          },
+          "lorebooks": {
+            "copied": 21,
+            "dropped": 0,
+            "synthesized": 0,
+            "filtered": 0,
+            "bytes": 22128986,
+            "droppedBytes": 0
+          },
+          "meta": {
+            "copied": 0,
+            "dropped": 1,
+            "synthesized": 0,
+            "filtered": 0,
+            "bytes": 0,
+            "droppedBytes": 0
+          },
+          "other": {
+            "copied": 0,
+            "dropped": 111,
+            "synthesized": 3,
+            "filtered": 0,
+            "bytes": 0,
+            "droppedBytes": 0
+          },
+          "presets": {
+            "copied": 269,
+            "dropped": 0,
+            "synthesized": 0,
+            "filtered": 0,
+            "bytes": 38771237,
+            "droppedBytes": 0
+          },
+          "secrets": {
+            "copied": 1,
+            "dropped": 0,
+            "synthesized": 0,
+            "filtered": 0,
+            "bytes": 4452,
+            "droppedBytes": 0
+          },
+          "settings": {
+            "copied": 1,
+            "dropped": 0,
+            "synthesized": 0,
+            "filtered": 0,
+            "bytes": 22843284,
+            "droppedBytes": 0
+          }
+        },
+        "warnings": [
+          "已按 gitMode=minimal 精简 32 个扩展的 Git 历史：仅保留识别与更新所需元数据（config/HEAD/index/refs），对象存储全部剔除。接收方首次「检查更新」时会从 origin 重新拉取对象，此后仓库自愈为完整状态；若接收方无网络，请改用 keep 或 strip。",
+          "完整离线包已含 32 个扩展实体：包内同时写入 _convert/extensions-manifest.json，仅用于恢复后的更新引导（不生成 extensions-index.json，以免宿主重复在线安装）。"
+        ],
+        "dropped": [
+          {
+            "path": "manifest.json",
+            "reason": "源 manifest 为元数据,由转换器按目标重新合成",
+            "bytes": 0
+          },
+          {
+            "path": "backups/chat__sgw_又看一集_20260828-011422.jsonl.zst",
+            "reason": "备份聊天记录与快照(默认不包含)",
+            "bytes": 0
+          },
+          {
+            "path": "backups/chat__sgw_又看一集_20260828-012939.jsonl.zst",
+            "reason": "备份聊天记录与快照(默认不包含)",
+            "bytes": 0
+          },
+          {
+            "path": "backups/chat__sgw_又看一集_20260828-020101.jsonl.zst",
+            "reason": "备份聊天记录与快照(默认不包含)",
+            "bytes": 0
+          },
+          {
+            "path": "backups/chat_____3_20260906-172711.jsonl",
+            "reason": "备份聊天记录与快照(默认不包含)",
+            "bytes": 0
+          },
+          {
+            "path": "backups/chat_____3_20260906-172721.jsonl",
+            "reason": "备份聊天记录与快照(默认不包含)",
+            "bytes": 0
+          },
+          {
+            "path": "extensions/Acsus-Paws-Puffs/.git/description",
+            "reason": "gitMode=minimal：仅保留 Git 识别与更新所需最小集，剔除对象存储",
+            "bytes": 73
+          },
+          {
+            "path": "backups/chat_____3_20260906-173131.jsonl",
+            "reason": "备份聊天记录与快照(默认不包含)",
+            "bytes": 0
+          },
+          {
+            "path": "backups/chat_____3_20260906-173141.jsonl",
+            "reason": "备份聊天记录与快照(默认不包含)",
+            "bytes": 0
+          },
+          {
+            "path": "backups/chat_____3_20260906-173151.jsonl",
+            "reason": "备份聊天记录与快照(默认不包含)",
+            "bytes": 0
+          },
+          {
+            "path": "backups/chat_____3_20260906-173222.jsonl",
+            "reason": "备份聊天记录与快照(默认不包含)",
+            "bytes": 0
+          },
+          {
+            "path": "backups/chat_____3_20260906-173232.jsonl",
+            "reason": "备份聊天记录与快照(默认不包含)",
+            "bytes": 0
+          },
+          {
+            "path": "extensions/Acsus-Paws-Puffs/.git/info/exclude",
+            "reason": "gitMode=minimal：仅保留 Git 识别与更新所需最小集，剔除对象存储",
+            "bytes": 240
+          },
+          {
+            "path": "backups/chat_____3_20260906-173415.jsonl",
+            "reason": "备份聊天记录与快照(默认不包含)",
+            "bytes": 0
+          },
+          {
+            "path": "extensions/Acsus-Paws-Puffs/.git/info/refs",
+            "reason": "gitMode=minimal：仅保留 Git 识别与更新所需最小集，剔除对象存储",
+            "bytes": 189
+          },
+          {
+            "path": "backups/chat_____3_20260906-205039.jsonl",
+            "reason": "备份聊天记录与快照(默认不包含)",
+            "bytes": 0
+          },
+          {
+            "path": "backups/chat_____3_20260906-205516.jsonl",
+            "reason": "备份聊天记录与快照(默认不包含)",
+            "bytes": 0
+          },
+          {
+            "path": "backups/chat_____3_20260906-211254.jsonl",
+            "reason": "备份聊天记录与快照(默认不包含)",
+            "bytes": 0
+          },
+          {
+            "path": "extensions/Acsus-Paws-Puffs/.git/objects/info/packs",
+            "reason": "gitMode=minimal：仅保留 Git 识别与更新所需最小集，剔除对象存储",
+            "bytes": 54
+          },
+          {
+            "path": "backups/chat_____3_20260906-211318.jsonl",
+            "reason": "备份聊天记录与快照(默认不包含)",
+            "bytes": 0
+          }
+        ]
+      },
+      "output": {
+        "file": "pack-st-20260926-010422.zip",
+        "bytes": 535367247,
+        "entryCountCopied": 7146,
+        "dropped": 1537,
+        "warnings": 2,
+        "elapsedSeconds": 48.2,
+        "totals": {
+          "copied": 7146,
+          "dropped": 1537,
+          "droppedBytes": 114513052,
+          "filtered": 0,
+          "synthesized": 35,
+          "resumed": 0,
+          "warnings": 2
+        }
+      }
+    },
+    "tt": {
+      "name": "pack-tt-20260926-010422.zip",
+      "purpose": "PT M21 导入 / TT 人工导入",
+      "dryRun": {
+        "elapsedSeconds": 0.3,
+        "totals": {
+          "copied": 7145,
+          "dropped": 1538,
+          "droppedBytes": 114513052,
+          "filtered": 0,
+          "synthesized": 64,
+          "resumed": 0,
+          "warnings": 2
+        },
+        "modules": {
+          "assets": {
+            "copied": 223,
+            "dropped": 0,
+            "synthesized": 0,
+            "filtered": 0,
+            "bytes": 172476882,
+            "droppedBytes": 0
+          },
+          "characters": {
+            "copied": 430,
+            "dropped": 0,
+            "synthesized": 0,
+            "filtered": 0,
+            "bytes": 113148452,
+            "droppedBytes": 0
+          },
+          "chats": {
+            "copied": 1029,
+            "dropped": 0,
+            "synthesized": 0,
+            "filtered": 0,
+            "bytes": 699785000,
+            "droppedBytes": 0
+          },
+          "extensions": {
+            "copied": 5171,
+            "dropped": 1426,
+            "synthesized": 0,
+            "filtered": 0,
+            "bytes": 179141622,
+            "droppedBytes": 114513052
+          },
+          "lorebooks": {
+            "copied": 21,
+            "dropped": 0,
+            "synthesized": 0,
+            "filtered": 0,
+            "bytes": 22128986,
+            "droppedBytes": 0
+          },
+          "meta": {
+            "copied": 0,
+            "dropped": 1,
+            "synthesized": 0,
+            "filtered": 0,
+            "bytes": 0,
+            "droppedBytes": 0
+          },
+          "other": {
+            "copied": 0,
+            "dropped": 111,
+            "synthesized": 64,
+            "filtered": 0,
+            "bytes": 0,
+            "droppedBytes": 0
+          },
+          "presets": {
+            "copied": 269,
+            "dropped": 0,
+            "synthesized": 0,
+            "filtered": 0,
+            "bytes": 38771237,
+            "droppedBytes": 0
+          },
+          "secrets": {
+            "copied": 1,
+            "dropped": 0,
+            "synthesized": 0,
+            "filtered": 0,
+            "bytes": 4452,
+            "droppedBytes": 0
+          },
+          "settings": {
+            "copied": 1,
+            "dropped": 0,
+            "synthesized": 0,
+            "filtered": 0,
+            "bytes": 22843284,
+            "droppedBytes": 0
+          }
+        },
+        "warnings": [
+          "已按 gitMode=minimal 精简 32 个扩展的 Git 历史：仅保留识别与更新所需元数据（config/HEAD/index/refs），对象存储全部剔除。接收方首次「检查更新」时会从 origin 重新拉取对象，此后仓库自愈为完整状态；若接收方无网络，请改用 keep 或 strip。",
+          "已将 5773 个用户级 extensions/** 条目迁移为 third-party 布局(TT 规范需放置在 data/extensions/third-party/); 来源记录取自各扩展 manifest 的 homePage。"
+        ],
+        "dropped": [
+          {
+            "path": "manifest.json",
+            "reason": "源 manifest 为元数据,由转换器按目标重新合成",
+            "bytes": 0
+          },
+          {
+            "path": "backups/chat__sgw_又看一集_20260828-011422.jsonl.zst",
+            "reason": "备份聊天记录与快照(默认不包含)",
+            "bytes": 0
+          },
+          {
+            "path": "extensions/.gitkeep",
+            "reason": "extensions 根下的散文件,目标平台不消费",
+            "bytes": 0
+          },
+          {
+            "path": "backups/chat__sgw_又看一集_20260828-012939.jsonl.zst",
+            "reason": "备份聊天记录与快照(默认不包含)",
+            "bytes": 0
+          },
+          {
+            "path": "backups/chat__sgw_又看一集_20260828-020101.jsonl.zst",
+            "reason": "备份聊天记录与快照(默认不包含)",
+            "bytes": 0
+          },
+          {
+            "path": "backups/chat_____3_20260906-172711.jsonl",
+            "reason": "备份聊天记录与快照(默认不包含)",
+            "bytes": 0
+          },
+          {
+            "path": "backups/chat_____3_20260906-172721.jsonl",
+            "reason": "备份聊天记录与快照(默认不包含)",
+            "bytes": 0
+          },
+          {
+            "path": "extensions/Acsus-Paws-Puffs/.git/description",
+            "reason": "gitMode=minimal：仅保留 Git 识别与更新所需最小集，剔除对象存储",
+            "bytes": 73
+          },
+          {
+            "path": "backups/chat_____3_20260906-173131.jsonl",
+            "reason": "备份聊天记录与快照(默认不包含)",
+            "bytes": 0
+          },
+          {
+            "path": "backups/chat_____3_20260906-173141.jsonl",
+            "reason": "备份聊天记录与快照(默认不包含)",
+            "bytes": 0
+          },
+          {
+            "path": "backups/chat_____3_20260906-173151.jsonl",
+            "reason": "备份聊天记录与快照(默认不包含)",
+            "bytes": 0
+          },
+          {
+            "path": "backups/chat_____3_20260906-173222.jsonl",
+            "reason": "备份聊天记录与快照(默认不包含)",
+            "bytes": 0
+          },
+          {
+            "path": "backups/chat_____3_20260906-173232.jsonl",
+            "reason": "备份聊天记录与快照(默认不包含)",
+            "bytes": 0
+          },
+          {
+            "path": "extensions/Acsus-Paws-Puffs/.git/info/exclude",
+            "reason": "gitMode=minimal：仅保留 Git 识别与更新所需最小集，剔除对象存储",
+            "bytes": 240
+          },
+          {
+            "path": "backups/chat_____3_20260906-173415.jsonl",
+            "reason": "备份聊天记录与快照(默认不包含)",
+            "bytes": 0
+          },
+          {
+            "path": "extensions/Acsus-Paws-Puffs/.git/info/refs",
+            "reason": "gitMode=minimal：仅保留 Git 识别与更新所需最小集，剔除对象存储",
+            "bytes": 189
+          },
+          {
+            "path": "backups/chat_____3_20260906-205039.jsonl",
+            "reason": "备份聊天记录与快照(默认不包含)",
+            "bytes": 0
+          },
+          {
+            "path": "backups/chat_____3_20260906-205516.jsonl",
+            "reason": "备份聊天记录与快照(默认不包含)",
+            "bytes": 0
+          },
+          {
+            "path": "backups/chat_____3_20260906-211254.jsonl",
+            "reason": "备份聊天记录与快照(默认不包含)",
+            "bytes": 0
+          },
+          {
+            "path": "extensions/Acsus-Paws-Puffs/.git/objects/info/packs",
+            "reason": "gitMode=minimal：仅保留 Git 识别与更新所需最小集，剔除对象存储",
+            "bytes": 54
+          }
+        ]
+      },
+      "output": {
+        "file": "pack-tt-20260926-010422.zip",
+        "bytes": 535613420,
+        "entryCountCopied": 7145,
+        "dropped": 1538,
+        "warnings": 2,
+        "elapsedSeconds": 46.4,
+        "totals": {
+          "copied": 7145,
+          "dropped": 1538,
+          "droppedBytes": 114513052,
+          "filtered": 0,
+          "synthesized": 64,
+          "resumed": 0,
+          "warnings": 2
+        }
+      }
+    }
+  },
+  "finishedAt": "2026-09-26T07:50:54.491Z"
+}

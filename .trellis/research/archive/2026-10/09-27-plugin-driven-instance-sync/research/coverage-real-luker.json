@@ -1,0 +1,153 @@
+{
+  "target": "real-luker",
+  "targetRoot": "D:\\Repo\\Tavern-repo\\Instance\\Real\\Luker\\data\\default-user",
+  "pack": "D:\\Repo\\Tavern-repo\\My-repo\\ST-zip-converter\\test-results\\produce-real\\run2\\l_default-user_part1_2026-10-13.zip",
+  "takenAt": "2026-10-13T07:12:21.665Z",
+  "T1_packCoverage": {
+    "rule": "path",
+    "nameRuleHits": 0,
+    "packEntries": 7379,
+    "denominator": 7376,
+    "presentInTarget": 7375,
+    "missingCount": 1,
+    "coverage": 0.999864,
+    "pass": false,
+    "missingSample": [
+      "public/scripts/extensions/third-party/.gitkeep"
+    ],
+    "hostMetadataSkipped": {
+      "count": 2,
+      "entries": [
+        "manifest.json",
+        "_convert/extensions-manifest.json"
+      ]
+    },
+    "hostPrivateSkipped": {
+      "count": 0,
+      "entries": []
+    },
+    "linkedExternalDrift": {
+      "count": 0,
+      "roots": [],
+      "entries": []
+    },
+    "stCharacterMap": null
+  },
+  "T2_targetUnique": {
+    "count": 1501,
+    "sample": [
+      "backups/chat__sgw_又看一集_20260828-011422.jsonl.zst",
+      "backups/chat__sgw_又看一集_20260828-012939.jsonl.zst",
+      "backups/chat__sgw_又看一集_20260828-020101.jsonl.zst",
+      "backups/chat_____3_20260906-172711.jsonl",
+      "backups/chat_____3_20260906-172721.jsonl",
+      "backups/chat_____3_20260906-173131.jsonl",
+      "backups/chat_____3_20260906-173141.jsonl",
+      "backups/chat_____3_20260906-173151.jsonl",
+      "backups/chat_____3_20260906-173222.jsonl",
+      "backups/chat_____3_20260906-173232.jsonl",
+      "backups/chat_____3_20260906-173415.jsonl",
+      "backups/chat_____3_20260906-205039.jsonl",
+      "backups/chat_____3_20260906-205516.jsonl",
+      "backups/chat_____3_20260906-211254.jsonl",
+      "backups/chat_____3_20260906-211318.jsonl",
+      "backups/chat_____3_20260906-211533.jsonl",
+      "backups/chat_____3_20260906-211543.jsonl",
+      "backups/chat_____3_20260906-211934.jsonl",
+      "backups/chat_____3_20260906-212104.jsonl",
+      "backups/chat_____3_20260906-222106.jsonl",
+      "backups/chat_____3_20260906-222116.jsonl",
+      "backups/chat_____3_20260906-223342.jsonl",
+      "backups/chat_____3_20260906-223352.jsonl",
+      "backups/chat_____3_20260906-223405.jsonl",
+      "backups/chat_____3_20260906-223456.jsonl",
+      "backups/chat_____3_20260907-005022.jsonl",
+      "backups/chat_____3_20260907-005157.jsonl",
+      "backups/chat_____3_20260907-005207.jsonl",
+      "backups/chat_____3_20260907-005220.jsonl",
+      "backups/chat_____3_20260907-015407.jsonl",
+      "backups/chat_____3_20260907-032858.jsonl",
+      "backups/chat_____3_20260907-033024.jsonl",
+      "backups/chat_____3_20260907-033034.jsonl",
+      "backups/chat_____3_20260907-033321.jsonl",
+      "backups/chat_____3_20260907-033450.jsonl",
+      "backups/chat_____3_20260907-033500.jsonl",
+      "backups/chat_____3_20260907-033548.jsonl",
+      "backups/chat_____3_20260907-033558.jsonl",
+      "backups/chat_____3_20260907-033615.jsonl",
+      "backups/chat_____3_20260907-034324.jsonl",
+      "backups/chat_____3_20260907-131418.jsonl",
+      "backups/chat_____3_20260907-144634.jsonl",
+      "backups/chat_____3_20260907-145910.jsonl",
+      "backups/chat_____3_20260907-163455.jsonl",
+      "backups/chat_____3_20260907-163827.jsonl",
+      "backups/chat_____3_20260920-195605.jsonl",
+      "backups/chat_____3_20260921-141930.jsonl",
+      "backups/chat_____3_20260925-152021.jsonl",
+      "backups/chat_____3_20260925-153049.jsonl",
+      "backups/chat_____3_20260925-160810.jsonl"
+    ],
+    "deletionCheck": null,
+    "preManifestCheck": {
+      "manifest": ".trellis/tasks/09-27-plugin-driven-instance-sync/research/pre-real-luker-20261013-133409.json",
+      "takenAt": "2026-10-13T05:34:14.548Z",
+      "declared": 8202,
+      "stillPresent": 8202,
+      "deletedCount": 0,
+      "deletedSample": [],
+      "hostManagedCache": [
+        {
+          "prefix": "backups/",
+          "reason": "宿主 restore 前自动轮换（删最旧一条）",
+          "entries": [
+            "backups/settings_default-user_20260907-001238.json",
+            "backups/settings_default-user_20260907-005026.json",
+            "backups/settings_default-user_20260907-010025.json",
+            "backups/settings_default-user_20260907-012301.json",
+            "backups/settings_default-user_20260907-014241.json",
+            "backups/settings_default-user_20260907-015240.json",
+            "backups/settings_default-user_20260907-015344.json",
+            "backups/settings_default-user_20260907-020343.json",
+            "backups/settings_default-user_20260907-022941.json",
+            "backups/settings_default-user_20260907-023941.json"
+          ]
+        }
+      ],
+      "hostRotatedBackups": [
+        "backups/settings_default-user_20260907-001238.json",
+        "backups/settings_default-user_20260907-005026.json",
+        "backups/settings_default-user_20260907-010025.json",
+        "backups/settings_default-user_20260907-012301.json",
+        "backups/settings_default-user_20260907-014241.json",
+        "backups/settings_default-user_20260907-015240.json",
+        "backups/settings_default-user_20260907-015344.json",
+        "backups/settings_default-user_20260907-020343.json",
+        "backups/settings_default-user_20260907-022941.json",
+        "backups/settings_default-user_20260907-023941.json"
+      ]
+    }
+  },
+  "T3_content": {
+    "pack": {
+      "characters": 430,
+      "chats": 1029,
+      "worlds": 21,
+      "groups": 0,
+      "themes": 5,
+      "backgrounds": 23,
+      "extensions": 5402,
+      "other": 469
+    },
+    "target": {
+      "characters": 430,
+      "chats": 1029,
+      "worlds": 21,
+      "groups": 0,
+      "themes": 5,
+      "backgrounds": 23,
+      "extensions": 6699,
+      "other": 670
+    }
+  },
+  "targetFileCount": 8877
+}

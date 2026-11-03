@@ -1,0 +1,45 @@
+{
+  "task": "09-27-plugin-driven-instance-sync",
+  "step": "§2 备份（只 Luker 两处，U-3；必须先于任何写入）",
+  "device": "scripts/instance-sync/export-backups.cjs（宿主原生 POST /api/users/backup，Node 侧 https 流式落盘）",
+  "why": "§3.5 实测：该端点 transfer-encoding: chunked、无 content-length ⇒ 必须真流式；浏览器只取会话（cookie + /csrf-token）。故不用 Playwright download 事件。",
+  "backups": {
+    "real-luker": {
+      "instance": "real-luker",
+      "port": 8004,
+      "url": "https://127.0.0.1:8004",
+      "sourceDir": "Instance/Real/Luker/data/default-user",
+      "file": "backup-real-luker-20260929-123607.zip",
+      "bytes": 1683295913,
+      "megabytes": 1605.3,
+      "entryCount": 8698,
+      "sha256": "de2bc789d447706532d0b045bd833bbe0eb6e233c6c13bfead0c28ffd116eb45",
+      "elapsedSeconds": 337.5,
+      "exportedAt": "2026-09-29T04:36:00Z",
+      "exitCode": 0,
+      "recordJson": "Downloads/backup-real-luker-20260929-123607.json",
+      "comparisonToPreviousRound": "上一轮（2026-09-26 010422）：1602.7 MB / 8683 条目 ⇒ 本轮 +15 条目（真源在使用中）"
+    },
+    "dev-luker": {
+      "instance": "dev-luker",
+      "port": 8003,
+      "url": "https://127.0.0.1:8003",
+      "sourceDir": "Instance/Dev/Luker/data/default-user",
+      "file": "backup-dev-luker-20260929-124354.zip",
+      "bytes": 1271907099,
+      "megabytes": 1213.0,
+      "entryCount": 8061,
+      "sha256": "5cadfa39552301b92be11dea3f1a06c62f2cd7dcd9f2f8ca54c77bcb3f269fd8",
+      "elapsedSeconds": 181.6,
+      "exportedAt": "2026-09-29T04:46:58Z",
+      "exitCode": 0,
+      "recordJson": "Downloads/backup-dev-luker-20260929-124354.json",
+      "note": "本轮**新增**（上一轮 U-9 只备份了 Real）⇒ Dev Luker 首次获得回滚能力"
+    }
+  },
+  "validation": {
+    "§2.4": "两包文件存在、体积均 >1 GB、条目数均 >8000、sha256 已算 ⇒ 校验通过",
+    "ST两处": "§2.5 登记再确认：`:8001` / `:8002` 仍不备份（U-3 未变更，沿用上一轮 R-7 用户知情风险接受）；缓解 = merge 不删独有 + 写入前只读快照 + 逐目标零删除核对"
+  },
+  "ordering": "§2 全部完成于任何写入之前 ⇒ D3 顺序铁律（产包 → 备份 → 只读快照 → 灌入 → 核对）的「备份」环已就位。注意：本轮尚未执行 §5 灌入。"
+}

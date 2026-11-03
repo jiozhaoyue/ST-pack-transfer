@@ -1,0 +1,231 @@
+{
+  "sampledAt": "2026-09-25T08:52:23.220Z",
+  "popupProbe": {
+    "dump": [
+      {
+        "tag": "DIV",
+        "cls": "flex-container alignitemscenter world_popup_toolbar world_popup_primary_toolbar",
+        "visible": false,
+        "clickable": false,
+        "text": "新建 或 --- 选择以编辑 --- __MEMORY_GR"
+      },
+      {
+        "tag": "DIV",
+        "cls": "world_popup_primary_picker",
+        "visible": false,
+        "clickable": false,
+        "text": "新建 或 --- 选择以编辑 --- __MEMORY_GR"
+      },
+      {
+        "tag": "DIV",
+        "cls": "world_popup_primary_select",
+        "visible": false,
+        "clickable": false,
+        "text": "--- 选择以编辑 --- __MEMORY_GRAPH__"
+      },
+      {
+        "tag": "DIV",
+        "cls": "world_popup_action_group world_popup_primary_actions",
+        "visible": false,
+        "clickable": false,
+        "text": ""
+      },
+      {
+        "tag": "DIV",
+        "cls": "flex-container alignitemscenter world_popup_toolbar world_popup_editor_toolbar",
+        "visible": false,
+        "clickable": false,
+        "text": "搜索 优先级 自定义 标题 A 到 Z 标题 Z 到 A 词"
+      },
+      {
+        "tag": "DIV",
+        "cls": "world_popup_action_group world_popup_entry_actions",
+        "visible": false,
+        "clickable": false,
+        "text": "搜索 优先级 自定义 标题 A 到 Z 标题 Z 到 A 词"
+      },
+      {
+        "tag": "DIV",
+        "cls": "flex-container alignitemscenter world_popup_toolbar world_popup_search_toolbar",
+        "visible": false,
+        "clickable": false,
+        "text": "关键词搜索 模糊匹配 高级语法"
+      },
+      {
+        "tag": "DIV",
+        "cls": "world_popup_search_cluster",
+        "visible": false,
+        "clickable": false,
+        "text": "关键词搜索 模糊匹配 高级语法"
+      },
+      {
+        "tag": "DIV",
+        "cls": "world_popup_search_group",
+        "visible": false,
+        "clickable": false,
+        "text": ""
+      },
+      {
+        "tag": "DIV",
+        "cls": "world_popup_action_group world_popup_filter_group",
+        "visible": false,
+        "clickable": false,
+        "text": "关键词搜索 模糊匹配 高级语法"
+      },
+      {
+        "tag": "BUTTON",
+        "cls": "beautify-popup-btn",
+        "visible": false,
+        "clickable": true,
+        "text": "设置图片"
+      },
+      {
+        "tag": "DIV",
+        "cls": "completion_prompt_manager_popup_entry",
+        "visible": false,
+        "clickable": false,
+        "text": "Prompt List The list of prompt"
+      },
+      {
+        "tag": "FORM",
+        "cls": "completion_prompt_manager_popup_entry_form",
+        "visible": false,
+        "clickable": false,
+        "text": "Prompt List The list of prompt"
+      },
+      {
+        "tag": "DIV",
+        "cls": "completion_prompt_manager_popup_entry_form_control",
+        "visible": false,
+        "clickable": false,
+        "text": "Prompt List The list of prompt"
+      },
+      {
+        "tag": "DIV",
+        "cls": "completion_prompt_manager_popup_header",
+        "visible": false,
+        "clickable": false,
+        "text": "Prompt List"
+      },
+      {
+        "tag": "DIV",
+        "cls": "flex-container gap10px completion_prompt_manager_popup_entry_form_row",
+        "visible": false,
+        "clickable": false,
+        "text": "姓名 此提示词的名称。 角色 系统 用户 AI助手 此消息应"
+      },
+      {
+        "tag": "DIV",
+        "cls": "completion_prompt_manager_popup_entry_form_control flex1",
+        "visible": false,
+        "clickable": false,
+        "text": "姓名 此提示词的名称。"
+      },
+      {
+        "tag": "DIV",
+        "cls": "completion_prompt_manager_popup_entry_form_footer",
+        "visible": false,
+        "clickable": false,
+        "text": ""
+      },
+      {
+        "tag": "DIV",
+        "cls": "beautify-popup-overlay",
+        "visible": false,
+        "clickable": false,
+        "text": "防窥模式设置 解锁文字 自定义CSS 背景设置 当前解锁文字"
+      },
+      {
+        "tag": "DIV",
+        "cls": "beautify-popup",
+        "visible": false,
+        "clickable": false,
+        "text": "防窥模式设置 解锁文字 自定义CSS 背景设置 当前解锁文字"
+      },
+      {
+        "tag": "DIV",
+        "cls": "beautify-popup-header",
+        "visible": false,
+        "clickable": false,
+        "text": "防窥模式设置"
+      },
+      {
+        "tag": "BUTTON",
+        "cls": "beautify-popup-close",
+        "visible": false,
+        "clickable": true,
+        "text": ""
+      },
+      {
+        "tag": "DIV",
+        "cls": "beautify-popup-tabs",
+        "visible": false,
+        "clickable": false,
+        "text": "解锁文字 自定义CSS 背景设置"
+      },
+      {
+        "tag": "BUTTON",
+        "cls": "beautify-popup-tab active",
+        "visible": false,
+        "clickable": true,
+        "text": "解锁文字"
+      },
+      {
+        "tag": "BUTTON",
+        "cls": "beautify-popup-tab",
+        "visible": false,
+        "clickable": true,
+        "text": "自定义CSS"
+      }
+    ],
+    "tried": [
+      "popup-button-cancel",
+      "escape"
+    ],
+    "removed": 0,
+    "settled": true,
+    "result": 0
+  },
+  "survey": [
+    {
+      "label": "初始",
+      "userBackupButton": 0,
+      "backupManager": 0,
+      "backupActionRow": 0,
+      "injected": 0,
+      "backupish": []
+    },
+    {
+      "label": "点击 #user-settings-button",
+      "userBackupButton": 0,
+      "backupManager": 0,
+      "backupActionRow": 0,
+      "injected": 0,
+      "backupish": []
+    },
+    {
+      "label": "点击 #sys-settings-button",
+      "userBackupButton": 0,
+      "backupManager": 0,
+      "backupActionRow": 0,
+      "injected": 0,
+      "backupish": []
+    },
+    {
+      "label": "点击 #extensionsMenuButton",
+      "userBackupButton": 0,
+      "backupManager": 0,
+      "backupActionRow": 0,
+      "injected": 0,
+      "backupish": []
+    },
+    {
+      "label": "点击 #user-settings-block",
+      "userBackupButton": 0,
+      "backupManager": 0,
+      "backupActionRow": 0,
+      "injected": 0,
+      "backupish": []
+    }
+  ]
+}

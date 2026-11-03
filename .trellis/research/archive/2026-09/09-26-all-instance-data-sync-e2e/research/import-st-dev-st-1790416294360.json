@@ -1,0 +1,90 @@
+{
+  "instance": "dev-st",
+  "pack": "pack-st-20260926-010422.zip",
+  "categories": {
+    "characters": {
+      "ok": 26,
+      "fail": 0,
+      "scanned": 401,
+      "distinct": 26,
+      "versionsSkipped": 375,
+      "seconds": 5.8
+    },
+    "characters/sprites": {
+      "ok": 28,
+      "fail": 0,
+      "mode": "raw-write",
+      "targetRoot": "D:\\Repo\\Tavern-repo\\Instance\\Dev\\SillyTavern\\data\\default-user\\characters",
+      "units": 1,
+      "seconds": 0.3
+    }
+  },
+  "failures": [],
+  "unreachable": [
+    {
+      "key": "_convert",
+      "count": 3
+    },
+    {
+      "key": "context",
+      "count": 37
+    },
+    {
+      "key": "extensions",
+      "count": 5204
+    },
+    {
+      "key": "instruct",
+      "count": 41
+    },
+    {
+      "key": "KoboldAI Settings",
+      "count": 28
+    },
+    {
+      "key": "movingUI",
+      "count": 1
+    },
+    {
+      "key": "NovelAI Settings",
+      "count": 24
+    },
+    {
+      "key": "OpenAI Settings",
+      "count": 76
+    },
+    {
+      "key": "QuickReplies",
+      "count": 2
+    },
+    {
+      "key": "reasoning",
+      "count": 5
+    },
+    {
+      "key": "secrets.json",
+      "count": 1
+    },
+    {
+      "key": "sysprompt",
+      "count": 14
+    },
+    {
+      "key": "TextGen Settings",
+      "count": 36
+    },
+    {
+      "key": "themes",
+      "count": 5
+    },
+    {
+      "key": "user",
+      "count": 191
+    }
+  ],
+  "totals": {
+    "packTotal": 7181,
+    "reachableTotal": 726,
+    "unreachableTotal": 6455
+  }
+}

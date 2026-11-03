@@ -1,0 +1,14 @@
+{
+  "sampledAt": "2026-09-25T13:18:37.124Z",
+  "result": {
+    "hazardShapePresent": true,
+    "bodyBackgroundImage": "none",
+    "bodyBackgroundColor": "rgba(0, 0, 0, 0)",
+    "bodyFontFamily": "\"Times New Roman\"",
+    "bodyPadding": "0px",
+    "bodyDisplay": "block",
+    "bodyMinHeight": "0px",
+    "thirdPartyWidth": 1264,
+    "thirdPartyHasPageBackdrop": false
+  }
+}

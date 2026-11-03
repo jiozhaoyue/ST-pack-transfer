@@ -1,0 +1,337 @@
+{
+  "sampledAt": "2026-09-25T07:33:48.202Z",
+  "url": "https://127.0.0.1:8004",
+  "stimulus": {
+    "windowMs": 10000,
+    "totalSampledMs": 1829.2,
+    "byOrigin": {
+      "native/unknown": {
+        "ms": 1404.2,
+        "samples": 14042
+      },
+      "host-or-other-ext": {
+        "ms": 420.1,
+        "samples": 4201
+      },
+      "remote": {
+        "ms": 4.9,
+        "samples": 49
+      }
+    },
+    "pluginSharePct": 0,
+    "topFunctions": [
+      {
+        "fn": "(idle)",
+        "url": "",
+        "line": -1,
+        "origin": "native/unknown",
+        "samples": 7362,
+        "ms": 736.2
+      },
+      {
+        "fn": "(program)",
+        "url": "",
+        "line": -1,
+        "origin": "native/unknown",
+        "samples": 4949,
+        "ms": 494.9
+      },
+      {
+        "fn": "runRegexScript",
+        "url": "/scripts/extensions/regex/engine.js",
+        "line": 901,
+        "origin": "host-or-other-ext",
+        "samples": 1027,
+        "ms": 102.7
+      },
+      {
+        "fn": "serializeFrontendLogValue",
+        "url": "/scripts/frontend-log-manager.js",
+        "line": 25,
+        "origin": "host-or-other-ext",
+        "samples": 437,
+        "ms": 43.7
+      },
+      {
+        "fn": "cloneJsonValue",
+        "url": "/script.js",
+        "line": 11727,
+        "origin": "host-or-other-ext",
+        "samples": 243,
+        "ms": 24.3
+      },
+      {
+        "fn": "getMeasurableMes",
+        "url": "/scripts/extensions/third-party/st-acu-visualizer/index.js",
+        "line": 3566,
+        "origin": "host-or-other-ext",
+        "samples": 201,
+        "ms": 20.1
+      },
+      {
+        "fn": "updateIconDisplay",
+        "url": "/scripts/extensions/third-party/QR/settings.js",
+        "line": 57,
+        "origin": "host-or-other-ext",
+        "samples": 197,
+        "ms": 19.7
+      },
+      {
+        "fn": "RegExp: ([\\s\\S]*?)(<progress>[\\s\\S]*?<\\/progress>)([\\s\\S]*?$)",
+        "url": "",
+        "line": -1,
+        "origin": "native/unknown",
+        "samples": 192,
+        "ms": 19.2
+      },
+      {
+        "fn": "cloneJsonValue",
+        "url": "/script.js",
+        "line": 11727,
+        "origin": "host-or-other-ext",
+        "samples": 131,
+        "ms": 13.1
+      },
+      {
+        "fn": "querySelectorAll",
+        "url": "",
+        "line": -1,
+        "origin": "native/unknown",
+        "samples": 127,
+        "ms": 12.7
+      },
+      {
+        "fn": "querySelectorAll",
+        "url": "",
+        "line": -1,
+        "origin": "native/unknown",
+        "samples": 110,
+        "ms": 11
+      },
+      {
+        "fn": "getMeasurableMes",
+        "url": "/scripts/extensions/third-party/st-acu-visualizer/index.js",
+        "line": 3566,
+        "origin": "host-or-other-ext",
+        "samples": 106,
+        "ms": 10.6
+      },
+      {
+        "fn": "getPropertyValue",
+        "url": "",
+        "line": -1,
+        "origin": "native/unknown",
+        "samples": 96,
+        "ms": 9.6
+      },
+      {
+        "fn": "(garbage collector)",
+        "url": "",
+        "line": -1,
+        "origin": "native/unknown",
+        "samples": 83,
+        "ms": 8.3
+      },
+      {
+        "fn": "querySelector",
+        "url": "",
+        "line": -1,
+        "origin": "native/unknown",
+        "samples": 83,
+        "ms": 8.3
+      },
+      {
+        "fn": "(anonymous)",
+        "url": "/script.js",
+        "line": 11915,
+        "origin": "host-or-other-ext",
+        "samples": 72,
+        "ms": 7.2
+      },
+      {
+        "fn": "querySelectorAll",
+        "url": "",
+        "line": -1,
+        "origin": "native/unknown",
+        "samples": 69,
+        "ms": 6.9
+      },
+      {
+        "fn": "getPropertyValue",
+        "url": "",
+        "line": -1,
+        "origin": "native/unknown",
+        "samples": 69,
+        "ms": 6.9
+      },
+      {
+        "fn": "getBoundingClientRect",
+        "url": "",
+        "line": -1,
+        "origin": "native/unknown",
+        "samples": 67,
+        "ms": 6.7
+      },
+      {
+        "fn": "getEmbeddedTargetBlock",
+        "url": "/scripts/extensions/third-party/st-acu-visualizer/index.js",
+        "line": 3592,
+        "origin": "host-or-other-ext",
+        "samples": 65,
+        "ms": 6.5
+      },
+      {
+        "fn": "getPropertyValue",
+        "url": "",
+        "line": -1,
+        "origin": "native/unknown",
+        "samples": 64,
+        "ms": 6.4
+      },
+      {
+        "fn": "S.expr.pseudos.visible",
+        "url": "/lib/jquery-3.5.1.min.js",
+        "line": 1,
+        "origin": "host-or-other-ext",
+        "samples": 63,
+        "ms": 6.3
+      },
+      {
+        "fn": "(anonymous)",
+        "url": "/lib/jquery-3.5.1.min.js",
+        "line": 1,
+        "origin": "host-or-other-ext",
+        "samples": 57,
+        "ms": 5.7
+      },
+      {
+        "fn": "(anonymous)",
+        "url": "/lib/jquery-3.5.1.min.js",
+        "line": 1,
+        "origin": "host-or-other-ext",
+        "samples": 52,
+        "ms": 5.2
+      },
+      {
+        "fn": "getEmbeddedTargetBlock",
+        "url": "/scripts/extensions/third-party/st-acu-visualizer/index.js",
+        "line": 3592,
+        "origin": "host-or-other-ext",
+        "samples": 50,
+        "ms": 5
+      }
+    ],
+    "pluginFunctions": []
+  },
+  "quiet": {
+    "windowMs": 10000,
+    "totalSampledMs": 1851.4,
+    "byOrigin": {
+      "native/unknown": {
+        "ms": 1850.6,
+        "samples": 18506
+      },
+      "host-or-other-ext": {
+        "ms": 0.8,
+        "samples": 8
+      }
+    },
+    "pluginSharePct": 0,
+    "topFunctions": [
+      {
+        "fn": "(idle)",
+        "url": "",
+        "line": -1,
+        "origin": "native/unknown",
+        "samples": 17071,
+        "ms": 1707.1
+      },
+      {
+        "fn": "(program)",
+        "url": "",
+        "line": -1,
+        "origin": "native/unknown",
+        "samples": 1216,
+        "ms": 121.6
+      },
+      {
+        "fn": "(garbage collector)",
+        "url": "",
+        "line": -1,
+        "origin": "native/unknown",
+        "samples": 207,
+        "ms": 20.7
+      },
+      {
+        "fn": "querySelectorAll",
+        "url": "",
+        "line": -1,
+        "origin": "native/unknown",
+        "samples": 7,
+        "ms": 0.7
+      },
+      {
+        "fn": "querySelectorAll",
+        "url": "",
+        "line": -1,
+        "origin": "native/unknown",
+        "samples": 5,
+        "ms": 0.5
+      },
+      {
+        "fn": "getContext",
+        "url": "/scripts/st-context.js",
+        "line": 2409,
+        "origin": "host-or-other-ext",
+        "samples": 3,
+        "ms": 0.3
+      },
+      {
+        "fn": "moduleWorker",
+        "url": "/scripts/extensions/expressions/index.js",
+        "line": 475,
+        "origin": "host-or-other-ext",
+        "samples": 1,
+        "ms": 0.1
+      },
+      {
+        "fn": "(anonymous)",
+        "url": "/lib/jquery-3.5.1.min.js",
+        "line": 1,
+        "origin": "host-or-other-ext",
+        "samples": 1,
+        "ms": 0.1
+      },
+      {
+        "fn": "Yt",
+        "url": "blob:/b9157a02-b6a6-4482-a2f2-133a8d852fa3",
+        "line": 14,
+        "origin": "host-or-other-ext",
+        "samples": 1,
+        "ms": 0.1
+      },
+      {
+        "fn": "style",
+        "url": "/lib/jquery-3.5.1.min.js",
+        "line": 1,
+        "origin": "host-or-other-ext",
+        "samples": 1,
+        "ms": 0.1
+      },
+      {
+        "fn": "find",
+        "url": "/lib/jquery-3.5.1.min.js",
+        "line": 1,
+        "origin": "host-or-other-ext",
+        "samples": 1,
+        "ms": 0.1
+      }
+    ],
+    "pluginFunctions": []
+  },
+  "delta": {
+    "pluginMs": "0.00",
+    "hostMs": 419.3,
+    "totalMs": -22.2
+  }
+}
