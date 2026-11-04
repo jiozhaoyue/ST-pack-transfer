@@ -2265,6 +2265,86 @@ function makeHostButton({ id, icon, label, title, onClick }) {
 }
 
 /**
+ * 有界等待某个条件成立（L1-MR-7：任何 await 都必须能 settle）。
+ * @param {() => any} probe 返回真值即视为成立
+ * @param {number} [timeoutMs]
+ * @returns {Promise<any>} 成立时返回 probe 的值，超时返回 null
+ */
+function waitForCondition(probe, timeoutMs = 3000) {
+  return new Promise((resolve) => {
+    const deadline = Date.now() + timeoutMs;
+    const tick = () => {
+      let value = null;
+      try { value = probe(); } catch { value = null; }
+      if (value) { resolve(value); return; }
+      if (Date.now() >= deadline) { resolve(null); return; }
+      setTimeout(tick, 100);
+    };
+    tick();
+  });
+}
+
+/**
+ * 打开宿主的**原生**备份界面（类目勾选在那里进行）。
+ *
+ * 四宿主落点（用户 2026-11-04 指定）：
+ *  - ST / TT：账户面板「Account Actions → Download Backup」= `.userBackupButton`，只需打开账户面板；
+ *  - Luker：除 `.userBackupButton` 外还需点它打开「Backup & Restore」弹层，类目复选框在弹层里；
+ *  - PureTavern：无同类原生入口 ⇒ 返回 false，由调用方静默回退到插件内拉取。
+ *
+ * @param {'st'|'luker'|'tt'|'pt'|string} platform
+ * @returns {Promise<boolean>} 是否已把原生界面打开到可操作状态
+ */
+export async function openNativeBackupUi(platform) {
+  if (typeof document === 'undefined') return false;
+
+  if (!document.querySelector('.userBackupButton')) {
+    const accountBtn = document.getElementById('account_button');
+    if (!accountBtn) return false;
+    accountBtn.click();
+  }
+  const anchor = await waitForCondition(() => document.querySelector('.userBackupButton'), 3000);
+  if (!anchor) return false;
+
+  if (platform === 'luker') {
+    if (!document.querySelector('.userBackupManager')) anchor.click();
+    const row = await waitForCondition(
+      () => document.querySelector('.userBackupManager .backupActionRow'),
+      3000,
+    );
+    return Boolean(row);
+  }
+  return true;
+}
+
+/**
+ * 读取原生备份界面当前的类目勾选（只读，不写回宿主，用户的选择记忆不受影响）。
+ * @returns {Record<string, boolean>|null} 原生界面未打开时返回 null
+ */
+export function readNativeBackupSelection() {
+  if (typeof document === 'undefined') return null;
+  const boxes = document.querySelectorAll('.userBackupManager input[name="backupCategory"]');
+  if (!boxes.length) return null;
+  const selection = {};
+  boxes.forEach((box) => { selection[box.value] = Boolean(box.checked); });
+  return selection;
+}
+
+/**
+ * 用宿主原生提示弹层告知结果（ST/TT/Luker 均带 toastr）。
+ * @param {string} message
+ * @returns {boolean} 宿主没有原生 toast 时返回 false
+ */
+export function hostToast(message) {
+  const toast = globalThis.toastr;
+  if (toast && typeof toast.success === 'function') {
+    toast.success(message);
+    return true;
+  }
+  return false;
+}
+
+/**
  * 原生"用户数据备份/导出"UI 多锚点注入：在所有 .userBackupButton 旁追加
  * 转换器入口按钮。四个宿主（ST/Luker/TauriTavern/PureTavern）的
  * templates/userProfile.html（账号弹层）与 templates/admin.html（管理面板，
@@ -2277,9 +2357,9 @@ function makeHostButton({ id, icon, label, title, onClick }) {
  *     ST 侧用另一套 id。**排查「注入没生效」时不要只查初始 DOM，必须先把宿主面板打开**——
  *     本仓 2026-09-25 曾因只点错入口 id（`#user-settings-button` 等）而误判为回归。
  *
- * @param {() => void} [onOpen] 打开抽屉后的回调
+ * @param {() => void} [onPull] 点击后按原生勾选执行拉取
  */
-export function mountNativeBackupButton(onOpen) {
+export function mountNativeBackupButton(onPull) {
   if (typeof document === 'undefined') return;
   const BTN_ID = 'st-pack-transfer-native-btn';
 
@@ -2290,16 +2370,16 @@ export function mountNativeBackupButton(onOpen) {
       // 幂等：兄弟位已注入则跳过（弹层重渲染后标记随节点消失，observer 自动重注）
       if (anchor.nextElementSibling?.dataset?.stZipInjected === '1') return;
 
-      const openBtn = makeHostButton({
+      const pullBtn = makeHostButton({
         id: BTN_ID,
         icon: 'fa-right-left',
-        label: '数据包转运',
-        title: '打开数据包转运面板',
+        label: '从宿主拉取',
+        title: '从宿主拉取数据包（按原生界面的类目勾选）',
         onClick: () => {
-          if (typeof onOpen === 'function') onOpen();
+          if (typeof onPull === 'function') onPull();
         },
       });
-      anchor.parentElement.insertBefore(openBtn, anchor.nextSibling);
+      anchor.parentElement.insertBefore(pullBtn, anchor.nextSibling);
     });
   };
 
@@ -2320,9 +2400,9 @@ export function mountNativeBackupButton(onOpen) {
  *   因此 `querySelector('.userBackupManager .backupActionRow')`（取首个）**正是预期落点**，
  *   真机确认注入按钮即 row 0 的第一个子节点。
  *
- * @param {() => void} [onOpen]
+ * @param {() => void} [onPull] 点击后按原生勾选执行拉取
  */
-export function mountLukerBackupManagerButton(onOpen) {
+export function mountLukerBackupManagerButton(onPull) {
   if (typeof document === 'undefined') return;
   const BTN_ID = 'st-pack-transfer-luker-manager-btn';
 
@@ -2334,11 +2414,11 @@ export function mountLukerBackupManagerButton(onOpen) {
     const btn = makeHostButton({
       id: BTN_ID,
       icon: 'fa-right-left',
-      label: '数据包转运',
-      title: '打开数据包转运面板',
+      label: '从宿主拉取',
+      title: '从宿主拉取数据包（按上方类目勾选）',
       onClick: () => {
-        if (typeof onOpen === 'function') {
-          onOpen();
+        if (typeof onPull === 'function') {
+          onPull();
         }
       },
     });
