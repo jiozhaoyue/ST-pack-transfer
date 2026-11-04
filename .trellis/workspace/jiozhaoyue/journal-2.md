@@ -807,6 +807,7 @@ Dev Luker 实测「从宿主拉取 ~1MB/s，比原生慢 20 倍」。取证确�
 **Date**: 2026-11-04
 **Task**: 宿主原生导出入口：TT/PT 分支与调研纪律
 **Branch**: `main`
+**Spec**: [`.trellis/spec/frontend/host-capabilities.md`](../../spec/frontend/host-capabilities.md)（四宿主原生导出入口事实表 · 调研纪律）
 
 ### Summary
 
