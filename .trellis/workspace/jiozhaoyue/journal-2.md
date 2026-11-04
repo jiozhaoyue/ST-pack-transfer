@@ -799,3 +799,44 @@ Dev Luker 实测「从宿主拉取 ~1MB/s，比原生慢 20 倍」。取证确�
   审计日志是唯一判据，不再凭经验设阈值。
 - 原生下载与插件拉取共用 `/api/users/backup`，插件拉取越快，对原生的占用窗口越短。
 
+
+
+## Session 62: 宿主原生导出入口：TT/PT 分支与调研纪律
+<!-- trellis-session: v=2 fp=10686bd3816ddc70 -->
+
+**Date**: 2026-11-04
+**Task**: 宿主原生导出入口：TT/PT 分支与调研纪律
+**Branch**: `main`
+
+### Summary
+
+点「从宿主拉取」改为打开宿主原生导出界面并在其中注入拉取按钮；补齐此前误判的 TauriTavern（扩展列表 Data Migration）与 PureTavern（一方数据管理 dialog + /api/backups/archive/export）两条路径；把四宿主入口事实表与「禁止同构假设、先读宿主 docs」写进 spec 与 CLAUDE.md
+
+### Main Changes
+
+- 四宿主入口按平台分派：ST 账户面板 / Luker 备份弹层 / TT #data_migration_export_button / PT #ptdm-export
+- 新增 fetchPtBackup（POST /api/backups/archive/export，500ms 滑窗实时速度）、readPtExportOptions、mountTtDataMigrationButton、mountPtDataManagementButton
+- 拉取落库抽成 commitPulledPack；宿主无 toastr 时回退插件内提示
+- Luker fork 把 backups/ 拆成独立类目（11 行，已推 jiozhaoyue/Luker:release b978e69b3），PR note 在 docs/
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `adc317b` | feat(host-pull): 补 TauriTavern / PureTavern 的原生导出入口 |
+| `3326598` | fix(host-pull): Luker 只在备份弹层注入一个拉取入口 |
+| `5f3c8d4` | docs: 补 Luker fork「backups 拆分为独立类目」的 PR note |
+
+### Testing
+
+- [OK] npm test 934 passed / 2 skipped；七项守卫全绿
+- [OK] Dev Luker 8003 实测：原生弹层打开、注入按钮、只勾 characters 得 59.9MB/19.1s、原生 toast、勾选未被回写
+- [OK] PT dev 8899 实测受阻：GET /api/extensions 返回 501（第三方扩展未迁移），#pure-tavern-data-management-entry 与插件容器 40s 内均未出现
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- GitHub 网络恢复后 git push（本地 3 个提交未推）；TT 侧需 debug 可执行产物才能实机复验
