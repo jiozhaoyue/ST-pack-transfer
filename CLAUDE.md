@@ -9,7 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## 常用命令
 
 ```bash
-npm test                          # Vitest 全量（当前 817 passed / 2 skipped / 81 文件）
+npm test                          # Vitest 全量（当前 934 passed / 2 skipped / 95 文件）
 npx vitest run test/xxx.test.js   # 单文件
 npx vitest run -t "用例名"         # 单条用例
 npm run dev                       # vite 开发服务器，独立模式手测（http://127.0.0.1:3040；**不是** 5173）
@@ -78,6 +78,13 @@ npm run gen-fixtures              # 重新生成测试固件 fixtures/
 9. **运行器的 `dist` 新鲜度判据只看 mtime**：**看不见「删了源码文件」** ⇒ 凡涉及删/换文件的实验必须 `npm run e2e:web -- --rebuild`。
 10. **`[hidden]` 压不过同特异度的 `display`（2026-10-14 实测事故）**：`style.css` 给 `.wb-gate` 写了 `display:flex`，与插件内全局兜底 `#app.app-container [hidden]` **特异度相同**，源码顺序决定胜负 ⇒ 空壳框永远可见；而 `showGate()` 全仓无调用点 ⇒ 从不触发、永远显示、内容为空。**默认隐藏的容器若被写了 `display`，必须另写一条特异度更高的 `[hidden]` 覆盖规则**。同类：空容器占位（`#category-summary-badge` 空时是个空胶囊，用 `:empty{display:none}` 治）。
 11. **两个 UI 守卫按「文件源码正则」提取控件与文案** ⇒ **注释里不得出现控件标签字面量**（会被当成无 id 控件误报）；要断言**渲染结果**必须调用 `getWorkbenchHtml()`，读文件源码会把注释一并算进来（本轮「文案纪律」断言全误报过一次）。守卫只强制「声明存在」，**不验证声明为真**——死控件能通过。
+12. **宿主原生入口禁止同构假设，调研必须先读宿主 `docs/**`（2026-11-04 事故）**：
+    - **TT 没有** `#account_button` / `.userBackupButton`；原生导出在扩展列表的「Data Migration」→ `#data_migration_export_button`。
+    - **PT 有**一方扩展「PureTavern 数据管理」→ `#pure-tavern-data-management-entry` → `dialog#pure-tavern-data-management-dialog` → `#ptdm-export`；且 PT **没有** `/api/users/backup`，它走 `POST /api/backups/archive/export`（`{moduleIds, includeSecrets}`）。
+    - 曾凭「TT 是 ST 派生」+ 一次 grep 就断言 TT/PT「无原生入口」，被用户当面否决。
+    - 调研顺序：宿主 `docs/**`（含子目录）→ 一方扩展的 `manifest.json` / `settings.html` → 运行实例 DOM 取证；**禁止**用 grep 源码代替调研。
+    - 注意 TT 的 `docs/API/Migration.md` 是**「从 SillyTavern 扩展适配到 TauriTavern」指南**，不是数据迁移文档。
+    - 事实表见 `.trellis/spec/frontend/host-capabilities.md` 末节。
 
 ## Trellis 任务流
 

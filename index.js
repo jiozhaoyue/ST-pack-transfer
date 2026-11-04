@@ -22,8 +22,9 @@ import {
   detectHost, hostLayoutCode, fetchHostBackup, FULL_SELECTION,
   restoreToHost, restoreToLuker,
   confirmDialog, mountExtensionRowButton, closeHostExtensionSurface,
-  mountNativeBackupButton, mountLukerBackupManagerButton,
-  openNativeBackupUi, readNativeBackupSelection, hostToast,
+  mountNativeBackupButton, mountLukerBackupManagerButton, mountPtDataManagementButton,
+  mountTtDataMigrationButton,
+  openNativeBackupUi, readNativeBackupSelection, readPtExportOptions, hostToast, fetchPtBackup,
   uploadUserFile, userFilesSupported, sanitizeUserFileName, verifyUserFiles, deleteUserFile,
   readHostStorageQuota,
 } from './src/ui/host-bridge.js';
@@ -365,8 +366,10 @@ async function main(root) {
       return;
     }
 
-    // 静默回退：该宿主没有可用的原生备份界面（例如 PureTavern），走插件内路径
+    // 静默回退：原生入口未就绪（宿主版本差异 / 扩展未装）。
+    // PureTavern 没有 /api/users/backup，回退必须走它自己的归档端点。
     logger.warn(t('log.nativeUiMissing'));
+    if (host.platform === 'pt') { await pullFromPt(); return; }
     if (settings.trafficPrompt) {
       view.confirmTraffic(() => pullFromHost(FULL_SELECTION, false), {
         enabled: true,
@@ -380,12 +383,82 @@ async function main(root) {
   /** 原生界面里注入的「从宿主拉取」按钮：读取原生勾选后拉取（不回写宿主选择记忆）。 */
   async function pullFromNativeUi() {
     if (state.busy) return;
+    if (host.platform === 'pt') { await pullFromPt(); return; }
     const selection = readNativeBackupSelection() || FULL_SELECTION;
     const keys = Object.keys(selection).filter((key) => selection[key]);
     logger.info(t('log.nativeSelection', { keys: keys.join(',') || '-' }));
     await pullFromHost(selection, true);
   }
   nativePullHook = pullFromNativeUi;
+
+  /** PureTavern：原生数据管理面板的模块勾选 → 原生归档端点 → 入库。 */
+  async function pullFromPt() {
+    if (state.busy) return;
+    state.busy = true;
+    const pullStart = performance.now();
+    try {
+      const id = `pkg-${Date.now()}`;
+      const options = readPtExportOptions() || { moduleIds: [], includeSecrets: false };
+      logger.info(t('log.nativeSelection', { keys: options.moduleIds.join(',') || '-' }));
+      view.setProgress(5, t('progress.hostRequest'));
+      const blob = await fetchPtBackup(options, {
+        onPhase: (phase, received, total, _opfsName, bps) => {
+          if (phase === 'host-generating') view.setProgress(12, t('progress.hostPacking'));
+          else if (phase === 'transferring') {
+            const pct = total > 0 ? 15 + Math.round((received / total) * 20) : 20;
+            const speed = bps > 0 ? `${(bps / 1048576).toFixed(1)} MB/s` : '—';
+            view.setProgress(pct, t('progress.receiving', { size: (received / 1048576).toFixed(1), speed }));
+          }
+        },
+      });
+      await commitPulledPack({
+        id,
+        name: `PureTavern_host-export_${Date.now()}.zip`,
+        blob,
+        size: blob.size || 0,
+        opfsName: null,
+        opfsDir: null,
+        fromNativeUi: true,
+        pullStart,
+      });
+    } catch (err) {
+      logger.error(t('log.hostFetchFailed', { msg: err.message }));
+      view.setProgress(0, t('progress.hostFetchFailed'));
+    } finally {
+      state.busy = false;
+    }
+  }
+
+  /**
+   * 拉取落库的公共尾段：入库 → 同步 → 设为活动包 → 完成提示。
+   * @param {{id: string, name: string, blob?: Blob, opfsName?: string|null, opfsDir?: string|null, size: number, fromNativeUi: boolean, pullStart: number}} pack
+   */
+  async function commitPulledPack({ id, name, blob, opfsName, opfsDir, size, fromNativeUi, pullStart }) {
+    const storeStart = performance.now();
+    await saveFile({
+      id, name, size, blob: opfsName ? null : namedBlob(blob, name),
+      opfsName, opfsDir,
+      layout: hostLayoutCode(host.platform), role: 'source',
+      origin: ORIGINS.HOST_EXPORT, metadata: { fetchedAt: Date.now() },
+    });
+    logger.info(t('log.packStored', {
+      target: opfsName ? `OPFS ${opfsDir}/${opfsName}` : 'IndexedDB',
+      ms: Math.round(performance.now() - storeStart),
+    }));
+    state.layoutById.set(id, hostLayoutCode(host.platform));
+    await syncPackages();
+    await ensurePlan(id);
+    Object.assign(settings, loadSettings());
+    view.applySettings?.(settings);
+    view.setActivePackage(id);
+    view.setProgress(100, t('progress.hostFetched'));
+    // 原生界面触发时优先用宿主 toast；宿主没有 toastr（如 PureTavern）则回退插件内提示
+    if (!fromNativeUi || !hostToast(t('toast.nativePullDone'))) view.toast(t('toast.hostFetched'));
+    logger.success(t('log.hostPullDone', {
+      sec: (Math.round(performance.now() - pullStart) / 1000).toFixed(1),
+      size: (size / 1048576).toFixed(1),
+    }));
+  }
 
   /**
    * @param {Record<string, boolean>} selection 端点类目布尔（含宿主端新增的 backups 键）
@@ -414,32 +487,16 @@ async function main(root) {
       const packSize = fetched?.size || 0;
 
       const name = `${HOST_LABEL[host.platform] || 'Host'}_host-export_${Date.now()}.zip`;
-      const opfsName = fetched?.kind === 'opfs' ? fetched.name : null;
-      const opfsDir = fetched?.kind === 'opfs' ? (fetched.dir || 'packages') : null;
-      const storeStart = performance.now();
-      await saveFile({
-        id, name, size: packSize, blob: opfsName ? null : namedBlob(fetched, name),
-        opfsName, opfsDir,
-        layout: hostLayoutCode(host.platform), role: 'source',
-        origin: ORIGINS.HOST_EXPORT, metadata: { fetchedAt: Date.now() },
+      await commitPulledPack({
+        id,
+        name,
+        blob: fetched,
+        size: packSize,
+        opfsName: fetched?.kind === 'opfs' ? fetched.name : null,
+        opfsDir: fetched?.kind === 'opfs' ? (fetched.dir || 'packages') : null,
+        fromNativeUi,
+        pullStart,
       });
-      logger.info(t('log.packStored', {
-        target: opfsName ? `OPFS ${opfsDir}/${opfsName}` : 'IndexedDB',
-        ms: Math.round(performance.now() - storeStart),
-      }));
-      state.layoutById.set(id, hostLayoutCode(host.platform));
-      await syncPackages();
-      await ensurePlan(id);
-      Object.assign(settings, loadSettings());
-      view.applySettings?.(settings);
-      view.setActivePackage(id);
-      view.setProgress(100, t('progress.hostFetched'));
-      if (fromNativeUi) hostToast(t('toast.nativePullDone'));
-      else view.toast(t('toast.hostFetched'));
-      logger.success(t('log.hostPullDone', {
-        sec: (Math.round(performance.now() - pullStart) / 1000).toFixed(1),
-        size: (packSize / 1048576).toFixed(1),
-      }));
     } catch (err) {
       logger.error(t('log.hostFetchFailed', { msg: err.message }));
       view.setProgress(0, t('progress.hostFetchFailed'));
@@ -899,10 +956,17 @@ function bootstrap() {
       closeHostExtensionSurface();
       openConverterModal();
     });
-    // Luker 的类目勾选框只在「Backup & Restore」弹层里，账户面板的锚点不注入，
-    // 否则会多出一个读不到勾选的入口（ST/TT 的原生界面就是账户面板本体）。
+    // 原生入口逐宿主不同（2026-11-04 实测核对，不可按「都有账户面板」假设）：
+    //  · ST        → 账户面板 .userBackupButton
+    //  · Luker     → 账户面板 →「Backup & Restore」弹层的 .backupActionRow
+    //  · TauriTavern → 扩展列表「Data Migration」#data_migration_export_button（无账户面板入口）
+    //  · PureTavern → 扩展「PureTavern 数据管理」dialog 的 #ptdm-export
     if (host.platform === 'luker') {
       mountLukerBackupManagerButton(() => nativePullHook?.());
+    } else if (host.platform === 'tt') {
+      mountTtDataMigrationButton(() => nativePullHook?.());
+    } else if (host.platform === 'pt') {
+      mountPtDataManagementButton(() => nativePullHook?.());
     } else {
       mountNativeBackupButton(() => nativePullHook?.());
     }

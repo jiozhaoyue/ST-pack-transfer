@@ -19,7 +19,7 @@
 |-------|-------------|--------|
 | [Directory Structure](./directory-structure.md) | 三形态入口（独立 Web / 宿主插件 / Node 测试）、`src/**` 分层、构建与部署 | 就绪（2026-09-24 校正） |
 | [Component Guidelines](./component-guidelines.md) | 宿主内 UI 注入（幂等 + 自愈）、注入按钮工厂、单一模板源、CSS 作用域铁律、DOM 注入防线 | 就绪（2026-09-25 刷新） |
-| [Host Capabilities](./host-capabilities.md) | 宿主能力获取决策树、原生弹窗适配器契约（**含"宿主无 alert，信息提示用 `Popup.show.text`"**）、降级反例构造法、现存能力面表、**UI 控件合宪性（死控件取证）** | 就绪（2026-09-26 增补信息提示） |
+| [Host Capabilities](./host-capabilities.md) | 宿主能力获取决策树、原生弹窗适配器契约（**含"宿主无 alert，信息提示用 `Popup.show.text`"**）、降级反例构造法、现存能力面表、**UI 控件合宪性（死控件取证）**、**四宿主原生数据导出入口事实表（2026-11-04，含"禁止同构假设"事故）** | 就绪（2026-11-04 增补原生导出入口） |
 | [DOM Write Scope](./dom-write-scope.md) | **宿主 DOM 写入作用域**：锚点白名单（穷举）、`check:dom-scope` 守卫、运行期归因仪器与实测读数、仪器自身的坑、跨宿主安装落点 | 就绪（2026-09-26 新建） |
 | [Hook Guidelines](./hook-guidelines.md) | 宿主生命周期接入、备份/恢复端点、CSRF、全局命名空间（**仅 1 个已登记的只读探针**） | 就绪（2026-09-27 刷新） |
 | [Resume Checkpoint Invariant](./resume-checkpoint-invariant.md) | **断点续传的「已完成」判据**：不变量（清单里的条目必须已写进产物）· **曾经的违反与其实测读数** · **既有两处断言为何各锁一半**（锁机理 vs 锁不变量）+ 通用判别法 · 修法 (a) 的四段实现与三处「计划被证据否决」 | ✅ 就绪（2026-09-28 **已修**；实现细节见 `state-management.md` §8） |
@@ -37,7 +37,7 @@
 
 > 上述三份“迁移”文档是经用户批准记录的**后续目标契约**，不是当前实现事实；其中拟新增签名、测试和验收均有状态标注。不得据此宣称产品已完成迁移向导或双击离线交付。
 
-> 现行质量门槛：`npm test` 全绿（当前 **85 个测试文件 / 892 passed / 2 skipped**，零回归），
+> 现行质量门槛：`npm test` 全绿（当前 **95 个测试文件 / 934 passed / 2 skipped**，零回归），
 > 外加**五条**静态守卫 `npm run check:css-scope`、`npm run check:dom-injection`、
 > `npm run check:template-source`、`npm run check:control-consumer` 与 `npm run check:dom-scope`
 > （详见 quality-guidelines.md 与 dom-write-scope.md）。

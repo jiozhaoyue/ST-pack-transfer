@@ -318,6 +318,15 @@ export function hostSelectionCapability(platform) {
 - **`settings` 键与 `backups/` 目录绑死**（本节最重要事实）：勾「设置」⇒ Luker 被迫把
   `backups/`（本机 Dev 实测 892.2MB，占全量包 49.8%）一起打包，插件侧 `includeBackups=false`
   只能**拉取后**丢弃——字节已过网络。契约内无分离开关。
+
+  > **2026-11-04 更新（本仓 fork）**：已向 `jiozhaoyue/Luker:release` 提交最小侵入改动，
+  > 把 `backups` 拆成独立类目（`src/users.js` / `public/scripts/user.js` /
+  > `userBackupManager.html` / parity 测试，共 11 行），上游 `funnycups/Luker` **尚未合并**。
+  > 因此：
+  > - 在 **fork 版实例**上，`backups` 是合法的独立布尔键，`settings` 只含 `settings.json`；
+  > - 在 **上游版实例**上，本节原文仍然成立（绑定、`backups` 键被静默忽略）。
+  > 插件侧不再写死任何一种假设：改为读取原生界面勾选（`readNativeBackupSelection()`），
+  > 有 `backups` 复选框就带上，没有就不传。
 - `extensions-data/` **不进包**（与 `extensions/` 是两回事）。
 - 解绑诉求已登记 Authority PR 需求（父任务 R-B2）；本仓候选缓解「两段式拉取」
   （settings:false 拉 + settings.json 单取注入）改动面大，未经裁决不得实施。
@@ -382,3 +391,46 @@ Git handshake failed）——**非本插件错误**，E2E 判定须按「只属�
 - 不专门造公网 P2P；现有局域网 WebRTC 行为不删不扩。
 - 已知限制：Luker `POST /peers/:id/sync` 只有**本机拉取**语义（无远端直推）；
   TT 扩展不能 invoke Tauri 命令——这也是「插件不碰原生」的直接原因。
+
+---
+
+## 四宿主「原生数据导出 / 备份」入口事实表（2026-11-04 文档 + DOM 双取证）
+
+> 触发：任何要**打开宿主原生导出界面 / 在原生界面注入按钮 / 调原生导出端点**的改动。
+> 取证顺序（MUST）：宿主仓库 `docs/**`（含全部子目录）→ 官方/一方扩展的 `manifest.json` 与
+> `settings.html` → 最后在运行实例上核对 DOM 锚点。**禁止用 grep 源码代替调研**，
+> 也**禁止**因「ST 派生宿主」就假设入口同构。
+
+| 宿主 | 用户可见路径 | DOM 锚点 | 导出端点 |
+| --- | --- | --- | --- |
+| ST | 账户面板 → Account Actions → Download Backup | `#account_button` → `.userBackupButton` | `POST /api/users/backup`（`{handle, selection}`；**忽略 selection**，全量） |
+| Luker | 账户面板 → 备份按钮 → 「Backup & Restore」弹层 | `#account_button` → `.userBackupButton` → `.userBackupManager .backupActionRow` | 同上（**支持** 10 键 selection；fork 版另有 `backups` 独立键） |
+| TauriTavern | **扩展列表 → Data Migration → 导出当前数据** | `#extensions-settings-button` → `#data_migration_settings` → `#data_migration_export_button` | `POST /api/users/backup`（`{handle}`，全量） |
+| PureTavern | **扩展 → PureTavern 数据管理 → 导出 ZIP** | `#pure-tavern-data-management-entry` → `dialog#pure-tavern-data-management-dialog` → `#ptdm-export` | `POST /api/backups/archive/export`（`{moduleIds, includeSecrets}`） |
+
+### 文档依据（逐个核过，勿再重复调研）
+
+| 宿主 | 有 / 无 | 依据 |
+| --- | --- | --- |
+| ST | **无** `docs/` 目录 | 仓库根只有 `CONTRIBUTING.md`/`SECURITY.md`；入口以 UI 实测为准 |
+| Luker | 有 `docs/`，但**无备份面板文档** | `docs/development/frontend-plugin.md`（插件与 `settings.html`/`inline-drawer`/`callGenericPopup`）、`docs/development/extension-api/`；备份管理器属宿主功能，未文档化 |
+| TT | 有 `docs/API|Agent|CurrentState/**`，但**无数据迁移文档** | ⚠ `docs/API/Migration.md` 是**「从 SillyTavern 扩展适配到 TauriTavern」**，不是数据迁移；迁移扩展只有 `src/scripts/extensions/data-migration/{manifest.json,settings.html}` |
+| PT | 有 `docs/architecture/**` | `legacy-ui-strategy.md`（原版 UI 由上游页面负责、扩展挂 `#extensions_settings2`）、`feature-module-structure.md`（feature/legacy 路由）、`migration/module-inventory.md` |
+
+### 硬规则
+
+1. **禁止同构假设**（2026-11-04 真实事故）：曾据「TT 是 ST 派生」断言 TT 走 `.userBackupButton`、
+   并断言 PT「无同类原生入口」，两者都与事实相反 —— TT **没有** `#account_button`；
+   PT 有一方扩展「数据管理」且端点与 ST 完全不同。
+2. **PT 没有 `/api/users/backup`**：回退路径必须走 `/api/backups/archive/export`，否则必 404。
+3. `BACKUP_SELECTION_SUPPORT` 的值只描述**标准 10 键布尔**是否透传；PT 的 `moduleIds` 选择
+   不改变 `pt: false` 的含义（措辞别升级成「PT 支持类目勾选」，那是另一个粒度）。
+4. 新增宿主或宿主升级后，必须重跑本表核对（DOM 锚点 + 端点形状）。
+
+### 对应实现（2026-11-04）
+
+- `openNativeBackupUi(platform)`：四分支；`tt` / `pt` 判定必须排在通用 `.userBackupButton` 之前
+- 注入：`mountNativeBackupButton`（ST）/ `mountLukerBackupManagerButton`（Luker）/
+  `mountTtDataMigrationButton`（TT）/ `mountPtDataManagementButton`（PT），按 `host.platform` 二选一
+- 读取勾选：`readNativeBackupSelection()`（ST/Luker 标准键）/ `readPtExportOptions()`（PT moduleIds）
+- 拉取：`fetchHostBackup()`（ST/Luker/TT）/ `fetchPtBackup()`（PT 归档端点，带 500ms 滑窗速度）
