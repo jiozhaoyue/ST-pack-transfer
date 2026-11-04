@@ -78,3 +78,8 @@ CLAUDE.md.bak
 # 开发期预览页（非运行时）
 /src/ui/ui-demo.html
 
+# mini-trellis 迁移备份（2026-11-04 本地保留，不入库）
+/_migrate-backup-*/
+# SkillCompass 工具状态
+/.skill-compass/
+
