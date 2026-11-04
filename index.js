@@ -899,8 +899,13 @@ function bootstrap() {
       closeHostExtensionSurface();
       openConverterModal();
     });
-    mountNativeBackupButton(() => nativePullHook?.());
-    mountLukerBackupManagerButton(() => nativePullHook?.());
+    // Luker 的类目勾选框只在「Backup & Restore」弹层里，账户面板的锚点不注入，
+    // 否则会多出一个读不到勾选的入口（ST/TT 的原生界面就是账户面板本体）。
+    if (host.platform === 'luker') {
+      mountLukerBackupManagerButton(() => nativePullHook?.());
+    } else {
+      mountNativeBackupButton(() => nativePullHook?.());
+    }
     return;
   }
   const app = document.getElementById('app');
