@@ -417,6 +417,15 @@ Git handshake failed）——**非本插件错误**，E2E 判定须按「只属�
 | TT | 有 `docs/API|Agent|CurrentState/**`，但**无数据迁移文档** | ⚠ `docs/API/Migration.md` 是**「从 SillyTavern 扩展适配到 TauriTavern」**，不是数据迁移；迁移扩展只有 `src/scripts/extensions/data-migration/{manifest.json,settings.html}` |
 | PT | 有 `docs/architecture/**` | `legacy-ui-strategy.md`（原版 UI 由上游页面负责、扩展挂 `#extensions_settings2`）、`feature-module-structure.md`（feature/legacy 路由）、`migration/module-inventory.md` |
 
+### 各宿主开发者文档清单（2026-11-04 实际盘点，避免重复调研）
+
+| 宿主 | 文档根与子目录 | 已核对的关键文件 | 结论 |
+| --- | --- | --- | --- |
+| ST | **无 `docs/`** | 仓库根仅 `CONTRIBUTING.md` / `SECURITY.md` | 入口只能 UI 实测 |
+| Luker | `docs/`：`basics/` `development/` `features/` `guide/` `improvements/` `recipes/` `zh-CN/` `zh-TW/` + `index.md` `changelog.md` | `development/frontend-plugin.md`（manifest / `settings.html` / `inline-drawer` / `callGenericPopup` / Extension API）、`development/server-plugin.md`、`development/extension-api/` | 插件 UI 集成有文档；**备份管理器无文档** |
+| TT | `docs/`：`API/` `Agent/` `CurrentState/` + `AgentArchitecture.md` `AgentContract.md` `AgentImplementPlan.md` `FrontendGuide.md` **`FrontendHostContract.md`** `BackendStructure.md` `TechStack.md`（根另有 `ExtensionDEV.md`） | `API/Migration.md`（⚠ 是「ST 扩展适配指南」）、`API/Extension.md`（扩展 store API）、`FrontendHostContract.md` | **数据迁移扩展无文档**；入口见其 `src/scripts/extensions/data-migration/settings.html` |
+| PT | `docs/architecture/`（`feature-module-structure.md` `legacy-compatibility-contract.md` `legacy-ui-strategy.md`）、`docs/migration/module-inventory.md` | `legacy-ui-strategy.md`（原版 UI 所有权、扩展挂 `#extensions_settings2`、**M21 手动归档是核心数据安全能力**）、`feature-module-structure.md`（feature / legacy 路由分层） | 导入导出是 `features/import-export`，用户侧入口是一方扩展 `pure-tavern-data-management` |
+
 ### 硬规则
 
 1. **禁止同构假设**（2026-11-04 真实事故）：曾据「TT 是 ST 派生」断言 TT 走 `.userBackupButton`、

@@ -826,12 +826,13 @@ Dev Luker 实测「从宿主拉取 ~1MB/s，比原生慢 20 倍」。取证确�
 | `adc317b` | feat(host-pull): 补 TauriTavern / PureTavern 的原生导出入口 |
 | `3326598` | fix(host-pull): Luker 只在备份弹层注入一个拉取入口 |
 | `5f3c8d4` | docs: 补 Luker fork「backups 拆分为独立类目」的 PR note |
+| `0310edf` | docs(spec): 记录 TT/PT 实机验证的平台阻塞 |
 
 ### Testing
 
 - [OK] npm test 934 passed / 2 skipped；七项守卫全绿
 - [OK] Dev Luker 8003 实测：原生弹层打开、注入按钮、只勾 characters 得 59.9MB/19.1s、原生 toast、勾选未被回写
-- [OK] PT dev 8899 实测受阻：GET /api/extensions 返回 501（第三方扩展未迁移），#pure-tavern-data-management-entry 与插件容器 40s 内均未出现
+- [BLOCKED] PT dev 8899：GET /api/extensions 返回 501（第三方扩展未迁移），#pure-tavern-data-management-entry 与插件容器 40s 内均未出现 ⇒ PT 侧只有单测覆盖
 
 ### Status
 
@@ -839,4 +840,4 @@ Dev Luker 实测「从宿主拉取 ~1MB/s，比原生慢 20 倍」。取证确�
 
 ### Next Steps
 
-- GitHub 网络恢复后 git push（本地 3 个提交未推）；TT 侧需 debug 可执行产物才能实机复验
+- ~~git push~~ 已于网络恢复后推送（origin/main = fff95a2）；TT 侧需 debug 可执行产物才能实机复验
