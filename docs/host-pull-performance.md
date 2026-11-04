@@ -81,6 +81,10 @@ GB 级包会多一次全量拷贝（刷新后仍要占双份空间）。
 | 分段耗时/吞吐写入审计日志 | `fetchHostBackup()` 的 `传输完成 · ...` 行 |
 | 日志可审计：导出 `.txt` + localStorage 持久化 | `workbench-view.js` 的 `exportLog()` / `persistLog()` |
 
+> **2026-11-04 更新**：上表前两行（`settings:false` → 单独取 `/api/settings/get` → zip 追加拼回）
+> 已**整体删除**。Luker fork 把 `backups/` 拆成独立类目后，插件改为打开宿主**原生备份界面**、
+> 按其类目勾选直接拉取，不再需要绕行拼回；`fetchHostSettingsJson()` 一并移除。
+
 ### 3.1 审计日志能回答的问题
 
 日志视图 → 「导出」会得到 `ST-pack-transfer-log_<时间>.txt`。关键行：
@@ -98,7 +102,8 @@ settings.json 已拼入包内 · 22.01 MB · 183ms
 - **TTFB 大** → 服务端打包慢（数据量 / 磁盘 / CPU），客户端无能为力；
 - **传输慢但 OPFS写 很小** → 网络或宿主流生成慢；
 - **OPFS写 占比大** → 写块仍需调大或磁盘/杀软问题；
-- **settings 拼入耗时大** → OPFS `createWritable({keepExistingData:true})` 的复制开销。
+- **settings 拼入耗时大** → OPFS `createWritable({keepExistingData:true})` 的复制开销
+  （仅 2026-11-04 之前的日志会出现 `settings.json 已拼入包内` 行）。
 
 ## 4. 关于「本地 10 秒内完成」
 

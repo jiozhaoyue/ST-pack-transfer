@@ -839,44 +839,6 @@ export async function getHandle({ signal } = {}) {
 }
 
 /**
- * 读取当前用户的**原始设置 JSON**（`/api/settings/get` 的 `settings` 字段，是宿主运行态的
- * 权威设置文档；DB 存储模式下比磁盘上的旧 settings.json 更准确）。
- *
- * 用途：拉取时传 `settings:false`，避开 Luker 服务端「settings 隐含打包 backups/」的
- * GB 级历史快照，再把设置单独拼回包内。失败由调用方降级，不阻塞主路径。
- *
- * @param {{signal?: AbortSignal}} [options]
- * @returns {Promise<string>} JSON 文本
- */
-export async function fetchHostSettingsJson({ signal } = {}) {
-  const startedAt = performance.now();
-  const token = await getCsrfToken({ signal });
-  const response = await fetchWithTimeout('/api/settings/get', {
-    method: 'POST',
-    credentials: 'same-origin',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-CSRF-Token': token,
-    },
-    body: '{}',
-  }, {
-    timeoutMs: 60_000,
-    signal,
-    label: '读取宿主设置',
-  });
-  if (!response.ok) throw new Error(`读取宿主设置失败 (${response.status})`);
-  const data = await readJsonBounded(response, { timeoutMs: 60_000, signal, label: '读取宿主设置' });
-  const settings = data?.settings;
-  if (settings === undefined || settings === null) {
-    throw new Error('宿主设置响应缺少 settings 字段');
-  }
-  const text = typeof settings === 'string' ? settings : JSON.stringify(settings);
-  const bytes = new TextEncoder().encode(text).length;
-  logger.info(`已读取宿主设置 JSON · ${(bytes / 1048576).toFixed(2)} MB · ${Math.round(performance.now() - startedAt)}ms`);
-  return text;
-}
-
-/**
  * OPFS 可用性特性检测（仅浏览器；Node/Vitest 环境直接 false）
  * @returns {boolean}
  */
