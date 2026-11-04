@@ -1237,6 +1237,68 @@ export async function fetchHostBackup(platform, selection = null, {
 }
 
 /**
+ * PureTavern 数据包导出（原生端点 `POST /api/backups/archive/export`）。
+ *
+ * 与 ST/Luker 的 `/api/users/backup` 不同：请求体是 `{moduleIds, includeSecrets}`，
+ * 响应是 PT 自己的归档 ZIP（由 `src/core/pt-archive.js` 解析）。
+ *
+ * @param {{moduleIds?: string[], includeSecrets?: boolean}} [options]
+ * @param {{onPhase?: (phase: string, received: number, total: number, opfsName?: string, bps?: number) => void, signal?: AbortSignal}} [hooks]
+ * @returns {Promise<Blob>}
+ */
+export async function fetchPtBackup(options = {}, { onPhase, signal } = {}) {
+  const startedAt = performance.now();
+  logger.info('正在连接宿主 [PT] 获取授权凭证...');
+  const token = await getCsrfToken({ signal });
+  onPhase?.('host-generating', 0, 0);
+
+  const response = await fetch('/api/backups/archive/export', {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': token },
+    body: JSON.stringify({
+      moduleIds: Array.isArray(options.moduleIds) ? options.moduleIds : [],
+      includeSecrets: Boolean(options.includeSecrets),
+    }),
+    signal,
+  });
+  if (!response.ok) throw new Error(`PureTavern 数据归档导出失败 (${response.status})`);
+  const total = Number(response.headers.get('Content-Length')) || 0;
+
+  if (typeof response.body?.getReader !== 'function') {
+    const whole = await response.blob();
+    logger.success(`PT 归档导出完成(非流式) · ${(whole.size / 1048576).toFixed(1)} MB · ${Math.round(performance.now() - startedAt)}ms`);
+    onPhase?.('transferring', whole.size, whole.size, undefined, 0);
+    return whole;
+  }
+
+  const reader = response.body.getReader();
+  const chunks = [];
+  let received = 0;
+  let windowBytes = 0;
+  let windowStart = performance.now();
+  let bps = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    received += value.length;
+    windowBytes += value.length;
+    const now = performance.now();
+    if (now - windowStart >= 500) {
+      bps = windowBytes / ((now - windowStart) / 1000);
+      windowBytes = 0;
+      windowStart = now;
+    }
+    onPhase?.('transferring', received, total, undefined, bps);
+  }
+  const blob = new Blob(chunks, { type: 'application/zip' });
+  logger.success(`PT 归档导出完成 · ${(blob.size / 1048576).toFixed(1)} MB · ${Math.round(performance.now() - startedAt)}ms`);
+  onPhase?.('transferring', blob.size, total || blob.size, undefined, bps);
+  return blob;
+}
+
+/**
  * 读取**当前宿主**的用户清单（目标预检用），并把该次导出作为**保底备份**交回调用方。
  *
  * 这是 `src/core/target-inventory.js` 的宿主执行层：判定与呈现全在纯模块里，本函数只负责
@@ -2252,13 +2314,49 @@ function waitForCondition(probe, timeoutMs = 3000) {
  * 四宿主落点（用户 2026-11-04 指定）：
  *  - ST / TT：账户面板「Account Actions → Download Backup」= `.userBackupButton`，只需打开账户面板；
  *  - Luker：除 `.userBackupButton` 外还需点它打开「Backup & Restore」弹层，类目复选框在弹层里；
- *  - PureTavern：无同类原生入口 ⇒ 返回 false，由调用方静默回退到插件内拉取。
+ *  - PureTavern：一方扩展「PureTavern 数据管理」的 `<dialog>`，里面就是原生的模块勾选与「导出 ZIP」。
  *
  * @param {'st'|'luker'|'tt'|'pt'|string} platform
  * @returns {Promise<boolean>} 是否已把原生界面打开到可操作状态
  */
 export async function openNativeBackupUi(platform) {
   if (typeof document === 'undefined') return false;
+
+  // TauriTavern：**没有**账户面板入口，原生界面是扩展列表里的「Data Migration」
+  // （`src/scripts/extensions/data-migration/settings.html`）。
+  if (platform === 'tt') {
+    if (!document.getElementById('data_migration_settings')) {
+      document.getElementById('extensions-settings-button')?.click();
+    }
+    const block = await waitForCondition(() => document.getElementById('data_migration_settings'), 3000);
+    if (!block) return false;
+    const nativeExport = document.getElementById('data_migration_export_button');
+    if (!nativeExport || nativeExport.offsetParent === null) {
+      block.querySelector('.inline-drawer-toggle')?.click();
+    }
+    const btn = await waitForCondition(() => {
+      const el = document.getElementById('data_migration_export_button');
+      return el && el.offsetParent !== null ? el : null;
+    }, 2000);
+    return Boolean(btn);
+  }
+
+  // PureTavern：原生入口是一方扩展「PureTavern 数据管理」
+  // （`scripts/extensions/pure-tavern-data-management`，挂 `#extensions_settings2`）。
+  // 点它的「打开数据管理」按钮 → 弹出 `<dialog id="pure-tavern-data-management-dialog">`。
+  if (platform === 'pt') {
+    const entry = document.querySelector('#pure-tavern-data-management-entry');
+    if (!entry) return false;
+    const opener = entry.querySelector('button');
+    if (!opener) return false;
+    const dialog = document.getElementById('pure-tavern-data-management-dialog');
+    if (!dialog?.open) opener.click();
+    const opened = await waitForCondition(() => {
+      const el = document.getElementById('pure-tavern-data-management-dialog');
+      return el?.open ? el : null;
+    }, 4000);
+    return Boolean(opened);
+  }
 
   if (!document.querySelector('.userBackupButton')) {
     const accountBtn = document.getElementById('account_button');
@@ -2290,6 +2388,22 @@ export function readNativeBackupSelection() {
   const selection = {};
   boxes.forEach((box) => { selection[box.value] = Boolean(box.checked); });
   return selection;
+}
+
+/**
+ * 读取 PureTavern 原生数据管理面板的导出选项（只读，不写回）。
+ * 模块复选框是 `#ptdm-modules input[data-module]`，敏感模块带 `data-sensitive`。
+ * @returns {{moduleIds: string[], includeSecrets: boolean}|null} 面板未打开时返回 null
+ */
+export function readPtExportOptions() {
+  if (typeof document === 'undefined') return null;
+  const boxes = document.querySelectorAll('#ptdm-modules input[data-module]');
+  if (!boxes.length) return null;
+  const checked = Array.from(boxes).filter((box) => box.checked);
+  return {
+    moduleIds: checked.map((box) => box.dataset.module).filter(Boolean),
+    includeSecrets: checked.some((box) => box.dataset.sensitive !== undefined),
+  };
 }
 
 /**
@@ -2385,6 +2499,66 @@ export function mountLukerBackupManagerButton(onPull) {
       },
     });
     row.insertBefore(btn, row.firstChild);
+  };
+
+  watchHostDom(addBtn);
+}
+
+/**
+ * TauriTavern「数据迁移」扩展注入：在原生「导出当前数据」按钮旁插入「从宿主拉取」。
+ * 该扩展挂在 `#extensions_settings2`（扩展列表），没有账户面板入口。
+ * @param {() => void} [onPull] 点击后执行宿主拉取
+ */
+export function mountTtDataMigrationButton(onPull) {
+  if (typeof document === 'undefined') return;
+  const BTN_ID = 'st-pack-transfer-tt-btn';
+
+  const addBtn = () => {
+    if (document.getElementById(BTN_ID)) return;
+    const nativeExport = document.getElementById('data_migration_export_button');
+    const toolbar = nativeExport?.parentElement;
+    if (!toolbar) return;
+
+    const btn = makeHostButton({
+      id: BTN_ID,
+      icon: 'fa-right-left',
+      label: '从宿主拉取',
+      title: '从宿主拉取数据包（与「导出当前数据」同源）',
+      onClick: () => {
+        if (typeof onPull === 'function') onPull();
+      },
+    });
+    toolbar.insertBefore(btn, nativeExport);
+  };
+
+  watchHostDom(addBtn);
+}
+
+/**
+ * PureTavern「数据管理」弹层注入：在原生「导出 ZIP」按钮同级插入「从宿主拉取」。
+ * 弹层由一方扩展 `pure-tavern-data-management` 在打开时渲染，故仍需 watchHostDom。
+ * @param {() => void} [onPull] 点击后按原生模块勾选执行拉取
+ */
+export function mountPtDataManagementButton(onPull) {
+  if (typeof document === 'undefined') return;
+  const BTN_ID = 'st-pack-transfer-pt-btn';
+
+  const addBtn = () => {
+    if (document.getElementById(BTN_ID)) return;
+    const nativeExport = document.getElementById('ptdm-export');
+    const toolbar = nativeExport?.parentElement;
+    if (!toolbar) return;
+
+    const btn = makeHostButton({
+      id: BTN_ID,
+      icon: 'fa-right-left',
+      label: '从宿主拉取',
+      title: '从宿主拉取数据包（按上方模块勾选）',
+      onClick: () => {
+        if (typeof onPull === 'function') onPull();
+      },
+    });
+    toolbar.insertBefore(btn, nativeExport);
   };
 
   watchHostDom(addBtn);
