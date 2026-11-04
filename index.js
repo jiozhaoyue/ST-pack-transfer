@@ -19,13 +19,14 @@ import { trustedStaticMarkup } from './src/ui/escape.js';
 import { getWorkbenchHtml } from './src/ui/workbench-template.js';
 import { createWorkbenchView } from './src/ui/workbench-view.js';
 import {
-  detectHost, hostLayoutCode, fetchHostBackup, fetchHostSettingsJson, FULL_SELECTION,
+  detectHost, hostLayoutCode, fetchHostBackup, FULL_SELECTION,
   restoreToHost, restoreToLuker,
   confirmDialog, mountExtensionRowButton, closeHostExtensionSurface,
+  mountNativeBackupButton, mountLukerBackupManagerButton,
+  openNativeBackupUi, readNativeBackupSelection, hostToast,
   uploadUserFile, userFilesSupported, sanitizeUserFileName, verifyUserFiles, deleteUserFile,
   readHostStorageQuota,
 } from './src/ui/host-bridge.js';
-import { appendStoredEntryToBlob, appendStoredEntryToOpfs } from './src/core/zip-append.js';
 import { packPrivateContainer } from './src/core/private-container.js';
 import { loadPrivateFiles, addPrivateFile, removePrivateFile } from './src/ui/private-files-store.js';
 import { ORIGIN_ZONE, zoneOfOrigin, copyBackRecord } from './src/core/zone-model.js';
@@ -61,6 +62,8 @@ function clockOf(ts) {
 
 let initialized = false;
 let modalRefreshHook = null;
+/** main() 初始化后赋值；原生界面注入按钮的点击入口（插件加载时就要可点）。 */
+let nativePullHook = null;
 
 function ensureConverterModal() {
   let overlay = document.getElementById('st-converter-modal-overlay');
@@ -347,35 +350,53 @@ async function main(root) {
     }
   }
 
+  /**
+   * 工作台「从宿主拉取」：优先打开宿主**原生**备份界面，让类目勾选发生在原生侧
+   * （用户 2026-11-04 裁定：插件不再自建拉取勾选）。找不到原生入口时静默回退。
+   */
   async function fetchFromHost() {
     if (!host.isPlugin) { view.toast(t('toast.webNoHost')); return; }
     if (state.busy) return;
+
+    const opened = await openNativeBackupUi(host.platform);
+    if (opened) {
+      logger.info(t('log.nativeUiOpened'));
+      hostToast(t('toast.nativePickCategories'));
+      return;
+    }
+
+    // 静默回退：该宿主没有可用的原生备份界面（例如 PureTavern），走插件内路径
+    logger.warn(t('log.nativeUiMissing'));
     if (settings.trafficPrompt) {
-      view.confirmTraffic(() => fetchFromHostConfirmed(), {
+      view.confirmTraffic(() => pullFromHost(FULL_SELECTION, false), {
         enabled: true,
         onNever: () => { settings.trafficPrompt = false; saveSettings(settings); },
       });
       return;
     }
-    await fetchFromHostConfirmed();
+    await pullFromHost(FULL_SELECTION, false);
   }
 
-  async function fetchFromHostConfirmed() {
+  /** 原生界面里注入的「从宿主拉取」按钮：读取原生勾选后拉取（不回写宿主选择记忆）。 */
+  async function pullFromNativeUi() {
+    if (state.busy) return;
+    const selection = readNativeBackupSelection() || FULL_SELECTION;
+    const keys = Object.keys(selection).filter((key) => selection[key]);
+    logger.info(t('log.nativeSelection', { keys: keys.join(',') || '-' }));
+    await pullFromHost(selection, true);
+  }
+  nativePullHook = pullFromNativeUi;
+
+  /**
+   * @param {Record<string, boolean>} selection 端点类目布尔（含宿主端新增的 backups 键）
+   * @param {boolean} fromNativeUi 是否由原生界面按钮触发（完成时用宿主原生 toast）
+   */
+  async function pullFromHost(selection, fromNativeUi) {
     if (state.busy) return;
     state.busy = true;
     const pullStart = performance.now();
     try {
       const id = `pkg-${Date.now()}`;
-      /**
-       * Luker 的 `/api/users/backup` 只要 `settings:true` 就把 `backups/` 历史快照
-       * 一起打包（本机实测 2.5GB / 308 个 22MB 设置快照）。默认改为 `settings:false`
-       * 拉取，随后单独取运行态设置并拼回 `settings.json`。
-       */
-      const excludeHistoryBackups = host.platform === 'luker';
-      const selection = excludeHistoryBackups ? { ...FULL_SELECTION, settings: false } : null;
-      if (excludeHistoryBackups) {
-        logger.info(t('log.pullStrategyReduced'));
-      }
       view.setProgress(5, t('progress.hostRequest'));
       const fetched = await fetchHostBackup(host.platform, selection, {
         taskId: id,
@@ -390,35 +411,14 @@ async function main(root) {
         },
       });
 
-      let packBlob = fetched;
-      let packSize = fetched?.size || 0;
-      if (excludeHistoryBackups) {
-        const graftStart = performance.now();
-        try {
-          const settingsJson = await fetchHostSettingsJson();
-          const bytes = new TextEncoder().encode(settingsJson);
-          if (fetched?.kind === 'opfs') {
-            const appended = await appendStoredEntryToOpfs(fetched.handle, 'settings.json', bytes);
-            packSize = appended.size;
-          } else if (fetched && typeof fetched.slice === 'function') {
-            packBlob = await appendStoredEntryToBlob(fetched, 'settings.json', bytes);
-            packSize = packBlob.size;
-          }
-          logger.info(t('log.settingsGrafted', {
-            size: (bytes.length / 1048576).toFixed(2),
-            ms: Math.round(performance.now() - graftStart),
-          }));
-        } catch (err) {
-          logger.warn(t('log.settingsGraftFailed', { msg: err.message }));
-        }
-      }
+      const packSize = fetched?.size || 0;
 
       const name = `${HOST_LABEL[host.platform] || 'Host'}_host-export_${Date.now()}.zip`;
       const opfsName = fetched?.kind === 'opfs' ? fetched.name : null;
       const opfsDir = fetched?.kind === 'opfs' ? (fetched.dir || 'packages') : null;
       const storeStart = performance.now();
       await saveFile({
-        id, name, size: packSize, blob: opfsName ? null : namedBlob(packBlob, name),
+        id, name, size: packSize, blob: opfsName ? null : namedBlob(fetched, name),
         opfsName, opfsDir,
         layout: hostLayoutCode(host.platform), role: 'source',
         origin: ORIGINS.HOST_EXPORT, metadata: { fetchedAt: Date.now() },
@@ -434,7 +434,8 @@ async function main(root) {
       view.applySettings?.(settings);
       view.setActivePackage(id);
       view.setProgress(100, t('progress.hostFetched'));
-      view.toast(t('toast.hostFetched'));
+      if (fromNativeUi) hostToast(t('toast.nativePullDone'));
+      else view.toast(t('toast.hostFetched'));
       logger.success(t('log.hostPullDone', {
         sec: (Math.round(performance.now() - pullStart) / 1000).toFixed(1),
         size: (packSize / 1048576).toFixed(1),
@@ -898,6 +899,8 @@ function bootstrap() {
       closeHostExtensionSurface();
       openConverterModal();
     });
+    mountNativeBackupButton(() => nativePullHook?.());
+    mountLukerBackupManagerButton(() => nativePullHook?.());
     return;
   }
   const app = document.getElementById('app');
