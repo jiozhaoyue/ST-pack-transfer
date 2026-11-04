@@ -427,6 +427,16 @@ Git handshake failed）——**非本插件错误**，E2E 判定须按「只属�
    不改变 `pt: false` 的含义（措辞别升级成「PT 支持类目勾选」，那是另一个粒度）。
 4. 新增宿主或宿主升级后，必须重跑本表核对（DOM 锚点 + 端点形状）。
 
+### 实测状态与已知阻塞（2026-11-04）
+
+- **PT dev（`apps/web`，8899）当前不加载 `scripts/extensions/**` 的扩展脚本**：
+  `GET /api/extensions` → **501（"This Legacy endpoint has not been migrated."）**，
+  40 秒内 `#pure-tavern-data-management-entry` 与插件容器均未出现；
+  `#extensions_settings2` 里只有原版 built-ins 的设置片段。
+  ⇒ PT 侧的端到端实测**被平台迁移状态阻塞**，目前只有单测（DOM 桩）覆盖四分支。
+- **TT 无 debug 可执行产物**（`src-tauri/target/debug/tauritavern.exe` 不存在），
+  无法按 `guides/instance-testing-discipline.md` 的 CDP 方案复验；TT 侧同样只有单测覆盖。
+
 ### 对应实现（2026-11-04）
 
 - `openNativeBackupUi(platform)`：四分支；`tt` / `pt` 判定必须排在通用 `.userBackupButton` 之前
