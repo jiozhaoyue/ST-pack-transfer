@@ -25,3 +25,4 @@
 18. **注入源唯一**：规则只改本文件；hook 必须读文件，不得把规则硬编码进 hook。
 19. **注入频率**：会话启动强制注入一次；之后 UserPromptSubmit **每 5 条用户消息注入一次**，不逐条刷屏。
 20. **检索门禁**：本会话未完成 Web/GitHub 检索前，search-gate 拦截实现类写操作；规划目录 `.trellis/`、`docs/`、`tasks/` 与只读操作放行；紧急禁用 `TRELLIS_SEARCH_GATE=0`。
+21. **本地专属目录永不入库**（2026-11-05 用户明令）：`test/` `e2e/` `scripts/` `fixtures/` **绝对不纳入版本控制**、**绝不上传到任何云端仓库**（含 S3 包仓库）；禁止 `git add -f` 强制加入。判据：`git ls-files test e2e scripts fixtures` 恒为空。

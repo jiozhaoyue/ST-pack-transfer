@@ -842,3 +842,45 @@ Dev Luker 实测「从宿主拉取 ~1MB/s，比原生慢 20 倍」。取证确�
 ### Next Steps
 
 - ~~git push~~ 已于网络恢复后推送（origin/main = fff95a2）；TT 侧需 debug 可执行产物才能实机复验
+
+
+## Session 63: Session 63 · 工作台收口（布局 / 分卷 / 联动 / 云端包仓库）
+<!-- trellis-session: v=2 fp=4850047f2fec7ecf -->
+
+**Date**: 2026-11-05
+**Task**: Session 63 · 工作台收口（布局 / 分卷 / 联动 / 云端包仓库）
+**Branch**: `main`
+
+### Summary
+
+补完截断批次，落地分卷确认、角色卡联动、S3 云端包仓库；本地目录永不入库
+
+### Main Changes
+
+- 修复 style.css 截断与两处守卫失败
+- 移动端切换与配额宿主数据折叠
+- P1-5 分卷失焦确认
+- P2-1 角色卡↔聊天联动
+- P2-2 A+B：局域网概览 + S3 云端包仓库
+- 铁律 21：test/e2e/scripts/fixtures 永不入库
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `9cbacad` | feat(sync): 分卷确认、角色卡联动与云端包仓库 |
+| `35713ec` | docs(plan): 收口本轮状态与两条新坑位 |
+
+### Testing
+
+- [OK] npm test 956 passed / 2 skipped
+- [OK] 七守卫全绿
+- [OK] 浏览器 375/320/1440 实测
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 起 Dev 实例后复验 D-1/D-2
