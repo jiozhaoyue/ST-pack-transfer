@@ -630,6 +630,9 @@
   #app.app-container[data-view="mobile"] .col-chart{flex:0 0 auto}
   #app.app-container[data-view="mobile"] .col-side{display:contents}
   #app.app-container[data-view="mobile"] .chart-card{flex:0 0 auto}
+  #app.app-container[data-view="mobile"] .cloud-view{flex:0 0 auto}
+  #app.app-container[data-view="mobile"] .cloud-grid{grid-template-columns:minmax(0,1fr)}
+  #app.app-container[data-view="mobile"] .cloud-body{overflow:visible}
   #app.app-container[data-view="mobile"] .vol-collapse{display:inline-flex}
   #app.app-container[data-view="mobile"] .chart-stack > .chart-group:only-child .vol-card{height:auto}
   #app.app-container[data-view="mobile"] .vol-card{resize:none}
@@ -665,6 +668,9 @@
     #app.app-container .vol-collapse{display:inline-flex}
     #app.app-container .vol-card .chart-tree{max-height:none;overflow:visible}
     #app.app-container .chart-card{flex:0 0 auto}
+    #app.app-container .cloud-view{flex:0 0 auto}
+    #app.app-container .cloud-grid{grid-template-columns:minmax(0,1fr)}
+    #app.app-container .cloud-body{overflow:visible}
     /* 竖屏：唯一滚动容器是 .app-main —— 内部一律不滚 */
     #app.app-container .app-main{overflow-y:auto;overflow-x:hidden}
     #app.app-container .chart-stack{overflow:visible;max-height:none;height:auto}
@@ -776,9 +782,40 @@
 #app.app-container .lan-open-btn{white-space:nowrap;flex-shrink:0;border:1px solid var(--border);background:var(--panel-3);
   color:var(--text);font:inherit;font-size:11px;line-height:1.4;padding:3px 9px;border-radius:7px;cursor:pointer}
 #app.app-container .lan-open-btn:hover{border-color:var(--border-strong)}
+#app.app-container .cloud-view{flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
+#app.app-container #cloud-view[hidden]{display:none}
+#app.app-container .cloud-body{display:flex;flex-direction:column;gap:8px;overflow:auto;padding:10px 12px;min-height:0}
+#app.app-container .cloud-note{font-size:10.5px;line-height:1.4;color:var(--muted);margin:0}
+#app.app-container .cloud-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 8px}
+#app.app-container .cloud-field{display:flex;flex-direction:column;gap:3px;font-size:10px;color:var(--muted);min-width:0}
+#app.app-container .cloud-field .text_pole{height:26px;min-width:0}
+#app.app-container .cloud-check{display:inline-flex;align-items:center;gap:6px;font-size:11px;white-space:nowrap}
+#app.app-container .cloud-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+#app.app-container .cloud-row .menu_button{min-height:28px;padding:4px 10px;font-size:11px;
+  background:var(--panel-3);border:1px solid var(--border);border-radius:8px;color:var(--text)}
+#app.app-container .cloud-picked{font-size:10.5px;color:var(--muted);overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1 1 auto}
+#app.app-container .cloud-status{font-size:11px;color:var(--muted);min-height:14px}
+#app.app-container .cloud-list{display:flex;flex-direction:column;gap:4px}
+#app.app-container .cloud-item{display:flex;align-items:center;gap:8px;padding:4px 6px;
+  border:1px solid var(--border);border-radius:7px;font-size:11px}
+#app.app-container .cloud-item .ci-name{flex:1 1 auto;min-width:0;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+#app.app-container .cloud-item .ci-size,#app.app-container .cloud-item .ci-time{flex:0 0 auto;
+  color:var(--muted);font-variant-numeric:tabular-nums}
+#app.app-container .ci-btn{flex:0 0 auto;min-height:22px;padding:2px 8px;border:1px solid var(--border);
+  border-radius:6px;background:var(--panel-3);color:var(--text);font-size:11px}
+#app.app-container .ci-btn.danger{color:var(--drop);border-color:var(--drop)}
+#app.app-container .cloud-empty{color:var(--muted);font-size:11px;padding:6px 0}
 #app.app-container .lan-view{flex:1 1 auto;min-height:0}
 #app.app-container #lan-view[hidden]{display:none}
 #app.app-container .lan-body{display:flex;flex-direction:column;gap:10px;overflow:auto;padding:10px 12px;min-height:0}
+#app.app-container .lan-overview{display:flex;flex-wrap:wrap;gap:6px 14px;padding:6px 8px;
+  border:1px solid var(--border);border-radius:8px;background:var(--panel-3);font-size:10.5px}
+#app.app-container .lan-overview .lo-item{display:inline-flex;align-items:baseline;gap:5px;min-width:0}
+#app.app-container .lan-overview b{font-weight:600;color:var(--muted)}
+#app.app-container .lan-overview .lo-item > span{color:var(--text);overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap;min-width:0}
 #app.app-container .lan-send,#app.app-container .lan-recv{display:flex;flex-direction:column;gap:6px}
 #app.app-container .lan-recv{border-top:1px dashed var(--border);padding-top:8px}
 #app.app-container .lan-sec-head{display:flex;align-items:baseline;gap:8px}

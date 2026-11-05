@@ -100,6 +100,11 @@ export function getWorkbenchHtml() {
             </div>
           </div>
           <div class="lan-body" id="lan-body">
+            <div class="lan-overview" id="lan-overview">
+              <span class="lo-item"><b data-i18n="lan.ovPeer"></b><span id="lan-ov-peer"></span></span>
+              <span class="lo-item"><b data-i18n="lan.ovCats"></b><span id="lan-ov-cats"></span></span>
+              <span class="lo-item"><b data-i18n="lan.ovState"></b><span id="lan-ov-state"></span></span>
+            </div>
             <div class="lan-scan" id="lan-scan" hidden>
               <video id="lan-scan-video" playsinline muted></video>
               <div class="lan-scan-actions">
@@ -164,6 +169,50 @@ export function getWorkbenchHtml() {
                 <button type="button" class="menu_button" id="lan-btn-abandon" hidden data-i18n="action.abandon"></button>
               </div>
             </section>
+          </div>
+        </section>
+
+        <section class="panel cloud-view" id="cloud-view" hidden>
+          <div class="panel-head">
+            <div class="panel-title">
+              <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M7 18h10a4 4 0 0 0 .6-7.96A6 6 0 0 0 6 11.5 3.5 3.5 0 0 0 7 18z"/></svg>
+              <span data-i18n="cloud.title"></span>
+            </div>
+            <div class="panel-actions">
+              <button class="icon-btn" id="cloud-close-btn" data-i18n-title="header.close">×</button>
+            </div>
+          </div>
+          <div class="cloud-body" id="cloud-body">
+            <p class="cloud-note" data-i18n="cloud.note"></p>
+            <div class="cloud-grid">
+              <label class="cloud-field"><span data-i18n="cloud.endpoint"></span>
+                <input class="text_pole" id="cloud-endpoint" placeholder="https://s3.example.com" autocomplete="off"></label>
+              <label class="cloud-field"><span data-i18n="cloud.region"></span>
+                <input class="text_pole" id="cloud-region" placeholder="us-east-1" autocomplete="off"></label>
+              <label class="cloud-field"><span data-i18n="cloud.bucket"></span>
+                <input class="text_pole" id="cloud-bucket" autocomplete="off"></label>
+              <label class="cloud-field"><span data-i18n="cloud.prefix"></span>
+                <input class="text_pole" id="cloud-prefix" autocomplete="off"></label>
+              <label class="cloud-field"><span data-i18n="cloud.accessKey"></span>
+                <input class="text_pole" id="cloud-access-key" autocomplete="off"></label>
+              <label class="cloud-field"><span data-i18n="cloud.secretKey"></span>
+                <input class="text_pole" id="cloud-secret-key" type="password" autocomplete="off"></label>
+              <label class="cloud-field"><span data-i18n="cloud.passphrase"></span>
+                <input class="text_pole" id="cloud-passphrase" type="password" autocomplete="off"></label>
+              <label class="cloud-check"><input type="checkbox" id="cloud-path-style"><span data-i18n="cloud.pathStyle"></span></label>
+            </div>
+            <div class="cloud-row">
+              <button type="button" class="menu_button" id="cloud-save" data-i18n="cloud.save"></button>
+              <button type="button" class="menu_button" id="cloud-refresh" data-i18n="cloud.refresh"></button>
+            </div>
+            <div class="cloud-row">
+              <input class="text_pole" id="cloud-file" type="file" accept=".zip" hidden>
+              <button type="button" class="menu_button" id="cloud-pick" data-i18n="cloud.pick"></button>
+              <button type="button" class="menu_button" id="cloud-upload" data-i18n="cloud.upload" disabled></button>
+              <span class="cloud-picked" id="cloud-picked"></span>
+            </div>
+            <div class="cloud-status" id="cloud-status"></div>
+            <div class="cloud-list" id="cloud-list"></div>
           </div>
         </section>
       </div>

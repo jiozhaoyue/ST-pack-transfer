@@ -123,3 +123,16 @@ npm run check:i18n
 npm run build
 npm run dev   # 3040 → 根路径（正式工作台；demo 页已废弃，见 workbench-single-view.md §9）
 ```
+
+## 8. 分卷容量：改值必须先确认（2026-11-05 用户裁定）
+
+- `#split-input` 的 `input` 事件**只**更新尾部估算 `#split-sim`，**不得**写 `state.splitMb`、
+  **不得**调用 `renderChart()`。
+- `change` 事件（失焦 / 回车）才进入确认：数值夹到 `SPLIT_MIN..SPLIT_MAX` 后，
+  若与当前 `state.splitMb` 不同，弹 `openModal()`（`split.confirmTitle` / `split.confirmDesc`）：
+  - 取消 ⇒ 输入框回退为 `state.splitMb`，图表不变。
+  - 确定 ⇒ 写入 `state.splitMb`，并**只重算一次**图表。
+- 超出区间时先夹值并 `toast.splitLimit`，再走确认流程。
+- 判据：未确认时 `#chart-stack` 的 DOM 不变；取消后输入框回到旧值；确定后再改值会再次弹确认。
+- 实测（2026-11-05 浏览器）：输入 128 时 `stackLen` 保持 1001 不变；取消后 `value=''`；
+  确定后 `value='128'`；再输 256 重新弹确认，取消回退 128。
