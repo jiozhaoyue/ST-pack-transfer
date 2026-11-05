@@ -40,10 +40,11 @@ npm run gen-fixtures              # 重新生成测试固件 fixtures/
 ### 分层边界（硬性）
 
 - `src/core/` — 纯逻辑，**禁止 DOM 依赖**。`transform.js`（911 行，convert 主入口）、`plan-preview.js`、`delta.js`、`splitter.js`、`zip-io.js`（vendor zip.js 封装）、`pt-archive.js`（PT 原生归档 → hub 重建，`D-23`）、`pack-inject.js`（聊天库注入判定，纯决策）、`zip-augment.js`（源包增强，纯 IO）。
+- `src/app/` — 应用层（只被根 `index.js` 使用）。`task-runtime.js`（半成品持久化 / 断点节流 / 批量续传判定）、`conversion-runner.js`（转换接线：`TaskManager` + 暂停 / 继续 / 中止 / 真增量续传）。
 - `src/ui/` — 可 DOM。`workbench-template.js` 是 HTML 模板唯一来源，`host-bridge.js`（1202 行）负责宿主嗅探/CSRF/拉取/恢复/注入；`chat-store-bridge.js` 是**与外部聊天库打交道的唯一落点**（特性检测 + 有界等待 + 静默降级），`chat-store-inject.js` 负责三个方向的编排（打包并入 / 从库导出 / 还原后入库）。
 - `src/storage/` — `db.js`（IndexedDB，DB_VERSION 2，files store 带 `origin` 字段区分 upload/host-export/converted/delta/split-part）、`authority-store.js`（可选后端适配器）。
 - `public/` — Vite 的 publicDir（构建时摊平到 `dist/` 根）。当前只有 `file-protocol-notice.js`：`file://` 双击时给一句说明（模块脚本在 `file://` 下必被 CORS 拒，不提示就只剩白屏）。
-- `index.js` — 根控制器，串起 detectHost → applyPluginUi → ExportQueue + TaskManager。
+- `index.js` — 根控制器，串起 detectHost → 视图装配 → `conversionRunner`（暂停 / 续传）→ 产物落地。
 - `src/vendor/` — zip.js / fzstd / fontawesome 本地副本，**勿升级改动**，只用其已有 API。
 
 ### 关键机制（需读多文件才懂）

@@ -235,6 +235,7 @@ export function getWorkbenchHtml() {
             <button class="zone-tab active" data-zone="import"><span data-i18n="zones.import"></span><span class="count" id="count-import">4</span></button>
             <button class="zone-tab" data-zone="export"><span data-i18n="zones.export"></span><span class="count" id="count-export">1</span></button>
           </div>
+          <div class="pending-exports" id="pending-exports" hidden></div>
           <div class="zone-body" id="zone-body"></div>
         </section>
 

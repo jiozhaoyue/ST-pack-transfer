@@ -92,16 +92,19 @@ IO **不再有** Node / 浏览器双适配器（旧的 `node-io`(yauzl/yazl) / `
 持久化经注入 adapter（`{save,load,remove}`）；任务运行时（半成品持久化、断点节流、批量续传判定、
 调试探针）在 `src/app/task-runtime.js`（2026-10-27 从旧控制器抽出）。
 
-⚠️ **现状（2026-11-05 核对，勿按旧文档接线）**：
-- `TaskManager` 类**当前无调用点**；`src/app/task-runtime.js` 虽被 `index.js` import，但其中
-  `persistPartial` / `createCheckpointThrottle` / `runBatchItems` / `batchResumeVerdict` **均无调用**。
-- 暂停 / 中止的 **UI 不存在**（模板无 `#task-controls`，`index.js` 无 pause/abort 调用）。
-- 仍在工作的是**拉取侧** `AbortController`：宿主原生导出开始时 `activePullAbort.abort()`（宿主优先），
-  以及 `fetchHostBackup` 自己的 `Range` 续传（先发 `Range: bytes=<received>-`，非 206 则从零重拉）。
-- **转换调用（`index.js:569/673`）没有传 `resumeCrcMap` / `onEntryDone` / `signal`** ⇒ core 支持断点续传，
-  但当前入口不接。**这是「能力保留、入口未接」的状态，是否有意需产品裁定**（见计划 §9）。
+✅ **现状（2026-11-05 恢复接线）**：
+- 接线集中在 `src/app/conversion-runner.js`；`index.js` 的 `generate` / `generateMerged` 统一经
+  `conversionRunner.convert()`，自动携带 `signal` / `resumeCrcMap` / `appendFrom` / `finalizeOnAbort`。
+- 断点落盘挂 **`onProgress`**（不是 `onEntryDone`）；暂停 → `TaskManager.pause()` → Worker 协作式收尾 →
+  `onPaused` → `persistPartial`（**先落 zip 再写断点**）。
+- 暂停/中止的 UI 在**动作行动态渲染**（`#btn-task-pause` / `#btn-task-resume` / `#btn-task-abort`），
+  不新增模板控件；`view.setTask({state,label})` 是唯一入口。
+- 跨重载：OPFS 半成品 + localStorage `st-pack-transfer:pausedTask`；续传时用 `readZipEntryManifest()`
+  从半成品重建台账（不依赖 Authority；Authority 只作断点持久化的可选增强）。
+- 拉取侧仍是 `AbortController`（宿主原生导出优先）+ `fetchHostBackup` 的 `Range` 续传。
+- 单测：`test/conversion-runner.test.js`（成功传参 / 暂停不 fail / 中止清理 / 续传重建台账 / 空转安全）。
 
-历史接线路数（2026-09-27 取证，已失效）：宿主拉取与转换曾接 `TaskManager`；写回宿主另走
+历史接线路数（2026-09-27 取证，替换前形态）：宿主拉取与转换曾接 `TaskManager`；写回宿主另走
 `src/core/restore-batch.js`（`createRestoreBatch`）——该模块现亦无调用点，只剩 `host-bridge.js` 的
 `restoreInFlight` 互斥标志在用。
 

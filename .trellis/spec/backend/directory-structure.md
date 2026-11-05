@@ -44,6 +44,9 @@ ST-pack-transfer/
 │   │   ├── transform.js        # 转换主入口 convert()，target ∈ st|l|tt|pt
 │   │   ├── worker-client.js    # Worker 封装 + 无 Worker 时主线程降级
 │   │   └── zip-io.js           # 统一 zip IO（vendor zip.js + fzstd Method 93）
+│   ├── app/                # 应用层：任务运行时与转换接线（可依赖 core/ui）
+│   │   ├── task-runtime.js      # 半成品持久化 / 断点节流 / 批量续传判定 / 调试探针
+│   │   └── conversion-runner.js # 转换接线：TaskManager + persistPartial + 暂停/中止/续传
 │   ├── storage/            # 持久化
 │   │   ├── db.js               # IndexedDB（DB_VERSION 2：files / workspace / preferences）
 │   │   └── authority-store.js  # 可选 Authority 后端适配器（不可用时静默降级）
@@ -52,7 +55,7 @@ ST-pack-transfer/
 │   │   └── zip.js              # @zip.js/zip.js 自包含副本
 │   └── ui/                 # 可 DOM 层
 │       ├── escape.js           # escapeHtml / trustedStaticMarkup（HTML 转义唯一入口）
-│       ├── export-queue.js     # 旧待导出区（当前无调用方，只剩单测）
+│       ├── export-queue.js     # 本次待导出队列（keepExport=false 时承载产物）
 │       ├── host-bridge.js      # 宿主嗅探 / CSRF / 备份拉取 / 恢复写入 / 原生按钮注入
 │       ├── workbench-view.js   # 工作台视图渲染（图表 / 选择树 / 配额 / 设置视图）
 │       ├── workbench-template.js # 工作台 HTML 模板唯一来源

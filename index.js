@@ -28,6 +28,7 @@ import {
   isNativeExportBusy, closeNativeBackupUi, watchNativeExportStart,
   uploadUserFile, userFilesSupported, sanitizeUserFileName, verifyUserFiles, deleteUserFile,
   readHostStorageQuota,
+  opfsTmpHandle, opfsHandleToFile, opfsTmpCleanup,
 } from './src/ui/host-bridge.js';
 import { packPrivateContainer } from './src/core/private-container.js';
 import { loadPrivateFiles, addPrivateFile, removePrivateFile } from './src/ui/private-files-store.js';
@@ -41,6 +42,10 @@ import { applyI18n } from './src/i18n/dom.js';
 import { getLocale, onLocaleChange, setLocale, t } from './src/i18n/index.js';
 import { probeChatStore } from './src/ui/chat-store-bridge.js';
 import { mountDebugProbe } from './src/app/task-runtime.js';
+import { createConversionRunner, readPausedMarker, clearPausedMarker } from './src/app/conversion-runner.js';
+import { ExportQueue } from './src/ui/export-queue.js';
+import { reportToHuman } from './src/core/report.js';
+import { TaskManager, memoryAdapter } from './src/core/task-manager.js';
 
 export {
   TASK_KINDS, TASK_PREFIX, taskKindOf, partialNameFor, hasRoomForPartial,
@@ -111,6 +116,30 @@ async function main(root) {
     planCache: new Map(),
     busy: false,
   };
+
+  /** 本次待导出（内存队列）：产物统一出口，不入库直到用户点「存入工作区」。 */
+  const exportQueue = new ExportQueue();
+  /** 惰性初始化：Node 测试环境不得在 import 期触碰 Authority / OPFS。 */
+  let taskManagerPromise = null;
+  /** 上次暂停的转换（跨重载经 localStorage 恢复；仅保存 taskId/pkgId/target）。 */
+  let pendingResume = readPausedMarker();
+  /** @type {ReturnType<typeof createConversionRunner>|null} */
+  let conversionRunner = null;
+
+  async function getTaskManager() {
+    if (!taskManagerPromise) {
+      taskManagerPromise = (async () => {
+        let adapter = null;
+        try {
+          const mod = await import('./src/storage/authority-store.js');
+          adapter = (await mod.createCheckpointAdapter?.()) || null;
+        } catch { adapter = null; }
+        // Authority 不可用时退回内存适配器；跨重载的续传靠 OPFS 半成品 + localStorage 标记。
+        return new TaskManager(adapter || memoryAdapter());
+      })();
+    }
+    return taskManagerPromise;
+  }
 
   const pkgById = (id) => state.packages.find((pkg) => pkg.id === id) || null;
 
@@ -557,6 +586,7 @@ async function main(root) {
     const code = targetCodeOf(target);
     const limit = splitLimitOf(splitMb);
     const created = [];
+    const reports = [];
     try {
       for (const pkg of packages) {
         const blob = await blobOf(pkg);
@@ -566,18 +596,18 @@ async function main(root) {
         const excluded = view.getExcludedPaths(pkg);
         const exportOptions = view.getExportOptions(pkg);
         view.setProgress(3, t('progress.converting', { name: pkg.name }));
-        const { resultBlob } = await runConversionTask({
-          source: blob,
+        const outcome = await conversionRunner.convert({
+          pkg,
+          blob,
           target: code,
-          options: {
-            excludedPaths: excluded,
-            ...exportOptions,
-          },
-          onProgress: (current, total, filename) => {
-            const pct = total ? Math.round((current / total) * 92) : 10;
-            view.setProgress(pct, t('progress.convertingN', { current, total, file: filename ? ` · ${filename}` : '' }));
-          },
+          options: { excludedPaths: excluded, ...exportOptions },
+          pctBase: 3,
+          pctSpan: 92,
+          resume: takeResumeFor(pkg.id),
         });
+        if (outcome.paused || outcome.aborted) return;
+        if (outcome.report) reports.push(outcome.report);
+        const resultBlob = outcome.resultBlob;
         if (!resultBlob) continue;
         if (limit) {
           const entries = [];
@@ -606,6 +636,7 @@ async function main(root) {
         logger.info(t('log.converted', { name: pkg.name }));
       }
       await deliverCreated(created, code);
+      if (reports.length) view.showReport(reports[reports.length - 1]);
     } catch (err) {
       logger.error(t('log.convertFailed', { msg: err.message }));
       view.setProgress(0, t('progress.convertFailed'));
@@ -615,8 +646,12 @@ async function main(root) {
     }
   }
 
-  /** 产物落地：按设置留在导出区，或直接下载。合并模式与非合并模式共用。 */
+  /**
+   * 产物落地：`keepExport` 为真时写工作区（导出区列表）；否则进「本次待导出」内存队列。
+   * **不自动下载**——下载是用户在队列或导出区里的显式动作。
+   */
   async function deliverCreated(created, layout = 'unknown') {
+    if (!created.length) { view.setProgress(0, t('toast.convertFailed')); return; }
     if (settings.keepExport) {
       for (const item of created) {
         await saveFile({
@@ -627,14 +662,75 @@ async function main(root) {
         });
       }
       await syncPackages();
-      view.setProgress(100, t('progress.exportReady'));
-      view.toast(t('toast.generated', { n: created.length }));
-      if (created.length) view.setZone('export');
     } else {
-      for (const item of created) downloadBlob(item.blob, item.name);
-      view.setProgress(100, t('progress.exportDownloaded'));
-      view.toast(t('toast.generatedDownloaded', { n: created.length }));
+      for (const item of created) {
+        exportQueue.enqueue({
+          blob: item.blob,
+          name: item.name,
+          targetLayout: layout || 'unknown',
+          origin: ORIGINS.CONVERTED,
+          ephemeral: true,
+        });
+      }
     }
+    view.setProgress(100, t('progress.exportReady'));
+    view.toast(t('toast.generated', { n: created.length }));
+    view.setZone('export');
+  }
+
+  /** 取本次转换要用的断点：只有「同一源包」才复用，换包则丢弃旧标记（避免拿别人的半成品续写）。 */
+  function takeResumeFor(pkgId) {
+    if (!pendingResume) return null;
+    if (pendingResume.pkgId !== pkgId) {
+      pendingResume = null;
+      clearPausedMarker();
+      view.setTask(null);
+      logger.info(t('log.resumeDropped'));
+      return null;
+    }
+    const resume = { taskId: pendingResume.taskId };
+    pendingResume = null;
+    logger.info(t('log.taskResumed'));
+    return resume;
+  }
+
+  /** 「继续」：按暂停标记回到同一源包、同一目标布局。 */
+  async function resumePaused() {
+    const marker = pendingResume || readPausedMarker();
+    if (!marker) return;
+    const pkg = state.packages.find((p) => p.id === marker.pkgId);
+    if (!pkg) {
+      pendingResume = null;
+      clearPausedMarker();
+      view.setTask(null);
+      view.toast(t('toast.convertFailed'));
+      return;
+    }
+    pendingResume = marker;
+    const targetName = TARGET_PLATFORMS.find((p) => p.code === marker.target)?.name || marker.target;
+    await generate({ packages: [pkg], target: targetName, splitMb: view.getState().splitMb });
+  }
+
+  async function downloadPending(id) {
+    await exportQueue.download(id);
+    const item = exportQueue.items.find((it) => it.id === id);
+    if (item?.storedId) exportQueue.remove(id);
+    await syncPackages();
+  }
+
+  async function stashPending(id) {
+    await exportQueue.stash(id);
+    const item = exportQueue.items.find((it) => it.id === id);
+    if (item?.storedId) {
+      exportQueue.remove(id);
+      await syncPackages();
+      view.toast(t('toast.generated', { n: 1 }));
+    }
+  }
+
+  function downloadReport(report) {
+    const blob = new Blob([reportToHuman(report)], { type: 'text/plain;charset=utf-8' });
+    downloadBlob(blob, `report_${Date.now()}.txt`);
   }
 
   function escapeText(value) {
@@ -664,22 +760,25 @@ async function main(root) {
     const plan = view.getMergedPlan(packages);
     const compression = Number(view.getState().compression) || 5;
     const blobs = [];
+    const reports = [];
     try {
       for (const pkg of packages) {
         const blob = await blobOf(pkg);
         if (!blob) continue;
         if (!(await ensurePlan(pkg.id, target))) continue;
         view.setProgress(3, t('progress.converting', { name: pkg.name }));
-        const { resultBlob } = await runConversionTask({
-          source: blob,
+        const outcome = await conversionRunner.convert({
+          pkg,
+          blob,
           target: code,
           options: { excludedPaths: plan.excludedByPkg[pkg.id], ...plan.optionsByPkg[pkg.id] },
-          onProgress: (current, total, filename) => {
-            const pct = total ? Math.round((current / total) * 50) : 10;
-            view.setProgress(pct, t('progress.convertingN', { current, total, file: filename ? ` · ${filename}` : '' }));
-          },
+          pctBase: 3,
+          pctSpan: 50,
+          resume: takeResumeFor(pkg.id),
         });
-        if (resultBlob) blobs.push(resultBlob);
+        if (outcome.paused || outcome.aborted) return;
+        if (outcome.report) reports.push(outcome.report);
+        if (outcome.resultBlob) blobs.push(outcome.resultBlob);
         logger.info(t('log.converted', { name: pkg.name }));
       }
       if (!blobs.length) { view.toast(t('toast.convertFailed')); return; }
@@ -721,6 +820,7 @@ async function main(root) {
       }
       logger.info(t('log.mergeDone', { n: packages.length, files: merged.fileCount }));
       await deliverCreated(created, code);
+      if (reports.length) view.showReport(reports[reports.length - 1]);
     } catch (err) {
       logger.error(t('log.convertFailed', { msg: err.message }));
       view.setProgress(0, t('progress.convertFailed'));
@@ -886,6 +986,14 @@ async function main(root) {
       deleteSelected,
       download: downloadSelected,
       libraryExport: exportLibrary,
+      taskPause: () => conversionRunner?.pause(),
+      taskResume: resumePaused,
+      taskAbort: () => conversionRunner?.abort(),
+      pendingDownload,
+      pendingStash,
+      pendingRemove: (id) => exportQueue.remove(id),
+      pendingClear: () => exportQueue.clear(),
+      reportDownload: downloadReport,
       lan: lanActions,
       settings: openSettings,
       uploadRequest: () => root.querySelector('#file-input')?.click(),
@@ -929,6 +1037,18 @@ async function main(root) {
       },
     },
   });
+
+  conversionRunner = createConversionRunner({
+    getTaskManager,
+    runConversionTask,
+    view,
+    logger,
+    t,
+    opfs: { tmpHandle: opfsTmpHandle, handleToFile: opfsHandleToFile, cleanup: opfsTmpCleanup },
+  });
+  exportQueue.subscribe(() => view.setPendingExports(exportQueue.items));
+  view.setPendingExports(exportQueue.items);
+  if (pendingResume) view.setTask({ state: 'paused', label: pendingResume.name || '' });
 
   // 宿主原生导出优先：在途的插件拉取立即让路（可取消的只有插件自己的请求）。
   watchNativeExportStart(() => {

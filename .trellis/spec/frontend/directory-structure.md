@@ -50,6 +50,9 @@ ST-pack-transfer/
 │   │   ├── transform.js         # 转换主入口 convert()（TARGETS: st|l|tt|pt），hub 规范化 + 逐条目路由
 │   │   ├── worker-client.js     # Worker 调度；无 window/Worker（Node/Vitest）自动主线程降级
 │   │   └── zip-io.js            # 通用 zip IO 适配器（zip.js + fzstd，原生注册 Method 93 Zstandard）
+│   ├── app/                # 应用层：控制器与任务运行时（可依赖 core/ui，不反向）
+│   │   ├── task-runtime.js      # 半成品持久化 / 断点节流 / 批量续传判定 / 调试探针
+│   │   └── conversion-runner.js # 转换接线：TaskManager + persistPartial + 暂停/中止/续传
 │   ├── storage/
 │   │   ├── db.js                # IndexedDB（DB_VERSION 2；files store 带 origin: upload/host-export/converted/delta/split-part）
 │   │   └── authority-store.js   # Authority 可选适配器：探测 window.STAuthority.AuthoritySDK，不可用则全部返回 null/false
@@ -60,7 +63,7 @@ ST-pack-transfer/
 │       ├── workbench-template.js  # HTML 模板唯一来源（getWorkbenchHtml 无参数，两态逐字相同）
 │       ├── workbench-view.js      # 工作台视图渲染与交互（图表 / 选择树 / 配额 / 设置视图）
 │       ├── host-bridge.js         # 宿主嗅探 / CSRF / 备份拉取 / 恢复 / 扩展安装器 / 原生 UI 注入 / OPFS
-│       ├── export-queue.js        # 旧待导出区（当前无调用方，只剩单测）
+│       ├── export-queue.js        # 本次待导出队列（keepExport=false 时承载产物）
 │       ├── escape.js              # DOM 注入防线：escapeHtml / isSafeHttpUrl / trustedStaticMarkup
 │       ├── lan-transfer-panel.js  # 局域网互传面板（WebRTC）
 │       ├── settings-panel.js / settings-store.js  # 设置视图与持久化
@@ -185,11 +188,12 @@ ST-pack-transfer/
 - `escapeHtml()`（覆盖 `& < > " '`，元素上下文与**属性上下文**通用）、`isSafeHttpUrl()`（只放行 http/https）、`trustedStaticMarkup()`（恒等函数，唯一作用是让守卫放行并让 reviewer 一眼看完全部豁免点：`grep -rn "trustedStaticMarkup(" src/ index.js`）。
 - 配套守卫：`npm run check:dom-injection`（`scripts/dom-injection-guard.js`）扫描 `src/ui/**` 与根 `index.js`；豁免需写 `dom-injection-guard:allow <理由>`（单条）或 `allow-file <理由>`（整文件，当前**没有文件**使用）。
 
-### 5. 产物落地（原 `src/ui/export-queue.js`，当前未接线）
+### 5. 产物落地（`keepExport` 决定去向）
 - 转换 / 拉取的产物由 `index.js` 的 `deliverCreated()` 决定去向：`settings.keepExport` 为真时写 IndexedDB
-  （`saveFile`，`origin: ORIGINS.CONVERTED`，随后 `syncPackages()` 并切到导出区），否则直接 `downloadBlob()`。
-  **不自动下载**由该设置控制，不是无条件行为。
-- `export-queue.js` 的内存队列与 `renderExportQueue()` 自 2026-10-27 起**无调用方**（只剩单测），不要按它接线。
+  （`saveFile`，`origin: ORIGINS.CONVERTED`，随后 `syncPackages()` 并切到导出区）；为假时进
+  `ExportQueue` 的「本次待导出」队列（`#pending-exports`，下载 / 存入工作区 / 移除 / 清空）。
+- **不自动下载**：下载是用户在队列或导出区里的显式动作。
+- `renderExportQueue()`（整块旧面板）仍未被使用；现役渲染是 `workbench-view.js` 的 `renderPendingExports()`。
 
 ### 6. `src/core/delta.js`（增量导出）
 - `compareArchives` 基于条目元数据（文件名 / 未压缩大小 / CRC32）快速比对；`generateDeltaArchive` 只含新增与修改条目，并附审计清单 `_delta_manifest.json`。
