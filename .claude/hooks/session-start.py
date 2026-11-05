@@ -501,6 +501,20 @@ def _session_id_from_hook(hook_input: dict) -> str | None:
     return None
 
 
+def _build_iron_rules(trellis_dir: Path) -> str:
+    """Read the project's canonical iron-rules file for injection.
+
+    Only the `## 铁律` section is injected here; UserPromptSubmit re-injects it
+    every five user messages. Missing file fails open with a visible warning.
+    """
+    path = trellis_dir / "spec" / "guides" / "iron-rules.md"
+    try:
+        from rules_lib import read_section  # type: ignore[import-not-found]
+        return read_section(path, "铁律")
+    except Exception:
+        return ""
+
+
 def _build_compact_current_state(
     trellis_dir: Path,
     spec_index_paths: list[str],
@@ -621,6 +635,17 @@ mini-trellis SessionStart context. Orient from journal, spec, and research.
 
 """)
 
+    iron_rules = _build_iron_rules(trellis_dir)
+    if iron_rules:
+        output.write("<iron-rules>\n")
+        output.write(iron_rules)
+        output.write("\n</iron-rules>\n\n")
+    else:
+        output.write(
+            "<iron-rules>\n[注入源缺失] .trellis/spec/guides/iron-rules.md；"
+            "请恢复该文件，规则不再硬编码在 hook 里。\n</iron-rules>\n\n"
+        )
+
     # Legacy migration warning
     legacy_warning = _check_legacy_spec(trellis_dir, is_mono, packages)
     if legacy_warning:
@@ -713,11 +738,8 @@ Context loaded. Use journal, spec, research, and `mini-trellis mem` on demand. R
         previous = {}
     if not isinstance(previous, dict):
         previous = {}
-    if source == "startup" and context_key and previous.get("source") == source and previous.get("content_hash") == content_hash:
-        _write_runtime_status(trellis_dir, platform, "deduped", output_chars=0, context_key=context_key, content_hash=content_hash, source=source)
-        print("{}", flush=True)
-        return
-
+    # 强制注入：不做内容去重。用户 2026-11-05 明令「强制运行注入」，
+    # 宁可重复提示，也不让新会话静默漏掉铁律。
     result: dict[str, object] = {
         # Claude Code / Qoder / CodeBuddy / Droid / Gemini / Copilot / Trae /
         # ZCode format.

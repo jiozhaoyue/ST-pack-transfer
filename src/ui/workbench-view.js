@@ -150,9 +150,23 @@ function persistLog() {
   }, 250);
 }
 
+const CARD_SIZE_KEY = 'stpt.cardSize';
+
+/** 图表卡拖拽后的尺寸（按 data-volkey 持久化，刷新后保持）。 */
+function loadCardSizes(){
+  try {
+    const raw = localStorage.getItem(CARD_SIZE_KEY);
+    const parsed = raw ? JSON.parse(raw) : {};
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch { return {}; }
+}
+function persistCardSizes(){
+  try { localStorage.setItem(CARD_SIZE_KEY, JSON.stringify(state.cardSize)); } catch { /* 配额不足时仅本会话生效 */ }
+}
+
 const state = {
-  host:'luker', mode:'plugin', view:'desktop', pane:'workbench', zone:'import',
-  source:{ type:'host', pkgId:null }, target:'SillyTavern', delta:'overwrite', splitMb:'',
+  host:'luker', mode:'plugin', view:'desktop', mobileView:'chart', pane:'workbench', zone:'import',
+  source:{ type:'host', pkgId:null }, target:'SillyTavern', targetManual:false, delta:'overwrite', splitMb:'',
   compression:'5',
   extensionMode: typeof localStorage !== 'undefined' ? (loadSettings().defaultExtensionMode || 'full') : 'full',
   gitMode: typeof localStorage !== 'undefined' ? (loadSettings().defaultGitMode || 'minimal') : 'minimal',
@@ -160,7 +174,8 @@ const state = {
   packages: INITIAL_PACKAGES.map(p=>({...p})),
   selectedPkgs:new Set(), mergeMode:false, privateFiles:[], expanded:{}, collapsedVol:{}, sel:{}, log:loadPersistedLog(), logLevel:'ALL',
   noTrafficPrompt:false, keepExport:true,
-  storage:{ browser:null, host:null },
+  chartFmt:{}, cardSize:loadCardSizes(),
+  storage:{ browser:null, host:null }, quotaHostOpen:false,
   sort:'time-desc', filter:'all', tutorialStep:0, tutorialOpen:false, tutorialKind:'basic',
   sourceKey:'host:luker', seq:{}, libraryExport:false,
   lan:{
@@ -295,6 +310,30 @@ function hostFilterHtml(){
     +'</select></label>';
 }
 
+/* ── 视图形态与移动端左右切换 ── */
+function detectView(){
+  const w = typeof window !== 'undefined' ? window.innerWidth : 1024;
+  return w <= 640 ? 'mobile' : 'desktop';
+}
+function syncView(){
+  state.view = detectView();
+  const app = document.getElementById('app');
+  if(app) app.dataset.view = state.view;
+}
+/* 手机端：存储图表与数据包左右切换；同一时刻只显示一页，各页各自纵向滚动到尽头。 */
+function renderMobileView(){
+  const sw = document.getElementById('mobile-switch');
+  const chart = document.querySelector('.col-chart');
+  const side = document.querySelector('.col-side');
+  const mobile = state.view === 'mobile';
+  if(sw) sw.hidden = !mobile;
+  if(chart) chart.hidden = mobile && state.mobileView !== 'chart';
+  if(side) side.hidden = mobile && state.mobileView !== 'zone';
+  document.querySelectorAll('[data-mview]').forEach(b=>{
+    b.classList.toggle('active', b.dataset.mview === state.mobileView);
+  });
+}
+
 /* ── 渲染：头部 ── */
 /* 目标平台固定四项 + 英文全称；图标只在标识处用品牌色环，面板本身不染色。 */
 const TARGETS=[
@@ -303,6 +342,16 @@ const TARGETS=[
   { value:'TauriTavern', host:'tt' },
   { value:'PureTavern', host:'pt' }
 ];
+/** 宿主平台 → 目标平台默认值（defaultTarget=auto 时生效）。 */
+const HOST_TO_TARGET = { st:'SillyTavern', luker:'Luker', tt:'TauriTavern', pt:'PureTavern' };
+function targetForHost(hostKey){
+  const pref = loadSettings().defaultTarget;
+  if (pref && pref !== 'auto') {
+    const hit = TARGETS.find(x=>x.host===pref);
+    if (hit) return hit.value;
+  }
+  return HOST_TO_TARGET[hostKey] || 'SillyTavern';
+}
 function renderHeader(){
   const h=HOSTS[state.host];
   const isWeb=state.mode==='web';
@@ -321,6 +370,9 @@ function renderTargetPicker(){
   const bi=document.getElementById('target-btn-icon');
   bi.src=hostIcon(cur.host); bi.dataset.host=cur.host;
   document.getElementById('target-btn-text').textContent=cur.value;
+  const hostTag=document.getElementById('target-btn-host');
+  const isHostNow = state.mode!=='web' && cur.host===state.host;
+  if(hostTag){ hostTag.hidden=!isHostNow; hostTag.textContent=isHostNow?t('target.hostSuffix'):''; }
   const app=document.getElementById('app');
   if(app) app.setAttribute('data-target-host', cur.host);
   document.getElementById('target-pop').innerHTML=TARGETS.map(opt=>{
@@ -352,7 +404,8 @@ function updateSplitSim(){
 }
 
 /* ── 渲染：图表 ── */
-/* 图表目标：勾了包 → 每个勾选的包一组图表；否则看当前来源；都没有则看宿主。 */
+/* 图表目标：勾了包 → 每个勾选的包一组图表；否则看当前来源。
+   宿主数据不再作为图表卡出现——它只在配额折叠区里出现一次（禁止重复元素）。 */
 function chartTargets(){
   const sel=[...state.selectedPkgs].map(id=>state.packages.find(p=>p.id===id)).filter(Boolean);
   if(sel.length) return mergeActive(sel) ? [{merge:true,pkgs:sel}] : sel.map(p=>({pkg:p}));
@@ -360,7 +413,7 @@ function chartTargets(){
     const p=state.packages.find(x=>x.id===state.source.pkgId);
     if(p) return [{pkg:p}];
   }
-  return [{host:true}];
+  return [];
 }
 /* 合并模式：≥2 个包勾选时才生效；只有一个包时没有可合并的对象。 */
 function mergeActive(sel){
@@ -459,10 +512,33 @@ function renderQuota(){
       +'<span class="quota-val">'+gb(cell.used)+' / '+gb(total)+' · '+p+'%</span></div>';
   };
   const hostReadable=!!(HOSTS[state.host]||{}).readable;
+  const open=!!state.quotaHostOpen;
   head.innerHTML = row(t('quota.browser'),'db',state.storage.browser,t('quota.browserEmpty'))
-    + row(t('quota.host'),'shield',hostReadable ? state.storage.host : null,t('quota.hostEmpty'));
+    + row(t('quota.host'),'shield',hostReadable ? state.storage.host : null,t('quota.hostEmpty'))
+    + '<button type="button" class="quota-host-toggle" id="quota-host-toggle" aria-expanded="'+(open?'true':'false')+'">'
+      + svg('folder','tree-ico')
+      + '<span class="qht-label">'+t('quota.hostData')+'</span>'
+      + '<svg class="chev" viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5l7 7-7 7"/></svg>'
+    + '</button>'
+    + '<div class="quota-host-detail" id="quota-host-detail"'+(open?'':' hidden')+'>'
+      + (open ? hostDetailHtml(hostReadable ? (state.hostTree||[]) : []) : '')
+    + '</div>';
 }
-function renderTreeRows(nodes,depth,scope,readonly,tools){
+/* 宿主目录明细：默认收起，点击在同一条目内展开；只读，不参与勾选与统计。 */
+function hostDetailHtml(nodes){
+  let out='';
+  const walkRows=(list,depth)=>{
+    for(const n of list||[]){
+      out+='<div class="quota-host-row" style="padding-left:'+(8+depth*12)+'px">'
+        +'<span class="qhr-name" title="'+escapeHtml(n.label)+'">'+escapeHtml(n.label)+'</span>'
+        +'<span class="qhr-size">'+fmtMB(n.mb)+'</span></div>';
+      if(n.children && n.children.length) walkRows(n.children,depth+1);
+    }
+  };
+  walkRows(nodes,0);
+  return out || '<div class="quota-empty">'+t('quota.hostEmpty')+'</div>';
+}
+function renderTreeRows(nodes,depth,scope,readonly,tools,totalMb){
   let out='';
   for(const n of nodes){
     if(tools && tools[n.id]) out+=tools[n.id];
@@ -472,6 +548,7 @@ function renderTreeRows(nodes,depth,scope,readonly,tools){
     const checked = hasKids ? !!n._checked : isChecked(n,scope);
     const indeterminate = hasKids && !!n._indeterminate;
     const ind=Math.min(depth,8)*15;
+    const pct = totalMb>0 ? Math.max(0,Math.min(100,Math.round((Number(n.mb)||0)/totalMb*100))) : 0;
     const pillCls=n.suggest==='keep'?'keep':n.suggest==='optional'?'optional':n.suggest==='drop'?'drop':'unknown';
     const pillText=n.suggest==='keep'?t('tree.suggestKeep'):n.suggest==='optional'?t('tree.suggestOptional'):n.suggest==='drop'?t('tree.suggestDrop'):t('tree.suggestUnknown');
     out+='<div class="tree-row'+(expanded?' expanded':'')+'" data-id="'+n.id+'" style="padding-left:'+(6+ind)+'px">'
@@ -486,14 +563,58 @@ function renderTreeRows(nodes,depth,scope,readonly,tools){
         +'<button data-suball="none" data-subnode="'+n.id+'" title="'+t('chart.selectNone')+'">✕</button>'
         +'<button data-suball="invert" data-subnode="'+n.id+'" title="'+t('chart.invert')+'">⇄</button>'
       +'</span>' : '')
+      +'<span class="tree-occ" aria-hidden="true"><i style="width:'+pct+'%"></i></span>'
       +'<span class="tree-size">'+fmtMB(n.mb)+'</span>'
       +(n.uploadable?'<button class="tree-mini" data-upload="'+n.id+'">'+t('tree.upload')+'</button>':'')
       +'</div>';
     if(hasKids && expanded){
-      out+='<div class="tree-children">'+renderTreeRows(n.children,depth+1,scope,readonly,tools)+'</div>';
+      out+='<div class="tree-children">'+renderTreeRows(n.children,depth+1,scope,readonly,tools,totalMb)+'</div>';
     }
   }
   return out;
+}
+
+/* ── 图表可视化：条形 / 圆环，两种格式共用同一份类目数据 ── */
+const CHART_FMTS = ['bar','donut'];
+function chartFmtOf(key){
+  const fmt = state.chartFmt[key];
+  return CHART_FMTS.includes(fmt) ? fmt : 'bar';
+}
+function volChartData(nodes){
+  const items = (nodes||[])
+    .map(n=>({ label:String(n.label||''), mb:Number(n.mb)||0 }))
+    .filter(x=>x.mb>0)
+    .sort((a,b)=>b.mb-a.mb);
+  const top = items.slice(0,6);
+  const rest = items.slice(6);
+  if(rest.length) top.push({ label:t('chart.others'), mb:rest.reduce((a,b)=>a+b.mb,0) });
+  return { items: top, total: top.reduce((a,b)=>a+b.mb,0) };
+}
+function volChartHtml(nodes, fmt){
+  const { items, total } = volChartData(nodes);
+  if(!items.length) return '<div class="vol-chart is-empty" data-volchart="1"></div>';
+  if(fmt==='donut'){
+    let offset = 25;
+    const arcs = items.map((it,i)=>{
+      const p = total ? it.mb/total*100 : 0;
+      const arc = '<circle class="vc-arc vc-c'+(i%6+1)+'" cx="21" cy="21" r="15.915" fill="none" stroke-width="6"'
+        +' stroke-dasharray="'+p.toFixed(2)+' '+(100-p).toFixed(2)+'" stroke-dashoffset="'+offset.toFixed(2)+'"></circle>';
+      offset -= p;
+      return arc;
+    }).join('');
+    const legend = items.map((it,i)=>'<span class="vc-li"><i class="vc-sw vc-c'+(i%6+1)+'"></i>'
+      +escapeHtml(it.label)+'<b>'+fmtMB(it.mb)+'</b></span>').join('');
+    return '<div class="vol-chart is-donut" data-volchart="1">'
+      +'<svg class="vc-donut" viewBox="0 0 42 42" role="img">'+arcs+'</svg>'
+      +'<div class="vc-legend">'+legend+'</div></div>';
+  }
+  const rows = items.map((it,i)=>{
+    const p = total ? Math.round(it.mb/total*100) : 0;
+    return '<div class="vc-row"><span class="vc-label" title="'+escapeHtml(it.label)+'">'+escapeHtml(it.label)+'</span>'
+      +'<span class="vc-bar"><i class="vc-c'+(i%6+1)+'" style="width:'+p+'%"></i></span>'
+      +'<span class="vc-val">'+fmtMB(it.mb)+'</span></div>';
+  }).join('');
+  return '<div class="vol-chart is-bar" data-volchart="1">'+rows+'</div>';
 }
 
 /* 一张标准图表卡：包序号 + 卷号 + 本卷容量 + 全选 + 树 + 勾选摘要。
@@ -503,14 +624,23 @@ function chartCardHtml(o){
   syncAncestors(o.nodes,o.scope);
   const sum=sumSelected(o.nodes,o.scope);
   const dis = !!o.disabled;
-  return '<div class="vol-card'+(collapsed?' is-collapsed':'')+(dis?' is-disabled':'')+'" data-scope="'+o.scope+'" data-volkey="'+o.key+'"'+(dis?' aria-disabled="true"':'')+'>'
+  const fmt = chartFmtOf(o.key);
+  const size = state.cardSize[o.key];
+  const sizeStyle = (size && Number(size.w)>0 && Number(size.h)>0)
+    ? ' style="width:'+Math.round(size.w)+'px;height:'+Math.round(size.h)+'px"' : '';
+  return '<div class="vol-card'+(collapsed?' is-collapsed':'')+(dis?' is-disabled':'')+'" data-scope="'+o.scope+'" data-volkey="'+o.key+'"'+(dis?' aria-disabled="true"':'')+sizeStyle+'>'
     +'<div class="vol-head">'
       +'<span class="vol-idx'+(o.merged?' is-merged':'')+'">'+o.idxText+'</span>'
       +(o.volText?'<span class="vol-cap">'+o.volText+'</span>':'')
       +(o.capText?'<span class="vol-cap'+(o.over?' is-over':'')+'">'+o.capText+'</span>':'')
       +(o.extToolsHtml ? o.extToolsHtml : '')
+      +(o.pkgId ? privateFilesHtml() : '')
       +(o.over?'<span class="vol-flag">'+t('chart.overLimit')+'</span>':'')
       +'<span class="vol-spacer"></span>'
+      +'<label class="chart-fmt" data-chartfmt-wrap="1"><select class="text_pole" data-chartfmt="'+o.key+'" aria-label="'+t('chart.format')+'">'
+        +'<option value="bar"'+(fmt==='bar'?' selected':'')+'>'+t('chart.formatBar')+'</option>'
+        +'<option value="donut"'+(fmt==='donut'?' selected':'')+'>'+t('chart.formatDonut')+'</option>'
+      +'</select></label>'
       +(o.totalText?'<span class="vol-total">'+o.totalText+'</span>':'')
       +(dis || o.readonly ? '' : '<span class="vol-bulk">'
         +'<button data-treeall="1">'+t('chart.selectAll')+'</button>'
@@ -523,7 +653,8 @@ function chartCardHtml(o){
     +'</div>'
     +'<div class="vol-body">'
       +(o.noticeHtml||'')
-      +'<div class="chart-tree">'+renderTreeRows(o.nodes,0,o.scope,o.readonly||dis,groupToolsOf(o))+'</div>'
+      +volChartHtml(o.nodes, fmt)
+      +'<div class="chart-tree">'+renderTreeRows(o.nodes,0,o.scope,o.readonly||dis,groupToolsOf(o),volChartData(o.nodes).total)+'</div>'
       +(dis?'':'<div class="chart-foot"><span>'+t('chart.selected',{count:sum.count,size:fmtMB(sum.mb)})+'</span></div>')
     +'</div>'
   +'</div>';
@@ -562,13 +693,9 @@ function privateFilesHtml(){
     +'<button class="tree-mini" data-privfiles="open">'+t('priv.open')+(n?' ('+n+')':'')+'</button>'
     +'</div>';
 }
-/* 组级工具条：扩展组放模式/Git，私有组放「云端私有件」入口。 */
+/* 组级工具条：私有件的「云端私有件」入口已上移到卡片头，不再插在类目行里。 */
 function groupToolsOf(o){
-  const tools={};
-
-  const priv=privateFilesHtml();
-  if(priv) tools['group:private']=priv;
-  return tools;
+  return {};
 }
 function fmtStamp(ms){
   const d=new Date(Number(ms)||0); const p=(n)=>String(n).padStart(2,'0');
@@ -661,36 +788,23 @@ function renderChart(){
   const mainScroll = appMain ? appMain.scrollTop : 0;
   const winScroll = typeof window !== 'undefined' ? (window.scrollY || document.documentElement?.scrollTop || 0) : 0;
   let html='';
+  if(!targets.length){
+    html += '<div class="chart-empty-guide">'
+      + '<div class="empty-guide-card guide-fetch">'
+        + '<div class="guide-icon"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="M12 12v9"/><path d="m8 17 4 4 4-4"/></svg></div>'
+        + '<div class="guide-title">' + t('empty.fetchTitle') + '</div>'
+        + '<div class="guide-desc">' + t('empty.fetchDesc') + '</div>'
+        + '<button type="button" class="btn accent" id="btn-empty-fetch">' + t('empty.fetchBtn') + '</button>'
+      + '</div>'
+      + '<div class="empty-guide-card guide-import">'
+        + '<div class="guide-icon"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></div>'
+        + '<div class="guide-title">' + t('empty.importTitle') + '</div>'
+        + '<div class="guide-desc">' + t('empty.importDesc') + '</div>'
+        + '<button type="button" class="btn" id="btn-empty-import">' + t('empty.importBtn') + '</button>'
+      + '</div>'
+    + '</div>';
+  }
   targets.forEach(target=>{
-    if(target.host){
-      const tree=hostNodes(state.host);
-      const degraded = state.mode==='web' || !HOSTS[state.host].readable || !(state.hostTree && state.hostTree.length);
-      if(degraded && state.packages.length === 0){
-        html += '<div class="chart-empty-guide">'
-          + '<div class="empty-guide-card guide-fetch">'
-            + '<div class="guide-icon"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="M12 12v9"/><path d="m8 17 4 4 4-4"/></svg></div>'
-            + '<div class="guide-title">' + t('empty.fetchTitle') + '</div>'
-            + '<div class="guide-desc">' + t('empty.fetchDesc') + '</div>'
-            + '<button type="button" class="btn accent" id="btn-empty-fetch">' + t('empty.fetchBtn') + '</button>'
-          + '</div>'
-          + '<div class="empty-guide-card guide-import">'
-            + '<div class="guide-icon"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></div>'
-            + '<div class="guide-title">' + t('empty.importTitle') + '</div>'
-            + '<div class="guide-desc">' + t('empty.importDesc') + '</div>'
-            + '<button type="button" class="btn" id="btn-empty-import">' + t('empty.importBtn') + '</button>'
-          + '</div>'
-        + '</div>';
-        return;
-      }
-      html+='<div class="chart-group">'
-        +'<div class="vol-grid" data-vols="1">'+chartCardHtml({
-            key:'host', scope:'host:'+state.host, nodes:tree.nodes, idxText:t('chart.hostData'),
-            noticeHtml: '',
-            disabled: degraded,
-            readonly:false
-          })+'</div></div>';
-      return;
-    }
     if(target.merge){
       const nodes=mergedNodes(target.pkgs);
       const totalMb=mergedTotalMb(target.pkgs);
@@ -906,7 +1020,8 @@ function renderActions(){
       '<button class="btn" id="btn-fetch">'+svg('cloud','ico')+t('action.fetch')+'</button>'
       +'<button class="btn accent" id="btn-generate"'+(actionEnabled(state.zone,'generate',sel)?'':' disabled')+'>'+svg('archive','ico')+t('action.generatePack')+'</button>'
       +'<button class="btn" id="btn-merge"'+(actionEnabled(state.zone,'merge',sel)?'':' disabled')+'>'+svg('copy','ico')+t('action.mergeUpload')+'</button>'
-      +libBtn;
+      +libBtn
+      +'<button class="btn" id="lan-open-btn">'+svg('bolt','ico')+t('action.lan')+'</button>';
     row.querySelector('#btn-generate')?.addEventListener('click',()=>doGenerate());
     row.querySelector('#btn-merge')?.addEventListener('click',()=>doMerge());
     row.querySelector('#btn-library-export')?.addEventListener('click',()=>actions.libraryExport?.());
@@ -947,18 +1062,11 @@ function setLanQr(id, text, show){
 }
 function renderLan(){
   const L=state.lan;
-  const body=document.getElementById('lan-body');
-  const toggle=document.getElementById('lan-toggle');
-  if(!body||!toggle) return;
-  toggle.setAttribute('aria-expanded',String(!!L.open));
-  body.hidden=!L.open;
-  document.querySelector('.col-side')?.classList.toggle('lan-open', !!L.open);
-  const hint=document.getElementById('lan-toggle-hint');
-  if(hint){
-    const s=L.send.busy?t('lan.sending',{pct:Math.round(L.send.pct)}):'';
-    const r=L.recv.busy?t('lan.receiving',{pct:Math.round(L.recv.pct)}):'';
-    hint.textContent=[s,r].filter(Boolean).join(' · ') || t('action.lanHint');
-  }
+  const chart=document.getElementById('chart-card');
+  const view=document.getElementById('lan-view');
+  if(!chart||!view) return;
+  chart.hidden=!!L.open;
+  view.hidden=!L.open;
   const targets=lanTargets();
   const sum=document.getElementById('lan-send-summary'); if(sum) sum.textContent=lanSummaryText();
   const gen=document.getElementById('lan-btn-generate');
@@ -1082,7 +1190,6 @@ function showPane(name){
   });
   document.querySelectorAll('.app-header .icon-btn').forEach(b=>b.classList.remove('active-view'));
   if(state.pane==='settings') document.getElementById('btn-settings')?.classList.add('active-view');
-  if(state.pane==='log') document.getElementById('btn-log')?.classList.add('active-view');
 }
 function backToWorkbench(){ showPane('workbench'); }
 
@@ -1259,11 +1366,41 @@ function bind(){
   ['modal-extra','settings-body'].forEach(id => document.getElementById(id)?.addEventListener('click', extModeClick));
   document.getElementById('btn-close')?.addEventListener('click',()=>actions.close?.());
 
+  // 手机端：存储图表 / 数据包 左右切换
+  document.getElementById('mobile-switch')?.addEventListener('click',(e)=>{
+    const b=e.target.closest('[data-mview]'); if(!b) return;
+    state.mobileView = b.dataset.mview==='zone' ? 'zone' : 'chart';
+    renderMobileView();
+  });
+  // 宿主详细数据：默认收起，点击在同一条目内展开（全页只此一处宿主信息）
+  document.getElementById('quota-head')?.addEventListener('click',(e)=>{
+    if(!e.target.closest('#quota-host-toggle')) return;
+    state.quotaHostOpen = !state.quotaHostOpen;
+    renderQuota();
+  });
+  // 文件名模板默认折叠
+  document.getElementById('filename-toggle')?.addEventListener('click',()=>{
+    const row=document.getElementById('filename-row');
+    const btn=document.getElementById('filename-toggle');
+    if(!row) return;
+    const open=row.hidden;
+    row.hidden=!open;
+    if(btn) btn.setAttribute('aria-expanded',open?'true':'false');
+  });
+  if(typeof window!=='undefined'){
+    window.addEventListener('resize',()=>{ syncView(); renderMobileView(); });
+  }
+
   document.querySelectorAll('[data-help]').forEach(b=>b.addEventListener('click',e=>{ e.stopPropagation(); openHelp(b.dataset.help); }));
 
-  // ── 局域网互传（执行卡内联）──
-  document.getElementById('lan-toggle').addEventListener('click',()=>{
-    state.lan.open=!state.lan.open;
+  // ── 局域网互传（按钮在数据包动作行内，随 renderActions 重建）──
+  document.getElementById('action-row').addEventListener('click',(e)=>{
+    if(!e.target.closest('#lan-open-btn')) return;
+    state.lan.open=true;
+    renderLan();
+  });
+  document.getElementById('lan-close-btn').addEventListener('click',()=>{
+    state.lan.open=false;
     renderLan();
   });
   document.getElementById('lan-btn-generate').addEventListener('click',()=>actions.lan?.generate?.());
@@ -1306,6 +1443,7 @@ function bind(){
   targetPop.addEventListener('click',e=>{
     const it=e.target.closest('[data-target]'); if(!it) return;
     state.target=it.dataset.target;
+    state.targetManual=true;
     closeTargetPop(); renderTargetPicker(); renderChart();
     log('INFO',t('toast.targetChanged',{target:state.target}));
     actions.onTargetChange?.(state.target);
@@ -1425,6 +1563,13 @@ function bind(){
     }
   });
   stackEl.addEventListener('change',e=>{
+    const fmt=e.target.closest('[data-chartfmt]');
+    if(fmt){
+      const key=fmt.dataset.chartfmt;
+      state.chartFmt[key] = CHART_FMTS.includes(fmt.value) ? fmt.value : 'bar';
+      renderChart();
+      return;
+    }
     const git=e.target.closest('[data-gitmode]');
     if(git){
       state.gitMode = [GIT_MODES.KEEP,GIT_MODES.MINIMAL,GIT_MODES.STRIP].includes(git.value) ? git.value : GIT_MODES.KEEP;
@@ -1436,6 +1581,19 @@ function bind(){
     const scope=scopeFromEl(cb); if(!scope) return;
     const n=findNode(nodesForScope(scope),cb.dataset.check); if(!n) return;
     setChecked(n,scope,cb.checked); renderChart();
+  });
+  // 拖拽卡片右下角改尺寸 → 按 data-volkey 落库，刷新后保持
+  stackEl.addEventListener('pointerup',(e)=>{
+    const card=e.target && e.target.closest ? e.target.closest('.vol-card') : null;
+    if(!card) return;
+    const r=card.getBoundingClientRect();
+    if(e.clientX < r.right-20 || e.clientY < r.bottom-20) return;
+    const key=card.dataset.volkey;
+    if(!key) return;
+    const w=Math.round(card.offsetWidth), h=Math.round(card.offsetHeight);
+    if(!w || !h) return;
+    state.cardSize[key]={ w, h };
+    persistCardSizes();
   });
   document.getElementById('batch-bar').addEventListener('click',e=>{
     const toggle=e.target.closest('[data-mergetoggle]');
@@ -1485,13 +1643,22 @@ function bind(){
     const card=e.target.closest('[data-pkg]');
     if(card && !e.target.closest('input')){
       const id=card.dataset.pkg;
-      state.selectedPkgs=new Set();          // 点卡 = 聚焦单包；批量只走勾选框
-      state.source={type:'package',pkgId:id}; state.sourceKey='pkg:'+id; actions.onActivePackage?.(id);
-      renderChart(); renderZones(); renderActions(); toast(t('toast.packageSwitched'));
+      // 只切换当前查看的包，不改勾选集合：取消选择只能靠复选框或「反选」。
+      state.source={type:'package',pkgId:id}; state.sourceKey='pkg:'+id;
+      if(actions.onActivePackage) actions.onActivePackage(id);
+      else renderAll();
     }
   });
 
-  document.getElementById('btn-log').addEventListener('click',()=>{ renderLog(); showPane('log'); });
+  // 进度条即日志入口：点击或键盘激活都进日志视图
+  const progressBar=document.getElementById('workbench-progress');
+  if(progressBar){
+    const openLogView=()=>{ renderLog(); showPane('log'); };
+    progressBar.addEventListener('click',openLogView);
+    progressBar.addEventListener('keydown',(e)=>{
+      if(e.key==='Enter'||e.key===' '){ e.preventDefault(); openLogView(); }
+    });
+  }
   document.getElementById('log-close').addEventListener('click',backToWorkbench);
   document.getElementById('help-close').addEventListener('click',closeHelp);
   document.getElementById('modal-close').addEventListener('click',closeModal);
@@ -1567,46 +1734,6 @@ function initSplitters(){
     const stop=()=>{ on=false; sv.classList.remove('is-dragging'); document.body.style.cursor=''; };
     sv.addEventListener('pointerup',stop); sv.addEventListener('pointercancel',stop);
   }
-  const side=document.querySelector('.col-side');
-  const sh=document.getElementById('split-h');
-  if(sh && side){
-    let on=false;
-    sh.addEventListener('pointerdown',e=>{
-      on=true; sh.classList.add('is-dragging'); sh.setPointerCapture(e.pointerId);
-      document.body.style.cursor='row-resize'; e.preventDefault();
-    });
-    sh.addEventListener('pointermove',e=>{
-      if(!on) return;
-      const r=side.getBoundingClientRect();
-      let h=e.clientY-r.top;
-      h=Math.max(150,Math.min(r.height-170,h));
-      side.style.setProperty('--zone-h',h.toFixed(0)+'px');
-    });
-    const stop=()=>{ on=false; sh.classList.remove('is-dragging'); document.body.style.cursor=''; };
-    sh.addEventListener('pointerup',stop); sh.addEventListener('pointercancel',stop);
-  }
-  // 交叉点：一次拖动同时改列宽与上下高度
-  const corner=document.getElementById('split-corner');
-  if(corner && main && side){
-    let on=false, mainRect=null, sideTop=0, sideH=0;
-    corner.addEventListener('pointerdown',e=>{
-      on=true; corner.classList.add('is-dragging'); corner.setPointerCapture(e.pointerId);
-      mainRect=main.getBoundingClientRect();
-      const sr=side.getBoundingClientRect(); sideTop=sr.top; sideH=sr.height;
-      document.body.style.cursor='move'; e.preventDefault(); e.stopPropagation();
-    });
-    corner.addEventListener('pointermove',e=>{
-      if(!on) return;
-      let pct=((e.clientX-mainRect.left)/mainRect.width)*100;
-      pct=Math.max(30,Math.min(80,pct));
-      main.style.setProperty('--split-left',pct.toFixed(2)+'%');
-      let h=e.clientY-sideTop;
-      h=Math.max(150,Math.min(sideH-170,h));
-      side.style.setProperty('--zone-h',h.toFixed(0)+'px');
-    });
-    const stop=()=>{ on=false; corner.classList.remove('is-dragging'); document.body.style.cursor=''; };
-    corner.addEventListener('pointerup',stop); corner.addEventListener('pointercancel',stop);
-  }
 }
 
 /* ── 初始化（视图自有，不依赖外部数据） ── */
@@ -1616,11 +1743,13 @@ initSplitters();
 
   /* ── 对外 API ── */
   function renderAll() {
+    syncView();
     state.seq = pkgSeq();
     renderHeader();
     renderZones();
     renderActions();
     renderChart();
+    renderMobileView();
   }
 
   function getExcludedPaths(pkg) {
@@ -1692,6 +1821,7 @@ initSplitters();
     setHost(hostKey, mode) {
       state.host = hostKey;
       state.mode = mode;
+      if (!state.targetManual) state.target = targetForHost(hostKey);
       state.source = { type: 'host', pkgId: null };
       state.sourceKey = 'host:' + hostKey;
       renderAll();
@@ -1699,6 +1829,7 @@ initSplitters();
     setHostTree(nodes) {
       state.hostTree = nodes || [];
       renderChart();
+      renderQuota();
     },
     setPackageNodes(id, nodes) {
       const pkg = state.packages.find((p) => p.id === id);
@@ -1721,6 +1852,24 @@ initSplitters();
       renderQuota();
     },
     setLibraryExport(on) { state.libraryExport = !!on; renderActions(); },
+    /**
+     * 拉取落库后的默认不勾选：备份快照 `backups/` 与原生资产 `user/`。
+     * 只改插件侧选择状态，不触碰宿主原生界面的任何设置。
+     */
+    applyPullDefaults(pkgId, prefixes) {
+      const pkg = state.packages.find(p => p.id === pkgId);
+      if (!pkg) return;
+      const scope = 'pkg:' + pkgId;
+      const rules = Array.isArray(prefixes) && prefixes.length ? prefixes : ['backups/', 'user/'];
+      walk(packageNodes(pkg).nodes, (n) => {
+        const path = n.path || '';
+        if (!path) return;
+        if (rules.some((pre) => path === pre.replace(/\/$/, '') || path.startsWith(pre))) {
+          state.sel[treeKey(scope, n.id)] = false;
+        }
+      });
+      renderChart();
+    },
     setPrivateFiles(list) { state.privateFiles = Array.isArray(list) ? list : []; renderChart(); },
     setZone(zone) { state.zone = zone; state.selectedPkgs = new Set(); renderAll(); },
     setActivePackage(id) { state.source = { type: 'package', pkgId: id }; state.sourceKey = 'pkg:' + id; renderAll(); },

@@ -21,10 +21,11 @@ import { createWorkbenchView } from './src/ui/workbench-view.js';
 import {
   detectHost, hostLayoutCode, fetchHostBackup, FULL_SELECTION,
   restoreToHost, restoreToLuker,
-  confirmDialog, mountExtensionRowButton, closeHostExtensionSurface,
+  confirmDialog, alertDialog, mountExtensionRowButton, closeHostExtensionSurface,
   mountNativeBackupButton, mountLukerBackupManagerButton, mountPtDataManagementButton,
   mountTtDataMigrationButton,
   openNativeBackupUi, readNativeBackupSelection, readPtExportOptions, hostToast, fetchPtBackup,
+  isNativeExportBusy, closeNativeBackupUi, watchNativeExportStart,
   uploadUserFile, userFilesSupported, sanitizeUserFileName, verifyUserFiles, deleteUserFile,
   readHostStorageQuota,
 } from './src/ui/host-bridge.js';
@@ -65,6 +66,8 @@ let initialized = false;
 let modalRefreshHook = null;
 /** main() 初始化后赋值；原生界面注入按钮的点击入口（插件加载时就要可点）。 */
 let nativePullHook = null;
+/** 在途拉取的取消器；宿主原生导出开始时中止插件自己的请求（宿主优先）。 */
+let activePullAbort = null;
 
 function ensureConverterModal() {
   let overlay = document.getElementById('st-converter-modal-overlay');
@@ -160,6 +163,7 @@ async function main(root) {
       state.packages = [];
       view.setPackages([]);
     }
+    void refreshStorageQuota();
   }
 
   async function ensurePlan(pkgId, targetName = null) {
@@ -362,13 +366,15 @@ async function main(root) {
     const opened = await openNativeBackupUi(host.platform);
     if (opened) {
       logger.info(t('log.nativeUiOpened'));
-      hostToast(t('toast.nativePickCategories'));
+      // 只打开原生位置，绝不自动点注入按钮；用弹窗明确要求用户自己点「从宿主拉取」。
+      await alertDialog(t('toast.nativePickCategories'));
       return;
     }
 
     // 静默回退：原生入口未就绪（宿主版本差异 / 扩展未装）。
     // PureTavern 没有 /api/users/backup，回退必须走它自己的归档端点。
     logger.warn(t('log.nativeUiMissing'));
+    if (isNativeExportBusy(host.platform)) { notifyHostExportBusy(false); return; }
     if (host.platform === 'pt') { await pullFromPt(); return; }
     if (settings.trafficPrompt) {
       view.confirmTraffic(() => pullFromHost(FULL_SELECTION, false), {
@@ -380,28 +386,47 @@ async function main(root) {
     await pullFromHost(FULL_SELECTION, false);
   }
 
+  /** 宿主原生导出优先：提示并放弃插件侧拉取。 */
+  function notifyHostExportBusy(fromNativeUi) {
+    logger.warn(t('log.nativeExportWins'));
+    if (fromNativeUi && hostToast(t('toast.hostExportBusy'))) return;
+    view.toast(t('toast.hostExportBusy'));
+  }
+
   /** 原生界面里注入的「从宿主拉取」按钮：读取原生勾选后拉取（不回写宿主选择记忆）。 */
   async function pullFromNativeUi() {
     if (state.busy) return;
-    if (host.platform === 'pt') { await pullFromPt(); return; }
+    if (host.platform === 'pt') {
+      // 勾选必须先读：关闭 dialog 后就取不到了。
+      const options = readPtExportOptions() || { moduleIds: [], includeSecrets: false };
+      closeNativeBackupUi('pt');
+      if (isNativeExportBusy('pt')) { notifyHostExportBusy(true); return; }
+      await pullFromPt(options);
+      return;
+    }
     const selection = readNativeBackupSelection() || FULL_SELECTION;
     const keys = Object.keys(selection).filter((key) => selection[key]);
     logger.info(t('log.nativeSelection', { keys: keys.join(',') || '-' }));
+    closeNativeBackupUi(host.platform);
+    if (isNativeExportBusy(host.platform)) { notifyHostExportBusy(true); return; }
     await pullFromHost(selection, true);
   }
   nativePullHook = pullFromNativeUi;
 
   /** PureTavern：原生数据管理面板的模块勾选 → 原生归档端点 → 入库。 */
-  async function pullFromPt() {
+  async function pullFromPt(options) {
     if (state.busy) return;
     state.busy = true;
     const pullStart = performance.now();
+    const ac = new AbortController();
+    activePullAbort = ac;
     try {
       const id = `pkg-${Date.now()}`;
-      const options = readPtExportOptions() || { moduleIds: [], includeSecrets: false };
-      logger.info(t('log.nativeSelection', { keys: options.moduleIds.join(',') || '-' }));
+      const opts = options || readPtExportOptions() || { moduleIds: [], includeSecrets: false };
+      logger.info(t('log.nativeSelection', { keys: opts.moduleIds.join(',') || '-' }));
       view.setProgress(5, t('progress.hostRequest'));
-      const blob = await fetchPtBackup(options, {
+      const blob = await fetchPtBackup(opts, {
+        signal: ac.signal,
         onPhase: (phase, received, total, _opfsName, bps) => {
           if (phase === 'host-generating') view.setProgress(12, t('progress.hostPacking'));
           else if (phase === 'transferring') {
@@ -422,9 +447,15 @@ async function main(root) {
         pullStart,
       });
     } catch (err) {
-      logger.error(t('log.hostFetchFailed', { msg: err.message }));
-      view.setProgress(0, t('progress.hostFetchFailed'));
+      if (err?.name === 'AbortError') {
+        logger.warn(t('log.hostPullCancelled'));
+        view.setProgress(0, t('progress.hostPullCancelled'));
+      } else {
+        logger.error(t('log.hostFetchFailed', { msg: err.message }));
+        view.setProgress(0, t('progress.hostFetchFailed'));
+      }
     } finally {
+      if (activePullAbort === ac) activePullAbort = null;
       state.busy = false;
     }
   }
@@ -448,6 +479,8 @@ async function main(root) {
     state.layoutById.set(id, hostLayoutCode(host.platform));
     await syncPackages();
     await ensurePlan(id);
+    // 拉取完成后的默认不勾选（只在插件侧）：备份快照 + 原生资产。
+    view.applyPullDefaults?.(id, ['backups/', 'user/']);
     Object.assign(settings, loadSettings());
     view.applySettings?.(settings);
     view.setActivePackage(id);
@@ -468,12 +501,15 @@ async function main(root) {
     if (state.busy) return;
     state.busy = true;
     const pullStart = performance.now();
+    const ac = new AbortController();
+    activePullAbort = ac;
     try {
       const id = `pkg-${Date.now()}`;
       view.setProgress(5, t('progress.hostRequest'));
       const fetched = await fetchHostBackup(host.platform, selection, {
         taskId: id,
         opfsDirName: 'packages',
+        signal: ac.signal,
         onPhase: (phase, received, total, _opfsName, bps) => {
           if (phase === 'host-generating') view.setProgress(12, t('progress.hostPacking'));
           else if (phase === 'transferring') {
@@ -498,9 +534,15 @@ async function main(root) {
         pullStart,
       });
     } catch (err) {
-      logger.error(t('log.hostFetchFailed', { msg: err.message }));
-      view.setProgress(0, t('progress.hostFetchFailed'));
+      if (err?.name === 'AbortError') {
+        logger.warn(t('log.hostPullCancelled'));
+        view.setProgress(0, t('progress.hostPullCancelled'));
+      } else {
+        logger.error(t('log.hostFetchFailed', { msg: err.message }));
+        view.setProgress(0, t('progress.hostFetchFailed'));
+      }
     } finally {
+      if (activePullAbort === ac) activePullAbort = null;
       state.busy = false;
     }
   }
@@ -870,7 +912,13 @@ async function main(root) {
           return { ok: true };
         },
       },
-      onActivePackage: (id) => { ensurePlan(id).then(() => view.setActivePackage(id)); },
+      onActivePackage: (id) => {
+        // 先切换视图（命中已缓存的清单时零等待），再后台补扫描；扫描完成后仅当仍是当前包才重绘。
+        view.setActivePackage(id);
+        ensurePlan(id).then((plan) => {
+          if (plan && view.getState().source?.pkgId === id) view.setActivePackage(id);
+        });
+      },
       onTargetChange: (name) => {
         const active = state.packages.find((p) => view.getState().source?.pkgId === p.id);
         if (active) ensurePlan(active.id, name).then(() => view.setActivePackage(active.id));
@@ -880,6 +928,13 @@ async function main(root) {
         if (overlay) overlay.style.display = 'none';
       },
     },
+  });
+
+  // 宿主原生导出优先：在途的插件拉取立即让路（可取消的只有插件自己的请求）。
+  watchNativeExportStart(() => {
+    if (!activePullAbort) return;
+    activePullAbort.abort();
+    if (!hostToast(t('toast.hostExportBusy'))) view.toast(t('toast.hostExportBusy'));
   });
 
   logger.subscribe((entry) => {
@@ -925,8 +980,19 @@ async function main(root) {
   });
 
   await syncPackages();
-  const hostQuota = host.platform === 'luker' ? await readHostStorageQuota() : null;
-  view.setStorage({ browser: await readBrowserQuota(), host: hostQuota });
+  async function refreshStorageQuota() {
+    const [browser, hostQuota] = await Promise.all([
+      readBrowserQuota(),
+      host.platform === 'luker' ? readHostStorageQuota() : Promise.resolve(null),
+    ]);
+    view.setStorage({ browser, host: hostQuota });
+  }
+  await refreshStorageQuota();
+  if (typeof document !== 'undefined') {
+    // 读数必须随数据变化：操作后由 syncPackages 触发，另有低频兜底刷新。
+    setInterval(() => { if (!document.hidden) refreshStorageQuota(); }, 15000);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshStorageQuota(); });
+  }
   view.setProgress(0, t('progress.ready'));
   logger.info(t('log.workbenchReady', { host: host.isPlugin ? t('header.plugin', { host: HOST_LABEL[host.platform] || t('host.fallback') }) : t('header.web') }));
   try {

@@ -552,16 +552,47 @@ export async function openStorageInspector() {
  */
 export async function readHostStorageQuota() {
   const mod = await loadStorageInspectorModule();
-  if (typeof mod?.RestProvider !== 'function') return null;
+  if (typeof mod?.RestProvider === 'function') {
+    try {
+      const provider = new mod.RestProvider({ kind: 'self' });
+      const resp = await provider.fetch([]);
+      // 宿主 JSDoc 的规范形状是 `{ quota: { usedBytes, quotaBytes } }`；
+      // 兼容旧版/变体把字段直接挂在顶层的情况，但不猜测其它命名。
+      const quota = resp?.quota || resp;
+      const used = quota?.usedBytes;
+      if (typeof used === 'number' && used >= 0) {
+        const total = typeof quota?.quotaBytes === 'number' ? quota.quotaBytes : null;
+        return { used, total };
+      }
+    } catch (err) {
+      logger.warn(`宿主存储配额读取失败: ${err.message}`);
+    }
+  }
+  // 模块不可用/形状变化时的同源兜底：Luker 原生 Storage Inspector 用的就是这个端点。
+  return readLukerStorageQuotaDirect();
+}
+
+/** Luker `/api/users/storage/inspect` 的同源兜底（只读，只取 quota）。 */
+async function readLukerStorageQuotaDirect() {
   try {
-    const provider = new mod.RestProvider({ kind: 'self' });
-    const resp = await provider.fetch([]);
-    const used = resp?.quota?.usedBytes;
+    const token = await getCsrfToken();
+    const res = await fetch('/api/users/storage/inspect', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { 'X-CSRF-Token': token } : {}),
+      },
+      body: JSON.stringify({ path: [] }),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const quota = data?.quota || data;
+    const used = quota?.usedBytes;
     if (typeof used !== 'number' || used < 0) return null;
-    const total = typeof resp.quota.quotaBytes === 'number' ? resp.quota.quotaBytes : null;
+    const total = typeof quota?.quotaBytes === 'number' ? quota.quotaBytes : null;
     return { used, total };
-  } catch (err) {
-    logger.warn(`宿主存储配额读取失败: ${err.message}`);
+  } catch {
     return null;
   }
 }
@@ -2404,6 +2435,117 @@ export function readPtExportOptions() {
     moduleIds: checked.map((box) => box.dataset.module).filter(Boolean),
     includeSecrets: checked.some((box) => box.dataset.sensitive !== undefined),
   };
+}
+
+/**
+ * 宿主原生导出触发器的显式声明表（禁止按平台名推导）。
+ * 忙态探针与关闭逻辑共用这张表。
+ */
+const NATIVE_EXPORT_TRIGGERS = Object.freeze({
+  st: ['.userBackupButton'],
+  luker: ['.userBackupButton', '.userBackupManager .backupActionRow'],
+  tt: ['#data_migration_export_button'],
+  pt: ['#ptdm-export'],
+});
+
+/** 本项目注入按钮的幂等标记：捕捉式点击监听必须排除它们，否则自己点自己会被当成宿主导出。 */
+const OWN_INJECTED_SELECTOR = '[data-st-zip-injected="1"]';
+
+function nativeTriggerEls(platform) {
+  const selectors = NATIVE_EXPORT_TRIGGERS[platform];
+  if (!Array.isArray(selectors)) return [];
+  return selectors.flatMap((sel) => Array.from(document.querySelectorAll(sel)));
+}
+
+/**
+ * 宿主原生导出是否在途。
+ *
+ * 判据（任一命中）：`disabled` / `aria-busy="true"` / `data-busy="true"` /
+ * className 含 busy|loading|generating|disabled。
+ *
+ * **fail-open**：选择器失配或宿主结构变化时返回 false——探测失败不得阻断用户拉取。
+ * @param {'st'|'luker'|'tt'|'pt'|string} platform
+ * @returns {boolean}
+ */
+export function isNativeExportBusy(platform) {
+  if (typeof document === 'undefined') return false;
+  return nativeTriggerEls(platform).some((el) => {
+    if (!el) return false;
+    if (el.disabled === true) return true;
+    if (el.getAttribute('aria-busy') === 'true') return true;
+    if (el.dataset?.busy === 'true') return true;
+    return /\b(?:busy|loading|generating|disabled)\b/i.test(String(el.className || ''));
+  });
+}
+
+/**
+ * 关闭承载「从宿主拉取」按钮的原生界面（只关这一层，不波及其它弹窗）。
+ * 必须在读取原生勾选之后调用。
+ * @param {'st'|'luker'|'tt'|'pt'|string} platform
+ */
+export function closeNativeBackupUi(platform) {
+  if (typeof document === 'undefined') return;
+
+  if (platform === 'pt') {
+    const dialog = document.getElementById('pure-tavern-data-management-dialog');
+    try { dialog?.close?.(); } catch { /* 非 dialog */ }
+    return;
+  }
+
+  if (platform === 'tt') {
+    const block = document.getElementById('data_migration_settings');
+    const content = block?.querySelector('.inline-drawer-content');
+    const visible = content
+      && getComputedStyle(content).display !== 'none'
+      && content.getBoundingClientRect().height > 0;
+    if (visible) {
+      const toggle = block.querySelector('.inline-drawer-toggle')
+        || block.querySelector(':scope > .inline-drawer-header');
+      try { toggle?.click(); } catch { /* 宿主结构差异 */ }
+    }
+    return;
+  }
+
+  const anchor = document.getElementById('st-pack-transfer-native-btn')
+    || document.getElementById('st-pack-transfer-luker-manager-btn');
+  const surface = anchor?.closest('dialog[open], .popup[open]');
+  if (surface) {
+    try { surface.close?.(); } catch { /* 非 dialog */ }
+    surface.removeAttribute('open');
+    surface.style.display = 'none';
+  }
+  document.querySelectorAll('.popup_background').forEach((bg) => { bg.style.display = 'none'; });
+}
+
+const nativeExportStartHandlers = new Set();
+let nativeExportWatchBound = false;
+
+/**
+ * 捕捉式监听宿主原生导出触发器的点击，用于「插件在途拉取让路」。
+ * 只注册一次；返回取消订阅函数。
+ * @param {(platform: string) => void} handler
+ * @returns {() => void}
+ */
+export function watchNativeExportStart(handler) {
+  if (typeof document === 'undefined' || typeof handler !== 'function') return () => {};
+  nativeExportStartHandlers.add(handler);
+  if (!nativeExportWatchBound) {
+    nativeExportWatchBound = true;
+    document.addEventListener('click', (event) => {
+      const target = event.target;
+      if (target?.closest?.(OWN_INJECTED_SELECTOR)) return;
+      for (const platform of Object.keys(NATIVE_EXPORT_TRIGGERS)) {
+        const selectors = NATIVE_EXPORT_TRIGGERS[platform];
+        if (selectors.some((sel) => target?.closest?.(sel))) {
+          nativeExportStartHandlers.forEach((fn) => {
+            try { fn(platform); } catch { /* 单个订阅者失败不影响其它 */ }
+          });
+          return;
+        }
+      }
+    }, true);
+  }
+  return () => nativeExportStartHandlers.delete(handler);
 }
 
 /**

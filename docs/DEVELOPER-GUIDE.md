@@ -29,7 +29,8 @@
 
 | 功能 | UI 入口 | 源码落点 |
 | --- | --- | --- |
-| 从当前宿主拉取整份用户数据 | `#btn-host-fetch` | `src/ui/host-bridge.js` 的 `fetchHostBackup()` |
+| 从当前宿主拉取整份用户数据 | `#btn-host-fetch`（工作台）/ 宿主原生界面注入按钮 | `index.js` 的 `fetchFromHost()` / `pullFromNativeUi()`；`src/ui/host-bridge.js` 的 `openNativeBackupUi()` / `fetchHostBackup()` |
+| **原生界面生命周期**（拉取后自动关闭、宿主原生导出优先） | 原生界面「从宿主拉取」 | `closeNativeBackupUi()` / `isNativeExportBusy()` / `watchNativeExportStart()`；契约见 `.trellis/spec/frontend/host-native-pull-lifecycle.md` |
 | 细粒度类目勾选（10 类目 + 3 特殊类目） | `#category-checkboxes` | `src/ui/category-filter.js`、`src/core/inspect.js` |
 | 类目内逐文件穿透排除 | 统一文件树 | `src/ui/file-tree-picker.js`、`src/ui/host-bridge.js` 的 `exclude` 链路 |
 | 一步直出目标布局（拉取时即指定目标格式） | `#target-select` | `src/core/plan-preview.js` 的路由/合成分支 |
@@ -121,6 +122,35 @@
 | 运行期离线标记（确定走主线程降级） | `src/core/worker-client.js` 的 `isOfflineBuild()` |
 | 验证 | `e2e/standalone/specs/offline-single-file.e2e.cjs`（28 断言） |
 
+### K. 局域网互传（整面板视图，2026-11-05）
+
+| 功能 | UI 入口 | 源码落点 |
+| --- | --- | --- |
+| 用局域网面板**完整替换**左侧图表面板 | `#chart-card .panel-actions` 的 `#lan-open-btn` | `src/ui/workbench-template.js`（`#chart-card` / `#lan-view` 同级面板）、`src/ui/workbench-view.js` 的 `renderLan()` |
+| 关闭局域网面板、回到图表 | `#lan-close-btn` | 同上 |
+| WebRTC 分块传输 / 二维码信令 / 续传 | 面板内发送与接收区 | `src/core/lan-transfer.js`、`src/ui/lan-transfer-panel.js` |
+
+> 新的承载面契约见 `.trellis/spec/frontend/workbench-single-view.md` §7.3；
+> 旧「执行卡内折叠块」模型（`.lan-block` / `#lan-toggle` / `.col-side.lan-open`）已废弃。
+
+### L. 工作台布局：执行卡取消 · 进度条常驻 · 图表网格（2026-11-05）
+
+| 功能 | UI 入口 | 源码落点 |
+| --- | --- | --- |
+| 顶层面板只剩图表面板与数据包面板 | — | `src/ui/workbench-template.js`：`.col-chart`（`#chart-card` / `#lan-view`）+ `.col-side`（`#zone-card`） |
+| 动作按钮并入数据包面板底部 | `#zone-card > .zone-foot#action-row` | `workbench-view.js` 的 `renderActions()`（消费点未变） |
+| 进度条为常驻底栏，所有视图共用 | `#workbench-progress`（`.app-body` 末位子项） | `workbench-template.js` 模板末尾；`setProgress()` 写 `#progress-fill` / `#progress-label` / `#progress-pct` |
+| 点击进度条打开日志 | `#workbench-progress` 的 click | `workbench-view.js` 的 `bind()`（`renderLog()` + `showPane('log')`） |
+| 顶栏日志按钮已删除 | — | `#btn-log` 不再存在；`#log-dot` 迁入底栏 |
+| 图表自适应网格（1/2/3/4 列，上限 4） | `.chart-stack` | `style.css`：`#chart-card{container-type:inline-size}` + 三条 `@container`（520/800/1060px），必须排在 `.chart-stack` 基础规则之后 |
+| 图表格式切换（条形 / 圆环） | 每张卡的 `[data-chartfmt]` 下拉 | `workbench-view.js` 的 `chartFmtOf()` / `volChartHtml()`；状态 `state.chartFmt[key]` |
+| 每行占用条 | `.tree-row > .tree-occ` | `renderTreeRows()`（宽度 = 该行 mb / 本卡类目总量） |
+| 拖拽卡片改尺寸并持久化 | `.vol-card` 右下角 | `style.css` 的 `resize:both`；`workbench-view.js` 的 `pointerup` + `localStorage['stpt.cardSize']` |
+
+> 完整契约与验收判据见 `.trellis/spec/frontend/workbench-single-view.md` §11。
+> 注意：`@container` 与基础 `grid-template-columns` **同特异度**，靠源码顺序决胜负——
+> 列数规则必须写在基础规则之后，否则恒为单列（2026-11-05 实测踩到）。
+
 ---
 
 ## 三、分层与硬性边界
@@ -204,6 +234,8 @@ npm run e2e:web -- --rebuild  # 删/换过源码文件时必须加（mtime 判�
 ## 七、相关文档
 
 - `.trellis/spec/frontend/` —— 分层规范（目录结构 / 组件 / 状态管理 / 宿主能力 / 质量 / DOM 写入作用域 / 迁移三篇）
+  - `workbench-single-view.md` §7.3 —— 局域网互传整面板替换
+  - `host-native-pull-lifecycle.md` —— 宿主原生导出界面的打开 / 拉取 / 关闭 / 让路
 - `.trellis/spec/backend/` —— 核心层规范
 - `.trellis/workflow.md` —— 任务流
 - [README.md](../README.md) —— 用户向说明

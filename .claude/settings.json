@@ -35,6 +35,39 @@
           }
         ]
       }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "WebSearch|WebFetch|mcp__.*search.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/hooks/search-gate.py",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/hooks/search-gate.py",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/hooks/user-prompt-submit.py",
+            "timeout": 15
+          }
+        ]
+      }
     ]
   }
 }

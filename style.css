@@ -92,11 +92,14 @@
                var(--shadow)}
 
   #app.app-container .app-header{flex:0 0 auto;display:flex;align-items:center;gap:12px;padding:11px 14px;
-    border-bottom:1px solid var(--border);background:linear-gradient(180deg,var(--panel-2),var(--panel))}
-  #app.app-container .app-title{display:flex;align-items:baseline;gap:8px;min-width:0}
-  #app.app-container .app-title h1{font-size:16px;margin:0;font-weight:650;letter-spacing:.2px;white-space:nowrap}
-  #app.app-container .app-title .sub{font-size:11px;color:var(--muted-2);white-space:nowrap}
-  #app.app-container .header-actions{display:flex;align-items:center;gap:6px;margin-left:auto;flex-wrap:wrap;justify-content:flex-end}
+    flex-wrap:nowrap;border-bottom:1px solid var(--border);
+    background:linear-gradient(180deg,var(--panel-2),var(--panel))}
+  #app.app-container .app-title{display:flex;align-items:baseline;gap:8px;min-width:0;flex:1 1 auto;
+    overflow:hidden;white-space:nowrap}
+  #app.app-container .app-title h1{font-size:16px;margin:0;font-weight:650;letter-spacing:.2px;white-space:nowrap;
+    overflow:hidden;text-overflow:ellipsis}
+  #app.app-container .header-actions{display:flex;align-items:center;gap:6px;margin-left:auto;flex-wrap:nowrap;
+    justify-content:flex-end;flex:0 0 auto}
   #app.app-container .badge{display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border-radius:999px;
     border:1px solid var(--border);background:var(--panel-3);font-size:11px;color:var(--muted);white-space:nowrap}
   #app.app-container .badge .host-icon{width:14px;height:14px;object-fit:contain}
@@ -113,12 +116,10 @@
   #app.app-container .col-chart{min-height:0;min-width:0;display:flex;flex-direction:column;gap:10px}
   #app.app-container .col-side{position:relative;min-height:0;min-width:0;display:flex;flex-direction:column;gap:0;
     overflow:visible;padding:0 2px 0 0}
-  /* 右栏：数据包高度可拖，执行卡吃掉剩余高度 —— 两栏都贴到底，不留空白 */
+  /* 右栏：只有数据包面板，撑满整列；动作行固定在面板底部 */
   #app.app-container .col-side > .panel{flex:0 0 auto}
-  #app.app-container .col-side > .zone-card{flex:0 0 var(--zone-h,56%);min-height:140px}
-  #app.app-container .col-side > .action-card{flex:1 1 auto;min-height:96px;overflow:auto}
-  /* 局域网展开时：包区让出高度，执行卡内部滚动，避免二维码/接收区被裁切 */
-  #app.app-container .col-side.lan-open > .zone-card{flex:0 0 28%;min-height:120px}
+  #app.app-container .col-side > .zone-card{flex:1 1 auto;min-height:140px}
+  /* 局域网面板与图表面板同级互斥；不再让包区让出高度 */
 
   /* 拖拽分隔条：拖中间改列宽，拖右栏内改上下高度 */
   #app.app-container .splitter-v{width:8px;cursor:col-resize;align-self:stretch;display:flex;align-items:center;
@@ -127,24 +128,11 @@
     background:color-mix(in srgb, var(--outline) 26%, transparent);
     transition:background .15s ease}
   #app.app-container .splitter-v:hover::before, #app.app-container .splitter-v.is-dragging::before{background:var(--outline)}
-  #app.app-container .splitter-h{flex:0 0 auto;height:8px;cursor:row-resize;display:flex;align-items:center;
-    justify-content:center;touch-action:none}
-  #app.app-container .splitter-h::before{content:'';height:2px;width:100%;border-radius:2px;
-    background:color-mix(in srgb, var(--outline) 26%, transparent);
-    transition:background .15s ease}
-  #app.app-container .splitter-h:hover::before, #app.app-container .splitter-h.is-dragging::before{background:var(--outline)}
-  /* 两条分隔条的交叉点：十字光标，一次拖动同时改宽与高 */
-  /* 十字手柄正压在两线交点上：横向落在 8px 分隔条中心，纵向落在横向分隔条中心 */
-  #app.app-container .splitter-corner{position:absolute;left:-8px;top:calc(var(--zone-h,56%) - 1px);width:8px;height:10px;
-    cursor:move;z-index:6;touch-action:none}
-  #app.app-container .splitter-corner::before{content:'';position:absolute;inset:2px;border-radius:2px;
-    background:color-mix(in srgb, var(--outline) 40%, transparent)}
-  #app.app-container .splitter-corner:hover::before, #app.app-container .splitter-corner.is-dragging::before{background:var(--accent)}
 
   #app.app-container .panel{background:var(--panel-2);border:1px solid var(--border);border-radius:var(--radius);
     display:flex;flex-direction:column;min-height:0;min-width:0;overflow:hidden}
-  #app.app-container .chart-card{flex:1 1 auto}
-  #app.app-container .panel-head{flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:9px 12px;
+  #app.app-container .chart-card{flex:1 1 auto;container-type:inline-size}
+  #app.app-container .panel-head{flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:7px 10px;
     border-bottom:1px solid var(--border);background:linear-gradient(180deg,var(--panel-3),transparent)}
   #app.app-container .panel-title{display:flex;align-items:center;gap:7px;font-size:13px;font-weight:600;min-width:0}
   #app.app-container .panel-title .ico{width:16px;height:16px;color:var(--accent);flex:0 0 auto}
@@ -157,7 +145,7 @@
   #app.app-container .help-btn:hover{color:var(--text);border-color:var(--accent);color:var(--accent)}
 
   /* 图表控制 */
-  #app.app-container .chart-controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 12px;
+  #app.app-container .chart-controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:6px 10px;
     border-bottom:1px solid var(--border)}
   #app.app-container .field{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);white-space:nowrap}
   #app.app-container .field select, #app.app-container .field input{background:var(--panel-3);border:1px solid var(--border);border-radius:7px;
@@ -167,16 +155,19 @@
   #app.app-container .segmented button{border:0;background:transparent;padding:4px 9px;font-size:11px;color:var(--muted)}
   #app.app-container .segmented button.active{background:var(--accent-soft);color:var(--text)}
   #app.app-container .split-sim{font-size:10px;color:var(--muted-2);white-space:nowrap}
-  #app.app-container .filename-row{display:flex;flex-direction:column;align-items:stretch;gap:5px;padding:8px 12px 10px;
-    border-bottom:1px solid var(--border)}
-  #app.app-container .filename-row textarea{width:100%;box-sizing:border-box;min-height:32px;resize:vertical;
+  /* 文件名模板：默认折叠；展开后标签与输入框同一行，绝不换行 */
+  #app.app-container .filename-row{display:flex;flex-direction:row;align-items:center;gap:6px;padding:6px 10px 8px;
+    border-bottom:1px solid var(--border);flex-wrap:nowrap}
+  #app.app-container .filename-row .field{flex:0 0 auto;white-space:nowrap}
+  #app.app-container .filename-row textarea{flex:1 1 auto;min-width:0;width:auto;box-sizing:border-box;height:26px;
+    min-height:26px;padding:3px 7px;resize:none;white-space:nowrap;overflow-x:auto;overflow-y:hidden;
     background:var(--panel-3);border:1px solid var(--border);border-radius:7px;padding:6px 8px;
     font-family:Consolas,"Cascadia Mono",monospace;font-size:11px;line-height:1.5;color:var(--text)}
   #app.app-container .filename-row textarea:focus{outline:none;border-color:var(--accent)}
-  #app.app-container .filename-preview{font-family:Consolas,"Cascadia Mono",monospace;font-size:10px;color:var(--muted);
+  #app.app-container .filename-preview{flex:0 1 auto;max-width:38%;font-family:Consolas,"Cascadia Mono",monospace;font-size:10px;color:var(--muted);
     overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
 
-  /* 配额表头 */
+  /* 配额表头：常驻两行，不折叠 */
   #app.app-container .quota-head{display:flex;flex-direction:column;gap:7px;padding:9px 12px;border-bottom:1px solid var(--border)}
   #app.app-container .quota-row{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--muted)}
   #app.app-container .quota-row .q-label{display:inline-flex;align-items:center;gap:5px;min-width:92px;color:var(--text)}
@@ -188,7 +179,53 @@
   #app.app-container .quota-row.is-disabled{opacity:.55}
   #app.app-container .quota-row.is-disabled .quota-bar{background:repeating-linear-gradient(45deg,var(--panel-3),var(--panel-3) 4px,transparent 4px,transparent 8px)}
 
-  #app.app-container .legend{display:flex;align-items:center;gap:12px;padding:6px 12px;border-bottom:1px solid var(--border);
+  /* 宿主详细数据：默认收起，点击在同一条目内展开；全页唯一的宿主信息入口 */
+  #app.app-container .quota-host-toggle{display:flex;align-items:center;gap:6px;width:100%;min-height:24px;
+    padding:2px 0;border:0;background:none;color:var(--muted);font-size:11px;text-align:left}
+  #app.app-container .quota-host-toggle:hover{color:var(--text)}
+  #app.app-container .quota-host-toggle .qht-label{color:var(--text)}
+  #app.app-container .quota-host-toggle .chev{margin-left:auto;transition:transform .15s ease}
+  #app.app-container .quota-host-toggle[aria-expanded="true"] .chev{transform:rotate(90deg)}
+  #app.app-container .quota-host-detail{max-height:220px;overflow-y:auto;border-top:1px dashed var(--border);
+    padding-top:4px;font-size:11px}
+  #app.app-container .quota-host-row{display:flex;align-items:center;gap:8px;padding:1px 0;color:var(--muted);
+    white-space:nowrap}
+  #app.app-container .quota-host-row .qhr-name{flex:1 1 auto;min-width:0;overflow:hidden;
+    text-overflow:ellipsis;color:var(--text)}
+  #app.app-container .quota-host-row .qhr-size{flex:0 0 auto;font-variant-numeric:tabular-nums}
+  #app.app-container .quota-empty{color:var(--muted);font-size:11px;padding:3px 0}
+
+  /* 滚动条绝对保守：只在溢出时出现，一律细化 */
+  #app.app-container .chart-stack,
+  #app.app-container .card-list,
+  #app.app-container .log-body,
+  #app.app-container .lan-body,
+  #app.app-container .app-main{scrollbar-width:thin;
+    scrollbar-color:color-mix(in srgb,var(--outline) 45%,transparent) transparent}
+  #app.app-container .chart-stack::-webkit-scrollbar,
+  #app.app-container .card-list::-webkit-scrollbar,
+  #app.app-container .log-body::-webkit-scrollbar,
+  #app.app-container .lan-body::-webkit-scrollbar,
+  #app.app-container .app-main::-webkit-scrollbar{width:6px;height:6px}
+  #app.app-container .chart-stack::-webkit-scrollbar-thumb,
+  #app.app-container .card-list::-webkit-scrollbar-thumb,
+  #app.app-container .log-body::-webkit-scrollbar-thumb,
+  #app.app-container .lan-body::-webkit-scrollbar-thumb,
+  #app.app-container .app-main::-webkit-scrollbar-thumb{
+    background:color-mix(in srgb,var(--outline) 45%,transparent);border-radius:3px}
+  #app.app-container .chart-stack::-webkit-scrollbar-track,
+  #app.app-container .card-list::-webkit-scrollbar-track,
+  #app.app-container .log-body::-webkit-scrollbar-track,
+  #app.app-container .lan-body::-webkit-scrollbar-track,
+  #app.app-container .app-main::-webkit-scrollbar-track{background:transparent}
+  #app.app-container .quota-host-detail{scrollbar-width:thin;
+    scrollbar-color:color-mix(in srgb,var(--outline) 45%,transparent) transparent}
+  #app.app-container .quota-host-detail::-webkit-scrollbar{width:6px;height:6px}
+  #app.app-container .quota-host-detail::-webkit-scrollbar-thumb{
+    background:color-mix(in srgb,var(--outline) 45%,transparent);border-radius:3px}
+  #app.app-container .quota-host-detail::-webkit-scrollbar-track{background:transparent}
+
+  #app.app-container .legend{display:flex;align-items:center;gap:12px;padding:5px 10px;border-bottom:1px solid var(--border);
     font-size:10px;color:var(--muted);flex-wrap:wrap}
   #app.app-container .legend .item{display:inline-flex;align-items:center;gap:4px}
   #app.app-container .dot{width:8px;height:8px;border-radius:50%;display:inline-block}
@@ -216,14 +253,17 @@
   #app.app-container .extension-tools .et-label{font-size:10.5px;color:var(--muted)}
   #app.app-container .extension-tools .et-git{display:inline-flex;align-items:center;gap:4px;font-size:10.5px;color:var(--muted)}
   #app.app-container .extension-tools .et-git select{font-size:11px;padding:2px 5px}
-  #app.app-container .extension-tools .et-keepdev{font-size:10.5px;color:var(--muted);margin:0}
+  #app.app-container .extension-tools .et-keepdev{font-size:10.5px;color:var(--muted);margin:0;
+    display:inline-flex;align-items:center;gap:4px;white-space:nowrap;flex-shrink:0}
   #app.app-container .vol-head .extension-tools{display:inline-flex;align-items:center;gap:6px;padding:2px 8px;margin:0 4px;border-radius:6px;border:1px solid var(--border);background:color-mix(in srgb, var(--panel-3) 55%, transparent)}
   #app.app-container .vol-head .extension-tools .et-label{display:none}
   #app.app-container .settings-divider{border:0;border-top:1px solid var(--border);margin:10px 0}
   #app.app-container .settings-subhead{font-size:11.5px;font-weight:600;color:var(--text);margin-bottom:6px}
   #app.app-container .settings-ext-tools{display:flex;flex-direction:column;align-items:flex-start;gap:8px;padding:8px 10px;border-radius:8px;background:var(--panel-3);border:1px solid var(--border)}
   #app.app-container .settings-ext-tools .et-git select{font-size:11px;padding:2px 6px;background:var(--panel-2);border:1px solid var(--border);border-radius:4px}
-  #app.app-container .chart-empty-guide{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;padding:20px 8px;margin:auto 0}
+  #app.app-container .chart-empty-guide{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:10px;padding:16px;margin:auto;place-items:stretch;justify-self:center;width:100%;max-width:680px}
+  #app.app-container .chart-stack:has(> .chart-empty-guide){align-content:center;justify-items:center}
   #app.app-container .empty-guide-card{display:flex;flex-direction:column;align-items:center;text-align:center;gap:10px;padding:20px 16px;border-radius:12px;border:1px solid var(--border);background:var(--panel-2)}
   #app.app-container .empty-guide-card .guide-icon{width:44px;height:44px;border-radius:50%;background:var(--panel-3);display:flex;align-items:center;justify-content:center;color:var(--accent)}
   #app.app-container .empty-guide-card .guide-title{font-size:13.5px;font-weight:600;color:var(--text)}
@@ -267,26 +307,29 @@
   #app.app-container .chart-foot .spacer{flex:1}
   #app.app-container .chart-foot .target-badge{color:var(--accent);border:1px solid var(--accent);border-radius:999px;padding:1px 7px}
 
-  /* ── 图表栈：一卷 = 一张标准图表卡；桌面网格、移动单列可折叠 ── */
-  #app.app-container .chart-stack{flex:1 1 auto;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:10px;
-    padding:8px 10px 10px}
-  #app.app-container .chart-group{display:flex;flex-direction:column;gap:7px;min-width:0;flex:0 0 auto}
+  /* ── 图表栈：自适应网格（容器宽决定列数，硬上限 4），卡片边贴边 ── */
+  #app.app-container .chart-stack{flex:1 1 auto;min-height:0;overflow:auto;
+    display:grid;grid-template-columns:minmax(0,1fr);gap:1px;padding:1px;align-content:start}
+  /* 唯一一组图表时撑满面板剩余高度；多组时按内容高度，不留空白带 */
+  #app.app-container .chart-stack:has(> .chart-group:only-child){grid-auto-rows:minmax(0,1fr)}
+  #app.app-container .chart-stack > .chart-group:only-child .vol-card{height:100%}
+  #app.app-container .chart-stack > .chart-group:only-child .vol-card .chart-tree{max-height:none}
+  /* chart-group / vol-grid 只做逻辑分组，不产生盒子，让 vol-card 直接成为网格项 */
+  #app.app-container .chart-group{display:contents}
+  #app.app-container .vol-grid{display:contents}
   #app.app-container .chart-group-head{display:flex;align-items:center;gap:7px;flex-wrap:wrap;padding:0 2px;
     font-size:11px;color:var(--muted)}
   #app.app-container .chart-group-head .g-name{color:var(--text);font-weight:600}
-  #app.app-container .vol-grid{display:grid;gap:9px;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));
-    align-content:start;align-items:start}
-  #app.app-container .vol-grid[data-vols="1"]{grid-template-columns:minmax(0,1fr)}
-  /* 只有一组图表时让卡片撑满面板剩余高度（flex-basis 必须为 0，否则按内容高度撑破面板）。
-     卡片内树自己滚动，底部勾选摘要才不会被裁掉。 */
-  #app.app-container .chart-stack > .chart-group:only-child{flex:1 1 0;min-height:0}
-  #app.app-container .chart-stack > .chart-group:only-child .vol-grid{height:100%;align-content:stretch;
-    grid-template-rows:minmax(0,1fr)}
-  #app.app-container .chart-stack > .chart-group:only-child .vol-card{height:100%}
-  #app.app-container .chart-stack > .chart-group:only-child .vol-card .chart-tree{max-height:none}
+
+  /* 列数按图表卡容器宽度自适应：2 / 3 / 4，硬上限 4 列。
+     必须排在 .chart-stack 基础规则之后，否则同特异度会被基础的单列声明覆盖。 */
+  @container (min-width:520px){ #app.app-container .chart-stack{grid-template-columns:repeat(2,minmax(0,1fr))} }
+  @container (min-width:800px){ #app.app-container .chart-stack{grid-template-columns:repeat(3,minmax(0,1fr))} }
+  @container (min-width:1060px){ #app.app-container .chart-stack{grid-template-columns:repeat(4,minmax(0,1fr))} }
 
   #app.app-container .vol-card{display:flex;flex-direction:column;min-width:0;
-    border:1px solid var(--border);border-radius:10px;background:var(--panel-2);overflow:hidden}
+    border:1px solid var(--border);border-radius:10px;background:var(--panel-2);overflow:hidden;
+    resize:both}
   #app.app-container .vol-card.is-disabled{opacity:.55;filter:grayscale(1)}
   #app.app-container .vol-card.is-disabled .tree-row{pointer-events:none}
   #app.app-container .vol-card.is-disabled .tree-check{cursor:not-allowed}
@@ -309,6 +352,46 @@
   #app.app-container .vol-card.is-collapsed .vol-head{border-bottom-color:transparent}
   #app.app-container .vol-body{display:flex;flex-direction:column;min-height:0;flex:1 1 auto}
   #app.app-container .vol-card .chart-tree{flex:1 1 auto;min-height:0;max-height:250px}
+
+  /* ── 图表可视化：条形 / 圆环，两种格式共用同一份类目数据 ── */
+  #app.app-container .vol-chart{flex:0 0 auto;padding:7px 9px;border-bottom:1px solid var(--border);
+    display:flex;flex-direction:column;gap:4px;
+    --vc-c1:var(--accent);
+    --vc-c2:color-mix(in srgb,var(--accent) 55%,var(--muted));
+    --vc-c3:var(--muted);
+    --vc-c4:var(--muted-2);
+    --vc-c5:color-mix(in srgb,var(--muted-2) 55%,var(--panel-3));
+    --vc-c6:color-mix(in srgb,var(--panel-3) 70%,var(--muted))}
+  #app.app-container .vol-chart.is-empty{display:none}
+  #app.app-container .vc-row{display:flex;align-items:center;gap:6px;font-size:10.5px;color:var(--muted);min-width:0}
+  #app.app-container .vc-label{flex:0 1 34%;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  #app.app-container .vc-bar{flex:1 1 auto;min-width:0;height:6px;border-radius:3px;
+    background:color-mix(in srgb,var(--outline) 16%,transparent);overflow:hidden}
+  #app.app-container .vc-bar > i{display:block;height:100%;border-radius:3px;min-width:1px}
+  #app.app-container .vc-val{flex:0 0 auto;font-variant-numeric:tabular-nums;color:var(--muted-2)}
+  #app.app-container .vol-chart.is-donut{flex-direction:row;align-items:center;gap:9px}
+  #app.app-container .vc-donut{width:64px;height:64px;flex:0 0 auto;transform:rotate(-90deg)}
+  #app.app-container .vc-legend{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1 1 auto}
+  #app.app-container .vc-li{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--muted);min-width:0;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #app.app-container .vc-li > b{margin-left:auto;color:var(--muted-2);font-weight:500;font-variant-numeric:tabular-nums}
+  #app.app-container .vc-sw{width:8px;height:8px;border-radius:2px;flex:0 0 auto;background:currentColor}
+  #app.app-container .vol-chart .vc-c1{background:var(--vc-c1);color:var(--vc-c1);stroke:var(--vc-c1)}
+  #app.app-container .vol-chart .vc-c2{background:var(--vc-c2);color:var(--vc-c2);stroke:var(--vc-c2)}
+  #app.app-container .vol-chart .vc-c3{background:var(--vc-c3);color:var(--vc-c3);stroke:var(--vc-c3)}
+  #app.app-container .vol-chart .vc-c4{background:var(--vc-c4);color:var(--vc-c4);stroke:var(--vc-c4)}
+  #app.app-container .vol-chart .vc-c5{background:var(--vc-c5);color:var(--vc-c5);stroke:var(--vc-c5)}
+  #app.app-container .vol-chart .vc-c6{background:var(--vc-c6);color:var(--vc-c6);stroke:var(--vc-c6)}
+
+  /* 树行尾部占用条：宽度 = 该行字节 / 本卡总字节 */
+  #app.app-container .tree-occ{flex:0 0 46px;height:4px;border-radius:2px;overflow:hidden;
+    background:color-mix(in srgb,var(--outline) 14%,transparent)}
+  #app.app-container .tree-occ > i{display:block;height:100%;border-radius:2px;background:var(--accent);min-width:0}
+
+  /* 图表卡面板头的格式下拉 */
+  #app.app-container .chart-fmt{flex:0 0 auto;display:inline-flex;align-items:center}
+  #app.app-container .chart-fmt .text_pole{height:22px;padding:0 4px;font-size:10.5px;border-radius:5px;
+    background:var(--panel-3);border:1px solid var(--border);color:var(--text);min-width:62px}
   #app.app-container .field .unit{font-size:10px;color:var(--muted-2);margin-left:-2px}
 
   /* ── 目标平台下拉：icon + 英文全称 +（宿主）标记；品牌色只在图标环上 ── */
@@ -359,7 +442,7 @@
     padding:5px 12px;border-radius:7px;font-size:12px}
   #app.app-container .zone-tab.active{background:var(--accent-soft);border-color:var(--accent);color:var(--text)}
   #app.app-container .zone-tab .count{font-size:10px;color:var(--muted-2);margin-left:5px}
-  #app.app-container .zone-body{padding:9px;display:flex;flex-direction:column;gap:9px;min-height:0;overflow:hidden}
+  #app.app-container .zone-body{padding:8px;display:flex;flex-direction:column;gap:8px;min-height:0;overflow:hidden}
   /* 选择数据包 / 格式 / 排序固定不动，只有下面的包卡列表滚动 */
   #app.app-container .zone-body > .card-list{flex:1 1 auto;min-height:0;overflow:auto;padding-right:3px}
   #app.app-container .dropzone{border:1px dashed var(--border-strong);border-radius:9px;padding:12px;text-align:center;
@@ -423,8 +506,10 @@
   #app.app-container .batch-bar button:disabled{opacity:.45;cursor:not-allowed}
   #app.app-container .zone-empty{padding:16px;text-align:center;color:var(--muted-2);font-size:11.5px}
 
-  /* 操作条 */
-  #app.app-container .action-row{display:flex;gap:6px;flex-wrap:wrap;padding:9px}
+  /* 操作条：固定在数据包列表上方 */
+  #app.app-container .action-row{display:flex;gap:6px;flex-wrap:wrap;padding:7px 8px}
+  #app.app-container .zone-actions{flex:0 0 auto;border-bottom:1px solid var(--border);
+    background:color-mix(in srgb,var(--panel-3) 45%,transparent)}
   #app.app-container .btn{display:inline-flex;align-items:center;justify-content:center;gap:5px;border:1px solid var(--border);
     background:var(--panel-3);border-radius:8px;padding:6px 10px;font-size:11.5px;color:var(--text);min-height:30px}
   #app.app-container .btn:hover{border-color:var(--border-strong)}
@@ -433,10 +518,25 @@
   #app.app-container .btn.accent:hover{filter:brightness(1.06)}
   #app.app-container .btn.ghost{background:transparent}
   #app.app-container .btn .ico{width:14px;height:14px}
-  #app.app-container .progress{padding:0 9px 9px}
-  #app.app-container .progress-bar{height:6px;background:var(--panel-3);border:1px solid var(--border);border-radius:999px;overflow:hidden}
-  #app.app-container .progress-fill{height:100%;width:0%;background:var(--accent);transition:width .3s ease}
-  #app.app-container .progress-text{display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-top:4px}
+
+  /* 常驻进度条：工作台与所有视图共用的底部日志入口 */
+  #app.app-container .workbench-progress{flex:0 0 auto;display:flex;flex-direction:column;gap:4px;
+    width:100%;text-align:left;font:inherit;color:inherit;
+    padding:6px 12px 7px;border:0;border-top:1px solid var(--border);background:var(--panel-2);cursor:pointer;
+    touch-action:manipulation}
+  #app.app-container .workbench-progress:hover{background:var(--panel-3)}
+  #app.app-container .workbench-progress:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+  #app.app-container .workbench-progress .progress-bar{display:block;height:5px;background:var(--panel-3);
+    border:1px solid var(--border);border-radius:999px;overflow:hidden}
+  #app.app-container .workbench-progress .progress-fill{display:block;height:100%;width:0%;background:var(--accent);transition:width .2s ease}
+  #app.app-container .workbench-progress .progress-text{display:flex;align-items:center;gap:8px;
+    font-size:10px;color:var(--muted);min-width:0}
+  #app.app-container .workbench-progress #progress-label{flex:1 1 auto;min-width:0;overflow:hidden;
+    text-overflow:ellipsis;white-space:nowrap}
+  #app.app-container .workbench-progress .progress-hint{flex:0 0 auto;color:var(--muted-2);white-space:nowrap;
+    text-decoration:underline dotted;text-underline-offset:2px}
+  #app.app-container .workbench-progress #progress-pct{flex:0 0 auto;color:var(--text);
+    font-variant-numeric:tabular-nums;white-space:nowrap}
 
   /* 日志视图 */
   #app.app-container #view-log .log-toolbar{flex-wrap:wrap;padding:0}
@@ -445,8 +545,8 @@
   #app.app-container .log-badge{font-size:9px;padding:1px 5px;border-radius:999px;border:1px solid var(--border);color:var(--muted)}
   #app.app-container .log-badge.warn{color:var(--optional);border-color:var(--optional)}
   #app.app-container .log-badge.err{color:var(--drop);border-color:var(--drop)}
-  #app.app-container .log-dot{position:absolute;top:3px;right:3px;width:6px;height:6px;border-radius:50%;
-    background:var(--optional);display:block}
+  #app.app-container .log-dot{flex:0 0 auto;width:6px;height:6px;border-radius:50%;
+    background:var(--optional);display:inline-block}
   #app.app-container .log-dot[hidden]{display:none}
   #app.app-container .log-toolbar{display:flex;gap:5px;align-items:center;padding:0 0 6px;flex-wrap:wrap}
   #app.app-container .log-toolbar button{border:1px solid var(--border);background:var(--panel-3);border-radius:5px;
@@ -512,7 +612,16 @@
 
   /* 移动端：窄屏布局 */
   #app.app-container[data-view="mobile"]{width:390px;max-width:100%;height:min(820px,calc(100vh - 110px));margin:0 auto}
-  #app.app-container[data-view="mobile"] .splitter-v, #app.app-container[data-view="mobile"] .splitter-h, #app.app-container[data-view="mobile"] .splitter-corner{display:none}
+  #app.app-container[data-view="mobile"] .splitter-v{display:none}
+  /* 手机端左右切换：切换哪一列可见；唯一滚动容器仍是 .app-main —— 不做第二个滚动条 */
+  #app.app-container .mobile-switch{display:none;gap:4px;padding:3px;margin:0 2px;
+    background:var(--panel-2);border:1px solid var(--border);border-radius:9px}
+  #app.app-container[data-view="mobile"] .mobile-switch{display:flex;position:sticky;top:0;z-index:6;
+    backdrop-filter:blur(6px)}
+  #app.app-container .mobile-switch .msw{flex:1 1 0;min-width:0;min-height:28px;padding:3px 8px;
+    border:1px solid transparent;border-radius:7px;background:transparent;color:var(--muted);
+    font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #app.app-container .mobile-switch .msw.active{background:var(--panel-3);border-color:var(--border);color:var(--text)}
   #app.app-container[data-view="mobile"] .app-main{display:flex;flex-direction:column;gap:10px;overflow:auto}
   /* 竖排时子块一律不被压缩，否则 flex-shrink 会把下面的面板压成 2px 并被上方内容盖住。
      注意 `.col-side{display:contents}` 只改变布局树、不改变 DOM 树，
@@ -521,30 +630,56 @@
   #app.app-container[data-view="mobile"] .col-chart{flex:0 0 auto}
   #app.app-container[data-view="mobile"] .col-side{display:contents}
   #app.app-container[data-view="mobile"] .chart-card{flex:0 0 auto}
-  #app.app-container[data-view="mobile"] .chart-stack > .chart-group:only-child{flex:0 0 auto}
-  #app.app-container[data-view="mobile"] .chart-stack > .chart-group:only-child .vol-grid, #app.app-container[data-view="mobile"] .chart-stack > .chart-group:only-child .vol-card{height:auto}
-  #app.app-container[data-view="mobile"] .chart-stack{overflow:visible;padding:8px}
-  #app.app-container[data-view="mobile"] .vol-grid{grid-template-columns:minmax(0,1fr)}
   #app.app-container[data-view="mobile"] .vol-collapse{display:inline-flex}
+  #app.app-container[data-view="mobile"] .chart-stack > .chart-group:only-child .vol-card{height:auto}
+  #app.app-container[data-view="mobile"] .vol-card{resize:none}
+  /* 竖屏：唯一滚动容器是 .app-main —— 内部一律不滚，保证能一次看完所有图表 */
+  #app.app-container[data-view="mobile"] .app-main{overflow-y:auto;overflow-x:hidden}
+  #app.app-container[data-view="mobile"] .chart-stack{overflow:visible;max-height:none;height:auto}
+  #app.app-container[data-view="mobile"] .vol-card .chart-tree{max-height:none;overflow:visible}
+  #app.app-container[data-view="mobile"] .zone-body{overflow:visible}
+  #app.app-container[data-view="mobile"] .zone-body > .card-list{overflow:visible;max-height:none}
+  /* 竖屏空态：两张引导卡并排压紧，不得占掉数据包列表的空间 */
+  #app.app-container[data-view="mobile"] .chart-empty-guide{grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:8px;padding:8px 4px;margin:0}
+  #app.app-container[data-view="mobile"] .empty-guide-card{gap:5px;padding:9px 7px;border-radius:9px}
+  #app.app-container[data-view="mobile"] .empty-guide-card .guide-icon{width:28px;height:28px}
+  #app.app-container[data-view="mobile"] .empty-guide-card .guide-icon svg{width:17px;height:17px}
+  #app.app-container[data-view="mobile"] .empty-guide-card .guide-title{font-size:12px}
+  #app.app-container[data-view="mobile"] .empty-guide-card .guide-desc{font-size:10.5px;line-height:1.35;
+    min-height:0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  #app.app-container[data-view="mobile"] .empty-guide-card .btn{min-height:26px;padding:4px 8px;font-size:11px}
   #app.app-container[data-view="mobile"] .vol-card .chart-tree{height:auto;max-height:260px}
   #app.app-container[data-view="mobile"] .app-title .sub{display:none}
   #app.app-container[data-view="mobile"] .field select{max-width:150px}
   #app.app-container[data-view="mobile"] .panel-title .source-chip{max-width:150px}
 
   @media (max-width:860px){
-    #app.app-container{height:auto;min-height:calc(100vh - 96px)}
+    /* 窄屏固定容器高度：滚动交给 .app-main，进度条底栏始终留在视口底部 */
+    #app.app-container{height:calc(100vh - 96px);min-height:520px}
     #app.app-container .app-main{display:flex;flex-direction:column;gap:10px;overflow:auto}
-    #app.app-container .splitter-v, #app.app-container .splitter-h, #app.app-container .splitter-corner{display:none}
+    #app.app-container .splitter-v{display:none}
     #app.app-container .app-main > *, #app.app-container .col-side > *{flex:0 0 auto}
     #app.app-container .col-chart{flex:0 0 auto}
     #app.app-container .col-side{display:contents}
-    #app.app-container .chart-stack > .chart-group:only-child{flex:0 0 auto}
-    #app.app-container .chart-stack > .chart-group:only-child .vol-grid, #app.app-container .chart-stack > .chart-group:only-child .vol-card{height:auto}
-    #app.app-container .chart-stack{overflow:visible}
-    #app.app-container .vol-grid{grid-template-columns:minmax(0,1fr)}
     #app.app-container .vol-collapse{display:inline-flex}
-    #app.app-container .vol-card .chart-tree{max-height:260px}
+    #app.app-container .vol-card .chart-tree{max-height:none;overflow:visible}
     #app.app-container .chart-card{flex:0 0 auto}
+    /* 竖屏：唯一滚动容器是 .app-main —— 内部一律不滚 */
+    #app.app-container .app-main{overflow-y:auto;overflow-x:hidden}
+    #app.app-container .chart-stack{overflow:visible;max-height:none;height:auto}
+    #app.app-container .zone-body{overflow:visible}
+    #app.app-container .zone-body > .card-list{overflow:visible;max-height:none}
+    /* 竖屏空态：两张引导卡并排压紧 */
+    #app.app-container .chart-empty-guide{grid-template-columns:repeat(2,minmax(0,1fr));
+      gap:8px;padding:8px 4px;margin:0}
+    #app.app-container .empty-guide-card{gap:5px;padding:9px 7px;border-radius:9px}
+    #app.app-container .empty-guide-card .guide-icon{width:28px;height:28px}
+    #app.app-container .empty-guide-card .guide-icon svg{width:17px;height:17px}
+    #app.app-container .empty-guide-card .guide-title{font-size:12px}
+    #app.app-container .empty-guide-card .guide-desc{font-size:10.5px;line-height:1.35;
+      min-height:0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+    #app.app-container .empty-guide-card .btn{min-height:26px;padding:4px 8px;font-size:11px}
   }
 
 
@@ -637,14 +772,13 @@
 }
 
 
-/* ── 局域网互传（执行卡内联 · 发送/接收同屏） ── */
-#app.app-container .lan-block{flex:0 0 auto;border-top:1px solid var(--border);margin-top:8px;padding:8px 9px 10px}
-#app.app-container .lan-toggle{display:flex;align-items:center;gap:7px;width:100%;padding:6px 0;background:transparent;border:0;color:var(--text);font-size:12px}
-#app.app-container .lan-toggle-ico{width:13px;height:13px;color:var(--accent);flex:0 0 auto}
-#app.app-container .lan-toggle-hint{margin-left:auto;color:var(--muted-2);font-size:10px}
-#app.app-container .lan-chev{flex:0 0 auto;color:var(--muted);transition:transform .15s ease}
-#app.app-container .lan-toggle[aria-expanded="true"] .lan-chev{transform:rotate(90deg)}
-#app.app-container .lan-body{display:flex;flex-direction:column;gap:10px;overflow:visible;padding:2px 0 4px}
+/* ── 局域网互传（整面板替换图表面板 · 发送/接收同屏） ── */
+#app.app-container .lan-open-btn{white-space:nowrap;flex-shrink:0;border:1px solid var(--border);background:var(--panel-3);
+  color:var(--text);font:inherit;font-size:11px;line-height:1.4;padding:3px 9px;border-radius:7px;cursor:pointer}
+#app.app-container .lan-open-btn:hover{border-color:var(--border-strong)}
+#app.app-container .lan-view{flex:1 1 auto;min-height:0}
+#app.app-container #lan-view[hidden]{display:none}
+#app.app-container .lan-body{display:flex;flex-direction:column;gap:10px;overflow:auto;padding:10px 12px;min-height:0}
 #app.app-container .lan-send,#app.app-container .lan-recv{display:flex;flex-direction:column;gap:6px}
 #app.app-container .lan-recv{border-top:1px dashed var(--border);padding-top:8px}
 #app.app-container .lan-sec-head{display:flex;align-items:baseline;gap:8px}
