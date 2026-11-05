@@ -29,21 +29,21 @@
 
 | 功能 | UI 入口 | 源码落点 |
 | --- | --- | --- |
-| 从当前宿主拉取整份用户数据 | `#btn-host-fetch`（工作台）/ 宿主原生界面注入按钮 | `index.js` 的 `fetchFromHost()` / `pullFromNativeUi()`；`src/ui/host-bridge.js` 的 `openNativeBackupUi()` / `fetchHostBackup()` |
+| 从当前宿主拉取整份用户数据 | `#btn-fetch`（工作台）/ 宿主原生界面注入按钮 | `index.js` 的 `fetchFromHost()` / `pullFromNativeUi()`；`src/ui/host-bridge.js` 的 `openNativeBackupUi()` / `fetchHostBackup()` |
 | **原生界面生命周期**（拉取后自动关闭、宿主原生导出优先） | 原生界面「从宿主拉取」 | `closeNativeBackupUi()` / `isNativeExportBusy()` / `watchNativeExportStart()`；契约见 `.trellis/spec/frontend/host-native-pull-lifecycle.md` |
-| 细粒度类目勾选（10 类目 + 3 特殊类目） | `#category-checkboxes` | `src/ui/category-filter.js`、`src/core/inspect.js` |
-| 类目内逐文件穿透排除 | 统一文件树 | `src/ui/file-tree-picker.js`、`src/ui/host-bridge.js` 的 `exclude` 链路 |
+| 细粒度类目勾选（10 类目 + 3 特殊类目） | `#chart-stack` 的类目卡与选择树 | `src/ui/workbench-view.js` 的 `renderTreeRows()`、`src/core/inspect.js`、`src/core/chart-model.js` |
+| 类目内逐文件穿透排除 | 同一棵选择树 | `src/ui/workbench-view.js` 的 `renderTreeRows()`、`src/ui/host-bridge.js` 的 `exclude` 链路 |
 | 一步直出目标布局（拉取时即指定目标格式） | `#target-select` | `src/core/plan-preview.js` 的路由/合成分支 |
-| 拉取进度 / 断点续传 / 暂停收尾 | `#progress-container` + `#task-controls` | `src/core/task-manager.js`、`src/core/worker-client.js` |
+| 拉取进度 / 半成品续传 | `#workbench-progress` | `src/ui/host-bridge.js` 的 `fetchHostBackup()`（`Range` 续传）、`src/core/worker-client.js`。**暂停/中止 UI 当前不存在**（见 `.trellis/spec/frontend/state-management.md`） |
 
 ### B. 包转换（三形态都有）
 
 | 功能 | UI 入口 | 源码落点 |
 | --- | --- | --- |
-| 四布局互转 `st` / `l` / `tt` / `pt` | `#btn-convert` + `#target-select` | `src/core/transform.js`（`convert()` 主入口） |
+| 四布局互转 `st` / `l` / `tt` / `pt` | `#btn-generate` + `#target-select` | `src/core/transform.js`（`convert()` 主入口） |
 | 转换前完全扫描与动作预测 | 计划摘要条 | `src/core/plan-preview.js` |
-| 转换报告（复制/丢弃/合成计数 + 丢弃清单） | `#report-panel` | `src/core/report.js` |
-| 剔除酒馆原生重复资产 | `#prune-builtin-check` | `src/core/builtin-assets.js` |
+| 转换报告（复制/丢弃/合成计数 + 丢弃清单） | 无独立面板（结果以日志行呈现） | `src/core/report.js` 的 `reportToHuman()`（当前无调用方） |
+| 剔除酒馆原生重复资产 | 类目树的 `group:native` 勾选（`chart-model.js:408` 据此算 `pruneBuiltinAssets`） | `src/core/builtin-assets.js` |
 | Zstandard（Method 93）/ 7-Zip ZS 透明解压 | 自动 | `src/core/zip-io.js` + `src/vendor/fzstd.js` |
 
 ### C. 增量与差量
@@ -91,7 +91,7 @@
 | 工作区会话（跨重载恢复源包/目标/选择） | `src/storage/db.js` 的 `saveWorkspaceState()` / `loadWorkspaceState()` |
 | **强制不兼容**（非 v2 会话一律作废） | `src/core/migration-session.js` 的 `classifySessionCompatibility()` / `SESSION_SCHEMA_VERSION` |
 | 断点续传（crc 台账 + OPFS 半成品） | `src/core/task-manager.js`、`src/core/transform.js` 的 `resumeCrcMap` |
-| 产物统一出口（不自动下载） | `src/ui/export-queue.js` |
+| 产物落地（`keepExport` 决定入库或直接下载） | `index.js` 的 `deliverCreated()`；`src/ui/export-queue.js` 当前无调用方 |
 | 可选 Authority 后端增强（不可用即静默降级） | `src/storage/authority-store.js` |
 
 ### H. 聊天库适配（纯库模式）
@@ -109,7 +109,7 @@
 
 | 功能 | 源码落点 |
 | --- | --- |
-| 结构化实时日志（级别过滤/复制/下载 `.log`） | `src/core/logger.js`、`src/ui/log-console.js` |
+| 结构化实时日志（级别过滤/复制/下载 `.log`） | `src/core/logger.js`、`src/ui/workbench-view.js`（`#view-log`） |
 | 存储配额条（摘要行 + 展开详情） | `src/ui/workbench-view.js` 的 `renderQuota()` |
 | 宿主配额读数（Luker 同源兜底） | `src/ui/host-bridge.js` 的 `readHostStorageQuota()`（`/api/users/storage/inspect`） |
 
