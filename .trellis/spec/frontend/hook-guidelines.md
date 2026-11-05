@@ -42,15 +42,21 @@ if (typeof document !== 'undefined') {
 function bootstrap() {
   const existingApp = document.getElementById('app');
   if (existingApp) {
-    main(existingApp);              // 独立 Web 模式
+    // 独立 Web 模式：空骨架由同一模板函数填充
+    if (!existingApp.hasChildNodes()) existingApp.innerHTML = trustedStaticMarkup(getWorkbenchHtml());
+    main(existingApp);
   } else {
-    mountSettingsDrawer((drawerApp) => { /* 抽屉展开时渲染工作台 */ });
+    // 插件模式：扩展列表行按钮 → 全屏模态（抽屉注入已于 2026-10-15 删除）
+    mountExtensionRowButton(() => {
+      closeHostExtensionSurface();
+      openConverterModal();
+    });
   }
 }
 ```
 
 宿主 UI 注入统一走 `host-bridge.js` 的共享 `watchHostDom` MutationObserver（200ms 去抖），
-挂载点（扩展抽屉 / 菜单按钮 / 原生备份按钮 / Luker 备份管理器）以 `dataset.stZipInjected`
+挂载点（扩展列表行 / 菜单按钮 / 原生备份按钮 / Luker 备份管理器 / TT·PT 原生导出口）以 `dataset.stZipInjected`
 标记保证幂等，宿主重渲染导致节点丢失时自动重注入——**不要**各自新开 `setInterval` 轮询。
 
 ---

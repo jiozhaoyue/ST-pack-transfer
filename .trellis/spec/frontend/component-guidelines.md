@@ -16,7 +16,7 @@
   （历史教训：09-04 之前的 IIFE 时代曾把调试钩子挂在 `globalThis.__tavernConvert`；该形态与
   `tavern-convert-` DOM 前缀**均已删除**，出现即为陈旧描述。）
 - **DOM 隔离靠两件事，不靠命名前缀**：
-  1. **样式**：所有 CSS 规则作用域化在 `.app-container`（独立态）/ `.st-converter-drawer-app`（插件态）之下（见下方 CSS Scoping Mandate）；
+  1. **样式**：所有 CSS 规则作用域化在 `#app.app-container`（独立态与模态态统一根）/ 自有覆盖层 id（`#st-converter-modal-overlay` / `#wb-detail-overlay`）之下（见下方 CSS Scoping Mandate）；
   2. **注入要素**：id 统一为 `ST-pack-transfer-*`，防重标记用 `dataset.stZipInjected`。
 
 > 复用宿主原生类（`menu_button` / `text_pole` / `inline-drawer` 等）**只允许出现在标记里**，样式仍须作用域化——宿主用的是同一套设计系统，裸选择器会连带改掉宿主的每一个按钮。
@@ -92,8 +92,8 @@ document.querySelectorAll('.userBackupButton').forEach((anchor) => {
 
 | 函数 | 锚点 | 说明 |
 | --- | --- | --- |
-| `mountSettingsDrawer()` | `#extensions_settings2` / `#extensions_settings` | 工作台主抽屉（`getWorkbenchHtml({ isDrawer: true })`） |
-| `registerMenuButton()` | `#extensionsMenu .list-group` | 扩展菜单入口（兼容保留，点击后展开上述抽屉） |
+| `mountExtensionRowButton()` | 扩展列表行（宿主导出入口旁） | 打开工作台全屏模态（`openConverterModal()`）；抽屉注入已于 2026-10-15 删除 |
+| `registerMenuButton()` | `#extensionsMenu .list-group` | 扩展菜单入口（兼容保留，点击后打开上述模态） |
 | `mountNativeBackupButton()` | `.userBackupButton`（账号弹层 + 管理面板每用户行） | 「数据包转运」 |
 | `mountLukerBackupManagerButton()` | `.userBackupManager .backupActionRow` | 仅 Luker 有该锚点，其余宿主自然无操作 |
 
@@ -278,8 +278,7 @@ UI 文案必须是「已取消 + 宿主可能仍在处理，请稍后核对数�
 1. **变量定义域**：所有 CSS 变量定义在双容器选择器上（`style.css:8` 起），配色一律继承宿主变量 + 回退值：
    ```css
    /* style.css（节选，实际内容以此为准） */
-   .app-container,
-   .st-converter-drawer-app {
+   #app.app-container {
      --bg-primary: var(--SmartThemeBodyColor, #14161c);
      --border-color: var(--SmartThemeBorderColor, rgba(255, 255, 255, 0.14));
      --accent: var(--SmartThemeQuoteColor, #f59e0b);
@@ -288,8 +287,8 @@ UI 文案必须是「已取消 + 宿主可能仍在处理，请稍后核对数�
    }
    ```
    **严禁在此硬编码覆盖宿主 `--SmartTheme*` 变量**（09-07 金色系教训：回退值只是独立态的中性深色，不是品牌色）。
-2. **reset 范围**：通配 reset 只允许容器内前缀形式 `.app-container *, .st-converter-drawer-app *`。
-3. **body 骨架**：独立/模态态用 `body:has(> .app-container)`（页面背景与布局）与 `body:has(> .st-converter-modal-overlay) ...`（模态态）；插件模式**绝不触碰宿主 body**。
+2. **reset 范围**：通配 reset 只允许容器内前缀形式 `#app.app-container *`。
+3. **body 骨架**：**任何形态都不在 `body` 上写样式**（`body:has(> .app-container)` 豁免已于 2026-09-25 移除）；独立态的满屏底色挂在 marker 类 `#app.app-container.app-standalone::before` 上，模态态由自有覆盖层 `#st-converter-modal-overlay` 负责。
 4. **滚动条**：页面级 `::-webkit-scrollbar` 必须写成容器后代选择器。
 5. **新增样式自查**：跑 `npm run check:css-scope`（见下方自动化守卫），而不是只 grep 行首——行级 grep 会漏掉 `@media` 内嵌规则与逗号分支。
 
@@ -312,33 +311,34 @@ Luker 前端**同时暴露** `globalThis.SillyTavern`（script.js:360 `= lukerAp
 > 2026-09-25 起**不再有两份副本**，因此「同源同改」这条铁律在本仓**已不适用**——
 > 改为「只允许一个源」的结构性保证。旧条目的历史事故见本节末。
 
-**现行结构**：`index.html` 是**空骨架**，`src/ui/workbench-template.js` 的 `getWorkbenchHtml(opts)` 是**唯一**的结构来源。
+**现行结构**：`index.html` 是**空骨架**，`src/ui/workbench-template.js` 的 `getWorkbenchHtml()` 是**唯一**的结构来源；**函数已无参数**。
 
 ```
 index.html（骨架，约 22 行）
   └─ <div id="app" class="app-container"></div>   ← 空容器，无任何业务节点
         ↑ bootstrap() 检测到 #app 存在且为空时注入
-     getWorkbenchHtml({ isStandalone: true })
+     getWorkbenchHtml()
 ```
 
-三个入口共用同一函数（`src/ui/workbench-template.js:28`）：
+现存两个入口，共用同一函数且产出**逐字相同**的标记（`test/single-template-source.test.js` 正向断言）：
 
-| 入口 | 调用 | 差异 |
+| 入口 | 调用 | 挂载点 |
 | --- | --- | --- |
-| 独立 Web | `getWorkbenchHtml({ isStandalone: true })`（`index.js` 的 `bootstrap()`） | `chrome = !isDrawer` → 有页头/页脚 |
-| 插件抽屉态 | `mountSettingsDrawer()` → `getWorkbenchHtml({ isDrawer: true })` | 不出页头；多一个 `#status-row` 与 `#btn-storage-inspector` 存储入口 |
-| 模态态 | `openConverterModal()` → `getWorkbenchHtml({ isModal: true })` | 多一个 `#btn-close-converter-modal` 关闭按钮 |
+| 独立 Web | `getWorkbenchHtml()`（`index.js` 的 `bootstrap()`） | `index.html` 的 `#app.app-container` |
+| 插件（模态） | `getWorkbenchHtml()`（`index.js` 的 `ensureConverterModal()`） | `#st-converter-modal-overlay > #app.app-container` |
 
-**三态唯一允许的分支差异就是上表右列**，业务节点集合必须完全一致。
+> **2026-10-15 起「抽屉态」已删除**：`mountSettingsDrawer()` 与 `.st-converter-drawer-app` 前缀一并移除，
+> 插件态改挂全屏模态。`index.js` 里仍可见 `getWorkbenchHtml({ isStandalone: true })` / `{ isModal: true }`
+> 两处旧式实参，**函数已忽略**——那是兼容残留，不是分支开关。
 
 ### 机器断言（不得只靠人眼）
 
-`test/single-template-source.test.js` 用 `it.each` 对三态各跑一遍，断言：
+`test/single-template-source.test.js` 的现行断言：
 
-1. 三态均产出全部必需业务节点 id（清单源：`scripts/single-template-source.js` 的 `REQUIRED_TEMPLATE_IDS`，
+1. 两态均产出全部必需业务节点 id（清单源：`scripts/single-template-source.js` 的 `REQUIRED_TEMPLATE_IDS`，
    **节点数由该数组决定，本文件不写死数字**）→ `missing` 必须为空数组；
-2. 折叠区为宿主原生 `inline-drawer`，且**不得**回退到 `<details>`；
-3. 三态的分支差异被**正向断言**锁死：`isModal` 才有 `btn-close-converter-modal`、`isStandalone` 没有；`isDrawer` 才不出 `class="app-header"`、才有 `btn-storage-inspector`。
+2. **两态产物逐字相同**：`getWorkbenchHtml({ isStandalone: true })` === `getWorkbenchHtml({ isModal: true })`；
+3. 关闭按钮 `#btn-close` 与 `class="app-header"` 始终在模板里（独立态由 CSS 隐藏关闭按钮）。
 
 守卫 `npm run check:template-source`（`scripts/single-template-source.js`）双向扫：
 
@@ -372,7 +372,7 @@ expect(html).not.toContain('btn-clear-workspace');
 - Queue 是**纯内存**的（`this.items = []`，无持久化）—— 任何「断点持久化 + 依赖内存产物」的组合都必须显式处理这个落差；
 - `stash()` 写入 `files` store 并带上条目的 `origin`，统一工作区列表据此打来源徽标；
 - 分卷产物必须 `origin: 'split-part'` 入队（**不得**直接调 `saveFile`）；
-- `src/ui/split-deliver-modal.js` 是**待清理死代码**：`renderSplitDeliveryModal` 在 `index.js` 里被 import 但**全仓无调用点**，该文件因此持有 `dom-injection-guard:allow-file` 整文件豁免（见 `scripts/dom-injection-guard.js`）。接回或删除前，不要把它当作可用参考实现。
+- `src/ui/split-deliver-modal.js` **已删除**（2026-10-27 工作台重写 `3b7aeed`），其 `dom-injection-guard:allow-file` 整文件豁免随之消失；当前**没有任何文件**使用整文件豁免。
 
 ### Escalation (2026-09-07 第二次诊断)：裸原生类选择器同样是污染
 
@@ -381,18 +381,18 @@ expect(html).not.toContain('btn-clear-workspace');
 `.menu_button`（宿主样式表内 39 条原生规则）、`.inline-drawer`（13 条）、`.text_pole`、`.checkbox_label`、`.flex-container`、`.flex1`、`.badge`……
 插件 `<style>` 里一条无作用域的 `.menu_button { ... }` 会重排宿主 UI 的**每一个**按钮（含顶栏）——当时实测：注入插件 CSS 后宿主 chrome 上出现 5 处计算样式差异。
 
-**绝对规则**：`style.css` 中**每一个**选择器都必须以 `.app-container `（独立态祖先）或 `.st-converter-drawer-app `（插件挂载点）开头。
+**绝对规则**：`style.css` 中**每一个**选择器都必须以 `#app.app-container`（独立态与模态态统一根）或自有覆盖层 id（`#st-converter-modal-overlay` / `#wb-detail-overlay`）开头。
 不存在「看起来只在插件里用」的例外——宿主用的就是同一套设计系统。
 
 ### Automated guard (2026-09-23)：行级 grep 已不够
 
 grep 只能看到顶层规则行；嵌在 `@media` / `@supports` 里的裸选择器、以及逗号选择器列表中的任一分支，会被完整漏掉（真实回归：两个响应式 `@media` 块里带着裸的 `body`、`.app-header`、`.controls-row` …）。
 
-**规则**：每一个选择器——顶层的、嵌套的、逗号分隔的每一支——都必须以 `.app-container` / `.st-converter-drawer-app` 为作用域根。
-脚本额外宽容两类形：
+**规则**：每一个选择器——顶层的、嵌套的、逗号分隔的每一支——都必须以 `#app.app-container` / `#st-converter-modal-overlay` / `#wb-detail-overlay` 为作用域根。
+脚本宽容一类形：`@keyframes` 内的百分比帧不是元素选择器，直接跳过。
 
-- 独立态骨架：`body:has(> .<class>)` 形式（当前实际用到两个：`body:has(> .app-container)`、`body:has(> .st-converter-modal-overlay) ...`）；
-- `@keyframes` 内的百分比帧不是元素选择器，直接跳过。
+> `body:has(> .app-container)` 形式的豁免已于 2026-09-25 **移除**——`body` 属宿主页面元素，
+> 宿主仓内确有第三方扩展使用 `.app-container` 类名（`scripts/css-scope.js` 头注释有取证记录）。
 
 守卫：`npm run check:css-scope`（`scripts/css-scope.js` 用 PostCSS AST 走查，单测在 `test/css-scope.test.js`）必须通过，输出为 `CSS 作用域检查通过：style.css`。
 PostCSS 只是 devDependency，用于这条解析期守卫，**不进浏览器运行时**。
@@ -408,7 +408,7 @@ npm run check:dom-scope         # 宿主 DOM 写入只许落在声明锚点上�
 ```
 
 五条都可以单独跑（无需 `npm test`）。DOM 注入守卫的豁免约定：单条语句用 `dom-injection-guard:allow <理由>` 注释，整文件用 `dom-injection-guard:allow-file <理由>`（当前无文件使用）。
-第三条守卫的判据与三态一致性断言见上文「Single Template Source Mandate」。
+第三条守卫的判据与两态一致性断言见上文「Single Template Source Mandate」。
 第四条守卫的由来与局限见 [`host-capabilities.md`](./host-capabilities.md) 的「UI 控件的合宪性」一节。
 第五条的作用域契约、运行期仪器与负例要求见 [`dom-write-scope.md`](./dom-write-scope.md)。
 
@@ -433,8 +433,9 @@ npm run check:dom-scope         # 宿主 DOM 写入只许落在声明锚点上�
 ### 现行契约（违反即返工）
 
 - **根选择器**：独立态/模态态一律写 **`#app.app-container`**（本插件两处根
-  ——`index.html` 骨架、`index.js` 的模态容器——都带 `id="app"`）；抽屉态写 `.st-converter-drawer-app`；
-  模态覆盖层写 `#st-converter-modal-overlay`。**裸 `.app-container` 一律不允许**（守卫会拦）。
+  ——`index.html` 骨架、`index.js` 的模态容器——都带 `id="app"`）；覆盖层写
+  `#st-converter-modal-overlay` 或 `#wb-detail-overlay`。**裸 `.app-container` 一律不允许**（守卫会拦）。
+  `.st-converter-drawer-app` 已于 2026-10-15 随抽屉注入删除。
 - **主体禁止**：任何选择器的**最后一个复合选择器**（主体）不得是 `body`/`html`/`:root`。
   （`*` 允许出现在容器之后，如 `#app.app-container *`；裸 `* { … }` 会被根检查拦下。）
 - **独立态专属样式**（页面背景/居中/最小高度）必须挂在 **marker 类**

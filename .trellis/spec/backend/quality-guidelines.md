@@ -16,10 +16,10 @@
 
 | 类别 | 命令 | 目的 |
 |---|---|---|
-| 单元 / 集成 | `npm test` | Vitest 全量：当前 **39 个文件 / 333 passed / 2 skipped** |
+| 单元 / 集成 | `npm test` | Vitest 全量，以实跑为准（2026-11-05 为 **956 passed / 2 skipped**；`test/` 本地专属，不入库） |
 | 单文件 | `npx vitest run test/xxx.test.js` | 只跑一个文件（调试用） |
 | 单条用例 | `npx vitest run -t "用例名"` | 只跑一条用例 |
-| CSS 作用域守卫 | `npm run check:css-scope` | 断言 `style.css` 每条规则都带 `.app-container` 或 `.st-converter-drawer-app` 前缀 |
+| CSS 作用域守卫 | `npm run check:css-scope` | 断言 `style.css` 每条规则都以 `#app.app-container` 或自有覆盖层 id（`#st-converter-modal-overlay` / `#wb-detail-overlay`）为作用域根 |
 | DOM 注入守卫 | `npm run check:dom-injection` | 断言 `src/ui/**` 与根 `index.js` 中进 `innerHTML` 的插值都经 `escapeHtml()` / `trustedStaticMarkup()` |
 | 固件重建 | `npm run gen-fixtures` | 重新生成 `fixtures/` 下的四平台测试包 |
 

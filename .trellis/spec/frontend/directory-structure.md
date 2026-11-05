@@ -8,8 +8,8 @@
 
 项目采用**三形态同构**（"Trinity"），详见根 `CLAUDE.md`「三形态入口，同构核心」与 `AGENTS.md` L1-MR-6：
 
-1. **ST / Luker 扩展插件**：`git clone` 进宿主的第三方扩展目录（Luker 用户私有扩展须**平铺**在 `data/<user>/extensions/<name>/`，见 `AGENTS.md` L1-MR-12）。宿主读 `manifest.json`（`js: index.js`、`css: style.css`）后以原生 ES 模块加载根 `index.js`；`src/ui/host-bridge.js` 的 `mountSettingsDrawer()` 把工作台注入 `#extensions_settings2` / `#extensions_settings` 抽屉。
-2. **独立 Web 应用**：`npm run dev`（=`npm start`，Vite 开发服务器，`http://localhost:5173`）或 `npm run preview`。页面 `index.html` 是**静态 markup**，含 `<div class="app-container" id="app">` 与末尾的 `<script type="module" src="./index.js">`。
+1. **ST / Luker 扩展插件**：`git clone` 进宿主的第三方扩展目录（Luker 用户私有扩展须**平铺**在 `data/<user>/extensions/<name>/`，见 `AGENTS.md` L1-MR-12）。宿主读 `manifest.json`（`js: index.js`、`css: style.css`）后以原生 ES 模块加载根 `index.js`；插件经扩展列表行按钮打开**全屏模态** `#st-converter-modal-overlay`（抽屉注入与 `mountSettingsDrawer()` 已于 2026-10-15 删除）。
+2. **独立 Web 应用**：`npm run dev`（Vite 开发服务器，`http://127.0.0.1:3040`，`strictPort`）或 `npm run preview`（4173）。页面 `index.html` 是**空骨架**（仅 `<div class="app-container" id="app"></div>` + 末尾 `<script type="module" src="./index.js">`）。
 3. **GitHub Pages 静态站点**：`npm run build`（=`vite build --base=./`）产出 `dist/`；`.github/workflows/deploy.yml` 在 push `main` 时自动部署（`vite.config.js` 中 `base: './'`、`worker.format: 'es'`）。
 
 关键原则：
@@ -27,9 +27,9 @@
 
 ```
 ST-pack-transfer/
-├── index.html              # 独立 Web 入口：静态 markup（<div class="app-container" id="app">），末尾 <script type="module" src="./index.js">
-├── index.js                # 根控制器：detectHost → 独立/插件 UI 装配 → ExportQueue + TaskManager
-├── style.css               # 全部样式；每条规则必须以 .app-container / .st-converter-drawer-app 为作用域根
+├── index.html              # 独立 Web 入口：空骨架（<div class="app-container" id="app"></div>），末尾 <script type="module" src="./index.js">
+├── index.js                # 根控制器：detectHost → 独立/插件（模态）UI 装配 → ExportQueue + TaskManager
+├── style.css               # 全部样式；每条规则必须以 #app.app-container 或自有覆盖层 id 为作用域根
 ├── manifest.json           # ST / Luker 扩展清单（js: index.js、css: style.css、loading_order: 50）
 ├── vite.config.js          # base: './'、worker.format: 'es'
 ├── src/
@@ -57,25 +57,22 @@ ST-pack-transfer/
 │   │   ├── fzstd.js            # 纯 JS Zstandard 解压（Method 93）
 │   │   └── zip.js              # @zip.js/zip.js 自包含副本
 │   └── ui/                 # DOM 层（仅此层可依赖 document / window）
-│       ├── workbench-template.js  # HTML 模板唯一来源（getWorkbenchHtml 三态），分区式结构
-│       ├── host-bridge.js         # 宿主嗅探 / CSRF / 备份拉取 / 恢复 / 扩展安装器 / 原生 UI 注入 / OPFS 临时文件
-│       ├── escape.js              # DOM 注入防线：escapeHtml / isSafeHttpUrl / trustedStaticMarkup
-│       ├── stash-list.js          # 统一工作区单列表（来源徽标 + 载入/下载/写回/删除）
+│       ├── workbench-template.js  # HTML 模板唯一来源（getWorkbenchHtml 无参数，两态逐字相同）
+│       ├── workbench-view.js      # 工作台视图渲染与交互（图表 / 选择树 / 配额 / 设置视图）
+│       ├── host-bridge.js         # 宿主嗅探 / CSRF / 备份拉取 / 恢复 / 扩展安装器 / 原生 UI 注入 / OPFS
 │       ├── export-queue.js        # 待导出区状态机 + 渲染（所有产物的统一出口）
-│       ├── category-filter.js     # 类目勾选与脱敏预设（聚合 file-tree-picker 的逐文件明细）
-│       ├── file-tree-picker.js    # 逐文件穿透树/明细行（体积排序 + 大文件警示）
-│       ├── file-drop.js           # 拖放区与格式探测卡片
-│       ├── view.js                # 进度条 / 转换报告折叠屏 / 下载触发
-│       ├── task-controls.js       # 长任务控制条（暂停/中止/续传/丢弃）
-│       ├── usage-dashboard.js     # 配额条与来源统计看板
-│       ├── log-console.js         # 底部实时日志抽屉
-│       ├── archive-manager.js     # 旧「存档管理」组件：全仓已无调用点（保留待清理）
-│       └── split-deliver-modal.js # 旧「分卷交付弹窗」：全仓已无调用点（保留待清理）
+│       ├── escape.js              # DOM 注入防线：escapeHtml / isSafeHttpUrl / trustedStaticMarkup
+│       ├── lan-transfer-panel.js  # 局域网互传面板（WebRTC）
+│       ├── settings-panel.js / settings-store.js  # 设置视图与持久化
+│       ├── chat-store-bridge.js / chat-store-inject.js  # 外部聊天库唯一接缝与三向编排
+│       ├── private-files-store.js # 云端私有件本地存储
+│       ├── qr.js / host-icons.js / fetch-bounds.js  # 二维码 / 宿主图标 / 有界读取
+│       └── 其余（migration-* / workbench-session 等）以 `ls src/ui` 为准
 ├── scripts/
 │   ├── css-scope.js        # CSS 作用域守卫（PostCSS AST 走查，允许 @media 内嵌）
 │   ├── dom-injection-guard.js  # innerHTML/outerHTML/insertAdjacentHTML 未转义插值守卫
 │   └── single-template-source.js  # 单一模板源守卫：index.html 只许骨架 + 模板须含 REQUIRED_TEMPLATE_IDS
-├── test/                   # Vitest（34 个文件；npm test 全绿即质量门槛）
+├── test/                   # Vitest（本地专属不入库；`npm test` 全绿即质量门槛）
 │   ├── advanced-controls.test.js
 │   ├── authority-store.test.js
 │   ├── backup-chats.test.js
@@ -126,14 +123,14 @@ ST-pack-transfer/
 ## Single Template Source (单一模板源 · 2026-09-25 取代原「多入口同源同改」)
 
 `index.html` 是**空骨架**（仅 `<div id="app" class="app-container"></div>` + 脚本入口）。
-`src/ui/workbench-template.js` 的 `getWorkbenchHtml({ isStandalone | isDrawer | isModal })` 是**唯一**的结构来源，
-独立态由 `bootstrap()` 在 `#app` 为空时注入，插件抽屉态与模态态分别由 `mountSettingsDrawer()` 与
-`openConverterModal()` 注入。
+`src/ui/workbench-template.js` 的 `getWorkbenchHtml()`（**无参数**）是**唯一**的结构来源：
+独立态由 `bootstrap()` 在 `#app` 为空时注入，插件态由 `ensureConverterModal()` 注入到
+`#st-converter-modal-overlay > #app.app-container`。两态产物**逐字相同**。
 
 - **结构改动只需改一处**（`workbench-template.js`）；原「两份副本同时改」的自查法已作废。
 - 新增/删除业务节点须同步 `scripts/single-template-source.js` 的 `REQUIRED_TEMPLATE_IDS`，
-  否则 `npm run check:template-source` 的校验面与三态一致性断言同时失效。
-- 权威约定（三态分支差异、机器断言、历史事故）写在
+  否则 `npm run check:template-source` 的校验面与两态一致性断言同时失效。
+- 权威约定（单一模板源、机器断言、历史事故）写在
   [Component Guidelines](./component-guidelines.md) 的 **Single Template Source Mandate** 一节，**不要在此重复描述**。
 
 > `AGENTS.md` / `CLAUDE.md` 的 L1-MR-10「多入口同源同改」是**仓群通用规则**（且属禁止手改的真源同步块）：
@@ -144,10 +141,15 @@ ST-pack-transfer/
 
 ## Module Responsibilities (模块职责与交互边界)
 
+> **2026-11-05 核对（本节多处待重写）**：下面多处以**已删除模块**为锚点——`stash-list.js`、`category-filter.js`、
+> `file-tree-picker.js`、`file-drop.js`、`view.js`、`task-controls.js`、`log-console.js`、`archive-manager.js`、
+> `split-deliver-modal.js`、`usage-dashboard.js` 均在 2026-10-27 工作台重写（`3b7aeed`）后不存在。
+> 现役 UI 模块以上方目录树为准（`ls src/ui`）；涉及已删模块的小节按历史记录阅读，**不要照此接线**。
+
 ### 1. 根 `index.js`（根控制器）
-- `bootstrap()`：`document.getElementById('app')` 存在 → **独立 Web 模式**，直接用 `index.html` 的静态 markup，调 `main(existingApp)`；不存在 → **宿主插件模式**，走 `mountSettingsDrawer((drawerApp) => main(drawerApp))`，工作台 markup 来自 `getWorkbenchHtml({ isDrawer: true })`。
-- `main(root)` 的装配顺序：`detectHost()` → `setupDrawerToggles(root)` → `setupLogConsole(#log-console-mount || root)` → `setupCategoryFilter` → `setupFileDrop` → `new ExportQueue()` → `new TaskManager(createCheckpointAdapter() 或内存 adapter)` + `initTaskControls` → `renderStashList` / `renderUsageDashboard` / `renderExportQueue`。
-- `getWorkbenchHtml({ isModal: true })` 供「扩大为模态工作台」使用，与抽屉同源同模板。
+- `bootstrap()`：`document.getElementById('app')` 存在 → **独立 Web 模式**，直接复用 `index.html` 的空骨架，`#app` 为空时注入 `getWorkbenchHtml()` 后调 `main(app)`；命中宿主 → **插件模式**，向扩展列表注入行按钮，点击经 `openConverterModal()` 打开全屏模态 `#st-converter-modal-overlay > #app.app-container`（不预注入工作台）。
+- `main(root)` 的装配顺序：**本行停留在 2026-09-25 版本，10-27 工作台重写后多处已变**（`renderStashList` / `renderUsageDashboard` / `#log-console-mount` 等均已不存在）；装配细节以 `index.js` 的 `main()` 为准，待专项重写。
+- `ensureConverterModal()` 用 `getWorkbenchHtml()` 构建模态容器；与独立态同源同模板，产物逐字相同。
 
 ### 2. `src/ui/host-bridge.js`（宿主边界唯一出口）
 - 平台判定：`detectHost()` 返回**平台码** `st | luker | standalone`；`hostLayoutCode()` 把 `luker → l` 归一为**布局码** `st | l | tt | pt`。凡把宿主平台传给 `convert()` 或文件名模板处**必须经 `hostLayoutCode()`**（否则抛 `convert: target 必须是 st|l|tt|pt 之一`）。该双轨制的**权威表述**在 [Hook Guidelines](./hook-guidelines.md)，本节不复述细节。
@@ -155,13 +157,13 @@ ST-pack-transfer/
 - 认证与端点：`getCsrfToken()` / `getHandle()`；`fetchHostBackup()`（含 OPFS 半成品与 `resumeCheckpoint` 续传）、`restoreToHost()` / `restoreToLuker()` / `incrementalMergeArchives()`。端点调用传**平台码**（ST `/api/users/backup` 不支持 selection，Luker 支持）。
 - 扩展安装器：`discoverHostExtensions()` / `installExtensionViaHost()` / `deleteExtensionViaHost()` / `checkHostThirdPartyAnomaly()` / `renderExtensionInstallerModal()`。
 - OPFS 临时文件：`supportsOpfs()` / `opfsTmpHandle()` / `opfsHandleToFile()` / `opfsTmpCleanup()`。
-- UI 注入（**全部经共享 `watchHostDom`**）：`mountSettingsDrawer()`（设置抽屉 `#extensions_settings2` / `#extensions_settings`）、`registerMenuButton()`（扩展菜单，兼容保留）、`mountNativeBackupButton()`（账号弹层 + 管理面板的 `.userBackupButton` 旁）、`mountLukerBackupManagerButton()`（Luker `.userBackupManager .backupActionRow`）；`setupDrawerToggles(root)` 负责嵌套子抽屉折叠。
+- UI 注入（**全部经共享 `watchHostDom`**）：`mountExtensionRowButton()`（扩展列表行，打开工作台模态）、`registerMenuButton()`（扩展菜单，兼容保留）、`mountNativeBackupButton()`（ST 账号弹层 + 管理面板的 `.userBackupButton` 旁）、`mountLukerBackupManagerButton()`（Luker `.userBackupManager .backupActionRow`）、`mountTtDataMigrationButton()`（TT `#data_migration_export_button`）、`mountPtDataManagementButton()`（PT 数据管理 dialog 的 `#ptdm-export`）；`setupDrawerToggles(root)` 负责嵌套子抽屉折叠。
 - 宿主能力适配器（均在本模块，遵循「宿主差异只进桥接层」）：`confirmDialog(message) → Promise<boolean>`（官方文档路径 `getContext().Popup.show.confirm`，不可用时降级 `window.confirm`）、`makeHostButton({...})`（注入按钮工厂）。
 - 恢复链路：`restoreToHost()` / `isRestoreInFlight()` / `cancelRestoreInFlight()`（在途控制器由本模块持有，故无 DOM 的 Node 环境可单测）。
 
 ### 3. `src/ui/workbench-template.js`（HTML 模板**唯一来源** · 分区式）
 
-- 唯一出口 `getWorkbenchHtml({ isStandalone, isDrawer, isModal })`——**三态由同一函数产出**；
+- 唯一出口 `getWorkbenchHtml()`（**无参数**）——独立态与插件模态态由同一函数产出**逐字相同**的标记；
   `index.html` 自 2026-09-25 起仅为空骨架（详见本节 Multi-Entry 一节的现行约定与 §「Single Template Source」）。
 - 渲染顺序按**操作流**（配置 → 执行 → 反馈），非字母序；本次改造的权威设计见任务 `09-25-ui-slim-native` 的 `design.md`：
 
@@ -173,12 +175,12 @@ ST-pack-transfer/
   | E 动作 / D 执行反馈 / 日志 | `#btn-host-fetch` / `#btn-convert` / `#btn-restore-luker`；进度 + `#task-controls` + `#report-panel`（空态 `hidden`）；`#log-console-mount` | 常驻 |
 
 - 复用宿主原生类（`.inline-drawer` / `.menu_button` / `.text_pole` / `.checkbox_label` / `.extension_block`），图标统一 Font Awesome（`fa-solid fa-...`），无 emoji。
-- 徽标组按模式**只渲染一份**（抽屉模式在 `status-row`，独立/模态在 `header`）——历史上两处同时渲染导致重复 id，第二份 `#env-badge` 永远停在「检测中」。
-- **三态只允许三处分支差异**：模态多 `#btn-close-converter-modal`；抽屉不出 `app-header`、多 `#status-row` 与 `#btn-storage-inspector`。业务节点集合三态必须一致，由 `test/single-template-source.test.js` 机器断言（数目由 `REQUIRED_TEMPLATE_IDS` 决定）。
+- 徽标组只渲染一份（在页头 `header`）——历史上两处同时渲染导致重复 id，第二份 `#env-badge` 永远停在「检测中」。
+- **两态无任何分支差异**：`getWorkbenchHtml()` 不接参数，独立态与模态态产物逐字相同；关闭按钮 `#btn-close` 恒在模板里，由独立态 CSS 隐藏。历史「抽屉态」差异（`#status-row` / `#btn-storage-inspector`）已随 2026-10-15 抽屉删除而消失。机器断言见 `test/single-template-source.test.js`。
 
 ### 4. `src/ui/escape.js`（DOM 注入防线）
 - `escapeHtml()`（覆盖 `& < > " '`，元素上下文与**属性上下文**通用）、`isSafeHttpUrl()`（只放行 http/https）、`trustedStaticMarkup()`（恒等函数，唯一作用是让守卫放行并让 reviewer 一眼看完全部豁免点：`grep -rn "trustedStaticMarkup(" src/ index.js`）。
-- 配套守卫：`npm run check:dom-injection`（`scripts/dom-injection-guard.js`）扫描 `src/ui/**` 与根 `index.js`；豁免需写 `dom-injection-guard:allow <理由>`（单条）或 `allow-file <理由>`（整文件，当前仅 `src/ui/split-deliver-modal.js` 使用，因它是待清理死代码）。
+- 配套守卫：`npm run check:dom-injection`（`scripts/dom-injection-guard.js`）扫描 `src/ui/**` 与根 `index.js`；豁免需写 `dom-injection-guard:allow <理由>`（单条）或 `allow-file <理由>`（整文件，当前**没有文件**使用）。
 
 ### 5. `src/ui/export-queue.js` + `src/ui/stash-list.js`（产物出口与工作区）
 - 所有产物（宿主直出 / 转换生成 / 增量补丁 / 分卷）先进内存态 `ExportQueue`，由用户统一处置，**不自动下载**；`ephemeral: true` 的条目只在「下载」或「存工作区」时才落 IndexedDB。

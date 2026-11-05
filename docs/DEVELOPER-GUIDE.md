@@ -14,7 +14,7 @@
 | 形态 | 入口 | 装配点 | 差异 |
 | --- | --- | --- | --- |
 | **独立 Web** | `index.html`（仅空骨架 `#app.app-container`） | `index.js` → `bootstrap()` → `main()` | 无宿主；`file-protocol-notice.js` 只在 `file://` 下给提示 |
-| **酒馆扩展插件** | `index.js` 检测到宿主 | `index.js` → `mountSettingsDrawer()` | 抽屉态；额外注入宿主原生备份 UI 入口 |
+| **酒馆扩展插件** | `index.js` 检测到宿主 | `index.js` → 扩展列表行按钮 → `openConverterModal()` | 全屏模态；额外注入宿主原生备份 UI 入口 |
 | **模态态** | `openConverterModal()` 导出 | `index.js:2662` 附近 | 自绘覆盖层 `#st-converter-modal-overlay` |
 | **file:// 单文件离线**（新） | `dist-offline/ST-pack-transfer-offline.html` | `scripts/build-offline.mjs` | 单文件、IIFE、Worker 强制主线程降级 |
 
@@ -110,8 +110,8 @@
 | 功能 | 源码落点 |
 | --- | --- |
 | 结构化实时日志（级别过滤/复制/下载 `.log`） | `src/core/logger.js`、`src/ui/log-console.js` |
-| 存储配额条 | `src/ui/usage-dashboard.js` |
-| 宿主原生存储面板入口 | `#btn-storage-inspector`（`isStorageInspectorAvailable()`） |
+| 存储配额条（摘要行 + 展开详情） | `src/ui/workbench-view.js` 的 `renderQuota()` |
+| 宿主配额读数（Luker 同源兜底） | `src/ui/host-bridge.js` 的 `readHostStorageQuota()`（`/api/users/storage/inspect`） |
 
 ### J. file:// 单文件离线产物（S7，2026-10-13）
 
@@ -166,7 +166,8 @@ index.js      根控制器：detectHost → applyPluginUi → ExportQueue + Task
 
 不可越过的线（违反即返工）：
 
-1. **CSS 双前缀**：所有规则必须带 `#app.app-container` / `.st-converter-drawer-app` 前缀，
+1. **CSS 作用域**：所有规则必须挂在 `#app.app-container`（独立/模态统一根）或自有覆盖层 id
+   （`#st-converter-modal-overlay` / `#wb-detail-overlay`）之下；`.st-converter-drawer-app` 已删除（2026-10-15）。
    配色走 `var(--SmartTheme*, 回退值)`。裸选择器会污染宿主全站 UI（2026-09 实际发生）。
 2. **单一模板源**：业务节点只允许出现在 `workbench-template.js`。
 3. **Worker terminate 后必须置空引用**（否则此后每次任务静默挂死）。

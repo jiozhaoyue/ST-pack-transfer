@@ -52,7 +52,7 @@ PostCSS AST 解析 `style.css`，覆盖 `@media` / `@supports` 等嵌套规则�
 - 右值为变量或函数调用时必须显式包裹 `trustedStaticMarkup(...)`；
 - 语句所在行或上一行可加 `dom-injection-guard:allow <理由>` 做**语句级豁免**；
 - 文件首部可加 `dom-injection-guard:allow-file <理由>` 做**整文件豁免**
-  （当前仅 `src/ui/split-deliver-modal.js` 死代码使用）。
+  （当前**没有文件**使用；历史上的 `split-deliver-modal.js` 已于 2026-10-27 删除）。
 
 审计全部豁免点：
 
@@ -146,11 +146,11 @@ grep -rn "trustedStaticMarkup(" src/ index.js
 > **2026-09-25 起本仓不再有两份 UI 副本**，原「同源同改」自查法（`grep -c` 两处均须 ≥1）**已作废**。
 
 `index.html` 是空骨架（仅 `#app.app-container` + 脚本入口），`src/ui/workbench-template.js` 的
-`getWorkbenchHtml(opts)` 是唯一的结构来源，三态（`isStandalone` / `isDrawer` / `isModal`）由同一函数产出。
+`getWorkbenchHtml()`（**无参数**）是唯一的结构来源；独立态与插件模态态产物**逐字相同**（历史「抽屉态」已于 2026-10-15 删除）。
 因此结构改动**只需改一处**，但必须：
 
 1. 跑 `npm run check:template-source`（会同时校验 `index.html` 不含业务节点、模板含全部必需节点）；
-2. 跑 `test/single-template-source.test.js` 的三态一致性断言（三态各产出全部必需节点，数目由 `REQUIRED_TEMPLATE_IDS` 决定）；
+2. 跑 `test/single-template-source.test.js` 的两态一致性断言（两态产物逐字相同，且各产出全部必需节点，数目由 `REQUIRED_TEMPLATE_IDS` 决定）；
 3. 若新增/删除业务节点，同步更新 `scripts/single-template-source.js` 的 `REQUIRED_TEMPLATE_IDS`——
    **不更新清单等于守卫失效**。
 

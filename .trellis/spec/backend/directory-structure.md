@@ -10,7 +10,7 @@
 
 关键设计原则：
 
-- **三形态同构**：同一份 `src/core/` 跑在三种入口——①独立 Web（`index.html` + 根 `index.js`）②ST/Luker 扩展插件（`src/ui/host-bridge.js` 注入宿主扩展设置抽屉）③Node/Vitest（`src/core/worker-client.js` 在无 `Worker` 时自动降级为主线程）。
+- **三形态同构**：同一份 `src/core/` 跑在三种入口——①独立 Web（`index.html` + 根 `index.js`）②ST/Luker 扩展插件（`src/ui/host-bridge.js` 向扩展列表注入行按钮，点击打开全屏模态）③Node/Vitest（`src/core/worker-client.js` 在无 `Worker` 时自动降级为主线程）。
 - **逐条目流式**：不整包驻留内存，内存峰值 ≈ 最大单条目（大文件走 `addLazy` 惰性流直通，见 `src/core/transform.js` 与 `src/core/zip-io.js`）。
 - **IO 解耦**：核心经注入的 `options.io` 适配器读写 zip，默认实现为 `src/core/zip-io.js`（封装 `src/vendor/zip.js` + `src/vendor/fzstd.js`）。
 - **Hub & Spoke 路由**：四种源布局先归一为内部 hub（ST 摊平布局），再投影到目标布局（`src/core/transform.js` 的 `convert()`）。源布局集合见 `detect.js` 的 `LAYOUTS`，目标集合见 `transform.js` 的 `TARGETS`（`st|l|tt|pt`）。
@@ -23,7 +23,7 @@
 ST-pack-transfer/
 ├── index.html              # 独立 Web 入口（#app 容器）
 ├── index.js                # 根控制器：detectHost → 插件注入 / 独立工作台渲染
-├── style.css               # 全部规则带 .app-container / .st-converter-drawer-app 双前缀
+├── style.css               # 全部规则以 #app.app-container 或自有覆盖层 id 为作用域根
 ├── manifest.json           # ST/Luker 扩展清单（js: index.js, css: style.css）
 ├── vite.config.js          # base './' + worker.format 'es'
 ├── src/
@@ -51,28 +51,20 @@ ST-pack-transfer/
 │   │   ├── fzstd.js            # 纯 JS Zstandard 解压（Method 93）
 │   │   └── zip.js              # @zip.js/zip.js 自包含副本
 │   └── ui/                 # 可 DOM 层
-│       ├── archive-manager.js  # 工作区统一单列表管理器
-│       ├── category-filter.js  # 类目勾选与脱敏预设、动作预测条渲染
 │       ├── escape.js           # escapeHtml / trustedStaticMarkup（HTML 转义唯一入口）
 │       ├── export-queue.js     # 待导出区：产物统一出口（下载/入库/写回/移除）
-│       ├── file-drop.js        # 拖拽上传与格式识别卡片
-│       ├── file-tree-picker.js # 可穿透单项文件树与动作预览选择器
 │       ├── host-bridge.js      # 宿主嗅探 / CSRF / 备份拉取 / 恢复写入 / 原生按钮注入
-│       ├── log-console.js      # 底部实时诊断日志抽屉
-│       ├── split-deliver-modal.js # 智能分包交付管理面板
-│       ├── stash-list.js       # 上传暂存区源包列表（origin ∈ upload / host-export）
-│       ├── task-controls.js    # 进度条旁的 暂停/中止/继续/丢弃 控件
-│       ├── usage-dashboard.js  # 块一顶部配额条
-│       ├── view.js             # 进度条、报告展示与下载触发
-│       └── workbench-template.js # 工作台 HTML 模板唯一来源
+│       ├── workbench-view.js   # 工作台视图渲染（图表 / 选择树 / 配额 / 设置视图）
+│       ├── workbench-template.js # 工作台 HTML 模板唯一来源
+│       └── 其余界面模块（lan-transfer-panel / settings-panel / chat-store-* / qr 等）以 `ls src/ui` 为准
 ├── scripts/
-│   ├── css-scope.js            # CSS 双前缀守卫（npm run check:css-scope）
+│   ├── css-scope.js            # CSS 作用域守卫（npm run check:css-scope）
 │   ├── dom-injection-guard.js  # innerHTML 注入守卫（npm run check:dom-injection）
 │   ├── single-template-source.js  # 单一模板源守卫（npm run check:template-source）
 │   └── control-consumer-guard.js  # 控件消费点守卫（npm run check:control-consumer）
 ├── fixtures/               # 测试固件（四平台布局）
 │   └── gen.js              # 固件生成脚本（npm run gen-fixtures）
-├── test/                   # Vitest（当前 39 个文件 / 333 passed / 2 skipped）
+├── test/                   # Vitest（本地专属，不入库；2026-11-05 为 956 passed / 2 skipped，以实跑为准）
 │   ├── convert.test.js         # 转换规则与矩阵
 │   ├── detect.test.js / detect-host.test.js  # 布局识别 / 宿主嗅探
 │   ├── read-write.test.js      # zip 读写往返
@@ -120,16 +112,16 @@ ST-pack-transfer/
 ### 4. `src/ui/` — 可 DOM 层
 
 - `host-bridge.js`：环境嗅探（`detectHost()`，判定顺序 st/luker 不可颠倒）、`hostLayoutCode()`、CSRF（`/csrf-token`）、用户句柄（`/api/users/me`）、备份拉取（`/api/users/backup`）、恢复写入（`/api/users/restore`）、原生入口按钮注入（共享 `watchHostDom` MutationObserver）、扩展安装器、`FULL_SELECTION`。
-- `workbench-template.js`：工作台 HTML 模板的**唯一来源**（`getWorkbenchHtml()` 产出三态：独立 / 插件抽屉 / 模态；`index.html` 自 2026-09-25 起仅为空骨架）。
+- `workbench-template.js`：工作台 HTML 模板的**唯一来源**（`getWorkbenchHtml()` **无参数**，独立态与插件模态态产物逐字相同；`index.html` 自 2026-09-25 起仅为空骨架）。
 - `escape.js`：`escapeHtml()` / `trustedStaticMarkup()`——所有进入 `innerHTML` 的用户可控数据必须经它，由 `scripts/dom-injection-guard.js` 强制。
-- 其余为界面模块：`view.js`、`log-console.js`、`task-controls.js`、`export-queue.js`、`stash-list.js`、`archive-manager.js`、`category-filter.js`、`file-drop.js`、`file-tree-picker.js`、`split-deliver-modal.js`、`usage-dashboard.js`。
+- 其余为界面模块：`workbench-view.js`（视图渲染主体）、`export-queue.js`、`lan-transfer-panel.js`、`settings-panel.js`、`chat-store-bridge.js` / `chat-store-inject.js`、`qr.js`、`escape.js`、`host-icons.js`。
 
 ### 5. 三形态入口
 
 | 形态 | 入口 | 说明 |
 |---|---|---|
 | 独立 Web | `index.html`（`#app`）+ 根 `index.js` | 直接渲染工作台；`npm run dev` 调试、`npm run build`（`vite build --base=./`）产出静态站点 |
-| 酒馆扩展插件 | `manifest.json` + 根 `index.js` | `detectHost()` 命中后经 `host-bridge.js` 注入宿主扩展设置抽屉 |
+| 酒馆扩展插件 | `manifest.json` + 根 `index.js` | `detectHost()` 命中后向扩展列表注入行按钮，点击打开全屏模态（抽屉注入已于 2026-10-15 删除） |
 | Node/Vitest | `test/**` | `worker-client.js` 检测到无 `Worker`（或源为路径字符串）→ 主线程同构执行 |
 
 ---

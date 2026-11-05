@@ -11,7 +11,7 @@
 4. **变更可审**：比较用 diff；改文件用块级 `Edit`，禁止整文件 `Write` 覆盖；禁止 shell 重定向改源码。
 5. **数据正确性优先**：读数/体积/勾选必须同源、实时、可复核。读不到就如实显示「未提供」，禁止假 0、假缓存、假成功。
 6. **布局铁律**：控件与自身文字不得拆行；图表用自适应网格（宽屏最多 4 列），**不得压成单条并排**；每个图表 DOM 边相互贴着、可拖拽改高宽、不留空白；默认隐藏容器必须补高特异度 `[hidden]` 规则。
-7. **CSS 双前缀**：所有规则带 `.app-container` / `.st-converter-drawer-app` 前缀；颜色只用 `var(--SmartTheme*, 回退值)`。
+7. **CSS 作用域**：所有规则必须挂在 `#app.app-container`（独立态与模态态统一根）或自有覆盖层 id（`#st-converter-modal-overlay` / `#wb-detail-overlay`）之下；`.st-converter-drawer-app` 随抽屉注入已于 2026-10-15 删除，出现即陈旧。颜色只用 `var(--SmartTheme*, 回退值)`。
 8. **单一模板源**：业务节点只写在 `src/ui/workbench-template.js`；新增控件必须同步 `REQUIRED_TEMPLATE_IDS` 与 `CONTROL_CONSUMERS`。
 9. **宿主差异只进 `host-bridge.js`**；平台码/布局码经 `hostLayoutCode()` 归一；禁止同构假设，先读宿主 `docs/**`。
 10. **异步安全**：Worker `terminate()` 后置空引用；任何 `await` 必须有界可 settle；高频进度回调 rAF 合帧。

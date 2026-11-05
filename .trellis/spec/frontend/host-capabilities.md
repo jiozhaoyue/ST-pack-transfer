@@ -286,7 +286,7 @@ export function hostSelectionCapability(platform) {
 
 ### 文档不要写死节点数
 
-「三态各产出 N 个必需节点」中的 N 由 `scripts/single-template-source.js` 的
+「两态各产出 N 个必需节点」中的 N 由 `scripts/single-template-source.js` 的
 `REQUIRED_TEMPLATE_IDS` 决定。**spec 与文档里不要写死数字**——否则每次增删节点
 都要回头改一遍文档，且极易漏改（本项目已发生一次：41 → 40）。
 
