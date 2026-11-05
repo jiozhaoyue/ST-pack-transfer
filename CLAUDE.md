@@ -33,8 +33,8 @@ npm run gen-fixtures              # 重新生成测试固件 fixtures/
 
 同一份 `src/core/` 代码跑在三种环境，入口分别是：
 
-1. **独立 Web**：`index.html` 仅为空骨架（`#app.app-container`），`bootstrap()` 检测到 `#app` 为空时注入 `getWorkbenchHtml({ isStandalone: true })`——与插件态共用同一模板函数。
-2. **酒馆扩展插件**：`index.js` 检测宿主后经 `host-bridge.js` 把工作台注入扩展设置抽屉，并向原生备份 UI 注入入口按钮。
+1. **独立 Web**：`index.html` 仅为空骨架（`#app.app-container`），`bootstrap()` 检测到 `#app` 为空时注入 `getWorkbenchHtml()`（**已无参数**）——与插件态共用同一模板函数。
+2. **酒馆扩展插件**：`index.js` 检测宿主后向扩展列表注入行按钮，点击经 `openConverterModal()` 打开 `#st-converter-modal-overlay` 全屏模态（与独立态同一份模板）；并按宿主向原生备份 UI 注入入口按钮。抽屉注入（`mountSettingsDrawer`）已于 2026-10-15 删除。
 3. **Node/Vitest**：`worker-client.js` 检测无 `Worker` 时自动主线程降级，转换逻辑零改动可测。
 
 ### 分层边界（硬性）
@@ -64,7 +64,7 @@ npm run gen-fixtures              # 重新生成测试固件 fixtures/
 
 ## 踩过的坑（违反即返工）
 
-1. **CSS 双前缀铁律**：`style.css` 所有规则必须带 `.app-container`（独立）或 `.st-converter-drawer-app`（插件）前缀。裸选择器（`.menu_button`/`.inline-drawer` 等酒馆全站类）会污染宿主全站 UI——2026-09 实测发生并修复，严禁回归。配色一律继承宿主 `--SmartTheme*` 变量 + `var(..., 回退值)`，禁止硬编码金色系。
+1. **CSS 作用域铁律**：`style.css` 所有规则必须挂在 `#app.app-container`（独立态与模态态统一根）或自有覆盖层 id（`#st-converter-modal-overlay` / `#wb-detail-overlay`）之下；`.st-converter-drawer-app` 已随抽屉注入删除（2026-10-15），出现即为陈旧描述。裸选择器（`.menu_button`/`.inline-drawer` 等酒馆全站类）会污染宿主全站 UI——2026-09 实测发生并修复，严禁回归。配色一律继承宿主 `--SmartTheme*` 变量 + `var(..., 回退值)`，禁止硬编码金色系。
 2. **严禁写本地酒馆实例目录**；实例更新只走 Git（`git clone`/`git pull`/原生扩展安装器）。
 3. **计划先行**：Trellis 任务 PRD 未回填不得提交代码；`implement.md` 复选框随执行实时勾选。
 4. **完成即推送**：测试绿后 `git push` 到 origin，不得只提交不推送。

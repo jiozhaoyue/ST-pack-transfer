@@ -776,28 +776,28 @@ SillyTavern / Luker / TauriTavern / PureTavern 数据包互转工具，三形态
 ## 目录与架构边界
 
 - `src/core/` — 转换核心（纯逻辑，禁止 DOM 依赖）：`transform.js`（convert 入口，target ∈ {st,l,tt,pt}，见 `TARGETS`）、`detect.js`、`plan-preview.js`、`delta.js`、`splitter.js`、`worker-client.js`（Web Worker 封装，Node 自动主线程降级）
-- `src/ui/` — UI 模块（可 DOM）：`workbench-template.js`（HTML 模板唯一来源）、`host-bridge.js`（宿主嗅探/CSRF/备份拉取/恢复/扩展安装器，**含 `hostLayoutCode()`：宿主平台 luker→l 映射，宿主导出 target 必须经它归一**）、`index.js`（根控制器）、`category-filter.js`、`stash-list.js`、`export-queue.js`、`usage-dashboard.js`、`log-console.js`
+- `src/ui/` — UI 模块（可 DOM）：`workbench-template.js`（HTML 模板唯一来源，`getWorkbenchHtml()` 无参数）、`workbench-view.js`（视图渲染：图表 / 选择树 / 配额 / 设置视图）、`host-bridge.js`（宿主嗅探/CSRF/备份拉取/恢复/扩展安装器，**含 `hostLayoutCode()`：宿主平台 luker→l 映射，宿主导出 target 必须经它归一**）、`export-queue.js`（产物待导出区）、`lan-transfer-panel.js`、`settings-panel.js`、`chat-store-bridge.js` / `chat-store-inject.js`（聊天库唯一接缝）、`qr.js`、`escape.js`；根 `index.js` 是根控制器
 - `src/storage/db.js` — IndexedDB 封装（DB_VERSION 2，files store 带 `origin` 字段：upload/host-export/converted/delta/split-part）
 - `src/vendor/` — zip.js / fzstd 本地副本，勿升级改动
-- `test/` — Vitest（`npm test`，39 文件 / 333 项）
+- `test/` — Vitest（本地专属目录，**永不入库/永不上云**，见铁律 21；`npm test` 当前 956 passed / 2 skipped）
 - `docs/superpowers/specs/` 与 `docs/superpowers/plans/` — 设计规格与实施计划；`docs/research/` — Luker 机制研究报告
 - `.trellis/` — Trellis 任务系统（见上方 TRELLIS 块）
 
 ## 常用命令
 
 ```bash
-npm test          # Vitest 全量（39 文件 / 333 项）
+npm test          # Vitest 全量（当前 956 passed / 2 skipped；test/ 本地专属，不入库）
 npx vitest run test/xxx.test.js   # 单文件
 npm run build     # vite build --base=./
 npm run dev       # vite 开发服务器（独立模式手测）
-npm run check:css-scope       # CSS 双前缀铁律守卫（PostCSS AST）
+npm run check:css-scope       # CSS 作用域守卫（PostCSS AST）
 npm run check:dom-injection   # DOM 注入守卫（innerHTML 未转义插值）
 npm run check:template-source # 单一模板源守卫（index.html 只许骨架）
 ```
 
 ## 关键规则（踩过的坑，务必遵守）
 
-1. **CSS 作用域铁律**：`style.css` 所有规则必须带 `.app-container`（独立模式）或 `.st-converter-drawer-app`（插件模式）双前缀。裸选择器（`.menu_button`/`.inline-drawer`/`.text_pole`/`.checkbox_label` 等酒馆全站类）会污染宿主全站 UI——2026-09 已发生并修复过，严禁回归。禁止在容器上硬编码覆盖 `--SmartTheme*` 宿主主题变量（金色系教训）；配色一律继承宿主变量 + `var(..., 回退值)`。
+1. **CSS 作用域铁律**：`style.css` 所有规则必须挂在 `#app.app-container`（独立态与模态态统一根）或自有覆盖层 id（`#st-converter-modal-overlay` / `#wb-detail-overlay`）之下；`.st-converter-drawer-app` 已随抽屉注入删除（2026-10-15），出现即陈旧。裸选择器（`.menu_button`/`.inline-drawer`/`.text_pole`/`.checkbox_label` 等酒馆全站类）会污染宿主全站 UI——2026-09 已发生并修复过，严禁回归。禁止在容器上硬编码覆盖 `--SmartTheme*` 宿主主题变量（金色系教训）；配色一律继承宿主变量 + `var(..., 回退值)`。
 2. **平台代码 vs 布局代码**：宿主检测返回 `st|luker|standalone`；转换器只接受 `st|l|tt|pt`。凡把宿主平台传给 convert/文件名模板处必须经 `hostLayoutCode()` 归一（`luker→l`）。
 3. **宿主端点差异**：`/api/users/backup` ST 不支持 selection（全量导出+插件内过滤），Luker 支持（透传勾选）；恢复端点 `/api/users/restore`。相关端点调用传**宿主平台代码**（st/luker），非布局代码。
 4. **宿主 CSS 类复用**：模板使用酒馆原生类（`menu_button`/`text_pole`/`checkbox_label`/`inline-drawer`/`flex-container`），样式定义在 style.css 内作用域化版本。
