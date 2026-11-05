@@ -884,3 +884,44 @@ Dev Luker 实测「从宿主拉取 ~1MB/s，比原生慢 20 倍」。取证确�
 ### Next Steps
 
 - 起 Dev 实例后复验 D-1/D-2
+
+
+## Session 64: Session 64 · 文档对齐与四项接线恢复（续传/暂停/报告/待导出区）
+<!-- trellis-session: v=2 fp=e1b15a6d5fcb128c -->
+
+**Date**: 2026-11-06
+**Task**: Session 64 · 文档对齐与四项接线恢复（续传/暂停/报告/待导出区）
+**Branch**: `main`
+
+### Summary
+
+计划与规范对齐代码事实；重写十个已删 UI 模块的规范锚点；把断点续传、暂停中止、转换报告、待导出区四项能力接回当前 UI
+
+### Main Changes
+
+- 计划：D-1~D-3、P0-1~P0-6、P1-1~P1-4、P2-1/P2-2 按代码符号核对收口，坑位表清零「待取证」
+- 规范：十处已删模块（stash-list/category-filter/log-console 等）的引用改为现役锚点或历史记录；纠正「三态」为两态、目录树补 src/app/
+- 新增 src/app/conversion-runner.js：TaskManager + persistPartial + onProgress 断点；OPFS 半成品 + localStorage 标记跨重载续传
+- index.js 的 generate / generateMerged 统一经 runner，携带 signal / resumeCrcMap / appendFrom / finalizeOnAbort
+- 动作行动态渲染暂停/继续/中止；转换报告 showReport 模态；keepExport=false 时产物进本次待导出队列且不再自动下载
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `1533ac3` | feat(convert): 恢复断点续传、暂停中止、转换报告与待导出区接线 |
+
+### Testing
+
+- [OK] npm test 961 passed / 2 skipped；七项守卫全绿；npm run build 通过
+- [OK] test/conversion-runner.test.js 5 例：成功传参 / 暂停不 fail / 中止清理 / 续传重建台账 / 空转安全
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 真实浏览器实测暂停→继续→产物完整（3040 被其他会话占用，需换端口起本会话 dev server）
+- restore-batch.js（写回批次）与 renderExportQueue 整块旧面板仍未接线
+- AGENTS.md:369 / CLAUDE.md:437 的 L1-MR-3 仍在真源同步块内，需回 tavern-harness 修正后重新同步

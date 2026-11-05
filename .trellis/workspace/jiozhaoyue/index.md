@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-2.md`
-- **Total Sessions**: 63
-- **Last Active**: 2026-11-05
+- **Total Sessions**: 64
+- **Last Active**: 2026-11-06
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-2.md` | ~886 | Active |
+| `journal-2.md` | ~927 | Active |
 | `journal-1.md` | ~2491 | Archived |
 <!-- @@@/auto:active-documents -->
 
@@ -30,6 +30,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 64 | 2026-11-06 | Session 64 · 文档对齐与四项接线恢复（续传/暂停/报告/待导出区） | `1533ac3` | `main` |
 | 63 | 2026-11-05 | Session 63 · 工作台收口（布局 / 分卷 / 联动 / 云端包仓库） | `9cbacad`, `35713ec` | `main` |
 | 62 | 2026-11-04 | 宿主原生导出入口：TT/PT 分支与调研纪律 | `adc317b`, `3326598`, `5f3c8d4` | `main` |
 | 58 | 2026-10-27 | 宿主图表 / 设置收敛 / 图表唯一选择面 / i18n / 教程定位 | `00dc830`, `f5c02c2`, `9aed39a`, `e0cfdcd`, `53a7792` | `main` |
