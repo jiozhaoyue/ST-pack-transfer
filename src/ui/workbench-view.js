@@ -178,6 +178,7 @@ const state = {
   packages: INITIAL_PACKAGES.map(p=>({...p})),
   selectedPkgs:new Set(), mergeMode:false, privateFiles:[], expanded:{}, collapsedVol:{}, sel:{}, log:loadPersistedLog(), logLevel:'ALL',
   noTrafficPrompt:false, keepExport:true,
+  task:null, pendingExports:[],
   chartFmt:{}, cardSize:loadCardSizes(),
   storage:{ browser:null, host:null }, quotaHostOpen:false,
   cloud:{ open:false, config:loadCloudConfig(), busy:false, status:'', list:[], picked:null },
@@ -1019,12 +1020,20 @@ function renderActions(){
   const hasSel=state.selectedPkgs.size>0;
   const sel={selectedCount:state.selectedPkgs.size};
   const zoneActions=actionsForZone(state.zone);
+  const task=state.task;
+  const taskBtns=task
+    ? (task.state==='running'
+      ? '<button class="btn" id="btn-task-pause">'+t('action.pause')+'</button>'
+        +'<button class="btn" id="btn-task-abort">'+t('action.abort')+'</button>'
+      : '<button class="btn accent" id="btn-task-resume">'+t('action.resume')+'</button>'
+        +'<button class="btn" id="btn-task-abort">'+t('action.abort')+'</button>')
+    : '';
   const libBtn=state.libraryExport && zoneActions.includes('libraryExport')
     ? '<button class="btn" id="btn-library-export">'+svg('db','ico')+t('action.libraryExport')+'</button>'
     : '';
   if(zoneActions.includes('generate')){
-    row.innerHTML=
-      '<button class="btn" id="btn-fetch">'+svg('cloud','ico')+t('action.fetch')+'</button>'
+    row.innerHTML=taskBtns
+      +'<button class="btn" id="btn-fetch">'+svg('cloud','ico')+t('action.fetch')+'</button>'
       +'<button class="btn accent" id="btn-generate"'+(actionEnabled(state.zone,'generate',sel)?'':' disabled')+'>'+svg('archive','ico')+t('action.generatePack')+'</button>'
       +'<button class="btn" id="btn-merge"'+(actionEnabled(state.zone,'merge',sel)?'':' disabled')+'>'+svg('copy','ico')+t('action.mergeUpload')+'</button>'
       +libBtn
@@ -1034,14 +1043,17 @@ function renderActions(){
     row.querySelector('#btn-merge')?.addEventListener('click',()=>doMerge());
     row.querySelector('#btn-library-export')?.addEventListener('click',()=>actions.libraryExport?.());
   }else{
-    row.innerHTML=
-      '<button class="btn" id="btn-download"'+(hasSel?'':' disabled')+'>'+svg('file','ico')+t('action.download')+'</button>'
+    row.innerHTML=taskBtns
+      +'<button class="btn" id="btn-download"'+(hasSel?'':' disabled')+'>'+svg('file','ico')+t('action.download')+'</button>'
       +'<button class="btn accent" id="btn-upload"'+(hasSel?'':' disabled')+'>'+svg('cloud','ico')+t('action.restore')+'</button>'
       +'<button class="btn" id="btn-copyback"'+(hasSel?'':' disabled')+'>'+svg('folder','ico')+t('action.copyBack')+'</button>';
     row.querySelector('#btn-download')?.addEventListener('click',()=>{ actions.download?.([...state.selectedPkgs]); });
     row.querySelector('#btn-upload')?.addEventListener('click',()=>doUploadHost());
     row.querySelector('#btn-copyback')?.addEventListener('click',()=>doCopyBack());
   }
+  row.querySelector('#btn-task-pause')?.addEventListener('click',()=>actions.taskPause?.());
+  row.querySelector('#btn-task-resume')?.addEventListener('click',()=>actions.taskResume?.());
+  row.querySelector('#btn-task-abort')?.addEventListener('click',()=>actions.taskAbort?.());
   row.querySelector('#btn-fetch')?.addEventListener('click',()=>doFetch());
   renderLan();
   renderCloud();
@@ -2055,6 +2067,7 @@ initSplitters();
     renderActions();
     renderChart();
     renderMobileView();
+    renderPendingExports();
   }
 
   function getExcludedPaths(pkg) {
@@ -2118,6 +2131,58 @@ initSplitters();
     });
   }
 
+  /* ── 渲染：本次待导出（内存队列，不入库） ── */
+  function renderPendingExports(){
+    const host=document.getElementById('pending-exports');
+    if(!host) return;
+    const list=state.pendingExports||[];
+    host.hidden=list.length===0;
+    if(!list.length){ host.innerHTML=''; return; }
+    host.innerHTML='<div class="pending-head"><span>'+t('pending.title',{n:list.length})+'</span>'
+      +'<button class="mini" id="pending-clear">'+t('pending.clear')+'</button></div>'
+      +'<div class="pending-list">'+list.map(it=>'<div class="pending-row" data-id="'+escapeHtml(it.id)+'">'
+        +'<span class="pending-name" title="'+escapeHtml(it.name)+'">'+escapeHtml(it.name)+'</span>'
+        +'<span class="pending-size">'+fmtMB((it.blob?.size||0)/1048576)+'</span>'
+        +'<button class="mini" data-act="download">'+t('pending.download')+'</button>'
+        +'<button class="mini" data-act="stash">'+t('pending.stash')+'</button>'
+        +'<button class="mini" data-act="remove">'+t('pending.remove')+'</button>'
+        +'</div>').join('')+'</div>';
+    host.querySelector('#pending-clear')?.addEventListener('click',()=>actions.pendingClear?.());
+    host.querySelectorAll('[data-act]').forEach(btn=>btn.addEventListener('click',()=>{
+      const id=btn.closest('[data-id]')?.dataset.id;
+      if(!id) return;
+      if(btn.dataset.act==='download') actions.pendingDownload?.(id);
+      else if(btn.dataset.act==='stash') actions.pendingStash?.(id);
+      else actions.pendingRemove?.(id);
+    }));
+  }
+
+  /** 转换报告：结构化的计数 + 三类清单，全部来自 `Report#toJSON()` 的纯对象。 */
+  function showReport(report){
+    if(!report) return;
+    const counts=Object.entries(report.modules||{})
+      .map(([name,mod])=>'<div class="rep-row"><span>'+escapeHtml(name)+'</span><b>'+((mod&&mod.copied)||0)+'</b></div>')
+      .join('');
+    const section=(title,list)=>{
+      if(!Array.isArray(list)||!list.length) return '';
+      const text=list.map((x)=>typeof x==='string'?x:(x&&x.path)?x.path:JSON.stringify(x)).join('\n');
+      return '<details class="rep-sec"><summary>'+title+' ('+list.length+')</summary><pre>'+escapeHtml(text)+'</pre></details>';
+    };
+    const html='<div class="rep-grid">'+(counts||'<div class="rep-row"><span>-</span><b>0</b></div>')+'</div>'
+      +section(t('report.dropped'),report.dropped)
+      +section(t('report.filtered'),report.filtered)
+      +section(t('report.warnings'),report.warnings);
+    openModal(
+      t('report.title'),
+      t('report.desc',{from:report.sourceLayout||'-',to:report.target||'-'}),
+      [html],
+      [
+        {label:t('report.download'), onClick:()=>actions.reportDownload?.(report)},
+        {label:t('modal.close'), primary:true, onClick:()=>closeModal()},
+      ],
+    );
+  }
+
   return {
     setPackages(list) {
       state.packages = (list || []).map((pkg) => ({ ...pkg }));
@@ -2177,6 +2242,11 @@ initSplitters();
     },
     setPrivateFiles(list) { state.privateFiles = Array.isArray(list) ? list : []; renderChart(); },
     setZone(zone) { state.zone = zone; state.selectedPkgs = new Set(); renderAll(); },
+    /** 任务条：running / paused / null。只影响动作行的暂停·继续·中止三键。 */
+    setTask(task) { state.task = task || null; renderActions(); },
+    /** 本次待导出（内存队列）；空数组即隐藏整块。 */
+    setPendingExports(items) { state.pendingExports = Array.isArray(items) ? items : []; renderPendingExports(); },
+    showReport,
     setActivePackage(id) { state.source = { type: 'package', pkgId: id }; state.sourceKey = 'pkg:' + id; renderAll(); },
     pushLog(level, msg) { log(String(level || 'INFO').toUpperCase(), msg); },
     openModal,

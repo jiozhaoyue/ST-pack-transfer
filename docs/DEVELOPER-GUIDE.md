@@ -34,7 +34,8 @@
 | 细粒度类目勾选（10 类目 + 3 特殊类目） | `#chart-stack` 的类目卡与选择树 | `src/ui/workbench-view.js` 的 `renderTreeRows()`、`src/core/inspect.js`、`src/core/chart-model.js` |
 | 类目内逐文件穿透排除 | 同一棵选择树 | `src/ui/workbench-view.js` 的 `renderTreeRows()`、`src/ui/host-bridge.js` 的 `exclude` 链路 |
 | 一步直出目标布局（拉取时即指定目标格式） | `#target-select` | `src/core/plan-preview.js` 的路由/合成分支 |
-| 拉取进度 / 半成品续传 | `#workbench-progress` | `src/ui/host-bridge.js` 的 `fetchHostBackup()`（`Range` 续传）、`src/core/worker-client.js`。**暂停/中止 UI 当前不存在**（见 `.trellis/spec/frontend/state-management.md`） |
+| 拉取进度 / 半成品续传 | `#workbench-progress` | `src/ui/host-bridge.js` 的 `fetchHostBackup()`（`Range` 续传）、`src/core/worker-client.js` |
+| 转换进度 / 暂停 / 继续 / 中止 | 动作行 `#btn-task-pause` / `#btn-task-resume` / `#btn-task-abort` | `src/app/conversion-runner.js`、`src/core/task-manager.js`、`src/app/task-runtime.js` 的 `persistPartial` |
 
 ### B. 包转换（三形态都有）
 
@@ -42,7 +43,7 @@
 | --- | --- | --- |
 | 四布局互转 `st` / `l` / `tt` / `pt` | `#btn-generate` + `#target-select` | `src/core/transform.js`（`convert()` 主入口） |
 | 转换前完全扫描与动作预测 | 计划摘要条 | `src/core/plan-preview.js` |
-| 转换报告（复制/丢弃/合成计数 + 丢弃清单） | 无独立面板（结果以日志行呈现） | `src/core/report.js` 的 `reportToHuman()`（当前无调用方） |
+| 转换报告（计数 + 丢弃/过滤/警告三类清单 + 下载 `.txt`） | 转换完成后模态框 `view.showReport(report)` | `src/core/report.js` 的 `reportToHuman()`、`src/ui/workbench-view.js` 的 `showReport()` |
 | 剔除酒馆原生重复资产 | 类目树的 `group:native` 勾选（`chart-model.js:408` 据此算 `pruneBuiltinAssets`） | `src/core/builtin-assets.js` |
 | Zstandard（Method 93）/ 7-Zip ZS 透明解压 | 自动 | `src/core/zip-io.js` + `src/vendor/fzstd.js` |
 
@@ -91,7 +92,7 @@
 | 工作区会话（跨重载恢复源包/目标/选择） | `src/storage/db.js` 的 `saveWorkspaceState()` / `loadWorkspaceState()` |
 | **强制不兼容**（非 v2 会话一律作废） | `src/core/migration-session.js` 的 `classifySessionCompatibility()` / `SESSION_SCHEMA_VERSION` |
 | 断点续传（crc 台账 + OPFS 半成品） | `src/core/task-manager.js`、`src/core/transform.js` 的 `resumeCrcMap` |
-| 产物落地（`keepExport` 决定入库或直接下载） | `index.js` 的 `deliverCreated()`；`src/ui/export-queue.js` 当前无调用方 |
+| 产物落地（`keepExport` 决定入库；否则进本次待导出队列） | `index.js` 的 `deliverCreated()`；`src/ui/export-queue.js`（`ExportQueue` + `#pending-exports`） |
 | 可选 Authority 后端增强（不可用即静默降级） | `src/storage/authority-store.js` |
 
 ### H. 聊天库适配（纯库模式）
