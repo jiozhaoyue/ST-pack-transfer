@@ -9,7 +9,9 @@
  *   · 动作：`actions.*`（拉取 / 生成 / 恢复 / 复制 / 删除 / 下载 / 设置 / 关闭）
  */
 
-import { chartTreeFor, deriveExportOptions } from '../core/chart-model.js';
+import { chartTreeFor, deriveExportOptions, annotateChatLinks, counterpartsOf } from '../core/chart-model.js';
+import { createS3Client, buildBaseUrl, normalizePrefix, objectKey } from '../core/s3-client.js';
+import { encryptBytes, decryptBytes, isEncrypted } from '../core/s3-crypto.js';
 import { mergeChartTrees } from '../core/merge-packages.js';
 import { actionsForZone, actionEnabled } from '../core/zone-model.js';
 import { EXTENSION_MODES, GIT_MODES } from '../core/export-modes.js';
@@ -99,6 +101,8 @@ function hostNodes(host){
 }
 function packageNodes(pkg){
   const nodes = chartTreeFor(pkg, state.extensionMode);
+  /* 角色卡 / 聊天目录按名称配对；配不上的标「未匹配」，不猜。 */
+  annotateChatLinks(nodes, t('link.unmatched'));
   /* 私有件「传云」只在 ST/Luker 有原生 files 接口时出现；宿主树没有源包字节，故不标。 */
   const canUpload = state.mode!=='web' && (state.host==='st' || state.host==='luker');
   if(canUpload){
@@ -176,6 +180,7 @@ const state = {
   noTrafficPrompt:false, keepExport:true,
   chartFmt:{}, cardSize:loadCardSizes(),
   storage:{ browser:null, host:null }, quotaHostOpen:false,
+  cloud:{ open:false, config:loadCloudConfig(), busy:false, status:'', list:[], picked:null },
   sort:'time-desc', filter:'all', tutorialStep:0, tutorialOpen:false, tutorialKind:'basic',
   sourceKey:'host:luker', seq:{}, libraryExport:false,
   lan:{
@@ -384,11 +389,13 @@ function renderTargetPicker(){
       +'</button>';
   }).join('');
 }
-function updateSplitSim(){
+/* preview 传入时只算「输入中的草稿值」，不读 state —— 未确认前图表不得重算。 */
+function updateSplitSim(preview){
   const sim=document.getElementById('split-sim');
   if(!sim) return;
-  if(state.splitMb===''){ sim.textContent=''; sim.style.color=''; return; }
-  const raw=Number(state.splitMb);
+  const value = preview===undefined ? state.splitMb : preview;
+  if(value===''){ sim.textContent=''; sim.style.color=''; return; }
+  const raw=Number(value);
   if(!isFinite(raw)||raw<=0){ sim.textContent=t('splitSim.invalid'); sim.style.color='var(--optional)'; return; }
   if(raw<SPLIT_MIN){ sim.textContent=t('splitSim.min',{n:SPLIT_MIN}); sim.style.color='var(--optional)'; return; }
   if(raw>SPLIT_MAX){ sim.textContent=t('splitSim.max',{n:SPLIT_MAX}); sim.style.color='var(--optional)'; return; }
@@ -1021,7 +1028,8 @@ function renderActions(){
       +'<button class="btn accent" id="btn-generate"'+(actionEnabled(state.zone,'generate',sel)?'':' disabled')+'>'+svg('archive','ico')+t('action.generatePack')+'</button>'
       +'<button class="btn" id="btn-merge"'+(actionEnabled(state.zone,'merge',sel)?'':' disabled')+'>'+svg('copy','ico')+t('action.mergeUpload')+'</button>'
       +libBtn
-      +'<button class="btn" id="lan-open-btn">'+svg('bolt','ico')+t('action.lan')+'</button>';
+      +'<button class="btn" id="lan-open-btn">'+svg('bolt','ico')+t('action.lan')+'</button>'
+      +'<button class="btn" id="cloud-open-btn">'+svg('cloud','ico')+t('cloud.open')+'</button>';
     row.querySelector('#btn-generate')?.addEventListener('click',()=>doGenerate());
     row.querySelector('#btn-merge')?.addEventListener('click',()=>doMerge());
     row.querySelector('#btn-library-export')?.addEventListener('click',()=>actions.libraryExport?.());
@@ -1036,6 +1044,7 @@ function renderActions(){
   }
   row.querySelector('#btn-fetch')?.addEventListener('click',()=>doFetch());
   renderLan();
+  renderCloud();
 }
 
 /* ── 渲染：局域网互传（执行卡内联） ── */
@@ -1065,10 +1074,16 @@ function renderLan(){
   const chart=document.getElementById('chart-card');
   const view=document.getElementById('lan-view');
   if(!chart||!view) return;
-  chart.hidden=!!L.open;
+  chart.hidden=!!(L.open || state.cloud.open);
   view.hidden=!L.open;
   const targets=lanTargets();
   const sum=document.getElementById('lan-send-summary'); if(sum) sum.textContent=lanSummaryText();
+  /* 概览：对端 / 类别 / 状态（对齐 Luker 后端行的信息层级） */
+  const ovPeer=document.getElementById('lan-ov-peer');
+  if(ovPeer) ovPeer.textContent = L.send.busy||L.send.waiting ? t('action.send') : (L.recv.busy ? t('action.recv') : t('lan.ovIdle'));
+  const ovCats=document.getElementById('lan-ov-cats'); if(ovCats) ovCats.textContent = lanSummaryText() || t('lan.ovNone');
+  const ovState=document.getElementById('lan-ov-state');
+  if(ovState) ovState.textContent = (L.send.busy||L.send.waiting) ? (L.send.phase||t('action.ready')) : (L.recv.busy ? (L.recv.phase||t('action.waiting')) : t('action.ready'));
   const gen=document.getElementById('lan-btn-generate');
   if(gen) gen.disabled=!targets.length || L.send.busy || L.send.waiting;
   const sendCode=document.getElementById('lan-send-code');
@@ -1102,6 +1117,251 @@ function renderLan(){
   if(scanHint) scanHint.textContent=L.scanning==='answer'?t('lan.scanAnswerHint'):t('action.scanHint');
   const err=document.getElementById('lan-scan-error');
   if(err){ err.hidden=!L.scanError; err.textContent=L.scanError||''; }
+}
+
+/* ── 云端包仓库（S3 兼容；凭据只存本机浏览器，不可用时如实降级） ── */
+const CLOUD_KEY = 'st-pack-transfer:s3';
+
+function loadCloudConfig() {
+  if (typeof localStorage === 'undefined') return null;
+  try {
+    const parsed = JSON.parse(localStorage.getItem(CLOUD_KEY) || 'null');
+    if (!parsed || typeof parsed !== 'object') return null;
+    return {
+      endpoint: String(parsed.endpoint || ''),
+      region: String(parsed.region || ''),
+      bucket: String(parsed.bucket || ''),
+      prefix: normalizePrefix(parsed.prefix || ''),
+      pathStyle: !!parsed.pathStyle,
+      accessKeyId: String(parsed.accessKeyId || ''),
+      secretAccessKey: String(parsed.secretAccessKey || ''),
+      passphrase: String(parsed.passphrase || ''),
+    };
+  } catch {
+    return null;
+  }
+}
+function persistCloudConfig(config) {
+  if (typeof localStorage === 'undefined') return false;
+  try {
+    localStorage.setItem(CLOUD_KEY, JSON.stringify(config));
+    return true;
+  } catch {
+    return false;
+  }
+}
+function cloudConfigFromForm() {
+  const val = (id) => (document.getElementById(id)?.value || '').trim();
+  return {
+    endpoint: val('cloud-endpoint').replace(/\/+$/, ''),
+    region: val('cloud-region') || 'us-east-1',
+    bucket: val('cloud-bucket'),
+    prefix: normalizePrefix(val('cloud-prefix')),
+    pathStyle: !!document.getElementById('cloud-path-style')?.checked,
+    accessKeyId: val('cloud-access-key'),
+    secretAccessKey: val('cloud-secret-key'),
+    passphrase: document.getElementById('cloud-passphrase')?.value || '',
+  };
+}
+function cloudClient() {
+  return createS3Client({
+    config: state.cloud.config || {},
+    fetchImpl: (url, init) => fetch(url, init),
+  });
+}
+function cloudReady() {
+  return cloudClient().ready;
+}
+function renderCloud() {
+  const C = state.cloud;
+  const chart = document.getElementById('chart-card');
+  const view = document.getElementById('cloud-view');
+  if (!chart || !view) return;
+  chart.hidden = !!(C.open || state.lan.open);
+  view.hidden = !C.open;
+  const cfg = C.config || {};
+  const setVal = (id, value) => {
+    const el = document.getElementById(id);
+    if (el && document.activeElement !== el) el.value = value;
+  };
+  setVal('cloud-endpoint', cfg.endpoint || '');
+  setVal('cloud-region', cfg.region || '');
+  setVal('cloud-bucket', cfg.bucket || '');
+  setVal('cloud-prefix', cfg.prefix || '');
+  setVal('cloud-access-key', cfg.accessKeyId || '');
+  setVal('cloud-secret-key', cfg.secretAccessKey || '');
+  setVal('cloud-passphrase', cfg.passphrase || '');
+  const ps = document.getElementById('cloud-path-style');
+  if (ps) ps.checked = !!cfg.pathStyle;
+  const status = document.getElementById('cloud-status');
+  if (status) status.textContent = C.status || '';
+  const picked = document.getElementById('cloud-picked');
+  if (picked) picked.textContent = C.picked ? C.picked.name : '';
+  const upload = document.getElementById('cloud-upload');
+  if (upload) upload.disabled = !!C.busy || !C.picked || !cloudReady();
+  const list = document.getElementById('cloud-list');
+  if (!list) return;
+  if (!C.list.length) {
+    list.innerHTML = '<div class="cloud-empty">' + t('cloud.empty') + '</div>';
+    return;
+  }
+  list.innerHTML = C.list
+    .map(
+      (item) =>
+        '<div class="cloud-item" data-cloud-key="' + escapeHtml(item.key) + '">' +
+        '<span class="ci-name" title="' + escapeHtml(item.key) + '">' + escapeHtml(item.key) + '</span>' +
+        '<span class="ci-size">' + fmtMB((Number(item.size) || 0) / 1048576) + '</span>' +
+        '<span class="ci-time">' + escapeHtml(String(item.lastModified || '').replace('T', ' ').slice(0, 16)) + '</span>' +
+        '<button type="button" class="ci-btn" data-cloud-get="' + escapeHtml(item.key) + '">' + t('cloud.download') + '</button>' +
+        '<button type="button" class="ci-btn danger" data-cloud-del="' + escapeHtml(item.key) + '">' + t('cloud.remove') + '</button>' +
+        '</div>'
+    )
+    .join('');
+}
+async function cloudSave() {
+  const cfg = cloudConfigFromForm();
+  state.cloud.config = cfg;
+  const saved = persistCloudConfig(cfg);
+  if (!saved) {
+    state.cloud.status = t('cloud.saveFailed');
+    renderCloud();
+    return;
+  }
+  if (cfg.endpoint && !buildBaseUrl(cfg)) {
+    state.cloud.status = t('cloud.badEndpoint');
+    renderCloud();
+    return;
+  }
+  state.cloud.status = t('cloud.saved');
+  renderCloud();
+  await cloudRefresh();
+}
+async function cloudRefresh() {
+  const C = state.cloud;
+  const client = cloudClient();
+  if (!client.ready) {
+    C.list = [];
+    C.status = t('cloud.notConfigured');
+    renderCloud();
+    return;
+  }
+  C.busy = true;
+  C.status = t('cloud.loading');
+  renderCloud();
+  const res = await client.listObjects(C.config.prefix || '');
+  C.busy = false;
+  if (!res.ok) {
+    C.status = t('cloud.error', { msg: res.message });
+    renderCloud();
+    return;
+  }
+  C.list = res.items
+    .slice()
+    .sort((a, b) => String(b.lastModified).localeCompare(String(a.lastModified)));
+  C.status = C.list.length ? t('cloud.loaded', { n: C.list.length }) : t('cloud.empty');
+  renderCloud();
+}
+async function cloudUpload() {
+  const C = state.cloud;
+  if (!C.picked) return;
+  const client = cloudClient();
+  if (!client.ready) {
+    C.status = t('cloud.notConfigured');
+    renderCloud();
+    return;
+  }
+  C.busy = true;
+  C.status = t('cloud.uploading', { name: C.picked.name });
+  renderCloud();
+  let name = C.picked.name;
+  try {
+    let bytes = new Uint8Array(await C.picked.arrayBuffer());
+    if (C.config.passphrase) {
+      bytes = await encryptBytes(bytes, C.config.passphrase);
+      name = name.replace(/\.zip$/i, '') + '.spt';
+    }
+    const res = await client.putObject(objectKey(C.config.prefix, name), bytes);
+
+    C.busy = false;
+    if (!res.ok) {
+      C.status = t('cloud.error', { msg: res.message });
+      renderCloud();
+      return;
+    }
+    C.picked = null;
+    const file = document.getElementById('cloud-file');
+    if (file) file.value = '';
+    C.status = t('cloud.uploaded', { name });
+    renderCloud();
+    await cloudRefresh();
+  } catch (error) {
+    C.busy = false;
+    C.status = t('cloud.error', { msg: String(error?.message || error) });
+    renderCloud();
+  }
+}
+async function cloudDownload(key) {
+  const C = state.cloud;
+  const client = cloudClient();
+  if (!client.ready) {
+    C.status = t('cloud.notConfigured');
+    renderCloud();
+    return;
+  }
+  C.busy = true;
+  C.status = t('cloud.loading');
+  renderCloud();
+  const res = await client.getObject(key);
+  C.busy = false;
+  if (!res.ok) {
+    C.status = t('cloud.error', { msg: res.message });
+    renderCloud();
+    return;
+  }
+  let bytes = res.bytes;
+  let name = String(key).split('/').pop() || 'pack.zip';
+  if (isEncrypted(bytes)) {
+    if (!C.config.passphrase) {
+      C.status = t('cloud.needPassphrase');
+      renderCloud();
+      return;
+    }
+    try {
+      bytes = await decryptBytes(bytes, C.config.passphrase);
+      name = name.replace(/\.spt$/i, '') + '.zip';
+    } catch {
+      C.status = t('cloud.badPassphrase');
+      renderCloud();
+      return;
+    }
+  }
+  const url = URL.createObjectURL(new Blob([bytes], { type: 'application/zip' }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+  C.status = t('cloud.downloaded', { name });
+  renderCloud();
+}
+async function cloudDelete(key) {
+  const C = state.cloud;
+  const client = cloudClient();
+  if (!client.ready) {
+    C.status = t('cloud.notConfigured');
+    renderCloud();
+    return;
+  }
+  C.busy = true;
+  renderCloud();
+  const res = await client.deleteObject(key);
+  C.busy = false;
+  if (!res.ok) {
+    C.status = t('cloud.error', { msg: res.message });
+    renderCloud();
+    return;
+  }
+  await cloudRefresh();
 }
 
 let stopLanScan=null;
@@ -1395,9 +1655,17 @@ function bind(){
 
   // ── 局域网互传（按钮在数据包动作行内，随 renderActions 重建）──
   document.getElementById('action-row').addEventListener('click',(e)=>{
-    if(!e.target.closest('#lan-open-btn')) return;
-    state.lan.open=true;
-    renderLan();
+    if(e.target.closest('#lan-open-btn')){
+      state.lan.open=true;
+      state.cloud.open=false;
+      renderLan(); renderCloud();
+      return;
+    }
+    if(e.target.closest('#cloud-open-btn')){
+      state.cloud.open=true;
+      state.lan.open=false;
+      renderLan(); renderCloud();
+    }
   });
   document.getElementById('lan-close-btn').addEventListener('click',()=>{
     state.lan.open=false;
@@ -1422,6 +1690,26 @@ function bind(){
   document.getElementById('lan-btn-scan-offer').addEventListener('click',()=>startLanScan('offer'));
   document.getElementById('lan-btn-scan-answer').addEventListener('click',()=>startLanScan('answer'));
   document.getElementById('lan-scan-cancel').addEventListener('click',()=>finishLanScan());
+
+  // ── 云端包仓库 ──
+  document.getElementById('cloud-close-btn')?.addEventListener('click',()=>{
+    state.cloud.open=false;
+    renderCloud();
+  });
+  document.getElementById('cloud-save')?.addEventListener('click',()=>cloudSave());
+  document.getElementById('cloud-refresh')?.addEventListener('click',()=>cloudRefresh());
+  document.getElementById('cloud-pick')?.addEventListener('click',()=>document.getElementById('cloud-file')?.click());
+  document.getElementById('cloud-file')?.addEventListener('change',(e)=>{
+    state.cloud.picked=(e.target.files && e.target.files[0]) || null;
+    renderCloud();
+  });
+  document.getElementById('cloud-upload')?.addEventListener('click',()=>cloudUpload());
+  document.getElementById('cloud-list')?.addEventListener('click',(e)=>{
+    const get=e.target.closest('[data-cloud-get]');
+    if(get){ cloudDownload(get.dataset.cloudGet); return; }
+    const del=e.target.closest('[data-cloud-del]');
+    if(del) cloudDelete(del.dataset.cloudDel);
+  });
   document.getElementById('lan-answer-input').addEventListener('input',(e)=>{ state.lan.send.answer=e.target.value; });
   document.getElementById('lan-offer-input').addEventListener('input',(e)=>{ state.lan.recv.offer=e.target.value; });
 
@@ -1457,18 +1745,29 @@ function bind(){
     state.delta=b.dataset.delta; log('INFO',state.delta==='overwrite'?t('toast.deltaOverwrite'):t('toast.deltaIncremental'));
   });
   const splitInput=document.getElementById('split-input');
-  splitInput.addEventListener('input',e=>{
-    state.splitMb=e.target.value;
+  const restoreSplitInput=()=>{ splitInput.value=state.splitMb; updateSplitSim(); };
+  const commitSplit=(mb)=>{
+    const next=Math.min(SPLIT_MAX,Math.max(SPLIT_MIN,Math.round(mb)));
+    state.splitMb=String(next);
+    splitInput.value=String(next);
+    updateSplitSim();
     renderChart();
-  });
+  };
+  /* 输入过程中只预览估算，未确认前不写 state、不重算图表 */
+  splitInput.addEventListener('input',e=>{ updateSplitSim(e.target.value); });
   splitInput.addEventListener('change',e=>{
     const raw=Number(e.target.value);
-    if(e.target.value===''||!isFinite(raw)) return;
+    if(e.target.value===''||!isFinite(raw)){ restoreSplitInput(); return; }
     const clamped=Math.min(SPLIT_MAX,Math.max(SPLIT_MIN,Math.round(raw)));
     if(clamped!==raw){
-      e.target.value=clamped; state.splitMb=String(clamped);
-      renderChart(); toast(t('toast.splitLimit',{min:SPLIT_MIN,max:SPLIT_MAX}));
+      splitInput.value=String(clamped);
+      toast(t('toast.splitLimit',{min:SPLIT_MIN,max:SPLIT_MAX}));
     }
+    if(state.splitMb!=='' && Number(state.splitMb)===clamped){ updateSplitSim(); return; }
+    openModal(t('split.confirmTitle'),t('split.confirmDesc',{n:clamped}),[],[
+      {label:t('modal.cancel'),onClick:()=>{ closeModal(); restoreSplitInput(); }},
+      {label:t('modal.confirm'),primary:true,onClick:()=>{ closeModal(); commitSplit(clamped); }}
+    ]);
   });
   const compressionSelect=document.getElementById('compression-select');
   if(compressionSelect){
@@ -1579,8 +1878,14 @@ function bind(){
     if(keepDev){ state.keepDev = !!keepDev.checked; return; }
     const cb=e.target.closest('[data-check]'); if(!cb) return;
     const scope=scopeFromEl(cb); if(!scope) return;
-    const n=findNode(nodesForScope(scope),cb.dataset.check); if(!n) return;
-    setChecked(n,scope,cb.checked); renderChart();
+    const tree=nodesForScope(scope);
+    const n=findNode(tree,cb.dataset.check); if(!n) return;
+    setChecked(n,scope,cb.checked);
+    /* 角色卡 ↔ 聊天记录：只同步勾选，不删改任何文件 */
+    const linked=counterpartsOf(tree,n);
+    linked.forEach(x=>setChecked(x,scope,cb.checked));
+    if(linked.length) toast(t('link.synced',{n:linked.length}));
+    renderChart();
   });
   // 拖拽卡片右下角改尺寸 → 按 data-volkey 落库，刷新后保持
   stackEl.addEventListener('pointerup',(e)=>{

@@ -239,6 +239,103 @@ export function walk(nodes, fn) {
   }
 }
 
+/* ── 角色卡 ↔ 聊天记录联动（纯函数；只做匹配与建议，不删改任何文件） ── */
+
+/** 取 hub 路径中 `dir/` 之后的部分；无该目录返回 ''。 */
+function tailOf(path, dir) {
+  const p = String(path || '').replace(/\\/g, '/');
+  const marker = `/${dir}/`;
+  const at = p.lastIndexOf(marker);
+  if (at >= 0) return p.slice(at + marker.length);
+  return p.startsWith(`${dir}/`) ? p.slice(dir.length + 1) : '';
+}
+
+/** 角色卡基名（去扩展名）；`characters/` 下的一级文件才认。 */
+export function characterBaseName(path) {
+  const tail = tailOf(path, 'characters');
+  if (!tail || tail.includes('/')) return '';
+  return tail.replace(/\.[^./]+$/, '');
+}
+
+/** 聊天所属角色名：`chats/<name>/…` → `<name>`，其它返回 ''。 */
+export function chatOwnerName(path) {
+  const parts = tailOf(path, 'chats').split('/').filter(Boolean);
+  return parts.length >= 2 ? parts[0] : '';
+}
+
+/** 节点对应的 hub 路径；目录节点没有 path，从 id 反推。 */
+export function nodeHubPath(node) {
+  if (node && node.path) return node.path;
+  const id = (node && node.id) || '';
+  const leaf = /^leaf:(.+)$/.exec(id);
+  if (leaf) return leaf[1];
+  const m = /^dir:[^:]+:(.+)$/.exec(id);
+  return m ? m[1] : '';
+}
+
+/**
+ * 目录节点若是「某角色的聊天根目录」，返回角色名。
+ * 兼容两种 id 形态：`dir:chats:chats/Foo`（含分组前缀）与 `dir:chats:Foo`（组内相对）。
+ */
+export function chatOwnerOfDirNode(node) {
+  const m = /^dir:chats:(.+)$/.exec((node && node.id) || '');
+  if (!m) return '';
+  const parts = m[1].split('/').filter(Boolean);
+  const at = parts[0] === 'chats' ? 1 : 0;
+  return parts[at] || '';
+}
+
+/**
+ * 与某节点联动的对端节点。
+ * 角色卡 → 该角色的聊天根目录（勾一次带全部聊天）；聊天目录 / 聊天文件 → 对应角色卡。
+ */
+export function counterpartsOf(nodes, node) {
+  const out = [];
+  const asChar = characterBaseName(nodeHubPath(node));
+  if (asChar) {
+    walk(nodes, (n) => {
+      if (n !== node && chatOwnerOfDirNode(n) === asChar) out.push(n);
+    });
+    return out;
+  }
+  const asChat = chatOwnerOfDirNode(node) || chatOwnerName(nodeHubPath(node));
+  if (asChat) {
+    walk(nodes, (n) => {
+      if (n !== node && characterBaseName(nodeHubPath(n)) === asChat) out.push(n);
+    });
+  }
+  return out;
+}
+
+/**
+ * 给无法配对的角色卡 / 聊天目录打上「未匹配」标记（只写 note，不动勾选）。
+ * 配得上的一律不加标记，避免刷屏。
+ */
+export function annotateChatLinks(nodes, unmatchedLabel) {
+  const chars = new Set();
+  const owners = new Set();
+  walk(nodes, (n) => {
+    const c = characterBaseName(nodeHubPath(n));
+    if (c) chars.add(c);
+    const d = chatOwnerOfDirNode(n);
+    if (d) owners.add(d);
+  });
+  const lower = (set) => new Set([...set].map((s) => s.toLowerCase()));
+  const charsLower = lower(chars);
+  const ownersLower = lower(owners);
+  const has = (name, exact, loose) => exact.has(name) || loose.has(name.toLowerCase());
+  walk(nodes, (n) => {
+    if (n.note) return;
+    const c = characterBaseName(nodeHubPath(n));
+    if (c) {
+      if (!has(c, owners, ownersLower)) n.note = unmatchedLabel;
+      return;
+    }
+    const d = chatOwnerOfDirNode(n);
+    if (d && !has(d, chars, charsLower)) n.note = unmatchedLabel;
+  });
+}
+
 /** 收集所有叶子。 */
 export function leavesOf(nodes) {
   const out = [];
