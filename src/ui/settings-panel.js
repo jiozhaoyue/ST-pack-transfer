@@ -14,6 +14,8 @@ export const SETTINGS_DEFAULTS = Object.freeze({
   defaultExtensionMode: 'full',
   defaultGitMode: 'minimal',
   defaultKeepDev: false,
+  /** 目标平台默认值：auto = 跟随宿主平台。 */
+  defaultTarget: 'auto',
 });
 
 export const SETTING_KEYS = Object.freeze(Object.keys(SETTINGS_DEFAULTS));
@@ -28,6 +30,7 @@ export function normalizeSettings(input) {
     if (['full', 'manifest'].includes(input.defaultExtensionMode)) out.defaultExtensionMode = input.defaultExtensionMode;
     if (['keep', 'minimal', 'strip'].includes(input.defaultGitMode)) out.defaultGitMode = input.defaultGitMode;
     if (typeof input.defaultKeepDev === 'boolean') out.defaultKeepDev = input.defaultKeepDev;
+    if (['auto', 'st', 'luker', 'tt', 'pt'].includes(input.defaultTarget)) out.defaultTarget = input.defaultTarget;
   }
   return out;
 }
@@ -52,6 +55,13 @@ export function buildSettingsHtml(settings = {}) {
         + '<button type="button" class="seg-btn' + (isFull ? ' active' : '') + '" data-setting-extmode="full">' + t('extension.full') + '</button>'
         + '<button type="button" class="seg-btn' + (isFull ? '' : ' active') + '" data-setting-extmode="manifest">' + t('extension.manifest') + '</button>'
       + '</div>'
+      + '<label class="et-git"><span>' + t('settings.defaultTarget') + '</span><select class="text_pole" data-setting-target>'
+        + '<option value="auto"' + (s.defaultTarget === 'auto' ? ' selected' : '') + '>' + t('settings.targetAuto') + '</option>'
+        + '<option value="st"' + (s.defaultTarget === 'st' ? ' selected' : '') + '>SillyTavern</option>'
+        + '<option value="luker"' + (s.defaultTarget === 'luker' ? ' selected' : '') + '>Luker</option>'
+        + '<option value="tt"' + (s.defaultTarget === 'tt' ? ' selected' : '') + '>TauriTavern</option>'
+        + '<option value="pt"' + (s.defaultTarget === 'pt' ? ' selected' : '') + '>PureTavern</option>'
+      + '</select></label>'
       + '<label class="et-git"><span>' + t('settings.defaultGitMode') + '</span><select class="text_pole" data-setting-gitmode>'
         + '<option value="keep"' + (s.defaultGitMode === 'keep' ? ' selected' : '') + '>' + t('extension.gitKeep') + '</option>'
         + '<option value="minimal"' + (s.defaultGitMode === 'minimal' ? ' selected' : '') + '>' + t('extension.gitMinimal') + '</option>'
@@ -81,6 +91,9 @@ export function readSettings(root) {
 
   const keepDevEl = root.querySelector?.('[data-setting="defaultKeepDev"]');
   if (keepDevEl && typeof keepDevEl.checked === 'boolean') out.defaultKeepDev = keepDevEl.checked;
+
+  const targetEl = root.querySelector?.('[data-setting-target]');
+  if (targetEl?.value) out.defaultTarget = targetEl.value;
 
   return normalizeSettings(out);
 }

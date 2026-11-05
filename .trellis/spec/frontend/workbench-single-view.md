@@ -218,46 +218,97 @@ TauriTavern 的阶段+进度事件 / 原子落盘 / 自然续传 / 地址发现�
 执行卡内部滚动；旧的 `inset:0` 全屏浮层在 TT 会塌陷（TT 的 `<html>` 有 transform 且高 0），
 全屏浮层一律 `100vw × 100vh`。
 
+> ⚠ **2026-11-05 起 §7.2 的「承载面 = 执行卡内可折叠区块」被 §7.3 取代**；其余条目
+> （发送源、接收落地、来源徽标、扫码、失败续传等）继续有效。
+
 ---
 
-## 9. demo 只消费正式代码（2026-10-27 用户裁定）
+### 7.3 局域网改为整面板替换（2026-11-05 用户裁定）
 
-**规则（依赖方向）**：正式三件套（`style.css`、`src/ui/workbench-template.js`、
-`src/ui/workbench-view.js`）是**手写唯一源**。`src/ui/ui-demo.html` 是**开发期预览页**，
-只允许：
+**契约**：局域网互传不再是执行卡内的折叠块，而是**左侧图表面板的完整替换**：
 
-- `<link rel="stylesheet" href="../../style.css">`
-- `import { getWorkbenchHtml } from './workbench-template.js'`
-- `import { createWorkbenchView } from './workbench-view.js'`
+- 三个顶层面板 DOM：`#chart-card`（左侧图表）、`#zone-card`（数据包列表）、`#action-card`（执行卡）。
+- 图表面板头（`#chart-card .panel-actions`）放一个「局域网互传」按钮 `#lan-open-btn`。
+- 点击后：`#chart-card` 整体 `hidden`，**同级**的 `#lan-view` 面板显示——替换的是**整个面板**
+  （含面板头与边框），不是只换里面的 `#chart-stack` 图表。
+- `#lan-view` 自己的面板头有标题与关闭按钮 `#lan-close-btn`，点击回到 `#chart-card`。
+- 移动端布局顺序由 DOM 决定：`.col-chart` 在最前 ⇒ 局域网面板自然出现在**最上方**，
+  下面依次是 `#zone-card`（数据包列表）、`#action-card`。不得用 CSS `order` 反序。
 
-**正式代码、构建、测试、CI 一律不得引用 demo**：`index.js` / `index.html` / `src/**` /
-`scripts/**` / `e2e/**` / `.github/**` 出现 `ui-demo` 路径即违规。
-守卫：`test/ui-demo-isolation.test.js`（同时断言 demo 不再内联三件套副本）。
-旧的 `sync:ui` / `check:ui-sync` 同步器已删除（2026-10-27 用户批准）。
+**DOM 落点**（`src/ui/workbench-template.js`，唯一模板源）：
 
-**为什么反转**：旧规则让正式代码成为 demo 的生成物，改正式 UI 必须先改 demo；
-用户新裁定是「demo 可以引用正式的 JS，但 demo html 本身不被任何依赖和引用」。
-
-**demo 外圈不是产品代码**：演示工具条、演示数据（`demoTree` / `DEMO_PACKAGES` /
-`DEMO_QUOTA`）、演示重置、入口预览、演示专用 sessionStorage key，只存在于 demo 文件内。
-正式三件套**禁止**出现 `demo` / `演示` / `DEMO_` 字样。
-
-**预览方式（只经 HTTP）**：
-
-```bash
-npm run dev
-# http://localhost:3040/src/ui/ui-demo.html
+```
+.col-chart
+  section.panel.chart-card#chart-card        ← 原有，面板头新增 #lan-open-btn
+  section.panel.lan-view#lan-view [hidden]   ← 新增，承载原 #lan-block 的全部内容
 ```
 
-ESM `import` 在 `file://` 下会被 CORS 拒绝，因此 **demo 不再支持双击打开**。
-正式产品的 `file://` 支持不受影响（`index.html` + `public/file-protocol-notice.js`）。
+原 `#lan-block` 内的扫描 / 发送 / 接收结构**原样迁移**进 `#lan-view .lan-body`，
+不再保留 `.lan-block` 外框、`#lan-toggle`、`#lan-toggle-hint`。
 
-**正式数据必须真实**：浏览器配额来自 `navigator.storage.estimate()`，不可用时显示
-「浏览器未提供配额读数」；宿主配额经宿主官方 Storage Inspector 模块
-（`/scripts/storage-inspector.js` 的 `RestProvider`）读取，读不到时显示
-「宿主未提供存储读数」，**禁止**用演示数字冒充真实读数。
+**状态与渲染**（`src/ui/workbench-view.js`）：
 
-**改动流程**：改正式三件套 → `npm test` + 五守卫 → 需要看交互时在 demo harness 里调整演示数据。
+- `state.lan.open` 仍是唯一开关，语义改为「局域网面板是否占据图表面板位置」。
+- `renderLan()` 只翻 `#chart-card` / `#lan-view` 的 `hidden`，**删除**
+  `.col-side.classList.toggle('lan-open')` 与 `#lan-toggle-hint` 的读写。
+- 点击 `#lan-open-btn` / `#lan-close-btn` 只改 `state.lan.open` 并重渲染，不直接操作 DOM。
+
+**CSS**（`style.css`，双前缀铁律不变）：
+
+- 删除 `.col-side.lan-open > .zone-card` 与 `.lan-toggle*` 规则。
+- `#lan-view` 与 `#chart-card` 同为 `.col-chart` 的直接子面板：`flex:1 1 auto; min-height:0`，
+  内部 `.lan-body` 是唯一滚动容器（R1 无外层滚动条）。
+- 默认隐藏的 `#lan-view` 若被写了 `display`，必须补一条特异度不低于它的
+  `#app.app-container #lan-view[hidden]{display:none}`（见本页 §2）。
+
+**守卫与登记**：
+
+- `scripts/single-template-source.js` 的 `REQUIRED_TEMPLATE_IDS`：新增 `chart-card`、
+  `lan-open-btn`、`lan-view`、`lan-close-btn`；移除 `lan-toggle`、`lan-toggle-hint`。
+- `scripts/control-consumer-guard.js` 的 `CONTROL_CONSUMERS`：为 `lan-open-btn` /
+  `lan-close-btn` 各写真实消费点（读 `state.lan.open`）。
+- 按钮文案「局域网互传」已在 `ui-orchestration-rules.md` §2 的动词封闭集内，不得换词。
+
+**验收**：
+
+1. 点「局域网互传」后，左侧整块图表（含面板头、配额条、图例、图表）消失，局域网面板占满该列。
+2. 右侧数据包列表与执行卡位置不变。
+3. 320px 视口下，局域网面板在数据包列表之上。
+4. `#chart-card[hidden]` 与 `#lan-view[hidden]` 的计算样式均为 `display:none`。
+5. `npm test` + 五个 UI 守卫全绿。
+
+---
+
+## 9. 正式 UI 即预览（2026-11-05 用户裁定，demo 页整体作废）
+
+**规则（唯一入口）**：开发期预览**只走** `npm run dev` → `http://127.0.0.1:3040/`
+（正式 `index.html` 的独立 Web 形态，与插件态共用同一套模板与视图）。
+
+- **不存在**任何独立 demo / 预览页。`src/ui/ui-demo.html` 已删除，
+  `test/ui-demo-isolation.test.js` 一并删除。
+- 正式三件套（`style.css`、`src/ui/workbench-template.js`、`src/ui/workbench-view.js`）
+  是唯一 UI 源，改完刷新即生效（Vite HMR）。
+- 正式代码、构建、测试、CI 中**不得**再出现 `ui-demo` 路径或演示外壳。
+
+**为什么**：demo 页需要维护第二套演示数据与外壳，与正式 UI 反复漂移——
+2026-10-26 就出现过「demo 有、生产无」的虚拟节点（完整扩展包 / 保留 Git 历史 / 保留构建配置）。
+dev server 已能直接跑正式 UI，demo 只剩维护成本与误导风险。
+
+**数据必须真实**：预览用真实数据——导入真实 zip 或从宿主拉取；不得在正式代码里注入演示数据。
+独立 Web 无数据源时显示空态引导，这是正确行为，不是缺陷。
+
+**形态由真实视口决定**：`data-view` 由 `matchMedia` 计算，不提供演示用的桌面/移动切换按钮。
+
+**验证方式**：内置浏览器打开 `http://127.0.0.1:3040/`，用 DOM 计算值（宽高、`grid-template-columns`、
+`overflow`、`getBoundingClientRect`）与截图取证；不再要求「先 demo 生效」。
+
+> 历史 `.trellis/research/**` 里关于 demo 的说明是**存档**，不再作为当前流程依据。
+
+**正式数据必须真实**：浏览器配额来自 `navigator.storage.estimate()`，不可用时显示「未提供」；
+宿主配额经宿主官方 Storage Inspector 模块（`/scripts/storage-inspector.js` 的 `RestProvider`）
+读取，读不到时显示「未提供」，**禁止**用演示数字冒充真实读数。
+
+**改动流程**：改正式三件套 → `npm test` + 守卫 → 内置浏览器在 3040 上取证。
 
 ---
 
@@ -309,3 +360,155 @@ ESM `import` 在 `file://` 下会被 CORS 拒绝，因此 **demo 不再支持双
 
 **例外**：教程全屏引导、`#st-converter-modal-overlay`（插件外壳）仍是固定定位；
 新增**任何**业务浮层前必须先过用户裁定。
+
+---
+
+## 11. 执行卡取消 · 进度条置底 · 图表网格（2026-11-05 用户裁定）
+
+**契约**：工作台不再有独立的「执行卡」面板。动作按钮并入数据包列表底部，
+进度条成为贯穿所有视图的常驻底栏，图表卡改为自适应网格。
+
+**为什么**：独立执行卡把可用的纵向空间切成三块，图表被压成一条；
+进度条藏在执行卡里，手机上滚动后就看不见，且必须先点顶栏日志按钮才能看日志。
+
+### 11.1 顶层面板只剩两个 + 常驻底栏
+
+```
+.app-body
+  .app-main#view-workbench
+    .col-chart        ← #chart-card / #lan-view（图表区）
+    .splitter-v
+    .col-side
+      #zone-card      ← 数据包列表；底部新增 #action-row
+  section.view-card#view-settings / #view-log / #view-help  (hidden)
+  footer#workbench-progress   ← 常驻底栏，任何 view-card 下都可见
+```
+
+- **删除** `#action-card`（含其面板头与 `data-help="action"`）。
+- `#action-row` 移入 `#zone-card` 底部，作为 `.zone-foot`；`renderActions()` 消费点不变。
+- **删除** 顶栏 `#btn-log`；`#log-dot` 迁入底栏。
+- `#workbench-progress` 是 `.app-body` 的**最后一个 flex 子项**（`flex:0 0 auto`），
+  `.app-main` 负责内部滚动 ⇒ 手机端滚动内容时底栏**不离开视口底部**。
+
+### 11.2 进度条即日志入口
+
+- 点击底栏任意位置（或聚焦后按 Enter/Space）→ `renderLog()` + `showPane('log')`。
+- 底栏内常驻一行提示文案 `progress.openLog`（「点此查看日志」），**这是唯一允许的
+  可操作提示**，不受 §4「零说明性文案」约束（用户 2026-11-05 明确要求显式提示）。
+- 日志视图不再自带进度条——底栏在 `#view-log` 下同样可见，读数天然同源。
+- `#log-dot`（警告/错误计数点）挂在底栏提示旁，不再挂顶栏。
+
+### 11.3 图表网格
+
+- `.chart-stack` 是**网格容器**（`container-type:inline-size`），`.chart-group` 与
+  `.vol-grid` 用 `display:contents` 让 `.vol-card` 直接成为网格项。
+- 列数由**容器宽度**决定，硬上限 4：
+  | 容器宽 | 列数 |
+  | --- | --- |
+  | ≥ 1060px | 4 |
+  | ≥ 800px | 3 |
+  | ≥ 520px | 2 |
+  | < 520px | 1 |
+- `gap:1px` + 卡片自身 1px 边框 ⇒ 相邻图表边**相互贴着**，不出现空白带。
+- `.vol-card` 可拖拽改尺寸：`resize:both`，尺寸按 `data-volkey` 落 `localStorage`，
+  刷新后保持；未拖拽时由网格决定。
+- 每个 `.vol-card` 面板头有格式下拉 `[data-chartfmt]`（`bar` / `donut`），
+  切换后只重绘该卡的 `[data-volchart]` 区域，不重建整棵树。
+- 每张卡的 `.vol-body` 顶部渲染 `[data-volchart]` 可视化：
+  - `bar`：每个一级类目一行，标签 + 横向占用条 + 读数；
+  - `donut`：同一份数据的 SVG 圆环（≤ 6 段，余量并入「其他」）。
+  数据与树**同源**（同一 `nodes` / `mb`），勾选或换包后即时更新。
+- 树行尾部追加占用条 `.tree-occ`，宽度 = 该行 `mb` / 本卡总 `mb`。
+
+### 11.4 守卫与登记
+
+- `scripts/single-template-source.js`：移除 `action-card`、`btn-log`；
+  新增 `workbench-progress`、`vol-chart`（若为模板节点）。`action-row`、`progress-fill`、
+  `progress-label`、`progress-pct`、`log-dot` 保留。
+- `scripts/control-consumer-guard.js`：移除 `btn-log`；为 `workbench-progress` 写真实消费点
+  （点开日志视图）。
+- `test/ui-verb-table.test.js` 的按钮封闭集不变（本次不新增按钮文案）。
+
+### 11.5 验收
+
+1. DOM 中不存在 `#action-card`；`#action-row` 在 `#zone-card` 内。
+2. 任一视图下 `#workbench-progress` 的 `getBoundingClientRect().bottom` 等于 `.app-body` 底边。
+3. 320px 视口滚动工作台，底栏仍在视口底部。
+4. 点底栏进入 `#view-log`；日志视图底部可见同一条底栏，读数与工作台一致。
+5. 顶栏无日志按钮。
+6. 图表按容器宽度分 1/2/3/4 列，相邻卡片间距 1px；宽屏最多 4 列。
+
+---
+
+## 12. 滚动、配额折叠与目标平台默认（2026-11-05 用户裁定）
+
+**为什么**：2026-11-05 实测——竖屏下 `.chart-stack` 与 `.zone-body` 各自滚动，
+图表只能看到一半，数据包列表被压成只剩标题；配额行、宿主配额、宿主数据卡三处
+重复表达同一份宿主信息；目标平台默认写死 `SillyTavern`，与宿主平台无关。
+
+### 12.1 滚动绝对保守：竖屏只有一个滚动条
+
+- **桌面**：`.app-main` 不滚动（`overflow:hidden`）。滚动只发生在内容列自己的容器内
+  （`.chart-stack` / `.zone-body`），且 `overflow-y:auto` —— **不溢出就不出现滚动条**。
+  滚动条一律细化（`scrollbar-width:thin`），不得出现系统粗滚动条。
+- **竖屏**（`[data-view="mobile"]` 与 `@media (max-width:860px)`）：
+  **唯一滚动容器是 `.app-main`**。`.chart-stack`、`.zone-body`、`.chart-card`、`.zone-card`
+  一律 `overflow:visible`、`max-height:none`、`flex:0 0 auto`，保证一次滚到底
+  看完全部图表与整张数据包列表。
+- **判据**（320px 视口）：
+  1. 全页 `scrollHeight > clientHeight + 1` 且 `overflow-y` 为 `auto|scroll` 的元素**恰好 1 个**（`.app-main`）。
+  2. 滚动到底部时，最后一个图表卡与数据包列表尾部都可见。
+  3. 底栏 `#workbench-progress` 全程贴视口底（见 §11.2）。
+
+### 12.2 配额两行常驻 · 宿主详细数据默认收起
+
+- `#quota-head` **直接**渲染「浏览器配额」「宿主配额」两行常驻内容。
+  **不得**把这两行放进折叠按钮、详情容器或任何「点开才看」的结构（2026-11-05 用户裁定：
+  「浏览器配额等禁止有这个折叠的东西，必须直接放置，必须用之前的」）。
+- **宿主详细数据**（宿主目录清单）与上述两行**同一个** `#quota-head` 块内，紧跟其后；
+  默认收起（`#quota-host-detail[hidden]`），点击 `#quota-host-toggle` 在**同一 DOM 内**展开，
+  再次点击收起。展开态只渲染只读行（路径 + 体积），不参与勾选与统计。
+- **全页唯一**：宿主信息只出现在这一处。图表栈不再有「宿主数据」卡（`chartTargets()` 无勾选包时返回空）。
+- 读不到显示「未提供 / 宿主未提供存储读数」，**禁止假 0**。
+
+### 12.4 动作按钮在数据包列表上方
+
+- `#action-row` 位于 `#zone-card` 内、`#zone-tabs` **之上**，容器类 `.zone-actions`。
+- 数据包面板下方**不再有任何动作区**；腾出的高度全部归图表区。
+- 按钮集合不变：从宿主拉取 / 生成导出包 / 合并上传（导出区为下载 / 恢复 / 复制回）。
+
+### 12.5 无数据包时两张引导卡并排居中
+
+- `.chart-empty-guide` 固定两列：`grid-template-columns:repeat(2,minmax(0,1fr))`，
+  `max-width:680px`、`justify-self:center`；`.chart-stack:has(> .chart-empty-guide)`
+  垂直居中（`align-content:center`）。
+- 竖屏（375×812）同样两列并排，并压紧：图标 28px、描述两行截断、按钮 26px 高、
+  卡片 padding ≤ 9px。两张卡不得纵向堆叠占满屏幕。
+
+### 12.3 目标平台默认值跟随宿主
+
+- 设置新增 `defaultTarget`：`auto | st | luker | tt | pt`，默认 `auto`。
+- `auto` ⇒ 目标平台等于宿主平台（宿主 → 目标映射：`st→SillyTavern`、
+  `luker→Luker`、`tt→TauriTavern`、`pt→PureTavern`；`standalone` 回退 `SillyTavern`）。
+- 用户在目标平台下拉里手动选过之后，本次会话以手动值为准；设置保存默认值后重新应用。
+- 目标平台按钮在「选中平台 == 宿主平台」时显示宿主标记 `.host-tag`
+  （与下拉项同一文案 `target.hostSuffix`）。
+- 判据：宿主 Luker 下首次启动，按钮文本为 `Luker` 且带宿主标记；
+  设置里把默认改为 `PureTavern` 后重新进入，按钮为 `PureTavern` 且无宿主标记。
+
+---
+
+## 10. 数据包选择语义（2026-11-05 用户裁定）
+
+**契约**：勾选集合 `state.selectedPkgs` **只能**由以下操作改变：
+
+- 数据包行内复选框（`[data-pkgcheck]`）；
+- 批量「全选 / 全不选 / 反选」。
+
+**禁止**：点击卡片主体、文件名、图标、空白处时清空勾选。点击卡片主体只允许切换
+`state.source`（当前查看的包）并重绘图表，**不得**触碰 `selectedPkgs`。
+
+**原因**：2026-11-05 实测，点数据包非复选框部分会把批量选择全部清空，用户无法连续多选。
+
+**判据**：选中 2 个包后，依次点另一个包的行文本 / 图标 / 空白处，`state.selectedPkgs.size` 保持 2。
+

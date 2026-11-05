@@ -121,5 +121,5 @@ npm run check:dom-scope
 npm run check:control-consumer
 npm run check:i18n
 npm run build
-npm run dev   # 3040 → /src/ui/ui-demo.html
+npm run dev   # 3040 → 根路径（正式工作台；demo 页已废弃，见 workbench-single-view.md §9）
 ```

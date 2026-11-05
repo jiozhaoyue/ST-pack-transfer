@@ -426,6 +426,18 @@ Git handshake failed）——**非本插件错误**，E2E 判定须按「只属�
 | TT | `docs/`：`API/` `Agent/` `CurrentState/` + `AgentArchitecture.md` `AgentContract.md` `AgentImplementPlan.md` `FrontendGuide.md` **`FrontendHostContract.md`** `BackendStructure.md` `TechStack.md`（根另有 `ExtensionDEV.md`） | `API/Migration.md`（⚠ 是「ST 扩展适配指南」）、`API/Extension.md`（扩展 store API）、`FrontendHostContract.md` | **数据迁移扩展无文档**；入口见其 `src/scripts/extensions/data-migration/settings.html` |
 | PT | `docs/architecture/`（`feature-module-structure.md` `legacy-compatibility-contract.md` `legacy-ui-strategy.md`）、`docs/migration/module-inventory.md` | `legacy-ui-strategy.md`（原版 UI 所有权、扩展挂 `#extensions_settings2`、**M21 手动归档是核心数据安全能力**）、`feature-module-structure.md`（feature / legacy 路由分层） | 导入导出是 `features/import-export`，用户侧入口是一方扩展 `pure-tavern-data-management` |
 
+### 插件行为边界（2026-11-05 用户裁定，MUST）
+
+1. **只认 Luker 原上游**：任何 fork 只作开发版，不正式使用。不得把 fork 才有的独立 `backups`
+   键当成产品事实。
+2. **严禁更改宿主任何用户设置**：包括原生备份界面里的复选框、选择记忆、宿主配置。插件对
+   原生界面**只读**。
+3. **从宿主拉取只打开原生位置**：禁止自动点击注入的「从宿主拉取」按钮；必须弹窗明确提示
+   用户自己去原生界面点击。
+4. **默认不勾选只在拉下来之后、插件侧生效**：拉取完成后的插件选择树默认取消 `backups/`
+   与 `user/`（原生资产），不回写宿主。
+5. 上游 `settings ↔ backups/` 绑死导致的体积问题，如实显示，不擅自改 selection 绕过。
+
 ### 硬规则
 
 1. **禁止同构假设**（2026-11-04 真实事故）：曾据「TT 是 ST 派生」断言 TT 走 `.userBackupButton`、
