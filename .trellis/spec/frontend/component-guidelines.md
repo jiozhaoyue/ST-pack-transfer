@@ -158,9 +158,9 @@ document.querySelectorAll('.userBackupButton').forEach((anchor) => {
      setTimeout(() => URL.revokeObjectURL(url), 60_000);
    }
    ```
-   全仓约定回收延时 **60_000 ms**（`export-queue.js` / `stash-list.js` / `view.js` 一致）。`src/ui/split-deliver-modal.js` 里的 1000 ms 属待清理死代码，**不要照抄**。
+   全仓约定回收延时 **60_000 ms**（`export-queue.js:36` 与 `workbench-view.js:240` 一致）。历史上的 `split-deliver-modal.js`（1000 ms）已于 2026-10-27 删除，**不要照抄**。
 3. **浏览器能力必须检测再回退**：`window.showSaveFilePicker`（选位置导出，见 `export-queue.js` 的 `exportToLocation`：不支持或用户取消 → 回退普通下载）、拖出 `DataTransfer` 的 `DownloadURL`（仅 Chromium）、`navigator.storage.estimate`（配额条）——三者都必须特性检测。
-4. **高频回调必须 rAF 合帧**：进度回调、队列批量渲染等高频 DOM 写入先经 `requestAnimationFrame` 合并（最新值胜出），禁止逐 chunk/逐条目同步写 DOM（实测累积出 14 个 80–107ms 长任务、宿主整页卡顿）。现存实现锚点：`export-queue.js:401`、`log-console.js:298`、`view.js:56`。
+4. **高频回调必须 rAF 合帧**：进度回调、队列批量渲染等高频 DOM 写入先经 `requestAnimationFrame` 合并（最新值胜出），禁止逐 chunk/逐条目同步写 DOM（实测累积出 14 个 80–107ms 长任务、宿主整页卡顿）。现存实现锚点：`workbench-view.js:1604-1608`（`setProgress`）、`export-queue.js:639`（队列批量渲染）、`qr.js:122`（扫码动画）。
 5. **有界等待**：任何 `await`（`fetch` / 媒体事件 / 渲染挂载 promise）都必须经**超时或 abort 信号**兜底 settle，禁止让 promise 永远 pending（历史事故：`IframeRenderer.render` 只等 `onload`，iframe 被 destroy 后永久悬置）。
 
 ### Bounded Fetch Contract (有界 fetch 契约 · 2026-09-24)
@@ -264,7 +264,7 @@ UI 文案必须是「已取消 + 宿主可能仍在处理，请稍后核对数�
 - **SillyTavern 备份端点不含 `secrets.json`**：ST 的 `/api/users/backup` 服务端默认排除密钥文件；Luker 的选择项可带 `secrets: true`。UI 必须明确告知用户这一差异。
   > ⚠ **本仓已无 CLI**（`cli.js` 已随 09-04 统一工作台重构删除）。提示文案**禁止**再引用任何「用 xx CLI 处理」的说法。
 - **ST 目标的手动导入说明**写死在 `src/core/transform.js` 的 `INSTALL_MD` 常量里，随 ST 目标产物落盘（解压后覆盖到 `data/<handle>/`，含「覆盖前请先备份原目录。secrets.json 已包含在本包内(会覆盖现有密钥)。」）。改文案请改该常量。
-- **报告不截断**：`src/ui/view.js` 把报告拆成三个折叠屏，各自带条数——丢弃项（`丢弃项清单 (N 条 - 派生缓存或不兼容)`）、脱敏排除项（`脱敏与排除清单 (N 条 - 按类目主动过滤)`）、警告项（`警告与适配提示 (N 条)`），**全量**写入，不再有「只显示前 10 条」的截断。
+- **报告不截断**：报告生成在 `src/core/report.js`（`reportToHuman()`：丢弃项 / 脱敏排除项 / 警告项**全量**输出，不截断）。**UI 侧当前没有报告面板**——2026-10-27 重写后 `#report-panel` 已不存在，转换结果以日志行呈现（`index.js` 的 `logger.info('log.converted')`）。要恢复报告展示，直接接 `reportToHuman()`。
 - **恢复模式必须让用户显式选择**：`增量合并 (推荐)` / `全量覆盖` 二选一（`index.html` 与模板中的 `#restore-modal`），不得默认静默覆盖宿主数据。
 
 ---
@@ -351,6 +351,7 @@ index.html（骨架，约 22 行）
 `index.html` 曾是 441 行旧多抽屉结构（含 `#workspace-panel` / `#host-export-card` / `#btn-clear-workspace`），
 与插件态的 `workbench-template.js`（`wb-block` 两块式）**已经分歧**，
 后果是独立态 `refreshArchiveManagerUI()` 在 `getElementById('stash-list')` 为空时直接 return（L1-MR-10 违规）。
+（`refreshArchiveManagerUI` 与 `#stash-list` 均已随 2026-10-27 重写删除，此处仅作历史事故记录。）
 `test/single-template-source.test.js` 保留了反向断言，确保这些旧节点**不得复活**：
 
 ```javascript

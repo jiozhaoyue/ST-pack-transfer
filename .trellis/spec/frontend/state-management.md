@@ -10,9 +10,9 @@
 
 | 层 | 载体 | 生命周期 | 位置 |
 | --- | --- | --- | --- |
-| 易失 UI 状态 | DOM / 内存变量 | 页面刷新即失 | `src/ui/view.js`、各控件模块 |
-| 待导出区（内存队列） | `ExportQueue.items`（持有 Blob） | 页面刷新即失 | `src/ui/export-queue.js` |
-| 长任务状态机 | `TaskManager` + checkpoint adapter | 跨暂停/续传 | `src/core/task-manager.js` |
+| 易失 UI 状态 | DOM / 内存变量 | 页面刷新即失 | `src/ui/workbench-view.js` 的 `state` 与各视图函数 |
+| 产物落地 | 直接写 IndexedDB 或下载（无内存队列） | 入库跨刷新 | `index.js` 的 `deliverCreated()` |
+| 长任务状态机 | `TaskManager`（**当前无调用点**）+ checkpoint adapter | 设计为跨暂停/续传 | `src/core/task-manager.js`、`src/app/task-runtime.js` |
 | 持久层 | IndexedDB / OPFS /（可选）Authority | 跨刷新 | `src/storage/db.js`、`src/storage/authority-store.js` |
 
 - IndexedDB（`src/storage/db.js`，`DB_VERSION = 2`）的 `files` store 带 **`origin`** 字段区分来源：
@@ -65,9 +65,9 @@ Object URL 会持有底层 Blob 直到显式 `revokeObjectURL`。全仓现行实
 
 | 场景 | 位置 | 撤销时限 |
 | --- | --- | --- |
-| 普通下载 / 另存 | `triggerBlobDownload`（`export-queue.js`）、`stash-list.js`、`archive-manager.js`、`view.js` | 60s |
-| 拖出（drag-out `DownloadURL`，仅 Chromium） | `setDragOutPayload`（`export-queue.js`） | 120s（拖放过程可能很长） |
-| 分卷交付弹窗 | `split-deliver-modal.js` | 用后立即撤销 |
+| 普通下载 / 另存 | `triggerBlobDownload`（`export-queue.js:26`）、`workbench-view.js:240` 的日志导出 | 60s |
+| 拖出（drag-out `DownloadURL`，仅 Chromium） | `setDragOutPayload`（`export-queue.js:66`） | 120s（拖放过程可能很长） |
+| 分卷交付 | 走 `openModal()` 确认后生成，无独立弹窗文件 | 用后立即撤销 |
 
 「选位置导出」优先 File System Access API（`window.showSaveFilePicker` + `createWritable`，
 见 `exportToLocation`），**必须特性检测**；不支持或用户取消时回退普通下载。
@@ -88,19 +88,22 @@ IO **不再有** Node / 浏览器双适配器（旧的 `node-io`(yauzl/yazl) / `
 
 ## Long-Task State: TaskManager + OPFS Half-Products (2026-09-07)
 
-长任务由 `src/core/task-manager.js` 管理——**纯状态机**，持久化经
-注入的 adapter（OPFS 或 Authority KV），core 无 DOM / 存储依赖；UI 控制在 `src/ui/task-controls.js`。
-状态：`running | paused | aborted | done | failed`（`TASK_STATES`）。
+`src/core/task-manager.js` 仍是**纯状态机**（`TASK_STATES = running | paused | aborted | done | failed`），
+持久化经注入 adapter（`{save,load,remove}`）；任务运行时（半成品持久化、断点节流、批量续传判定、
+调试探针）在 `src/app/task-runtime.js`（2026-10-27 从旧控制器抽出）。
 
-⚠️ **接线路数（2026-09-27 逐条取证，勿凭印象）**：已接 `TaskManager` 的是
-**宿主拉取**（`handleHostExport`，`index.js`）与**转换 / 批量转换**（`handleExternalConvert` /
-`handleBatchConvert`，R-16 修复后接入）。
-**「写回宿主」不走 `TaskManager`** —— 它有自己的状态机 `src/core/restore-batch.js`
-（`createRestoreBatch`，`index.js` 顶部 import）与 `host-bridge` 的 `restoreInFlight` 互斥标志；
-`taskControls` 一次只展示一个**任务**，而写回批次由待导出区的 `.eq-restore-bar` 呈现
-（见 `component-guidelines.md` 的 Export Queue 一节）。
-（原句写作「长任务（宿主拉取 / **转换** / **写回**）由 `TaskManager` 管理」——
-「写回」那半句**从来不是事实**，2026-09-27 更正。）
+⚠️ **现状（2026-11-05 核对，勿按旧文档接线）**：
+- `TaskManager` 类**当前无调用点**；`src/app/task-runtime.js` 虽被 `index.js` import，但其中
+  `persistPartial` / `createCheckpointThrottle` / `runBatchItems` / `batchResumeVerdict` **均无调用**。
+- 暂停 / 中止的 **UI 不存在**（模板无 `#task-controls`，`index.js` 无 pause/abort 调用）。
+- 仍在工作的是**拉取侧** `AbortController`：宿主原生导出开始时 `activePullAbort.abort()`（宿主优先），
+  以及 `fetchHostBackup` 自己的 `Range` 续传（先发 `Range: bytes=<received>-`，非 206 则从零重拉）。
+- **转换调用（`index.js:569/673`）没有传 `resumeCrcMap` / `onEntryDone` / `signal`** ⇒ core 支持断点续传，
+  但当前入口不接。**这是「能力保留、入口未接」的状态，是否有意需产品裁定**（见计划 §9）。
+
+历史接线路数（2026-09-27 取证，已失效）：宿主拉取与转换曾接 `TaskManager`；写回宿主另走
+`src/core/restore-batch.js`（`createRestoreBatch`）——该模块现亦无调用点，只剩 `host-bridge.js` 的
+`restoreInFlight` 互斥标志在用。
 
 ### OPFS 半成品生命周期（拉取任务）
 - 流式拉取写入 OPFS `fetch-tmp/<taskId>.zip`——**绝不**在内存里缓冲 GB 级响应体
@@ -132,7 +135,8 @@ IO **不再有** Node / 浏览器双适配器（旧的 `node-io`(yauzl/yazl) / `
 流式拉取约 50 chunk/秒；每个 chunk 同步调 `setProgress` 在 20 秒内累积出 14 个 80–107ms
 长任务（实机测量），宿主整页卡顿。**规则**：进度类 DOM 写入必须经 `requestAnimationFrame`
 合帧（取最新值）。现行合帧点只有三处，改动高频回调时对照检查：
-`src/ui/view.js`（进度）、`src/ui/export-queue.js`（队列表格）、`src/ui/log-console.js`（日志批量 flush）。
+`src/ui/workbench-view.js` 的 `setProgress()`（:1604-1608）、`src/ui/export-queue.js` 的队列批量渲染（:639）、
+`src/ui/qr.js` 的扫码动画（:122）。日志在 `workbench-view.js` 的 `log()` 里直接写 DOM（不产长任务）。
 任何新增的 per-chunk / per-entry 回调只要接 DOM，同样必须合帧。
 
 ### Luker 备份 selection 陷阱
@@ -237,12 +241,12 @@ Worker 分支走 `postMessage`，**函数过不了结构化克隆** ⇒ **真浏
 
 `runBatchConversion` 在 2026-09-27 之前是**无调用者的死代码**（`grep -rn runBatchConversion`
 只有定义 + 注释），而 `README.md:74` 承诺了「批量转换」—— 与 R-16 同族的「承诺有、入口无」。
-现入口在**暂存区批量栏**（`src/ui/stash-list.js` 的 `onBatchConvert` 接缝，
-启用判据 `cap.canBatchConvert = n > 0`）。
+现入口在数据包区的**多选 + 转换动作**（`workbench-view.js` 维护 `state.selectedPkgs`，
+`index.js` 遍历选中包逐个 `runConversionTask`，见 `index.js:569/673`）。
 
 ⚠️ **不要复用 `cap.canLoad` 作批量判据**：它是 `n === 1` 的**单选**语义，
 误用会让「选 2 个以上」时按钮被**禁用** —— 而批量恰恰只在多选时才有意义。
-`test/stash-list.test.js` 有专门用例锁定。**新增面向用户的能力时，先确认它有可达入口**，
+`test/batch-convert.test.js` 有用例锁定（`test/` 本地专属，不入库）。**新增面向用户的能力时，先确认它有可达入口**，
 否则「修好了但用户碰不到」也是一种未完成。
 
 ---

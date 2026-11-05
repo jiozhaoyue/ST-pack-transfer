@@ -77,7 +77,7 @@ export async function alertDialog(message: string, title?: string): Promise<void
 - **Bad**：把 `POPUP_RESULT.AFFIRMATIVE` 硬编码成 `1`，或假设「必须动态 import `popup.js`」而放弃原生路径。
 - **Bad（2026-09-26 清理掉的真实形态）**：业务代码里直接 `alert('…')`。清理前共 **16 处**
   （`index.js` 12 处：差量补丁提示、恢复不可用、已有恢复任务、恢复结果四态；
-  `src/ui/host-bridge.js` 安装器「至少勾选一个」；`src/ui/log-console.js` 复制失败）。
+  `src/ui/host-bridge.js` 安装器「至少勾选一个」；`src/ui/log-console.js` 复制失败——该文件已于 2026-10-27 删除）。
   在酒馆里这些会弹出浏览器自带样式的小方框，与酒馆 UI 割裂——**用户报的"插件侵入宿主观感"有一半来自这里**。
   自查命令（业务层须为 0）：`grep -rn "[^a-zA-Z.]alert(" src/ index.js`
 
@@ -98,7 +98,7 @@ export async function alertDialog(message: string, title?: string): Promise<void
 #### Wrong —— 裸用 `confirm()`（组件层直接调）
 
 ```js
-// src/ui/stash-list.js（旧写法）
+// 历史写法：src/ui/stash-list.js（该文件已于 2026-10-27 删除，仅作反例）
 if (!confirm(`确定删除选中的 ${selected.size} 个源包吗？`)) return;
 ```
 
@@ -113,20 +113,21 @@ const askConfirm = typeof confirmFn === 'function'
   : (msg) => Promise.resolve(typeof window !== 'undefined' ? window.confirm(msg) : true);
 if (!(await askConfirm(`确定删除选中的 ${selected.size} 个源包吗？`))) return;
 
-// 调用方（index.js）：注入 host-bridge 的实现
-renderStashList({ /* … */ confirmFn: confirmDialog });
+// 调用方（历史）：renderExportQueue({ /* … */ confirmFn: confirmDialog })
+// 现状：export-queue.js 自 2026-10-27 重写后已无调用方（只剩单测），该接缝保留但未接线。
 ```
 
-**当前接入面（4 处，改动确认 UI 时须一并检查）**：
-`src/ui/stash-list.js` 批量删除与行内删除、`src/ui/export-queue.js` 「清空」与「取消在途恢复」。
-自查命令（应只剩适配器内部与已知死代码）：
+**当前接入面（改动确认 UI 时须一并检查）**：
+`index.js:309/335`（删除选中包 / 恢复）经 `host-bridge.js` 的 `confirmDialog()`；
+`workbench-view.js` 的 `openModal()` 与 `#confirm-dialog`（自绘 `<dialog>`）；
+`export-queue.js:296` 的 `confirmFn` 接缝**当前无调用方**（该模块只剩单测覆盖，未接入 10-27 后的界面）。
+自查命令（应只剩适配器内部）：
 
 ```bash
 grep -rn "[^a-zA-Z.]confirm(" src/ui/*.js index.js
 ```
 
-> **注意**：`src/ui/archive-manager.js:188` 还有一处裸 `confirm()`，但该文件**全仓无引用**（死代码，
-> 仅被陈旧产物 `dist/index.html` 的注释提到）——不要把它当作可用参考实现。已另行登记处置。
+> **历史注意项（已作废）**：`src/ui/archive-manager.js` 曾有裸 `confirm()`；该文件已于 2026-10-27 删除。
 
 ---
 

@@ -72,7 +72,8 @@ grep -rn "trustedStaticMarkup(" src/ index.js
 | `trustedStaticMarkup(markup)` | 恒等函数，**仅用于标注可信静态 HTML 片段**。命名刻意冗长刺眼——凡见到它，必须人工确认入参不含任何变量或外部输入。 |
 
 **禁止**在各模块自建转义函数。历史教训：`log-console.js` 曾自带只覆盖 3 个字符的私有实现，
-漏掉引号转义意味着该值一旦落入属性位置仍可越出属性边界。
+漏掉引号转义意味着该值一旦落入属性位置仍可越出属性边界。（`log-console.js` 已于 2026-10-27 删除；
+现役转义唯一入口是 `src/ui/escape.js`。）
 
 ---
 
@@ -117,7 +118,9 @@ grep -rn "trustedStaticMarkup(" src/ index.js
    - ✅ 走 `src/ui/host-bridge.js` 的 `confirmDialog()`（官方文档路径
      `SillyTavern.getContext().Popup.show.confirm`，不可用时静默降级）；组件经 `confirmFn` DI 接缝注入
    - 后果：插件在酒馆里出现原生浏览器弹窗，与宿主 UI 割裂；且组件无法脱离宿主单测
-   - 现役接入面：`stash-list.js`（批量删除 / 行内删除）、`export-queue.js`（清空 / 取消在途恢复）
+   - 现役接入面：`workbench-view.js` 的 `openModal()` 与 `#confirm-dialog`（自绘 `<dialog>`）、
+     `index.js` 从 `host-bridge.js` 引入的 `confirmDialog()` / `alertDialog()`。
+     `export-queue.js:296` 的 `confirmFn` 接缝保留，但该模块自 2026-10-27 起无调用方（只剩单测）
 
 10. **假设「宿主能力必须动态 `import` 宿主模块」**
    - ❌ 认定 `popup.js` 等宿主模块未挂全局，于是放弃原生路径或改走 `import()` 宿主源码路径
@@ -154,7 +157,7 @@ grep -rn "trustedStaticMarkup(" src/ index.js
 3. 若新增/删除业务节点，同步更新 `scripts/single-template-source.js` 的 `REQUIRED_TEMPLATE_IDS`——
    **不更新清单等于守卫失效**。
 
-细节与历史事故（旧双副本分歧导致独立态缺失 `#stash-list`）见
+细节与历史事故（旧双副本分歧导致独立态缺失 `#stash-list`；该 id 已随 2026-10-27 重写删除）见
 [`component-guidelines.md`](./component-guidelines.md) 的 Single Template Source Mandate 一节。
 
 ---
@@ -253,7 +256,8 @@ Host Native Dialog Adapter 第 7 节）。
 
 ⇒ **纪律**：`src/ui/` 的每个渲染入口（`renderXxx`）至少要有**一条**「跑通渲染路径」的用例，
 断言的是**渲染不抛错 + 产出的 DOM 契约**，而不是它的纯函数助手。本仓不引 jsdom
-（L1-MR-11），用 `test/stash-list-render.test.js` 的最小 DOM 桩 + `vi.mock` 数据层即可。
+（L1-MR-11），用最小 DOM 桩 + `vi.mock` 数据层即可（现役示例：`test/workbench-session.test.js`、
+`test/settings-panel.test.js`、`test/confirm-dialog.test.js`）。
 
 **判别力已实测**：把两处声明移回缺失态 ⇒ **7 项全红**，报错正是 `ReferenceError: btns is not defined`
 （与浏览器里那行警告同形）。若要再加一层：断言 DOM 契约（`.archive-name` /

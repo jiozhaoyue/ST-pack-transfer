@@ -330,7 +330,7 @@ E2E 用持久化 context（`.pw-profile-dev`），而插件把当前工作区写
 - 喂进新源包后**计划读数纹丝不动**（仍显示上一轮的包）——
   因为 `index.js:1473` 的 `if (!currentFile) { currentFile = item.file; … }`
   **只在尚无源包时采纳新文件**，否则只把文件存进 IndexedDB；
-- `#stash-list` **一张卡都没有**；
+- `#zone-body` **一张卡都没有**；
 - `#target-select` 一会儿 `native`、一会儿 `l`（自动推断分支 `index.js:1475` 只在 `!currentFile` 时执行）
   ⇒ 同一个 spec 在两实例上跑出**不同读数**，一红一绿。
 
@@ -359,13 +359,13 @@ t.eq('converted 记录增量 == 本轮产物数',
 | 断言 | 错在哪 |
 | --- | --- |
 | 「`#env-badge` 必含宿主版本号」 | **臆造契约**：版本段是按宿主可得性拼的（`index.js:703` `applyHostBadge(host.platform)` 只传 platform）⇒ Luker 有、ST 没有。应断言「已脱离模板初始值 `检测中...`」 |
-| 「`#count-chars` > 0」 | **选错元素**：`count-*` 属 `#module-grid`（**宿主拉取**路径），外部包的计划走 `renderCategoryStats`（`src/ui/category-filter.js:113`），更新的是 `#plan-summary-bar` / `#action-stats-badges` / `#output-estimate-text` / `#category-checkboxes` |
+| 「`#count-chars` > 0」 | **选错元素**：`count-*` 属宿主拉取路径，外部包的计划走 `workbench-view.js` 的 `renderTreeRows()` / `renderChart()`，更新的是 `#chart-stack` 与 `#zone-body`（`#plan-summary-bar` / `#action-stats-badges` / `#output-estimate-text` / `#category-checkboxes` 等旧 id 已随 2026-10-27 重写删除） |
 | 「目标 tt/pt 应报『直通 7』」 | **把语义差异当 bug**：ST/Luker 目录形态相同 ⇒ 直通；TT 树根要套 `data/default-user/` 前缀 ⇒ 必须**路由**。正确读数是「**路由** 7」 |
 | 「`.drawer-open` 选择器」 | 见 §11.1 —— **截断的 dump** 制造了不存在的 class |
 | 「`offsetParent !== null` 判可见」 | 见 §11.1 —— fixed 元素恒 `null` |
 | 「恢复入口仅 Luker 显示」 | **照过时注释写断言**：`computeActionAvailability`（`index.js:140`）的当前契约是 **`restore.visible = isHost && hasArtifact`**，与平台无关；`index.js:712` 那句注释描述的是**已被替换掉的旧实现** |
 | 「暂停窗口夹具 > 40 MB」（2026-09-27） | **陈旧阈值**：`ensurePauseFixture` 早已从「48 × 1 MB」改成「1500 × 3 KB」（多条目、少字节，为减持久化 profile 负担）⇒ 该断言在**正确实现下恒假**。**阈值必须与实现的 `minBytes` 同源**，改实现时同步改断言 |
-| 「续传日志含『沿用断点跳过 N 项』」（2026-09-27） | **读了折叠态的 DOM**：`log-console.js:262` 在面板折叠时直接 `return`，不往 `#log-stream-container` 追加任何行（只更新「最新一条」与徽标）⇒ 折叠态读到的永远是占位符「暂无日志记录」。**先展开再读**（`readLogText()` 点 `#btn-toggle-log`，这也是真实用户动作） |
+| 「续传日志含『沿用断点跳过 N 项』」（2026-09-27） | **读了折叠态的 DOM**（历史形态）：旧 `log-console.js` 在面板折叠时直接 `return`，读到的永远是占位符。**2026-10-27 后该陷阱消失**——`workbench-view.js` 的 `renderLog()` 无条件写 `#log-lines`（视图隐藏时也在写），断言直接读 `#log-lines` 的 `textContent` 即可，不必先展开 |
 | 「native == 显式 st」（2026-09-27） | **陈旧读数的竞态 —— 同时制造假红与假绿**：`l` 与 `st` 的读数**模式完全相同**（「直通 7 合成 1 丢弃 4 产物 8」，只有字节数 826.0 B / 870.0 B 不同），而 `selectOption` 后按该模式等待会**立刻返回上一个状态的陈旧读数**。ST 宿主上该断言因此**恒假**；Luker 宿主上却因「陈旧值恰好等于期望值」**侥幸变绿**。**修法**：切目标先经过一个**读数必然不同**的中间态（`tt` ⇒ 路由 7 / 产物 7），落地后再切目标值。**纪律**：`selectOption` + 模式等待只保证「屏幕上出现了这个模式」，**不保证它是新状态算出来的** |
 | 「M-9 分卷产出 > 1 份」（2026-09-27） | **`page.fill` 静默不写入**（最隐蔽的一种）：宿主 ST 的 splash / 弹窗 —— `<dialog open>` 内含 `#loader.splash-screen` —— 未关闭时，`document.activeElement.tagName === 'DIALOG'` ⇒ Playwright 的 `fill`（focus + insertText）**不报错但一个字符都没写进去**；同一状态下 `page.click` / `pressSequentially` 会**超时**（指针事件被弹窗吞掉）。后果：M-9 的「1 MB 阈值」没生效 ⇒ 分卷退化为单包 ⇒ 三条断言红，而现场毫无异常（元素可见、`disabled=false`、`readOnly=false`、`value` 读作空串）。**修法**：`fillNumber()` —— 填完**校验取值**，失效则退回程序化赋值 + 派发 `input`/`change`，并把走过的路径落进断言证据。**纪律**：凡 `fill`／`selectOption` 之类「失败也可能不抛错」的交互，都要**回读一次取值**；这也解释了「同一 spec 一个实例绿、另一个红」的最常见成因 |
 

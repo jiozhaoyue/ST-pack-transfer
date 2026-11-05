@@ -52,7 +52,7 @@ ST-pack-transfer/
 │   │   └── zip.js              # @zip.js/zip.js 自包含副本
 │   └── ui/                 # 可 DOM 层
 │       ├── escape.js           # escapeHtml / trustedStaticMarkup（HTML 转义唯一入口）
-│       ├── export-queue.js     # 待导出区：产物统一出口（下载/入库/写回/移除）
+│       ├── export-queue.js     # 旧待导出区（当前无调用方，只剩单测）
 │       ├── host-bridge.js      # 宿主嗅探 / CSRF / 备份拉取 / 恢复写入 / 原生按钮注入
 │       ├── workbench-view.js   # 工作台视图渲染（图表 / 选择树 / 配额 / 设置视图）
 │       ├── workbench-template.js # 工作台 HTML 模板唯一来源

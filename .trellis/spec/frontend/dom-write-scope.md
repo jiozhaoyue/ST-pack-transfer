@@ -18,7 +18,7 @@
 | `.extension_block[data-name*="ST-pack-transfer"]` | `div.inline-drawer`（宿主同款内联下拉，内容只有「打开面板」按钮 `#st-pack-transfer-open-btn`） | `src/ui/host-bridge.js` `mountExtensionRowButton()` |
 | `.userBackupButton` 的父元素（账号弹层 / 管理面板每用户行） | `#st-pack-transfer-native-btn`（`menu_button menu_button_icon`） | `src/ui/host-bridge.js` `mountNativeBackupButton()` |
 | `.userBackupManager .backupActionRow` | `#st-pack-transfer-luker-manager-btn` | `src/ui/host-bridge.js` `mountLukerBackupManagerButton()` |
-| `document.body`（**须显式标记**） | 自绘模态覆盖层、下载用临时 `<a>` | `index.js` 模态、`src/ui/{view,export-queue,stash-list,log-console}.js` 下载锚点 |
+| `document.body`（**须显式标记**） | 自绘模态覆盖层、下载用临时 `<a>` | `index.js` 模态与 `downloadBlob()`、`workbench-view.js:237`（日志导出）、`export-queue.js:26`（当前无调用方） |
 
 **2026-10-27 R1.3 变更**：扩展菜单（顶栏魔方棒）**禁止注入**——`registerMenuButton` 已删除，
 `#extensionsMenu` / `.list-group` / `#options` 已从 `ANCHOR_SELECTORS` 白名单移除，

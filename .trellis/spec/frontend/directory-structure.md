@@ -60,14 +60,16 @@ ST-pack-transfer/
 │       ├── workbench-template.js  # HTML 模板唯一来源（getWorkbenchHtml 无参数，两态逐字相同）
 │       ├── workbench-view.js      # 工作台视图渲染与交互（图表 / 选择树 / 配额 / 设置视图）
 │       ├── host-bridge.js         # 宿主嗅探 / CSRF / 备份拉取 / 恢复 / 扩展安装器 / 原生 UI 注入 / OPFS
-│       ├── export-queue.js        # 待导出区状态机 + 渲染（所有产物的统一出口）
+│       ├── export-queue.js        # 旧待导出区（当前无调用方，只剩单测）
 │       ├── escape.js              # DOM 注入防线：escapeHtml / isSafeHttpUrl / trustedStaticMarkup
 │       ├── lan-transfer-panel.js  # 局域网互传面板（WebRTC）
 │       ├── settings-panel.js / settings-store.js  # 设置视图与持久化
 │       ├── chat-store-bridge.js / chat-store-inject.js  # 外部聊天库唯一接缝与三向编排
 │       ├── private-files-store.js # 云端私有件本地存储
-│       ├── qr.js / host-icons.js / fetch-bounds.js  # 二维码 / 宿主图标 / 有界读取
-│       └── 其余（migration-* / workbench-session 等）以 `ls src/ui` 为准
+│       ├── qr.js                  # 二维码（局域网配对，现役）
+│       ├── host-icons.js / fetch-bounds.js  # 当前无调用方（宿主图标 / 有界读取兜底）
+│       ├── workbench-session.js   # 当前无调用方（旧会话状态）
+│       └── 其余（migration-* 等）以 `ls src/ui` 为准
 ├── scripts/
 │   ├── css-scope.js        # CSS 作用域守卫（PostCSS AST 走查，允许 @media 内嵌）
 │   ├── dom-injection-guard.js  # innerHTML/outerHTML/insertAdjacentHTML 未转义插值守卫
@@ -102,7 +104,7 @@ ST-pack-transfer/
 │   ├── roundtrip.test.js
 │   ├── smart-compression.test.js
 │   ├── splitter.test.js
-│   ├── stash-list.test.js
+│   ├── batch-convert.test.js
 │   ├── task-manager.test.js
 │   ├── unified-tree.test.js
 │   ├── web-converter.test.js
@@ -115,8 +117,9 @@ ST-pack-transfer/
 ```
 
 > `test/` 清单是快照；**目录本身才是权威**（增删测试文件时无需回头改本文件，只需保持 `npm test` 全绿）。
-> `src/ui/archive-manager.js` 与 `src/ui/split-deliver-modal.js` 的「无调用点」结论可自查：
-> `grep -rn "renderArchiveManager\|renderSplitDeliveryModal" src/ index.js` —— 只会命中定义处，命中不到任何 import/调用。
+> `test/` 与 `fixtures/` 是**本地专属目录，永不入库/永不上云**（铁律 21；判据 `git ls-files test e2e scripts fixtures` 恒为空）。
+> 历史上的 `src/ui/archive-manager.js` 与 `src/ui/split-deliver-modal.js` 已于 2026-10-27 删除，
+> 原「无调用点」自查结论随之失效。
 
 ---
 
@@ -141,14 +144,9 @@ ST-pack-transfer/
 
 ## Module Responsibilities (模块职责与交互边界)
 
-> **2026-11-05 核对（本节多处待重写）**：下面多处以**已删除模块**为锚点——`stash-list.js`、`category-filter.js`、
-> `file-tree-picker.js`、`file-drop.js`、`view.js`、`task-controls.js`、`log-console.js`、`archive-manager.js`、
-> `split-deliver-modal.js`、`usage-dashboard.js` 均在 2026-10-27 工作台重写（`3b7aeed`）后不存在。
-> 现役 UI 模块以上方目录树为准（`ls src/ui`）；涉及已删模块的小节按历史记录阅读，**不要照此接线**。
-
 ### 1. 根 `index.js`（根控制器）
 - `bootstrap()`：`document.getElementById('app')` 存在 → **独立 Web 模式**，直接复用 `index.html` 的空骨架，`#app` 为空时注入 `getWorkbenchHtml()` 后调 `main(app)`；命中宿主 → **插件模式**，向扩展列表注入行按钮，点击经 `openConverterModal()` 打开全屏模态 `#st-converter-modal-overlay > #app.app-container`（不预注入工作台）。
-- `main(root)` 的装配顺序：**本行停留在 2026-09-25 版本，10-27 工作台重写后多处已变**（`renderStashList` / `renderUsageDashboard` / `#log-console-mount` 等均已不存在）；装配细节以 `index.js` 的 `main()` 为准，待专项重写。
+- `main(root)`：`createWorkbenchView({ actions, qr })`（`index.js:878`）→ 接 `actions`（导入 / 转换 / 拉取 / 恢复 / 删除 / 上传 / 局域网 / 云端）→ `await syncPackages()` 读库并渲染 → `refreshStorageQuota()`（启动 + 15s 兜底 + 页面可见时刷新）→ 按设置决定是否打开教程。
 - `ensureConverterModal()` 用 `getWorkbenchHtml()` 构建模态容器；与独立态同源同模板，产物逐字相同。
 
 ### 2. `src/ui/host-bridge.js`（宿主边界唯一出口）
@@ -165,16 +163,21 @@ ST-pack-transfer/
 
 - 唯一出口 `getWorkbenchHtml()`（**无参数**）——独立态与插件模态态由同一函数产出**逐字相同**的标记；
   `index.html` 自 2026-09-25 起仅为空骨架（详见本节 Multi-Entry 一节的现行约定与 §「Single Template Source」）。
-- 渲染顺序按**操作流**（配置 → 执行 → 反馈），非字母序；本次改造的权威设计见任务 `09-25-ui-slim-native` 的 `design.md`：
+- 渲染顺序按**操作流**（图表 → 数据包 → 设置/日志/帮助 的视图切换），分区与控件纪律见
+  [`workbench-single-view.md`](./workbench-single-view.md)：
 
   | 区 | 内容 | 披露 |
   | --- | --- | --- |
-  | A 状态 / B 源包 / C 产物 | 徽标 + 拖放区 `#dropzone` + `#stash-list` + `#stash-batch-bar` + `#export-queue-panel` | 常驻（`wb-block-status`，`workbench-template.js:47`） |
-  | G 内容范围 / F 输出三联 | `#category-panel`；`#target-select` + `#compression-select` + `#split-input` | 常驻 |
-  | H 垃圾清理 / I 扩展打包 / J 增量与差量 / K 包名 | 宿主原生 `.inline-drawer wb-fold`，标题栏带 `#fold-summary-*` 状态读数 | **折叠**（H 默认按语义全清理） |
-  | E 动作 / D 执行反馈 / 日志 | `#btn-host-fetch` / `#btn-convert` / `#btn-restore-luker`；进度 + `#task-controls` + `#report-panel`（空态 `hidden`）；`#log-console-mount` | 常驻 |
+  | 图表区 | `#chart-card` + `#chart-stack`（类目/体积卡、格式下拉、可拖拽尺寸） | 常驻 |
+  | 数据包区 | `#zone-card` + `#zone-tabs`（导入/导出）+ `#zone-body` + `#action-row` + `#batch-bar` | 常驻 |
+  | 配额区 | `#quota-head`（摘要行，详情默认收起） | 常驻 |
+  | 进度底栏 | `#workbench-progress`（进度条 + 「点此查看日志」） | 常驻 |
+  | 设置 / 日志 / 帮助 | `#view-settings` / `#view-log` / `#view-help` | 视图切换（面板内，非浮层） |
 
-- 复用宿主原生类（`.inline-drawer` / `.menu_button` / `.text_pole` / `.checkbox_label` / `.extension_block`），图标统一 Font Awesome（`fa-solid fa-...`），无 emoji。
+> 上表取代 09-25 版分区（`#stash-list` / `#category-panel` / `#task-controls` / `#report-panel` / `#log-console-mount`
+> 均已在 2026-10-27 重写时删除）。
+
+- 复用宿主原生类只有 `.menu_button`（10 处）与 `.text_pole`（13 处）；`.inline-drawer` / `.checkbox_label` / `.extension_block` 当前模板**未使用**。图标一律**内联 SVG**（`workbench-view.js` 的 `svg()` 辅助），无 Font Awesome 类、无 emoji。
 - 徽标组只渲染一份（在页头 `header`）——历史上两处同时渲染导致重复 id，第二份 `#env-badge` 永远停在「检测中」。
 - **两态无任何分支差异**：`getWorkbenchHtml()` 不接参数，独立态与模态态产物逐字相同；关闭按钮 `#btn-close` 恒在模板里，由独立态 CSS 隐藏。历史「抽屉态」差异（`#status-row` / `#btn-storage-inspector`）已随 2026-10-15 抽屉删除而消失。机器断言见 `test/single-template-source.test.js`。
 
@@ -182,15 +185,17 @@ ST-pack-transfer/
 - `escapeHtml()`（覆盖 `& < > " '`，元素上下文与**属性上下文**通用）、`isSafeHttpUrl()`（只放行 http/https）、`trustedStaticMarkup()`（恒等函数，唯一作用是让守卫放行并让 reviewer 一眼看完全部豁免点：`grep -rn "trustedStaticMarkup(" src/ index.js`）。
 - 配套守卫：`npm run check:dom-injection`（`scripts/dom-injection-guard.js`）扫描 `src/ui/**` 与根 `index.js`；豁免需写 `dom-injection-guard:allow <理由>`（单条）或 `allow-file <理由>`（整文件，当前**没有文件**使用）。
 
-### 5. `src/ui/export-queue.js` + `src/ui/stash-list.js`（产物出口与工作区）
-- 所有产物（宿主直出 / 转换生成 / 增量补丁 / 分卷）先进内存态 `ExportQueue`，由用户统一处置，**不自动下载**；`ephemeral: true` 的条目只在「下载」或「存工作区」时才落 IndexedDB。
-- `stash-list.js` 是统一工作区单列表（按 `db.js` 的 `ORIGINS` 打来源徽标），渲染进 `#stash-list`；导出队列渲染进 `#export-queue-panel`。
+### 5. 产物落地（原 `src/ui/export-queue.js`，当前未接线）
+- 转换 / 拉取的产物由 `index.js` 的 `deliverCreated()` 决定去向：`settings.keepExport` 为真时写 IndexedDB
+  （`saveFile`，`origin: ORIGINS.CONVERTED`，随后 `syncPackages()` 并切到导出区），否则直接 `downloadBlob()`。
+  **不自动下载**由该设置控制，不是无条件行为。
+- `export-queue.js` 的内存队列与 `renderExportQueue()` 自 2026-10-27 起**无调用方**（只剩单测），不要按它接线。
 
 ### 6. `src/core/delta.js`（增量导出）
 - `compareArchives` 基于条目元数据（文件名 / 未压缩大小 / CRC32）快速比对；`generateDeltaArchive` 只含新增与修改条目，并附审计清单 `_delta_manifest.json`。
 
-### 7. `src/ui/log-console.js`
-- 底部可折叠诊断抽屉，订阅 `logger` 事件；级别过滤（ALL/INFO/WARN/ERROR）、实时自动滚动、一键复制与导出日志文件；刷新经 `requestAnimationFrame` 合帧。
+### 7. 日志视图（原 `src/ui/log-console.js`，已删除）
+- 日志的渲染与过滤现由 `src/ui/workbench-view.js` 负责：`log()` 写入 `#log-lines`、`logText()` / `exportLog()` 导出、`#view-log` 为整页视图（点底部进度条进入）；`src/core/logger.js` 仍是唯一日志源，订阅接口 `logger.subscribe(fn)` 未变。
 
 ### 8. `src/storage/authority-store.js`（可选后端，不阻塞主路径）
 - 探测 `window.STAuthority.AuthoritySDK`；不可用时全部接口返回 `null/false`，调用方无需分支。

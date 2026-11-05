@@ -36,8 +36,9 @@
 `#app.app-container [hidden] { display: none }`，**但两者特异度相同**（id + 2 个 class 级），
 于是**源码顺序决定胜负**——`.wb-gate` 那条位置更靠后 ⇒ 它赢 ⇒ 空壳框永远可见。
 更糟的是 `showGate()` 在全仓**没有任何调用点**，所以它从不被触发、却永远显示，
-内容永远是空字符串。同类元素 `.host-tree-confirm-bar` / `.task-controls` / `.report-panel`
-都单独补了 `[hidden]` 覆盖规则，**唯独漏了 `.wb-gate`**——「逐元素打补丁而非根治」的实证。
+内容永远是空字符串。当时同类元素（`.host-tree-confirm-bar` / `.task-controls` / `.report-panel`，均已随
+2026-10-27 重写删除）都单独补了 `[hidden]` 覆盖规则，**唯独漏了 `.wb-gate`**——「逐元素打补丁而非根治」的实证。
+现役兜底是统一的一条高特异度规则 `#app.app-container [hidden]{display:none!important}`（`style.css`）。
 
 **正确写法**（提高特异度，不依赖源码顺序）：
 

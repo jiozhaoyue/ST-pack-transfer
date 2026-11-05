@@ -11,7 +11,7 @@
 
 现有证据（167796d）：
 - src/ui/workbench-template.js:257-314 已有动作、任务控制和报告区；并非从零实现这些能力。
-- src/ui/category-filter.js:22-36 是既有选择模型，包含普通类目及 backups/cache/appPrivate。
+- 选择模型：原 `src/ui/category-filter.js:22-36`（**已删除**，2026-10-27）；现为 `workbench-view.js` 的 `state.sel` + `src/core/zone-model.js`，类目仍含 backups/cache/appPrivate。
 - src/core/task-manager.js:26-32 定义执行状态；此状态机不因新增向导而再造一份。
 - index.js:1493、1989、2230 是后续可分片抽离的编排接缝。
 

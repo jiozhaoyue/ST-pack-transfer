@@ -58,7 +58,8 @@ selectRetryCandidates({ items, plan, evidence }) -> { candidates, rejected, gate
 恢复对话框现同时要求「冲突状态未知」风险确认（`#restore-conflict-ack`，见 §3.2）。
 
 `MigrationPlan` 为**深度冻结**快照，含 `revision` / `requested` / `effective` / `capabilities`。
-`requested` **一律**来自显式传入的选择快照，**不读** `src/ui/category-filter.js` 的模块级 `currentSelection`
+`requested` **一律**来自显式传入的选择快照，**不读**视图层的模块级选择状态（原 `src/ui/category-filter.js` 的
+`currentSelection` 已随该文件 2026-10-27 删除；现视图选择在 `workbench-view.js` 的 `state.sel`）
 （该值会被 `renderCategoryStats` 按「类目是否可用」写回改写，是「换包后旧勾选残留」污染源；
 见 `.trellis/tasks/10-01-safe-migration-productization/research/selection-semantics.md` §3）。
 

@@ -231,7 +231,7 @@ rsync -av --delete --exclude='__pycache__' .trellis/scripts/ packages/cli/src/te
 
 | 关注点 | 唯一来源 | 自查方法 |
 | --- | --- | --- |
-| HTML 转义 / URL 校验 | `src/ui/escape.js`（`escapeHtml` 覆盖 `& < > " '`、`isSafeHttpUrl`、`trustedStaticMarkup`） | `grep -rn "trustedStaticMarkup(" src/ index.js` 列出全部豁免点；`log-console.js` 曾自带只转 `& < >` 的私有实现（缺引号转义）→ 已统一 |
+| HTML 转义 / URL 校验 | `src/ui/escape.js`（`escapeHtml` 覆盖 `& < > " '`、`isSafeHttpUrl`、`trustedStaticMarkup`） | `grep -rn "trustedStaticMarkup(" src/ index.js` 列出全部豁免点；`log-console.js` 曾自带只转 `& < >` 的私有实现（缺引号转义）→ 已统一；该文件已于 2026-10-27 删除，现役转义入口只有 `src/ui/escape.js` |
 | zip **读** | `src/core/zip-io.js` 的 `zipIo.openReader()`（封装 `src/vendor/zip.js` + `src/vendor/fzstd.js`） | `new zip.ZipReader` / `new zip.BlobReader` 只应出现在 `src/core/zip-io.js` |
 | zip **写** | `zipIo.createWriter(target, { level })`（`ZipWriter` 只在它内部构造） | 调用方可自建 `zip.BlobWriter` 仅作**内存目的地**（`delta.js` / `splitter.js` / `worker-client.js` / `converter-worker.js` / `host-bridge.js` 均如此），随后仍须交给 `zipIo.createWriter` |
 | 目标布局枚举 | `src/core/transform.js` 的 `TARGETS` | UI 里不应硬编码 `'st' \| 'l' \| 'tt' \| 'pt'` 字面量 |

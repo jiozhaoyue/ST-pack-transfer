@@ -25,7 +25,7 @@
 - 阶段集合：`idle / scanned / running / awaiting / done`。`awaiting`（执行中停下等用户拍板，
   如宿主文件树确认）**优先级高于** `running`；`log` 是常驻模块，不参与门控（出错时唯一可见反馈）。
 - **切屏/门控一律翻 `hidden` 属性，不移出 DOM**：全仓十余处动态 `getElementById`
-  （`#category-panel`、`#host-tree-confirm-bar`、`#stash-list`…）依赖元素在 DOM 里；
+  （`#chart-stack`、`#zone-body`、`#quota-head`…）依赖元素在 DOM 里；
   摘出 DOM 会让它们拿到 `null` 而**静默空转**，宿主拉取路径直接死锁。
 - `[hidden]` 的特异度陷阱见 `workbench-single-view.md` §2——给容器写了 `display` 就必须补
   特异度不低于它的 `[hidden]` 覆盖规则；本仓有全局兜底

@@ -90,7 +90,7 @@ async function getHandle() {
   （含 `secrets: true`、`globalExtensions: true`）。**代码对 ST 与 Luker 发送同一形状的请求体。**
   - Luker 服务端支持 `selection` 细粒度过滤，勾选类别直接生效。
   - ST 服务端不支持 selection 过滤（全量导出），实际过滤在插件侧完成
-    （`src/ui/category-filter.js` + `convert()` 的 `selection` / `excludedPaths`）。
+    （视图层选择在 `workbench-view.js` 的 `state.sel`；原 `category-filter.js` 已于 2026-10-27 删除，与之配套的 `convert()` `selection` / `excludedPaths` 参数未变）。
     「待验证」：ST 端点对未知 `selection` 字段的具体处置未被本仓代码证实，
     需对 Dev ST 实例（8001）抓包确认。
 - **OPFS 直写**：`supportsOpfs()` 为真时响应体流式写入 `fetch-tmp/<taskId>.zip`（零内存缓冲），
