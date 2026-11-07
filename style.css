@@ -261,8 +261,11 @@
   #app.app-container .settings-subhead{font-size:11.5px;font-weight:600;color:var(--text);margin-bottom:6px}
   #app.app-container .settings-ext-tools{display:flex;flex-direction:column;align-items:flex-start;gap:8px;padding:8px 10px;border-radius:8px;background:var(--panel-3);border:1px solid var(--border)}
   #app.app-container .settings-ext-tools .et-git select{font-size:11px;padding:2px 6px;background:var(--panel-2);border:1px solid var(--border);border-radius:4px}
+  /* 空态引导块：跨满 .chart-stack 的全部列（容器 ≥520px 时栈是两列网格，
+    不跨列会挤进单列导致整体偏左）；纵居中由 :has 规则的 align-content 承担。 */
   #app.app-container .chart-empty-guide{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
-    gap:10px;padding:16px;margin:auto;place-items:stretch;justify-self:center;width:100%;max-width:680px}
+    gap:10px;padding:16px;margin:auto;place-items:stretch;justify-self:center;
+    grid-column:1/-1;width:100%;max-width:680px}
   #app.app-container .chart-stack:has(> .chart-empty-guide){align-content:center;justify-items:center}
   #app.app-container .empty-guide-card{display:flex;flex-direction:column;align-items:center;text-align:center;gap:10px;padding:20px 16px;border-radius:12px;border:1px solid var(--border);background:var(--panel-2)}
   #app.app-container .empty-guide-card .guide-icon{width:44px;height:44px;border-radius:50%;background:var(--panel-3);display:flex;align-items:center;justify-content:center;color:var(--accent)}
