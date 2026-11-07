@@ -2398,9 +2398,13 @@ export async function openNativeBackupUi(platform) {
   if (!anchor) return false;
 
   if (platform === 'luker') {
-    if (!document.querySelector('.userBackupManager')) anchor.click();
+    // 只认「含原生 ZIP 下载按钮」的管理器弹层：日志查看器同样挂 .userBackupManager
+    // （2026-11-08 实测，Real/Dev 的 user.js 均如此），不加限定会把日志弹层当成
+    // 已打开的备份弹层而漏点打开动作。
+    const MANAGER = '.userBackupManager:has(.backupDownloadButton)';
+    if (!document.querySelector(MANAGER)) anchor.click();
     const row = await waitForCondition(
-      () => document.querySelector('.userBackupManager .backupActionRow'),
+      () => document.querySelector(`${MANAGER} .backupActionRow`),
       3000,
     );
     return Boolean(row);
@@ -2439,7 +2443,8 @@ export function readPtExportOptions() {
 
 /**
  * 宿主原生导出触发器的显式声明表（禁止按平台名推导）。
- * 忙态探针与关闭逻辑共用这张表。
+ * 供 `watchNativeExportStart` 的**点击**监视用：点击瞬间按钮还没有忙态标记，
+ * 所以这里挂「触发器本体」；与 `NATIVE_BUSY_PROBES`（状态探针）刻意分开。
  */
 const NATIVE_EXPORT_TRIGGERS = Object.freeze({
   st: ['.userBackupButton'],
@@ -2448,8 +2453,22 @@ const NATIVE_EXPORT_TRIGGERS = Object.freeze({
   pt: ['#ptdm-export'],
 });
 
-/** 本项目注入按钮的幂等标记：捕捉式点击监听必须排除它们，否则自己点自己会被当成宿主导出。 */
-const OWN_INJECTED_SELECTOR = '[data-st-zip-injected="1"]';
+/**
+ * 原生导出「在途」状态探针（`isNativeExportBusy` 专用）。
+ *
+ * 只认**确凿的在途标记**，不得把「弹层开着 / 空闲态」当忙态（2026-11-08 实测回归）：
+ * Real Luker 的账户面板 `.userBackupButton` 在备份弹层打开期间恒带 `disabled` 类
+ * （user.js：点击 addClass('disabled') → 弹层 promise resolve 后才 removeClass），
+ * 管理器里恢复/复制按钮空闲时也带 `disabled` 类（未选文件/未生成链接）。
+ * 唯一可靠的在途信号是 `.backupDownloadButton.disabled`：
+ * `setActionBusy` 仅在备份/恢复进行中给它加类，结束必摘。
+ */
+const NATIVE_BUSY_PROBES = Object.freeze({
+  st: [{ sel: '.userBackupManager .backupDownloadButton.disabled', stateEncoded: true }],
+  luker: [{ sel: '.userBackupManager .backupDownloadButton.disabled', stateEncoded: true }],
+  tt: [{ sel: '#data_migration_export_button', stateEncoded: false }],
+  pt: [{ sel: '#ptdm-export', stateEncoded: false }],
+});
 
 function nativeTriggerEls(platform) {
   const selectors = NATIVE_EXPORT_TRIGGERS[platform];
@@ -2457,25 +2476,43 @@ function nativeTriggerEls(platform) {
   return selectors.flatMap((sel) => Array.from(document.querySelectorAll(sel)));
 }
 
+/** 本项目注入按钮的幂等标记：捕捉式点击监听必须排除它们，否则自己点自己会被当成宿主导出。 */
+const OWN_INJECTED_SELECTOR = '[data-st-zip-injected="1"]';
+
+/** 元素当前是否真实可见（宿主已关闭但未移除的残留弹层一律视为不可见）。桩环境缺 API 时放行。 */
+function isElementVisible(el) {
+  if (typeof el.checkVisibility === 'function') return el.checkVisibility();
+  if (el.offsetParent !== null) return true;
+  return (el.getClientRects?.().length ?? 1) > 0;
+}
+
 /**
  * 宿主原生导出是否在途。
  *
- * 判据（任一命中）：`disabled` / `aria-busy="true"` / `data-busy="true"` /
- * className 含 busy|loading|generating|disabled。
+ * 判据见 `NATIVE_BUSY_PROBES`：st/luker 的探针选择器已内嵌在途标记
+ * （`.backupDownloadButton.disabled`，命中即在途）；tt/pt 探针是触发器本体，
+ * 需再核对 `disabled` 属性 / `aria-busy` / `data-busy`。
  *
- * **fail-open**：选择器失配或宿主结构变化时返回 false——探测失败不得阻断用户拉取。
+ * **不按裸 className 判忙**：宿主把 `disabled` 类当「弹层开着 / 空闲未选」用
+ * （2026-11-08 Real Luker 实测），按类名判忙会把空闲态误判成在途，
+ * 导致「从宿主拉取」永远被取消。不可见的残留弹层一律放行（fail-open）。
  * @param {'st'|'luker'|'tt'|'pt'|string} platform
  * @returns {boolean}
  */
 export function isNativeExportBusy(platform) {
   if (typeof document === 'undefined') return false;
-  return nativeTriggerEls(platform).some((el) => {
+  const probes = NATIVE_BUSY_PROBES[platform];
+  if (!Array.isArray(probes)) return false;
+  return probes.some(({ sel, stateEncoded }) => Array.from(document.querySelectorAll(sel)).some((el) => {
     if (!el) return false;
+    if (el.closest?.(OWN_INJECTED_SELECTOR)) return false; // 自己的按钮绝不自证忙
+    if (!isElementVisible(el)) return false; // 已关闭未移除的残留弹层不判忙
+    if (stateEncoded) return true;
     if (el.disabled === true) return true;
     if (el.getAttribute('aria-busy') === 'true') return true;
     if (el.dataset?.busy === 'true') return true;
-    return /\b(?:busy|loading|generating|disabled)\b/i.test(String(el.className || ''));
-  });
+    return false;
+  }));
 }
 
 /**
@@ -2506,15 +2543,28 @@ export function closeNativeBackupUi(platform) {
     return;
   }
 
-  const anchor = document.getElementById('st-pack-transfer-native-btn')
-    || document.getElementById('st-pack-transfer-luker-manager-btn');
+  // Luker 上「从宿主拉取」按钮在管理器弹层里，优先关它（账户弹层只是入口层）。
+  const anchor = document.getElementById('st-pack-transfer-luker-manager-btn')
+    || document.getElementById('st-pack-transfer-native-btn');
   const surface = anchor?.closest('dialog[open], .popup[open]');
   if (surface) {
-    try { surface.close?.(); } catch { /* 非 dialog */ }
-    surface.removeAttribute('open');
-    surface.style.display = 'none';
+    // 必须走宿主自己的完成链路（Popup：点 [data-result] 控件 → complete() → 动画后
+    // dlg.close()+dlg.remove()+resolver）。**裸 dialog.close() 不行**：它只触发 Popup 的
+    // closeListener 守卫、不走 complete()，宿主 promise 永久挂起 → 账户面板打开器的
+    // disabled 类永不摘除（忙态误判源）、弹层 DOM 永不清理（残留 id 挡住再注入）。
+    // 2026-11-08 实测回归（Real Luker）：两个症状同出此根。
+    const control = typeof surface.querySelector === 'function'
+      ? surface.querySelector('[data-result]')
+      : null;
+    if (control) {
+      try { control.click(); } catch { /* 完成控件失效 → 裸关兜底 */ }
+    } else if (typeof surface.close === 'function') {
+      try { surface.close(); } catch { /* 非 dialog */ }
+    } else {
+      surface.removeAttribute('open');
+      surface.style.display = 'none';
+    }
   }
-  document.querySelectorAll('.popup_background').forEach((bg) => { bg.style.display = 'none'; });
 }
 
 const nativeExportStartHandlers = new Set();
@@ -2625,9 +2675,22 @@ export function mountLukerBackupManagerButton(onPull) {
   const BTN_ID = 'st-pack-transfer-luker-manager-btn';
 
   const addBtn = () => {
-    if (document.getElementById(BTN_ID)) return;
-    const row = document.querySelector('.userBackupManager .backupActionRow');
+    // 只认含原生 ZIP 下载按钮的动作行：日志查看器弹层同样用 .userBackupManager + .backupActionRow
+    // （2026-11-08 实测），不限定会把按钮注进日志弹层、且全局 id 幂等检查会被它永久挡住。
+    // 可见过滤跳过已关闭未移除的残留弹层；:has 失配时退回旧行为（取首个动作行）。
+    const rows = Array.from(document.querySelectorAll('.userBackupManager .backupActionRow'))
+      .filter((el) => el.querySelector?.('.backupDownloadButton') && isElementVisible(el));
+    const row = rows[0]
+      || document.querySelector('.userBackupManager .backupActionRow');
     if (!row) return;
+
+    // 幂等 + 自愈：按钮已在**当前**动作行里才跳过；残留在旧弹层里的同名按钮挪到当前行
+    // （全局 getElementById 命中残留弹层会挡住新弹层的注入——2026-11-08 实测回归）。
+    const existing = document.getElementById(BTN_ID);
+    if (existing) {
+      if (typeof row.contains === 'function' && row.contains(existing)) return;
+      if (typeof existing.remove === 'function') existing.remove();
+    }
 
     const btn = makeHostButton({
       id: BTN_ID,
