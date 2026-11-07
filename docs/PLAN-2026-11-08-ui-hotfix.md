@@ -42,3 +42,54 @@
 
 **附注**：排查中 fullPage 截图出现「工作台 4 份平铺」为 IAB 截图对 fixed 元素的伪影，非产品 bug（DOM 仅 1 份、命中测试干净）。
 **教训**：新增接线引用既有函数时必须先确认函数名；actions 简写属性是这类 ReferenceError 的高发位，且会以「整页半残」形态出现。
+
+---
+
+# §2 插件态热修：从宿主拉取被永久取消 + 注入按钮消失（2026-11-08 第二批）
+
+## 现象（Real Luker 实测，frontend-log-manager 日志）
+
+1. 做过一次原生导出后，点「从宿主拉取」必被取消（WARN `宿主原生导出优先，插件拉取已取消`）；
+2. 此后到 账户 → 数据与备份（Backup & Restore 弹层），插件注入的「从宿主拉取」按钮不再出现。
+
+## 根因（两症状同根，均经宿主源码取证）
+
+**关键宿主事实（Real Luker 8004，旧版 UI）**：
+- 账户面板 `.userBackupButton` 点击时宿主 `addClass('disabled')`，**弹层 promise resolve 后才 removeClass**
+  （user.js:2470）——即弹层开着 = 打开器带 disabled 类；管理器里恢复/复制按钮**空闲时也带** `disabled` 类。
+- 宿主 Popup 的裸 `dialog.close()` **不走 `complete()`**（closeListener 只是防误关守卫）；
+  只有 `[data-result]` 控件点击 / ESC(cancel) 才会 complete → 动画后 `dlg.remove()` + resolver。
+
+- **症状 A**：旧 `isNativeExportBusy` 按 className 正则（busy|loading|generating|disabled）判忙 →
+  把「弹层开着/空闲态」的 `disabled` 类误判成「原生导出在途」→ 拉取被取消；
+  且我们 `closeNativeBackupUi` 用裸 `close()`+强制 `display:none` 绕过 Popup 生命周期 →
+  promise 永久挂起 → 打开器的 `disabled` 类永不摘除 → **此后每次拉取都被取消**。
+- **症状 B**：同一次裸关让弹层 DOM 永久残留 → `mountLukerBackupManagerButton` 的全局
+  `getElementById` 幂等检查命中残留按钮 → 新弹层不再注入。
+- **放大器**：日志查看器弹层**同样**用 `.userBackupManager + .backupActionRow`（Real/Dev 的 user.js 均如此），
+  「取首个动作行」会注错容器；Dev Luker（新数据窗口 UI）已无 `.userBackupButton`，旧选择器全部落空。
+
+## 修复（全部在 `src/ui/host-bridge.js`，4 处）
+
+1. **探针/点击监视分表**：新增 `NATIVE_BUSY_PROBES`（状态探针）与 `NATIVE_EXPORT_TRIGGERS`（点击监视）分离。
+   st/luker 的在途探针只认 `.userBackupManager .backupDownloadButton.disabled`
+   （`setActionBusy` 仅在备份/恢复进行中加、结束必摘——唯一可靠信号）；
+   tt/pt 仍探触发器本体但只认 `disabled` 属性/`aria-busy`/`data-busy`。
+2. **`isNativeExportBusy`**：结构化探针条目（`stateEncoded`）；加 `checkVisibility` 可见过滤
+   （已关未移除的残留弹层放行）；排除自家注入按钮；**删除 className 正则**。
+3. **`closeNativeBackupUi`**：优先点宿主自己的 `[data-result]` 完成控件（走 complete → 动画移除 → promise resolve），
+   裸 `close()` 只作回退，非 dialog 才用旧兜底；锚点改为管理器按钮优先；删除 `.popup_background` 盲扫
+   （现行宿主无此类，纯死代码）。
+4. **注入自愈**：`mountLukerBackupManagerButton` 只认**含 `.backupDownloadButton` 的可见动作行**
+   （日志弹层行排除），残留在旧弹层的同名按钮 `remove()` 后注入当前行；
+   `openNativeBackupUi('luker')` 的 `.userBackupManager` 判定同步加 `:has(.backupDownloadButton)` 限定。
+
+## 验证
+
+- 新增 `test/native-busy-close.test.js`（本地专属）13 例：真信号命中 / 打开器 disabled 不误判 /
+  残留弹层放行 / 自家按钮不自证 / tt-pt 属性判据 / 三级关闭兜底 / 锚点优先级 /
+  注入行限定 / 陈旧按钮搬家 / 已在当前行不重注 / 无行静默。
+- `npm test` **974 passed / 2 skipped**（+13）；三守卫 + `npm run build` 全过。
+- **未做**：Real Luker 真机复验（实例未在线；且只允许 Dev 跑 E2E——Dev 是新 UI，症状本就不在其上）。
+  用户下次在 Real 实测预期：拉取不再被取消、数据与备份弹层每次打开都有注入按钮、
+  原生导出进行中点拉取仍会让路（点击监视保留）。
