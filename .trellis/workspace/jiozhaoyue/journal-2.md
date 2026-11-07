@@ -956,3 +956,34 @@ Topics: [.trellis/research/ui-init-chain-debugging.md](../../research/ui-init-ch
 ### Next Steps
 
 - 宿主态（Luker/ST 抽屉）同样走 main() 初始化链，本修复对其同样生效；如需继续收口，按 HANDOFF-2026-11-06 决定 restore-batch 与旧导出面板接回与否
+
+
+## Session 66: 插件态热修:拉取误取消与注入消失(宿主生命周期+忙态探针)
+<!-- trellis-session: v=2 fp=0763c716095262d8 -->
+
+**Date**: 2026-11-08
+**Task**: 插件态热修:拉取误取消与注入消失(宿主生命周期+忙态探针)
+**Branch**: `main`
+
+### Summary
+
+Real Luker 实测双症状：原生导出后「从宿主拉取」必被取消、数据与备份弹层不再注入按钮。取证（Real/Dev 宿主源码比对）确认同根：① isNativeExportBusy 按 className 正则判忙，把「弹层开着/空闲态」的 disabled 类误判成导出在途；② closeNativeBackupUi 裸 close+强制隐藏绕过宿主 Popup 生命周期（close 事件不走 complete），promise 永久挂起→打开器 disabled 永不摘+弹层 DOM 残留→残留 id 挡住再注入；③ 日志查看器弹层共用 .userBackupManager/.backupActionRow，「取首个行」注错容器。修复 4 处（host-bridge.js）：忙态探针/点击监视分表（探针只认 .backupDownloadButton.disabled+可见过滤+去 className 正则）、关闭改走宿主 [data-result] 完成链路、注入行限定下载行+残留按钮搬家。新增本地单测 13 例，npm test 974 passed/2 skipped、三守卫+build 全过，已推送。Real 真机复验待实例在线（详见 .trellis/research/luker-native-ui-busy-injection.md）。
+Topics: [.trellis/research/luker-native-ui-busy-injection.md](../../research/luker-native-ui-busy-injection.md)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `6acd259` | fix(host): 从宿主拉取被误取消与注入按钮消失（双症状同根） |
+
+### Testing
+
+- [OK] npm test 974 passed/2 skipped; 三守卫+build 过; test/native-busy-close.test.js 13 例
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 用户在 Real Luker 实测：拉取不再被取消、数据与备份每次打开有注入按钮、原生导出进行中拉取仍让路；Dev 新 UI 依赖点击监视让路属预期
