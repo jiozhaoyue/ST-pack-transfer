@@ -925,3 +925,34 @@ Dev Luker 实测「从宿主拉取 ~1MB/s，比原生慢 20 倍」。取证确�
 - 真实浏览器实测暂停→继续→产物完整（3040 被其他会话占用，需换端口起本会话 dev server）
 - restore-batch.js（写回批次）与 renderExportQueue 整块旧面板仍未接线
 - AGENTS.md:369 / CLAUDE.md:437 的 L1-MR-3 仍在真源同步块内，需回 tavern-harness 修正后重新同步
+
+
+## Session 65: UI 全面异常热修:index.js ReferenceError 杀死初始化链
+<!-- trellis-session: v=2 fp=a3e5873aacf2e0fe -->
+
+**Date**: 2026-11-08
+**Task**: UI 全面异常热修:index.js ReferenceError 杀死初始化链
+**Branch**: `main`
+
+### Summary
+
+用户报告整页异常、该有按钮全无。定位为 Session 64 四项接线引入的 index.js:992 actions 简写属性 pendingDownload/pendingStash 指向不存在标识符（实际名 downloadPending/stashPending），构造时 ReferenceError 使 main() 中断，其后全部接线静默死亡；单测 961 全绿拦不住（index.js DOM 接线层无覆盖）。修复 2 行显式键值并真机复验（计数归零、按钮齐全、页签/设置/日志冒烟过、零未捕获异常）；npm test 961 passed/2 skipped、三守卫与 build 全过，已推送。复用发现见 .trellis/research/ui-init-chain-debugging.md（初始化链中断判据、cache-bust 重跑捕获法、简写属性高发位、fullPage 伪影等排查干扰项）。
+Topics: [.trellis/research/ui-init-chain-debugging.md](../../research/ui-init-chain-debugging.md)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `532e5e2` | fix(ui): 待导出区动作引用错名函数杀死整条初始化链 |
+
+### Testing
+
+- [OK] npm test 961 passed/2 skipped; check:css-scope/check:dom-injection/check:template-source 过; npm run build 过
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 宿主态（Luker/ST 抽屉）同样走 main() 初始化链，本修复对其同样生效；如需继续收口，按 HANDOFF-2026-11-06 决定 restore-batch 与旧导出面板接回与否
