@@ -1023,3 +1023,50 @@ Topics: [.trellis/research/luker-2.9-adaptation-and-handoff.md](../../research/l
 
 - 浏览器实机复测第一批（preview_start 曾因分类器故障不可用）：教程即时性、配额点击、日志计数与时间戳、图表最大化下钻
 - 第二批 R4-R6：迁移与备份入口合并、S3 分包增量、WebDAV 全降级传输（判据见 docs/PLAN-2026-11-09.md）
+
+
+## Session 68: 资产列表导入 + 迁移备份统一面板 + S3/WebDAV（第二批）
+<!-- trellis-session: v=2 fp=288cf887cf86e4df -->
+
+**Date**: 2026-11-09
+**Task**: 资产列表导入 + 迁移备份统一面板 + S3/WebDAV（第二批）
+**Branch**: `main`
+
+### Summary
+
+完成第二批：资产列表改为可导入下载扩展和资源菜单的官方扁平 JSON（每张图表卡 + 从宿主拉取入口），拉取顺序改为流量警告→原生指引→开面板并持久化开关，局域网/公网合并为迁移与备份面板并接入 S3/WebDAV 分片/断点/降级。小规模目标测试 47 例、五守卫、构建与单页 UI 取证全绿；按用户禁令未跑全量/大内存测试。宿主注入与真实 WebDAV 因实例离线/缺服务器未实测。
+Topics: [.trellis/research/asset-list-and-transfer-handoff.md](../../research/asset-list-and-transfer-handoff.md)
+
+### Main Changes
+
+- 资产列表：官方五键扁平 JSON，过滤非 http(s) 与宿主内置 system；宿主 discover + manifest.homePage；无 URL/不支持如实提示
+- 入口：每张图表卡 + 从宿主拉取空态/动作行；设置诊断导出删除；教程放按钮 title 与导出 toast
+- 拉取顺序：流量警告→原生指引→开面板；原生按钮拉取前也警告；nativePullNotice 默认每次并持久化
+- 迁移与备份：lan/cloud 合并 #transfer-view，S3/WebDAV 二级 tab；动作行只留 #transfer-open-btn
+- 传输：transfer-plan/transfer-runner/transfer-target；S3 HEAD/Range/multipart；WebDAV 全降级
+- 验收：build+preview(4173)+单页 DOM 取证；launch.json 与 docs 改为唯一路径
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `9e9f93e` | feat(transfer): 资产列表可导入下载菜单 + 迁移备份统一面板 + 分片/WebDAV |
+| `f474b4d` | docs(asset-list): 导出提示加入下载扩展和资源菜单使用教程 |
+| `5a5bb03` | fix(asset-list): 动作行补宿主扩展导出入口 |
+
+### Testing
+
+- [OK] 47 个小规模目标用例通过：asset-list/pull-entry/settings-panel/transfer-plan/webdav-client/transfer-runner/host-extensions
+- [OK] 五守卫全绿；npm run build 通过；UI 取证 0 pageerror，包内资产列表 JSON 合法
+- [OK] 未跑全量/大内存测试（用户 2026-11-09 明令）
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- Dev 实例 8001/8003 在线后补宿主注入实测：Luker 2.9 账户窗口、配额跳转、原生按钮拉取、提示顺序
+- 真实 WebDAV 服务器验证 405/401/409/CORS 与 Range 下载
+- 用户允许后再跑全量 npm test；当前只跑目标小文件
+- R7 保持一键备份；cron/服务端直传按禁令不做，已登记 FUTURE-BACKEND-CAPABILITIES.md
