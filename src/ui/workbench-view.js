@@ -1079,6 +1079,7 @@ function renderActions(){
   if(zoneActions.includes('generate')){
     row.innerHTML=taskBtns
       +'<button class="btn" id="btn-fetch">'+svg('cloud','ico')+t('action.fetch')+'</button>'
+      +'<button class="btn" id="btn-host-assetlist">'+svg('file','ico')+t('action.exportHostAssetList')+'</button>'
       +'<button class="btn accent" id="btn-generate"'+(actionEnabled(state.zone,'generate',sel)?'':' disabled')+'>'+svg('archive','ico')+t('action.generatePack')+'</button>'
       +'<button class="btn" id="btn-merge"'+(actionEnabled(state.zone,'merge',sel)?'':' disabled')+'>'+svg('copy','ico')+t('action.mergeUpload')+'</button>'
       +libBtn
@@ -1924,6 +1925,10 @@ function bind(){
 
   // ── 局域网互传（按钮在数据包动作行内，随 renderActions 重建）──
   document.getElementById('action-row').addEventListener('click',(e)=>{
+    if(e.target.closest('#btn-host-assetlist')){
+      actions.exportAssetList?.({source:'host'});
+      return;
+    }
     if(e.target.closest('#transfer-open-btn')){
       state.transfer.open=true;
       if(state.transfer.tab!=='lan' && state.transfer.tab!=='cloud') state.transfer.tab='lan';

@@ -202,6 +202,7 @@ export default {
   'empty.fetchDesc': 'Fetch current data pack from host backend (uses bandwidth)',
   'empty.fetchBtn': 'Fetch Host Data',
   'empty.assetListBtn': 'Export Host Extension List',
+  'action.exportHostAssetList': 'Export list',
   'empty.importTitle': 'Import Data Pack',
   'empty.importDesc': 'Select or drag-and-drop an existing .zip pack',
   'empty.importBtn': 'Select File',
