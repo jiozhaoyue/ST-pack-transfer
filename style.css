@@ -221,9 +221,9 @@
   #app.app-container .tree-tools button:hover{color:var(--text);border-color:var(--accent)}
   #app.app-container .tree-tools .spacer{flex:1}
   #app.app-container .tree-tools .hint{font-size:10px;color:var(--muted-2)}
-  #app.app-container .vol-head .vol-bulk{display:inline-flex;gap:4px;margin-right:2px}
+  #app.app-container .vol-head .vol-bulk{display:inline-flex;gap:4px;margin-right:2px;flex:0 0 auto}
   #app.app-container .vol-head .vol-bulk button{border:1px solid var(--border);background:var(--panel-3);border-radius:5px;
-    padding:1px 6px;font-size:10px;color:var(--muted);cursor:pointer}
+    padding:1px 6px;font-size:10px;color:var(--muted);cursor:pointer;white-space:nowrap;flex:0 0 auto}
   #app.app-container .vol-head .vol-bulk button:hover{color:var(--text);border-color:var(--accent)}
   #app.app-container .row-bulk{display:none;gap:2px;margin-left:4px}
   #app.app-container .tree-row:hover .row-bulk{display:inline-flex}
@@ -238,8 +238,24 @@
   #app.app-container .extension-tools .et-git select{font-size:11px;padding:2px 5px}
   #app.app-container .extension-tools .et-keepdev{font-size:10.5px;color:var(--muted);margin:0;
     display:inline-flex;align-items:center;gap:4px;white-space:nowrap;flex-shrink:0}
-  #app.app-container .vol-head .extension-tools{display:inline-flex;align-items:center;gap:6px;padding:2px 8px;margin:0 4px;border-radius:6px;border:1px solid var(--border);background:color-mix(in srgb, var(--panel-3) 55%, transparent)}
+  #app.app-container .vol-head .extension-tools{display:inline-flex;flex-wrap:wrap;align-items:center;gap:5px;padding:1px 6px;margin:0 2px;border-radius:6px;border:1px solid var(--border);background:color-mix(in srgb, var(--panel-3) 55%, transparent);min-width:0}
   #app.app-container .vol-head .extension-tools .et-label{display:none}
+  /* 扩展这一横条放在图形下方：保持单行，窄卡内横向滑动，不再撑高卡头 */
+  #app.app-container .vol-body > .extension-tools{display:flex;flex-wrap:nowrap;align-items:center;gap:5px;
+    padding:3px 8px;border-bottom:1px solid var(--border);flex:0 0 auto;overflow-x:auto;scrollbar-width:none;
+    background:color-mix(in srgb, var(--panel-3) 55%, transparent)}
+  #app.app-container .vol-body > .extension-tools::-webkit-scrollbar{display:none}
+  #app.app-container .vol-body > .extension-tools .et-label{display:none}
+  #app.app-container .vol-body > .extension-tools .segmented{flex:0 0 auto;white-space:nowrap}
+  #app.app-container .vol-body > .extension-tools .segmented button{flex:0 0 auto;white-space:nowrap}
+  #app.app-container .vol-body > .extension-tools .et-git{flex:0 0 auto;white-space:nowrap}
+  #app.app-container .vol-body > .extension-tools .et-keepdev{flex:0 0 auto}
+  #app.app-container .vol-body > .extension-tools .et-list-btn{border:1px solid var(--border);background:var(--panel-3);
+    border-radius:6px;padding:2px 7px;font-size:10.5px;color:var(--muted);white-space:nowrap;cursor:pointer;flex:0 0 auto;order:-1}
+  #app.app-container .vol-body > .extension-tools .et-list-btn:hover{color:var(--text);border-color:var(--accent)}
+  #app.app-container .vol-head .extension-tools .et-list-btn{border:1px solid var(--border);background:var(--panel-3);
+    border-radius:6px;padding:2px 7px;font-size:10.5px;color:var(--muted);white-space:nowrap;cursor:pointer}
+  #app.app-container .vol-head .extension-tools .et-list-btn:hover{color:var(--text);border-color:var(--accent)}
   #app.app-container .settings-divider{border:0;border-top:1px solid var(--border);margin:10px 0}
   #app.app-container .settings-subhead{font-size:11.5px;font-weight:600;color:var(--text);margin-bottom:6px}
   #app.app-container .settings-ext-tools{display:flex;flex-direction:column;align-items:flex-start;gap:8px;padding:8px 10px;border-radius:8px;background:var(--panel-3);border:1px solid var(--border)}
@@ -293,36 +309,53 @@
   #app.app-container .chart-foot .spacer{flex:1}
   #app.app-container .chart-foot .target-badge{color:var(--accent);border:1px solid var(--accent);border-radius:999px;padding:1px 7px}
 
-  /* ── 图表栈：自适应网格（容器宽决定列数，硬上限 4），卡片边贴边 ── */
-  #app.app-container .chart-stack{flex:1 1 auto;min-height:0;overflow:auto;
-    display:grid;grid-template-columns:minmax(0,1fr);gap:1px;padding:1px;align-content:start}
-  /* 唯一一组图表时撑满面板剩余高度；多组时按内容高度，不留空白带 */
-  #app.app-container .chart-stack:has(> .chart-group:only-child){grid-auto-rows:minmax(0,1fr)}
-  #app.app-container .chart-stack > .chart-group:only-child .vol-card{height:100%}
-  #app.app-container .chart-stack > .chart-group:only-child .vol-card .chart-tree{max-height:none}
-  /* chart-group / vol-grid 只做逻辑分组，不产生盒子，让 vol-card 直接成为网格项 */
-  #app.app-container .chart-group{display:contents}
-  #app.app-container .vol-grid{display:contents}
+  /* ── 图表栈：固定图表区，内部 canvas 由 JS 按数量摆 1 / 2 / 3 / 4 宫格 ── */
+  #app.app-container .chart-stack{flex:1 1 auto;min-height:0;overflow:auto;padding:1px;display:block}
+  #app.app-container .chart-canvas{display:grid;width:100%;height:100%;min-height:0;align-content:stretch;gap:0}
+  #app.app-container .chart-canvas.is-max{height:100%}
+  /* 图表之间的拖拽条：列间一条，行间左右各一条，样式与主分栏一致 */
+  #app.app-container .chart-split-v{position:relative;cursor:col-resize;touch-action:none;z-index:2;background:transparent}
+  #app.app-container .chart-split-v::before{content:'';position:absolute;top:0;bottom:0;left:50%;width:2px;
+    transform:translateX(-50%);border-radius:2px;background:color-mix(in srgb,var(--outline) 26%,transparent);
+    transition:background .15s ease}
+  #app.app-container .chart-split-v:hover::before,
+  #app.app-container .chart-split-v.is-dragging::before{background:var(--outline)}
+  #app.app-container .chart-split-h{position:relative;cursor:row-resize;touch-action:none;min-height:6px;z-index:2;background:transparent}
+  #app.app-container .chart-split-h::before{content:'';position:absolute;left:0;right:0;top:50%;height:2px;
+    transform:translateY(-50%);border-radius:2px;background:color-mix(in srgb,var(--outline) 26%,transparent);
+    transition:background .15s ease}
+  #app.app-container .chart-split-h:hover::before,
+  #app.app-container .chart-split-h.is-dragging::before{background:var(--outline)}
+
+  /* 数据包偏好：整列列表，像图表下的类目行，不挤在一侧 */
+  #app.app-container .chart-prefs{display:flex;flex-direction:column;height:100%;min-height:0;padding:8px 10px;gap:8px}
+  #app.app-container .pref-head{display:flex;flex-direction:column;gap:2px;flex:0 0 auto}
+  #app.app-container .pref-head b{font-size:13px;color:var(--text)}
+  #app.app-container .pref-head span{font-size:11px;color:var(--muted);line-height:1.5}
+  #app.app-container .pref-list{flex:1 1 auto;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:4px}
+  #app.app-container .pref-row{display:flex;align-items:center;gap:8px;padding:7px 9px;border:1px solid var(--border);
+    border-radius:8px;background:var(--panel-3);font-size:12px;color:var(--text);white-space:nowrap;flex:0 0 auto}
+  #app.app-container .pref-row input{flex:0 0 auto;margin:0}
+  #app.app-container .pref-dot{width:9px;height:9px;border-radius:50%;flex:0 0 auto;background:var(--vc,var(--accent))}
+  #app.app-container .pref-label{min-width:0;overflow:hidden;text-overflow:ellipsis}
+  #app.app-container .pref-actions{display:flex;justify-content:flex-end;gap:8px;flex:0 0 auto}
+  #app.app-container .pref-extra{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:6px 8px;
+    border:1px solid var(--border);border-radius:8px;background:var(--panel-3);flex:0 0 auto}
+  #app.app-container .pref-extra .et-git{display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--muted)}
+  #app.app-container .asset-guide{margin:0;padding-left:18px;line-height:1.9;font-size:12px}
   #app.app-container .chart-group-head{display:flex;align-items:center;gap:7px;flex-wrap:wrap;padding:0 2px;
     font-size:11px;color:var(--muted)}
   #app.app-container .chart-group-head .g-name{color:var(--text);font-weight:600}
 
-  /* 列数按图表卡容器宽度自适应：2 / 3 / 4，硬上限 4 列。
-     必须排在 .chart-stack 基础规则之后，否则同特异度会被基础的单列声明覆盖。 */
-  @container (min-width:520px){ #app.app-container .chart-stack{grid-template-columns:repeat(2,minmax(0,1fr))} }
-  @container (min-width:800px){ #app.app-container .chart-stack{grid-template-columns:repeat(3,minmax(0,1fr))} }
-  @container (min-width:1060px){ #app.app-container .chart-stack{grid-template-columns:repeat(4,minmax(0,1fr))} }
-
-  #app.app-container .vol-card{display:flex;flex-direction:column;min-width:0;
-    border:1px solid var(--border);border-radius:10px;background:var(--panel-2);overflow:hidden;
-    resize:both}
+  #app.app-container .vol-card{display:flex;flex-direction:column;min-width:0;min-height:0;overflow:hidden;
+    border:1px solid var(--border);border-radius:10px;background:var(--panel-2)}
   #app.app-container .vol-card.is-disabled{opacity:.55;filter:grayscale(1)}
   #app.app-container .vol-card.is-disabled .tree-row{pointer-events:none}
   #app.app-container .vol-card.is-disabled .tree-check{cursor:not-allowed}
-  #app.app-container .vol-head{flex:0 0 auto;display:flex;align-items:center;gap:6px;padding:6px 9px;
+  #app.app-container .vol-head{flex:0 0 auto;display:flex;align-items:center;gap:5px;padding:5px 7px;
     border-bottom:1px solid var(--border);
     background:color-mix(in srgb, var(--panel-3) 72%, transparent);
-    font-size:11.5px;color:var(--text)}
+    font-size:11.5px;color:var(--text);flex-wrap:wrap;min-width:0}
   #app.app-container .vol-head .vol-idx{font-weight:600}
   #app.app-container .vol-head .vol-idx.is-merged{color:var(--accent);border:1px solid var(--accent);
     border-radius:4px;padding:0 5px;font-size:10px;letter-spacing:.2px}
@@ -337,59 +370,60 @@
   #app.app-container .vol-card.is-collapsed .vol-body{display:none}
   #app.app-container .vol-card.is-collapsed .vol-head{border-bottom-color:transparent}
   #app.app-container .vol-body{display:flex;flex-direction:column;min-height:0;flex:1 1 auto}
-  #app.app-container .vol-card .chart-tree{flex:1 1 auto;min-height:0;max-height:250px}
+  #app.app-container .vol-card .chart-tree{flex:1 1 auto;min-height:0;overflow:auto}
 
-  /* 最大化：单卡占满图表区，其它卡隐藏；树可继续下钻，勾选逻辑不变。 */
-  #app.app-container .chart-stack.has-max{grid-auto-rows:minmax(0,1fr);align-content:stretch}
-  #app.app-container .chart-stack.has-max .vol-card:not(.is-max){display:none}
-  #app.app-container .vol-card.is-max{grid-column:1 / -1;width:100%;height:100%;min-height:320px;resize:none}
+  /* 最大化：单卡占满插件 DOM（不是只占图表栈）；树可继续下钻，勾选逻辑不变。 */
+  #app.app-container .chart-stack.has-max{height:100%}
+  #app.app-container .vol-card.is-max{position:fixed;inset:0;z-index:1000;width:auto;height:auto;min-height:0;
+    border-radius:0;border:0;background:var(--panel-2)}
   #app.app-container .vol-card.is-max .chart-tree{max-height:none;min-height:0;flex:1 1 auto;overflow:auto}
-  #app.app-container .vol-max{width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;
-    border:1px solid var(--border);background:var(--panel-3);border-radius:5px;color:var(--muted);padding:0;cursor:pointer}
-  #app.app-container .vol-max:hover{color:var(--text);border-color:var(--accent)}
-  #app.app-container .vol-assetlist{width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;
-    border:1px solid var(--border);background:var(--panel-3);border-radius:5px;color:var(--muted);padding:0;cursor:pointer;font-size:12px;line-height:1}
-  #app.app-container .vol-assetlist:hover{color:var(--text);border-color:var(--accent)}
+  #app.app-container .vol-fmt,
+  #app.app-container .vol-max,
+  #app.app-container .group-close,
+  #app.app-container .vol-priv{position:relative;width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;
+    border:1px solid var(--border);background:var(--panel-3);border-radius:6px;color:var(--muted);padding:0;cursor:pointer;flex:0 0 auto}
+  #app.app-container .vol-fmt:hover,
+  #app.app-container .vol-max:hover,
+  #app.app-container .group-close:hover,
+  #app.app-container .vol-priv:hover{color:var(--text);border-color:var(--accent)}
+  #app.app-container .vol-priv b{position:absolute;top:-5px;right:-5px;min-width:13px;height:13px;padding:0 3px;border-radius:999px;
+    background:var(--accent);color:#fff;font-size:9px;line-height:13px;text-align:center;font-weight:600}
+  #app.app-container .vol-priv svg{width:14px;height:14px}
   #app.app-container .vol-breadcrumb{display:flex;align-items:center;gap:4px;padding:4px 9px;border-bottom:1px solid var(--border);
     font-size:10.5px;color:var(--muted);flex-wrap:wrap}
   #app.app-container .vol-breadcrumb button{border:0;background:none;color:var(--accent);cursor:pointer;padding:0;font:inherit}
   #app.app-container .vol-breadcrumb .sep{color:var(--muted-2)}
   #app.app-container .vol-drill{width:18px;height:18px;padding:0;line-height:1}
 
-  /* ── 图表可视化：条形 / 圆环，两种格式共用同一份类目数据 ── */
-  #app.app-container .vol-chart{flex:0 0 auto;padding:7px 9px;border-bottom:1px solid var(--border);
-    display:flex;flex-direction:column;gap:4px;
-    --vc-c1:var(--accent);
-    --vc-c2:color-mix(in srgb,var(--accent) 55%,var(--muted));
-    --vc-c3:var(--muted);
-    --vc-c4:var(--muted-2);
-    --vc-c5:color-mix(in srgb,var(--muted-2) 55%,var(--panel-3));
-    --vc-c6:color-mix(in srgb,var(--panel-3) 70%,var(--muted))}
+  /* ── 图表可视化：Luker 式单条多色 / 圆环；颜色只在下方列表解释 ── */
+  #app.app-container .vc-c1{--vc:#4c8dff}
+  #app.app-container .vc-c2{--vc:#ff7a45}
+  #app.app-container .vc-c3{--vc:#2ed47a}
+  #app.app-container .vc-c4{--vc:#ffd43b}
+  #app.app-container .vc-c5{--vc:#b37feb}
+  #app.app-container .vc-c6{--vc:#ff5c8a}
+  #app.app-container .vc-c7{--vc:#13c2c2}
+  #app.app-container .vc-c8{--vc:#a0d911}
+  #app.app-container .vc-c9{--vc:#fa8c16}
+  #app.app-container .vc-c10{--vc:#7252d9}
+  #app.app-container .vc-c11{--vc:#36cfc9}
+  #app.app-container .vc-c12{--vc:#f759ab}
+  #app.app-container .vol-chart{flex:0 0 auto;min-height:84px;padding:12px 14px;border-bottom:1px solid var(--border);
+    display:flex;align-items:center;justify-content:center}
   #app.app-container .vol-chart.is-empty{display:none}
-  #app.app-container .vc-row{display:flex;align-items:center;gap:6px;font-size:10.5px;color:var(--muted);min-width:0}
-  #app.app-container .vc-label{flex:0 1 34%;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  #app.app-container .vc-bar{flex:1 1 auto;min-width:0;height:6px;border-radius:3px;
-    background:color-mix(in srgb,var(--outline) 16%,transparent);overflow:hidden}
-  #app.app-container .vc-bar > i{display:block;height:100%;border-radius:3px;min-width:1px}
-  #app.app-container .vc-val{flex:0 0 auto;font-variant-numeric:tabular-nums;color:var(--muted-2)}
-  #app.app-container .vol-chart.is-donut{flex-direction:row;align-items:center;gap:9px}
-  #app.app-container .vc-donut{width:64px;height:64px;flex:0 0 auto;transform:rotate(-90deg)}
-  #app.app-container .vc-legend{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1 1 auto}
-  #app.app-container .vc-li{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--muted);min-width:0;
-    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  #app.app-container .vc-li > b{margin-left:auto;color:var(--muted-2);font-weight:500;font-variant-numeric:tabular-nums}
-  #app.app-container .vc-sw{width:8px;height:8px;border-radius:2px;flex:0 0 auto;background:currentColor}
-  #app.app-container .vol-chart .vc-c1{background:var(--vc-c1);color:var(--vc-c1);stroke:var(--vc-c1)}
-  #app.app-container .vol-chart .vc-c2{background:var(--vc-c2);color:var(--vc-c2);stroke:var(--vc-c2)}
-  #app.app-container .vol-chart .vc-c3{background:var(--vc-c3);color:var(--vc-c3);stroke:var(--vc-c3)}
-  #app.app-container .vol-chart .vc-c4{background:var(--vc-c4);color:var(--vc-c4);stroke:var(--vc-c4)}
-  #app.app-container .vol-chart .vc-c5{background:var(--vc-c5);color:var(--vc-c5);stroke:var(--vc-c5)}
-  #app.app-container .vol-chart .vc-c6{background:var(--vc-c6);color:var(--vc-c6);stroke:var(--vc-c6)}
+  #app.app-container .vc-stack{display:flex;width:100%;height:34px;border-radius:8px;overflow:hidden;
+    background:var(--panel-3);gap:1px}
+  #app.app-container .vc-seg{display:block;height:100%;flex-basis:0;flex-shrink:0;min-width:3px;
+    background:var(--vc,var(--accent));transition:filter .15s ease}
+  #app.app-container .vc-seg:hover{filter:brightness(1.18)}
+  #app.app-container .vol-chart.is-donut .vc-donut{width:96px;height:96px;max-width:100%;transform:rotate(-90deg)}
+  #app.app-container .vc-arc{stroke:var(--vc,var(--accent))}
+  #app.app-container .tree-dot{width:9px;height:9px;border-radius:50%;flex:0 0 auto;background:var(--vc,var(--accent))}
 
   /* 树行尾部占用条：宽度 = 该行字节 / 本卡总字节 */
   #app.app-container .tree-occ{flex:0 0 46px;height:4px;border-radius:2px;overflow:hidden;
     background:color-mix(in srgb,var(--outline) 14%,transparent)}
-  #app.app-container .tree-occ > i{display:block;height:100%;border-radius:2px;background:var(--accent);min-width:0}
+  #app.app-container .tree-occ > i{display:block;height:100%;border-radius:2px;background:var(--vc,var(--accent));min-width:0}
 
   /* 图表卡面板头的格式下拉 */
   #app.app-container .chart-fmt{flex:0 0 auto;display:inline-flex;align-items:center}
@@ -424,10 +458,10 @@
 
   /* 图表组头：包序号是图表唯一身份；右侧 × 关掉该包图表 */
   #app.app-container .chart-group-head .g-name{font-weight:600}
-  #app.app-container .group-close{width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center;
-    border:1px solid var(--border);background:var(--panel-3);border-radius:5px;color:var(--muted);
-    padding:0;font-size:12px;line-height:1}
-  #app.app-container .group-close:hover{color:var(--text);border-color:var(--outline)}
+  #app.app-container .group-close{width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;
+    border:1px solid var(--border);background:var(--panel-3);border-radius:6px;color:var(--muted);
+    padding:0;font-size:14px;line-height:1}
+  #app.app-container .group-close:hover{color:var(--text);border-color:var(--accent)}
   #app.app-container .vol-head .chev{transform:rotate(90deg);transition:transform .12s ease}
   #app.app-container .vol-card.is-collapsed .vol-head .chev{transform:rotate(0deg)}
 
@@ -510,7 +544,9 @@
   #app.app-container .zone-empty{padding:16px;text-align:center;color:var(--muted-2);font-size:11.5px}
 
   /* 操作条：固定在数据包列表上方 */
-  #app.app-container .action-row{display:flex;gap:6px;flex-wrap:wrap;padding:7px 8px}
+  #app.app-container .action-row{display:flex;gap:6px;flex-wrap:wrap;padding:7px 8px;align-items:center}
+  #app.app-container .action-hint{display:inline-flex;align-items:center;padding:3px 8px;border-radius:6px;
+    border:1px dashed var(--accent);background:var(--accent-soft);color:var(--text);font-size:11px;white-space:nowrap;cursor:pointer}
   #app.app-container .zone-actions{flex:0 0 auto;border-bottom:1px solid var(--border);
     background:color-mix(in srgb,var(--panel-3) 45%,transparent)}
   #app.app-container .btn{display:inline-flex;align-items:center;justify-content:center;gap:5px;border:1px solid var(--border);
@@ -594,11 +630,11 @@
   #app.app-container .set-group[open] > .set-group-head::before{transform:rotate(90deg)}
   #app.app-container .set-group-body{padding:6px 10px 10px;border-top:1px solid var(--border)}
   #app.app-container .set-note{font-size:10.5px;color:var(--muted);margin:0 0 7px}
-  #app.app-container .toast{position:absolute;left:50%;top:calc(100% - 18px);bottom:auto;transform:translate(-50%,calc(-100% + 10px));z-index:120;
+  #app.app-container .toast{position:absolute;left:50%;top:12px;bottom:auto;transform:translate(-50%,-10px);z-index:120;
     background:var(--panel);border:1px solid var(--accent);border-radius:9px;padding:8px 13px;
     font-size:11.5px;color:var(--text);box-shadow:var(--shadow);opacity:0;pointer-events:none;
     transition:opacity .18s ease,transform .18s ease;max-width:calc(100% - 32px)}
-  #app.app-container .toast.show{opacity:1;transform:translate(-50%,-100%)}
+  #app.app-container .toast.show{opacity:1;transform:translate(-50%,0)}
 
   /* 教程 */
   #app.app-container .tutorial-overlay{position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:95;display:none}

@@ -114,7 +114,7 @@
 | 存储配额两行（浏览器 / 宿主），点击跳宿主原生存储页对应分页 | `src/ui/workbench-view.js` 的 `renderQuota()`；`src/ui/host-bridge.js` 的 `openHostStoragePage()` / `openHostAccountWindow()` |
 | 宿主配额读数（Luker 同源兜底） | `src/ui/host-bridge.js` 的 `readHostStorageQuota()`（`RestProvider`） |
 | 导出扩展资产列表（官方扁平 JSON，可导入「下载扩展和资源菜单」） | 每张图表卡 `[data-assetlist]`；空态 `#btn-assetlist-host` | `src/core/asset-list.js`、`src/ui/host-bridge.js` 的 `listHostExtensions()`、`index.js` 的 `exportPackageAssetList()` / `exportHostAssetList()`；契约见 `.trellis/spec/frontend/asset-list-export.md` |
-| 设置分组可收起 | `src/ui/settings-panel.js` 的 `buildSettingsHtml()`（四个 `<details>`） |
+| 设置分组可收起（提示 / 导出 / 日志） | `src/ui/settings-panel.js` 的 `buildSettingsHtml()`（三个 `<details>`） |
 | 图表单独最大化 + 逐层下钻（勾选逻辑不变） | `src/ui/workbench-view.js` 的 `chartCardHtml()` / `volScopedNodes()` / `volBreadcrumbHtml()` |
 
 ### J. file:// 单文件离线产物（S7，2026-10-13）
@@ -147,10 +147,12 @@
 | 进度条为常驻底栏，所有视图共用 | `#workbench-progress`（`.app-body` 末位子项） | `workbench-template.js` 模板末尾；`setProgress()` 写 `#progress-fill` / `#progress-label` / `#progress-pct` |
 | 点击进度条打开日志 | `#workbench-progress` 的 click | `workbench-view.js` 的 `bind()`（`renderLog()` + `showPane('log')`） |
 | 顶栏日志按钮已删除 | — | `#btn-log` 不再存在；`#log-dot` 迁入底栏 |
-| 图表自适应网格（1/2/3/4 列，上限 4） | `.chart-stack` | `style.css`：`#chart-card{container-type:inline-size}` + 三条 `@container`（520/800/1060px），必须排在 `.chart-stack` 基础规则之后 |
-| 图表格式切换（条形 / 圆环） | 每张卡的 `[data-chartfmt]` 下拉 | `workbench-view.js` 的 `chartFmtOf()` / `volChartHtml()`；状态 `state.chartFmt[key]` |
-| 每行占用条 | `.tree-row > .tree-occ` | `renderTreeRows()`（宽度 = 该行 mb / 本卡类目总量） |
-| 拖拽卡片改尺寸并持久化 | `.vol-card` 右下角 | `style.css` 的 `resize:both`；`workbench-view.js` 的 `pointerup` + `localStorage['stpt.cardSize']` |
+| 图表动态宫格（1 张占满 / 2 张平分 / 3–4 张 2×2 / >4 张纵向滚动） | `.chart-canvas` | `src/ui/workbench-view.js` 的 `chartCanvasHtml()`；`style.css` 的 `.chart-canvas` |
+| 图表之间拖拽调整行列比例 | `.chart-split-v` / `.chart-split-h` | `initChartSplitters()` + `localStorage['stpt.chartLayout']` |
+| 图表格式切换（单条多色 / 圆环） | 每张卡的 `[data-chartfmt-toggle]` 图标按钮 | `chartFmtOf()` / `volChartHtml()`；状态 `state.chartFmt[key]` |
+| 数据包偏好（占位勾选 + 顶部控件并入） | `#chart-pref-btn` | `src/ui/chart-prefs.js`、`openChartPrefs()` / `saveChartPrefsDraft()`；保存后只影响以后导入的包 |
+| 每行占用条与色标 | `.tree-row > .tree-dot` / `.tree-occ` | `renderTreeRows()` 用同一套调色板 |
+| 拖拽卡片改尺寸 | **已删除**（2026-11-09 用户裁定：图表大小由宫格动态决定，不允许自由拉伸） | — |
 
 > 完整契约与验收判据见 `.trellis/spec/frontend/workbench-single-view.md` §11。
 > 注意：`@container` 与基础 `grid-template-columns` **同特异度**，靠源码顺序决胜负——

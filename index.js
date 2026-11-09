@@ -327,6 +327,23 @@ async function main(root) {
     return `extensions-asset-list_${source}_${stamp}.json`;
   }
 
+  /** 扩展清单首次导出前的一次性教程（尤其说明 file:// 不可用）。 */
+  async function ensureAssetListGuide() {
+    try { if (localStorage.getItem('stpt.assetListGuideSeen') === '1') return; } catch { /* 隐私模式 */ }
+    await new Promise((resolve) => {
+      view.openModal(
+        t('assetList.guideTitle'),
+        t('assetList.guideDesc'),
+        '<ul class="asset-guide"><li>' + t('assetList.guide1') + '</li><li>' + t('assetList.guide2') + '</li><li>' + t('assetList.guide3') + '</li></ul>',
+        [{ label: t('modal.confirm'), primary: true, onClick: () => {
+          try { localStorage.setItem('stpt.assetListGuideSeen', '1'); } catch { /* 隐私模式 */ }
+          view.closeModal();
+          resolve();
+        } }],
+      );
+    });
+  }
+
   /**
    * 导出宿主扩展资产列表（官方扁平数组）。
    *
@@ -334,6 +351,7 @@ async function main(root) {
    * `homePage`。因此可能出现「有扩展、但没有可导入地址」——此时如实提示，不生成空文件。
    */
   async function exportHostAssetList() {
+    await ensureAssetListGuide();
     const result = await listHostExtensions(host.platform);
     if (!result.ok) {
       view.toast(t('toast.assetListUnavailable'));
@@ -359,6 +377,7 @@ async function main(root) {
    * @param {string[]} pkgIds
    */
   async function exportPackageAssetList(pkgIds) {
+    await ensureAssetListGuide();
     const ids = (Array.isArray(pkgIds) ? pkgIds : []).filter(Boolean);
     if (!ids.length) {
       view.toast(t('toast.assetListNoPackage'));
@@ -677,12 +696,18 @@ async function main(root) {
   }
 
   async function downloadSelected(ids) {
+    let count = 0;
     for (const id of ids) {
       const pkg = pkgById(id);
       const blob = await blobOf(pkg);
       if (!blob) continue;
       downloadBlob(blob, pkg.name);
+      count += 1;
+      if (settings.deleteAfterExport) {
+        try { await deleteFile(id); } catch { /* 已不存在 */ }
+      }
     }
+    if (settings.deleteAfterExport && count) await syncPackages();
   }
 
   async function copyBack(ids) {
@@ -1033,32 +1058,20 @@ async function main(root) {
   }
 
   /**
-   * 产物落地：`keepExport` 为真时写工作区（导出区列表）；否则进「本次待导出」内存队列。
-   * **不自动下载**——下载是用户在队列或导出区里的显式动作。
+   * 产物落地：始终写工作区（导出区列表），**不自动下载**；下载是用户在导出区里的显式动作。
+   * 是否在下载后删除该包由设置「导出后删除导出区里的包」决定。
    */
   async function deliverCreated(created, layout = 'unknown') {
     if (!created.length) { view.setProgress(0, t('toast.convertFailed')); return; }
-    if (settings.keepExport) {
-      for (const item of created) {
-        await saveFile({
-          id: `out-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-          name: item.name, size: item.blob.size, blob: namedBlob(item.blob, item.name),
-          layout, role: 'output', origin: ORIGINS.CONVERTED,
-          metadata: { convertedAt: Date.now() },
-        });
-      }
-      await syncPackages();
-    } else {
-      for (const item of created) {
-        exportQueue.enqueue({
-          blob: item.blob,
-          name: item.name,
-          targetLayout: layout || 'unknown',
-          origin: ORIGINS.CONVERTED,
-          ephemeral: true,
-        });
-      }
+    for (const item of created) {
+      await saveFile({
+        id: `out-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        name: item.name, size: item.blob.size, blob: namedBlob(item.blob, item.name),
+        layout, role: 'output', origin: ORIGINS.CONVERTED,
+        metadata: { convertedAt: Date.now() },
+      });
     }
+    await syncPackages();
     view.setProgress(100, t('progress.exportReady'));
     view.toast(t('toast.generated', { n: created.length }));
     view.setZone('export');
@@ -1495,10 +1508,13 @@ async function main(root) {
 
   await syncPackages();
   async function refreshStorageQuota() {
+    // 三条读数彼此独立：任一失败都不能拖垮其余读数（尤其不能让「存储页可用」被配额异常吞掉）。
     const [browser, hostQuota, pageAvailable] = await Promise.all([
-      readBrowserQuota(),
-      host.platform === 'luker' ? readHostStorageQuota() : Promise.resolve(null),
-      isHostAccountWindowAvailable(host.platform),
+      Promise.resolve().then(() => readBrowserQuota()).catch(() => null),
+      host.platform === 'luker'
+        ? Promise.resolve().then(() => readHostStorageQuota()).catch(() => null)
+        : Promise.resolve(null),
+      Promise.resolve().then(() => isHostAccountWindowAvailable(host.platform)).catch(() => false),
     ]);
     view.setStorage({ browser, host: hostQuota, page: { available: pageAvailable } });
   }
