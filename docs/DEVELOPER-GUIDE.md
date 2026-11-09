@@ -162,10 +162,13 @@
 | --- | --- | --- |
 | 公网内二级切换 S3 / WebDAV | `#cloud-provider-tabs` | `src/ui/workbench-view.js` 的 `renderCloud()` / `cloudClient()` |
 | 分片上传 / 断点续传 / 清单 | 云端面板的上传与备份按钮 | `src/core/transfer-plan.js`、`src/app/transfer-runner.js`、`src/core/transfer-target.js` |
+| 选包来源 | **只读左侧数据包列表的选中项**，面板内无独立文件选择器 | `state.selectedPkgs`；`#cloud-upload`（原包名上传）/ `#cloud-backup-selected`（建备份版本） |
 | S3 HEAD / Range / multipart | 自动 | `src/core/s3-client.js` |
 | WebDAV 全方法降级（OPTIONS/PROPFIND/MKCOL） | 自动 | `src/core/webdav-client.js` |
-| 一键备份选中包到云端 | `#cloud-backup-selected` | `index.js` 的 `backupSelectedToCloud()` |
-| 加密上传 / 下载 | S3/WebDAV 表单的「加密短语」 | `src/core/s3-crypto.js`；自动备份不支持加密短语（如实提示） |
+| 逐片加密（可选） | S3/WebDAV 表单的「加密短语」；**留空即不加密** | `src/core/s3-crypto.js`；`transfer-runner` 每片独立 IV，续传沿用清单里的原 salt |
+| 一键备份：全量时间戳快照 | `#cloud-backup-selected` + `#cloud-mode-select=full` | `index.js` 的 `backupSelectedToCloud()`；每次独立对象，保留最近 `#cloud-retention` 份 |
+| 一键备份：增量备份集 | `#cloud-mode-select=set` + `#cloud-set-name` | `src/app/backup-set-runner.js`、`src/core/backup-set.js`；对象按 sha256 去重，每版一张完整快照 |
+| 备份集恢复 | 列表里的「恢复」按钮 | `restoreBackupSet()` → `actions.importCloudPack()` 落入工作区，再走既有迁移流程 |
 
 > 契约见 `.trellis/spec/frontend/transfer-s3-webdav.md`。
 > **无服务端直传、无 cron**：本插件禁止后台插件；`serverTransfer` 能力表全 false。
@@ -264,7 +267,7 @@ npm run preview      # 本地静态服务器托管 dist，默认 4173
 | PT 原生归档源的有损点 | 角色卡用自带卡的 `avatars` blob（运行期 PT 角色头像可能已被 PT 重编码）；聊天 jsonl 重序列化丢原始空白；预设 metadata 不重建 |
 | PT 原生源断点续传 | 不支持（重建条目无源 crc32 ⇒ 暂停后作废半成品并完整重做，安全降级） |
 | 资产列表 URL 来源 | 宿主 `/api/extensions/discover` 只给目录名/类型；URL 只能取各扩展 `manifest.json` 的 `homePage`。没有 `homePage` 的扩展无法导出可导入地址（如实提示，不伪造） |
-| 自动备份 | **只做**「选中包 → 云端」的一键分片上传；**无 cron、无服务端直传**（用户禁止后台插件）。加密短语需整包加密，自动备份不接（如实拒绝） |
+| 自动备份 | 两条路：① **全量时间戳快照**（每次独立新包，保留最近 N 份）；② **内容寻址增量备份集**（只传新增/修改条目，每版一张完整清单，任一张可独立恢复）。**加密可选**：填口令即逐片加密，留空即不加密。**无 cron、无服务端直传**（用户禁止后台插件）。**不做差量链**（用户 2026-11-09 裁定 D-8） |
 | WebDAV 真机 | 协议与降级分支已单测覆盖；**尚未在真实 WebDAV 服务器上跑过**（含 405/401/CORS 实测） |
 | 静态 UI 验收 | `npm run build && npm run preview` 只覆盖独立 Web / 插件模板本身；宿主注入（账户面板、原生按钮）仍需 Dev 实例 |
 

@@ -185,6 +185,20 @@ export function getWorkbenchHtml() {
               <button type="button" class="seg-btn" data-cloud-provider="webdav">WebDAV</button>
             </div>
           </div>
+          <div class="cloud-body" id="cloud-mode-row">
+            <div class="cloud-grid">
+              <label class="cloud-field"><span data-i18n="cloud.mode"></span>
+                <select class="text_pole" id="cloud-mode-select">
+                  <option value="full" data-i18n="cloud.modeFull"></option>
+                  <option value="set" data-i18n="cloud.modeSet"></option>
+                </select></label>
+              <label class="cloud-field"><span data-i18n="cloud.setName"></span>
+                <input class="text_pole" id="cloud-set-name" autocomplete="off" placeholder="default"></label>
+              <label class="cloud-field"><span data-i18n="cloud.retention"></span>
+                <input class="text_pole" id="cloud-retention" type="number" min="1" max="99" value="10"></label>
+            </div>
+            <p class="cloud-note" data-i18n="cloud.encryptNote"></p>
+          </div>
           <div class="transfer-subpane" id="cloud-s3-pane">
           <div class="cloud-body" id="cloud-body">
             <p class="cloud-note" data-i18n="cloud.note"></p>
@@ -235,8 +249,6 @@ export function getWorkbenchHtml() {
           </div>
 
           <div class="cloud-row">
-            <input class="text_pole" id="cloud-file" type="file" accept=".zip" hidden>
-            <button type="button" class="menu_button" id="cloud-pick" data-i18n="cloud.pick"></button>
             <button type="button" class="menu_button" id="cloud-upload" data-i18n="cloud.upload" disabled></button>
             <button type="button" class="menu_button" id="cloud-backup-selected" data-i18n="cloud.backupSelected"></button>
             <span class="cloud-picked" id="cloud-picked"></span>
