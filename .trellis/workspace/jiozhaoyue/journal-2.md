@@ -1070,3 +1070,52 @@ Topics: [.trellis/research/asset-list-and-transfer-handoff.md](../../research/as
 - 真实 WebDAV 服务器验证 405/401/409/CORS 与 Range 下载
 - 用户允许后再跑全量 npm test；当前只跑目标小文件
 - R7 保持一键备份；cron/服务端直传按禁令不做，已登记 FUTURE-BACKEND-CAPABILITIES.md
+
+
+## Session 69: 云端备份：加密可选 / 全量快照 / 增量备份集 / 选包统一
+<!-- trellis-session: v=2 fp=4db089f95b2a1c23 -->
+
+**Date**: 2026-11-09
+**Task**: 云端备份：加密可选 / 全量快照 / 增量备份集 / 选包统一
+**Branch**: `main`
+
+### Summary
+
+云端备份完成两条路（全量时间戳快照 + 内容寻址增量备份集），加密改为可选；所有选包统一走侧栏列表；目标测试与五项守卫全绿，脱离酒馆运行时的静态截图验收通过。
+Topics: [.trellis/spec/frontend/transfer-s3-webdav.md](../../spec/frontend/transfer-s3-webdav.md)
+
+### Main Changes
+
+- 新增 src/core/backup-set.js 与 src/app/backup-set-runner.js：sets/<set>/objects/<sha256> + snapshots/<ts>.json + index.json；对象按明文 sha256 去重，每版快照清单完整，任一张可独立恢复
+- 一键备份拆为 full（时间戳快照，保留最近 N 份）与 set（增量备份集）两种模式；full 仅在全部包成功时执行保留策略
+- 加密改为可选：口令留空不加密；transfer-runner 逐片加密（每片独立 IV，salt 写清单），续传沿用原 salt；新增 provisional 清单防止中断后 salt 丢失
+- 备份集恢复 restoreBackupSet：读 index+snapshot → 取对象 → zip.js 重建 ZIP → actions.importCloudPack 落入工作区，复用既有迁移/写回流程
+- 删除云端面板内独立文件选择器（#cloud-file/#cloud-pick）；#cloud-upload 与 #cloud-backup-selected 统一读 state.selectedPkgs
+- 选包变化即时刷新云端按钮；renderAll 同步 renderCloud；上传/备份完成后自动 cloudRefresh
+- i18n 新增备份方式/备份集名称/保留数/加密说明/恢复/上传完成等键；模板与五个 UI 守卫声明同步
+- 规范回流: .trellis/spec/frontend/transfer-s3-webdav.md（加密字段、备份集协议、选包唯一来源）；docs/DEVELOPER-GUIDE.md M 节
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `35a52f9` | feat(transfer): 云端备份支持全量快照与增量备份集，加密可选 |
+
+### Testing
+
+- [OK] 目标小测试 31 passed：transfer-plan / s3-crypto / transfer-runner（含加密中断续传）/ backup-set（含去重、独立恢复、保留、对象缺失）
+- [OK] 五守卫 + i18n 守卫全绿；npm run build 通过
+- [OK] 脱离酒馆运行时截图验收：scripts/ui-verify-cloud.cjs ok:true / errors:[]；既有 ui-verify-static.cjs ok:true
+- [OK] 截图: test-results/cloud-ui-full-mode.png / cloud-ui-set-mode.png / cloud-ui-webdav.png（本地专属，不入库）
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 真实 S3/WebDAV 服务器验证：上传/续传/下载/405/401/409/CORS 与备份集恢复
+- 四宿主导入兼容性：用恢复出的 ZIP 在 Dev/Real 实例实际导入一次
+- 未跑全量 npm test（用户禁令）；需要时再征得同意
+- 无 cron、无服务端直传（用户禁令），已登记 docs/FUTURE-BACKEND-CAPABILITIES.md
+- 备份集对象 GC 未做；当前只增不改，删除快照不回收共享对象

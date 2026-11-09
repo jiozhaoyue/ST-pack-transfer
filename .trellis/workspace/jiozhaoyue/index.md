@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-2.md`
-- **Total Sessions**: 68
+- **Total Sessions**: 69
 - **Last Active**: 2026-11-09
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-2.md` | ~1072 | Active |
+| `journal-2.md` | ~1121 | Active |
 | `journal-1.md` | ~2491 | Archived |
 <!-- @@@/auto:active-documents -->
 
@@ -30,6 +30,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 69 | 2026-11-09 | 云端备份：加密可选 / 全量快照 / 增量备份集 / 选包统一 | `35a52f9` | `main` |
 | 68 | 2026-11-09 | 资产列表导入 + 迁移备份统一面板 + S3/WebDAV（第二批） | `9e9f93e`, `f474b4d`, `5a5bb03` | `main` |
 | 67 | 2026-11-09 | Luker 2.9 适配与工作台增强（第一批） | - | `main` |
 | 66 | 2026-11-08 | 插件态热修:拉取误取消与注入消失(宿主生命周期+忙态探针) | `6acd259` | `main` |
