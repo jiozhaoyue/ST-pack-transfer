@@ -19,6 +19,15 @@ import {
   parseManifest,
   planChunks,
 } from '../core/transfer-plan.js';
+import {
+  SALT_LEN,
+  bytesToHex,
+  decryptWithKey,
+  deriveKeyFromPassphrase,
+  encryptWithKey,
+  hexToBytes,
+  randomBytes,
+} from '../core/s3-crypto.js';
 
 function toHex(buffer) {
   return [...new Uint8Array(buffer)].map((b) => b.toString(16).padStart(2, '0')).join('');
@@ -79,9 +88,20 @@ export function createTransferRunner({
   retries = 1,
   onProgress,
   signal,
+  passphrase = '',
   crypto = globalThis.crypto,
 } = {}) {
   const aborted = () => Boolean(signal?.aborted);
+
+  async function readManifest(name) {
+    const result = await target.get(manifestKey(name));
+    if (!result?.ok || !result.bytes) return null;
+    try {
+      return parseManifest(new TextDecoder().decode(result.bytes));
+    } catch {
+      return null;
+    }
+  }
 
   async function headChunks(name, chunks) {
     const present = new Set();
@@ -92,13 +112,48 @@ export function createTransferRunner({
     return present;
   }
 
-  async function upload({ blob, name, sha256 = '', contentType = 'application/zip' } = {}) {
+  async function upload({ blob, name, sha256 = '', contentType = 'application/zip', entryCount = null } = {}) {
     if (!target?.ready) return { ok: false, code: 'not-configured' };
     if (!blob || typeof blob.slice !== 'function') return { ok: false, code: 'bad-input' };
     if (aborted()) return { ok: false, code: 'aborted' };
 
     const size = Number(blob.size) || 0;
     const chunks = planChunks(size, chunkSize);
+    const existing = await readManifest(name);
+    const encrypted = Boolean(passphrase);
+    // 加密模式必须与已有分片一致：旧分片用哪把钥匙加密的，续传只能沿用。
+    if (existing?.encrypted && !passphrase) return { ok: false, code: 'passphrase-required' };
+    if (existing && !existing.encrypted && passphrase) return { ok: false, code: 'encryption-mismatch' };
+    let salt = null;
+    let key = null;
+    if (encrypted) {
+      try {
+        salt = existing?.salt ? hexToBytes(existing.salt) : randomBytes(SALT_LEN, crypto);
+        key = await deriveKeyFromPassphrase(passphrase, salt, { crypto });
+      } catch (error) {
+        return { ok: false, code: error?.message || 'crypto-unavailable' };
+      }
+    }
+    if (encrypted && !existing) {
+      // 先落一张临时清单把 salt 固定下来：否则中断后旧分片会失去 salt，
+      // 续传用新 salt 派生出的钥匙解不开旧分片。
+      const provisional = buildManifest({
+        name,
+        size,
+        chunkSize,
+        chunks: [],
+        sha256,
+        entryCount,
+        encrypted,
+        salt: bytesToHex(salt),
+        provisional: true,
+      });
+      const written = await withRetry(
+        () => target.put(manifestKey(name), jsonBytes(provisional), { contentType: 'application/json' }),
+        retries,
+      );
+      if (!written.ok) return { ok: false, ...written };
+    }
     const present = await headChunks(name, chunks);
     const missing = chunks.filter((chunk) => !present.has(chunk.index));
     const totalBytes = size;
@@ -107,7 +162,10 @@ export function createTransferRunner({
 
     if (missing.length === 0) {
       // 全部分片命中：只补写清单，保持「零字节上传」的事实。
-      const manifest = buildManifest({ name, size, chunkSize, chunks, sha256 });
+      const manifest = buildManifest({
+        name, size, chunkSize, chunks, sha256, entryCount,
+        encrypted, salt: encrypted ? bytesToHex(salt) : '',
+      });
       const written = await withRetry(
         () => target.put(manifestKey(name), jsonBytes(manifest), { contentType: 'application/json' }),
         retries,
@@ -119,6 +177,7 @@ export function createTransferRunner({
       return {
         ok: true,
         skipped: true,
+        encrypted,
         totalChunks: chunks.length,
         uploadedChunks: 0,
         skippedChunks: present.size,
@@ -130,7 +189,8 @@ export function createTransferRunner({
     let failure = null;
     await pool(missing, concurrency, async (chunk) => {
       if (aborted() || failure) return;
-      const bytes = new Uint8Array(await blob.slice(chunk.start, chunk.end).arrayBuffer());
+      const plain = new Uint8Array(await blob.slice(chunk.start, chunk.end).arrayBuffer());
+      const bytes = encrypted ? await encryptWithKey(plain, key, salt, { crypto }) : plain;
       const result = await withRetry(
         () => target.put(chunkKey(name, chunk.index), bytes, { contentType: 'application/octet-stream' }),
         retries,
@@ -163,7 +223,10 @@ export function createTransferRunner({
       };
     }
 
-    const manifest = buildManifest({ name, size, chunkSize, chunks, sha256 });
+    const manifest = buildManifest({
+      name, size, chunkSize, chunks, sha256, entryCount,
+      encrypted, salt: encrypted ? bytesToHex(salt) : '',
+    });
     const finished = await withRetry(
       () => target.put(manifestKey(name), jsonBytes(manifest), { contentType: 'application/json' }),
       retries,
@@ -175,6 +238,7 @@ export function createTransferRunner({
     });
     return {
       ok: true,
+      encrypted,
       totalChunks: chunks.length,
       uploadedChunks,
       skippedChunks: present.size,
@@ -193,7 +257,16 @@ export function createTransferRunner({
       : null;
 
     if (manifest) {
-      return downloadByManifest(name, manifest, expectedSha256);
+      if (manifest.encrypted && !passphrase) return { ok: false, code: 'passphrase-required' };
+      let key = null;
+      if (manifest.encrypted) {
+        try {
+          key = await deriveKeyFromPassphrase(passphrase, hexToBytes(manifest.salt), { crypto });
+        } catch {
+          return { ok: false, code: 'bad-passphrase' };
+        }
+      }
+      return downloadByManifest(name, manifest, expectedSha256, key);
     }
 
     const head = await target.head(name);
@@ -230,7 +303,7 @@ export function createTransferRunner({
     return { ok: true, bytes: out, size: out.length, fromManifest: false };
   }
 
-  async function downloadByManifest(name, manifest, expectedSha256) {
+  async function downloadByManifest(name, manifest, expectedSha256, key = null) {
     const out = new Uint8Array(manifest.size);
     const chunks = manifest.chunks.map((chunk) => ({
       index: chunk.index,
@@ -247,7 +320,20 @@ export function createTransferRunner({
         failure = result;
         return;
       }
-      out.set(result.bytes, chunk.start);
+      let bytes = result.bytes;
+      if (key) {
+        try {
+          bytes = await decryptWithKey(bytes, key, { crypto });
+        } catch {
+          failure = { ok: false, code: 'bad-passphrase' };
+          return;
+        }
+      }
+      if (bytes.length !== chunk.size) {
+        failure = { ok: false, code: 'chunk-size-mismatch', chunk: chunk.index };
+        return;
+      }
+      out.set(bytes, chunk.start);
       downloadedBytes += chunk.size;
       onProgress?.({
         phase: 'downloading',
@@ -260,14 +346,22 @@ export function createTransferRunner({
     if (aborted()) return { ok: false, code: 'aborted' };
 
     const expected = expectedSha256 || manifest.sha256;
-    if (expected) {
+    if (expected && !manifest.encrypted) {
       const actual = await sha256Hex(out, crypto);
       if (!actual) return { ok: true, bytes: out, size: out.length, fromManifest: true, verified: false };
       if (actual !== expected) {
         return { ok: false, code: 'sha256-mismatch', expected, actual };
       }
     }
-    return { ok: true, bytes: out, size: out.length, fromManifest: true, verified: Boolean(expected) };
+    return {
+      ok: true,
+      bytes: out,
+      size: out.length,
+      fromManifest: true,
+      verified: Boolean(expected) && !manifest.encrypted,
+      encrypted: Boolean(manifest.encrypted),
+      entryCount: manifest.entryCount,
+    };
   }
 
   return { upload, download };

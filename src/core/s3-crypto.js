@@ -39,13 +39,41 @@ async function deriveKey(crypto, passphrase, salt) {
   );
 }
 
-/** @param {Uint8Array} bytes @param {string} passphrase */
-export async function encryptBytes(bytes, passphrase, { crypto = globalThis.crypto } = {}) {
+export function randomBytes(length, crypto = globalThis.crypto) {
+  return crypto.getRandomValues(new Uint8Array(length));
+}
+
+export function bytesToHex(bytes) {
+  return [...new Uint8Array(bytes)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+export function hexToBytes(hex) {
+  const text = String(hex || '');
+  if (!text || text.length % 2 !== 0) throw new Error('bad-hex');
+  const out = new Uint8Array(text.length / 2);
+  for (let i = 0; i < out.length; i += 1) {
+    const byte = Number.parseInt(text.slice(i * 2, i * 2 + 2), 16);
+    if (!Number.isFinite(byte)) throw new Error('bad-hex');
+    out[i] = byte;
+  }
+  return out;
+}
+
+/**
+ * 从口令与 salt 派生 AES-GCM 密钥。
+ * 同一个 salt 只派生一次：PBKDF2 12 万轮，按对象重复派生会慢到不可用。
+ */
+export async function deriveKeyFromPassphrase(passphrase, salt, { crypto = globalThis.crypto } = {}) {
   if (!hasWebCrypto(crypto)) throw new Error('webcrypto-unavailable');
   if (!passphrase) throw new Error('passphrase-required');
-  const salt = crypto.getRandomValues(new Uint8Array(SALT_LEN));
+  return deriveKey(crypto, passphrase, salt);
+}
+
+/** 用已派生密钥加密；每段自带随机 IV，salt 原样写入以便自描述。 */
+export async function encryptWithKey(bytes, key, salt, { crypto = globalThis.crypto } = {}) {
+  if (!hasWebCrypto(crypto)) throw new Error('webcrypto-unavailable');
+  if (!key) throw new Error('key-required');
   const iv = crypto.getRandomValues(new Uint8Array(IV_LEN));
-  const key = await deriveKey(crypto, passphrase, salt);
   const cipher = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, bytes));
   const out = new Uint8Array(MAGIC.length + SALT_LEN + IV_LEN + cipher.length);
   out.set(MAGIC, 0);
@@ -55,14 +83,29 @@ export async function encryptBytes(bytes, passphrase, { crypto = globalThis.cryp
   return out;
 }
 
+/** 用已派生密钥解密；salt 来自调用方（manifest / index），不重复跑 PBKDF2。 */
+export async function decryptWithKey(payload, key, { crypto = globalThis.crypto } = {}) {
+  if (!hasWebCrypto(crypto)) throw new Error('webcrypto-unavailable');
+  if (!isEncrypted(payload)) throw new Error('not-encrypted');
+  if (!key) throw new Error('key-required');
+  const iv = payload.slice(MAGIC.length + SALT_LEN, MAGIC.length + SALT_LEN + IV_LEN);
+  const cipher = payload.slice(MAGIC.length + SALT_LEN + IV_LEN);
+  const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, cipher);
+  return new Uint8Array(plain);
+}
+
+/** @param {Uint8Array} bytes @param {string} passphrase */
+export async function encryptBytes(bytes, passphrase, { crypto = globalThis.crypto } = {}) {
+  const salt = crypto.getRandomValues(new Uint8Array(SALT_LEN));
+  const key = await deriveKeyFromPassphrase(passphrase, salt, { crypto });
+  return encryptWithKey(bytes, key, salt, { crypto });
+}
+
 /** @param {Uint8Array} payload @param {string} passphrase */
 export async function decryptBytes(payload, passphrase, { crypto = globalThis.crypto } = {}) {
   if (!hasWebCrypto(crypto)) throw new Error('webcrypto-unavailable');
   if (!isEncrypted(payload)) throw new Error('not-encrypted');
   const salt = payload.slice(MAGIC.length, MAGIC.length + SALT_LEN);
-  const iv = payload.slice(MAGIC.length + SALT_LEN, MAGIC.length + SALT_LEN + IV_LEN);
-  const cipher = payload.slice(MAGIC.length + SALT_LEN + IV_LEN);
-  const key = await deriveKey(crypto, passphrase, salt);
-  const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, cipher);
-  return new Uint8Array(plain);
+  const key = await deriveKeyFromPassphrase(passphrase, salt, { crypto });
+  return decryptWithKey(payload, key, { crypto });
 }

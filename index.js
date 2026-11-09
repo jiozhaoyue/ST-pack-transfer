@@ -7,7 +7,7 @@
 
 import { runConversionTask, runPlanTask } from './src/core/worker-client.js';
 import { logger } from './src/core/logger.js';
-import { zipIo } from './src/core/zip-io.js';
+import { zipIo, readZipEntryManifest } from './src/core/zip-io.js';
 import { splitArchiveEntries } from './src/core/splitter.js';
 import { mergeConvertedBlobs } from './src/core/merge-packages.js';
 import {
@@ -50,6 +50,9 @@ import { deriveExtensionEntry } from './src/core/extension-manifest.js';
 import { objectKey } from './src/core/s3-client.js';
 import { createTransferTarget } from './src/core/transfer-target.js';
 import { createTransferRunner } from './src/app/transfer-runner.js';
+import { uploadBackupSet, updateSetRegistry } from './src/app/backup-set-runner.js';
+import { openEntrySession, safeSegment, timestampName } from './src/core/backup-set.js';
+import { parseManifest, chunkKey, manifestKey } from './src/core/transfer-plan.js';
 import { ExportQueue } from './src/ui/export-queue.js';
 import { reportToHuman } from './src/core/report.js';
 import { TaskManager, memoryAdapter } from './src/core/task-manager.js';
@@ -385,16 +388,57 @@ async function main(root) {
     return exportPackageAssetList(request.pkgIds);
   }
 
+  const FULL_KEEP_DEFAULT = 10;
+
+  /** 删除超出保留数的全量快照。列表不可用（如 WebDAV 禁 PROPFIND）时跳过，不阻断备份。 */
+  async function pruneFullSnapshots({ target, prefix = '', keep = FULL_KEEP_DEFAULT } = {}) {
+    const limit = Math.max(1, Math.trunc(Number(keep) || FULL_KEEP_DEFAULT));
+    if (typeof target?.list !== 'function') return { ok: false, code: 'list-unavailable' };
+    const listPrefix = prefix ? `${prefix}/snapshots/` : 'snapshots/';
+    const listed = await target.list(listPrefix);
+    if (!listed?.ok) return { ok: false, code: listed?.code || listed?.message || 'list-unavailable' };
+
+    const map = new Map();
+    for (const item of listed.items || []) {
+      if (!/\.manifest\.json$/i.test(item.key)) continue;
+      const base = item.key.slice(0, -'.manifest.json'.length);
+      const man = await target.get(item.key);
+      const parsed = man?.ok && man.bytes ? parseManifest(new TextDecoder().decode(man.bytes)) : null;
+      map.set(base, { key: base, createdAt: parsed?.createdAt || item.lastModified || '' });
+    }
+
+    const sorted = [...map.values()].sort(
+      (a, b) => String(b.createdAt).localeCompare(String(a.createdAt)),
+    );
+    const removed = [];
+    for (const item of sorted.slice(limit)) {
+      const man = await target.get(manifestKey(item.key));
+      const parsed = man?.ok && man.bytes ? parseManifest(new TextDecoder().decode(man.bytes)) : null;
+      if (parsed) {
+        for (const chunk of parsed.chunks) await target.remove(chunkKey(item.key, chunk.index));
+      }
+      await target.remove(manifestKey(item.key));
+      await target.remove(item.key);
+      removed.push(item.key);
+    }
+    return { ok: true, removed };
+  }
+
   /**
-   * 把当前选中的导入包分片备份到云端（S3 / WebDAV）。
+   * 把当前选中的导入包备份到云端（S3 / WebDAV）。
    *
-   * 事实边界：分片从本地 Blob 逐片读取，不经整包内存；但字节仍经本机网卡。
-   * 加密短语需要整包加密，自动备份不做（如实提示，改用单包上传）。
+   * 两种模式（用户 2026-11-09 裁定 D-8 / D-9）：
+   * - `full`：每次一个时间戳快照，互不覆盖，保留最近 N 份；
+   * - `set`：内容寻址备份集，只传新增/修改条目，每版一张完整清单。
+   *
+   * 加密可选：`config.passphrase` 非空即启用；分片逐片加密，不整包入内存。
    */
-  async function backupSelectedToCloud({ provider = 's3', config = {} } = {}) {
+  async function backupSelectedToCloud({
+    provider = 's3', config = {}, mode = 'full', setName = 'default', retention = 10,
+  } = {}) {
     const ids = [...state.selectedPkgs];
     if (!ids.length) { view.toast(t('toast.selectPackFirst')); return; }
-    if (config.passphrase) { view.toast(t('cloud.backupNoPassphrase')); return; }
+    if (mode === 'set' && ids.length !== 1) { view.toast(t('cloud.setSinglePack')); return; }
     if (state.busy) return;
     const target = createTransferTarget({
       kind: provider === 'webdav' ? 'webdav' : 's3',
@@ -405,6 +449,7 @@ async function main(root) {
 
     state.busy = true;
     try {
+      const passphrase = String(config.passphrase || '');
       if (provider === 'webdav' && config.prefix && typeof target.ensureCollection === 'function') {
         const collection = await target.ensureCollection(config.prefix);
         if (!collection.ok) {
@@ -412,20 +457,155 @@ async function main(root) {
           return;
         }
       }
+
+      if (mode === 'plain') {
+        // 与侧栏选中列表共用同一选择：不做快照命名、不做保留策略，按原包名上传。
+        let uploaded = 0;
+        let skipped = 0;
+        let failed = 0;
+        let encryptedPackages = 0;
+        for (const id of ids) {
+          const pkg = state.packages.find((p) => p.id === id);
+          if (!pkg) { failed += 1; continue; }
+          const blob = await blobOf(pkg);
+          if (!blob) {
+            failed += 1;
+            logger.warn(t('cloud.backupMissingBlob', { name: pkg.name }));
+            continue;
+          }
+          let entryCount = null;
+          try {
+            entryCount = (await readZipEntryManifest(blob)).length;
+          } catch {
+            entryCount = null;
+          }
+          const runner = createTransferRunner({
+            target,
+            passphrase,
+            onProgress: (progress) => {
+              if (progress.phase !== 'uploading') return;
+              const pct = 15 + Math.round((progress.uploadedBytes / Math.max(1, progress.totalBytes)) * 80);
+              view.setProgress(pct, t('cloud.uploadingChunk', {
+                done: progress.uploadedChunks,
+                total: progress.totalChunks,
+              }));
+            },
+          });
+          const result = await runner.upload({
+            blob,
+            name: objectKey(config.prefix, pkg.name),
+            contentType: 'application/zip',
+            entryCount,
+          });
+          if (!result.ok) {
+            failed += 1;
+            logger.error(t('cloud.backupItemFailed', { name: pkg.name, msg: result.code || result.message }));
+            continue;
+          }
+          if (result.encrypted) encryptedPackages += 1;
+          if (result.skipped) skipped += 1;
+          else uploaded += 1;
+        }
+        const summary = { uploaded, skipped, failed, encrypted: encryptedPackages };
+        view.setProgress(100, t('cloud.uploadDone', summary));
+        view.toast(t('cloud.uploadDone', summary));
+        logger.info(t('cloud.uploadDone', summary));
+        return;
+      }
+
+      if (mode === 'set') {
+        const pkg = state.packages.find((p) => p.id === ids[0]);
+        const blob = pkg ? await blobOf(pkg) : null;
+        if (!blob) {
+          logger.warn(t('cloud.backupMissingBlob', { name: pkg?.name || ids[0] }));
+          view.toast(t('cloud.backupMissingBlob', { name: pkg?.name || ids[0] }));
+          return;
+        }
+        const set = safeSegment(setName || 'default', 'default');
+        const setBase = objectKey(config.prefix, `sets/${set}`);
+        const session = await openEntrySession(blob);
+        try {
+          const result = await uploadBackupSet({
+            target,
+            setBase,
+            setName: set,
+            entries: session.entries,
+            sourceName: pkg.name,
+            passphrase,
+            retention,
+            onProgress: (progress) => {
+              const pct = 10 + Math.round((progress.done / Math.max(1, progress.total)) * 80);
+              view.setProgress(pct, t('cloud.setUploading', {
+                done: progress.done,
+                total: progress.total,
+                uploaded: progress.uploaded,
+                reused: progress.reused,
+              }));
+            },
+          });
+          if (!result.ok) {
+            const msg = result.code || result.message || 'backup-failed';
+            view.toast(t('cloud.error', { msg }));
+            logger.error(t('cloud.backupItemFailed', { name: pkg.name, msg }));
+            return;
+          }
+          const registry = await updateSetRegistry({
+            target,
+            prefix: config.prefix || '',
+            setName: set,
+            latest: result.snapshotKey,
+            snapshotCount: result.entries,
+          });
+          if (!registry.ok) logger.warn(t('cloud.registryFailed', { msg: registry.code }));
+          const summary = {
+            set,
+            uploaded: result.uploaded,
+            deduped: result.deduped,
+            reused: result.reused,
+            encrypted: result.encrypted ? 1 : 0,
+          };
+          view.setProgress(100, t('cloud.setBackupDone', summary));
+          view.toast(t('cloud.setBackupDone', summary));
+          logger.info(t('cloud.setBackupDone', summary));
+        } finally {
+          await session.close();
+        }
+        return;
+      }
+
+      if (provider === 'webdav' && config.prefix && typeof target.ensureCollection === 'function') {
+        const collection = await target.ensureCollection(`${config.prefix}/snapshots`);
+        if (!collection.ok) {
+          view.toast(t('cloud.error', { msg: collection.message || collection.code || 'mkcol-failed' }));
+          return;
+        }
+      }
+
       let uploaded = 0;
       let skipped = 0;
       let failed = 0;
-      for (const id of ids) {
-        const pkg = state.packages.find((p) => p.id === id);
-        if (!pkg) continue;
+      let encryptedPackages = 0;
+      const stamp = timestampName();
+      for (let i = 0; i < ids.length; i += 1) {
+        const pkg = state.packages.find((p) => p.id === ids[i]);
+        if (!pkg) { failed += 1; continue; }
         const blob = await blobOf(pkg);
         if (!blob) {
           failed += 1;
           logger.warn(t('cloud.backupMissingBlob', { name: pkg.name }));
           continue;
         }
+        const base = `${stamp}-${String(i + 1).padStart(2, '0')}-${safeSegment(pkg.name.replace(/\.zip$/i, ''), 'pack')}`;
+        const name = objectKey(config.prefix, `snapshots/${base}`);
+        let entryCount = null;
+        try {
+          entryCount = (await readZipEntryManifest(blob)).length;
+        } catch {
+          entryCount = null;
+        }
         const runner = createTransferRunner({
           target,
+          passphrase,
           onProgress: (progress) => {
             if (progress.phase !== 'uploading') return;
             const pct = 15 + Math.round((progress.uploadedBytes / Math.max(1, progress.totalBytes)) * 80);
@@ -435,26 +615,65 @@ async function main(root) {
             }));
           },
         });
-        const result = await runner.upload({
-          blob,
-          name: objectKey(config.prefix, pkg.name),
-          contentType: 'application/zip',
-        });
+        const result = await runner.upload({ blob, name, contentType: 'application/zip', entryCount });
         if (!result.ok) {
           failed += 1;
           logger.error(t('cloud.backupItemFailed', { name: pkg.name, msg: result.code || result.message }));
           continue;
         }
+        if (result.encrypted) encryptedPackages += 1;
         if (result.skipped) skipped += 1;
         else uploaded += 1;
       }
-      const summary = { uploaded, skipped, failed };
+
+      // 只有全部选中包都成功时才执行保留策略：失败时删旧快照会让用户两头落空。
+      let prune = { ok: true, removed: [] };
+      const succeeded = uploaded + skipped;
+      if (failed === 0 && succeeded > 0) {
+        prune = await pruneFullSnapshots({ target, prefix: config.prefix || '', keep: retention });
+        if (!prune.ok) logger.warn(t('cloud.pruneSkipped', { msg: prune.code }));
+      } else {
+        logger.warn(t('cloud.pruneSkipped', { msg: 'backup-incomplete' }));
+      }
+      const summary = {
+        uploaded,
+        skipped,
+        failed,
+        encrypted: encryptedPackages,
+        pruned: prune.removed?.length || 0,
+      };
       view.setProgress(100, t('cloud.backupDone', summary));
       view.toast(t('cloud.backupDone', summary));
       logger.info(t('cloud.backupDone', summary));
+    } catch (error) {
+      const msg = String(error?.message || error);
+      logger.error(t('cloud.backupItemFailed', { name: 'backup', msg }));
+      view.toast(t('cloud.error', { msg }));
     } finally {
       state.busy = false;
     }
+  }
+
+  /** 云端产物入工作区：恢复后可直接走既有迁移 / 写回流程。 */
+  async function importCloudPack({ name = 'cloud-pack.zip', blob } = {}) {
+    if (!blob) {
+      view.toast(t('cloud.error', { msg: 'empty' }));
+      return;
+    }
+    const fileId = await saveFile({
+      name,
+      blob,
+      size: blob.size,
+      layout: 'unknown',
+      origin: ORIGINS.CONVERTED,
+      metadata: { fromCloud: true },
+    });
+    if (!fileId) {
+      view.toast(t('cloud.error', { msg: 'storage-unavailable' }));
+      return;
+    }
+    await syncPackages();
+    view.toast(t('cloud.importedToWorkspace', { name }));
   }
 
   async function downloadSelected(ids) {
@@ -1163,6 +1382,7 @@ async function main(root) {
       reportDownload: downloadReport,
       exportAssetList,
       backupSelectedToCloud,
+      importCloudPack,
       lan: lanActions,
       settings: openSettings,
       /** 配额行点击：跳到宿主原生存储页的对应分页；宿主没有就如实提示。 */

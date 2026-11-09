@@ -15,7 +15,13 @@ import { createWebdavClient } from '../core/webdav-client.js';
 import { createTransferTarget } from '../core/transfer-target.js';
 import { DEFAULT_CHUNK_SIZE, chunkKey, manifestKey, parseManifest } from '../core/transfer-plan.js';
 import { createTransferRunner } from '../app/transfer-runner.js';
-import { encryptBytes, decryptBytes, isEncrypted } from '../core/s3-crypto.js';
+import {
+  readBackupSet,
+  readSetRegistry,
+  removeSnapshotFromSet,
+  restoreBackupSet,
+} from '../app/backup-set-runner.js';
+import { decryptBytes, isEncrypted } from '../core/s3-crypto.js';
 import { mergeChartTrees } from '../core/merge-packages.js';
 import { actionsForZone, actionEnabled } from '../core/zone-model.js';
 import { EXTENSION_MODES, GIT_MODES } from '../core/export-modes.js';
@@ -200,7 +206,7 @@ const state = {
   task:null, pendingExports:[],
   chartFmt:{}, cardSize:loadCardSizes(),
   storage:{ browser:null, host:null, page:null },
-  cloud:{ provider:'s3', config:loadCloudConfig(), webdav:loadWebdavConfig(), busy:false, status:'', list:[], picked:null },
+  cloud:{ provider:'s3', config:loadCloudConfig(), webdav:loadWebdavConfig(), busy:false, status:'', list:[] },
   sort:'time-desc', filter:'all', tutorialStep:0, tutorialOpen:false, tutorialKind:'basic',
   sourceKey:'host:luker', seq:{}, libraryExport:false,
   transfer:{ open:false, tab:'lan' },
@@ -1204,6 +1210,9 @@ function loadCloudConfig() {
       accessKeyId: String(parsed.accessKeyId || ''),
       secretAccessKey: String(parsed.secretAccessKey || ''),
       passphrase: String(parsed.passphrase || ''),
+      mode: parsed.mode === 'set' ? 'set' : 'full',
+      setName: String(parsed.setName || 'default'),
+      retention: Math.max(1, Math.min(99, Number(parsed.retention) || 10)),
     };
   } catch {
     return null;
@@ -1233,6 +1242,9 @@ function loadWebdavConfig() {
       password: String(parsed.password || ''),
       prefix: normalizePrefix(parsed.prefix || ''),
       passphrase: String(parsed.passphrase || ''),
+      mode: parsed.mode === 'set' ? 'set' : 'full',
+      setName: String(parsed.setName || 'default'),
+      retention: Math.max(1, Math.min(99, Number(parsed.retention) || 10)),
     };
   } catch {
     return null;
@@ -1254,8 +1266,14 @@ function activeCloudConfig() {
 }
 function cloudConfigFromForm() {
   const val = (id) => (document.getElementById(id)?.value || '').trim();
+  const shared = {
+    mode: document.getElementById('cloud-mode-select')?.value || 'full',
+    setName: val('cloud-set-name') || 'default',
+    retention: Math.max(1, Math.min(99, Number(val('cloud-retention')) || 10)),
+  };
   if (state.cloud.provider === 'webdav') {
     return {
+      ...shared,
       baseUrl: val('webdav-base-url').replace(/\/+$/, ''),
       username: val('webdav-username'),
       password: document.getElementById('webdav-password')?.value || '',
@@ -1264,6 +1282,7 @@ function cloudConfigFromForm() {
     };
   }
   return {
+    ...shared,
     endpoint: val('cloud-endpoint').replace(/\/+$/, ''),
     region: val('cloud-region') || 'us-east-1',
     bucket: val('cloud-bucket'),
@@ -1347,12 +1366,20 @@ function renderCloud() {
     const ps = document.getElementById('cloud-path-style');
     if (ps) ps.checked = !!cfg.pathStyle;
   }
+  const modeSelect = document.getElementById('cloud-mode-select');
+  if (modeSelect && document.activeElement !== modeSelect) modeSelect.value = cfg.mode || 'full';
+  setVal('cloud-set-name', cfg.setName || 'default');
+  setVal('cloud-retention', String(cfg.retention || 10));
   const status = document.getElementById('cloud-status');
   if (status) status.textContent = C.status || '';
   const picked = document.getElementById('cloud-picked');
-  if (picked) picked.textContent = C.picked ? C.picked.name : '';
+  if (picked) {
+    picked.textContent = state.selectedPkgs.size
+      ? t('cloud.selectedCount', { n: state.selectedPkgs.size })
+      : '';
+  }
   const upload = document.getElementById('cloud-upload');
-  if (upload) upload.disabled = !!C.busy || !C.picked || !cloudReady();
+  if (upload) upload.disabled = !!C.busy || state.selectedPkgs.size === 0 || !cloudReady();
   const backupSelected = document.getElementById('cloud-backup-selected');
   if (backupSelected) backupSelected.disabled = !!C.busy || state.selectedPkgs.size === 0;
   const list = document.getElementById('cloud-list');
@@ -1362,16 +1389,28 @@ function renderCloud() {
     return;
   }
   list.innerHTML = C.list
-    .map(
-      (item) =>
-        '<div class="cloud-item" data-cloud-key="' + escapeHtml(item.key) + '">' +
-        '<span class="ci-name" title="' + escapeHtml(item.key) + '">' + escapeHtml(item.key) + '</span>' +
-        '<span class="ci-size">' + (item.size == null ? t('cloud.sizeUnknown') : fmtMB((Number(item.size) || 0) / 1048576)) + '</span>' +
+    .map((item) => {
+      const snapshot = item.kind === 'set-snapshot';
+      const key = escapeHtml(item.key);
+      const label = snapshot ? `${item.setName} · ${item.ts}` : item.key;
+      const sizeText = snapshot
+        ? t('cloud.snapshotMeta', { n: Number(item.entries) || 0 })
+        : (item.size == null
+          ? t('cloud.sizeUnknown')
+          : fmtMB((Number(item.size) || 0) / 1048576)
+            + (item.entryCount ? ` · ${t('cloud.entries', { n: item.entryCount })}` : ''));
+      const primary = snapshot
+        ? '<button type="button" class="ci-btn" data-cloud-restore="' + key + '">' + t('cloud.restore') + '</button>'
+        : '<button type="button" class="ci-btn" data-cloud-get="' + key + '">' + t('cloud.download') + '</button>';
+      const removeAttr = snapshot ? 'data-cloud-del-snapshot' : 'data-cloud-del';
+      return '<div class="cloud-item' + (snapshot ? ' is-snapshot' : '') + '" data-cloud-key="' + key + '">' +
+        '<span class="ci-name" title="' + escapeHtml(label) + '">' + escapeHtml(label) + '</span>' +
+        '<span class="ci-size">' + escapeHtml(sizeText) + '</span>' +
         '<span class="ci-time">' + escapeHtml(String(item.lastModified || '').replace('T', ' ').slice(0, 16)) + '</span>' +
-        '<button type="button" class="ci-btn" data-cloud-get="' + escapeHtml(item.key) + '">' + t('cloud.download') + '</button>' +
-        '<button type="button" class="ci-btn danger" data-cloud-del="' + escapeHtml(item.key) + '">' + t('cloud.remove') + '</button>' +
-        '</div>'
-    )
+        primary +
+        '<button type="button" class="ci-btn danger" ' + removeAttr + '="' + key + '">' + t('cloud.remove') + '</button>' +
+        '</div>';
+    })
     .join('');
 }
 async function cloudSave() {
@@ -1421,105 +1460,70 @@ async function cloudRefresh() {
   C.busy = true;
   C.status = t('cloud.loading');
   renderCloud();
-  const res = await target.list(activeCloudConfig().prefix || '');
+  const prefix = activeCloudConfig().prefix || '';
+  const res = await target.list(prefix);
   C.busy = false;
-  if (!res.ok) {
-    C.status = t('cloud.error', { msg: res.message || res.code });
-    renderCloud();
-    return;
-  }
-  // 分片对象不进列表；清单对象折叠成「包」一项，体积以清单记录为准。
+  // 列表不可用（WebDAV 禁 PROPFIND）时仍可从备份集登记表显示增量快照，不整体失败。
   const packs = new Map();
-  for (const item of res.items) {
+  for (const item of (res.ok ? res.items : [])) {
     if (/\.part\d+$/i.test(item.key)) continue;
+    // 备份集（sets/**）由登记表单独读取，避免把 objects/ 当包显示。
+    if (/(^|\/)sets\//i.test(item.key)) continue;
     if (/\.manifest\.json$/i.test(item.key)) {
       const base = item.key.slice(0, -'.manifest.json'.length);
       const man = await target.get(item.key);
       const parsed = man.ok && man.bytes
         ? parseManifest(new TextDecoder().decode(man.bytes))
         : null;
-      packs.set(base, { key: base, size: parsed ? parsed.size : null, lastModified: item.lastModified });
+      // 临时清单（中断在半路）不算一个可下载的包。
+      if (parsed?.provisional) continue;
+      packs.set(base, {
+        key: base,
+        size: parsed ? parsed.size : null,
+        entryCount: parsed?.entryCount ?? null,
+        encrypted: Boolean(parsed?.encrypted),
+        lastModified: item.lastModified,
+      });
       continue;
     }
     packs.set(item.key, { key: item.key, size: item.size, lastModified: item.lastModified });
   }
-  C.list = [...packs.values()].sort(
-    (a, b) => String(b.lastModified).localeCompare(String(a.lastModified)),
-  );
-  C.status = C.list.length ? t('cloud.loaded', { n: C.list.length }) : t('cloud.empty');
-  renderCloud();
-}
-async function cloudUpload() {
-  const C = state.cloud;
-  if (!C.picked) return;
-  const client = cloudClient();
-  if (!client.ready) {
-    C.status = t('cloud.notConfigured');
-    renderCloud();
-    return;
-  }
-  const cfg = activeCloudConfig();
-  C.busy = true;
-  C.status = t('cloud.uploading', { name: C.picked.name });
-  renderCloud();
-  let name = C.picked.name;
-  try {
-    let blob = C.picked;
-    if (cfg.passphrase) {
-      const encrypted = await encryptBytes(new Uint8Array(await C.picked.arrayBuffer()), cfg.passphrase);
-      blob = new Blob([encrypted], { type: 'application/octet-stream' });
-      name = name.replace(/\.zip$/i, '') + '.spt';
-    }
-    if (C.provider === 'webdav' && cfg.prefix && typeof client.ensureCollection === 'function') {
-      const collection = await client.ensureCollection(cfg.prefix);
-      if (!collection.ok) {
-        C.busy = false;
-        C.status = t('cloud.error', { msg: collection.message || collection.code || 'mkcol-failed' });
-        renderCloud();
-        return;
+
+  const snapshots = [];
+  const registry = await readSetRegistry({ target, prefix });
+  if (registry.ok) {
+    for (const entry of registry.sets) {
+      const setBase = objectKey(prefix, `sets/${entry.name}`);
+      const set = await readBackupSet({ target, setBase });
+      if (!set.ok) continue;
+      for (const snapshot of set.index.snapshots) {
+        snapshots.push({
+          kind: 'set-snapshot',
+          key: `${setBase}/${snapshot.key}`,
+          setName: entry.name,
+          ts: snapshot.ts,
+          entries: snapshot.entries,
+          size: snapshot.size,
+          lastModified: snapshot.createdAt || entry.updatedAt || '',
+        });
       }
     }
-    const target = createTransferTarget({
-      kind: C.provider === 'webdav' ? 'webdav' : 's3',
-      config: cfg,
-      fetchImpl: (url, init) => fetch(url, init),
-    });
-    const runner = createTransferRunner({
-      target,
-      chunkSize: DEFAULT_CHUNK_SIZE,
-      onProgress: (progress) => {
-        if (progress.phase !== 'uploading') return;
-        C.status = t('cloud.uploadingChunk', {
-          done: progress.uploadedChunks,
-          total: progress.totalChunks,
-        });
-        renderCloud();
-      },
-    });
-    const res = await runner.upload({
-      blob,
-      name: objectKey(cfg.prefix, name),
-      contentType: 'application/zip',
-    });
-    C.busy = false;
-    if (!res.ok) {
-      C.status = t('cloud.error', { msg: res.code || res.message });
-      renderCloud();
-      return;
-    }
-    C.picked = null;
-    const file = document.getElementById('cloud-file');
-    if (file) file.value = '';
-    C.status = res.skipped
-      ? t('cloud.alreadyExists', { name })
-      : t('cloud.uploaded', { name });
-    renderCloud();
-    await cloudRefresh();
-  } catch (error) {
-    C.busy = false;
-    C.status = t('cloud.error', { msg: String(error?.message || error) });
-    renderCloud();
   }
+
+  C.list = [...packs.values(), ...snapshots].sort(
+    (a, b) => String(b.lastModified || '').localeCompare(String(a.lastModified || '')),
+  );
+  C.status = (!res.ok && !C.list.length)
+    ? t('cloud.error', { msg: res.message || res.code })
+    : (C.list.length ? t('cloud.loaded', { n: C.list.length }) : t('cloud.empty'));
+  renderCloud();
+}
+function cloudErrorText(code) {
+  if (code === 'passphrase-required') return t('cloud.needPassphrase');
+  if (code === 'bad-passphrase') return t('cloud.badPassphrase');
+  if (code === 'encryption-mismatch') return t('cloud.encryptionMismatch');
+  if (code === 'set-single-pack') return t('cloud.setSinglePack');
+  return t('cloud.error', { msg: code || 'unknown' });
 }
 async function cloudDownload(key) {
   const C = state.cloud;
@@ -1540,6 +1544,7 @@ async function cloudDownload(key) {
   const runner = createTransferRunner({
     target,
     chunkSize: DEFAULT_CHUNK_SIZE,
+    passphrase: cfg.passphrase,
     onProgress: (progress) => {
       if (progress.phase !== 'downloading') return;
       C.status = t('cloud.downloadingChunk', {
@@ -1552,7 +1557,7 @@ async function cloudDownload(key) {
   const res = await runner.download({ name: key });
   C.busy = false;
   if (!res.ok) {
-    C.status = t('cloud.error', { msg: res.code || res.message });
+    C.status = cloudErrorText(res.code || res.message);
     renderCloud();
     return;
   }
@@ -1582,6 +1587,94 @@ async function cloudDownload(key) {
   C.status = t('cloud.downloaded', { name });
   renderCloud();
 }
+async function cloudRestoreSnapshot(key) {
+  const C = state.cloud;
+  const cfg = activeCloudConfig();
+  const target = createTransferTarget({
+    kind: C.provider === 'webdav' ? 'webdav' : 's3',
+    config: cfg,
+    fetchImpl: (url, init) => fetch(url, init),
+  });
+  if (!target.ready) {
+    C.status = t('cloud.notConfigured');
+    renderCloud();
+    return;
+  }
+  const at = String(key).indexOf('/snapshots/');
+  if (at < 0) {
+    C.status = cloudErrorText('bad-snapshot-key');
+    renderCloud();
+    return;
+  }
+  const setBase = String(key).slice(0, at);
+  C.busy = true;
+  C.status = t('cloud.restoringSnapshot');
+  renderCloud();
+  let result;
+  try {
+    result = await restoreBackupSet({
+      target,
+      setBase,
+      snapshotKey: key,
+      passphrase: cfg.passphrase,
+      onProgress: (progress) => {
+        C.status = t('cloud.restoringEntry', { done: progress.done, total: progress.total });
+        renderCloud();
+      },
+    });
+  } catch (error) {
+    result = { ok: false, code: String(error?.message || error) };
+  }
+  C.busy = false;
+  if (!result.ok) {
+    C.status = cloudErrorText(result.code || result.message);
+    renderCloud();
+    return;
+  }
+  await actions.importCloudPack?.({ name: result.name, blob: result.blob });
+  C.status = t('cloud.restoredSnapshot', { name: result.name, n: result.entries });
+  renderCloud();
+}
+
+async function cloudDeleteSnapshot(key) {
+  const C = state.cloud;
+  const target = createTransferTarget({
+    kind: C.provider === 'webdav' ? 'webdav' : 's3',
+    config: activeCloudConfig(),
+    fetchImpl: (url, init) => fetch(url, init),
+  });
+  if (!target.ready) {
+    C.status = t('cloud.notConfigured');
+    renderCloud();
+    return;
+  }
+  const at = String(key).indexOf('/snapshots/');
+  if (at < 0) {
+    C.status = cloudErrorText('bad-snapshot-key');
+    renderCloud();
+    return;
+  }
+  const setBase = String(key).slice(0, at);
+  C.busy = true;
+  C.status = t('cloud.loading');
+  renderCloud();
+  let result;
+  try {
+    result = await removeSnapshotFromSet({ target, setBase, snapshotKey: key });
+  } catch (error) {
+    result = { ok: false, code: String(error?.message || error) };
+  }
+  C.busy = false;
+  if (!result.ok) {
+    C.status = cloudErrorText(result.code || result.message);
+    renderCloud();
+    return;
+  }
+  C.status = t('cloud.snapshotRemoved');
+  renderCloud();
+  await cloudRefresh();
+}
+
 async function cloudDelete(key) {
   const C = state.cloud;
   const target = createTransferTarget({
@@ -1950,7 +2043,6 @@ function bind(){
     state.cloud.provider=b.dataset.cloudProvider==='webdav'?'webdav':'s3';
     state.cloud.status='';
     state.cloud.list=[];
-    state.cloud.picked=null;
     renderCloud();
   });
   document.getElementById('webdav-save')?.addEventListener('click',()=>cloudSave());
@@ -1978,18 +2070,35 @@ function bind(){
   // ── 云端包仓库 ──
   document.getElementById('cloud-save')?.addEventListener('click',()=>cloudSave());
   document.getElementById('cloud-refresh')?.addEventListener('click',()=>cloudRefresh());
-  document.getElementById('cloud-pick')?.addEventListener('click',()=>document.getElementById('cloud-file')?.click());
-  document.getElementById('cloud-file')?.addEventListener('change',(e)=>{
-    state.cloud.picked=(e.target.files && e.target.files[0]) || null;
-    renderCloud();
+  document.getElementById('cloud-upload')?.addEventListener('click',async()=>{
+    const cfg = activeCloudConfig();
+    await actions.backupSelectedToCloud?.({
+      provider: state.cloud.provider,
+      config: cfg,
+      mode: 'plain',
+      setName: cfg.setName || 'default',
+      retention: cfg.retention || 10,
+    });
+    await cloudRefresh();
   });
-  document.getElementById('cloud-upload')?.addEventListener('click',()=>cloudUpload());
-  document.getElementById('cloud-backup-selected')?.addEventListener('click',()=>{
-    actions.backupSelectedToCloud?.({ provider: state.cloud.provider, config: activeCloudConfig() });
+  document.getElementById('cloud-backup-selected')?.addEventListener('click',async()=>{
+    const cfg = activeCloudConfig();
+    await actions.backupSelectedToCloud?.({
+      provider: state.cloud.provider,
+      config: cfg,
+      mode: cfg.mode || 'full',
+      setName: cfg.setName || 'default',
+      retention: cfg.retention || 10,
+    });
+    await cloudRefresh();
   });
   document.getElementById('cloud-list')?.addEventListener('click',(e)=>{
     const get=e.target.closest('[data-cloud-get]');
     if(get){ cloudDownload(get.dataset.cloudGet); return; }
+    const restore=e.target.closest('[data-cloud-restore]');
+    if(restore){ cloudRestoreSnapshot(restore.dataset.cloudRestore); return; }
+    const delSnapshot=e.target.closest('[data-cloud-del-snapshot]');
+    if(delSnapshot){ cloudDeleteSnapshot(delSnapshot.dataset.cloudDelSnapshot); return; }
     const del=e.target.closest('[data-cloud-del]');
     if(del) cloudDelete(del.dataset.cloudDel);
   });
@@ -2240,7 +2349,7 @@ function bind(){
     if(check){
       const id=check.dataset.pkgcheck;
       if(check.checked) state.selectedPkgs.add(id); else state.selectedPkgs.delete(id);
-      renderZones(); renderActions(); return;
+      renderZones(); renderActions(); renderCloud(); return;
     }
     const act=e.target.closest('[data-pkgact]');
     if(act){
@@ -2371,6 +2480,7 @@ initSplitters();
     renderChart();
     renderMobileView();
     renderPendingExports();
+    renderCloud();
   }
 
   function getExcludedPaths(pkg) {

@@ -57,6 +57,10 @@ export function buildManifest({
   chunkSize = DEFAULT_CHUNK_SIZE,
   chunks = [],
   sha256 = '',
+  encrypted = false,
+  salt = '',
+  entryCount = null,
+  provisional = false,
   createdAt = new Date().toISOString(),
 }) {
   return {
@@ -66,11 +70,19 @@ export function buildManifest({
     chunkSize: normalizeChunkSize(chunkSize),
     totalChunks: Array.isArray(chunks) ? chunks.length : 0,
     sha256: String(sha256 || ''),
+    encrypted: Boolean(encrypted),
+    salt: String(salt || ''),
+    entryCount: entryCount == null ? null : Math.max(0, Math.trunc(Number(entryCount) || 0)),
+    provisional: Boolean(provisional),
     createdAt: String(createdAt || ''),
-    chunks: (Array.isArray(chunks) ? chunks : []).map((c) => ({
-      index: Math.trunc(Number(c.index) || 0),
-      size: Math.max(0, Math.trunc(Number(c.size) || 0)),
-    })),
+    chunks: (Array.isArray(chunks) ? chunks : []).map((c) => {
+      const item = {
+        index: Math.trunc(Number(c.index) || 0),
+        size: Math.max(0, Math.trunc(Number(c.size) || 0)),
+      };
+      if (c.iv) item.iv = String(c.iv);
+      return item;
+    }),
   };
 }
 
@@ -89,7 +101,11 @@ export function parseManifest(raw) {
   const chunkSize = normalizeChunkSize(obj.chunkSize);
   const chunks = obj.chunks
     .filter((c) => c && Number.isFinite(Number(c.index)) && Number.isFinite(Number(c.size)))
-    .map((c) => ({ index: Number(c.index), size: Number(c.size) }));
+    .map((c) => {
+      const item = { index: Number(c.index), size: Number(c.size) };
+      if (c.iv) item.iv = String(c.iv);
+      return item;
+    });
   return {
     schema: 1,
     name: String(obj.name || ''),
@@ -97,6 +113,10 @@ export function parseManifest(raw) {
     chunkSize,
     totalChunks: chunks.length,
     sha256: String(obj.sha256 || ''),
+    encrypted: Boolean(obj.encrypted),
+    salt: String(obj.salt || ''),
+    entryCount: obj.entryCount == null ? null : Math.max(0, Math.trunc(Number(obj.entryCount) || 0)),
+    provisional: Boolean(obj.provisional),
     createdAt: String(obj.createdAt || ''),
     chunks,
   };
