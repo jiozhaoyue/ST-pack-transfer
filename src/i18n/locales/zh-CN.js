@@ -205,6 +205,7 @@ export default {
   'empty.fetchDesc': '向宿主后端拉取当前数据包',
   'empty.fetchBtn': '读取宿主数据',
   'empty.assetListBtn': '导出宿主扩展列表',
+  'action.exportHostAssetList': '导出扩展列表',
   'empty.importTitle': '导入外部数据包',
   'empty.importDesc': '从本地选择或拖拽已有的 .zip 数据包',
   'empty.importBtn': '选择数据包',
