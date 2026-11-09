@@ -401,27 +401,38 @@ dev server 已能直接跑正式 UI，demo 只剩维护成本与误导风险。
 - 日志视图不再自带进度条——底栏在 `#view-log` 下同样可见，读数天然同源。
 - `#log-dot`（警告/错误计数点）挂在底栏提示旁，不再挂顶栏。
 
-### 11.3 图表网格
+### 11.3 图表网格（2026-11-09 重做）
 
-- `.chart-stack` 是**网格容器**（`container-type:inline-size`），`.chart-group` 与
-  `.vol-grid` 用 `display:contents` 让 `.vol-card` 直接成为网格项。
-- 列数由**容器宽度**决定，硬上限 4：
-  | 容器宽 | 列数 |
+- `.chart-stack` 只是**滚动容器**；真正的布局在 `.chart-canvas`，由 `chartCanvasHtml()` 按图表数量生成：
+  | 图表数 | 布局 |
   | --- | --- |
-  | ≥ 1060px | 4 |
-  | ≥ 800px | 3 |
-  | ≥ 520px | 2 |
-  | < 520px | 1 |
-- `gap:1px` + 卡片自身 1px 边框 ⇒ 相邻图表边**相互贴着**，不出现空白带。
-- `.vol-card` 可拖拽改尺寸：`resize:both`，尺寸按 `data-volkey` 落 `localStorage`，
-  刷新后保持；未拖拽时由网格决定。
-- 每个 `.vol-card` 面板头有格式下拉 `[data-chartfmt]`（`bar` / `donut`），
-  切换后只重绘该卡的 `[data-volchart]` 区域，不重建整棵树。
-- 每张卡的 `.vol-body` 顶部渲染 `[data-volchart]` 可视化：
-  - `bar`：每个一级类目一行，标签 + 横向占用条 + 读数；
-  - `donut`：同一份数据的 SVG 圆环（≤ 6 段，余量并入「其他」）。
-  数据与树**同源**（同一 `nodes` / `mb`），勾选或换包后即时更新。
-- 树行尾部追加占用条 `.tree-occ`，宽度 = 该行 `mb` / 本卡总 `mb`。
+  | 1 | 单格占满 |
+  | 2 | 左右平分 |
+  | 3 | 2×2，右下留空 |
+  | 4 | 2×2 占满 |
+  | > 4 | 2 列多行，图表区纵向滚动 |
+- **禁止自由拖拽卡片尺寸**：`.vol-card` 不再有 `resize`，尺寸完全由宫格决定。
+- 拖拽条：列间 `.chart-split-v` 一条；行间每条左右各一段 `.chart-split-h`。
+  拖动只改相邻行列比例，写 `localStorage['stpt.chartLayout']`（`col` + `rows[]`）。
+- 每个 `.vol-card` 面板头有格式图标按钮 `[data-chartfmt-toggle]`（单条多色 / 圆环）。
+- 每张卡的 `.vol-body` 顶部渲染 `[data-volchart]`：
+  - `bar`：**一根** Luker 式堆积条，所有一级类目按体积占比上色；极小占比 `min-width:3px` 保可见；
+  - `donut`：同一份数据的 SVG 圆环（极小占比最小 0.6% 弧）。
+  - **图形区不再画图例**；颜色说明只在下方树行：一级类目 `.tree-dot` 与 `.tree-occ` 用同一套
+    12 色调色板（`--vc-c1..c12`）。
+- 扩展工具条（`.vol-body > .extension-tools`）在图形下方：**单行、禁止收缩、窄卡横向滑动**；
+  卡头只保留序号 / 容量 / 批量 / 格式 / 全屏 / 关闭，不得再放扩展控件。
+- 树行尾部占用条 `.tree-occ` 宽度 = 该行 `mb` / 本卡总 `mb`，颜色继承所属一级类目。
+- 全屏：`.vol-card.is-max` 使用 `position:fixed;inset:0`，占满插件 DOM；再次点击还原。
+- 逐文件「上传」按钮**已移除**（2026-11-09 用户明令）。
+
+### 11.3.1 数据包偏好
+
+- 面板头 `#chart-pref-btn` 进入偏好模式；图表区变为整列复选框（`[data-prefgroup]`）+ 取消 / 保存。
+- 默认勾选：除 `backups`（备份快照）与 `native`（原生资产）外全勾。
+- 保存内容：勾选组、目标平台、压缩、分卷、文件名模板、差量、扩展模式、Git、保留构建配置。
+- 语义：**取消**回滚草稿；**保存**写 `localStorage['stpt.chartPrefs']`，只对**以后导入**的包生效。
+- 设置页不再承载任何打包选项。
 
 ### 11.4 守卫与登记
 

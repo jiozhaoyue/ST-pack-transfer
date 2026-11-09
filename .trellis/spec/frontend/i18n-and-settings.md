@@ -7,11 +7,16 @@
 
 ## 1. 设置承载边界
 
-- 设置页**只允许 3 个行为开关**：导出区保留、后端流量提示、教程自动打开。
-- **打包选项不得回到设置页**：压缩、扩展包、Git、保留构建配置、backups、派生缓存、
-  私有配置、清理原生资产——全部属于图表。
-- 唯一源：`src/ui/settings-panel.js`（HTML + 读取）；持久化：
-  `src/ui/settings-store.js`（键 `st-pack-transfer:settings`，只存 3 个布尔）。
+- 设置页只保留**提示 / 导出 / 日志**三组：
+  - 提示：`trafficPrompt`、`nativePullNotice`、`autoTutorial`；
+  - 导出：`deleteAfterExport`（默认 `false`；下载后是否删除导出区里的包）；
+  - 日志：`logMaxEntries`、`clearLogOnLoad`。
+- **打包选项不得回到设置页**：目标平台、压缩、分卷、文件名、扩展模式、Git、保留构建配置、
+  backups、派生缓存、私有配置、原生资产——全部属于**图表偏好**。
+- 图表偏好唯一源：`src/ui/chart-prefs.js`（键 `stpt.chartPrefs`），入口是面板头 `#chart-pref-btn`；
+  保存后只对以后导入的包生效。
+- 设置唯一源：`src/ui/settings-panel.js`（HTML + 读取）；持久化：
+  `src/ui/settings-store.js`（键 `st-pack-transfer:settings`）。
 - 新增设置项必须同时：加 locale key（zh + en）、更新 `test/settings-panel.test.js`、
   在 `index.js` 与 demo 的共享面板里生效。
 

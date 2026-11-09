@@ -28,6 +28,7 @@ export const HOST_CAPABILITIES = Object.freeze({
 export function capabilityState(kind, platform) {
   const table = HOST_CAPABILITIES[kind];
   if (!table || !platform) return { supported: false, known: false };
+  if (platform === 'standalone') return { supported: false, known: true };
   const declared = table[platform];
   return { supported: declared === true, known: declared !== undefined };
 }

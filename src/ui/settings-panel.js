@@ -8,16 +8,12 @@ import { t } from '../i18n/index.js';
 
 /** 设置默认值。新增项必须同步 zh-CN / en-US 文案与测试。 */
 export const SETTINGS_DEFAULTS = Object.freeze({
-  keepExport: true,
   trafficPrompt: true,
   /** 点「从宿主拉取」时是否先提示「去原生界面点拉取」；默认每次提醒。 */
   nativePullNotice: true,
   autoTutorial: true,
-  defaultExtensionMode: 'full',
-  defaultGitMode: 'minimal',
-  defaultKeepDev: false,
-  /** 目标平台默认值：auto = 跟随宿主平台。 */
-  defaultTarget: 'auto',
+  /** 下载导出区里的包后是否把它从导出区删除；默认不删。 */
+  deleteAfterExport: false,
   /** 日志上限（条）；0/非法回落默认。 */
   logMaxEntries: 500,
   /** 每次加载插件是否清空上次日志。 */
@@ -30,14 +26,10 @@ export const SETTING_KEYS = Object.freeze(Object.keys(SETTINGS_DEFAULTS));
 export function normalizeSettings(input) {
   const out = { ...SETTINGS_DEFAULTS };
   if (input && typeof input === 'object') {
-    if (typeof input.keepExport === 'boolean') out.keepExport = input.keepExport;
     if (typeof input.trafficPrompt === 'boolean') out.trafficPrompt = input.trafficPrompt;
     if (typeof input.nativePullNotice === 'boolean') out.nativePullNotice = input.nativePullNotice;
     if (typeof input.autoTutorial === 'boolean') out.autoTutorial = input.autoTutorial;
-    if (['full', 'manifest'].includes(input.defaultExtensionMode)) out.defaultExtensionMode = input.defaultExtensionMode;
-    if (['keep', 'minimal', 'strip'].includes(input.defaultGitMode)) out.defaultGitMode = input.defaultGitMode;
-    if (typeof input.defaultKeepDev === 'boolean') out.defaultKeepDev = input.defaultKeepDev;
-    if (['auto', 'st', 'luker', 'tt', 'pt'].includes(input.defaultTarget)) out.defaultTarget = input.defaultTarget;
+    if (typeof input.deleteAfterExport === 'boolean') out.deleteAfterExport = input.deleteAfterExport;
     const logMax = Number(input.logMaxEntries);
     if (Number.isFinite(logMax)) out.logMaxEntries = Math.max(50, Math.min(5000, Math.round(logMax)));
     if (typeof input.clearLogOnLoad === 'boolean') out.clearLogOnLoad = input.clearLogOnLoad;
@@ -52,44 +44,23 @@ function setting(id, key, label, checked) {
 /** 设置弹窗正文：分组可收起，不再全部平铺。 */
 export function buildSettingsHtml(settings = {}) {
   const s = normalizeSettings(settings);
-  const isFull = s.defaultExtensionMode !== 'manifest';
   const group = (key, title, body, open) => '<details class="set-group" data-group="' + key + '"' + (open ? ' open' : '') + '>'
     + '<summary class="set-group-head">' + title + '</summary>'
     + '<div class="set-group-body">' + body + '</div></details>';
 
-  const behavior = setting('set-keep-export', 'keepExport', t('settings.keepExport'), s.keepExport)
-    + setting('set-traffic', 'trafficPrompt', t('settings.trafficPrompt'), s.trafficPrompt)
+  const tips = setting('set-traffic', 'trafficPrompt', t('settings.trafficPrompt'), s.trafficPrompt)
     + setting('set-native-pull-notice', 'nativePullNotice', t('settings.nativePullNotice'), s.nativePullNotice)
     + setting('set-auto-tutorial', 'autoTutorial', t('settings.autoTutorial'), s.autoTutorial);
 
-  const exportDefaults = '<div class="extension-tools settings-ext-tools" data-exttools="1">'
-    + '<span class="et-label">' + t('settings.defaultExtMode') + '</span>'
-    + '<div class="segmented et-mode">'
-      + '<button type="button" class="seg-btn' + (isFull ? ' active' : '') + '" data-setting-extmode="full">' + t('extension.full') + '</button>'
-      + '<button type="button" class="seg-btn' + (isFull ? '' : ' active') + '" data-setting-extmode="manifest">' + t('extension.manifest') + '</button>'
-    + '</div>'
-    + '<label class="et-git"><span>' + t('settings.defaultTarget') + '</span><select class="text_pole" data-setting-target>'
-      + '<option value="auto"' + (s.defaultTarget === 'auto' ? ' selected' : '') + '>' + t('settings.targetAuto') + '</option>'
-      + '<option value="st"' + (s.defaultTarget === 'st' ? ' selected' : '') + '>SillyTavern</option>'
-      + '<option value="luker"' + (s.defaultTarget === 'luker' ? ' selected' : '') + '>Luker</option>'
-      + '<option value="tt"' + (s.defaultTarget === 'tt' ? ' selected' : '') + '>TauriTavern</option>'
-      + '<option value="pt"' + (s.defaultTarget === 'pt' ? ' selected' : '') + '>PureTavern</option>'
-    + '</select></label>'
-    + '<label class="et-git"><span>' + t('settings.defaultGitMode') + '</span><select class="text_pole" data-setting-gitmode>'
-      + '<option value="keep"' + (s.defaultGitMode === 'keep' ? ' selected' : '') + '>' + t('extension.gitKeep') + '</option>'
-      + '<option value="minimal"' + (s.defaultGitMode === 'minimal' ? ' selected' : '') + '>' + t('extension.gitMinimal') + '</option>'
-      + '<option value="strip"' + (s.defaultGitMode === 'strip' ? ' selected' : '') + '>' + t('extension.gitStrip') + '</option>'
-    + '</select></label>'
-    + '<label class="check et-keepdev"><input type="checkbox" data-setting="defaultKeepDev"' + (s.defaultKeepDev ? ' checked' : '') + '> ' + t('extension.keepDev') + '</label>'
-    + '</div>';
+  const exportGroup = setting('set-delete-after-export', 'deleteAfterExport', t('settings.deleteAfterExport'), s.deleteAfterExport);
 
   const logging = '<label class="et-git"><span>' + t('settings.logMaxEntries') + '</span>'
     + '<input class="text_pole" type="number" min="50" max="5000" step="50" data-setting="logMaxEntries" value="' + s.logMaxEntries + '"></label>'
     + setting('set-clear-log', 'clearLogOnLoad', t('settings.clearLogOnLoad'), s.clearLogOnLoad);
 
   return '<div class="settings-grid">'
-    + group('behavior', t('settings.groupBehavior'), behavior, true)
-    + group('export', t('settings.groupExport'), exportDefaults, true)
+    + group('behavior', t('settings.groupBehavior'), tips, true)
+    + group('export', t('settings.groupExport'), exportGroup, true)
     + group('log', t('settings.groupLog'), logging, false)
     + '</div>';
 }
@@ -98,26 +69,14 @@ export function buildSettingsHtml(settings = {}) {
 export function readSettings(root) {
   const out = { ...SETTINGS_DEFAULTS };
   if (!root) return out;
-  const keepExportEl = root.querySelector?.('[data-setting="keepExport"]');
-  if (keepExportEl && typeof keepExportEl.checked === 'boolean') out.keepExport = keepExportEl.checked;
   const trafficEl = root.querySelector?.('[data-setting="trafficPrompt"]');
   if (trafficEl && typeof trafficEl.checked === 'boolean') out.trafficPrompt = trafficEl.checked;
   const nativePullEl = root.querySelector?.('[data-setting="nativePullNotice"]');
   if (nativePullEl && typeof nativePullEl.checked === 'boolean') out.nativePullNotice = nativePullEl.checked;
   const tutorialEl = root.querySelector?.('[data-setting="autoTutorial"]');
   if (tutorialEl && typeof tutorialEl.checked === 'boolean') out.autoTutorial = tutorialEl.checked;
-
-  const activeExt = root.querySelector?.('[data-setting-extmode].active');
-  if (activeExt?.dataset?.settingExtmode) out.defaultExtensionMode = activeExt.dataset.settingExtmode;
-
-  const gitEl = root.querySelector?.('[data-setting-gitmode]');
-  if (gitEl?.value) out.defaultGitMode = gitEl.value;
-
-  const keepDevEl = root.querySelector?.('[data-setting="defaultKeepDev"]');
-  if (keepDevEl && typeof keepDevEl.checked === 'boolean') out.defaultKeepDev = keepDevEl.checked;
-
-  const targetEl = root.querySelector?.('[data-setting-target]');
-  if (targetEl?.value) out.defaultTarget = targetEl.value;
+  const deleteEl = root.querySelector?.('[data-setting="deleteAfterExport"]');
+  if (deleteEl && typeof deleteEl.checked === 'boolean') out.deleteAfterExport = deleteEl.checked;
 
   const logMaxEl = root.querySelector?.('[data-setting="logMaxEntries"]');
   if (logMaxEl?.value) out.logMaxEntries = Number(logMaxEl.value);

@@ -549,6 +549,7 @@ const HOST_ACCOUNT_WINDOW = Object.freeze({
 });
 
 export function accountWindowCapability(platform) {
+  if (platform === 'standalone' || !platform) return { supported: false, known: true };
   const declared = HOST_ACCOUNT_WINDOW[platform];
   return { supported: declared === true, known: declared !== undefined };
 }

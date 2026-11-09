@@ -9,7 +9,7 @@
  *   · 动作：`actions.*`（拉取 / 生成 / 恢复 / 复制 / 删除 / 下载 / 设置 / 关闭）
  */
 
-import { chartTreeFor, deriveExportOptions, annotateChatLinks, counterpartsOf } from '../core/chart-model.js';
+import { chartTreeFor, deriveExportOptions, annotateChatLinks, counterpartsOf, CHART_GROUPS } from '../core/chart-model.js';
 import { createS3Client, buildBaseUrl, normalizePrefix, objectKey } from '../core/s3-client.js';
 import { createWebdavClient } from '../core/webdav-client.js';
 import { createTransferTarget } from '../core/transfer-target.js';
@@ -27,6 +27,7 @@ import { actionsForZone, actionEnabled } from '../core/zone-model.js';
 import { EXTENSION_MODES, GIT_MODES } from '../core/export-modes.js';
 import { t } from '../i18n/index.js';
 import { loadSettings } from './settings-store.js';
+import { loadChartPrefs, saveChartPrefs, normalizeChartPrefs } from './chart-prefs.js';
 
 /**
  * 教程锚点纯几何：用 overlay 自身矩形做基准，兼容宿主容器的 transform。
@@ -178,33 +179,45 @@ function persistLog() {
   }, 250);
 }
 
-const CARD_SIZE_KEY = 'stpt.cardSize';
+const CHART_LAYOUT_KEY = 'stpt.chartLayout';
 
-/** 图表卡拖拽后的尺寸（按 data-volkey 持久化，刷新后保持）。 */
-function loadCardSizes(){
+function normalizeChartLayout(input){
+  const out = { col: 0.5, rows: [] };
+  if(input && typeof input === 'object'){
+    const col = Number(input.col);
+    if(Number.isFinite(col)) out.col = Math.max(0.2, Math.min(0.8, col));
+    if(Array.isArray(input.rows)) out.rows = input.rows.map((n)=>Math.max(0.15, Math.min(0.85, Number(n)||0.5)));
+  }
+  return out;
+}
+function loadChartLayout(){
   try {
-    const raw = localStorage.getItem(CARD_SIZE_KEY);
-    const parsed = raw ? JSON.parse(raw) : {};
-    return parsed && typeof parsed === 'object' ? parsed : {};
-  } catch { return {}; }
+    const raw = localStorage.getItem(CHART_LAYOUT_KEY);
+    return normalizeChartLayout(raw ? JSON.parse(raw) : null);
+  } catch { return normalizeChartLayout(null); }
 }
-function persistCardSizes(){
-  try { localStorage.setItem(CARD_SIZE_KEY, JSON.stringify(state.cardSize)); } catch { /* 配额不足时仅本会话生效 */ }
+function persistChartLayout(){
+  try { localStorage.setItem(CHART_LAYOUT_KEY, JSON.stringify(state.chartLayout)); } catch { /* 仅本会话 */ }
 }
+
+let chartPrefs = typeof localStorage !== 'undefined' ? loadChartPrefs() : normalizeChartPrefs(null);
 
 const state = {
   host:'luker', mode:'plugin', view:'desktop', mobileView:'chart', pane:'workbench', zone:'import',
-  source:{ type:'host', pkgId:null }, target:'SillyTavern', targetManual:false, delta:'overwrite', splitMb:'',
-  compression:'5',
-  extensionMode: typeof localStorage !== 'undefined' ? (loadSettings().defaultExtensionMode || 'full') : 'full',
-  gitMode: typeof localStorage !== 'undefined' ? (loadSettings().defaultGitMode || 'minimal') : 'minimal',
-  keepDev: typeof localStorage !== 'undefined' ? (loadSettings().defaultKeepDev || false) : false,
+  source:{ type:'host', pkgId:null }, target:'SillyTavern', targetManual:false,
+  delta: chartPrefs.delta, splitMb: chartPrefs.splitMb,
+  compression: chartPrefs.compression,
+  extensionMode: chartPrefs.extensionMode,
+  gitMode: chartPrefs.gitMode,
+  keepDev: chartPrefs.keepDev,
   packages: INITIAL_PACKAGES.map(p=>({...p})),
   selectedPkgs:new Set(), mergeMode:false, privateFiles:[], expanded:{}, collapsedVol:{}, sel:{}, log:loadPersistedLog(), logLevel:'ALL',
-  noTrafficPrompt:false, keepExport:true,
+  noTrafficPrompt:false,
   volMaxKey:null, volPath:{},
   task:null, pendingExports:[],
-  chartFmt:{}, cardSize:loadCardSizes(),
+  chartFmt:{}, chartLayout:loadChartLayout(),
+  filenameTemplate: chartPrefs.filenameTemplate,
+  prefMode:false, prefDraft:null, prefAppliedPkgs:new Set(),
   storage:{ browser:null, host:null, page:null },
   cloud:{ provider:'s3', config:loadCloudConfig(), webdav:loadWebdavConfig(), busy:false, status:'', list:[] },
   sort:'time-desc', filter:'all', tutorialStep:0, tutorialOpen:false, tutorialKind:'basic',
@@ -271,6 +284,14 @@ function exportLog(){
   toast(t('toast.logExported'));
 }
 function toast(msg){
+  // 宿主原生提示优先（酒馆顶部 toastr）；没有宿主时回退插件内浮层。
+  const hostToast = globalThis.toastr;
+  if (hostToast && typeof hostToast.info === 'function') {
+    try {
+      hostToast.info(msg, '', { positionClass: 'toast-top-center', timeOut: 3200 });
+      return;
+    } catch { /* 宿主 toastr 异常时回退 */ }
+  }
   const el=document.getElementById('toast');
   el.textContent=msg; el.classList.add('show');
   clearTimeout(el._t); el._t=setTimeout(()=>el.classList.remove('show'),2400);
@@ -292,7 +313,7 @@ function syncAncestors(nodes,scope){
   for(const n of nodes){
     if(n.children && n.children.length){
       syncAncestors(n.children,scope);
-      const vals=n.children.map(c=>isChecked(c,scope));
+      const vals=n.children.map(c=> (c.children && c.children.length) ? !!c._checked : isChecked(c,scope));
       const all=vals.every(Boolean), none=vals.every(v=>!v);
       n._indeterminate = !all && !none;
       n._checked = all;
@@ -377,10 +398,10 @@ const TARGETS=[
   { value:'TauriTavern', host:'tt' },
   { value:'PureTavern', host:'pt' }
 ];
-/** 宿主平台 → 目标平台默认值（defaultTarget=auto 时生效）。 */
+/** 宿主平台 → 目标平台默认值（偏好 target=auto 时生效）。 */
 const HOST_TO_TARGET = { st:'SillyTavern', luker:'Luker', tt:'TauriTavern', pt:'PureTavern' };
 function targetForHost(hostKey){
-  const pref = loadSettings().defaultTarget;
+  const pref = chartPrefs.target;
   if (pref && pref !== 'auto') {
     const hit = TARGETS.find(x=>x.host===pref);
     if (hit) return hit.value;
@@ -534,7 +555,7 @@ function renderQuota(){
   const gb=bytes=>(bytes/1073741824).toFixed(1)+' GB';
   // 宿主存储页能力由控制器探测后经 setStorage 传入；未提供时不伪造入口。
   const page=state.storage.page || { available:false };
-  const row=(label,ico,cell,emptyText,kind)=>{
+  const row=(label,ico,cell,emptyText,kind,showPageHint=true)=>{
     const openable=!!page.available;
     const hasReading=!!cell && typeof cell.used==='number';
     const total=hasReading && typeof cell.total==='number' ? cell.total : 0;
@@ -543,21 +564,26 @@ function renderQuota(){
     if(!hasReading) val=emptyText;
     else if(total<=0) val=gb(cell.used)+' · '+t('quota.unlimited');
     else val=gb(cell.used)+' / '+gb(total)+' · '+pct+'%';
-    return '<button type="button" class="quota-row'+(hasReading?'':' is-disabled')+(openable?'':' is-nopage')+'"'
+    return '<button type="button" class="quota-row'+(hasReading?'':' is-disabled')+((openable||!showPageHint)?'':' is-nopage')+'"'
       +' data-quota-kind="'+kind+'" title="'+escapeHtml(openable?t('quota.openHostPage'):t('quota.noHostPage'))+'">'
       +'<span class="q-label">'+svg(ico,'tree-ico')+label+'</span>'
       +'<span class="quota-bar"><span class="quota-fill'+(pct>85?' warn':'')+'" style="width:'+pct+'%"></span></span>'
       +'<span class="quota-val">'+val+'</span>'
-      +(openable?'':'<span class="quota-nopage">'+t('quota.noHostPageShort')+'</span>')
+      +((openable||!showPageHint)?'':'<span class="quota-nopage">'+t('quota.noHostPageShort')+'</span>')
       +'</button>';
   };
   const hostReadable=!!(HOSTS[state.host]||{}).readable;
-  head.innerHTML = row(t('quota.browser'),'db',state.storage.browser,t('quota.browserEmpty'),'browser')
-    + row(t('quota.host'),'shield',hostReadable ? state.storage.host : null,t('quota.hostEmpty'),'server');
+  const isWeb=state.mode==='web';
+  // 独立 Web 态没有宿主，不伪造「Luker 宿主配额」行，也不给浏览器行挂「宿主未提供」尾巴。
+  head.innerHTML = row(t('quota.browser'),'db',state.storage.browser,t('quota.browserEmpty'),'browser',!isWeb)
+    + (isWeb ? '' : row(t('quota.host'),'shield',hostReadable ? state.storage.host : null,t('quota.hostEmpty'),'server'));
 }
-function renderTreeRows(nodes,depth,scope,readonly,tools,totalMb,drill){
+function renderTreeRows(nodes,depth,scope,readonly,tools,totalMb,drill,colorMap,rootId){
   let out='';
   for(const n of nodes){
+    const root = depth===0 ? n.id : rootId;
+    const cIdx = colorMap ? (colorMap[root]||0) : 0;
+    const colorCls = cIdx ? volColorClass(cIdx) : '';
     if(tools && tools[n.id]) out+=tools[n.id];
     const key=treeKey(scope,n.id);
     const expanded=state.expanded[key]!==undefined ? state.expanded[key] : !!n.expanded;
@@ -572,6 +598,7 @@ function renderTreeRows(nodes,depth,scope,readonly,tools,totalMb,drill){
       +'<button class="tree-toggle'+(hasKids?'':' empty')+'" data-node="'+n.id+'" aria-label="'+t('chart.expand')+'">'
       +'<svg class="chev" viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5l7 7-7 7"/></svg></button>'
       +'<input class="tree-check" type="checkbox" data-check="'+n.id+'"'+(checked?' checked':'')+(indeterminate?' data-ind="1"':'')+(readonly?' disabled':'')+'>'
+      +(depth===0 && colorCls ? '<span class="tree-dot '+colorCls+'" aria-hidden="true"></span>' : '')
       +svg(n.icon,'tree-ico')
       +'<span class="tree-label" title="'+n.label+'">'+n.label+(n.badge?'<span class="sub">'+n.badge+'</span>':'')+(n.note?'<span class="sub">'+n.note+'</span>':'')+'</span>'
       +'<span class="tree-pill '+pillCls+'">'+pillText+'</span>'
@@ -580,34 +607,32 @@ function renderTreeRows(nodes,depth,scope,readonly,tools,totalMb,drill){
         +'<button data-suball="none" data-subnode="'+n.id+'" title="'+t('chart.selectNone')+'">✕</button>'
         +'<button data-suball="invert" data-subnode="'+n.id+'" title="'+t('chart.invert')+'">⇄</button>'
       +'</span>' : '')
-      +'<span class="tree-occ" aria-hidden="true"><i style="width:'+pct+'%"></i></span>'
+      +'<span class="tree-occ" aria-hidden="true"><i class="'+colorCls+'" style="width:'+pct+'%"></i></span>'
       +'<span class="tree-size">'+fmtMB(n.mb)+'</span>'
       +(drill && hasKids ? '<button class="tree-mini vol-drill" data-voldrill="'+n.id+'" title="'+t('chart.drill')+'">›</button>' : '')
-      +(n.uploadable?'<button class="tree-mini" data-upload="'+n.id+'">'+t('tree.upload')+'</button>':'')
       +'</div>';
     if(hasKids && expanded){
-      out+='<div class="tree-children">'+renderTreeRows(n.children,depth+1,scope,readonly,tools,totalMb,drill)+'</div>';
+      out+='<div class="tree-children">'+renderTreeRows(n.children,depth+1,scope,readonly,tools,totalMb,drill,colorMap,root)+'</div>';
     }
   }
   return out;
 }
 
-/* ── 图表可视化：条形 / 圆环，两种格式共用同一份类目数据 ── */
+/* ── 图表可视化：Luker 式单条多色 + 圆环；颜色说明只在下方列表 ── */
 const CHART_FMTS = ['bar','donut'];
+const VC_PALETTE_SIZE = 12;
 function chartFmtOf(key){
   const fmt = state.chartFmt[key];
   return CHART_FMTS.includes(fmt) ? fmt : 'bar';
 }
 function volChartData(nodes){
   const items = (nodes||[])
-    .map(n=>({ label:String(n.label||''), mb:Number(n.mb)||0 }))
+    .map(n=>({ id:String(n.id||''), label:String(n.label||''), mb:Number(n.mb)||0 }))
     .filter(x=>x.mb>0)
     .sort((a,b)=>b.mb-a.mb);
-  const top = items.slice(0,6);
-  const rest = items.slice(6);
-  if(rest.length) top.push({ label:t('chart.others'), mb:rest.reduce((a,b)=>a+b.mb,0) });
-  return { items: top, total: top.reduce((a,b)=>a+b.mb,0) };
+  return { items, total: items.reduce((a,b)=>a+b.mb,0) };
 }
+function volColorClass(index){ return 'vc-c'+((Math.max(1,index)-1)%VC_PALETTE_SIZE+1); }
 function volChartHtml(nodes, fmt){
   const { items, total } = volChartData(nodes);
   if(!items.length) return '<div class="vol-chart is-empty" data-volchart="1"></div>';
@@ -615,24 +640,25 @@ function volChartHtml(nodes, fmt){
     let offset = 25;
     const arcs = items.map((it,i)=>{
       const p = total ? it.mb/total*100 : 0;
-      const arc = '<circle class="vc-arc vc-c'+(i%6+1)+'" cx="21" cy="21" r="15.915" fill="none" stroke-width="6"'
-        +' stroke-dasharray="'+p.toFixed(2)+' '+(100-p).toFixed(2)+'" stroke-dashoffset="'+offset.toFixed(2)+'"></circle>';
-      offset -= p;
+      const shown = Math.max(p, 0.6);
+      const arc = '<circle class="vc-arc '+volColorClass(i+1)+'" cx="21" cy="21" r="15.915" fill="none" stroke-width="7"'
+        +' stroke-dasharray="'+shown.toFixed(2)+' '+(100-shown).toFixed(2)+'" stroke-dashoffset="'+offset.toFixed(2)+'">'
+        +'<title>'+escapeHtml(it.label)+' · '+fmtMB(it.mb)+'</title></circle>';
+      offset -= shown;
       return arc;
     }).join('');
-    const legend = items.map((it,i)=>'<span class="vc-li"><i class="vc-sw vc-c'+(i%6+1)+'"></i>'
-      +escapeHtml(it.label)+'<b>'+fmtMB(it.mb)+'</b></span>').join('');
-    return '<div class="vol-chart is-donut" data-volchart="1">'
-      +'<svg class="vc-donut" viewBox="0 0 42 42" role="img">'+arcs+'</svg>'
-      +'<div class="vc-legend">'+legend+'</div></div>';
+    return '<div class="vol-chart is-donut" data-volchart="1"><svg class="vc-donut" viewBox="0 0 42 42" role="img">'+arcs+'</svg></div>';
   }
-  const rows = items.map((it,i)=>{
-    const p = total ? Math.round(it.mb/total*100) : 0;
-    return '<div class="vc-row"><span class="vc-label" title="'+escapeHtml(it.label)+'">'+escapeHtml(it.label)+'</span>'
-      +'<span class="vc-bar"><i class="vc-c'+(i%6+1)+'" style="width:'+p+'%"></i></span>'
-      +'<span class="vc-val">'+fmtMB(it.mb)+'</span></div>';
+  const segs = items.map((it,i)=>{
+    const p = total ? it.mb/total*100 : 0;
+    return '<i class="vc-seg '+volColorClass(i+1)+'" style="flex-grow:'+p.toFixed(2)+'" title="'+escapeHtml(it.label)+' · '+fmtMB(it.mb)+'"></i>';
   }).join('');
-  return '<div class="vol-chart is-bar" data-volchart="1">'+rows+'</div>';
+  return '<div class="vol-chart is-bar" data-volchart="1"><div class="vc-stack">'+segs+'</div></div>';
+}
+function volColorMap(nodes){
+  const map = {};
+  volChartData(nodes).items.forEach((it,i)=>{ map[it.id] = (i%VC_PALETTE_SIZE)+1; });
+  return map;
 }
 
 /* 一张标准图表卡：包序号 + 卷号 + 本卷容量 + 全选 + 树 + 勾选摘要。
@@ -667,31 +693,29 @@ function volBreadcrumbHtml(o){
     +'</div>';
 }
 
-function chartCardHtml(o){
+function chartCardHtml(o, place){
   const maxed = state.volMaxKey === o.key;
   const collapsed = !maxed && (state.collapsedVol[o.key]!==undefined ? !!state.collapsedVol[o.key] : !!o.defaultCollapsed);
   syncAncestors(o.nodes,o.scope);
   const sum=sumSelected(o.nodes,o.scope);
   const dis = !!o.disabled;
   const fmt = chartFmtOf(o.key);
-  const size = state.cardSize[o.key];
-  const assetPkgs = Array.isArray(o.assetPkgs) ? o.assetPkgs.filter(Boolean) : [];
   const scopeNodes = maxed ? volScopedNodes(o) : o.nodes;
-  const sizeStyle = (!maxed && size && Number(size.w)>0 && Number(size.h)>0)
-    ? ' style="width:'+Math.round(size.w)+'px;height:'+Math.round(size.h)+'px"' : '';
-  return '<div class="vol-card'+(collapsed?' is-collapsed':'')+(maxed?' is-max':'')+(dis?' is-disabled':'')+'" data-scope="'+o.scope+'" data-volkey="'+o.key+'"'+(dis?' aria-disabled="true"':'')+sizeStyle+'>'
+  const colorMap = volColorMap(scopeNodes);
+  const placeStyle = (!maxed && place) ? ' style="grid-column:'+place.col+';grid-row:'+place.row+'"' : '';
+  return '<div class="vol-card'+(collapsed?' is-collapsed':'')+(maxed?' is-max':'')+(dis?' is-disabled':'')+'" data-scope="'+o.scope+'" data-volkey="'+o.key+'"'+(dis?' aria-disabled="true"':'')+placeStyle+'>'
     +'<div class="vol-head">'
       +'<span class="vol-idx'+(o.merged?' is-merged':'')+'">'+o.idxText+'</span>'
       +(o.volText?'<span class="vol-cap">'+o.volText+'</span>':'')
       +(o.capText?'<span class="vol-cap'+(o.over?' is-over':'')+'">'+o.capText+'</span>':'')
-      +(o.extToolsHtml ? o.extToolsHtml : '')
       +(o.pkgId ? privateFilesHtml() : '')
       +(o.over?'<span class="vol-flag">'+t('chart.overLimit')+'</span>':'')
       +'<span class="vol-spacer"></span>'
-      +'<label class="chart-fmt" data-chartfmt-wrap="1"><select class="text_pole" data-chartfmt="'+o.key+'" aria-label="'+t('chart.format')+'">'
-        +'<option value="bar"'+(fmt==='bar'?' selected':'')+'>'+t('chart.formatBar')+'</option>'
-        +'<option value="donut"'+(fmt==='donut'?' selected':'')+'>'+t('chart.formatDonut')+'</option>'
-      +'</select></label>'
+      +'<button class="vol-fmt" type="button" data-chartfmt-toggle="'+o.key+'" title="'+t('chart.format')+': '+(fmt==='bar'?t('chart.formatBar'):t('chart.formatDonut'))+'" aria-label="'+t('chart.format')+'">'
+        +(fmt==='bar'
+          ? '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="9" width="16" height="6" rx="2"/><path d="M9 9v6M15 9v6"/></svg>'
+          : '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="7"/><path d="M12 5v7h7"/></svg>')
+      +'</button>'
       +(o.totalText?'<span class="vol-total">'+o.totalText+'</span>':'')
       +(dis || o.readonly ? '' : '<span class="vol-bulk">'
         +'<button data-treeall="1">'+t('chart.selectAll')+'</button>'
@@ -699,7 +723,6 @@ function chartCardHtml(o){
         +'<button data-treeinvert="1">'+t('chart.invert')+'</button>'
       +'</span>')
       +(o.pkgId?'<button class="group-close" data-closegroup="'+o.pkgId+'" aria-label="'+t('chart.closeGroup')+'">×</button>':'')
-      +(assetPkgs.length?'<button class="vol-assetlist" data-assetlist="1" data-assetpkgs="'+escapeHtml(assetPkgs.join(','))+'" title="'+t('chart.exportAssetList')+'" aria-label="'+t('chart.exportAssetList')+'">⤓</button>':'')
       +'<button class="vol-max" data-volmax="'+o.key+'" title="'+(maxed?t('chart.restore'):t('chart.maximize'))+'" aria-label="'+(maxed?t('chart.restore'):t('chart.maximize'))+'">'+(maxed?'⤡':'⤢')+'</button>'
       +'<button class="vol-collapse" data-voltoggle="'+o.key+'" aria-label="'+t('chart.expand')+'">'
       +'<svg class="chev" viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5l7 7-7 7"/></svg></button>'
@@ -708,31 +731,39 @@ function chartCardHtml(o){
     +'<div class="vol-body">'
       +(o.noticeHtml||'')
       +volChartHtml(scopeNodes, fmt)
-      +'<div class="chart-tree">'+renderTreeRows(scopeNodes,0,o.scope,o.readonly||dis,groupToolsOf(o),volChartData(scopeNodes).total,maxed)+'</div>'
+      +(o.extToolsHtml||'')
+      +'<div class="chart-tree">'+renderTreeRows(scopeNodes,0,o.scope,o.readonly||dis,groupToolsOf(o),volChartData(scopeNodes).total,maxed,colorMap)+'</div>'
       +(dis?'':'<div class="chart-foot"><span>'+t('chart.selected',{count:sum.count,size:fmtMB(sum.mb)})+'</span></div>')
     +'</div>'
   +'</div>';
 }
 
-/** 扩展组内的模式/ Git / 构建配置控件（只有完整扩展时才显示 Git）。 */
-function extensionToolsHtml(pkg){
+/** 扩展组内的模式/ Git / 构建配置控件（只有完整扩展时才显示 Git）；导出扩展清单也在这一条。 */
+function extensionToolsHtml(pkg, assetPkgs){
   const hasExt = (pkg?.extensions && pkg.extensions.length) || !!findNode(pkg?.nodes || [], 'group:extensions');
-  if(!hasExt) return '';
+  const pkgs = Array.isArray(assetPkgs) ? assetPkgs.filter(Boolean) : [];
+  const listBtn = pkgs.length
+    ? '<button type="button" class="et-list-btn" data-assetlist="1" data-assetpkgs="'+escapeHtml(pkgs.join(','))+'" title="'+t('chart.exportAssetList')+'">'+t('chart.exportAssetList')+'</button>'
+    : '';
+  if(!hasExt && !listBtn) return '';
   const full = state.extensionMode !== EXTENSION_MODES.MANIFEST;
   return '<div class="extension-tools" data-exttools="1">'
-    +'<span class="et-label">'+t('extension.label')+'</span>'
-    +'<div class="segmented et-mode">'
-      +'<button class="seg-btn'+(full?' active':'')+'" data-extmode="full">'+t('extension.full')+'</button>'
-      +'<button class="seg-btn'+(full?'':' active')+'" data-extmode="manifest">'+t('extension.manifest')+'</button>'
-    +'</div>'
-    +(full
-      ? '<label class="et-git"><span>'+t('extension.git')+'</span><select class="text_pole" data-gitmode>'
-          +'<option value="keep"'+(state.gitMode===GIT_MODES.KEEP?' selected':'')+'>'+t('extension.gitKeep')+'</option>'
-          +'<option value="minimal"'+(state.gitMode===GIT_MODES.MINIMAL?' selected':'')+'>'+t('extension.gitMinimal')+'</option>'
-          +'<option value="strip"'+(state.gitMode===GIT_MODES.STRIP?' selected':'')+'>'+t('extension.gitStrip')+'</option>'
-        +'</select></label>'
-        +'<label class="check et-keepdev"><input type="checkbox" data-keepdev'+(state.keepDev?' checked':'')+'> '+t('extension.keepDev')+'</label>'
+    +(hasExt
+      ? '<span class="et-label">'+t('extension.label')+'</span>'
+        +'<div class="segmented et-mode">'
+          +'<button class="seg-btn'+(full?' active':'')+'" data-extmode="full">'+t('extension.full')+'</button>'
+          +'<button class="seg-btn'+(full?'':' active')+'" data-extmode="manifest">'+t('extension.manifest')+'</button>'
+        +'</div>'
+        +(full
+          ? '<label class="et-git"><span>'+t('extension.git')+'</span><select class="text_pole" data-gitmode>'
+              +'<option value="keep"'+(state.gitMode===GIT_MODES.KEEP?' selected':'')+'>'+t('extension.gitKeep')+'</option>'
+              +'<option value="minimal"'+(state.gitMode===GIT_MODES.MINIMAL?' selected':'')+'>'+t('extension.gitMinimal')+'</option>'
+              +'<option value="strip"'+(state.gitMode===GIT_MODES.STRIP?' selected':'')+'>'+t('extension.gitStrip')+'</option>'
+            +'</select></label>'
+            +'<label class="check et-keepdev"><input type="checkbox" data-keepdev'+(state.keepDev?' checked':'')+'> '+t('extension.keepDev')+'</label>'
+          : '')
       : '')
+    + listBtn
     +'</div>';
 }
 
@@ -743,9 +774,8 @@ function userFilesAvailable(){
 function privateFilesHtml(){
   if(!userFilesAvailable()) return '';
   const n=state.privateFiles.length;
-  return '<div class="priv-tools" data-privtools="1">'
-    +'<button class="tree-mini" data-privfiles="open">'+t('priv.open')+(n?' ('+n+')':'')+'</button>'
-    +'</div>';
+  return '<button type="button" class="vol-priv" data-privfiles="open" title="'+t('priv.open')+'" aria-label="'+t('priv.open')+'">'
+    +svg('cloud','ico')+(n?'<b>'+n+'</b>':'')+'</button>';
 }
 /* 组级工具条：私有件的「云端私有件」入口已上移到卡片头，不再插在类目行里。 */
 function groupToolsOf(o){
@@ -824,6 +854,46 @@ function renderBatchBar(targets){
     +'<span style="color:var(--muted-2)">'+t(merged?'chart.mergeHint':'chart.batchHint')+'</span>';
 }
 
+function layoutRowRatios(rows){
+  const list = state.chartLayout.rows || [];
+  const out = [];
+  for(let i=0;i<rows;i++) out.push(Math.max(0.15, Math.min(0.85, Number(list[i]) || (1/rows))));
+  const sum = out.reduce((a,b)=>a+b,0) || 1;
+  return out.map((v)=>v/sum);
+}
+function chartCanvasHtml(defs){
+  if(!defs.length) return '';
+  if(state.volMaxKey){
+    const hit = defs.find((d)=>d.key===state.volMaxKey) || defs[0];
+    return '<div class="chart-canvas is-max" data-count="1" style="grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr)">'
+      + chartCardHtml(hit) + '</div>';
+  }
+  const n = defs.length;
+  if(n===1){
+    return '<div class="chart-canvas" data-count="1" data-rows="1" style="grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr);min-height:100%">'
+      + chartCardHtml(defs[0], { col:1, row:1 }) + '</div>';
+  }
+  const rows = n<=2 ? 1 : Math.ceil(n/2);
+  const col = Math.max(0.2, Math.min(0.8, state.chartLayout.col || 0.5));
+  const ratios = layoutRowRatios(rows);
+  const cols = 'minmax(0,'+col+'fr) 6px minmax(0,'+(1-col)+'fr)';
+  const rowTpl = rows===1 ? 'minmax(0,1fr)' : ratios.map((r)=>'minmax(0,'+r+'fr)').join(' 6px ');
+  const minHeight = rows<=2 ? '100%' : 'calc('+rows+' * 220px)';
+  let html = '<div class="chart-canvas" data-count="'+n+'" data-rows="'+rows+'" style="grid-template-columns:'+cols+';grid-template-rows:'+rowTpl+';min-height:'+minHeight+'">';
+  if(n>=2) html += '<div class="chart-split-v" data-split="col" role="separator" aria-orientation="vertical" title="'+t('chart.dragCol')+'" style="grid-column:2;grid-row:1 / span '+(2*rows-1)+'"></div>';
+  for(let r=0;r<rows-1;r++){
+    html += '<div class="chart-split-h" data-split="row" data-gap="'+r+'" role="separator" aria-orientation="horizontal" title="'+t('chart.dragRow')+'" style="grid-column:1;grid-row:'+(2*r+2)+'"></div>';
+    if(n > 2*(r+1)+1) {
+      html += '<div class="chart-split-h" data-split="row" data-gap="'+r+'" role="separator" aria-orientation="horizontal" title="'+t('chart.dragRow')+'" style="grid-column:3;grid-row:'+(2*r+2)+'"></div>';
+    }
+  }
+  defs.forEach((d,i)=>{
+    const r = Math.floor(i/2);
+    const c = i%2;
+    html += chartCardHtml(d, { col: c===0?1:3, row: 2*r+1 });
+  });
+  return html + '</div>';
+}
 function renderChart(){
   state.seq=pkgSeq();
   const targets=chartTargets();
@@ -831,8 +901,7 @@ function renderChart(){
   renderBatchBar(targets);
   const stack=document.getElementById('chart-stack');
   if(!stack) return;
-  if(state.volMaxKey && !targets.some((tgt)=>tgt.key===state.volMaxKey)) state.volMaxKey=null;
-  stack.classList.toggle('has-max', !!state.volMaxKey);
+  stack.classList.toggle('is-prefs', !!state.prefMode);
   const stackScroll = { top: stack.scrollTop, left: stack.scrollLeft };
   const treeScrolls = {};
   stack.querySelectorAll('.vol-card').forEach(card => {
@@ -843,10 +912,62 @@ function renderChart(){
   const appMain = document.querySelector('.app-main');
   const mainScroll = appMain ? appMain.scrollTop : 0;
   const winScroll = typeof window !== 'undefined' ? (window.scrollY || document.documentElement?.scrollTop || 0) : 0;
-  let html='';
+  if(state.prefMode){
+    const batch=document.getElementById('batch-bar');
+    if(batch) batch.hidden=true;
+    stack.innerHTML = chartPrefsHtml();
+    stack.scrollTop = stackScroll.top;
+    stack.scrollLeft = stackScroll.left;
+    return;
+  }
+  const defs = [];
+  targets.forEach(target=>{
+    if(target.merge){
+      const nodes=mergedNodes(target.pkgs);
+      const totalMb=mergedTotalMb(target.pkgs);
+      const vols=volumesFor(totalMb,nodes);
+      const multi=vols.length>1;
+      const scope=mergeScope(target.pkgs);
+      const extOwner=target.pkgs.find(p=>p.extensions&&p.extensions.length)||target.pkgs[0];
+      const assetPkgs=target.pkgs.map(p=>p.id);
+      const extTools=extensionToolsHtml(extOwner, assetPkgs);
+      vols.forEach(v=>defs.push({
+        key:'merge-'+v.i, scope, nodes:v.nodes,
+        idxText:t('chart.mergedBadge',{n:target.pkgs.length}),
+        merged:true,
+        volText: multi ? t('chart.volume',{i:v.i,n:v.n}) : t('chart.whole'),
+        capText: fmtMB(v.mb),
+        totalText: multi ? t('chart.total',{size:fmtMB(totalMb)}) : '',
+        noticeHtml: '', readonly: false, over: !!v.over, pkgId: '',
+        extToolsHtml: extTools,
+        defaultCollapsed: state.view==='mobile' && multi && v.i>1
+      }));
+      return;
+    }
+    const pkg=target.pkg;
+    const tree=packageNodes(pkg);
+    const vols=volumesOf(pkg, tree.nodes);
+    const multi=vols.length>1;
+    const notice=tree.unrecognized ? '<div class="chart-unavailable"><b>'+t('chart.unrecognizedTitle')+'</b></div>' : '';
+    const extTools=extensionToolsHtml(pkg, [pkg.id]);
+    vols.forEach(v=>defs.push({
+      key:pkg.id+'-'+v.i, scope:'pkg:'+pkg.id, nodes:v.nodes,
+      idxText: seqLabel(pkg),
+      volText: multi ? t('chart.volume',{i:v.i,n:v.n}) : t('chart.whole'),
+      capText: fmtMB(v.mb),
+      totalText: multi ? t('chart.total',{size:pkg.size}) : '',
+      noticeHtml: notice, readonly: pkg.zone==='export',
+      over: !!v.over,
+      pkgId: pkg.id,
+      extToolsHtml: extTools,
+      defaultCollapsed: state.view==='mobile' && multi && v.i>1
+    }));
+  });
+  if(state.volMaxKey && !defs.some((d)=>d.key===state.volMaxKey)) state.volMaxKey=null;
+  stack.classList.toggle('has-max', !!state.volMaxKey);
+  let html = '';
   if(!targets.length){
-    html += '<div class="chart-empty-guide">'
-      + '<div class="empty-guide-card guide-fetch">'
+    html += '<div class="chart-empty-guide">'      + '<div class="empty-guide-card guide-fetch">'
         + '<div class="guide-icon"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="M12 12v9"/><path d="m8 17 4 4 4-4"/></svg></div>'
         + '<div class="guide-title">' + t('empty.fetchTitle') + '</div>'
         + '<div class="guide-desc">' + t('empty.fetchDesc') + '</div>'
@@ -860,56 +981,9 @@ function renderChart(){
         + '<button type="button" class="btn" id="btn-empty-import">' + t('empty.importBtn') + '</button>'
       + '</div>'
     + '</div>';
+  } else {
+    html = chartCanvasHtml(defs);
   }
-  targets.forEach(target=>{
-    if(target.merge){
-      const nodes=mergedNodes(target.pkgs);
-      const totalMb=mergedTotalMb(target.pkgs);
-      const vols=volumesFor(totalMb,nodes);
-      const multi=vols.length>1;
-      const scope=mergeScope(target.pkgs);
-      const extOwner=target.pkgs.find(p=>p.extensions&&p.extensions.length)||target.pkgs[0];
-      const extTools=extensionToolsHtml(extOwner);
-      html+='<div class="chart-group is-merged">'
-        +'<div class="vol-grid" data-vols="'+vols.length+'">'
-        + vols.map(v=>chartCardHtml({
-            key:'merge-'+v.i, scope, nodes:v.nodes,
-            idxText:t('chart.mergedBadge',{n:target.pkgs.length}),
-            merged:true,
-            volText: multi ? t('chart.volume',{i:v.i,n:v.n}) : t('chart.whole'),
-            capText: fmtMB(v.mb),
-            totalText: multi ? t('chart.total',{size:fmtMB(totalMb)}) : '',
-            noticeHtml: '', readonly: false, over: !!v.over, pkgId: '',
-            extToolsHtml: extTools,
-            assetPkgs: target.pkgs.map(p=>p.id),
-            defaultCollapsed: state.view==='mobile' && multi && v.i>1
-          })).join('')
-        +'</div></div>';
-      return;
-    }
-    const pkg=target.pkg;
-    const tree=packageNodes(pkg);
-    const vols=volumesOf(pkg, tree.nodes);
-    const multi=vols.length>1;
-    const notice=tree.unrecognized ? '<div class="chart-unavailable"><b>'+t('chart.unrecognizedTitle')+'</b></div>' : '';
-    const extTools=extensionToolsHtml(pkg);
-    html+='<div class="chart-group">'
-      +'<div class="vol-grid" data-vols="'+vols.length+'">'
-      + vols.map(v=>chartCardHtml({
-          key:pkg.id+'-'+v.i, scope:'pkg:'+pkg.id, nodes:v.nodes,
-          idxText: seqLabel(pkg),
-          volText: multi ? t('chart.volume',{i:v.i,n:v.n}) : t('chart.whole'),
-          capText: fmtMB(v.mb),
-          totalText: multi ? t('chart.total',{size:pkg.size}) : '',
-          noticeHtml: notice, readonly: pkg.zone==='export',
-          over: !!v.over,
-          pkgId: pkg.id,
-          extToolsHtml: extTools,
-          assetPkgs: [pkg.id],
-          defaultCollapsed: state.view==='mobile' && multi && v.i>1
-        })).join('')
-      +'</div></div>';
-  });
   stack.innerHTML=html;
   stack.querySelectorAll('.tree-check[data-ind="1"]').forEach(el=>{ el.indeterminate=true; });
   stack.scrollTop = stackScroll.top;
@@ -928,6 +1002,126 @@ function renderChart(){
   }
   renderFilenamePreview();
   updateSplitSim();
+}
+
+/* ── 数据包偏好：占位复选框 + 顶部控件并入保存 ── */
+function targetCodeOf(value){
+  if(value==='auto') return 'auto';
+  const hit=TARGETS.find(x=>x.value===value);
+  return hit ? hit.host : 'auto';
+}
+function targetValueOfCode(code){
+  if(!code || code==='auto') return targetForHost(state.host);
+  const hit=TARGETS.find(x=>x.host===code);
+  return hit ? hit.value : targetForHost(state.host);
+}
+function syncTopControls(){
+  const comp=document.getElementById('compression-select'); if(comp) comp.value=state.compression;
+  const split=document.getElementById('split-input'); if(split) split.value=state.splitMb;
+  const fn=document.getElementById('filename-template'); if(fn) fn.value=state.filenameTemplate;
+  document.querySelectorAll('#delta-toggle button').forEach(b=>b.classList.toggle('active',b.dataset.delta===state.delta));
+  renderTargetPicker();
+  renderFilenamePreview();
+  updateSplitSim();
+}
+function chartPrefsHtml(){
+  const p = state.prefDraft || normalizeChartPrefs(chartPrefs);
+  const checked = new Set(p.checkedGroups);
+  const rows = CHART_GROUPS.map((g,i)=>
+    '<label class="pref-row">'
+      +'<input type="checkbox" data-prefgroup="'+g.key+'"'+(checked.has(g.key)?' checked':'')+'>'
+      +'<span class="pref-dot '+volColorClass(i+1)+'" aria-hidden="true"></span>'
+      +'<span class="pref-label">'+g.label+'</span>'
+    +'</label>').join('');
+  const full = state.extensionMode !== EXTENSION_MODES.MANIFEST;
+  return '<div class="chart-prefs">'
+    +'<div class="pref-head"><b>'+t('chart.prefsTitle')+'</b><span>'+t('chart.prefsDesc')+'</span></div>'
+    +'<div class="pref-list">'+rows+'</div>'
+    +'<div class="pref-extra">'
+      +'<div class="segmented et-mode">'
+        +'<button type="button" class="seg-btn'+(full?' active':'')+'" data-prefextmode="full">'+t('extension.full')+'</button>'
+        +'<button type="button" class="seg-btn'+(full?'':' active')+'" data-prefextmode="manifest">'+t('extension.manifest')+'</button>'
+      +'</div>'
+      +'<label class="et-git"><span>'+t('chart.prefsGit')+'</span><select class="text_pole" data-prefgitmode>'
+        +'<option value="keep"'+(state.gitMode===GIT_MODES.KEEP?' selected':'')+'>'+t('extension.gitKeep')+'</option>'
+        +'<option value="minimal"'+(state.gitMode===GIT_MODES.MINIMAL?' selected':'')+'>'+t('extension.gitMinimal')+'</option>'
+        +'<option value="strip"'+(state.gitMode===GIT_MODES.STRIP?' selected':'')+'>'+t('extension.gitStrip')+'</option>'
+      +'</select></label>'
+      +'<label class="check et-keepdev"><input type="checkbox" data-prefkeepdev'+(state.keepDev?' checked':'')+'> '+t('extension.keepDev')+'</label>'
+    +'</div>'
+    +'<div class="pref-actions">'
+      +'<button type="button" class="btn" id="pref-cancel">'+t('chart.prefsCancel')+'</button>'
+      +'<button type="button" class="btn accent" id="pref-save">'+t('chart.prefsSave')+'</button>'
+    +'</div>'
+  +'</div>';
+}
+function openChartPrefs(){
+  if(state.prefMode) return;
+  state.prefSnapshot = {
+    target: state.target, targetManual: state.targetManual, delta: state.delta,
+    splitMb: state.splitMb, compression: state.compression,
+    extensionMode: state.extensionMode, gitMode: state.gitMode, keepDev: state.keepDev,
+    filenameTemplate: state.filenameTemplate,
+  };
+  state.prefDraft = normalizeChartPrefs(chartPrefs);
+  state.prefMode = true;
+  state.target = targetValueOfCode(chartPrefs.target);
+  state.targetManual = chartPrefs.target !== 'auto';
+  state.delta = chartPrefs.delta;
+  state.splitMb = chartPrefs.splitMb;
+  state.compression = chartPrefs.compression;
+  state.filenameTemplate = chartPrefs.filenameTemplate;
+  state.extensionMode = chartPrefs.extensionMode;
+  state.gitMode = chartPrefs.gitMode;
+  state.keepDev = chartPrefs.keepDev;
+  syncTopControls();
+  renderChart();
+}
+function cancelChartPrefs(){
+  const s = state.prefSnapshot;
+  if(s) Object.assign(state, s);
+  state.prefMode = false; state.prefDraft = null; state.prefSnapshot = null;
+  syncTopControls();
+  renderAll();
+}
+function saveChartPrefsDraft(){
+  const checked = [...document.querySelectorAll('[data-prefgroup]:checked')].map((el)=>el.dataset.prefgroup);
+  chartPrefs = saveChartPrefs({
+    checkedGroups: checked,
+    target: targetCodeOf(state.target),
+    compression: state.compression,
+    splitMb: state.splitMb,
+    filenameTemplate: state.filenameTemplate,
+    delta: state.delta,
+    extensionMode: state.extensionMode,
+    gitMode: state.gitMode,
+    keepDev: state.keepDev,
+  });
+  state.prefMode = false; state.prefDraft = null; state.prefSnapshot = null;
+  toast(t('chart.prefsSaved'));
+  renderAll();
+}
+function applyPrefsToPackage(pkg){
+  if(!pkg || !Array.isArray(pkg.nodes) || !pkg.nodes.length) return;
+  const checked = new Set(chartPrefs.checkedGroups);
+  const scope = 'pkg:'+pkg.id;
+  pkg.nodes.forEach((top)=>{
+    const key = String(top.id||'').replace(/^group:/,'');
+    const val = checked.has(key);
+    walk([top],(n)=>{ state.sel[treeKey(scope,n.id)] = val; });
+  });
+}
+function applyTopControlsFromPrefs(){
+  state.target = targetValueOfCode(chartPrefs.target);
+  state.targetManual = chartPrefs.target !== 'auto';
+  state.delta = chartPrefs.delta;
+  state.splitMb = chartPrefs.splitMb;
+  state.compression = chartPrefs.compression;
+  state.filenameTemplate = chartPrefs.filenameTemplate;
+  state.extensionMode = chartPrefs.extensionMode;
+  state.gitMode = chartPrefs.gitMode;
+  state.keepDev = chartPrefs.keepDev;
+  syncTopControls();
 }
 
 function renderFilenamePreview(){
@@ -1084,12 +1278,14 @@ function renderActions(){
     : '';
   if(zoneActions.includes('generate')){
     row.innerHTML=taskBtns
+      +(hasSel?'':'<span class="action-hint" id="action-hint">'+t('chart.needSelect')+'</span>')
       +'<button class="btn" id="btn-fetch">'+svg('cloud','ico')+t('action.fetch')+'</button>'
       +'<button class="btn" id="btn-host-assetlist">'+svg('file','ico')+t('action.exportHostAssetList')+'</button>'
-      +'<button class="btn accent" id="btn-generate"'+(actionEnabled(state.zone,'generate',sel)?'':' disabled')+'>'+svg('archive','ico')+t('action.generatePack')+'</button>'
-      +'<button class="btn" id="btn-merge"'+(actionEnabled(state.zone,'merge',sel)?'':' disabled')+'>'+svg('copy','ico')+t('action.mergeUpload')+'</button>'
+      +'<button class="btn accent" id="btn-generate"'+(actionEnabled(state.zone,'generate',sel)?'':' disabled title="'+t('chart.needSelect')+'"')+'>'+svg('archive','ico')+t('action.generatePack')+'</button>'
+      +'<button class="btn" id="btn-merge"'+(actionEnabled(state.zone,'merge',sel)?'':' disabled title="'+t('chart.needSelect')+'"')+'>'+svg('copy','ico')+t('action.mergeUpload')+'</button>'
       +libBtn
       +'<button class="btn" id="transfer-open-btn">'+svg('bolt','ico')+t('transfer.open')+'</button>';
+    row.querySelector('#action-hint')?.addEventListener('click',()=>toast(t('chart.needSelect')));
     row.querySelector('#btn-generate')?.addEventListener('click',()=>doGenerate());
     row.querySelector('#btn-merge')?.addEventListener('click',()=>doMerge());
     row.querySelector('#btn-library-export')?.addEventListener('click',()=>actions.libraryExport?.());
@@ -1780,7 +1976,7 @@ function escapeHtml(s){ return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<'
 function doFetch(){ actions.fetch?.(); return undefined; }
 function doGenerate(){
   const pkgs=[...state.selectedPkgs].map(id=>state.packages.find(p=>p.id===id)).filter(Boolean);
-  actions.generate?.({ packages: pkgs, merge: mergeActive(pkgs), target: state.target, delta: state.delta, splitMb: state.splitMb, filenameTemplate: document.getElementById('filename-template').value });
+  actions.generate?.({ packages: pkgs, merge: mergeActive(pkgs), target: state.target, delta: state.delta, splitMb: state.splitMb, filenameTemplate: state.filenameTemplate });
 }
 function doMerge(){
   const pkgs=[...state.selectedPkgs].map(id=>state.packages.find(p=>p.id===id)).filter(Boolean);
@@ -1790,7 +1986,6 @@ function doMerge(){
 function doUploadHost(){ actions.restore?.([...state.selectedPkgs]); }
 function doCopyBack(){ actions.copyBack?.([...state.selectedPkgs]); }
 function doDeleteSelected(){ actions.deleteSelected?.([...state.selectedPkgs]); }
-function doUploadPrivate(payload){ actions.uploadPrivate?.(payload); }
 
 /* ── 面板内视图（设置 / 日志 / 帮助；确认框为顶层 dialog） ── */
 const PANES=['workbench','settings','log','help'];
@@ -1831,7 +2026,7 @@ function openModal(title,desc,extraHtml,actions){
   if(!dlg) return;
   document.getElementById('modal-title').textContent=title;
   document.getElementById('modal-desc').textContent=desc;
-  document.getElementById('modal-extra').innerHTML=(extraHtml||[]).join('');
+  document.getElementById('modal-extra').innerHTML=(Array.isArray(extraHtml) ? extraHtml.join('') : (extraHtml || ''));
   const acts=document.getElementById('modal-actions'); acts.innerHTML='';
   (actions||[]).forEach(a=>{
     const b=document.createElement('button');
@@ -2166,7 +2361,13 @@ function bind(){
     compressionSelect.value=state.compression;
     compressionSelect.addEventListener('change',e=>{ state.compression=e.target.value; });
   }
-  document.getElementById('filename-template').addEventListener('input',renderFilenamePreview);
+  const filenameInput=document.getElementById('filename-template');
+  if(filenameInput){
+    filenameInput.value=state.filenameTemplate;
+    filenameInput.addEventListener('input',()=>{ state.filenameTemplate=filenameInput.value; renderFilenamePreview(); });
+  }
+
+  document.getElementById('chart-pref-btn')?.addEventListener('click', openChartPrefs);
 
   const stackEl=document.getElementById('chart-stack');
   const scopeFromEl=el=>{ const h=el.closest('[data-scope]'); return h?h.dataset.scope:null; };
@@ -2249,6 +2450,12 @@ function bind(){
       renderChart();
       return;
     }
+    const prefExtMode=e.target.closest('[data-prefextmode]');
+    if(prefExtMode){
+      state.extensionMode = prefExtMode.dataset.prefextmode==='manifest' ? EXTENSION_MODES.MANIFEST : EXTENSION_MODES.FULL;
+      prefExtMode.parentElement.querySelectorAll('[data-prefextmode]').forEach((b)=>b.classList.toggle('active', b===prefExtMode));
+      return;
+    }
     const sub=e.target.closest('[data-suball]');
     if(sub){
       const scope=scopeFromEl(sub); if(!scope) return;
@@ -2276,20 +2483,22 @@ function bind(){
     }
     const priv=e.target.closest('[data-privfiles]');
     if(priv){ void openPrivateFiles(); return; }
-    const up=e.target.closest('[data-upload]');
-    if(up){
-      const scope=scopeFromEl(up);
-      const n=findNode(nodesForScope(scope),up.dataset.upload);
-      doUploadPrivate({ name:n?n.label:'', path:n?(n.path||''):'', pkgId:scope && scope.indexOf('pkg:')===0 ? scope.slice(4) : null });
-      return;
+    const fmtBtn=e.target.closest('[data-chartfmt-toggle]');
+    if(fmtBtn){
+      const key=fmtBtn.dataset.chartfmtToggle;
+      state.chartFmt[key] = chartFmtOf(key)==='bar' ? 'donut' : 'bar';
+      renderChart(); return;
     }
+    if(e.target.closest('#pref-save')){ saveChartPrefsDraft(); return; }
+    if(e.target.closest('#pref-cancel')){ cancelChartPrefs(); return; }
   });
   stackEl.addEventListener('change',e=>{
-    const fmt=e.target.closest('[data-chartfmt]');
-    if(fmt){
-      const key=fmt.dataset.chartfmt;
-      state.chartFmt[key] = CHART_FMTS.includes(fmt.value) ? fmt.value : 'bar';
-      renderChart();
+    const pg=e.target.closest('[data-prefgroup]');
+    if(pg){
+      const base=state.prefDraft || normalizeChartPrefs(chartPrefs);
+      const set=new Set(base.checkedGroups);
+      if(pg.checked) set.add(pg.dataset.prefgroup); else set.delete(pg.dataset.prefgroup);
+      state.prefDraft={...base, checkedGroups:[...set]};
       return;
     }
     const git=e.target.closest('[data-gitmode]');
@@ -2297,6 +2506,13 @@ function bind(){
       state.gitMode = [GIT_MODES.KEEP,GIT_MODES.MINIMAL,GIT_MODES.STRIP].includes(git.value) ? git.value : GIT_MODES.KEEP;
       return;
     }
+    const prefGit=e.target.closest('[data-prefgitmode]');
+    if(prefGit){
+      state.gitMode = [GIT_MODES.KEEP,GIT_MODES.MINIMAL,GIT_MODES.STRIP].includes(prefGit.value) ? prefGit.value : GIT_MODES.KEEP;
+      return;
+    }
+    const prefKeepDev=e.target.closest('[data-prefkeepdev]');
+    if(prefKeepDev){ state.keepDev = !!prefKeepDev.checked; return; }
     const keepDev=e.target.closest('[data-keepdev]');
     if(keepDev){ state.keepDev = !!keepDev.checked; return; }
     const cb=e.target.closest('[data-check]'); if(!cb) return;
@@ -2309,19 +2525,6 @@ function bind(){
     linked.forEach(x=>setChecked(x,scope,cb.checked));
     if(linked.length) toast(t('link.synced',{n:linked.length}));
     renderChart();
-  });
-  // 拖拽卡片右下角改尺寸 → 按 data-volkey 落库，刷新后保持
-  stackEl.addEventListener('pointerup',(e)=>{
-    const card=e.target && e.target.closest ? e.target.closest('.vol-card') : null;
-    if(!card) return;
-    const r=card.getBoundingClientRect();
-    if(e.clientX < r.right-20 || e.clientY < r.bottom-20) return;
-    const key=card.dataset.volkey;
-    if(!key) return;
-    const w=Math.round(card.offsetWidth), h=Math.round(card.offsetHeight);
-    if(!w || !h) return;
-    state.cardSize[key]={ w, h };
-    persistCardSizes();
   });
   document.getElementById('batch-bar').addEventListener('click',e=>{
     const toggle=e.target.closest('[data-mergetoggle]');
@@ -2349,7 +2552,7 @@ function bind(){
     if(check){
       const id=check.dataset.pkgcheck;
       if(check.checked) state.selectedPkgs.add(id); else state.selectedPkgs.delete(id);
-      renderZones(); renderActions(); renderCloud(); return;
+      renderZones(); renderChart(); renderActions(); renderCloud(); return;
     }
     const act=e.target.closest('[data-pkgact]');
     if(act){
@@ -2465,10 +2668,62 @@ function initSplitters(){
   }
 }
 
+/* ── 图表网格拖拽条：列间 1 条 + 行间左右两段 ── */
+function initChartSplitters(){
+  const stack=document.getElementById('chart-stack');
+  if(!stack) return;
+  let drag=null;
+  const stop=()=>{
+    if(!drag) return;
+    drag.bar.classList.remove('is-dragging');
+    document.body.style.cursor='';
+    drag=null;
+    persistChartLayout();
+  };
+  stack.addEventListener('pointerdown',e=>{
+    const bar=e.target.closest('[data-split]');
+    if(!bar) return;
+    const canvas=bar.closest('.chart-canvas');
+    if(!canvas) return;
+    drag={ kind:bar.dataset.split, gap:Number(bar.dataset.gap)||0, canvas, bar };
+    bar.classList.add('is-dragging');
+    try { bar.setPointerCapture(e.pointerId); } catch { /* 老浏览器 */ }
+    document.body.style.cursor = drag.kind==='col' ? 'col-resize' : 'row-resize';
+    e.preventDefault();
+  });
+  stack.addEventListener('pointermove',e=>{
+    if(!drag) return;
+    const { kind, gap, canvas } = drag;
+    const rect = canvas.getBoundingClientRect();
+    if(kind==='col'){
+      const col=Math.max(0.2, Math.min(0.8, (e.clientX-rect.left)/rect.width));
+      state.chartLayout.col=col;
+      canvas.style.gridTemplateColumns='minmax(0,'+col+'fr) 6px minmax(0,'+(1-col)+'fr)';
+      return;
+    }
+    const count=Math.max(2, Number(canvas.dataset.rows)||2);
+    const rows=layoutRowRatios(count);
+    const usable=Math.max(1, rect.height - 6*(count-1));
+    let start=0;
+    for(let i=0;i<gap;i++) start += rows[i]*usable + 6;
+    const pair=rows[gap]+rows[gap+1];
+    let first=(e.clientY-rect.top-start)/usable;
+    first=Math.max(0.15, Math.min(pair-0.15, first));
+    rows[gap]=first;
+    rows[gap+1]=pair-first;
+    state.chartLayout.rows=rows;
+    canvas.style.gridTemplateRows=rows.map(r=>'minmax(0,'+r+'fr)').join(' 6px ');
+  });
+  stack.addEventListener('pointerup',stop);
+  stack.addEventListener('pointercancel',stop);
+}
+
 /* ── 初始化（视图自有，不依赖外部数据） ── */
 renderAll();
 bind();
+syncTopControls();
 initSplitters();
+initChartSplitters();
 
   /* ── 对外 API ── */
   function renderAll() {
@@ -2598,7 +2853,13 @@ initSplitters();
 
   return {
     setPackages(list) {
-      state.packages = (list || []).map((pkg) => ({ ...pkg }));
+      const next = (list || []).map((pkg) => ({ ...pkg }));
+      const fresh = next.filter((pkg) => !state.prefAppliedPkgs.has(pkg.id) && Array.isArray(pkg.nodes) && pkg.nodes.length);
+      state.packages = next;
+      if (fresh.length) {
+        fresh.forEach((pkg) => { applyPrefsToPackage(pkg); state.prefAppliedPkgs.add(pkg.id); });
+        applyTopControlsFromPrefs();
+      }
       renderAll();
     },
     setHost(hostKey, mode) {
@@ -2681,9 +2942,6 @@ initSplitters();
     getState() { return state; },
     applySettings(s) {
       if(!s) return;
-      if(s.defaultExtensionMode) state.extensionMode = s.defaultExtensionMode;
-      if(s.defaultGitMode) state.gitMode = s.defaultGitMode;
-      if(typeof s.defaultKeepDev === 'boolean') state.keepDev = s.defaultKeepDev;
       renderChart();
     },
     openTutorial,

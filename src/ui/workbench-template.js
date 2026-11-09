@@ -33,6 +33,9 @@ export function getWorkbenchHtml() {
               <span data-i18n="chart.title"></span>
             </div>
             <div class="panel-actions">
+              <button class="icon-btn chart-pref-btn" id="chart-pref-btn" data-i18n-title="chart.prefsBtn" data-i18n-aria="chart.prefsBtn">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h8M16 7h4M4 12h4M12 12h8M4 17h10M18 17h2"/><circle cx="14" cy="7" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="16" cy="17" r="2"/></svg>
+              </button>
               <button class="help-btn" data-help="chart" data-i18n-title="chart.help">?</button>
             </div>
           </div>
