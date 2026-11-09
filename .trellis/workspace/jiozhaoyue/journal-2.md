@@ -987,3 +987,39 @@ Topics: [.trellis/research/luker-native-ui-busy-injection.md](../../research/luk
 ### Next Steps
 
 - 用户在 Real Luker 实测：拉取不再被取消、数据与备份每次打开有注入按钮、原生导出进行中拉取仍让路；Dev 新 UI 依赖点击监视让路属预期
+
+
+## Session 67: Luker 2.9 适配与工作台增强（第一批）
+<!-- trellis-session: v=2 fp=0d38453f92940990 -->
+
+**Date**: 2026-11-09
+**Task**: Luker 2.9 适配与工作台增强（第一批）
+**Branch**: `main`
+
+### Summary
+
+按用户需求适配 Luker 2.9 账户改版并完成工作台增强：注入锚点改 .dw-foot、配额两行跳转宿主存储页、教程首帧覆盖、日志改造（按钮计数/毫秒时间戳/条数设置/防刷屏）、设置分组、扩展清单导出、图表最大化下钻。982 测试 + 六守卫 + 构建通过；浏览器实测因预览分类器故障未做。第二批（迁移与备份合并、S3 通用化、WebDAV）未动工。
+Topics: [.trellis/research/luker-2.9-adaptation-and-handoff.md](../../research/luker-2.9-adaptation-and-handoff.md)
+
+### Main Changes
+
+- host-bridge：新增账户窗口/存储页能力表与 openHostAccountWindow/openHostStoragePage；.dw-foot 注入用原生 dw-btn；勾选读取兼容 .dw-chip；忙态只认 .busy
+- workbench-view：renderQuota 改两行可点按钮；openTutorial 首帧禁用过渡；renderLog 按钮带计数与毫秒时间戳；图表卡最大化与逐层下钻
+- settings-panel：四个可收起分组 + 日志条数/加载清空 + 诊断导出扩展清单；index.js 接线与自动教程下一帧
+
+### Git Commits
+
+(No commits - planning session)
+
+### Testing
+
+- [OK] npm test 982 passed / 2 skipped；六条 UI 守卫全绿；npm run build 通过
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 浏览器实机复测第一批（preview_start 曾因分类器故障不可用）：教程即时性、配额点击、日志计数与时间戳、图表最大化下钻
+- 第二批 R4-R6：迁移与备份入口合并、S3 分包增量、WebDAV 全降级传输（判据见 docs/PLAN-2026-11-09.md）

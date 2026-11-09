@@ -282,8 +282,10 @@ TauriTavern 的阶段+进度事件 / 原子落盘 / 自然续传 / 地址发现�
 
 ## 9. 正式 UI 即预览（2026-11-05 用户裁定，demo 页整体作废）
 
-**规则（唯一入口）**：开发期预览**只走** `npm run dev` → `http://127.0.0.1:3040/`
-（正式 `index.html` 的独立 Web 形态，与插件态共用同一套模板与视图）。
+**规则（唯一验收路径）**：开发热重载可用 `npm run dev`（3040）；**界面验收只走**
+`npm run build && npm run preview`（本地静态服务器 4173，托管 `dist/`），浏览器打开
+`http://localhost:4173/` 操作取证。**禁止** `file://`、直接双击 `dist/index.html`
+或 `npm run dev` 作为验收入口（2026-11-09 用户裁定）。
 
 - **不存在**任何独立 demo / 预览页。`src/ui/ui-demo.html` 已删除，
   `test/ui-demo-isolation.test.js` 一并删除。

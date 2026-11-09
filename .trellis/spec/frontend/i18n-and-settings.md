@@ -108,6 +108,10 @@
   - 只有 `st` / `luker` 支持；其它宿主直接 `{ok:false, reason:'unsupported-host'}`，不阻塞主路径。
   - 没有列表端点：下载走静态 `/user/files/<name>`；「列出」只能靠本地记录。
 - 上传前必须走流量提示（`view.confirmTraffic`），与后端上下传同一套设置开关。
+- **从宿主拉取的提示顺序**：流量警告 → 原生操作指引 → 打开原生界面；指引开关
+  `nativePullNotice` 默认 `true`（每次提醒），持久化于设置双层存储。
+- **资产列表导出**：只输出官方扁平 JSON（见 `asset-list-export.md`），不输出 Markdown；
+  入口只在图表卡与从宿主拉取；设置「诊断」导出按钮已删除。
 
 ## 7. 验证命令
 
@@ -121,7 +125,8 @@ npm run check:dom-scope
 npm run check:control-consumer
 npm run check:i18n
 npm run build
-npm run dev   # 3040 → 根路径（正式工作台；demo 页已废弃，见 workbench-single-view.md §9）
+npm run preview   # 4173 → 本地静态服务器；UI 验收唯一入口
+npm run dev       # 3040 → 仅开发热重载（demo 页已废弃，见 workbench-single-view.md §9）
 ```
 
 ## 8. 分卷容量：改值必须先确认（2026-11-05 用户裁定）

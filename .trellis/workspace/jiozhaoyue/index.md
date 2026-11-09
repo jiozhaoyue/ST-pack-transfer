@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-2.md`
-- **Total Sessions**: 66
-- **Last Active**: 2026-11-08
+- **Total Sessions**: 67
+- **Last Active**: 2026-11-09
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-2.md` | ~989 | Active |
+| `journal-2.md` | ~1025 | Active |
 | `journal-1.md` | ~2491 | Archived |
 <!-- @@@/auto:active-documents -->
 
@@ -30,6 +30,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 67 | 2026-11-09 | Luker 2.9 适配与工作台增强（第一批） | - | `main` |
 | 66 | 2026-11-08 | 插件态热修:拉取误取消与注入消失(宿主生命周期+忙态探针) | `6acd259` | `main` |
 | 65 | 2026-11-08 | UI 全面异常热修:index.js ReferenceError 杀死初始化链 | `532e5e2` | `main` |
 | 64 | 2026-11-06 | Session 64 · 文档对齐与四项接线恢复（续传/暂停/报告/待导出区） | `1533ac3` | `main` |

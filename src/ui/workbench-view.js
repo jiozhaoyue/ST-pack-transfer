@@ -11,6 +11,10 @@
 
 import { chartTreeFor, deriveExportOptions, annotateChatLinks, counterpartsOf } from '../core/chart-model.js';
 import { createS3Client, buildBaseUrl, normalizePrefix, objectKey } from '../core/s3-client.js';
+import { createWebdavClient } from '../core/webdav-client.js';
+import { createTransferTarget } from '../core/transfer-target.js';
+import { DEFAULT_CHUNK_SIZE, chunkKey, manifestKey, parseManifest } from '../core/transfer-plan.js';
+import { createTransferRunner } from '../app/transfer-runner.js';
 import { encryptBytes, decryptBytes, isEncrypted } from '../core/s3-crypto.js';
 import { mergeChartTrees } from '../core/merge-packages.js';
 import { actionsForZone, actionEnabled } from '../core/zone-model.js';
@@ -117,20 +121,34 @@ const INITIAL_PACKAGES = [];
 const SPLIT_MIN = 32, SPLIT_MAX = 2048;
 
 const LOG_STORAGE_KEY = 'st-pack-transfer:audit-log';
-const LOG_MAX_ENTRIES = 500;
+const DEFAULT_LOG_MAX_ENTRIES = 500;
 const LOG_MAX_CHARS = 400_000;
 let logPersistTimer = 0;
+
+/** 日志上限（设置项，默认 500；夹在 50–5000）。 */
+function logLimit(){
+  try{
+    const n=Number(loadSettings().logMaxEntries);
+    if(Number.isFinite(n)) return Math.max(50,Math.min(5000,Math.round(n)));
+  }catch{ /* 隐私模式：用默认 */ }
+  return DEFAULT_LOG_MAX_ENTRIES;
+}
 
 function loadPersistedLog() {
   try {
     if (typeof localStorage === 'undefined') return [];
+    // 默认每次加载插件清空；设置里可关闭。
+    if (loadSettings().clearLogOnLoad !== false) {
+      localStorage.removeItem(LOG_STORAGE_KEY);
+      return [];
+    }
     const raw = localStorage.getItem(LOG_STORAGE_KEY);
     if (!raw) return [];
     const list = JSON.parse(raw);
     if (!Array.isArray(list)) return [];
     return list
       .filter((e) => e && typeof e.msg === 'string' && typeof e.level === 'string')
-      .slice(-LOG_MAX_ENTRIES);
+      .slice(-logLimit());
   } catch {
     return [];
   }
@@ -141,7 +159,7 @@ function persistLog() {
   logPersistTimer = setTimeout(() => {
     logPersistTimer = 0;
     try {
-      let list = state.log.slice(-LOG_MAX_ENTRIES);
+      let list = state.log.slice(-logLimit());
       let raw = JSON.stringify(list);
       while (raw.length > LOG_MAX_CHARS && list.length > 1) {
         list = list.slice(1);
@@ -178,14 +196,16 @@ const state = {
   packages: INITIAL_PACKAGES.map(p=>({...p})),
   selectedPkgs:new Set(), mergeMode:false, privateFiles:[], expanded:{}, collapsedVol:{}, sel:{}, log:loadPersistedLog(), logLevel:'ALL',
   noTrafficPrompt:false, keepExport:true,
+  volMaxKey:null, volPath:{},
   task:null, pendingExports:[],
   chartFmt:{}, cardSize:loadCardSizes(),
-  storage:{ browser:null, host:null }, quotaHostOpen:false,
-  cloud:{ open:false, config:loadCloudConfig(), busy:false, status:'', list:[], picked:null },
+  storage:{ browser:null, host:null, page:null },
+  cloud:{ provider:'s3', config:loadCloudConfig(), webdav:loadWebdavConfig(), busy:false, status:'', list:[], picked:null },
   sort:'time-desc', filter:'all', tutorialStep:0, tutorialOpen:false, tutorialKind:'basic',
   sourceKey:'host:luker', seq:{}, libraryExport:false,
+  transfer:{ open:false, tab:'lan' },
   lan:{
-    open:false, scanning:null, scanError:'',
+    scanning:null, scanError:'',
     send:{ code:'', answer:'', phase:t('action.ready'), pct:0, detail:'', busy:false, done:false },
     recv:{ code:'', phase:t('action.waiting'), pct:0, detail:'', busy:false, done:false }
   }
@@ -201,8 +221,10 @@ function fmtMB(mb){
 function hostIcon(host){ return (HOSTS[host]||{}).icon || HOSTS.luker.icon; }
 function hostName(host){ return (HOSTS[host]||{}).full || t('filter.unknown'); }
 function nowTime(){
-  const d=new Date(); const p=n=>String(n).padStart(2,'0');
-  return p(d.getHours())+':'+p(d.getMinutes())+':'+p(d.getSeconds());
+  const d=new Date(); const p=(n,w=2)=>String(n).padStart(w,'0');
+  /* 完整时间戳：日期 + 时刻 + 毫秒，审计场景必须可精确排序。 */
+  return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())
+    +' '+p(d.getHours())+':'+p(d.getMinutes())+':'+p(d.getSeconds())+'.'+p(d.getMilliseconds(),3);
 }
 function dtNow(){
   const d=new Date(); const p=n=>String(n).padStart(2,'0');
@@ -210,7 +232,8 @@ function dtNow(){
 }
 function log(level,msg){
   state.log.push({ level, msg, time:nowTime() });
-  if(state.log.length>LOG_MAX_ENTRIES) state.log.shift();
+  const limit=logLimit();
+  while(state.log.length>limit) state.log.shift();
   persistLog();
   renderLog();
 }
@@ -503,50 +526,30 @@ function renderQuota(){
   const head=document.getElementById('quota-head');
   if(!head) return;
   const gb=bytes=>(bytes/1073741824).toFixed(1)+' GB';
-  const row=(label,ico,cell,emptyText)=>{
-    if(!cell || typeof cell.used!=='number') return '<div class="quota-row is-disabled">'
+  // 宿主存储页能力由控制器探测后经 setStorage 传入；未提供时不伪造入口。
+  const page=state.storage.page || { available:false };
+  const row=(label,ico,cell,emptyText,kind)=>{
+    const openable=!!page.available;
+    const hasReading=!!cell && typeof cell.used==='number';
+    const total=hasReading && typeof cell.total==='number' ? cell.total : 0;
+    const pct=hasReading && total>0 ? Math.max(0,Math.min(100,Math.round(cell.used/total*100))) : 0;
+    let val;
+    if(!hasReading) val=emptyText;
+    else if(total<=0) val=gb(cell.used)+' · '+t('quota.unlimited');
+    else val=gb(cell.used)+' / '+gb(total)+' · '+pct+'%';
+    return '<button type="button" class="quota-row'+(hasReading?'':' is-disabled')+(openable?'':' is-nopage')+'"'
+      +' data-quota-kind="'+kind+'" title="'+escapeHtml(openable?t('quota.openHostPage'):t('quota.noHostPage'))+'">'
       +'<span class="q-label">'+svg(ico,'tree-ico')+label+'</span>'
-      +'<span class="quota-bar"><span class="quota-fill" style="width:0%"></span></span>'
-      +'<span class="quota-val">'+emptyText+'</span></div>';
-    const total=typeof cell.total==='number'?cell.total:0;
-    if(total<=0) return '<div class="quota-row">'
-      +'<span class="q-label">'+svg(ico,'tree-ico')+label+'</span>'
-      +'<span class="quota-bar"><span class="quota-fill" style="width:0%"></span></span>'
-      +'<span class="quota-val">'+gb(cell.used)+' · '+t('quota.unlimited')+'</span></div>';
-    const p=Math.max(0,Math.min(100,Math.round(cell.used/total*100)));
-    return '<div class="quota-row">'
-      +'<span class="q-label">'+svg(ico,'tree-ico')+label+'</span>'
-      +'<span class="quota-bar"><span class="quota-fill '+(p>85?'warn':'')+'" style="width:'+p+'%"></span></span>'
-      +'<span class="quota-val">'+gb(cell.used)+' / '+gb(total)+' · '+p+'%</span></div>';
+      +'<span class="quota-bar"><span class="quota-fill'+(pct>85?' warn':'')+'" style="width:'+pct+'%"></span></span>'
+      +'<span class="quota-val">'+val+'</span>'
+      +(openable?'':'<span class="quota-nopage">'+t('quota.noHostPageShort')+'</span>')
+      +'</button>';
   };
   const hostReadable=!!(HOSTS[state.host]||{}).readable;
-  const open=!!state.quotaHostOpen;
-  head.innerHTML = row(t('quota.browser'),'db',state.storage.browser,t('quota.browserEmpty'))
-    + row(t('quota.host'),'shield',hostReadable ? state.storage.host : null,t('quota.hostEmpty'))
-    + '<button type="button" class="quota-host-toggle" id="quota-host-toggle" aria-expanded="'+(open?'true':'false')+'">'
-      + svg('folder','tree-ico')
-      + '<span class="qht-label">'+t('quota.hostData')+'</span>'
-      + '<svg class="chev" viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5l7 7-7 7"/></svg>'
-    + '</button>'
-    + '<div class="quota-host-detail" id="quota-host-detail"'+(open?'':' hidden')+'>'
-      + (open ? hostDetailHtml(hostReadable ? (state.hostTree||[]) : []) : '')
-    + '</div>';
+  head.innerHTML = row(t('quota.browser'),'db',state.storage.browser,t('quota.browserEmpty'),'browser')
+    + row(t('quota.host'),'shield',hostReadable ? state.storage.host : null,t('quota.hostEmpty'),'server');
 }
-/* 宿主目录明细：默认收起，点击在同一条目内展开；只读，不参与勾选与统计。 */
-function hostDetailHtml(nodes){
-  let out='';
-  const walkRows=(list,depth)=>{
-    for(const n of list||[]){
-      out+='<div class="quota-host-row" style="padding-left:'+(8+depth*12)+'px">'
-        +'<span class="qhr-name" title="'+escapeHtml(n.label)+'">'+escapeHtml(n.label)+'</span>'
-        +'<span class="qhr-size">'+fmtMB(n.mb)+'</span></div>';
-      if(n.children && n.children.length) walkRows(n.children,depth+1);
-    }
-  };
-  walkRows(nodes,0);
-  return out || '<div class="quota-empty">'+t('quota.hostEmpty')+'</div>';
-}
-function renderTreeRows(nodes,depth,scope,readonly,tools,totalMb){
+function renderTreeRows(nodes,depth,scope,readonly,tools,totalMb,drill){
   let out='';
   for(const n of nodes){
     if(tools && tools[n.id]) out+=tools[n.id];
@@ -573,10 +576,11 @@ function renderTreeRows(nodes,depth,scope,readonly,tools,totalMb){
       +'</span>' : '')
       +'<span class="tree-occ" aria-hidden="true"><i style="width:'+pct+'%"></i></span>'
       +'<span class="tree-size">'+fmtMB(n.mb)+'</span>'
+      +(drill && hasKids ? '<button class="tree-mini vol-drill" data-voldrill="'+n.id+'" title="'+t('chart.drill')+'">›</button>' : '')
       +(n.uploadable?'<button class="tree-mini" data-upload="'+n.id+'">'+t('tree.upload')+'</button>':'')
       +'</div>';
     if(hasKids && expanded){
-      out+='<div class="tree-children">'+renderTreeRows(n.children,depth+1,scope,readonly,tools,totalMb)+'</div>';
+      out+='<div class="tree-children">'+renderTreeRows(n.children,depth+1,scope,readonly,tools,totalMb,drill)+'</div>';
     }
   }
   return out;
@@ -627,16 +631,49 @@ function volChartHtml(nodes, fmt){
 
 /* 一张标准图表卡：包序号 + 卷号 + 本卷容量 + 全选 + 树 + 勾选摘要。
    导入/导出序号在卡片 DOM 内；每一级（卡/分类/子目录）都可全选/全不选/反选。 */
+/** 最大化视图的当前层级节点（按 state.volPath[key] 逐层下钻）。 */
+function volScopedNodes(o){
+  const path=state.volPath?.[o.key]||[];
+  let list=o.nodes||[];
+  for(const id of path){
+    const node=findNode(list,id);
+    if(!node || !node.children || !node.children.length) return list;
+    list=node.children;
+  }
+  return list;
+}
+
+/** 最大化视图的面包屑：点任意一级返回该层。 */
+function volBreadcrumbHtml(o){
+  const path=state.volPath?.[o.key]||[];
+  if(!path.length) return '';
+  const crumbs=[];
+  let list=o.nodes||[];
+  for(const id of path){
+    const node=findNode(list,id);
+    if(!node) break;
+    crumbs.push({ id, label: node.label });
+    list=node.children||[];
+  }
+  if(!crumbs.length) return '';
+  return '<div class="vol-breadcrumb"><button type="button" data-volcrumb="0">'+t('chart.root')+'</button>'
+    + crumbs.map((c,i)=>'<span class="sep">›</span><button type="button" data-volcrumb="'+(i+1)+'">'+escapeHtml(c.label)+'</button>').join('')
+    +'</div>';
+}
+
 function chartCardHtml(o){
-  const collapsed = state.collapsedVol[o.key]!==undefined ? !!state.collapsedVol[o.key] : !!o.defaultCollapsed;
+  const maxed = state.volMaxKey === o.key;
+  const collapsed = !maxed && (state.collapsedVol[o.key]!==undefined ? !!state.collapsedVol[o.key] : !!o.defaultCollapsed);
   syncAncestors(o.nodes,o.scope);
   const sum=sumSelected(o.nodes,o.scope);
   const dis = !!o.disabled;
   const fmt = chartFmtOf(o.key);
   const size = state.cardSize[o.key];
-  const sizeStyle = (size && Number(size.w)>0 && Number(size.h)>0)
+  const assetPkgs = Array.isArray(o.assetPkgs) ? o.assetPkgs.filter(Boolean) : [];
+  const scopeNodes = maxed ? volScopedNodes(o) : o.nodes;
+  const sizeStyle = (!maxed && size && Number(size.w)>0 && Number(size.h)>0)
     ? ' style="width:'+Math.round(size.w)+'px;height:'+Math.round(size.h)+'px"' : '';
-  return '<div class="vol-card'+(collapsed?' is-collapsed':'')+(dis?' is-disabled':'')+'" data-scope="'+o.scope+'" data-volkey="'+o.key+'"'+(dis?' aria-disabled="true"':'')+sizeStyle+'>'
+  return '<div class="vol-card'+(collapsed?' is-collapsed':'')+(maxed?' is-max':'')+(dis?' is-disabled':'')+'" data-scope="'+o.scope+'" data-volkey="'+o.key+'"'+(dis?' aria-disabled="true"':'')+sizeStyle+'>'
     +'<div class="vol-head">'
       +'<span class="vol-idx'+(o.merged?' is-merged':'')+'">'+o.idxText+'</span>'
       +(o.volText?'<span class="vol-cap">'+o.volText+'</span>':'')
@@ -656,13 +693,16 @@ function chartCardHtml(o){
         +'<button data-treeinvert="1">'+t('chart.invert')+'</button>'
       +'</span>')
       +(o.pkgId?'<button class="group-close" data-closegroup="'+o.pkgId+'" aria-label="'+t('chart.closeGroup')+'">×</button>':'')
+      +(assetPkgs.length?'<button class="vol-assetlist" data-assetlist="1" data-assetpkgs="'+escapeHtml(assetPkgs.join(','))+'" title="'+t('chart.exportAssetList')+'" aria-label="'+t('chart.exportAssetList')+'">⤓</button>':'')
+      +'<button class="vol-max" data-volmax="'+o.key+'" title="'+(maxed?t('chart.restore'):t('chart.maximize'))+'" aria-label="'+(maxed?t('chart.restore'):t('chart.maximize'))+'">'+(maxed?'⤡':'⤢')+'</button>'
       +'<button class="vol-collapse" data-voltoggle="'+o.key+'" aria-label="'+t('chart.expand')+'">'
       +'<svg class="chev" viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5l7 7-7 7"/></svg></button>'
     +'</div>'
+    +(maxed ? volBreadcrumbHtml(o) : '')
     +'<div class="vol-body">'
       +(o.noticeHtml||'')
-      +volChartHtml(o.nodes, fmt)
-      +'<div class="chart-tree">'+renderTreeRows(o.nodes,0,o.scope,o.readonly||dis,groupToolsOf(o),volChartData(o.nodes).total)+'</div>'
+      +volChartHtml(scopeNodes, fmt)
+      +'<div class="chart-tree">'+renderTreeRows(scopeNodes,0,o.scope,o.readonly||dis,groupToolsOf(o),volChartData(scopeNodes).total,maxed)+'</div>'
       +(dis?'':'<div class="chart-foot"><span>'+t('chart.selected',{count:sum.count,size:fmtMB(sum.mb)})+'</span></div>')
     +'</div>'
   +'</div>';
@@ -785,6 +825,8 @@ function renderChart(){
   renderBatchBar(targets);
   const stack=document.getElementById('chart-stack');
   if(!stack) return;
+  if(state.volMaxKey && !targets.some((tgt)=>tgt.key===state.volMaxKey)) state.volMaxKey=null;
+  stack.classList.toggle('has-max', !!state.volMaxKey);
   const stackScroll = { top: stack.scrollTop, left: stack.scrollLeft };
   const treeScrolls = {};
   stack.querySelectorAll('.vol-card').forEach(card => {
@@ -803,6 +845,7 @@ function renderChart(){
         + '<div class="guide-title">' + t('empty.fetchTitle') + '</div>'
         + '<div class="guide-desc">' + t('empty.fetchDesc') + '</div>'
         + '<button type="button" class="btn accent" id="btn-empty-fetch">' + t('empty.fetchBtn') + '</button>'
+        + '<button type="button" class="btn" id="btn-assetlist-host">' + t('empty.assetListBtn') + '</button>'
       + '</div>'
       + '<div class="empty-guide-card guide-import">'
         + '<div class="guide-icon"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></div>'
@@ -832,6 +875,7 @@ function renderChart(){
             totalText: multi ? t('chart.total',{size:fmtMB(totalMb)}) : '',
             noticeHtml: '', readonly: false, over: !!v.over, pkgId: '',
             extToolsHtml: extTools,
+            assetPkgs: target.pkgs.map(p=>p.id),
             defaultCollapsed: state.view==='mobile' && multi && v.i>1
           })).join('')
         +'</div></div>';
@@ -855,6 +899,7 @@ function renderChart(){
           over: !!v.over,
           pkgId: pkg.id,
           extToolsHtml: extTools,
+          assetPkgs: [pkg.id],
           defaultCollapsed: state.view==='mobile' && multi && v.i>1
         })).join('')
       +'</div></div>';
@@ -1037,8 +1082,7 @@ function renderActions(){
       +'<button class="btn accent" id="btn-generate"'+(actionEnabled(state.zone,'generate',sel)?'':' disabled')+'>'+svg('archive','ico')+t('action.generatePack')+'</button>'
       +'<button class="btn" id="btn-merge"'+(actionEnabled(state.zone,'merge',sel)?'':' disabled')+'>'+svg('copy','ico')+t('action.mergeUpload')+'</button>'
       +libBtn
-      +'<button class="btn" id="lan-open-btn">'+svg('bolt','ico')+t('action.lan')+'</button>'
-      +'<button class="btn" id="cloud-open-btn">'+svg('cloud','ico')+t('cloud.open')+'</button>';
+      +'<button class="btn" id="transfer-open-btn">'+svg('bolt','ico')+t('transfer.open')+'</button>';
     row.querySelector('#btn-generate')?.addEventListener('click',()=>doGenerate());
     row.querySelector('#btn-merge')?.addEventListener('click',()=>doMerge());
     row.querySelector('#btn-library-export')?.addEventListener('click',()=>actions.libraryExport?.());
@@ -1055,6 +1099,7 @@ function renderActions(){
   row.querySelector('#btn-task-resume')?.addEventListener('click',()=>actions.taskResume?.());
   row.querySelector('#btn-task-abort')?.addEventListener('click',()=>actions.taskAbort?.());
   row.querySelector('#btn-fetch')?.addEventListener('click',()=>doFetch());
+  renderTransfer();
   renderLan();
   renderCloud();
 }
@@ -1081,13 +1126,23 @@ function setLanQr(id, text, show){
   try { box.innerHTML=qr.encodeSvg(text); box.hidden=false; }
   catch { box.hidden=true; box.innerHTML=''; }
 }
+function renderTransfer(){
+  const open=!!state.transfer.open;
+  const chart=document.getElementById('chart-card');
+  const view=document.getElementById('transfer-view');
+  if(chart) chart.hidden=open;
+  if(view) view.hidden=!open;
+  document.querySelectorAll('[data-transfer-tab]').forEach(b=>{
+    const on=b.dataset.transferTab===state.transfer.tab;
+    b.classList.toggle('active',on);
+    b.setAttribute('aria-selected',on?'true':'false');
+  });
+}
 function renderLan(){
   const L=state.lan;
-  const chart=document.getElementById('chart-card');
   const view=document.getElementById('lan-view');
-  if(!chart||!view) return;
-  chart.hidden=!!(L.open || state.cloud.open);
-  view.hidden=!L.open;
+  if(!view) return;
+  view.hidden=!(state.transfer.open && state.transfer.tab==='lan');
   const targets=lanTargets();
   const sum=document.getElementById('lan-send-summary'); if(sum) sum.textContent=lanSummaryText();
   /* 概览：对端 / 类别 / 状态（对齐 Luker 后端行的信息层级） */
@@ -1162,8 +1217,51 @@ function persistCloudConfig(config) {
     return false;
   }
 }
+
+const WEBDAV_KEY = 'st-pack-transfer:webdav';
+
+/** WebDAV 配置：凭据只存本机浏览器；读不到时返回空配置而不是伪造。 */
+function loadWebdavConfig() {
+  if (typeof localStorage === 'undefined') return null;
+  try {
+    const parsed = JSON.parse(localStorage.getItem(WEBDAV_KEY) || 'null');
+    if (!parsed || typeof parsed !== 'object') return null;
+    return {
+      baseUrl: String(parsed.baseUrl || '').replace(/\/+$/, ''),
+      username: String(parsed.username || ''),
+      password: String(parsed.password || ''),
+      prefix: normalizePrefix(parsed.prefix || ''),
+      passphrase: String(parsed.passphrase || ''),
+    };
+  } catch {
+    return null;
+  }
+}
+function persistWebdavConfig(config) {
+  if (typeof localStorage === 'undefined') return false;
+  try {
+    localStorage.setItem(WEBDAV_KEY, JSON.stringify(config));
+    return true;
+  } catch {
+    return false;
+  }
+}
+function activeCloudConfig() {
+  return state.cloud.provider === 'webdav'
+    ? (state.cloud.webdav || {})
+    : (state.cloud.config || {});
+}
 function cloudConfigFromForm() {
   const val = (id) => (document.getElementById(id)?.value || '').trim();
+  if (state.cloud.provider === 'webdav') {
+    return {
+      baseUrl: val('webdav-base-url').replace(/\/+$/, ''),
+      username: val('webdav-username'),
+      password: document.getElementById('webdav-password')?.value || '',
+      prefix: normalizePrefix(val('webdav-prefix')),
+      passphrase: document.getElementById('webdav-passphrase')?.value || '',
+    };
+  }
   return {
     endpoint: val('cloud-endpoint').replace(/\/+$/, ''),
     region: val('cloud-region') || 'us-east-1',
@@ -1176,8 +1274,37 @@ function cloudConfigFromForm() {
   };
 }
 function cloudClient() {
+  const cfg = activeCloudConfig();
+  if (state.cloud.provider === 'webdav') {
+    const dav = createWebdavClient({
+      config: cfg,
+      fetchImpl: (url, init) => fetch(url, init),
+    });
+    return {
+      ready: dav.ready,
+      ensureCollection: (path) => dav.ensureCollection(path),
+      putObject: (key, bytes, opts) => dav.putObject(key, bytes, opts),
+      getObject: (key) => dav.getObject(key),
+      deleteObject: (key) => dav.deleteObject(key),
+      async listObjects(prefix = '') {
+        const result = await dav.list(prefix);
+        if (!result.ok) {
+          return { ok: false, status: result.status, message: result.code || result.message };
+        }
+        const base = String(prefix || '').replace(/\/+$/, '');
+        const items = (result.items || [])
+          .filter((item) => item && !item.isDir && item.name)
+          .map((item) => ({
+            key: base ? `${base}/${item.name}` : item.name,
+            size: item.size,
+            lastModified: item.lastModified,
+          }));
+        return { ok: true, status: result.status, items };
+      },
+    };
+  }
   return createS3Client({
-    config: state.cloud.config || {},
+    config: cfg,
     fetchImpl: (url, init) => fetch(url, init),
   });
 }
@@ -1186,31 +1313,47 @@ function cloudReady() {
 }
 function renderCloud() {
   const C = state.cloud;
-  const chart = document.getElementById('chart-card');
   const view = document.getElementById('cloud-view');
-  if (!chart || !view) return;
-  chart.hidden = !!(C.open || state.lan.open);
-  view.hidden = !C.open;
-  const cfg = C.config || {};
+  if (!view) return;
+  view.hidden = !(state.transfer.open && state.transfer.tab === 'cloud');
+  document.querySelectorAll('[data-cloud-provider]').forEach((b) => {
+    b.classList.toggle('active', b.dataset.cloudProvider === C.provider);
+  });
+  const s3Pane = document.getElementById('cloud-s3-pane');
+  const wdPane = document.getElementById('cloud-webdav-pane');
+  if (s3Pane) s3Pane.hidden = C.provider !== 's3';
+  if (wdPane) wdPane.hidden = C.provider !== 'webdav';
+
+  const cfg = activeCloudConfig() || {};
   const setVal = (id, value) => {
     const el = document.getElementById(id);
     if (el && document.activeElement !== el) el.value = value;
   };
-  setVal('cloud-endpoint', cfg.endpoint || '');
-  setVal('cloud-region', cfg.region || '');
-  setVal('cloud-bucket', cfg.bucket || '');
-  setVal('cloud-prefix', cfg.prefix || '');
-  setVal('cloud-access-key', cfg.accessKeyId || '');
-  setVal('cloud-secret-key', cfg.secretAccessKey || '');
-  setVal('cloud-passphrase', cfg.passphrase || '');
-  const ps = document.getElementById('cloud-path-style');
-  if (ps) ps.checked = !!cfg.pathStyle;
+  if (C.provider === 'webdav') {
+    setVal('webdav-base-url', cfg.baseUrl || '');
+    setVal('webdav-username', cfg.username || '');
+    setVal('webdav-password', cfg.password || '');
+    setVal('webdav-prefix', cfg.prefix || '');
+    setVal('webdav-passphrase', cfg.passphrase || '');
+  } else {
+    setVal('cloud-endpoint', cfg.endpoint || '');
+    setVal('cloud-region', cfg.region || '');
+    setVal('cloud-bucket', cfg.bucket || '');
+    setVal('cloud-prefix', cfg.prefix || '');
+    setVal('cloud-access-key', cfg.accessKeyId || '');
+    setVal('cloud-secret-key', cfg.secretAccessKey || '');
+    setVal('cloud-passphrase', cfg.passphrase || '');
+    const ps = document.getElementById('cloud-path-style');
+    if (ps) ps.checked = !!cfg.pathStyle;
+  }
   const status = document.getElementById('cloud-status');
   if (status) status.textContent = C.status || '';
   const picked = document.getElementById('cloud-picked');
   if (picked) picked.textContent = C.picked ? C.picked.name : '';
   const upload = document.getElementById('cloud-upload');
   if (upload) upload.disabled = !!C.busy || !C.picked || !cloudReady();
+  const backupSelected = document.getElementById('cloud-backup-selected');
+  if (backupSelected) backupSelected.disabled = !!C.busy || state.selectedPkgs.size === 0;
   const list = document.getElementById('cloud-list');
   if (!list) return;
   if (!C.list.length) {
@@ -1222,7 +1365,7 @@ function renderCloud() {
       (item) =>
         '<div class="cloud-item" data-cloud-key="' + escapeHtml(item.key) + '">' +
         '<span class="ci-name" title="' + escapeHtml(item.key) + '">' + escapeHtml(item.key) + '</span>' +
-        '<span class="ci-size">' + fmtMB((Number(item.size) || 0) / 1048576) + '</span>' +
+        '<span class="ci-size">' + (item.size == null ? t('cloud.sizeUnknown') : fmtMB((Number(item.size) || 0) / 1048576)) + '</span>' +
         '<span class="ci-time">' + escapeHtml(String(item.lastModified || '').replace('T', ' ').slice(0, 16)) + '</span>' +
         '<button type="button" class="ci-btn" data-cloud-get="' + escapeHtml(item.key) + '">' + t('cloud.download') + '</button>' +
         '<button type="button" class="ci-btn danger" data-cloud-del="' + escapeHtml(item.key) + '">' + t('cloud.remove') + '</button>' +
@@ -1231,27 +1374,44 @@ function renderCloud() {
     .join('');
 }
 async function cloudSave() {
+  const C = state.cloud;
   const cfg = cloudConfigFromForm();
-  state.cloud.config = cfg;
-  const saved = persistCloudConfig(cfg);
+  let saved;
+  if (C.provider === 'webdav') {
+    C.webdav = cfg;
+    saved = persistWebdavConfig(cfg);
+  } else {
+    C.config = cfg;
+    saved = persistCloudConfig(cfg);
+  }
   if (!saved) {
-    state.cloud.status = t('cloud.saveFailed');
+    C.status = t('cloud.saveFailed');
     renderCloud();
     return;
   }
-  if (cfg.endpoint && !buildBaseUrl(cfg)) {
-    state.cloud.status = t('cloud.badEndpoint');
+  if (C.provider === 'webdav') {
+    if (cfg.baseUrl && !/^https?:\/\//i.test(cfg.baseUrl)) {
+      C.status = t('webdav.badEndpoint');
+      renderCloud();
+      return;
+    }
+  } else if (cfg.endpoint && !buildBaseUrl(cfg)) {
+    C.status = t('cloud.badEndpoint');
     renderCloud();
     return;
   }
-  state.cloud.status = t('cloud.saved');
+  C.status = t('cloud.saved');
   renderCloud();
   await cloudRefresh();
 }
 async function cloudRefresh() {
   const C = state.cloud;
-  const client = cloudClient();
-  if (!client.ready) {
+  const target = createTransferTarget({
+    kind: C.provider === 'webdav' ? 'webdav' : 's3',
+    config: activeCloudConfig(),
+    fetchImpl: (url, init) => fetch(url, init),
+  });
+  if (!target.ready) {
     C.list = [];
     C.status = t('cloud.notConfigured');
     renderCloud();
@@ -1260,16 +1420,31 @@ async function cloudRefresh() {
   C.busy = true;
   C.status = t('cloud.loading');
   renderCloud();
-  const res = await client.listObjects(C.config.prefix || '');
+  const res = await target.list(activeCloudConfig().prefix || '');
   C.busy = false;
   if (!res.ok) {
-    C.status = t('cloud.error', { msg: res.message });
+    C.status = t('cloud.error', { msg: res.message || res.code });
     renderCloud();
     return;
   }
-  C.list = res.items
-    .slice()
-    .sort((a, b) => String(b.lastModified).localeCompare(String(a.lastModified)));
+  // 分片对象不进列表；清单对象折叠成「包」一项，体积以清单记录为准。
+  const packs = new Map();
+  for (const item of res.items) {
+    if (/\.part\d+$/i.test(item.key)) continue;
+    if (/\.manifest\.json$/i.test(item.key)) {
+      const base = item.key.slice(0, -'.manifest.json'.length);
+      const man = await target.get(item.key);
+      const parsed = man.ok && man.bytes
+        ? parseManifest(new TextDecoder().decode(man.bytes))
+        : null;
+      packs.set(base, { key: base, size: parsed ? parsed.size : null, lastModified: item.lastModified });
+      continue;
+    }
+    packs.set(item.key, { key: item.key, size: item.size, lastModified: item.lastModified });
+  }
+  C.list = [...packs.values()].sort(
+    (a, b) => String(b.lastModified).localeCompare(String(a.lastModified)),
+  );
   C.status = C.list.length ? t('cloud.loaded', { n: C.list.length }) : t('cloud.empty');
   renderCloud();
 }
@@ -1282,28 +1457,61 @@ async function cloudUpload() {
     renderCloud();
     return;
   }
+  const cfg = activeCloudConfig();
   C.busy = true;
   C.status = t('cloud.uploading', { name: C.picked.name });
   renderCloud();
   let name = C.picked.name;
   try {
-    let bytes = new Uint8Array(await C.picked.arrayBuffer());
-    if (C.config.passphrase) {
-      bytes = await encryptBytes(bytes, C.config.passphrase);
+    let blob = C.picked;
+    if (cfg.passphrase) {
+      const encrypted = await encryptBytes(new Uint8Array(await C.picked.arrayBuffer()), cfg.passphrase);
+      blob = new Blob([encrypted], { type: 'application/octet-stream' });
       name = name.replace(/\.zip$/i, '') + '.spt';
     }
-    const res = await client.putObject(objectKey(C.config.prefix, name), bytes);
-
+    if (C.provider === 'webdav' && cfg.prefix && typeof client.ensureCollection === 'function') {
+      const collection = await client.ensureCollection(cfg.prefix);
+      if (!collection.ok) {
+        C.busy = false;
+        C.status = t('cloud.error', { msg: collection.message || collection.code || 'mkcol-failed' });
+        renderCloud();
+        return;
+      }
+    }
+    const target = createTransferTarget({
+      kind: C.provider === 'webdav' ? 'webdav' : 's3',
+      config: cfg,
+      fetchImpl: (url, init) => fetch(url, init),
+    });
+    const runner = createTransferRunner({
+      target,
+      chunkSize: DEFAULT_CHUNK_SIZE,
+      onProgress: (progress) => {
+        if (progress.phase !== 'uploading') return;
+        C.status = t('cloud.uploadingChunk', {
+          done: progress.uploadedChunks,
+          total: progress.totalChunks,
+        });
+        renderCloud();
+      },
+    });
+    const res = await runner.upload({
+      blob,
+      name: objectKey(cfg.prefix, name),
+      contentType: 'application/zip',
+    });
     C.busy = false;
     if (!res.ok) {
-      C.status = t('cloud.error', { msg: res.message });
+      C.status = t('cloud.error', { msg: res.code || res.message });
       renderCloud();
       return;
     }
     C.picked = null;
     const file = document.getElementById('cloud-file');
     if (file) file.value = '';
-    C.status = t('cloud.uploaded', { name });
+    C.status = res.skipped
+      ? t('cloud.alreadyExists', { name })
+      : t('cloud.uploaded', { name });
     renderCloud();
     await cloudRefresh();
   } catch (error) {
@@ -1314,8 +1522,13 @@ async function cloudUpload() {
 }
 async function cloudDownload(key) {
   const C = state.cloud;
-  const client = cloudClient();
-  if (!client.ready) {
+  const cfg = activeCloudConfig();
+  const target = createTransferTarget({
+    kind: C.provider === 'webdav' ? 'webdav' : 's3',
+    config: cfg,
+    fetchImpl: (url, init) => fetch(url, init),
+  });
+  if (!target.ready) {
     C.status = t('cloud.notConfigured');
     renderCloud();
     return;
@@ -1323,23 +1536,35 @@ async function cloudDownload(key) {
   C.busy = true;
   C.status = t('cloud.loading');
   renderCloud();
-  const res = await client.getObject(key);
+  const runner = createTransferRunner({
+    target,
+    chunkSize: DEFAULT_CHUNK_SIZE,
+    onProgress: (progress) => {
+      if (progress.phase !== 'downloading') return;
+      C.status = t('cloud.downloadingChunk', {
+        done: (Number(progress.downloadedBytes) / 1048576).toFixed(1),
+        total: (Number(progress.totalBytes) / 1048576).toFixed(1),
+      });
+      renderCloud();
+    },
+  });
+  const res = await runner.download({ name: key });
   C.busy = false;
   if (!res.ok) {
-    C.status = t('cloud.error', { msg: res.message });
+    C.status = t('cloud.error', { msg: res.code || res.message });
     renderCloud();
     return;
   }
   let bytes = res.bytes;
   let name = String(key).split('/').pop() || 'pack.zip';
   if (isEncrypted(bytes)) {
-    if (!C.config.passphrase) {
+    if (!cfg.passphrase) {
       C.status = t('cloud.needPassphrase');
       renderCloud();
       return;
     }
     try {
-      bytes = await decryptBytes(bytes, C.config.passphrase);
+      bytes = await decryptBytes(bytes, cfg.passphrase);
       name = name.replace(/\.spt$/i, '') + '.zip';
     } catch {
       C.status = t('cloud.badPassphrase');
@@ -1358,21 +1583,38 @@ async function cloudDownload(key) {
 }
 async function cloudDelete(key) {
   const C = state.cloud;
-  const client = cloudClient();
-  if (!client.ready) {
+  const target = createTransferTarget({
+    kind: C.provider === 'webdav' ? 'webdav' : 's3',
+    config: activeCloudConfig(),
+    fetchImpl: (url, init) => fetch(url, init),
+  });
+  if (!target.ready) {
     C.status = t('cloud.notConfigured');
     renderCloud();
     return;
   }
   C.busy = true;
+  C.status = t('cloud.loading');
   renderCloud();
-  const res = await client.deleteObject(key);
+  const manifestResult = await target.get(manifestKey(key));
+  const manifest = manifestResult.ok && manifestResult.bytes
+    ? parseManifest(new TextDecoder().decode(manifestResult.bytes))
+    : null;
+  if (manifest) {
+    for (const chunk of manifest.chunks) {
+      await target.remove(chunkKey(key, chunk.index));
+    }
+    await target.remove(manifestKey(key));
+  }
+  const direct = await target.remove(key);
   C.busy = false;
-  if (!res.ok) {
-    C.status = t('cloud.error', { msg: res.message });
+  if (!direct.ok && !(manifest && direct.status === 404)) {
+    C.status = t('cloud.error', { msg: direct.message || direct.code });
     renderCloud();
     return;
   }
+  C.status = t('cloud.removed', { name: key });
+  renderCloud();
   await cloudRefresh();
 }
 
@@ -1421,13 +1663,19 @@ function renderLog(){
   const lines=document.getElementById('log-lines');
   const filter=state.logLevel;
   const list=state.log.filter(l=>filter==='ALL'||l.level===filter);
-  lines.innerHTML=list.map(l=>'<div class="log-line '+l.level.toLowerCase()+'"><span class="t">['+l.time+']</span> <span class="lv">['+l.level+']</span> '+escapeHtml(l.msg)+'</div>').join('') || '<div class="log-line">'+t('log.empty')+'</div>';
+  lines.innerHTML=list.map(l=>'<div class="log-line '+l.level.toLowerCase()+'"><span class="t">['+escapeHtml(l.time)+']</span> <span class="lv">['+l.level+']</span> '+escapeHtml(l.msg)+'</div>').join('') || '<div class="log-line">'+t('log.empty')+'</div>';
   const last=state.log[state.log.length-1];
   document.getElementById('log-latest').textContent=last?last.msg:t('log.empty');
-  const counts={INFO:0,WARN:0,ERROR:0}; state.log.forEach(l=>{ if(counts[l.level]!==undefined) counts[l.level]++; });
-  document.getElementById('log-count-info').textContent=counts.INFO+' INFO';
-  const warn=document.getElementById('log-count-warn'); warn.textContent=counts.WARN+' WARN'; warn.style.display=counts.WARN?'inline-block':'none';
-  const err=document.getElementById('log-count-err'); err.textContent=counts.ERROR+' ERR'; err.style.display=counts.ERROR?'inline-block':'none';
+  /* 等级按钮直接带条数：取消独立徽标，避免同一数字出现两次。 */
+  const counts={ALL:state.log.length,INFO:0,WARN:0,ERROR:0};
+  state.log.forEach(l=>{ if(counts[l.level]!==undefined) counts[l.level]++; });
+  const labels={ALL:t('log.all'),INFO:t('log.info'),WARN:t('log.warn'),ERROR:t('log.error')};
+  Object.keys(labels).forEach(level=>{
+    const btn=document.querySelector('.log-level-btn[data-level="'+level+'"]');
+    if(!btn) return;
+    btn.textContent=labels[level]+' ('+counts[level]+')';
+    btn.classList.toggle('active',state.logLevel===level);
+  });
   const dot=document.getElementById('log-dot');
   if(dot){ const n=counts.WARN+counts.ERROR; dot.hidden=n===0; dot.title=t('log.dotTitle',{n}); }
   const body=document.getElementById('log-body'); body.scrollTop=body.scrollHeight;
@@ -1465,7 +1713,7 @@ function showPane(name){
 }
 function backToWorkbench(){ showPane('workbench'); }
 
-function openSettingsView(html,{onSave,onClose}={}){
+function openSettingsView(html,{onSave,onClose,onAction}={}){
   const body=document.getElementById('settings-body');
   if(!body) return;
   body.innerHTML=html||'';
@@ -1475,6 +1723,9 @@ function openSettingsView(html,{onSave,onClose}={}){
   ['settings-cancel','settings-close'].forEach(id=>{
     const b=document.getElementById(id);
     if(b) b.onclick=done;
+  });
+  body.querySelectorAll('[data-action]').forEach(el=>{
+    el.addEventListener('click',()=>onAction?.(el.dataset.action, el));
   });
   showPane('settings');
 }
@@ -1510,12 +1761,12 @@ function closeModal(){
   const acts=document.getElementById('modal-actions');
   if(acts) acts.innerHTML='';
 }
-function openTrafficModal(onConfirm, { enabled = true, onNever } = {}){
+function openTrafficModal(onConfirm, { enabled = true, onNever, onCancel } = {}){
   if(!enabled || state.noTrafficPrompt){ onConfirm(); return; }
   openModal(t('traffic.title'),t('traffic.desc'),[
     '<label class="check"><input type="checkbox" id="traffic-nodisplay"> '+t('traffic.never')+'</label>'
   ],[
-    {label:t('traffic.cancel'),onClick:closeModal},
+    {label:t('traffic.cancel'),onClick:()=>{ closeModal(); onCancel?.(); }},
     {label:t('traffic.continue'),primary:true,onClick:()=>{
       const cb=document.getElementById('traffic-nodisplay');
       if(cb && cb.checked){ state.noTrafficPrompt=true; onNever?.(); log('INFO',t('traffic.off')); }
@@ -1567,8 +1818,14 @@ const TUTORIAL_ADV=[
 function tutorialSet(){ return state.tutorialKind==='adv' ? TUTORIAL_ADV : TUTORIAL_BASIC; }
 function openTutorial(){
   state.tutorialOpen=true; state.tutorialStep=0; state.tutorialKind='basic';
-  document.getElementById('tutorial-overlay').classList.add('open');
+  const overlay=document.getElementById('tutorial-overlay');
+  if(!overlay) return;
+  /* 首帧禁用位置过渡：蒙层必须立即铺满，不能从上一坐标飞过来（2026-11-09 用户反馈）。 */
+  overlay.classList.add('open','instant');
   renderTutorial();
+  const settle=()=>overlay.classList.remove('instant');
+  if(typeof requestAnimationFrame==='function') requestAnimationFrame(()=>requestAnimationFrame(settle));
+  else settle();
 }
 function closeTutorial(){ state.tutorialOpen=false; document.getElementById('tutorial-overlay').classList.remove('open'); }
 function renderTutorial(){
@@ -1585,8 +1842,8 @@ function renderTutorial(){
   const card=document.getElementById('tutorial-card');
   const overlay=document.getElementById('tutorial-overlay');
   /* 目标不存在时隐藏高亮环：保留上一帧的位置比不显示更糟（R6.4 锚定失败）。 */
-  if(!el){ ring.style.display='none'; return; }
-  ring.style.display='';
+  if(!el){ ring.style.display='none'; card.style.display='none'; return; }
+  ring.style.display=''; card.style.display='';
   if(overlay){
     const anchor=tutorialAnchor(el.getBoundingClientRect(), overlay.getBoundingClientRect());
     ring.style.left=anchor.ring.left+'px';
@@ -1644,11 +1901,11 @@ function bind(){
     state.mobileView = b.dataset.mview==='zone' ? 'zone' : 'chart';
     renderMobileView();
   });
-  // 宿主详细数据：默认收起，点击在同一条目内展开（全页只此一处宿主信息）
+  // 浏览器 / 宿主配额：点击跳到宿主原生存储页的对应分页（能力由控制器探测后传入）。
   document.getElementById('quota-head')?.addEventListener('click',(e)=>{
-    if(!e.target.closest('#quota-host-toggle')) return;
-    state.quotaHostOpen = !state.quotaHostOpen;
-    renderQuota();
+    const row=e.target.closest('[data-quota-kind]');
+    if(!row) return;
+    actions.hostStoragePage?.(row.dataset.quotaKind);
   });
   // 文件名模板默认折叠
   document.getElementById('filename-toggle')?.addEventListener('click',()=>{
@@ -1667,22 +1924,32 @@ function bind(){
 
   // ── 局域网互传（按钮在数据包动作行内，随 renderActions 重建）──
   document.getElementById('action-row').addEventListener('click',(e)=>{
-    if(e.target.closest('#lan-open-btn')){
-      state.lan.open=true;
-      state.cloud.open=false;
-      renderLan(); renderCloud();
+    if(e.target.closest('#transfer-open-btn')){
+      state.transfer.open=true;
+      if(state.transfer.tab!=='lan' && state.transfer.tab!=='cloud') state.transfer.tab='lan';
+      renderTransfer(); renderLan(); renderCloud();
       return;
     }
-    if(e.target.closest('#cloud-open-btn')){
-      state.cloud.open=true;
-      state.lan.open=false;
-      renderLan(); renderCloud();
-    }
   });
-  document.getElementById('lan-close-btn').addEventListener('click',()=>{
-    state.lan.open=false;
-    renderLan();
+  document.getElementById('transfer-close-btn')?.addEventListener('click',()=>{
+    state.transfer.open=false;
+    renderTransfer(); renderLan(); renderCloud();
   });
+  document.getElementById('transfer-tabs')?.addEventListener('click',(e)=>{
+    const b=e.target.closest('[data-transfer-tab]'); if(!b) return;
+    state.transfer.tab=b.dataset.transferTab==='cloud'?'cloud':'lan';
+    renderTransfer(); renderLan(); renderCloud();
+  });
+  document.getElementById('cloud-provider-tabs')?.addEventListener('click',(e)=>{
+    const b=e.target.closest('[data-cloud-provider]'); if(!b) return;
+    state.cloud.provider=b.dataset.cloudProvider==='webdav'?'webdav':'s3';
+    state.cloud.status='';
+    state.cloud.list=[];
+    state.cloud.picked=null;
+    renderCloud();
+  });
+  document.getElementById('webdav-save')?.addEventListener('click',()=>cloudSave());
+  document.getElementById('webdav-refresh')?.addEventListener('click',()=>cloudRefresh());
   document.getElementById('lan-btn-generate').addEventListener('click',()=>actions.lan?.generate?.());
   document.getElementById('lan-btn-copy-send').addEventListener('click',()=>{
     copyLanText(document.getElementById('lan-send-code')?.value||'');
@@ -1704,10 +1971,6 @@ function bind(){
   document.getElementById('lan-scan-cancel').addEventListener('click',()=>finishLanScan());
 
   // ── 云端包仓库 ──
-  document.getElementById('cloud-close-btn')?.addEventListener('click',()=>{
-    state.cloud.open=false;
-    renderCloud();
-  });
   document.getElementById('cloud-save')?.addEventListener('click',()=>cloudSave());
   document.getElementById('cloud-refresh')?.addEventListener('click',()=>cloudRefresh());
   document.getElementById('cloud-pick')?.addEventListener('click',()=>document.getElementById('cloud-file')?.click());
@@ -1716,6 +1979,9 @@ function bind(){
     renderCloud();
   });
   document.getElementById('cloud-upload')?.addEventListener('click',()=>cloudUpload());
+  document.getElementById('cloud-backup-selected')?.addEventListener('click',()=>{
+    actions.backupSelectedToCloud?.({ provider: state.cloud.provider, config: activeCloudConfig() });
+  });
   document.getElementById('cloud-list')?.addEventListener('click',(e)=>{
     const get=e.target.closest('[data-cloud-get]');
     if(get){ cloudDownload(get.dataset.cloudGet); return; }
@@ -1819,11 +2085,42 @@ function bind(){
   };
 
   stackEl.addEventListener('click',e=>{
+    /* 最大化 / 面包屑 / 下钻：只改视图层级，勾选仍走同一 scope 与同一棵树。 */
+    const maxBtn=e.target.closest('[data-volmax]');
+    if(maxBtn){
+      const key=maxBtn.dataset.volmax;
+      state.volMaxKey = state.volMaxKey===key ? null : key;
+      if(!state.volMaxKey) state.volPath[key]=[];
+      renderChart(); return;
+    }
+    const crumb=e.target.closest('[data-volcrumb]');
+    if(crumb){
+      const key=crumb.closest('.vol-card')?.dataset.volkey;
+      if(!key) return;
+      const n=Math.max(0,Number(crumb.dataset.volcrumb)||0);
+      state.volPath[key]=(state.volPath[key]||[]).slice(0,n);
+      renderChart(); return;
+    }
+    const drill=e.target.closest('[data-voldrill]');
+    if(drill){
+      const key=drill.closest('.vol-card')?.dataset.volkey;
+      if(!key) return;
+      state.volPath[key]=[...(state.volPath[key]||[]),drill.dataset.voldrill];
+      renderChart(); return;
+    }
     const emptyFetch=e.target.closest('#btn-empty-fetch');
     if(emptyFetch){
       const fetchBtn=document.getElementById('btn-fetch');
       if(fetchBtn) fetchBtn.click();
       else actions.fetch?.();
+      return;
+    }
+    const hostAssetList=e.target.closest('#btn-assetlist-host');
+    if(hostAssetList){ actions.exportAssetList?.({source:'host'}); return; }
+    const cardAssetList=e.target.closest('[data-assetlist]');
+    if(cardAssetList){
+      const pkgIds=String(cardAssetList.dataset.assetpkgs||'').split(',').filter(Boolean);
+      actions.exportAssetList?.({source:'package', pkgIds});
       return;
     }
     const emptyImport=e.target.closest('#btn-empty-import');
@@ -2012,6 +2309,7 @@ function bind(){
   });
   document.addEventListener('keydown',(e)=>{ if(e.key!=='Escape') return;
     if(confirmDialogEl()?.open) return; // 原生 dialog 自行处理 Esc
+    if(state.volMaxKey){ state.volPath[state.volMaxKey]=[]; state.volMaxKey=null; renderChart(); return; }
     if(state.pane!=='workbench'){ backToWorkbench(); return; }
     closeTutorial();
   });
@@ -2210,10 +2508,14 @@ initSplitters();
     },
     setProgress,
     setLan(next = {}) {
-      if ('open' in next) state.lan.open = !!next.open;
+      if ('open' in next) {
+        state.transfer.open = !!next.open;
+        if (next.open) state.transfer.tab = 'lan';
+      }
       if (next.send) Object.assign(state.lan.send, next.send);
       if (next.recv) Object.assign(state.lan.recv, next.recv);
       if ('scanError' in next) state.lan.scanError = next.scanError;
+      renderTransfer();
       renderLan();
     },
     getLan() { return state.lan; },

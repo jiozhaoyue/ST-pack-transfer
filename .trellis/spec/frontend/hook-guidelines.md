@@ -143,8 +143,9 @@ async function getHandle() {
 - **Node / Vitest**：所有模块都是 ES Module，`src/core/**` 无 DOM 依赖可直接 import；
   `test/plugin.test.js` 即在 Node 下 import `src/ui/host-bridge.js` 校验导出面与清单字段。
 - **静态守卫**：`npm run check:dom-injection`、`npm run check:css-scope`。
-- **浏览器手测**：`npm run dev` 起 Vite 开发服务器走独立 Web 形态；宿主插件形态需加载到
-  **Dev 实例**（8001 ST / 8003 Luker），用 DevTools 直接断点调试 `host-bridge.js` 的导出函数。
+- **浏览器手测**：独立 Web 形态用 `npm run build && npm run preview`（4173，本地静态服务器）取证；
+  `npm run dev` 仅作开发热重载。宿主插件形态需加载到 **Dev 实例**（8001 ST / 8003 Luker），
+  用 DevTools 直接断点调试 `host-bridge.js` 的导出函数。
 
 ---
 

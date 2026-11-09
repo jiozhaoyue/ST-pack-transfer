@@ -22,7 +22,7 @@
 | 单一模板源守卫 | `npm run check:template-source` | `index.html` 只许骨架（业务节点 id 仅 `app` 在白名单内）；`REQUIRED_TEMPLATE_IDS` 全部须定义于 `src/ui/workbench-template.js`。退出码 0。 |
 | 控件消费点守卫 | `npm run check:control-consumer` | 模板中每个交互控件（`button`/`input`/`select`/`textarea`）必须在 `CONTROL_CONSUMERS` 中有消费点声明；声明表含僵尸条目同样违规。退出码 0。 |
 | 宿主 DOM 写入守卫 | `npm run check:dom-scope` | `src/ui/**` 与根 `index.js` 里往宿主 DOM 的写入只许落在声明锚点（`#extensions_settings2` / `#extensionsMenu` / `.userBackupButton` 父元素 / `.userBackupManager .backupActionRow`）或带 `dom-scope:allow <理由>` 标记。取值契约见 [dom-write-scope.md](./dom-write-scope.md)。退出码 0。 |
-| 宿主行为冒烟 | `npm run dev` + **Dev** 实例 | Dev ST `8001` / Dev Luker `8003`；**默认严禁** Real 实例（`8002` / `8004`）——见下表下方注。 |
+| 宿主行为冒烟 | `npm run build` + `npm run preview`（独立 UI）或 **Dev** 实例 E2E | 独立 UI 走本地静态服务器 4173；Dev ST `8001` / Dev Luker `8003`；**默认严禁** Real 实例（`8002` / `8004`）——见下表下方注。 |
 
 > **Real 实例（8004）例外口径**：仅当**该任务**获用户明确授权时才可对 Real 采样，
 > 且必须同时满足：① **只读**（不调写端点、不触发转换落盘/覆盖/删除、不写 `Instance/**` 业务数据）；

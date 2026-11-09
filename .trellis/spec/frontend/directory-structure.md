@@ -9,7 +9,7 @@
 项目采用**三形态同构**（"Trinity"），详见根 `CLAUDE.md`「三形态入口，同构核心」与 `AGENTS.md` L1-MR-6：
 
 1. **ST / Luker 扩展插件**：`git clone` 进宿主的第三方扩展目录（Luker 用户私有扩展须**平铺**在 `data/<user>/extensions/<name>/`，见 `AGENTS.md` L1-MR-12）。宿主读 `manifest.json`（`js: index.js`、`css: style.css`）后以原生 ES 模块加载根 `index.js`；插件经扩展列表行按钮打开**全屏模态** `#st-converter-modal-overlay`（抽屉注入与 `mountSettingsDrawer()` 已于 2026-10-15 删除）。
-2. **独立 Web 应用**：`npm run dev`（Vite 开发服务器，`http://127.0.0.1:3040`，`strictPort`）或 `npm run preview`（4173）。页面 `index.html` 是**空骨架**（仅 `<div class="app-container" id="app"></div>` + 末尾 `<script type="module" src="./index.js">`）。
+2. **独立 Web 应用**：开发热重载用 `npm run dev`（Vite，`http://127.0.0.1:3040`，`strictPort`）；**UI 验收只走** `npm run build && npm run preview`（本地静态服务器 4173）。页面 `index.html` 是**空骨架**（仅 `<div class="app-container" id="app"></div>` + 末尾 `<script type="module" src="./index.js">`）。
 3. **GitHub Pages 静态站点**：`npm run build`（=`vite build --base=./`）产出 `dist/`；`.github/workflows/deploy.yml` 在 push `main` 时自动部署（`vite.config.js` 中 `base: './'`、`worker.format: 'es'`）。
 
 关键原则：

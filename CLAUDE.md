@@ -12,7 +12,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 npm test                          # Vitest 全量（当前 934 passed / 2 skipped / 95 文件）
 npx vitest run test/xxx.test.js   # 单文件
 npx vitest run -t "用例名"         # 单条用例
-npm run dev                       # vite 开发服务器，独立模式手测（http://127.0.0.1:3040；**不是** 5173）
+npm run dev                       # 开发热重载（仅开发；**UI 验收不用它**）
+npm run build && npm run preview  # UI 验收：本地静态服务器托管 dist（4173）
 npm run build                     # vite build --base=./（产出 GitHub Pages 静态站点）
 npm run e2e                       # 实例侧 E2E（需要 Dev 实例在跑；只许连 Dev，见 e2e/lib/guard.cjs）
 npm run e2e:web                   # 独立 Web / 云子路径形态 E2E（**不需要实例**；自己起静态服务器）
@@ -27,6 +28,8 @@ npm run gen-fixtures              # 重新生成测试固件 fixtures/
 
 无独立 lint/typecheck 命令——类型契约靠 JSDoc + 运行时目标守卫，质量门槛就是 `npm test` 全绿。
 
+**UI 验收只走** `npm run build && npm run preview`（本地静态服务器 4173）；禁止 `file://` 或 `npm run dev` 作为验收入口（2026-11-09 用户裁定）。按用户禁令，不得跑全量/大内存测试，只跑目标小测试。
+
 ## 高层架构（跨文件才能看懂的部分）
 
 ### 三形态入口，同构核心
@@ -39,8 +42,8 @@ npm run gen-fixtures              # 重新生成测试固件 fixtures/
 
 ### 分层边界（硬性）
 
-- `src/core/` — 纯逻辑，**禁止 DOM 依赖**。`transform.js`（911 行，convert 主入口）、`plan-preview.js`、`delta.js`、`splitter.js`、`zip-io.js`（vendor zip.js 封装）、`pt-archive.js`（PT 原生归档 → hub 重建，`D-23`）、`pack-inject.js`（聊天库注入判定，纯决策）、`zip-augment.js`（源包增强，纯 IO）。
-- `src/app/` — 应用层（只被根 `index.js` 使用）。`task-runtime.js`（半成品持久化 / 断点节流 / 批量续传判定）、`conversion-runner.js`（转换接线：`TaskManager` + 暂停 / 继续 / 中止 / 真增量续传）。
+- `src/core/` — 纯逻辑，**禁止 DOM 依赖**。`transform.js`（911 行，convert 主入口）、`plan-preview.js`、`delta.js`、`splitter.js`、`zip-io.js`（vendor zip.js 封装）、`pt-archive.js`（PT 原生归档 → hub 重建，`D-23`）、`pack-inject.js`（聊天库注入判定，纯决策）、`zip-augment.js`（源包增强，纯 IO）、`asset-list.js`（官方资产列表）、`transfer-plan.js`（分片台账）、`webdav-client.js`、`transfer-target.js`、`host-capabilities.js`。
+- `src/app/` — 应用层（只被根 `index.js` 使用）。`task-runtime.js`（半成品持久化 / 断点节流 / 批量续传判定）、`conversion-runner.js`（转换接线：`TaskManager` + 暂停 / 继续 / 中止 / 真增量续传）、`transfer-runner.js`（分片上传/下载/断点）、`pull-entry.js`（从宿主拉取的顺序编排）。
 - `src/ui/` — 可 DOM。`workbench-template.js` 是 HTML 模板唯一来源，`host-bridge.js`（1202 行）负责宿主嗅探/CSRF/拉取/恢复/注入；`chat-store-bridge.js` 是**与外部聊天库打交道的唯一落点**（特性检测 + 有界等待 + 静默降级），`chat-store-inject.js` 负责三个方向的编排（打包并入 / 从库导出 / 还原后入库）。
 - `src/storage/` — `db.js`（IndexedDB，DB_VERSION 2，files store 带 `origin` 字段区分 upload/host-export/converted/delta/split-part）、`authority-store.js`（可选后端适配器）。
 - `public/` — Vite 的 publicDir（构建时摊平到 `dist/` 根）。当前只有 `file-protocol-notice.js`：`file://` 双击时给一句说明（模块脚本在 `file://` 下必被 CORS 拒，不提示就只剩白屏）。

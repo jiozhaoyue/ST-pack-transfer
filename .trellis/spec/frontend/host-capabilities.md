@@ -449,6 +449,14 @@ Git handshake failed）——**非本插件错误**，E2E 判定须按「只属�
    不改变 `pt: false` 的含义（措辞别升级成「PT 支持类目勾选」，那是另一个粒度）。
 4. 新增宿主或宿主升级后，必须重跑本表核对（DOM 锚点 + 端点形状）。
 
+### Luker 2.9 账户窗口（2026-11-09 新增事实）
+
+2.9 起账户是自绘窗口（`dialog.dw-layer` → `.dw-win` → `.dw`），备份页动作区 `.dw-foot`、
+主按钮 `[data-act="backup-go"]`，存储页切换 `[data-act="storage-kind"][data-kind]`；
+旧 `.userBackupButton` / `.userBackupManager` 在 2.9 已不存在。
+完整契约（打开方式、注入、勾选读取、存储页跳转、忙态探针）见
+[`luker-2.9-account-window.md`](./luker-2.9-account-window.md)。
+
 ### 实测状态与已知阻塞（2026-11-04）
 
 - **PT dev（`apps/web`，8899）当前不加载 `scripts/extensions/**` 的扩展脚本**：

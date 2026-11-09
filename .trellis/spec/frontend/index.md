@@ -34,6 +34,9 @@
 | [工作台单一视图与局域网互传](./workbench-single-view.md) | **迁移向导外壳已整体删除**（六步步骤条 / 向导·高级模式切换 / 不兼容门）· `[hidden]` 与 `display` 的特异度事故 · **配色只用 `--SmartTheme*`** · 文案纪律（无说明、无黑话）· 控件纪律（枚举 / 单列 / 紧凑折叠）· 宿主动态识别四宿主判据 · **WebRTC 一次性取件码互传**与必须如实告知的两跳信令限制 | ✅ 就位（2026-10-14 新建；端到端实测 300 KB 字节级一致） |
 | [工作台三层架构与 CSS 铁律](./workbench-three-layer.md) | **模块/流程/外壳三层契约**（模块层唯一实现）· 阶段门控与 `hidden` 不移出 DOM 的理由 · **三条 CSS 铁律**（无外层滚动 / 浮层必锚行 / 单行不折，均带 E2E 断言）· body 级浮层的作用域根约定 · **单测夹具须与模板同构**（真实事故）· 模板字符串注释禁反引号 · 首装引导拦截点击（E2E 必读） | ✅ 就位（2026-10-24 新建；断言固化为 `e2e/standalone/specs/s1-remedies.e2e.cjs` 15/15） |
 | [UI 编排铁律](./ui-orchestration-rules.md) | **工作台 UI 定型规范**：布局/控件/文案/帮助四节（每节「规则 + 判据 + 守卫」）· **按钮动词封闭集**（新增按钮先扩表再写码）· 帮助层「常驻说明为零、说明只活在引导层与「?」浮层」· `HELP_TOPICS` 键与 `data-wb-module` 防悬空 | ✅ 就位（2026-10-24 新建；动词表断言 `test/ui-verb-table.test.js`，悬空断言 `test/help-topics.test.js`） |
+| [Luker 2.9 账户窗口](./luker-2.9-account-window.md) | **2.9 账户改版事实**：自绘窗口（`dw-layer` / `.dw-foot`）、`openAccountWindow({tab})`（关窗才 resolve ⇒ 必须 `void`）、备份页注入锚点、`.dw-chip` 勾选读取、存储页 `storage-kind` 跳转、忙态只认 `.busy` | ✅ 就位（2026-11-09 源码取证；单测 `test/account-window-29.test.js` 8 例） |
+| [资产列表导出](./asset-list-export.md) | **只输出官方扁平 JSON 数组**（`id/type/name/description/url`），供「下载扩展和资源菜单」加载；入口只在每张图表卡与从宿主拉取；宿主 discover + manifest 取 URL；无 URL 如实提示 | ✅ 就位（2026-11-09；单测 `test/asset-list.test.js`） |
+| [S3 / WebDAV 传输](./transfer-s3-webdav.md) | 共用分片/清单/断点协议；S3 HEAD/Range/multipart；WebDAV OPTIONS/PROPFIND/MKCOL 全降级；405/401/409/CORS 分类；`#transfer-view` 统一面板 | ✅ 就位（2026-11-09；小规模单测 `transfer-plan` / `transfer-runner` / `webdav-client`） |
 
 > 上述三份“迁移”文档是经用户批准记录的**后续目标契约**，不是当前实现事实；其中拟新增签名、测试和验收均有状态标注。不得据此宣称产品已完成迁移向导或双击离线交付。
 
