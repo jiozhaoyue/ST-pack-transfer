@@ -12,6 +12,9 @@
 - 每个条目只允许五键：`id / type / name / description / url`。
 - `type` 当前固定为 `extension`；`url` 必须是 `http(s)`。
 - 只保留可下载条目；**没有任何可下载条目时不得生成空文件冒充成功**。
+- **使用教程不能写进 JSON**（会破坏 `Array.isArray`）。教程放在两处：导出按钮的
+  `title`（`empty.assetListHint`）与导出成功 toast（`toast.assetListExported`），
+  文案固定为「保存为 index.json → 酒馆 → 下载扩展和资源菜单 → Asset URL → 加载资产列表」。
 
 ## 2. 数据来源
 
