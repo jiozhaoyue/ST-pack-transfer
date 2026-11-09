@@ -1119,3 +1119,44 @@ Topics: [.trellis/spec/frontend/transfer-s3-webdav.md](../../spec/frontend/trans
 - 未跑全量 npm test（用户禁令）；需要时再征得同意
 - 无 cron、无服务端直传（用户禁令），已登记 docs/FUTURE-BACKEND-CAPABILITIES.md
 - 备份集对象 GC 未做；当前只增不改，删除快照不回收共享对象
+
+
+## Session 70: Session 70 交接：图表动态宫格 / 数据包偏好 / Luker 式配色
+<!-- trellis-session: v=2 fp=5b2377b257a41d26 -->
+
+**Date**: 2026-11-10
+**Task**: Session 70 交接：图表动态宫格 / 数据包偏好 / Luker 式配色
+**Branch**: `main`
+
+### Summary
+
+图表区按 1–5 卡动态宫格重做，新增数据包偏好与 Luker 式多色单条，设置重组，并修复全屏/多选/勾选/通知/配额等缺陷
+
+### Main Changes
+
+- 图表 1–5 卡宫格 + 行列拖拽条；移除自由拉伸与逐文件上传
+- 数据包偏好（默认仅备份快照不勾）+ 设置提示/导出/日志重组
+- Luker 式鲜艳单条多色、树行色标、紧凑卡头、全屏占满插件 DOM
+- 扩展清单入口与 file:// 教程、原生顶部通知、Luker 配额修复
+- 修复多选不重绘、目录分组勾选、最大化键清空、openModal 字符串报错
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `46899f9` | feat(chart): 图表动态宫格 / 数据包偏好 / Luker 式配色 |
+
+### Testing
+
+- [OK] 六守卫全绿：template-source / control-consumer / css-scope / dom-injection / dom-scope / i18n
+- [OK] 目标测试 10 文件 89 项通过
+- [OK] 浏览器：1–5 卡布局 ok、偏好默认勾 10、全屏 1280×900、扩展清单可下载、0 pageerror
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 回传宿主 413 待单独测试
+- 分卷上下传待实测
