@@ -169,30 +169,19 @@
 
   /* 配额表头：常驻两行，不折叠 */
   #app.app-container .quota-head{display:flex;flex-direction:column;gap:7px;padding:9px 12px;border-bottom:1px solid var(--border)}
-  #app.app-container .quota-row{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--muted)}
+  #app.app-container .quota-row{display:flex;align-items:center;gap:8px;width:100%;padding:2px 0;border:0;
+    background:none;font:inherit;font-size:11px;color:var(--muted);text-align:left;cursor:pointer}
+  #app.app-container .quota-row:hover .q-label{color:var(--accent)}
+  #app.app-container .quota-row:focus-visible{outline:1px solid var(--accent);outline-offset:1px;border-radius:6px}
   #app.app-container .quota-row .q-label{display:inline-flex;align-items:center;gap:5px;min-width:92px;color:var(--text)}
   #app.app-container .quota-bar{display:block;flex:1 1 auto;height:7px;background:var(--panel-3);border:1px solid var(--border);
     border-radius:999px;overflow:hidden;min-width:80px}
   #app.app-container .quota-fill{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--keep));border-radius:999px}
   #app.app-container .quota-fill.warn{background:linear-gradient(90deg,var(--optional),var(--drop))}
   #app.app-container .quota-val{font-variant-numeric:tabular-nums;white-space:nowrap}
+  #app.app-container .quota-nopage{flex:0 0 auto;font-size:10px;color:var(--muted);opacity:.8;white-space:nowrap}
   #app.app-container .quota-row.is-disabled{opacity:.55}
   #app.app-container .quota-row.is-disabled .quota-bar{background:repeating-linear-gradient(45deg,var(--panel-3),var(--panel-3) 4px,transparent 4px,transparent 8px)}
-
-  /* 宿主详细数据：默认收起，点击在同一条目内展开；全页唯一的宿主信息入口 */
-  #app.app-container .quota-host-toggle{display:flex;align-items:center;gap:6px;width:100%;min-height:24px;
-    padding:2px 0;border:0;background:none;color:var(--muted);font-size:11px;text-align:left}
-  #app.app-container .quota-host-toggle:hover{color:var(--text)}
-  #app.app-container .quota-host-toggle .qht-label{color:var(--text)}
-  #app.app-container .quota-host-toggle .chev{margin-left:auto;transition:transform .15s ease}
-  #app.app-container .quota-host-toggle[aria-expanded="true"] .chev{transform:rotate(90deg)}
-  #app.app-container .quota-host-detail{max-height:220px;overflow-y:auto;border-top:1px dashed var(--border);
-    padding-top:4px;font-size:11px}
-  #app.app-container .quota-host-row{display:flex;align-items:center;gap:8px;padding:1px 0;color:var(--muted);
-    white-space:nowrap}
-  #app.app-container .quota-host-row .qhr-name{flex:1 1 auto;min-width:0;overflow:hidden;
-    text-overflow:ellipsis;color:var(--text)}
-  #app.app-container .quota-host-row .qhr-size{flex:0 0 auto;font-variant-numeric:tabular-nums}
   #app.app-container .quota-empty{color:var(--muted);font-size:11px;padding:3px 0}
 
   /* 滚动条绝对保守：只在溢出时出现，一律细化 */
@@ -218,12 +207,6 @@
   #app.app-container .log-body::-webkit-scrollbar-track,
   #app.app-container .lan-body::-webkit-scrollbar-track,
   #app.app-container .app-main::-webkit-scrollbar-track{background:transparent}
-  #app.app-container .quota-host-detail{scrollbar-width:thin;
-    scrollbar-color:color-mix(in srgb,var(--outline) 45%,transparent) transparent}
-  #app.app-container .quota-host-detail::-webkit-scrollbar{width:6px;height:6px}
-  #app.app-container .quota-host-detail::-webkit-scrollbar-thumb{
-    background:color-mix(in srgb,var(--outline) 45%,transparent);border-radius:3px}
-  #app.app-container .quota-host-detail::-webkit-scrollbar-track{background:transparent}
 
   #app.app-container .legend{display:flex;align-items:center;gap:12px;padding:5px 10px;border-bottom:1px solid var(--border);
     font-size:10px;color:var(--muted);flex-wrap:wrap}
@@ -355,6 +338,23 @@
   #app.app-container .vol-card.is-collapsed .vol-head{border-bottom-color:transparent}
   #app.app-container .vol-body{display:flex;flex-direction:column;min-height:0;flex:1 1 auto}
   #app.app-container .vol-card .chart-tree{flex:1 1 auto;min-height:0;max-height:250px}
+
+  /* 最大化：单卡占满图表区，其它卡隐藏；树可继续下钻，勾选逻辑不变。 */
+  #app.app-container .chart-stack.has-max{grid-auto-rows:minmax(0,1fr);align-content:stretch}
+  #app.app-container .chart-stack.has-max .vol-card:not(.is-max){display:none}
+  #app.app-container .vol-card.is-max{grid-column:1 / -1;width:100%;height:100%;min-height:320px;resize:none}
+  #app.app-container .vol-card.is-max .chart-tree{max-height:none;min-height:0;flex:1 1 auto;overflow:auto}
+  #app.app-container .vol-max{width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;
+    border:1px solid var(--border);background:var(--panel-3);border-radius:5px;color:var(--muted);padding:0;cursor:pointer}
+  #app.app-container .vol-max:hover{color:var(--text);border-color:var(--accent)}
+  #app.app-container .vol-assetlist{width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;
+    border:1px solid var(--border);background:var(--panel-3);border-radius:5px;color:var(--muted);padding:0;cursor:pointer;font-size:12px;line-height:1}
+  #app.app-container .vol-assetlist:hover{color:var(--text);border-color:var(--accent)}
+  #app.app-container .vol-breadcrumb{display:flex;align-items:center;gap:4px;padding:4px 9px;border-bottom:1px solid var(--border);
+    font-size:10.5px;color:var(--muted);flex-wrap:wrap}
+  #app.app-container .vol-breadcrumb button{border:0;background:none;color:var(--accent);cursor:pointer;padding:0;font:inherit}
+  #app.app-container .vol-breadcrumb .sep{color:var(--muted-2)}
+  #app.app-container .vol-drill{width:18px;height:18px;padding:0;line-height:1}
 
   /* ── 图表可视化：条形 / 圆环，两种格式共用同一份类目数据 ── */
   #app.app-container .vol-chart{flex:0 0 auto;padding:7px 9px;border-bottom:1px solid var(--border);
@@ -545,9 +545,7 @@
   #app.app-container #view-log .log-toolbar{flex-wrap:wrap;padding:0}
   #app.app-container #view-log .log-body{flex:1 1 auto;max-height:none;overflow:auto;padding:8px 10px;
     border:1px solid var(--border);border-radius:8px;background:var(--panel-2)}
-  #app.app-container .log-badge{font-size:9px;padding:1px 5px;border-radius:999px;border:1px solid var(--border);color:var(--muted)}
-  #app.app-container .log-badge.warn{color:var(--optional);border-color:var(--optional)}
-  #app.app-container .log-badge.err{color:var(--drop);border-color:var(--drop)}
+  #app.app-container .log-level-btn{font-size:10px}
   #app.app-container .log-dot{flex:0 0 auto;width:6px;height:6px;border-radius:50%;
     background:var(--optional);display:inline-block}
   #app.app-container .log-dot[hidden]{display:none}
@@ -587,6 +585,15 @@
   #app.app-container .help-view-body ul{margin:0;padding-left:16px;font-size:11.5px;color:var(--muted);line-height:1.8}
   #app.app-container .view-body .check{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);margin:8px 0}
   #app.app-container .settings-grid{display:flex;flex-direction:column;gap:2px}
+  #app.app-container .set-group{border:1px solid var(--border);border-radius:8px;background:var(--panel-2);overflow:hidden}
+  #app.app-container .set-group + .set-group{margin-top:6px}
+  #app.app-container .set-group-head{cursor:pointer;padding:7px 10px;font-size:11.5px;font-weight:600;color:var(--text);
+    list-style:none;display:flex;align-items:center;gap:6px}
+  #app.app-container .set-group-head::-webkit-details-marker{display:none}
+  #app.app-container .set-group-head::before{content:'▸';color:var(--muted);transition:transform .12s ease}
+  #app.app-container .set-group[open] > .set-group-head::before{transform:rotate(90deg)}
+  #app.app-container .set-group-body{padding:6px 10px 10px;border-top:1px solid var(--border)}
+  #app.app-container .set-note{font-size:10.5px;color:var(--muted);margin:0 0 7px}
   #app.app-container .toast{position:absolute;left:50%;top:calc(100% - 18px);bottom:auto;transform:translate(-50%,calc(-100% + 10px));z-index:120;
     background:var(--panel);border:1px solid var(--accent);border-radius:9px;padding:8px 13px;
     font-size:11.5px;color:var(--text);box-shadow:var(--shadow);opacity:0;pointer-events:none;
@@ -597,9 +604,14 @@
   #app.app-container .tutorial-overlay{position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:95;display:none}
   #app.app-container .tutorial-overlay.open{display:block}
   #app.app-container .tutorial-ring{position:fixed;border:2px solid var(--accent);border-radius:9px;pointer-events:none;
-    box-shadow:0 0 0 9999px rgba(0,0,0,.42);transition:all .16s ease}
+    box-shadow:0 0 0 9999px rgba(0,0,0,.42);
+    transition:left .16s ease, top .16s ease, width .16s ease, height .16s ease}
   #app.app-container .tutorial-card{position:fixed;width:min(330px,calc(100vw - 24px));background:var(--panel);
-    border:1px solid var(--accent);border-radius:11px;padding:12px;box-shadow:var(--shadow)}
+    border:1px solid var(--accent);border-radius:11px;padding:12px;box-shadow:var(--shadow);
+    transition:left .16s ease, top .16s ease}
+  /* 首次打开：蒙层立即覆盖，位置过渡从下一帧才启用。 */
+  #app.app-container .tutorial-overlay.instant .tutorial-ring,
+  #app.app-container .tutorial-overlay.instant .tutorial-card{transition:none}
   #app.app-container .tutorial-card .tt{font-size:13px;font-weight:600;margin-bottom:6px}
   #app.app-container .tutorial-card .td{font-size:11px;color:var(--muted);line-height:1.6;margin-bottom:9px}
   #app.app-container .tutorial-card .dots{display:flex;gap:4px;margin-bottom:9px}
@@ -785,6 +797,13 @@
 #app.app-container .lan-open-btn{white-space:nowrap;flex-shrink:0;border:1px solid var(--border);background:var(--panel-3);
   color:var(--text);font:inherit;font-size:11px;line-height:1.4;padding:3px 9px;border-radius:7px;cursor:pointer}
 #app.app-container .lan-open-btn:hover{border-color:var(--border-strong)}
+#app.app-container .transfer-view{flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
+#app.app-container #transfer-view[hidden]{display:none}
+#app.app-container .transfer-body{flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
+#app.app-container .transfer-tabs{flex:0 0 auto}
+#app.app-container .transfer-subtabs{flex:0 0 auto;padding:6px 12px 0}
+#app.app-container .transfer-subpane{flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
+#app.app-container .transfer-subpane[hidden]{display:none}
 #app.app-container .cloud-view{flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
 #app.app-container #cloud-view[hidden]{display:none}
 #app.app-container .cloud-body{display:flex;flex-direction:column;gap:8px;overflow:auto;padding:10px 12px;min-height:0}

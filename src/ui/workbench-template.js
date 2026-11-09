@@ -89,16 +89,22 @@ export function getWorkbenchHtml() {
           <div class="chart-stack" id="chart-stack"></div>
         </section>
 
-        <section class="panel lan-view" id="lan-view" hidden>
+        <section class="panel transfer-view" id="transfer-view" hidden>
           <div class="panel-head">
             <div class="panel-title">
               <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M13 3L5 14h6l-1 7 8-11h-6z"/></svg>
-              <span data-i18n="action.lan"></span>
+              <span data-i18n="transfer.title"></span>
             </div>
             <div class="panel-actions">
-              <button class="icon-btn" id="lan-close-btn" data-i18n-title="header.close">×</button>
+              <div class="segmented transfer-tabs" id="transfer-tabs">
+                <button type="button" class="seg-btn active" data-transfer-tab="lan" data-i18n="action.lan"></button>
+                <button type="button" class="seg-btn" data-transfer-tab="cloud" data-i18n="cloud.open"></button>
+              </div>
+              <button class="icon-btn" id="transfer-close-btn" data-i18n-title="header.close">×</button>
             </div>
           </div>
+          <div class="transfer-body">
+          <div class="transfer-pane" id="lan-view">
           <div class="lan-body" id="lan-body">
             <div class="lan-overview" id="lan-overview">
               <span class="lo-item"><b data-i18n="lan.ovPeer"></b><span id="lan-ov-peer"></span></span>
@@ -170,18 +176,16 @@ export function getWorkbenchHtml() {
               </div>
             </section>
           </div>
-        </section>
+          </div>
 
-        <section class="panel cloud-view" id="cloud-view" hidden>
-          <div class="panel-head">
-            <div class="panel-title">
-              <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M7 18h10a4 4 0 0 0 .6-7.96A6 6 0 0 0 6 11.5 3.5 3.5 0 0 0 7 18z"/></svg>
-              <span data-i18n="cloud.title"></span>
-            </div>
-            <div class="panel-actions">
-              <button class="icon-btn" id="cloud-close-btn" data-i18n-title="header.close">×</button>
+          <div class="transfer-pane" id="cloud-view" hidden>
+          <div class="transfer-subtabs">
+            <div class="segmented" id="cloud-provider-tabs">
+              <button type="button" class="seg-btn active" data-cloud-provider="s3">S3</button>
+              <button type="button" class="seg-btn" data-cloud-provider="webdav">WebDAV</button>
             </div>
           </div>
+          <div class="transfer-subpane" id="cloud-s3-pane">
           <div class="cloud-body" id="cloud-body">
             <p class="cloud-note" data-i18n="cloud.note"></p>
             <div class="cloud-grid">
@@ -205,14 +209,41 @@ export function getWorkbenchHtml() {
               <button type="button" class="menu_button" id="cloud-save" data-i18n="cloud.save"></button>
               <button type="button" class="menu_button" id="cloud-refresh" data-i18n="cloud.refresh"></button>
             </div>
-            <div class="cloud-row">
-              <input class="text_pole" id="cloud-file" type="file" accept=".zip" hidden>
-              <button type="button" class="menu_button" id="cloud-pick" data-i18n="cloud.pick"></button>
-              <button type="button" class="menu_button" id="cloud-upload" data-i18n="cloud.upload" disabled></button>
-              <span class="cloud-picked" id="cloud-picked"></span>
+          </div>
+          </div>
+
+          <div class="transfer-subpane" id="cloud-webdav-pane" hidden>
+          <div class="cloud-body" id="webdav-body">
+            <p class="cloud-note" data-i18n="webdav.note"></p>
+            <div class="cloud-grid">
+              <label class="cloud-field"><span data-i18n="webdav.baseUrl"></span>
+                <input class="text_pole" id="webdav-base-url" placeholder="https://dav.example.com/remote.php/dav/files/user" autocomplete="off"></label>
+              <label class="cloud-field"><span data-i18n="webdav.username"></span>
+                <input class="text_pole" id="webdav-username" autocomplete="off"></label>
+              <label class="cloud-field"><span data-i18n="webdav.password"></span>
+                <input class="text_pole" id="webdav-password" type="password" autocomplete="off"></label>
+              <label class="cloud-field"><span data-i18n="webdav.prefix"></span>
+                <input class="text_pole" id="webdav-prefix" autocomplete="off"></label>
+              <label class="cloud-field"><span data-i18n="webdav.passphrase"></span>
+                <input class="text_pole" id="webdav-passphrase" type="password" autocomplete="off"></label>
             </div>
-            <div class="cloud-status" id="cloud-status"></div>
-            <div class="cloud-list" id="cloud-list"></div>
+            <div class="cloud-row">
+              <button type="button" class="menu_button" id="webdav-save" data-i18n="cloud.save"></button>
+              <button type="button" class="menu_button" id="webdav-refresh" data-i18n="cloud.refresh"></button>
+            </div>
+          </div>
+          </div>
+
+          <div class="cloud-row">
+            <input class="text_pole" id="cloud-file" type="file" accept=".zip" hidden>
+            <button type="button" class="menu_button" id="cloud-pick" data-i18n="cloud.pick"></button>
+            <button type="button" class="menu_button" id="cloud-upload" data-i18n="cloud.upload" disabled></button>
+            <button type="button" class="menu_button" id="cloud-backup-selected" data-i18n="cloud.backupSelected"></button>
+            <span class="cloud-picked" id="cloud-picked"></span>
+          </div>
+          <div class="cloud-status" id="cloud-status"></div>
+          <div class="cloud-list" id="cloud-list"></div>
+          </div>
           </div>
         </section>
       </div>
@@ -267,9 +298,6 @@ export function getWorkbenchHtml() {
         <button class="log-level-btn" data-level="WARN" data-i18n="log.warn"></button>
         <button class="log-level-btn" data-level="ERROR" data-i18n="log.error"></button>
         <span style="flex:1"></span>
-        <span class="log-badge" id="log-count-info">0 INFO</span>
-        <span class="log-badge warn" id="log-count-warn">0 WARN</span>
-        <span class="log-badge err" id="log-count-err">0 ERR</span>
         <button id="log-export" data-i18n="log.export"></button>
         <button id="log-copy" data-i18n="log.copy"></button>
         <button id="log-clear" data-i18n="log.clear"></button>

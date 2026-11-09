@@ -28,6 +28,7 @@ import {
   isNativeExportBusy, closeNativeBackupUi, watchNativeExportStart,
   uploadUserFile, userFilesSupported, sanitizeUserFileName, verifyUserFiles, deleteUserFile,
   readHostStorageQuota,
+  isHostAccountWindowAvailable, openHostStoragePage, listHostExtensions,
   opfsTmpHandle, opfsHandleToFile, opfsTmpCleanup,
 } from './src/ui/host-bridge.js';
 import { packPrivateContainer } from './src/core/private-container.js';
@@ -43,6 +44,12 @@ import { getLocale, onLocaleChange, setLocale, t } from './src/i18n/index.js';
 import { probeChatStore } from './src/ui/chat-store-bridge.js';
 import { mountDebugProbe } from './src/app/task-runtime.js';
 import { createConversionRunner, readPausedMarker, clearPausedMarker } from './src/app/conversion-runner.js';
+import { beginHostPull, beginNativePull } from './src/app/pull-entry.js';
+import { buildAssetList, summarizeExtensions } from './src/core/asset-list.js';
+import { deriveExtensionEntry } from './src/core/extension-manifest.js';
+import { objectKey } from './src/core/s3-client.js';
+import { createTransferTarget } from './src/core/transfer-target.js';
+import { createTransferRunner } from './src/app/transfer-runner.js';
 import { ExportQueue } from './src/ui/export-queue.js';
 import { reportToHuman } from './src/core/report.js';
 import { TaskManager, memoryAdapter } from './src/core/task-manager.js';
@@ -307,6 +314,149 @@ async function main(root) {
     setTimeout(() => URL.revokeObjectURL(url), 60_000);
   }
 
+  function saveJsonDownload(data, name) {
+    const blob = new Blob([JSON.stringify(data, null, 2) + '\n'], { type: 'application/json;charset=utf-8' });
+    downloadBlob(blob, name);
+  }
+
+  function assetListFileName(source) {
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    return `extensions-asset-list_${source}_${stamp}.json`;
+  }
+
+  /**
+   * 导出宿主扩展资产列表（官方扁平数组）。
+   *
+   * 事实边界：宿主 discover 只给目录名/类型，URL 来自各扩展 `manifest.json` 的
+   * `homePage`。因此可能出现「有扩展、但没有可导入地址」——此时如实提示，不生成空文件。
+   */
+  async function exportHostAssetList() {
+    const result = await listHostExtensions(host.platform);
+    if (!result.ok) {
+      view.toast(t('toast.assetListUnavailable'));
+      logger.warn(`${t('toast.assetListUnavailable')}: ${result.reason || result.status || ''}`);
+      return;
+    }
+    const hostItems = (result.items || []).filter((item) => item.sourceType !== 'system');
+    const list = buildAssetList(hostItems);
+    const summary = summarizeExtensions(hostItems);
+    if (!list.length) {
+      view.toast(t('toast.assetListEmpty', { total: summary.total }));
+      logger.warn(t('log.assetListEmpty', { total: summary.total }));
+      return;
+    }
+    saveJsonDownload(list, assetListFileName('host'));
+    view.toast(t('toast.assetListExported', { n: list.length }));
+    logger.info(t('log.assetListExported', { n: list.length, total: summary.total }));
+  }
+
+  /**
+   * 导出数据包内扩展的资产列表。
+   * 元数据来自 `plan-preview` 已缓存的 `pkg.extensions`，不二次扫描 zip。
+   * @param {string[]} pkgIds
+   */
+  async function exportPackageAssetList(pkgIds) {
+    const ids = (Array.isArray(pkgIds) ? pkgIds : []).filter(Boolean);
+    if (!ids.length) {
+      view.toast(t('toast.assetListNoPackage'));
+      return;
+    }
+    const raws = [];
+    for (const id of ids) {
+      await ensurePlan(id);
+      raws.push(...(state.extensionsById.get(id) || []));
+    }
+    const derived = raws.map((ext) => deriveExtensionEntry({ ...ext, mode: 'manifest' }));
+    const list = buildAssetList(derived);
+    const summary = summarizeExtensions(derived);
+    if (!list.length) {
+      view.toast(t('toast.assetListEmpty', { total: summary.total }));
+      logger.warn(t('log.assetListEmpty', { total: summary.total }));
+      return;
+    }
+    saveJsonDownload(list, assetListFileName('pack'));
+    view.toast(t('toast.assetListExported', { n: list.length }));
+    logger.info(t('log.assetListExported', { n: list.length, total: summary.total }));
+  }
+
+  /** 图表卡 / 空态拉取卡的统一导出入口。 */
+  async function exportAssetList(request = {}) {
+    if (request.source === 'host') return exportHostAssetList();
+    return exportPackageAssetList(request.pkgIds);
+  }
+
+  /**
+   * 把当前选中的导入包分片备份到云端（S3 / WebDAV）。
+   *
+   * 事实边界：分片从本地 Blob 逐片读取，不经整包内存；但字节仍经本机网卡。
+   * 加密短语需要整包加密，自动备份不做（如实提示，改用单包上传）。
+   */
+  async function backupSelectedToCloud({ provider = 's3', config = {} } = {}) {
+    const ids = [...state.selectedPkgs];
+    if (!ids.length) { view.toast(t('toast.selectPackFirst')); return; }
+    if (config.passphrase) { view.toast(t('cloud.backupNoPassphrase')); return; }
+    if (state.busy) return;
+    const target = createTransferTarget({
+      kind: provider === 'webdav' ? 'webdav' : 's3',
+      config,
+      fetchImpl: (url, init) => fetch(url, init),
+    });
+    if (!target.ready) { view.toast(t('cloud.notConfigured')); return; }
+
+    state.busy = true;
+    try {
+      if (provider === 'webdav' && config.prefix && typeof target.ensureCollection === 'function') {
+        const collection = await target.ensureCollection(config.prefix);
+        if (!collection.ok) {
+          view.toast(t('cloud.error', { msg: collection.message || collection.code || 'mkcol-failed' }));
+          return;
+        }
+      }
+      let uploaded = 0;
+      let skipped = 0;
+      let failed = 0;
+      for (const id of ids) {
+        const pkg = state.packages.find((p) => p.id === id);
+        if (!pkg) continue;
+        const blob = await blobOf(pkg);
+        if (!blob) {
+          failed += 1;
+          logger.warn(t('cloud.backupMissingBlob', { name: pkg.name }));
+          continue;
+        }
+        const runner = createTransferRunner({
+          target,
+          onProgress: (progress) => {
+            if (progress.phase !== 'uploading') return;
+            const pct = 15 + Math.round((progress.uploadedBytes / Math.max(1, progress.totalBytes)) * 80);
+            view.setProgress(pct, t('cloud.uploadingChunk', {
+              done: progress.uploadedChunks,
+              total: progress.totalChunks,
+            }));
+          },
+        });
+        const result = await runner.upload({
+          blob,
+          name: objectKey(config.prefix, pkg.name),
+          contentType: 'application/zip',
+        });
+        if (!result.ok) {
+          failed += 1;
+          logger.error(t('cloud.backupItemFailed', { name: pkg.name, msg: result.code || result.message }));
+          continue;
+        }
+        if (result.skipped) skipped += 1;
+        else uploaded += 1;
+      }
+      const summary = { uploaded, skipped, failed };
+      view.setProgress(100, t('cloud.backupDone', summary));
+      view.toast(t('cloud.backupDone', summary));
+      logger.info(t('cloud.backupDone', summary));
+    } finally {
+      state.busy = false;
+    }
+  }
+
   async function downloadSelected(ids) {
     for (const id of ids) {
       const pkg = pkgById(id);
@@ -385,34 +535,39 @@ async function main(root) {
   }
 
   /**
-   * 工作台「从宿主拉取」：优先打开宿主**原生**备份界面，让类目勾选发生在原生侧
-   * （用户 2026-11-04 裁定：插件不再自建拉取勾选）。找不到原生入口时静默回退。
+   * 工作台「从宿主拉取」：顺序为 **流量警告 → 原生操作指引 → 打开原生界面**。
+   * 原生入口不可用时如实回退插件侧拉取（PT 走它自己的归档端点）。
    */
   async function fetchFromHost() {
     if (!host.isPlugin) { view.toast(t('toast.webNoHost')); return; }
     if (state.busy) return;
 
-    const opened = await openNativeBackupUi(host.platform);
-    if (opened) {
-      logger.info(t('log.nativeUiOpened'));
-      // 只打开原生位置，绝不自动点注入按钮；用弹窗明确要求用户自己点「从宿主拉取」。
-      await alertDialog(t('toast.nativePickCategories'));
-      return;
-    }
+    await beginHostPull({
+      trafficPrompt: settings.trafficPrompt,
+      nativePullNotice: settings.nativePullNotice !== false,
+      confirmTraffic: askTraffic,
+      showNativeNotice: () => alertDialog(t('toast.nativePickCategories')),
+      openNativeUi: () => openNativeBackupUi(host.platform),
+      isBusy: () => isNativeExportBusy(host.platform),
+      notifyBusy: () => notifyHostExportBusy(false),
+      onOpened: () => logger.info(t('log.nativeUiOpened')),
+      onMissing: () => logger.warn(t('log.nativeUiMissing')),
+      fallbackPull: async () => {
+        if (host.platform === 'pt') { await pullFromPt(); return; }
+        await pullFromHost(FULL_SELECTION, false);
+      },
+    });
+  }
 
-    // 静默回退：原生入口未就绪（宿主版本差异 / 扩展未装）。
-    // PureTavern 没有 /api/users/backup，回退必须走它自己的归档端点。
-    logger.warn(t('log.nativeUiMissing'));
-    if (isNativeExportBusy(host.platform)) { notifyHostExportBusy(false); return; }
-    if (host.platform === 'pt') { await pullFromPt(); return; }
-    if (settings.trafficPrompt) {
-      view.confirmTraffic(() => pullFromHost(FULL_SELECTION, false), {
+  /** 流量确认是回调式弹窗；包成 Promise 以便按顺序编排。取消必须能 settle。 */
+  function askTraffic() {
+    return new Promise((resolve) => {
+      view.confirmTraffic(() => resolve(true), {
         enabled: true,
+        onCancel: () => resolve(false),
         onNever: () => { settings.trafficPrompt = false; saveSettings(settings); },
       });
-      return;
-    }
-    await pullFromHost(FULL_SELECTION, false);
+    });
   }
 
   /** 宿主原生导出优先：提示并放弃插件侧拉取。 */
@@ -422,23 +577,35 @@ async function main(root) {
     view.toast(t('toast.hostExportBusy'));
   }
 
-  /** 原生界面里注入的「从宿主拉取」按钮：读取原生勾选后拉取（不回写宿主选择记忆）。 */
+  /** 原生界面里注入的「从宿主拉取」按钮：流量确认 → 读勾选 → 关面板 → 拉取。 */
   async function pullFromNativeUi() {
     if (state.busy) return;
     if (host.platform === 'pt') {
-      // 勾选必须先读：关闭 dialog 后就取不到了。
-      const options = readPtExportOptions() || { moduleIds: [], includeSecrets: false };
-      closeNativeBackupUi('pt');
-      if (isNativeExportBusy('pt')) { notifyHostExportBusy(true); return; }
-      await pullFromPt(options);
+      await beginNativePull({
+        trafficPrompt: settings.trafficPrompt,
+        confirmTraffic: askTraffic,
+        readSelection: () => readPtExportOptions() || { moduleIds: [], includeSecrets: false },
+        closeNativeUi: () => closeNativeBackupUi('pt'),
+        isBusy: () => isNativeExportBusy('pt'),
+        notifyBusy: () => notifyHostExportBusy(true),
+        pull: (options) => pullFromPt(options),
+      });
       return;
     }
-    const selection = readNativeBackupSelection() || FULL_SELECTION;
-    const keys = Object.keys(selection).filter((key) => selection[key]);
-    logger.info(t('log.nativeSelection', { keys: keys.join(',') || '-' }));
-    closeNativeBackupUi(host.platform);
-    if (isNativeExportBusy(host.platform)) { notifyHostExportBusy(true); return; }
-    await pullFromHost(selection, true);
+
+    await beginNativePull({
+      trafficPrompt: settings.trafficPrompt,
+      confirmTraffic: askTraffic,
+      readSelection: () => readNativeBackupSelection() || FULL_SELECTION,
+      closeNativeUi: () => closeNativeBackupUi(host.platform),
+      isBusy: () => isNativeExportBusy(host.platform),
+      notifyBusy: () => notifyHostExportBusy(true),
+      pull: async (selection) => {
+        const keys = Object.keys(selection).filter((key) => selection[key]);
+        logger.info(t('log.nativeSelection', { keys: keys.join(',') || '-' }));
+        await pullFromHost(selection, true);
+      },
+    });
   }
   nativePullHook = pullFromNativeUi;
 
@@ -994,8 +1161,15 @@ async function main(root) {
       pendingRemove: (id) => exportQueue.remove(id),
       pendingClear: () => exportQueue.clear(),
       reportDownload: downloadReport,
+      exportAssetList,
+      backupSelectedToCloud,
       lan: lanActions,
       settings: openSettings,
+      /** 配额行点击：跳到宿主原生存储页的对应分页；宿主没有就如实提示。 */
+      hostStoragePage: async (kind) => {
+        const result = await openHostStoragePage(kind, host.platform);
+        if (!result.ok) view.toast(t('quota.noHostPage'));
+      },
       uploadRequest: () => root.querySelector('#file-input')?.click(),
       uploadPrivate,
       privateFiles: {
@@ -1101,11 +1275,12 @@ async function main(root) {
 
   await syncPackages();
   async function refreshStorageQuota() {
-    const [browser, hostQuota] = await Promise.all([
+    const [browser, hostQuota, pageAvailable] = await Promise.all([
       readBrowserQuota(),
       host.platform === 'luker' ? readHostStorageQuota() : Promise.resolve(null),
+      isHostAccountWindowAvailable(host.platform),
     ]);
-    view.setStorage({ browser, host: hostQuota });
+    view.setStorage({ browser, host: hostQuota, page: { available: pageAvailable } });
   }
   await refreshStorageQuota();
   if (typeof document !== 'undefined') {
@@ -1118,7 +1293,9 @@ async function main(root) {
   try {
     if (settings.autoTutorial && !sessionStorage.getItem('st-pack-transfer:tutorial-seen')) {
       sessionStorage.setItem('st-pack-transfer:tutorial-seen', '1');
-      setTimeout(() => view.openTutorial(), 300);
+      // 立即弹：延迟会让用户先操作再看到蒙层（2026-11-09 反馈）。
+      if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => view.openTutorial());
+      else view.openTutorial();
     }
   } catch { /* 隐私模式 */ }
 }

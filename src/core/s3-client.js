@@ -143,14 +143,14 @@ export function createS3Client({ config, fetchImpl = globalThis.fetch, crypto = 
   const region = config.region || 'us-east-1';
   const ready = !!(base && config.accessKeyId && config.secretAccessKey && fetchImpl && crypto?.subtle);
 
-  async function request(method, key, { body, query = '', contentType, as = 'bytes' } = {}) {
+  async function request(method, key, { body, query = '', contentType, as = 'bytes', extraHeaders = {} } = {}) {
     if (!ready) return { ok: false, status: 0, message: 'not-configured' };
     const url = `${base}/${key ? encodePath(key) : ''}${query}`;
     try {
       const payload = body || new Uint8Array(0);
       const payloadHash = await sha256Hex(crypto, payload);
       const { amz } = amzDates();
-      const headers = { 'x-amz-content-sha256': payloadHash, 'x-amz-date': amz };
+      const headers = { 'x-amz-content-sha256': payloadHash, 'x-amz-date': amz, ...extraHeaders };
       if (contentType) headers['content-type'] = contentType;
       const { authorization } = await signRequest({
         method,
@@ -165,7 +165,7 @@ export function createS3Client({ config, fetchImpl = globalThis.fetch, crypto = 
       const res = await fetchImpl(url, {
         method,
         headers: { ...headers, Authorization: authorization },
-        body: method === 'PUT' ? payload : undefined,
+        body: method === 'PUT' || method === 'POST' ? payload : undefined,
       });
       if (!res.ok) {
         let detail = '';
@@ -174,11 +174,17 @@ export function createS3Client({ config, fetchImpl = globalThis.fetch, crypto = 
         } catch {
           detail = '';
         }
-        return { ok: false, status: res.status, message: detail || `http-${res.status}` };
+        return { ok: false, status: res.status, message: detail || `http-${res.status}`, headers: res.headers };
       }
-      if (method !== 'GET') return { ok: true, status: res.status };
-      if (as === 'text') return { ok: true, status: res.status, text: await res.text() };
-      return { ok: true, status: res.status, bytes: new Uint8Array(await res.arrayBuffer()) };
+      if (method === 'HEAD' || method === 'DELETE') {
+        return { ok: true, status: res.status, headers: res.headers };
+      }
+      if (method !== 'GET' && method !== 'POST') return { ok: true, status: res.status, headers: res.headers };
+      if (method === 'POST') {
+        return { ok: true, status: res.status, text: await res.text(), headers: res.headers };
+      }
+      if (as === 'text') return { ok: true, status: res.status, text: await res.text(), headers: res.headers };
+      return { ok: true, status: res.status, bytes: new Uint8Array(await res.arrayBuffer()), headers: res.headers };
     } catch (error) {
       return { ok: false, status: 0, message: String(error?.message || error) };
     }
@@ -192,8 +198,65 @@ export function createS3Client({ config, fetchImpl = globalThis.fetch, crypto = 
     async getObject(key) {
       return request('GET', key, { as: 'bytes' });
     },
+    /** Range GET：`start`/`end` 均为闭区间字节偏移。 */
+    async getObjectRange(key, { start = 0, end = 0 } = {}) {
+      return request('GET', key, {
+        as: 'bytes',
+        extraHeaders: { Range: `bytes=${Math.max(0, start)}-${Math.max(0, end)}` },
+      });
+    },
+    async headObject(key) {
+      const result = await request('HEAD', key);
+      if (!result.ok) return result;
+      return {
+        ok: true,
+        status: result.status,
+        size: Number(result.headers?.get?.('content-length')) || 0,
+        etag: String(result.headers?.get?.('etag') || '').replace(/^"|"$/g, ''),
+        lastModified: String(result.headers?.get?.('last-modified') || ''),
+      };
+    },
     async deleteObject(key) {
       return request('DELETE', key);
+    },
+    /** 开始分片上传，返回 `uploadId`。 */
+    async createMultipart(key, { contentType = 'application/octet-stream' } = {}) {
+      const result = await request('POST', key, { query: '?uploads', contentType, as: 'text' });
+      if (!result.ok) return result;
+      const uploadId = pickXmlTag(result.text, 'UploadId');
+      if (!uploadId) return { ok: false, status: result.status, message: 'missing-upload-id' };
+      return { ok: true, status: result.status, uploadId };
+    },
+    async uploadPart(key, uploadId, partNumber, bytes) {
+      const result = await request('PUT', key, {
+        body: bytes,
+        query: `?partNumber=${Math.max(1, Math.trunc(partNumber))}&uploadId=${encodeURIComponent(uploadId)}`,
+        as: 'text',
+      });
+      if (!result.ok) return result;
+      return {
+        ok: true,
+        status: result.status,
+        etag: String(result.headers?.get?.('etag') || '').replace(/^"|"$/g, ''),
+      };
+    },
+    async completeMultipart(key, uploadId, parts = []) {
+      const body = '<CompleteMultipartUpload>'
+        + parts.map((part) => `<Part><PartNumber>${part.partNumber}</PartNumber><ETag>"${part.etag}"</ETag></Part>`).join('')
+        + '</CompleteMultipartUpload>';
+      return request('POST', key, {
+        body: new TextEncoder().encode(body),
+        query: `?uploadId=${encodeURIComponent(uploadId)}`,
+        contentType: 'application/xml',
+        as: 'text',
+      });
+    },
+    async abortMultipart(key, uploadId) {
+      const result = await request('DELETE', key, {
+        query: `?uploadId=${encodeURIComponent(uploadId)}`,
+      });
+      if (!result.ok && result.status === 404) return { ok: true, status: 404, alreadyMissing: true };
+      return result;
     },
     async listObjects(prefix = '', { maxPages = 5 } = {}) {
       if (!ready) return { ok: false, status: 0, message: 'not-configured' };
@@ -213,4 +276,10 @@ export function createS3Client({ config, fetchImpl = globalThis.fetch, crypto = 
       return { ok: true, status: 200, items };
     },
   };
+}
+
+/** 从 S3 XML 响应取标签值（UploadId 等）。 */
+function pickXmlTag(xml, tag) {
+  const match = new RegExp(`<${tag}\\b[^>]*>([\\s\\S]*?)</${tag}>`, 'i').exec(String(xml || ''));
+  return match ? match[1].trim() : '';
 }

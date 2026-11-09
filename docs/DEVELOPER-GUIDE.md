@@ -30,12 +30,12 @@
 | 功能 | UI 入口 | 源码落点 |
 | --- | --- | --- |
 | 从当前宿主拉取整份用户数据 | `#btn-fetch`（工作台）/ 宿主原生界面注入按钮 | `index.js` 的 `fetchFromHost()` / `pullFromNativeUi()`；`src/ui/host-bridge.js` 的 `openNativeBackupUi()` / `fetchHostBackup()` |
+| **Luker 2.9+ 账户窗口**（备份页注入 / 存储页跳转 / 勾选读取） | 账户 → Backup / Storage | `openHostAccountWindow()` / `openHostStoragePage()` / `readNativeBackupSelection()`；契约见 `.trellis/spec/frontend/luker-2.9-account-window.md` |
 | **原生界面生命周期**（拉取后自动关闭、宿主原生导出优先） | 原生界面「从宿主拉取」 | `closeNativeBackupUi()` / `isNativeExportBusy()` / `watchNativeExportStart()`；契约见 `.trellis/spec/frontend/host-native-pull-lifecycle.md` |
 | 细粒度类目勾选（10 类目 + 3 特殊类目） | `#chart-stack` 的类目卡与选择树 | `src/ui/workbench-view.js` 的 `renderTreeRows()`、`src/core/inspect.js`、`src/core/chart-model.js` |
 | 类目内逐文件穿透排除 | 同一棵选择树 | `src/ui/workbench-view.js` 的 `renderTreeRows()`、`src/ui/host-bridge.js` 的 `exclude` 链路 |
 | 一步直出目标布局（拉取时即指定目标格式） | `#target-select` | `src/core/plan-preview.js` 的路由/合成分支 |
-| 拉取进度 / 半成品续传 | `#workbench-progress` | `src/ui/host-bridge.js` 的 `fetchHostBackup()`（`Range` 续传）、`src/core/worker-client.js` |
-| 转换进度 / 暂停 / 继续 / 中止 | 动作行 `#btn-task-pause` / `#btn-task-resume` / `#btn-task-abort` | `src/app/conversion-runner.js`、`src/core/task-manager.js`、`src/app/task-runtime.js` 的 `persistPartial` |
+| 拉取进度 / 半成品续传 | `#workbench-progress` | `src/ui/host-bridge.js` 的 `fetchHostBackup()`（`Range` 续传）、`src/core/worker-client.js` || 转换进度 / 暂停 / 继续 / 中止 | 动作行 `#btn-task-pause` / `#btn-task-resume` / `#btn-task-abort` | `src/app/conversion-runner.js`、`src/core/task-manager.js`、`src/app/task-runtime.js` 的 `persistPartial` |
 
 ### B. 包转换（三形态都有）
 
@@ -110,9 +110,12 @@
 
 | 功能 | 源码落点 |
 | --- | --- |
-| 结构化实时日志（级别过滤/复制/下载 `.log`） | `src/core/logger.js`、`src/ui/workbench-view.js`（`#view-log`） |
-| 存储配额条（摘要行 + 展开详情） | `src/ui/workbench-view.js` 的 `renderQuota()` |
-| 宿主配额读数（Luker 同源兜底） | `src/ui/host-bridge.js` 的 `readHostStorageQuota()`（`/api/users/storage/inspect`） |
+| 结构化实时日志（等级按钮自带条数 / 毫秒时间戳 / 条数上限 / 加载时清空） | `src/ui/workbench-view.js` 的 `renderLog()` / `nowTime()` / `logLimit()`；`test` 外无独立模块 |
+| 存储配额两行（浏览器 / 宿主），点击跳宿主原生存储页对应分页 | `src/ui/workbench-view.js` 的 `renderQuota()`；`src/ui/host-bridge.js` 的 `openHostStoragePage()` / `openHostAccountWindow()` |
+| 宿主配额读数（Luker 同源兜底） | `src/ui/host-bridge.js` 的 `readHostStorageQuota()`（`RestProvider`） |
+| 导出扩展资产列表（官方扁平 JSON，可导入「下载扩展和资源菜单」） | 每张图表卡 `[data-assetlist]`；空态 `#btn-assetlist-host` | `src/core/asset-list.js`、`src/ui/host-bridge.js` 的 `listHostExtensions()`、`index.js` 的 `exportPackageAssetList()` / `exportHostAssetList()`；契约见 `.trellis/spec/frontend/asset-list-export.md` |
+| 设置分组可收起 | `src/ui/settings-panel.js` 的 `buildSettingsHtml()`（四个 `<details>`） |
+| 图表单独最大化 + 逐层下钻（勾选逻辑不变） | `src/ui/workbench-view.js` 的 `chartCardHtml()` / `volScopedNodes()` / `volBreadcrumbHtml()` |
 
 ### J. file:// 单文件离线产物（S7，2026-10-13）
 
@@ -127,9 +130,10 @@
 
 | 功能 | UI 入口 | 源码落点 |
 | --- | --- | --- |
-| 用局域网面板**完整替换**左侧图表面板 | `#chart-card .panel-actions` 的 `#lan-open-btn` | `src/ui/workbench-template.js`（`#chart-card` / `#lan-view` 同级面板）、`src/ui/workbench-view.js` 的 `renderLan()` |
-| 关闭局域网面板、回到图表 | `#lan-close-btn` | 同上 |
-| WebRTC 分块传输 / 二维码信令 / 续传 | 面板内发送与接收区 | `src/core/lan-transfer.js`、`src/ui/lan-transfer-panel.js` |
+| 用「迁移与备份」面板**完整替换**左侧图表面板 | `#chart-card` 动作行的 `#transfer-open-btn` | `src/ui/workbench-template.js`（`#transfer-view` + `#transfer-tabs`）、`src/ui/workbench-view.js` 的 `renderTransfer()` / `renderLan()` |
+| 关闭面板、回到图表 | `#transfer-close-btn` | 同上 |
+| 一级 tab：局域网 / 公网 | `#transfer-tabs` | `src/ui/workbench-view.js` 的 `renderTransfer()` |
+| WebRTC 分块传输 / 二维码信令 / 续传 | 局域网 pane 内发送与接收区 | `src/core/lan-transfer.js`、`src/ui/lan-transfer-panel.js` |
 
 > 新的承载面契约见 `.trellis/spec/frontend/workbench-single-view.md` §7.3；
 > 旧「执行卡内折叠块」模型（`.lan-block` / `#lan-toggle` / `.col-side.lan-open`）已废弃。
@@ -152,12 +156,29 @@
 > 注意：`@container` 与基础 `grid-template-columns` **同特异度**，靠源码顺序决胜负——
 > 列数规则必须写在基础规则之后，否则恒为单列（2026-11-05 实测踩到）。
 
+### M. 公网传输：S3 / WebDAV（2026-11-09）
+
+| 功能 | UI 入口 | 源码落点 |
+| --- | --- | --- |
+| 公网内二级切换 S3 / WebDAV | `#cloud-provider-tabs` | `src/ui/workbench-view.js` 的 `renderCloud()` / `cloudClient()` |
+| 分片上传 / 断点续传 / 清单 | 云端面板的上传与备份按钮 | `src/core/transfer-plan.js`、`src/app/transfer-runner.js`、`src/core/transfer-target.js` |
+| S3 HEAD / Range / multipart | 自动 | `src/core/s3-client.js` |
+| WebDAV 全方法降级（OPTIONS/PROPFIND/MKCOL） | 自动 | `src/core/webdav-client.js` |
+| 一键备份选中包到云端 | `#cloud-backup-selected` | `index.js` 的 `backupSelectedToCloud()` |
+| 加密上传 / 下载 | S3/WebDAV 表单的「加密短语」 | `src/core/s3-crypto.js`；自动备份不支持加密短语（如实提示） |
+
+> 契约见 `.trellis/spec/frontend/transfer-s3-webdav.md`。
+> **无服务端直传、无 cron**：本插件禁止后台插件；`serverTransfer` 能力表全 false。
+
 ---
 
 ## 三、分层与硬性边界
 
 ```
 src/core/     纯逻辑，**禁止 DOM / window / fetch**（可在 Node/Vitest 直接跑）
+              新增：asset-list.js（官方资产列表）、transfer-plan.js（分片台账）、
+              webdav-client.js、transfer-target.js、host-capabilities.js
+src/app/      转换/传输编排（task-runtime / conversion-runner / transfer-runner / pull-entry）
 src/ui/       可 DOM；host-bridge.js 是宿主差异的唯一落点
 src/storage/  IndexedDB + 可选 Authority 适配器
 src/vendor/   zip.js / fzstd / fontawesome 本地副本 —— **勿升级改动**
@@ -191,6 +212,7 @@ npm run check:template-source # 单一模板源 + 必需节点 id
 npm run check:dom-scope       # 宿主 DOM 写入作用域
 npm run check:control-consumer# 控件消费点
 npm run build                 # GitHub Pages 静态站点（base=./）
+npm run preview               # 本地静态服务器托管 dist（4173）——**UI 验收唯一入口**
 npm run build:offline         # file:// 单文件离线产物
 npm run e2e                   # 实例侧 E2E（需 Dev 实例；只连 Dev 白名单端口）
 npm run e2e:web               # 独立 Web / 云子路径 / file:// 离线（不需要实例）
@@ -198,6 +220,17 @@ npm run e2e:web -- --rebuild  # 删/换过源码文件时必须加（mtime 判�
 ```
 
 无独立 lint/typecheck —— 类型契约靠 JSDoc + 运行时守卫，**质量门槛就是 `npm test` 全绿**。
+
+**UI 验收唯一路径（2026-11-09 用户裁定）**：
+
+```bash
+npm run build        # 产物必须是最新源码
+npm run preview      # 本地静态服务器托管 dist，默认 4173
+```
+
+浏览器打开 `http://localhost:4173/` 操作取证。**禁止**用 `file://`、`npm run dev`
+或直接双击 `dist/index.html` 作为界面验收入口；`npm run dev` 只用于开发热重载。
+本机小规模取证脚本（不纳版本控制）：`scripts/ui-verify-static.cjs`。
 
 **E2E 视图约定（2026-10-13 起）**：默认入口是向导，向导只披露当前步 ⇒ 测高级工作台的 spec
 必须显式调用 `common.useAdvancedView(page)`。测向导本身的用 `wizard.e2e.cjs`。
@@ -230,6 +263,10 @@ npm run e2e:web -- --rebuild  # 删/换过源码文件时必须加（mtime 判�
 | TT 自动化 | 无浏览器端口 ⇒ 人工交付 |
 | PT 原生归档源的有损点 | 角色卡用自带卡的 `avatars` blob（运行期 PT 角色头像可能已被 PT 重编码）；聊天 jsonl 重序列化丢原始空白；预设 metadata 不重建 |
 | PT 原生源断点续传 | 不支持（重建条目无源 crc32 ⇒ 暂停后作废半成品并完整重做，安全降级） |
+| 资产列表 URL 来源 | 宿主 `/api/extensions/discover` 只给目录名/类型；URL 只能取各扩展 `manifest.json` 的 `homePage`。没有 `homePage` 的扩展无法导出可导入地址（如实提示，不伪造） |
+| 自动备份 | **只做**「选中包 → 云端」的一键分片上传；**无 cron、无服务端直传**（用户禁止后台插件）。加密短语需整包加密，自动备份不接（如实拒绝） |
+| WebDAV 真机 | 协议与降级分支已单测覆盖；**尚未在真实 WebDAV 服务器上跑过**（含 405/401/CORS 实测） |
+| 静态 UI 验收 | `npm run build && npm run preview` 只覆盖独立 Web / 插件模板本身；宿主注入（账户面板、原生按钮）仍需 Dev 实例 |
 
 ---
 

@@ -26,6 +26,13 @@ import {
 } from './fetch-bounds.js';
 import { STAGE_LABELS } from '../core/stage-timings.js';
 import { buildEndpointSelection } from '../core/selection-defaults.js';
+import {
+  manifestToExtension,
+  manifestUrlOf,
+  normalizeDiscoverResponse,
+  summarizeExtensions,
+} from '../core/asset-list.js';
+import { capabilityState } from '../core/host-capabilities.js';
 
 /**
  * 恢复在途标志（并发互斥）。
@@ -495,6 +502,248 @@ function loadStorageInspectorModule() {
       });
   }
   return storageInspectorModulePromise;
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * Luker 2.9+ 账户窗口（AccountWindow）
+ *
+ * 2.9 起账户是自绘窗口（`dialog.dw-layer` → `.dw-win` → `.dw`），备份/存储页都在里面；
+ * 旧版的 `.userBackupButton` / `.userBackupManager` 已不存在。
+ * 模块与 Storage Inspector 一样没有 window 挂载、也不在 getContext() 里，
+ * 只能经站点根绝对路径 import；形状校验优先于「加载成功」。
+ * 契约见 `.trellis/spec/frontend/luker-2.9-account-window.md`。
+ * ──────────────────────────────────────────────────────────────────────────── */
+const ACCOUNT_WINDOW_MODULE_URL = '/scripts/account-window.js';
+let accountWindowModulePromise = null;
+
+function loadAccountWindowModule() {
+  if (typeof window === 'undefined' || typeof document === 'undefined') {
+    return Promise.resolve(null);
+  }
+  if (!accountWindowModulePromise) {
+    accountWindowModulePromise = import(/* @vite-ignore */ ACCOUNT_WINDOW_MODULE_URL)
+      .catch((err) => {
+        console.warn('[ST-pack-transfer] 宿主账户窗口模块不可用，降级旧版入口：', err);
+        return null;
+      });
+  }
+  return accountWindowModulePromise;
+}
+
+/** 形状判据：导出确实是函数，而不是「模块能加载」。 */
+export function hasAccountWindow(mod) {
+  return typeof mod?.openAccountWindow === 'function';
+}
+
+/**
+ * 账户窗口能力显式声明表（禁止用 `platform === 'luker'` 之类推导）。
+ * - `true`  = 已确认该宿主有此能力；
+ * - `false` = 已确认没有（不发起探测、不产生 404 噪音）；
+ * - 未列出  = 未取证 → 探测一次（fail-open），失败再降级。
+ */
+const HOST_ACCOUNT_WINDOW = Object.freeze({
+  st: false,
+  luker: true,
+  tt: false,
+  pt: false,
+});
+
+export function accountWindowCapability(platform) {
+  const declared = HOST_ACCOUNT_WINDOW[platform];
+  return { supported: declared === true, known: declared !== undefined };
+}
+
+/** 宿主是否提供 2.9+ 账户窗口（独立 Web 态恒 false）。 */
+export async function isHostAccountWindowAvailable(platform) {
+  const declared = accountWindowCapability(platform);
+  if (declared.known) return declared.supported;
+  return hasAccountWindow(await loadAccountWindowModule());
+}
+
+/**
+ * 打开宿主账户窗口并切到指定页。
+ *
+ * ⚠ `openAccountWindow()` 返回的 Promise 在**窗口关闭时**才 resolve——
+ * 这里必须 `void`，不能 `await`（否则调用方会一直挂到用户关窗）。
+ *
+ * @param {{ tab?: string, view?: string, platform?: string }} [spec]
+ * @returns {Promise<{ok: boolean, reason?: string}>}
+ */
+export async function openHostAccountWindow({ tab = 'profile', view, platform } = {}) {
+  const declared = accountWindowCapability(platform);
+  if (declared.known && !declared.supported) return { ok: false, reason: 'host-missing' };
+  const mod = await loadAccountWindowModule();
+  if (!hasAccountWindow(mod)) return { ok: false, reason: 'host-missing' };
+  try {
+    void mod.openAccountWindow(view ? { tab, view } : { tab });
+    return { ok: true };
+  } catch (err) {
+    console.warn('[ST-pack-transfer] 打开宿主账户窗口失败：', err);
+    return { ok: false, reason: 'failed' };
+  }
+}
+
+/**
+ * 打开宿主原生存储页并切到 server/browser 分页（配额行点击用）。
+ * @param {'server'|'browser'} kind
+ * @param {string} [platform]
+ * @returns {Promise<{ok: boolean, reason?: string}>}
+ */
+export async function openHostStoragePage(kind = 'server', platform) {
+  const opened = await openHostAccountWindow({ tab: 'storage', platform });
+  if (!opened.ok) return opened;
+  const wanted = kind === 'browser' ? 'browser' : 'server';
+  const btn = await waitForCondition(
+    () => document.querySelector(`[data-act="storage-kind"][data-kind="${wanted}"]`),
+    3000,
+  );
+  if (!btn) return { ok: false, reason: 'storage-page-missing' };
+  try {
+    btn.click();
+    return { ok: true };
+  } catch {
+    return { ok: false, reason: 'storage-page-failed' };
+  }
+}
+
+/**
+ * 宿主扩展清单的候选端点（按优先级）。
+ *
+ * `discover` 是 ST / Luker 客户端自己使用的权威端点（`public/scripts/extensions.js`）；
+ * 根路由只作兼容兜底。两者形状无关紧要——统一交给 `normalizeDiscoverResponse` 判定，
+ * **形状不认识就换下一个，绝不把它当成空清单**。
+ */
+const EXTENSION_LIST_ENDPOINTS = Object.freeze([
+  '/api/extensions/discover',
+  '/api/extensions',
+]);
+
+/** 逐条读取 manifest 的并发上限：宿主可能装了几十个扩展，串行会让按钮长时间无响应。 */
+const EXTENSION_MANIFEST_CONCURRENCY = 4;
+
+/** GET JSON（带 CSRF 与有界超时）；失败返回 `{ok:false}`，不抛。 */
+async function getJsonBounded(url, label) {
+  try {
+    const token = await getCsrfToken().catch(() => null);
+    const headers = token ? { 'X-CSRF-Token': token } : {};
+    const response = await fetchWithTimeout(url, {
+      method: 'GET',
+      credentials: 'same-origin',
+      headers,
+    }, { timeoutMs: 10_000, label });
+    if (!response.ok) return { ok: false, status: response.status };
+    try {
+      return { ok: true, data: await response.json() };
+    } catch {
+      return { ok: false, status: response.status, reason: 'invalid-json' };
+    }
+  } catch (err) {
+    return { ok: false, status: 0, reason: String(err?.message || err) };
+  }
+}
+
+/** 并发上限内的 map；任一任务失败由调用方自行降级，不中断其它任务。 */
+async function mapWithConcurrency(items, limit, fn) {
+  const out = new Array(items.length);
+  let cursor = 0;
+  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    for (;;) {
+      const index = cursor;
+      cursor += 1;
+      if (index >= items.length) return;
+      out[index] = await fn(items[index], index);
+    }
+  });
+  await Promise.all(workers);
+  return out;
+}
+
+/**
+ * 列出宿主已安装的**第三方**扩展（只读；内置 `system` 不参与可安装资产列表）。
+ *
+ * 数据来源与归一规则：
+ * 1. 先读 `discover`（权威），读不到再试根路由；
+ * 2. 逐条读 `/scripts/extensions/<name>/manifest.json` 取 `display_name` / `version` / `homePage`；
+ * 3. 形状不认识或端点全失败 ⇒ `{ok:false}`，调用方显示「当前宿主未提供扩展清单」；
+ * 4. 端点成功但列表为空 ⇒ `ok:true, total:0`（这是**真实空清单**，与「不支持」区分）。
+ *
+ * @returns {Promise<{
+ *   ok:boolean,
+ *   items?:Array<object>,
+ *   total?:number,
+ *   installable?:number,
+ *   endpoint?:string,
+ *   status?:number,
+ *   reason?:string
+ * }>}
+ */
+export async function listHostExtensions(platform) {
+  if (typeof fetch !== 'function') return { ok: false, reason: 'no-fetch' };
+  const declared = capabilityState('assetList', platform);
+  if (declared.known && !declared.supported) {
+    return { ok: false, reason: 'host-missing' };
+  }
+
+  let discovered = null;
+  let endpoint = '';
+  let lastStatus = 0;
+  let lastReason = '';
+  for (const url of EXTENSION_LIST_ENDPOINTS) {
+    const response = await getJsonBounded(url, '列出宿主扩展');
+    if (!response.ok) {
+      lastStatus = response.status || lastStatus;
+      lastReason = response.reason || lastReason;
+      continue;
+    }
+    const normalized = normalizeDiscoverResponse(response.data);
+    if (!normalized) {
+      lastReason = 'shape-unrecognized';
+      continue;
+    }
+    discovered = normalized;
+    endpoint = url;
+    break;
+  }
+
+  if (!discovered) {
+    return {
+      ok: false,
+      status: lastStatus,
+      reason: lastReason || (lastStatus ? `http-${lastStatus}` : 'unavailable'),
+    };
+  }
+
+  // 只取第三方扩展：system 是宿主内置，不应出现在「可安装资产列表」里。
+  const candidates = discovered.filter((entry) => entry.sourceType !== 'system');
+  const items = await mapWithConcurrency(
+    candidates,
+    EXTENSION_MANIFEST_CONCURRENCY,
+    async (entry) => {
+      if (entry.manifest && typeof entry.manifest === 'object') {
+        return manifestToExtension(entry.name, entry.manifest, { sourceType: entry.sourceType });
+      }
+      const manifest = await getJsonBounded(manifestUrlOf(entry.name), '读取扩展 manifest');
+      if (!manifest.ok || !manifest.data || typeof manifest.data !== 'object') {
+        // manifest 读不到时仍保留目录名：让导出结果是「N 个扩展、0 个可导入」，
+        // 而不是凭空消失成一个看起来正常的空清单。
+        return {
+          ...manifestToExtension(entry.name, {}, { sourceType: entry.sourceType }),
+          url: '',
+          manifestError: manifest.reason || `http-${manifest.status || 0}`,
+        };
+      }
+      return manifestToExtension(entry.name, manifest.data, { sourceType: entry.sourceType });
+    },
+  );
+
+  const summary = summarizeExtensions(items);
+  return {
+    ok: true,
+    endpoint,
+    items,
+    total: summary.total,
+    installable: summary.installable,
+  };
 }
 
 /**
@@ -1168,6 +1417,14 @@ export async function fetchHostBackup(platform, selection = null, {
       let speedWindowBytes = 0;
       let speedWindowStart = performance.now();
       let lastBps = 0;
+      /* 进度日志节流：至少间隔 1.5s 才允许再记一条，避免 4MB 步进刷屏。 */
+      let lastLogAt = 0;
+      const canLogProgress = () => {
+        const now = nowMs();
+        if (now - lastLogAt < 1500) return false;
+        lastLogAt = now;
+        return true;
+      };
       const fmtSpeed = (bps) => (bps > 0 ? `${(bps / 1048576).toFixed(1)} MB/s` : '—');
       for (;;) {
         // 停滞守卫：只守「两次字节之间的间隔」，不守总时长（见 async-bounds.md）
@@ -1199,13 +1456,13 @@ export async function fetchHostBackup(platform, selection = null, {
         }
         if (transferTotal > 0) {
           const pct = Math.round((received / transferTotal) * 100);
-          if (pct >= lastLoggedPct + 10) {
+          if (pct >= lastLoggedPct + 10 && canLogProgress()) {
             lastLoggedPct = pct;
             logger.info(`数据包传输中: ${pct}% (${(received / 1048576).toFixed(1)} / ${(transferTotal / 1048576).toFixed(1)} MB) · ${fmtSpeed(liveBps)}`);
           }
-        } else if (received >= lastLoggedPct + 4194304) {
-          // chunked 响应无 Content-Length：按 4MB 步进汇报
-          lastLoggedPct = received - (received % 4194304);
+        } else if (received >= lastLoggedPct + 16777216 && canLogProgress()) {
+          // chunked 响应无 Content-Length：按 16MB 步进 + 1.5s 节流汇报
+          lastLoggedPct = received - (received % 16777216);
           logger.info(`数据包传输中: 已接收 ${(received / 1048576).toFixed(1)} MB · ${fmtSpeed(liveBps)}`);
         }
         onPhase?.('transferring', received, transferTotal, opfsHandle ? opfsName : undefined, liveBps);
@@ -2296,12 +2553,12 @@ export function mountExtensionRowButton(onOpen) {
  * @param {{ id: string, icon: string, label?: string, title?: string, onClick?: () => void }} spec
  * @returns {HTMLElement} 已挂好点击处理的按钮节点
  */
-function makeHostButton({ id, icon, label, title, onClick }) {
+function makeHostButton({ id, icon, label, title, onClick, className }) {
   const btn = document.createElement('div');
   btn.id = id;
   btn.dataset.stZipInjected = '1';
-  // 复用宿主原生 menu_button 样式，与原生按钮并排
-  btn.className = 'menu_button menu_button_icon';
+  // 默认复用宿主原生 menu_button 样式；2.9+ 账户窗口传 `dw-btn` 以贴合新 UI。
+  btn.className = className || 'menu_button menu_button_icon';
   if (title) btn.title = title;
   const iconEl = document.createElement('i');
   iconEl.className = `fa-fw fa-solid ${icon}`;
@@ -2389,6 +2646,19 @@ export async function openNativeBackupUi(platform) {
     return Boolean(opened);
   }
 
+  // Luker 2.9+：账户 = 自绘窗口，备份页主按钮是 `[data-act="backup-go"]`；
+  // 旧版 `.userBackupButton` 已不存在（2026-11-09 源码取证）。
+  if (platform === 'luker') {
+    const opened = await openHostAccountWindow({ tab: 'backup', platform });
+    if (opened.ok) {
+      const backupBtn = await waitForCondition(
+        () => document.querySelector('[data-act="backup-go"]'),
+        3000,
+      );
+      if (backupBtn) return true;
+    }
+  }
+
   if (!document.querySelector('.userBackupButton')) {
     const accountBtn = document.getElementById('account_button');
     if (!accountBtn) return false;
@@ -2418,10 +2688,18 @@ export async function openNativeBackupUi(platform) {
  */
 export function readNativeBackupSelection() {
   if (typeof document === 'undefined') return null;
+  // 旧版（≤2.8）：备份管理器弹层里的复选框。
   const boxes = document.querySelectorAll('.userBackupManager input[name="backupCategory"]');
-  if (!boxes.length) return null;
+  if (boxes.length) {
+    const selection = {};
+    boxes.forEach((box) => { selection[box.value] = Boolean(box.checked); });
+    return selection;
+  }
+  // 2.9+：账户窗口备份页的类目芯片；选中态是 `.on`，不是 checkbox。
+  const chips = document.querySelectorAll('button.dw-chip[data-act="bcat"][data-id]');
+  if (!chips.length) return null;
   const selection = {};
-  boxes.forEach((box) => { selection[box.value] = Boolean(box.checked); });
+  chips.forEach((chip) => { selection[chip.dataset.id] = chip.classList.contains('on'); });
   return selection;
 }
 
@@ -2448,7 +2726,7 @@ export function readPtExportOptions() {
  */
 const NATIVE_EXPORT_TRIGGERS = Object.freeze({
   st: ['.userBackupButton'],
-  luker: ['.userBackupButton', '.userBackupManager .backupActionRow'],
+  luker: ['.userBackupButton', '.userBackupManager .backupActionRow', '[data-act="backup-go"]'],
   tt: ['#data_migration_export_button'],
   pt: ['#ptdm-export'],
 });
@@ -2465,7 +2743,12 @@ const NATIVE_EXPORT_TRIGGERS = Object.freeze({
  */
 const NATIVE_BUSY_PROBES = Object.freeze({
   st: [{ sel: '.userBackupManager .backupDownloadButton.disabled', stateEncoded: true }],
-  luker: [{ sel: '.userBackupManager .backupDownloadButton.disabled', stateEncoded: true }],
+  // 2.9+ 的唯一在途标记是按钮上的 `.busy`（`b.running ? ' busy'`）；
+  // 空闲时按钮也可能带 `disabled`（未选类目），故不能用属性判据。
+  luker: [
+    { sel: '[data-act="backup-go"].busy', stateEncoded: true },
+    { sel: '.userBackupManager .backupDownloadButton.disabled', stateEncoded: true },
+  ],
   tt: [{ sel: '#data_migration_export_button', stateEncoded: false }],
   pt: [{ sel: '#ptdm-export', stateEncoded: false }],
 });
@@ -2543,9 +2826,24 @@ export function closeNativeBackupUi(platform) {
     return;
   }
 
-  // Luker 上「从宿主拉取」按钮在管理器弹层里，优先关它（账户弹层只是入口层）。
   const anchor = document.getElementById('st-pack-transfer-luker-manager-btn')
     || document.getElementById('st-pack-transfer-native-btn');
+
+  // Luker 2.9+：账户窗口是自绘 dialog.dw-layer，关闭走宿主自己的 close 动作
+  // （宿主内部还会处理「长任务在跑」的确认；不要裸 remove）。
+  // 判定必须校验 className：测试/异常桩的 closest 可能不按选择器过滤。
+  const dwLayer = anchor?.closest?.('dialog.dw-layer');
+  const isDwLayer = !!dwLayer
+    && (dwLayer.classList?.contains?.('dw-layer') === true
+      || /(^|\s)dw-layer(\s|$)/.test(String(dwLayer.className || '')));
+  if (isDwLayer) {
+    const closeBtn = dwLayer.querySelector('.dw-ibtn.is-close[data-act="close"]')
+      || dwLayer.querySelector('[data-act="close"]');
+    try { closeBtn?.click(); } catch { /* 窗口结构差异 */ }
+    return;
+  }
+
+  // ≤2.8：「从宿主拉取」按钮在管理器弹层里，优先关它（账户弹层只是入口层）。
   const surface = anchor?.closest('dialog[open], .popup[open]');
   if (surface) {
     // 必须走宿主自己的完成链路（Popup：点 [data-result] 控件 → complete() → 动画后
@@ -2675,8 +2973,29 @@ export function mountLukerBackupManagerButton(onPull) {
   const BTN_ID = 'st-pack-transfer-luker-manager-btn';
 
   const addBtn = () => {
-    // 只认含原生 ZIP 下载按钮的动作行：日志查看器弹层同样用 .userBackupManager + .backupActionRow
-    // （2026-11-08 实测），不限定会把按钮注进日志弹层、且全局 id 幂等检查会被它永久挡住。
+    // Luker 2.9+：账户窗口 → Backup 页，动作区 `.dw-foot`，主按钮 `[data-act="backup-go"]`。
+    const foot = Array.from(document.querySelectorAll('.dw-foot'))
+      .filter((el) => el.querySelector?.('[data-act="backup-go"]') && isElementVisible(el))[0];
+    if (foot) {
+      if (foot.querySelector('#' + BTN_ID)) return;
+      const stale = document.getElementById(BTN_ID);
+      if (stale) stale.remove();
+      const btn = makeHostButton({
+        id: BTN_ID,
+        icon: 'fa-right-left',
+        label: '从宿主拉取',
+        title: '从宿主拉取数据包（按上方类目勾选）',
+        className: 'dw-btn big',
+        onClick: () => {
+          if (typeof onPull === 'function') onPull();
+        },
+      });
+      foot.insertBefore(btn, foot.firstElementChild);
+      return;
+    }
+
+    // ≤2.8：备份管理器弹层里的动作行。只认含原生 ZIP 下载按钮的行——日志查看器弹层
+    // 同样用 .userBackupManager + .backupActionRow（2026-11-08 实测），不限定会注错容器。
     // 可见过滤跳过已关闭未移除的残留弹层；:has 失配时退回旧行为（取首个动作行）。
     const rows = Array.from(document.querySelectorAll('.userBackupManager .backupActionRow'))
       .filter((el) => el.querySelector?.('.backupDownloadButton') && isElementVisible(el));
