@@ -65,7 +65,6 @@ export default {
   'chart.prefsKeepDev': 'Keep build config',
   'chart.dragCol': 'Drag to resize columns',
   'chart.dragRow': 'Drag to resize rows',
-  'chart.needSelect': 'Tick a pack checkbox in the pack list before using these buttons',
   'chart.selectAll': 'Select all',
   'chart.selectNone': 'Select none',
   'chart.invert': 'Invert',
@@ -397,7 +396,6 @@ export default {
   'zones.emptyExport': 'Export area is empty',
   'zones.selected': '{n} selected',
   'zones.batchGenerate': 'Generate export pack',
-  'zones.batchMerge': 'Merge upload',
   'zones.batchDelete': 'Delete',
   'pkg.unrecognized': 'Unrecognized pack',
   'pkg.split': 'Split {n}',
@@ -408,7 +406,6 @@ export default {
   'pkg.delete': 'Delete',
   'action.fetch': 'Fetch from host',
   'action.generatePack': 'Generate export pack',
-  'action.mergeUpload': 'Merge upload',
   'action.libraryExport': 'Export from chat library',
   'action.download': 'Download',
   'action.restore': 'Upload',
@@ -547,8 +544,6 @@ export default {
   'progress.merging': 'Merging...',
   'log.mergeConflict': 'Merge stopped: {n} duplicate paths',
   'log.mergeDone': 'Merged {n} packs · {files} files',
-  'log.mergeUpload': 'Merge upload done: {n} packs · {files} files',
-  'log.mergeUploadFailed': 'Merge upload failed: {msg}',
   'toast.mergeDone': 'Merged into 1 pack',
 
   // ── Cloud private files (user/files) ──
