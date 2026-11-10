@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-2.md`
-- **Total Sessions**: 70
+- **Total Sessions**: 71
 - **Last Active**: 2026-11-10
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-2.md` | ~1162 | Active |
+| `journal-2.md` | ~1204 | Active |
 | `journal-1.md` | ~2491 | Archived |
 <!-- @@@/auto:active-documents -->
 
@@ -30,6 +30,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 71 | 2026-11-10 | Session 71：动作落点重构 / 图表下钻 / 云上传分片 | `1c9e943` | `main` |
 | 70 | 2026-11-10 | Session 70 交接：图表动态宫格 / 数据包偏好 / Luker 式配色 | `46899f9` | `main` |
 | 69 | 2026-11-09 | 云端备份：加密可选 / 全量快照 / 增量备份集 / 选包统一 | `35a52f9` | `main` |
 | 68 | 2026-11-09 | 资产列表导入 + 迁移备份统一面板 + S3/WebDAV（第二批） | `9e9f93e`, `f474b4d`, `5a5bb03` | `main` |

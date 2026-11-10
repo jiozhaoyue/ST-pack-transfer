@@ -1160,3 +1160,45 @@ Topics: [.trellis/spec/frontend/transfer-s3-webdav.md](../../spec/frontend/trans
 
 - 回传宿主 413 待单独测试
 - 分卷上下传待实测
+
+
+## Session 71: Session 71：动作落点重构 / 图表下钻 / 云上传分片
+<!-- trellis-session: v=2 fp=72304ae92302f44f -->
+
+**Date**: 2026-11-10
+**Task**: Session 71：动作落点重构 / 图表下钻 / 云上传分片
+**Branch**: `main`
+
+### Summary
+
+重构工作台动作落点与图表交互，修复云酒馆大包上传失败
+Topics: [.trellis/spec/frontend/large-pack-upload.md](../../spec/frontend/large-pack-upload.md), [.trellis/spec/frontend/workbench-single-view.md](../../spec/frontend/workbench-single-view.md)
+
+### Main Changes
+
+- 顶部全局动作条 + 勾选后底部动作；删除合并上传与卡后三按钮
+- 图表最大化逐层下钻；占比按勾选动态计算；修复聊天记录误取消
+- PT 产物保留声明布局；导出区多选上传逐包顺序恢复
+- 设置新增加载时清空暂存包；仅清单包展示与补 URL
+- Luker/ST 恢复改 8 MiB 分片，端点缺失回退整包
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `1c9e943` | feat(ui): 重构动作落点与图表交互，支持云酒馆分片恢复 |
+
+### Testing
+
+- [OK] 目标测试 93 passed（chunked-restore/restore-chain/settings-panel/zone-model/export-queue/workbench-session/restore-manifest/restore-probe）
+- [OK] 六守卫全绿：css-scope/dom-injection/template-source/dom-scope/control-consumer/i18n
+- [OK] 浏览器 4173 实测：动作落点/PT/下钻/动态占比/清空设置/清单安装器，页面错误 0
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 在 Cloud-Luker 实测 >100 MB 分片恢复（需用户授权对外写操作）
+- README 四酒馆规则变更时同步 zh-CN/en-US 的 help.chart.rule*
