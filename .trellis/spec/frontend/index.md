@@ -19,7 +19,7 @@
 |-------|-------------|--------|
 | [Directory Structure](./directory-structure.md) | 三形态入口（独立 Web / 宿主插件 / Node 测试）、`src/**` 分层、构建与部署 | 就绪（2026-09-24 校正） |
 | [Component Guidelines](./component-guidelines.md) | 宿主内 UI 注入（幂等 + 自愈）、注入按钮工厂、单一模板源、CSS 作用域铁律、DOM 注入防线 | 就绪（2026-09-25 刷新） |
-| [Host Capabilities](./host-capabilities.md) | 宿主能力获取决策树、原生弹窗适配器契约（**含"宿主无 alert，信息提示用 `Popup.show.text`"**）、降级反例构造法、现存能力面表、**UI 控件合宪性（死控件取证）**、**四宿主原生数据导出入口事实表（2026-11-04，含"禁止同构假设"事故）** | 就绪（2026-11-04 增补原生导出入口） |
+| [Host Capabilities](./host-capabilities.md) | 宿主能力获取决策树、原生弹窗适配器契约（**含"宿主无 alert，信息提示用 `Popup.show.text`"**）、降级反例构造法、现存能力面表、**UI 控件合宪性（死控件取证）**、Luker selection 契约、**四宿主原生局域网同步边界**（导出入口事实表已拆至 `host-backup-entries.md`） | 就绪（2026-11-10 拆分后重建指针） |
 | [DOM Write Scope](./dom-write-scope.md) | **宿主 DOM 写入作用域**：锚点白名单（穷举）、`check:dom-scope` 守卫、运行期归因仪器与实测读数、仪器自身的坑、跨宿主安装落点 | 就绪（2026-09-26 新建） |
 | [Hook Guidelines](./hook-guidelines.md) | 宿主生命周期接入、备份/恢复端点、CSRF、全局命名空间（**仅 1 个已登记的只读探针**） | 就绪（2026-09-27 刷新） |
 | [Resume Checkpoint Invariant](./resume-checkpoint-invariant.md) | **断点续传的「已完成」判据**：不变量（清单里的条目必须已写进产物）· **曾经的违反与其实测读数** · **既有两处断言为何各锁一半**（锁机理 vs 锁不变量）+ 通用判别法 · 修法 (a) 的四段实现与三处「计划被证据否决」 | ✅ 就绪（2026-09-28 **已修**；实现细节见 `state-management.md` §8） |
@@ -37,6 +37,8 @@
 | [Luker 2.9 账户窗口](./luker-2.9-account-window.md) | **2.9 账户改版事实**：自绘窗口（`dw-layer` / `.dw-foot`）、`openAccountWindow({tab})`（关窗才 resolve ⇒ 必须 `void`）、备份页注入锚点、`.dw-chip` 勾选读取、存储页 `storage-kind` 跳转、忙态只认 `.busy` | ✅ 就位（2026-11-09 源码取证；单测 `test/account-window-29.test.js` 8 例） |
 | [资产列表导出](./asset-list-export.md) | **只输出官方扁平 JSON 数组**（`id/type/name/description/url`），供「下载扩展和资源菜单」加载；入口只在每张图表卡与从宿主拉取；宿主 discover + manifest 取 URL；无 URL 如实提示 | ✅ 就位（2026-11-09；单测 `test/asset-list.test.js`） |
 | [S3 / WebDAV 传输](./transfer-s3-webdav.md) | 共用分片/清单/断点协议；S3 HEAD/Range/multipart；WebDAV OPTIONS/PROPFIND/MKCOL 全降级；405/401/409/CORS 分类；`#transfer-view` 统一面板 | ✅ 就位（2026-11-09；小规模单测 `transfer-plan` / `transfer-runner` / `webdav-client`） |
+| [宿主能力矩阵与原生复用判据](./host-capability-matrix.md) | **四宿主 × 传输/备份能力矩阵**、插件各能力来源判定（用原生 / 补位 / 自建）、**原生 LAN Sync 为何接不了插件包**（单位是类目文件不是 zip）、**三层分层裁定**、TT 可抄的设计清单 | ✅ 就位（2026-11-10 用户裁定「三层分层」） |
+| [四宿主备份入口事实表](./host-backup-entries.md) | DOM 锚点、导出端点、各宿主文档清单、插件行为边界、硬规则、Luker 2.9 窗口、实测阻塞与对应实现 | ✅ 就位（2026-11-10 从 `host-capabilities.md` 拆出） |
 
 > 上述三份“迁移”文档是经用户批准记录的**后续目标契约**，不是当前实现事实；其中拟新增签名、测试和验收均有状态标注。不得据此宣称产品已完成迁移向导或双击离线交付。
 
