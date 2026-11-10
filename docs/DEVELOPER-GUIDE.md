@@ -25,6 +25,55 @@
 
 ## 二、功能清单
 
+### 0. 能力矩阵：四酒馆原生 vs 插件
+
+> 取证时点 2026-11-10，来源为四宿主实例源码（非推测）。
+> 判定口径见 `.trellis/spec/frontend/host-capability-matrix.md`。
+
+#### 0.1 数据包能力（宿主原生）
+
+| 能力 | SillyTavern | Luker | TauriTavern | PureTavern |
+| --- | --- | --- | --- | --- |
+| **导出端点** | `POST /api/users/backup`（忽略 selection，全量） | 同端点，**支持 10 键 selection** | `POST /api/extensions/data-migration/export`（返回 job_id，轮询 `/job?id=`）；另有 `/api/users/backup` 兼容层 | `POST /api/backups/archive/export`（versioned/hashed ZIP） |
+| **导入 / 恢复端点** | ❌ 无恢复端点 | ✅ `POST /api/users/restore-backup` + **8 MiB 分片** | ✅ `POST /api/extensions/data-migration/import`（multipart `archive`） | ✅ `POST /api/backups/archive/import`（另 `import/preview` 冲突预览） |
+| **可导入格式** | — | 本包 ZIP | ZIP / tar / tar.gz / tgz，**可直接导入 ST 数据包** | 本包 ZIP + **TT 包**（语义转换） |
+| **包内布局** | `data/<handle>/` 目录树 | 同 ST，selection 决定类目 | `data/default-user/` 树（ST 兼容） | `manifest.json` + 模块记录（versioned/hashed） |
+| **导入策略** | — | 合并 / 覆盖 | 由迁移作业处理 | merge / skip / replace-module / replace-all / 受保护的本地替换 |
+| **恢复点** | ❌ | ❌ | ❌ | ✅ 导入前自动建恢复点 + 导入日志 |
+| **本地备份库** | ❌ | ❌ | ❌ | ✅ `/api/backups/archive/local/*`（默认保留 5 份） |
+| **跨宿主互操作** | ❌ | ❌ | ✅ 导入端兼容 ST 布局 | ✅ 内置 TT 互操作（模块记录 ↔ `data/default-user` 语义转换） |
+
+#### 0.2 传输能力（宿主原生）
+
+| 能力 | ST | Luker | TT | PT |
+| --- | --- | --- | --- | --- |
+| 局域网互传 | ❌ | ✅ `/api/sync/v1/*`（服务端 ↔ 服务端） | ✅ 但为 **Rust 命令**，扩展不可 invoke | ❌ |
+| 云端对象存储 | ❌ | ✅ S3 Sync（加密桶 / 冲突决策 / Undo） | ✅ TT-Sync v2 | ❌ |
+| WebDAV | ❌ | ❌ | ❌ | ❌ |
+| 存储面板 / 配额 | ❌ | ✅ `storage-inspector.js` | ❌ | ❌ |
+
+#### 0.3 插件功能来源：哪些直接用原生
+
+| 插件功能 | ST | Luker | TT | PT | 来源 |
+| --- | --- | --- | --- | --- | --- |
+| 从宿主拉取数据包 | 原生端点 | 原生端点 + selection | 原生端点 | 原生端点 + moduleIds | **用原生** |
+| 写回 / 恢复宿主 | 无原生恢复端点 | 原生 + 8 MiB 分片 | 原生导入端点 | 原生导入 + 预览 | **用原生** |
+| 扩展清单 / 批量安装 | 原生 `discover` + manifest | 同左 + 原生安装器 | 原生 | 原生（当前 501） | **原生 + 增强** |
+| 存储面板 / 配额 | 自建兜底 | 原生面板优先 | 自建兜底 | 自建兜底 | **原生优先** |
+| 四酒馆格式互转 | 插件 | 插件 | 插件 | 插件 | **自建**（四家都没有） |
+| 局域网互传 | 插件 | 插件 | 插件 | 插件 | **自建**（原生接不了，见下） |
+| S3 / WebDAV 包仓库 | 插件 | 插件 | 插件 | 插件 | **自建**（Luker↔Luker 用原生） |
+| 条目级差量导出 | 插件 | 插件 | 插件 | 插件 | **自建** |
+| 暂停 / 续传 / 中止 | 插件 | 插件 | 插件 | 插件 | **自建**（原生无手动暂停） |
+
+#### 0.4 两条边界
+
+1. **原生同步接不了插件包**：Luker 的同步单位是「类目下的文件路径」（`src/sync/categories.js`），
+   TT 的是 `DatasetPolicy` + per-file/bundle；协议里**没有「包」这一层**。把包塞进去只能先解压进宿主数据目录，
+   那会写宿主数据且跨宿主失效。
+2. **S3 / 局域网只在 Luker↔Luker 时该用原生**：插件这两项的价值在跨宿主（ST/PT/TT/云）与跨形态搬运。
+   同宿主之间应引导用户走原生 Sync，避免重复配置凭据。
+
 ### A. 宿主数据导出（插件态）
 
 | 功能 | UI 入口 | 源码落点 |
