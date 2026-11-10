@@ -68,7 +68,6 @@ export default {
   'chart.prefsKeepDev': '保留构建配置',
   'chart.dragCol': '拖动调整左右宽度',
   'chart.dragRow': '拖动调整上下高度',
-  'chart.needSelect': '先在数据包列表勾选复选框，再使用这些按钮',
   'chart.selectAll': '全选',
   'chart.selectNone': '全不选',
   'chart.invert': '反选',
@@ -400,7 +399,6 @@ export default {
   'zones.emptyExport': '导出区为空',
   'zones.selected': '已选 {n} 项',
   'zones.batchGenerate': '生成导出包',
-  'zones.batchMerge': '合并上传',
   'zones.batchDelete': '删除',
   'pkg.unrecognized': '未识别包',
   'pkg.split': '分卷 {n}',
@@ -411,7 +409,6 @@ export default {
   'pkg.delete': '删除',
   'action.fetch': '从宿主拉取',
   'action.generatePack': '生成导出包',
-  'action.mergeUpload': '合并上传',
   'action.libraryExport': '从聊天库导出',
   'action.download': '下载',
   'action.restore': '上传',
@@ -550,8 +547,6 @@ export default {
   'progress.merging': '合并中...',
   'log.mergeConflict': '合并停止：{n} 个同名路径',
   'log.mergeDone': '已合并 {n} 个包 · {files} 个文件',
-  'log.mergeUpload': '合并上传完成：{n} 个包 · {files} 个文件',
-  'log.mergeUploadFailed': '合并上传失败：{msg}',
   'toast.mergeDone': '已合并为 1 个包',
 
   // ── 云端私有件（user/files） ──
