@@ -283,6 +283,8 @@
   #app.app-container .tree-label{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
     font-size:12.5px;color:var(--text)}
   #app.app-container .tree-label .sub{color:var(--muted-2);font-size:10px;margin-left:5px}
+  #app.app-container .tree-label.is-drill{cursor:pointer}
+  #app.app-container .tree-label.is-drill:hover{color:var(--accent)}
   #app.app-container .tree-size{font-size:10.5px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
   #app.app-container .tree-pill{font-size:9.5px;padding:1px 6px;border-radius:999px;border:1px solid;white-space:nowrap}
   #app.app-container .tree-pill.keep{color:var(--keep);border-color:var(--keep);background:var(--keep-bg)}
@@ -543,12 +545,18 @@
   #app.app-container .batch-bar button:disabled{opacity:.45;cursor:not-allowed}
   #app.app-container .zone-empty{padding:16px;text-align:center;color:var(--muted-2);font-size:11.5px}
 
-  /* 操作条：固定在数据包列表上方 */
-  #app.app-container .action-row{display:flex;gap:6px;flex-wrap:wrap;padding:7px 8px;align-items:center}
+  /* 顶部全局动作：从宿主拉取 / 导出扩展清单 / 迁移与备份 */
+  #app.app-container .top-actions{flex:0 0 auto;display:flex;gap:6px;flex-wrap:wrap;align-items:center;
+    padding:7px 12px;border-bottom:1px solid var(--border);
+    background:color-mix(in srgb,var(--panel-3) 45%,transparent)}
+  #app.app-container .top-actions:empty{display:none}
+  #app.app-container .zone-foot-actions{flex:0 0 auto;display:flex;gap:6px;flex-wrap:wrap;align-items:center;
+    padding:7px 9px;border-top:1px solid var(--border);
+    background:color-mix(in srgb,var(--panel-3) 35%,transparent)}
+  #app.app-container .zone-foot-actions:empty{display:none}
+  #app.app-container .zone-foot-actions .lbl{color:var(--text);font-size:11px;margin-right:2px}
   #app.app-container .action-hint{display:inline-flex;align-items:center;padding:3px 8px;border-radius:6px;
     border:1px dashed var(--accent);background:var(--accent-soft);color:var(--text);font-size:11px;white-space:nowrap;cursor:pointer}
-  #app.app-container .zone-actions{flex:0 0 auto;border-bottom:1px solid var(--border);
-    background:color-mix(in srgb,var(--panel-3) 45%,transparent)}
   #app.app-container .btn{display:inline-flex;align-items:center;justify-content:center;gap:5px;border:1px solid var(--border);
     background:var(--panel-3);border-radius:8px;padding:6px 10px;font-size:11.5px;color:var(--text);min-height:30px}
   #app.app-container .btn:hover{border-color:var(--border-strong)}
@@ -619,6 +627,9 @@
   #app.app-container .confirm-dialog .view-body{flex:0 1 auto;max-height:calc(72vh - 96px)}
   #app.app-container .confirm-dialog::backdrop{background:rgba(0,0,0,.55);backdrop-filter:blur(2px)}
   #app.app-container .help-view-body ul{margin:0;padding-left:16px;font-size:11.5px;color:var(--muted);line-height:1.8}
+  #app.app-container .help-view-body .help-sec{margin-bottom:14px}
+  #app.app-container .help-view-body .help-sec:last-child{margin-bottom:0}
+  #app.app-container .help-view-body .help-sec h4{margin:0 0 4px;font-size:12px;color:var(--text);font-weight:600}
   #app.app-container .view-body .check{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);margin:8px 0}
   #app.app-container .settings-grid{display:flex;flex-direction:column;gap:2px}
   #app.app-container .set-group{border:1px solid var(--border);border-radius:8px;background:var(--panel-2);overflow:hidden}

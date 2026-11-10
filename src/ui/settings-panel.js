@@ -18,6 +18,8 @@ export const SETTINGS_DEFAULTS = Object.freeze({
   logMaxEntries: 500,
   /** 每次加载插件是否清空上次日志。 */
   clearLogOnLoad: true,
+  /** 每次加载插件是否清空浏览器里暂存的数据包（IndexedDB files + OPFS packages）。 */
+  clearPackagesOnLoad: false,
 });
 
 export const SETTING_KEYS = Object.freeze(Object.keys(SETTINGS_DEFAULTS));
@@ -33,6 +35,7 @@ export function normalizeSettings(input) {
     const logMax = Number(input.logMaxEntries);
     if (Number.isFinite(logMax)) out.logMaxEntries = Math.max(50, Math.min(5000, Math.round(logMax)));
     if (typeof input.clearLogOnLoad === 'boolean') out.clearLogOnLoad = input.clearLogOnLoad;
+    if (typeof input.clearPackagesOnLoad === 'boolean') out.clearPackagesOnLoad = input.clearPackagesOnLoad;
   }
   return out;
 }
@@ -52,7 +55,8 @@ export function buildSettingsHtml(settings = {}) {
     + setting('set-native-pull-notice', 'nativePullNotice', t('settings.nativePullNotice'), s.nativePullNotice)
     + setting('set-auto-tutorial', 'autoTutorial', t('settings.autoTutorial'), s.autoTutorial);
 
-  const exportGroup = setting('set-delete-after-export', 'deleteAfterExport', t('settings.deleteAfterExport'), s.deleteAfterExport);
+  const exportGroup = setting('set-delete-after-export', 'deleteAfterExport', t('settings.deleteAfterExport'), s.deleteAfterExport)
+    + setting('set-clear-packages', 'clearPackagesOnLoad', t('settings.clearPackagesOnLoad'), s.clearPackagesOnLoad);
 
   const logging = '<label class="et-git"><span>' + t('settings.logMaxEntries') + '</span>'
     + '<input class="text_pole" type="number" min="50" max="5000" step="50" data-setting="logMaxEntries" value="' + s.logMaxEntries + '"></label>'
@@ -83,6 +87,9 @@ export function readSettings(root) {
 
   const clearLogEl = root.querySelector?.('[data-setting="clearLogOnLoad"]');
   if (clearLogEl && typeof clearLogEl.checked === 'boolean') out.clearLogOnLoad = clearLogEl.checked;
+
+  const clearPackagesEl = root.querySelector?.('[data-setting="clearPackagesOnLoad"]');
+  if (clearPackagesEl && typeof clearPackagesEl.checked === 'boolean') out.clearPackagesOnLoad = clearPackagesEl.checked;
 
   return normalizeSettings(out);
 }

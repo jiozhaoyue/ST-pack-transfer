@@ -23,7 +23,6 @@ import {
 } from '../app/backup-set-runner.js';
 import { decryptBytes, isEncrypted } from '../core/s3-crypto.js';
 import { mergeChartTrees } from '../core/merge-packages.js';
-import { actionsForZone, actionEnabled } from '../core/zone-model.js';
 import { EXTENSION_MODES, GIT_MODES } from '../core/export-modes.js';
 import { t } from '../i18n/index.js';
 import { loadSettings } from './settings-store.js';
@@ -578,7 +577,7 @@ function renderQuota(){
   head.innerHTML = row(t('quota.browser'),'db',state.storage.browser,t('quota.browserEmpty'),'browser',!isWeb)
     + (isWeb ? '' : row(t('quota.host'),'shield',hostReadable ? state.storage.host : null,t('quota.hostEmpty'),'server'));
 }
-function renderTreeRows(nodes,depth,scope,readonly,tools,totalMb,drill,colorMap,rootId){
+function renderTreeRows(nodes,depth,scope,readonly,tools,totalMb,drill,colorMap,rootId,mbMap){
   let out='';
   for(const n of nodes){
     const root = depth===0 ? n.id : rootId;
@@ -591,16 +590,23 @@ function renderTreeRows(nodes,depth,scope,readonly,tools,totalMb,drill,colorMap,
     const checked = hasKids ? !!n._checked : isChecked(n,scope);
     const indeterminate = hasKids && !!n._indeterminate;
     const ind=Math.min(depth,8)*15;
-    const pct = totalMb>0 ? Math.max(0,Math.min(100,Math.round((Number(n.mb)||0)/totalMb*100))) : 0;
+    const pct = totalMb>0 ? Math.max(0,Math.min(100,Math.round(((mbMap?mbMap.get(n):Number(n.mb))||0)/totalMb*100))) : 0;
     const pillCls=n.suggest==='keep'?'keep':n.suggest==='optional'?'optional':n.suggest==='drop'?'drop':'unknown';
     const pillText=n.suggest==='keep'?t('tree.suggestKeep'):n.suggest==='optional'?t('tree.suggestOptional'):n.suggest==='drop'?t('tree.suggestDrop'):t('tree.suggestUnknown');
+    const inMax=!!drill;
+    const toggleHtml=hasKids
+      ? (inMax
+        ? '<button class="tree-toggle vol-drill" data-voldrill="'+n.id+'" aria-label="'+t('chart.drill')+'" title="'+t('chart.drill')+'">'
+          +'<svg class="chev" viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5l7 7-7 7"/></svg></button>'
+        : '<button class="tree-toggle" data-node="'+n.id+'" aria-label="'+t('chart.expand')+'">'
+          +'<svg class="chev" viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5l7 7-7 7"/></svg></button>')
+      : '<button class="tree-toggle empty" aria-hidden="true"></button>';
     out+='<div class="tree-row'+(expanded?' expanded':'')+'" data-id="'+n.id+'" style="padding-left:'+(6+ind)+'px">'
-      +'<button class="tree-toggle'+(hasKids?'':' empty')+'" data-node="'+n.id+'" aria-label="'+t('chart.expand')+'">'
-      +'<svg class="chev" viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5l7 7-7 7"/></svg></button>'
+      +toggleHtml
       +'<input class="tree-check" type="checkbox" data-check="'+n.id+'"'+(checked?' checked':'')+(indeterminate?' data-ind="1"':'')+(readonly?' disabled':'')+'>'
       +(depth===0 && colorCls ? '<span class="tree-dot '+colorCls+'" aria-hidden="true"></span>' : '')
       +svg(n.icon,'tree-ico')
-      +'<span class="tree-label" title="'+n.label+'">'+n.label+(n.badge?'<span class="sub">'+n.badge+'</span>':'')+(n.note?'<span class="sub">'+n.note+'</span>':'')+'</span>'
+      +'<span class="tree-label'+(inMax&&hasKids?' is-drill':'')+'"'+(inMax&&hasKids?' data-voldrill="'+n.id+'"':'')+' title="'+n.label+'">'+n.label+(n.badge?'<span class="sub">'+n.badge+'</span>':'')+(n.note?'<span class="sub">'+n.note+'</span>':'')+'</span>'
       +'<span class="tree-pill '+pillCls+'">'+pillText+'</span>'
       +(hasKids && !readonly ? '<span class="row-bulk">'
         +'<button data-suball="all" data-subnode="'+n.id+'" title="'+t('chart.selectAll')+'">✓</button>'
@@ -611,8 +617,8 @@ function renderTreeRows(nodes,depth,scope,readonly,tools,totalMb,drill,colorMap,
       +'<span class="tree-size">'+fmtMB(n.mb)+'</span>'
       +(drill && hasKids ? '<button class="tree-mini vol-drill" data-voldrill="'+n.id+'" title="'+t('chart.drill')+'">›</button>' : '')
       +'</div>';
-    if(hasKids && expanded){
-      out+='<div class="tree-children">'+renderTreeRows(n.children,depth+1,scope,readonly,tools,totalMb,drill,colorMap,root)+'</div>';
+    if(hasKids && expanded && !inMax){
+      out+='<div class="tree-children">'+renderTreeRows(n.children,depth+1,scope,readonly,tools,totalMb,drill,colorMap,root,mbMap)+'</div>';
     }
   }
   return out;
@@ -625,16 +631,32 @@ function chartFmtOf(key){
   const fmt = state.chartFmt[key];
   return CHART_FMTS.includes(fmt) ? fmt : 'bar';
 }
-function volChartData(nodes){
+function volChartData(nodes, mbMap){
   const items = (nodes||[])
-    .map(n=>({ id:String(n.id||''), label:String(n.label||''), mb:Number(n.mb)||0 }))
+    .map(n=>({ id:String(n.id||''), label:String(n.label||''), mb:mbMap?(mbMap.get(n)||0):(Number(n.mb)||0) }))
     .filter(x=>x.mb>0)
     .sort((a,b)=>b.mb-a.mb);
   return { items, total: items.reduce((a,b)=>a+b.mb,0) };
 }
+/** 当前勾选体积：分支=其已勾选叶子之和，叶子=勾选则计体积。 */
+function selectedMbMap(nodes, scope){
+  const map=new Map();
+  const visit=(n)=>{
+    if(n.children && n.children.length){
+      const mb=sumSelected(n.children,scope).mb;
+      map.set(n,mb);
+      return mb;
+    }
+    const mb=isChecked(n,scope)?(Number(n.mb)||0):0;
+    map.set(n,mb);
+    return mb;
+  };
+  (nodes||[]).forEach(visit);
+  return map;
+}
 function volColorClass(index){ return 'vc-c'+((Math.max(1,index)-1)%VC_PALETTE_SIZE+1); }
-function volChartHtml(nodes, fmt){
-  const { items, total } = volChartData(nodes);
+function volChartHtml(nodes, fmt, mbMap){
+  const { items, total } = volChartData(nodes, mbMap);
   if(!items.length) return '<div class="vol-chart is-empty" data-volchart="1"></div>';
   if(fmt==='donut'){
     let offset = 25;
@@ -655,9 +677,9 @@ function volChartHtml(nodes, fmt){
   }).join('');
   return '<div class="vol-chart is-bar" data-volchart="1"><div class="vc-stack">'+segs+'</div></div>';
 }
-function volColorMap(nodes){
+function volColorMap(nodes, mbMap){
   const map = {};
-  volChartData(nodes).items.forEach((it,i)=>{ map[it.id] = (i%VC_PALETTE_SIZE)+1; });
+  volChartData(nodes, mbMap).items.forEach((it,i)=>{ map[it.id] = (i%VC_PALETTE_SIZE)+1; });
   return map;
 }
 
@@ -701,7 +723,9 @@ function chartCardHtml(o, place){
   const dis = !!o.disabled;
   const fmt = chartFmtOf(o.key);
   const scopeNodes = maxed ? volScopedNodes(o) : o.nodes;
-  const colorMap = volColorMap(scopeNodes);
+  const selectedMap = selectedMbMap(scopeNodes, o.scope);
+  const colorMap = volColorMap(scopeNodes, selectedMap);
+  const selectedTotal = volChartData(scopeNodes, selectedMap).total;
   const placeStyle = (!maxed && place) ? ' style="grid-column:'+place.col+';grid-row:'+place.row+'"' : '';
   return '<div class="vol-card'+(collapsed?' is-collapsed':'')+(maxed?' is-max':'')+(dis?' is-disabled':'')+'" data-scope="'+o.scope+'" data-volkey="'+o.key+'"'+(dis?' aria-disabled="true"':'')+placeStyle+'>'
     +'<div class="vol-head">'
@@ -709,6 +733,8 @@ function chartCardHtml(o, place){
       +(o.volText?'<span class="vol-cap">'+o.volText+'</span>':'')
       +(o.capText?'<span class="vol-cap'+(o.over?' is-over':'')+'">'+o.capText+'</span>':'')
       +(o.pkgId ? privateFilesHtml() : '')
+      +(o.manifestCount ? '<button class="vol-priv" type="button" data-extmanifest="'+escapeHtml(o.pkgId)+'" title="'+t('chart.extManifest')+'" aria-label="'+t('chart.extManifest')+'">'
+        +svg('puzzle','ico')+'<b>'+o.manifestCount+'</b></button>' : '')
       +(o.over?'<span class="vol-flag">'+t('chart.overLimit')+'</span>':'')
       +'<span class="vol-spacer"></span>'
       +'<button class="vol-fmt" type="button" data-chartfmt-toggle="'+o.key+'" title="'+t('chart.format')+': '+(fmt==='bar'?t('chart.formatBar'):t('chart.formatDonut'))+'" aria-label="'+t('chart.format')+'">'
@@ -730,9 +756,9 @@ function chartCardHtml(o, place){
     +(maxed ? volBreadcrumbHtml(o) : '')
     +'<div class="vol-body">'
       +(o.noticeHtml||'')
-      +volChartHtml(scopeNodes, fmt)
+      +volChartHtml(scopeNodes, fmt, selectedMap)
       +(o.extToolsHtml||'')
-      +'<div class="chart-tree">'+renderTreeRows(scopeNodes,0,o.scope,o.readonly||dis,groupToolsOf(o),volChartData(scopeNodes).total,maxed,colorMap)+'</div>'
+      +'<div class="chart-tree">'+renderTreeRows(scopeNodes,0,o.scope,o.readonly||dis,groupToolsOf(o),selectedTotal,maxed,colorMap,undefined,selectedMap)+'</div>'
       +(dis?'':'<div class="chart-foot"><span>'+t('chart.selected',{count:sum.count,size:fmtMB(sum.mb)})+'</span></div>')
     +'</div>'
   +'</div>';
@@ -959,6 +985,7 @@ function renderChart(){
       noticeHtml: notice, readonly: pkg.zone==='export',
       over: !!v.over,
       pkgId: pkg.id,
+      manifestCount: (pkg.extManifest||[]).length,
       extToolsHtml: extTools,
       defaultCollapsed: state.view==='mobile' && multi && v.i>1
     }));
@@ -1108,7 +1135,11 @@ function applyPrefsToPackage(pkg){
   pkg.nodes.forEach((top)=>{
     const key = String(top.id||'').replace(/^group:/,'');
     const val = checked.has(key);
-    walk([top],(n)=>{ state.sel[treeKey(scope,n.id)] = val; });
+    walk([top],(n)=>{
+      const k = treeKey(scope,n.id);
+      // 只给「尚无用户选择」的节点上默认值：偏好是初始值，不是每次重渲染都覆盖用户操作。
+      if(state.sel[k]===undefined) state.sel[k]=val;
+    });
   });
 }
 function applyTopControlsFromPrefs(){
@@ -1184,13 +1215,10 @@ function pkgCard(p){
     +'<div class="pkg-name"><span class="pkg-name-txt" data-fullname="'+encodeURIComponent(p.name)+'" title="'+p.name+'">'+p.name+'</span></div>'
     +'<div class="pkg-meta">'+badges.join('')+'<span>'+p.size+'</span><span>'+p.time+'</span></div>'
     +'</div>'
-    +'<div class="pkg-actions">'
-    +(p.zone==='export'
-      ? '<button data-pkgact="download" data-id="'+p.id+'" title="'+t('pkg.download')+'">'+svg('file','tree-ico')+'</button>'
-        +'<button data-pkgact="upload" data-id="'+p.id+'" title="'+t('pkg.restore')+'">'+svg('cloud','tree-ico')+'</button>'
-        +'<button data-pkgact="copyback" data-id="'+p.id+'" title="'+t('pkg.copyBack')+'">'+svg('folder','tree-ico')+'</button>'
-      : '<button data-pkgact="delete" data-id="'+p.id+'" title="'+t('pkg.delete')+'">'+svg('archive','tree-ico')+'</button>')
-    +'</div></div>';
+    +(p.zone==='export'?'':'<div class="pkg-actions">'
+      +'<button data-pkgact="delete" data-id="'+p.id+'" title="'+t('pkg.delete')+'">'+svg('archive','tree-ico')+'</button>'
+    +'</div>')
+    +'</div>';
 }
 function renderZones(){
   document.querySelectorAll('#zone-tabs .zone-tab').forEach(b=>{
@@ -1223,23 +1251,12 @@ function renderZones(){
   }else{
     html+='<div class="card-list">'+list.map(pkgCard).join('')+'</div>';
   }
-  const zoneActions=actionsForZone(state.zone);
-  const sel={selectedCount:state.selectedPkgs.size};
-  if(zoneActions.includes('generate') && state.selectedPkgs.size>0){
-    html+='<div class="batch-bar"><span class="lbl">'+t('zones.selected',{n:state.selectedPkgs.size})+'</span>'
-      +'<button id="batch-generate"'+(!actionEnabled(state.zone,'generate',sel)?' disabled':'')+'>'+t('zones.batchGenerate')+'</button>'
-      +'<button id="batch-merge"'+(!actionEnabled(state.zone,'merge',sel)?' disabled':'')+'>'+t('zones.batchMerge')+'</button>'
-      +'<button id="batch-delete">'+t('zones.batchDelete')+'</button></div>';
-  }
   body.innerHTML=html;
   body.querySelector('#sort-select')?.addEventListener('change',e=>{ state.sort=e.target.value; renderZones(); });
   body.querySelector('#host-filter')?.addEventListener('change',e=>{ state.filter=e.target.value; renderZones(); });
   body.querySelector('#dropzone')?.addEventListener('click',()=>{
     actions.uploadRequest?.();
   });
-  body.querySelector('#batch-generate')?.addEventListener('click',()=>doGenerate());
-  body.querySelector('#batch-merge')?.addEventListener('click',()=>doMerge());
-  body.querySelector('#batch-delete')?.addEventListener('click',()=>doDeleteSelected());
   fitPackageNames();
 }
 
@@ -1259,12 +1276,25 @@ function fitPackageNames(){
   });
 }
 
-/* ── 渲染：操作 ── */
+/* ── 渲染：顶部全局动作 + 分区底部动作（勾选后才出现） ── */
+function renderTopActions(){
+  const row=document.getElementById('top-actions');
+  if(!row) return;
+  const libBtn=state.libraryExport
+    ? '<button class="btn" id="btn-library-export">'+svg('db','ico')+t('action.libraryExport')+'</button>'
+    : '';
+  row.innerHTML='<button class="btn" id="btn-fetch">'+svg('cloud','ico')+t('action.fetch')+'</button>'
+    +'<button class="btn" id="btn-host-assetlist">'+svg('file','ico')+t('action.exportHostAssetList')+'</button>'
+    +libBtn
+    +'<button class="btn" id="transfer-open-btn">'+svg('bolt','ico')+t('transfer.open')+'</button>';
+  row.querySelector('#btn-fetch')?.addEventListener('click',()=>doFetch());
+  row.querySelector('#btn-library-export')?.addEventListener('click',()=>actions.libraryExport?.());
+}
 function renderActions(){
-  const row=document.getElementById('action-row');
+  renderTopActions();
+  const row=document.getElementById('zone-actions-bottom');
+  if(!row) return;
   const hasSel=state.selectedPkgs.size>0;
-  const sel={selectedCount:state.selectedPkgs.size};
-  const zoneActions=actionsForZone(state.zone);
   const task=state.task;
   const taskBtns=task
     ? (task.state==='running'
@@ -1273,35 +1303,28 @@ function renderActions(){
       : '<button class="btn accent" id="btn-task-resume">'+t('action.resume')+'</button>'
         +'<button class="btn" id="btn-task-abort">'+t('action.abort')+'</button>')
     : '';
-  const libBtn=state.libraryExport && zoneActions.includes('libraryExport')
-    ? '<button class="btn" id="btn-library-export">'+svg('db','ico')+t('action.libraryExport')+'</button>'
+  const selectedLabel=hasSel
+    ? '<span class="lbl">'+t('zones.selected',{n:state.selectedPkgs.size})+'</span>'
     : '';
-  if(zoneActions.includes('generate')){
-    row.innerHTML=taskBtns
-      +(hasSel?'':'<span class="action-hint" id="action-hint">'+t('chart.needSelect')+'</span>')
-      +'<button class="btn" id="btn-fetch">'+svg('cloud','ico')+t('action.fetch')+'</button>'
-      +'<button class="btn" id="btn-host-assetlist">'+svg('file','ico')+t('action.exportHostAssetList')+'</button>'
-      +'<button class="btn accent" id="btn-generate"'+(actionEnabled(state.zone,'generate',sel)?'':' disabled title="'+t('chart.needSelect')+'"')+'>'+svg('archive','ico')+t('action.generatePack')+'</button>'
-      +'<button class="btn" id="btn-merge"'+(actionEnabled(state.zone,'merge',sel)?'':' disabled title="'+t('chart.needSelect')+'"')+'>'+svg('copy','ico')+t('action.mergeUpload')+'</button>'
-      +libBtn
-      +'<button class="btn" id="transfer-open-btn">'+svg('bolt','ico')+t('transfer.open')+'</button>';
-    row.querySelector('#action-hint')?.addEventListener('click',()=>toast(t('chart.needSelect')));
-    row.querySelector('#btn-generate')?.addEventListener('click',()=>doGenerate());
-    row.querySelector('#btn-merge')?.addEventListener('click',()=>doMerge());
-    row.querySelector('#btn-library-export')?.addEventListener('click',()=>actions.libraryExport?.());
+  if(state.zone==='import'){
+    row.innerHTML=taskBtns+selectedLabel
+      +(hasSel?'<button class="btn accent" id="btn-generate">'+svg('archive','ico')+t('action.generatePack')+'</button>':'')
+      +(hasSel?'<button class="btn" id="btn-delete-selected">'+t('zones.batchDelete')+'</button>':'');
   }else{
-    row.innerHTML=taskBtns
-      +'<button class="btn" id="btn-download"'+(hasSel?'':' disabled')+'>'+svg('file','ico')+t('action.download')+'</button>'
-      +'<button class="btn accent" id="btn-upload"'+(hasSel?'':' disabled')+'>'+svg('cloud','ico')+t('action.restore')+'</button>'
-      +'<button class="btn" id="btn-copyback"'+(hasSel?'':' disabled')+'>'+svg('folder','ico')+t('action.copyBack')+'</button>';
-    row.querySelector('#btn-download')?.addEventListener('click',()=>{ actions.download?.([...state.selectedPkgs]); });
-    row.querySelector('#btn-upload')?.addEventListener('click',()=>doUploadHost());
-    row.querySelector('#btn-copyback')?.addEventListener('click',()=>doCopyBack());
+    row.innerHTML=taskBtns+selectedLabel
+      +(hasSel?'<button class="btn" id="btn-download">'+svg('file','ico')+t('action.download')+'</button>':'')
+      +(hasSel?'<button class="btn accent" id="btn-upload">'+svg('cloud','ico')+t('action.restore')+'</button>':'')
+      +(hasSel?'<button class="btn" id="btn-copyback">'+svg('folder','ico')+t('action.copyBack')+'</button>':'')
+      +(hasSel?'<button class="btn" id="btn-delete-selected">'+t('zones.batchDelete')+'</button>':'');
   }
+  row.querySelector('#btn-generate')?.addEventListener('click',()=>doGenerate());
+  row.querySelector('#btn-download')?.addEventListener('click',()=>{ actions.download?.([...state.selectedPkgs]); });
+  row.querySelector('#btn-upload')?.addEventListener('click',()=>doUploadHost());
+  row.querySelector('#btn-copyback')?.addEventListener('click',()=>doCopyBack());
+  row.querySelector('#btn-delete-selected')?.addEventListener('click',()=>doDeleteSelected());
   row.querySelector('#btn-task-pause')?.addEventListener('click',()=>actions.taskPause?.());
   row.querySelector('#btn-task-resume')?.addEventListener('click',()=>actions.taskResume?.());
   row.querySelector('#btn-task-abort')?.addEventListener('click',()=>actions.taskAbort?.());
-  row.querySelector('#btn-fetch')?.addEventListener('click',()=>doFetch());
   renderTransfer();
   renderLan();
   renderCloud();
@@ -1978,11 +2001,6 @@ function doGenerate(){
   const pkgs=[...state.selectedPkgs].map(id=>state.packages.find(p=>p.id===id)).filter(Boolean);
   actions.generate?.({ packages: pkgs, merge: mergeActive(pkgs), target: state.target, delta: state.delta, splitMb: state.splitMb, filenameTemplate: state.filenameTemplate });
 }
-function doMerge(){
-  const pkgs=[...state.selectedPkgs].map(id=>state.packages.find(p=>p.id===id)).filter(Boolean);
-  if(pkgs.length<2){ toast(t('lan.atLeastTwo')); return; }
-  actions.mergeUpload?.(pkgs);
-}
 function doUploadHost(){ actions.restore?.([...state.selectedPkgs]); }
 function doCopyBack(){ actions.copyBack?.([...state.selectedPkgs]); }
 function doDeleteSelected(){ actions.deleteSelected?.([...state.selectedPkgs]); }
@@ -2065,9 +2083,21 @@ function openTrafficModal(onConfirm, { enabled = true, onNever, onCancel } = {})
 }
 
 /* ── 帮助视图 ── */const HELP={
-  chart:{ title:'help.chart.title', points:['help.chart.p1','help.chart.p2','help.chart.p3','help.chart.p4','help.chart.p5','help.chart.p6'] },
-  zone:{ title:'help.zone.title', points:['help.zone.p1','help.zone.p2','help.zone.p3','help.zone.p4'] },
-  action:{ title:'help.action.title', points:['help.action.p1','help.action.p2','help.action.p3'] },
+  chart:{ title:'help.chart.title', sections:[
+    { title:'help.chart.rulesTitle', points:['help.chart.ruleST','help.chart.ruleL','help.chart.ruleTT','help.chart.rulePT'] },
+    { title:'help.chart.selectTitle', points:['help.chart.selectP1','help.chart.selectP2','help.chart.selectP3','help.chart.selectP4'] },
+    { title:'help.chart.compatTitle', points:['help.chart.compatP1','help.chart.compatP2','help.chart.compatP3'] },
+    { title:'help.chart.chunkTitle', points:['help.chart.chunkP1','help.chart.chunkP2','help.chart.chunkP3'] },
+  ]},
+  zone:{ title:'help.zone.title', sections:[
+    { title:'help.zone.uploadTitle', points:['help.zone.uploadP1','help.zone.uploadP2','help.zone.uploadP3','help.zone.uploadP4'] },
+    { title:'help.zone.manifestTitle', points:['help.zone.manifestP1','help.zone.manifestP2','help.zone.manifestP3','help.zone.manifestP4','help.zone.manifestP5'] },
+    { title:'help.zone.extTitle', points:['help.zone.extP1','help.zone.extP2','help.zone.extP3','help.zone.extP4'] },
+    { title:'help.zone.assetTitle', points:['help.zone.assetP1','help.zone.assetP2','help.zone.assetP3'] },
+  ]},
+  action:{ title:'help.action.title', sections:[
+    { title:'help.action.flowTitle', points:['help.action.p1','help.action.p2','help.action.p3'] },
+  ]},
   log:{ title:'help.log.title', points:['help.log.p1','help.log.p2','help.log.p3'] }
 };
 function closeHelp(){
@@ -2083,7 +2113,15 @@ function openHelp(key){
   const body=document.getElementById('help-body');
   if(!title||!body) return;
   title.textContent=t(topic.title);
-  body.innerHTML='<ul>'+topic.points.map(x=>'<li>'+t(x)+'</li>').join('')+'</ul>';
+  if(topic.sections){
+    body.innerHTML=topic.sections.map(s=>
+      '<section class="help-sec"><h4>'+t(s.title)+'</h4><ul>'
+        +s.points.map(x=>'<li>'+t(x)+'</li>').join('')
+      +'</ul></section>'
+    ).join('');
+  }else{
+    body.innerHTML='<ul>'+topic.points.map(x=>'<li>'+t(x)+'</li>').join('')+'</ul>';
+  }
   showPane('help');
 }
 
@@ -2094,7 +2132,7 @@ const TUTORIAL_BASIC=[
   { sel:'#chart-stack .chart-tree', title:'tutorial.basic.2.title', desc:'tutorial.basic.2.desc' },
   { sel:'#delta-toggle', title:'tutorial.basic.3.title', desc:'tutorial.basic.3.desc' },
   { sel:'#split-input', title:'tutorial.basic.4.title', desc:'tutorial.basic.4.desc' },
-  { sel:'#btn-generate', title:'tutorial.basic.5.title', desc:'tutorial.basic.5.desc' },
+  { sel:'#zone-actions-bottom', title:'tutorial.basic.5.title', desc:'tutorial.basic.5.desc' },
   { sel:'#zone-card', title:'tutorial.basic.6.title', desc:'tutorial.basic.6.desc' }
 ];
 const TUTORIAL_ADV=[
@@ -2102,7 +2140,7 @@ const TUTORIAL_ADV=[
   { sel:'#chart-stack', title:'tutorial.adv.1.title', desc:'tutorial.adv.1.desc' },
   { sel:'#target-select', title:'tutorial.adv.2.title', desc:'tutorial.adv.2.desc' },
   { sel:'#split-input', title:'tutorial.adv.3.title', desc:'tutorial.adv.3.desc' },
-  { sel:'#btn-generate', title:'tutorial.adv.4.title', desc:'tutorial.adv.4.desc' }
+  { sel:'#zone-actions-bottom', title:'tutorial.adv.4.title', desc:'tutorial.adv.4.desc' }
 ];
 function tutorialSet(){ return state.tutorialKind==='adv' ? TUTORIAL_ADV : TUTORIAL_BASIC; }
 function openTutorial(){
@@ -2211,8 +2249,8 @@ function bind(){
 
   document.querySelectorAll('[data-help]').forEach(b=>b.addEventListener('click',e=>{ e.stopPropagation(); openHelp(b.dataset.help); }));
 
-  // ── 局域网互传（按钮在数据包动作行内，随 renderActions 重建）──
-  document.getElementById('action-row').addEventListener('click',(e)=>{
+  // ── 顶部全局动作（按钮随 renderTopActions 重建）──
+  document.getElementById('top-actions').addEventListener('click',(e)=>{
     if(e.target.closest('#btn-host-assetlist')){
       actions.exportAssetList?.({source:'host'});
       return;
@@ -2483,6 +2521,8 @@ function bind(){
     }
     const priv=e.target.closest('[data-privfiles]');
     if(priv){ void openPrivateFiles(); return; }
+    const extManifest=e.target.closest('[data-extmanifest]');
+    if(extManifest){ actions.openExtensionManifest?.(extManifest.dataset.extmanifest); return; }
     const fmtBtn=e.target.closest('[data-chartfmt-toggle]');
     if(fmtBtn){
       const key=fmtBtn.dataset.chartfmtToggle;
@@ -2912,6 +2952,9 @@ initChartSplitters();
       walk(packageNodes(pkg).nodes, (n) => {
         const path = n.path || '';
         if (!path) return;
+        // 聊天/角色/世界书等用户内容永不在默认取消范围内（曾出现聊天记录被误取消）。
+        if (path.startsWith('chats/') || path.startsWith('characters/')
+          || path.startsWith('worlds/') || path.startsWith('group chats/')) return;
         if (rules.some((pre) => path === pre.replace(/\/$/, '') || path.startsWith(pre))) {
           state.sel[treeKey(scope, n.id)] = false;
         }

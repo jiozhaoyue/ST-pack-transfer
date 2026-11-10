@@ -436,6 +436,25 @@ export async function loadPreferences() {
 }
 
 /**
+ * 只清空暂存数据包（files store + OPFS packages），保留工作区会话、设置与偏好。
+ * 供设置项「每次加载清空浏览器存储（暂存数据包）」使用。
+ */
+export async function clearStoredFiles() {
+  if (!isStorageSupported()) return;
+  const db = await openDb();
+  if (!db) return;
+
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction([STORES.FILES], 'readwrite');
+    tx.objectStore(STORES.FILES).clear();
+    tx.oncomplete = () => {
+      opfsClearDir('packages').catch(() => {}).finally(resolve);
+    };
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+/**
  * 清空所有暂存文件与工作区数据
  */
 export async function clearAll() {

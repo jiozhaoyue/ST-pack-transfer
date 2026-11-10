@@ -33,6 +33,17 @@ import {
   summarizeExtensions,
 } from '../core/asset-list.js';
 import { capabilityState } from '../core/host-capabilities.js';
+import {
+  RESTORE_UPLOAD_BASE,
+  RESTORE_UPLOAD_CHUNK_SIZE,
+  RESTORE_UPLOAD_MAX_RETRIES,
+  buildRestoreBody,
+  buildUploadSessionBody,
+  halveChunkLength,
+  isChunkEndpointMissing,
+  retryDelayMs,
+  shouldRetryStatus,
+} from '../core/chunked-restore.js';
 
 /**
  * 恢复在途标志（并发互斥）。
@@ -1677,6 +1688,235 @@ export async function restoreToHost(zipBlob, { mode = 'merge', platform = 'st', 
   }
 }
 
+/** 单片上传/组装请求的有界等待（毫秒）；总恢复时长仍由外部 signal 兜底。 */
+const RESTORE_CHUNK_TIMEOUT_MS = 300_000;
+const RESTORE_ASSEMBLE_TIMEOUT_MS = 600_000;
+
+function abortError(label) {
+  const err = new Error(`${label || '请求'}已取消`);
+  err.name = 'AbortError';
+  return err;
+}
+
+function sleepBounded(ms, signal, label = '等待重试') {
+  if (!ms) return Promise.resolve();
+  if (signal?.aborted) return Promise.reject(abortError(label));
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => { cleanup(); resolve(); }, ms);
+    const onAbort = () => { cleanup(); reject(abortError(label)); };
+    const cleanup = () => { clearTimeout(timer); signal?.removeEventListener('abort', onAbort); };
+    signal?.addEventListener('abort', onAbort, { once: true });
+  });
+}
+
+async function bestEffortCancelUpload(uploadId, headers) {
+  if (!uploadId) return;
+  try {
+    await fetch(`${RESTORE_UPLOAD_BASE}/${encodeURIComponent(uploadId)}`, {
+      method: 'DELETE', credentials: 'same-origin', headers,
+    });
+  } catch { /* 取消是尽力而为 */ }
+}
+
+async function restoreHttpError(response, label) {
+  let detail = '';
+  try {
+    detail = (await readJsonBounded(response, { timeoutMs: SHORT_FETCH_TIMEOUT_MS, label: `读取${label}错误` }))?.error || '';
+  } catch { /* 非 JSON / 体读取失败 */ }
+  return new Error(`${label}失败 (${response.status})${detail ? `: ${detail}` : ''}`);
+}
+
+/**
+ * Luker 原生 8 MiB 分片恢复。
+ *
+ * 为什么必须分片：云酒馆走 Cloudflare 代理，单请求体上限 100 MB，整包一次 POST 必失败。
+ * 分片端点不存在（旧版 Luker）返回 `{supported:false}`，由调用方回退整包 FormData。
+ *
+ * @returns {Promise<{supported:false}|{supported:true,result:object}>}
+ */
+async function tryLukerChunkedRestore(zipBlob, { mode, handle, token, signal, timeoutMs }) {
+  const size = Number(zipBlob?.size) || 0;
+  if (!size) return { supported: false };
+  const headers = token ? { 'X-CSRF-Token': token } : {};
+  const jsonHeaders = { ...headers, 'Content-Type': 'application/json' };
+  const createSession = async () => {
+    const response = await fetchWithTimeout(RESTORE_UPLOAD_BASE, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: jsonHeaders,
+      body: buildUploadSessionBody({ handle, fileName: 'backup.zip', size }),
+    }, { timeoutMs: SHORT_FETCH_TIMEOUT_MS, signal, label: '初始化分片上传' });
+    if (isChunkEndpointMissing(response.status)) return { missing: true };
+    if (!response.ok) throw await restoreHttpError(response, '初始化分片上传');
+    const data = await readJsonBounded(response, { timeoutMs: SHORT_FETCH_TIMEOUT_MS, signal, label: '读取分片上传会话' });
+    if (!data?.uploadId) throw new Error('分片上传初始化未返回 uploadId');
+    return { uploadId: data.uploadId };
+  };
+
+  const first = await createSession();
+  if (first.missing) return { supported: false };
+  let uploadId = first.uploadId;
+  let cursor = 0;
+  let uploaded = 0;
+  let chunkSize = RESTORE_UPLOAD_CHUNK_SIZE;
+  let sessionRestarts = 0;
+  let lastLoggedPct = -1;
+
+  try {
+    while (cursor < size) {
+      let length = Math.min(chunkSize, size - cursor);
+      let attempt = 0;
+      for (;;) {
+        let response = null;
+        try {
+          response = await fetchWithTimeout(`${RESTORE_UPLOAD_BASE}/${encodeURIComponent(uploadId)}/chunks/${cursor}`, {
+            method: 'PUT',
+            credentials: 'same-origin',
+            headers: { ...headers, 'Content-Type': 'application/octet-stream' },
+            body: zipBlob.slice(cursor, cursor + length),
+          }, { timeoutMs: RESTORE_CHUNK_TIMEOUT_MS, signal, label: `上传分片（offset ${cursor}）` });
+        } catch (err) {
+          if (err?.name === 'AbortError') throw err;
+          attempt += 1;
+          if (attempt > RESTORE_UPLOAD_MAX_RETRIES) {
+            throw new Error(`分片上传失败（offset ${cursor}）：${err?.message || err}`);
+          }
+          logger.warn(`分片上传中断，重试 ${attempt}/${RESTORE_UPLOAD_MAX_RETRIES}（offset ${cursor}）`);
+          await sleepBounded(retryDelayMs(attempt), signal, '等待分片重试');
+          continue;
+        }
+
+        if (response.status === 413) {
+          const next = halveChunkLength(length);
+          if (next === null) {
+            throw new Error(`服务器拒绝了 ${length} 字节的分片，已无法继续减半；请检查反向代理请求体上限`);
+          }
+          logger.warn(`分片被 413 拒绝，${length} → ${next} 字节后重试`);
+          chunkSize = next;
+          length = next;
+          attempt = 0;
+          continue;
+        }
+
+        if (response.status === 404) {
+          sessionRestarts += 1;
+          if (sessionRestarts > 1) throw new Error('分片上传会话反复丢失，请重试');
+          logger.warn('分片上传会话丢失，重新初始化并从 0 开始');
+          await bestEffortCancelUpload(uploadId, headers);
+          const next = await createSession();
+          if (next.missing) throw new Error('分片上传会话丢失，且分片端点突然不可用');
+          uploadId = next.uploadId;
+          cursor = 0;
+          uploaded = 0;
+          chunkSize = RESTORE_UPLOAD_CHUNK_SIZE;
+          attempt = 0;
+          break;
+        }
+
+        if (response.ok) {
+          cursor += length;
+          uploaded += length;
+          const pct = Math.floor((uploaded / size) * 100);
+          if (pct !== lastLoggedPct && (pct === 100 || pct >= lastLoggedPct + 10)) {
+            lastLoggedPct = pct;
+            logger.info(`分片上传 ${pct}%（${uploaded} / ${size} 字节）`);
+          }
+          break;
+        }
+
+        if (shouldRetryStatus(response.status)) {
+          attempt += 1;
+          if (attempt > RESTORE_UPLOAD_MAX_RETRIES) {
+            throw await restoreHttpError(response, `上传分片（offset ${cursor}）`);
+          }
+          await sleepBounded(retryDelayMs(attempt), signal, '等待分片重试');
+          continue;
+        }
+        throw await restoreHttpError(response, `上传分片（offset ${cursor}）`);
+      }
+    }
+
+    const assembled = await fetchWithTimeout(`${RESTORE_UPLOAD_BASE}/${encodeURIComponent(uploadId)}/finalize`, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: jsonHeaders,
+      body: '{}',
+    }, { timeoutMs: RESTORE_ASSEMBLE_TIMEOUT_MS, signal, label: '组装分片' });
+    if (!assembled.ok) throw await restoreHttpError(assembled, '组装分片');
+    await readJsonBounded(assembled, { timeoutMs: RESTORE_ASSEMBLE_TIMEOUT_MS, signal, label: '读取组装结果' });
+
+    const restored = await fetchWithTimeout('/api/users/restore-backup', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: jsonHeaders,
+      body: buildRestoreBody({ uploadId, handle, mode, selection: FULL_SELECTION }),
+    }, { timeoutMs: timeoutMs || 0, signal, label: '恢复数据包至宿主' });
+    if (!restored.ok) throw await restoreHttpError(restored, '恢复数据包至宿主');
+    const result = await readJsonBounded(restored, { timeoutMs: RESTORE_ASSEMBLE_TIMEOUT_MS, signal, label: '读取恢复结果' });
+    return { supported: true, result };
+  } catch (err) {
+    await bestEffortCancelUpload(uploadId, headers);
+    throw err;
+  }
+}
+
+/** 200 不等于「有写入」：如实上报宿主返回的条目计数。 */
+function reportRestoreCounts(result) {
+  if (typeof result?.restoredCount !== 'number') return;
+  if (result.restoredCount === 0 && (result.skippedCount || 0) > 0) {
+    result.nothingRestored = true;
+    logger.warn(`宿主未写入任何条目：restored ${result.restoredCount} / skipped ${result.skippedCount}`
+      + '（请核对包的类目是否被宿主接受）');
+  } else {
+    logger.info(`宿主恢复条目计数：restored ${result.restoredCount}`
+      + `${typeof result.skippedCount === 'number' ? ` / skipped ${result.skippedCount}` : ''}`);
+  }
+}
+
+/** 检查包内扩展清单，据归一后的状态决定是否自动呼出安装器。 */
+async function maybeOpenExtensionInstaller(zipBlob) {
+  try {
+    // 非 ZIP（测试桩 / 异常体）不进入解析，避免无意义的 zip 异常日志。
+    const head = new Uint8Array(await zipBlob.slice(0, 4).arrayBuffer());
+    if (!(head[0] === 0x50 && head[1] === 0x4b)) return;
+    const reader = await zipIo.openReader(zipBlob);
+    try {
+      for await (const entry of reader.entries()) {
+        const entryName = String(entry.fileName || '').replace(/\\/g, '/');
+        if (entryName === '_convert/extensions-manifest.json') {
+          const text = new TextDecoder().decode(await entry.read());
+          const manifest = JSON.parse(text);
+          const entries = normalizeManifestEntries(manifest);
+          if (entries.length > 0) {
+            const embeddedCount = entries.filter((e) => e.availability === AVAILABILITY.EMBEDDED).length;
+            const installableCount = entries.filter((e) => e.availability === AVAILABILITY.INSTALLABLE).length;
+            const unavailableCount = entries.filter((e) => e.availability === AVAILABILITY.UNAVAILABLE).length;
+            if (shouldAutoOpenInstaller(entries)) {
+              logger.info(
+                `检测到包内 ${entries.length} 个扩展清单（可在线安装 ${installableCount} 个），正在呼出扩展安装面板...`,
+              );
+              renderExtensionInstallerModal(entries, undefined, { embeddedCount, unavailableCount });
+            } else {
+              // 无可在线安装项：不打扰用户，仅提示并提供手动入口（决策 D-4）
+              logger.info(
+                `本包含 ${entries.length} 个扩展，其中 0 个可在线安装`
+                + `${embeddedCount > 0 ? `（${embeddedCount} 个实体已随恢复写入）` : ''}`
+                + `${unavailableCount > 0 ? `，${unavailableCount} 个缺少可用 Git URL` : ''}。`
+                + '如需重装，请从扩展设置抽屉手动开始。',
+              );
+            }
+          }
+          break;
+        }
+      }
+    } finally {
+      await reader.close();
+    }
+  } catch (err) {
+    logger.warn('检查扩展清单失败 (非阻塞):', err);
+  }
+}
+
 /** `restoreToHost` 的实现体（互斥标志由外层 `try/finally` 保证复位）。 */
 async function restoreToHostInner(zipBlob, { mode, platform, signal, timeoutMs }) {
   // 已判定本宿主无整包恢复能力（全部候选 404/405）：直接拒绝，不再重复探测，
@@ -1688,6 +1928,22 @@ async function restoreToHostInner(zipBlob, { mode, platform, signal, timeoutMs }
   // 与这里的宿主端 merge 语义完全无关。此处语义是「把包并入现有数据」vs「整体覆盖」。
   logger.info(`准备向宿主 [${platform.toUpperCase()}] 恢复写入数据包 (模式: ${mode === 'merge' ? '合并写入' : '覆盖写入'})...`);
   const [token, handle] = await Promise.all([getCsrfToken({ signal }), getHandle({ signal })]);
+
+  // Luker / ST 优先试原生 8 MiB 分片：云酒馆经 Cloudflare 代理，单请求体上限 100 MB，
+  // 整包一次 POST 必失败。分片端点不存在（旧版或未实现该协议的宿主）才回退整包 FormData。
+  if (platform === 'luker' || platform === 'st') {
+    const chunked = await tryLukerChunkedRestore(zipBlob, { mode, handle, token, signal, timeoutMs });
+    if (chunked.supported) {
+      restoreCapability = 'available';
+      restoreEndpointHit = '/api/users/restore-backup';
+      const result = chunked.result || {};
+      reportRestoreCounts(result);
+      logger.success(`数据包已按 8 MiB 分片恢复至当前用户 (${handle})！模式: ${mode === 'merge' ? '合并写入' : '覆盖写入'}`);
+      await maybeOpenExtensionInstaller(zipBlob);
+      return result;
+    }
+    logger.warn(`${platform.toUpperCase()} 分片恢复端点不可用，回退整包上传`);
+  }
 
   const formData = new FormData();
   formData.append('avatar', zipBlob, 'backup.zip');
@@ -1733,57 +1989,9 @@ async function restoreToHostInner(zipBlob, { mode, platform, signal, timeoutMs }
     logger.warn('宿主恢复响应体读取失败，无法确认结果（请求已发出）:', err);
     return { success: false, unconfirmed: true, reason: '响应体不可解析' };
   }
-  // 200 不等于「有写入」：宿主可能把全部条目跳过。如实上报条目计数，
-  // 避免「点了恢复 → 显示成功 → 其实一个条目都没写」的假成功（与审计 R-15 同源）。
-  if (typeof result.restoredCount === 'number') {
-    if (result.restoredCount === 0 && (result.skippedCount || 0) > 0) {
-      result.nothingRestored = true;
-      logger.warn(`宿主未写入任何条目：restored ${result.restoredCount} / skipped ${result.skippedCount}`
-        + '（请核对包的类目是否被宿主接受）');
-    } else {
-      logger.info(`宿主恢复条目计数：restored ${result.restoredCount}`
-        + `${typeof result.skippedCount === 'number' ? ` / skipped ${result.skippedCount}` : ''}`);
-    }
-  }
+  reportRestoreCounts(result);
   logger.success(`数据包恢复至当前用户 (${handle}) 成功！模式: ${mode === 'merge' ? '合并写入' : '覆盖写入'}`);
-
-  // 检查包内扩展清单 _convert/extensions-manifest.json，据归一后的状态决定是否自动呼出安装器
-  try {
-    const reader = await zipIo.openReader(zipBlob);
-    try {
-      for await (const entry of reader.entries()) {
-        if (entry.fileName === '_convert/extensions-manifest.json') {
-          const text = new TextDecoder().decode(await entry.read());
-          const manifest = JSON.parse(text);
-          const entries = normalizeManifestEntries(manifest);
-          if (entries.length > 0) {
-            const embeddedCount = entries.filter((e) => e.availability === AVAILABILITY.EMBEDDED).length;
-            const installableCount = entries.filter((e) => e.availability === AVAILABILITY.INSTALLABLE).length;
-            const unavailableCount = entries.filter((e) => e.availability === AVAILABILITY.UNAVAILABLE).length;
-            if (shouldAutoOpenInstaller(entries)) {
-              logger.info(
-                `检测到包内 ${entries.length} 个扩展清单（可在线安装 ${installableCount} 个），正在呼出扩展安装面板...`,
-              );
-              renderExtensionInstallerModal(entries, undefined, { embeddedCount, unavailableCount });
-            } else {
-              // 无可在线安装项：不打扰用户，仅提示并提供手动入口（决策 D-4）
-              logger.info(
-                `本包含 ${entries.length} 个扩展，其中 0 个可在线安装`
-                + `${embeddedCount > 0 ? `（${embeddedCount} 个实体已随恢复写入）` : ''}`
-                + `${unavailableCount > 0 ? `，${unavailableCount} 个缺少可用 Git URL` : ''}。`
-                + '如需重装，请从扩展设置抽屉手动开始。',
-              );
-            }
-          }
-          break;
-        }
-      }
-    } finally {
-      await reader.close();
-    }
-  } catch (err) {
-    logger.warn('检查扩展清单失败 (非阻塞):', err);
-  }
+  await maybeOpenExtensionInstaller(zipBlob);
 
   return result;
 }
@@ -2124,6 +2332,41 @@ export async function renderExtensionInstallerModal(extensions, onFinish, option
       mainCol.appendChild(noteEl);
     }
 
+    // 仅清单且缺 URL：允许用户就地补一个 http(s) 来源（Git / zip），补上即可勾选安装。
+    let manualUrl = null;
+    if (isUnavailable) {
+      manualUrl = document.createElement('input');
+      manualUrl.type = 'text';
+      manualUrl.className = 'text_pole ext-manual-url';
+      manualUrl.placeholder = 'https://…（Git 或 zip 来源）';
+      manualUrl.autocomplete = 'off';
+      manualUrl.style.cssText = 'margin-top: 6px; width: 100%; font-size: 0.8rem;';
+      mainCol.appendChild(manualUrl);
+    }
+
+    const itemState = {
+      ext,
+      checkbox: chk,
+      statusEl: null,
+      isInstalled,
+      selectable,
+      manualUrl,
+      stateEl,
+    };
+    if (manualUrl) {
+      manualUrl.addEventListener('input', () => {
+        const ok = isSafeHttpUrl(manualUrl.value.trim());
+        itemState.selectable = ok;
+        chk.disabled = !ok;
+        chk.checked = ok && !isInstalled;
+        chk.style.opacity = ok ? '1' : '0.35';
+        stateEl.textContent = ok ? '待安装' : '无法在线安装';
+        stateEl.style.cssText = ok
+          ? 'font-size: 0.72rem; padding: 1px 6px; background: rgba(137,180,250,0.2); color: var(--SmartThemeQuoteColor, #f59e0b); border-radius: 4px;'
+          : 'font-size: 0.72rem; padding: 1px 6px; background: rgba(243,139,168,0.2); color: #f38ba8; border-radius: 4px;';
+      });
+    }
+
     const itemStatusEl = document.createElement('span');
     itemStatusEl.id = `ext-item-status-${idx}`;
     itemStatusEl.style.cssText = 'font-size: 0.8rem; color: color-mix(in srgb, var(--SmartThemeBodyColor, #f2f4f8) 58%, transparent);';
@@ -2133,13 +2376,8 @@ export async function renderExtensionInstallerModal(extensions, onFinish, option
     itemEl.appendChild(itemStatusEl);
 
     listEl.appendChild(itemEl);
-    itemsState.push({
-      ext,
-      checkbox: itemEl.querySelector(`#ext-chk-${idx}`),
-      statusEl: itemEl.querySelector(`#ext-item-status-${idx}`),
-      isInstalled,
-      selectable,
-    });
+    itemState.statusEl = itemEl.querySelector(`#ext-item-status-${idx}`);
+    itemsState.push(itemState);
   });
 
   // 按钮事件绑定
@@ -2222,19 +2460,22 @@ export async function renderExtensionInstallerModal(extensions, onFinish, option
     for (let i = 0; i < selected.length; i++) {
       const item = selected[i];
       const { ext, statusEl } = item;
+      const effectiveUrl = (item.manualUrl && isSafeHttpUrl(item.manualUrl.value.trim()))
+        ? item.manualUrl.value.trim()
+        : ext.url;
       const progressText = `${i + 1} / ${selected.length}`;
       progressNum.textContent = progressText;
       progressFill.style.width = `${Math.round(((i + 1) / selected.length) * 100)}%`;
-      progressStatus.textContent = `正在浅克隆: ${ext.displayName || ext.name} (${ext.url})...`;
+      progressStatus.textContent = `正在浅克隆: ${ext.displayName || ext.name} (${effectiveUrl || '无 URL'})...`;
       setStatusContent(statusEl, 'fa-solid fa-spinner fa-spin', '克隆中...', themeAccent());
 
       try {
         // 与核心层 extension-manifest.js 的 isInstallableUrl 同一规则，避免两套判定分叉
-        if (!isInstallableUrl(ext.url)) {
+        if (!isInstallableUrl(effectiveUrl)) {
           throw new Error('缺少有效的 Git HTTP(S) URL');
         }
         await installExtensionViaHost({
-          url: ext.url,
+          url: effectiveUrl,
           branch: ext.branch || 'main',
           replace: forceReplaceChk.checked,
         });
