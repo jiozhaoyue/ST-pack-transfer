@@ -12,7 +12,7 @@ const GROUP_KEYS = CHART_GROUPS.map((g) => g.key);
 const DEFAULT_CHECKED = GROUP_KEYS.filter((k) => k !== 'backups' && k !== 'native');
 
 export const CHART_PREF_DEFAULTS = Object.freeze({
-  version: 1,
+  version: 2,
   checkedGroups: DEFAULT_CHECKED,
   target: 'auto',
   compression: '5',
@@ -30,7 +30,15 @@ export function normalizeChartPrefs(input) {
   if (Array.isArray(input.checkedGroups)) {
     const seen = new Set();
     out.checkedGroups = input.checkedGroups.filter((k) => GROUP_KEYS.includes(k) && !seen.has(k) && seen.add(k));
+    // v1 偏好没有「类目键完整性」概念：旧记录里缺失的键无法区分「用户取消」与「当时还没有这个类目」，
+    // 一律按默认补齐，避免升级后聊天记录等类目莫名不勾选。v2 起以显式列表为准。
+    if (Number(input.version) < 2) {
+      for (const key of DEFAULT_CHECKED) {
+        if (!out.checkedGroups.includes(key)) out.checkedGroups.push(key);
+      }
+    }
   }
+  out.version = 2;
   if (['auto', 'st', 'luker', 'tt', 'pt'].includes(input.target)) out.target = input.target;
   if (['0', '1', '5', '9'].includes(String(input.compression))) out.compression = String(input.compression);
   const split = Number(input.splitMb);

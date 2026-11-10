@@ -3,7 +3,7 @@
 > 面向**改这个仓的人**。用户向说明见 [README.md](../README.md)；跨会话的架构规范见 `.trellis/spec/`。
 > 本文登记**已经实现的功能**与它们的源码落点。**未实现的不写进来**——"文档有、代码无"是本仓明确禁止的形态。
 >
-> 最后核对：2026-10-13（对照 `src/` 全量模块头部说明 + 五守卫 + `npm test` 718 passed）。
+> 最后核对：2026-11-10（本轮功能改动对照 `src/` 与目标测试；未跑全量）。
 
 ---
 
@@ -29,7 +29,8 @@
 
 | 功能 | UI 入口 | 源码落点 |
 | --- | --- | --- |
-| 从当前宿主拉取整份用户数据 | `#btn-fetch`（工作台）/ 宿主原生界面注入按钮 | `index.js` 的 `fetchFromHost()` / `pullFromNativeUi()`；`src/ui/host-bridge.js` 的 `openNativeBackupUi()` / `fetchHostBackup()` |
+| 从当前宿主拉取整份用户数据 | 顶部全局动作条 `#btn-fetch` / 宿主原生界面注入按钮 | `index.js` 的 `fetchFromHost()` / `pullFromNativeUi()`；`src/ui/host-bridge.js` 的 `openNativeBackupUi()` / `fetchHostBackup()` |
+| 迁移与备份 / 导出扩展清单 | 顶部全局动作条 `#transfer-open-btn` / `#btn-host-assetlist` | `src/ui/workbench-view.js` 的 `renderTopActions()` |
 | **Luker 2.9+ 账户窗口**（备份页注入 / 存储页跳转 / 勾选读取） | 账户 → Backup / Storage | `openHostAccountWindow()` / `openHostStoragePage()` / `readNativeBackupSelection()`；契约见 `.trellis/spec/frontend/luker-2.9-account-window.md` |
 | **原生界面生命周期**（拉取后自动关闭、宿主原生导出优先） | 原生界面「从宿主拉取」 | `closeNativeBackupUi()` / `isNativeExportBusy()` / `watchNativeExportStart()`；契约见 `.trellis/spec/frontend/host-native-pull-lifecycle.md` |
 | 细粒度类目勾选（10 类目 + 3 特殊类目） | `#chart-stack` 的类目卡与选择树 | `src/ui/workbench-view.js` 的 `renderTreeRows()`、`src/core/inspect.js`、`src/core/chart-model.js` |
@@ -143,13 +144,17 @@
 | 功能 | UI 入口 | 源码落点 |
 | --- | --- | --- |
 | 顶层面板只剩图表面板与数据包面板 | — | `src/ui/workbench-template.js`：`.col-chart`（`#chart-card` / `#lan-view`）+ `.col-side`（`#zone-card`） |
-| 动作按钮并入数据包面板底部 | `#zone-card > .zone-foot#action-row` | `workbench-view.js` 的 `renderActions()`（消费点未变） |
+| 动作按钮并入数据包面板底部 | `#zone-card > #zone-actions-bottom` | `workbench-view.js` 的 `renderActions()`（仅在勾选后出现） |
+| 顶部全局动作条 | `.app-body > #top-actions` | `renderTopActions()`：从宿主拉取 / 导出扩展清单 / 迁移与备份 |
+| 导出区多选「上传」 | `#btn-upload` | `index.js` 的 `restoreSelectedConfirmed()` 逐包顺序恢复；任一失败即停止并报错 |
 | 进度条为常驻底栏，所有视图共用 | `#workbench-progress`（`.app-body` 末位子项） | `workbench-template.js` 模板末尾；`setProgress()` 写 `#progress-fill` / `#progress-label` / `#progress-pct` |
 | 点击进度条打开日志 | `#workbench-progress` 的 click | `workbench-view.js` 的 `bind()`（`renderLog()` + `showPane('log')`） |
 | 顶栏日志按钮已删除 | — | `#btn-log` 不再存在；`#log-dot` 迁入底栏 |
 | 图表动态宫格（1 张占满 / 2 张平分 / 3–4 张 2×2 / >4 张纵向滚动） | `.chart-canvas` | `src/ui/workbench-view.js` 的 `chartCanvasHtml()`；`style.css` 的 `.chart-canvas` |
 | 图表之间拖拽调整行列比例 | `.chart-split-v` / `.chart-split-h` | `initChartSplitters()` + `localStorage['stpt.chartLayout']` |
 | 图表格式切换（单条多色 / 圆环） | 每张卡的 `[data-chartfmt-toggle]` 图标按钮 | `chartFmtOf()` / `volChartHtml()`；状态 `state.chartFmt[key]` |
+| 图表占比动态跟随勾选 | 自动 | `selectedMbMap()` / `volChartData()`；取消勾选后色块与 `tree-occ` 同步重算 |
+| 最大化逐层下钻 | 图表卡 `⤢` + 分类行 | `renderTreeRows()` 在 `drill` 态只渲染下钻按钮，面包屑 `data-volcrumb` 返回 |
 | 数据包偏好（占位勾选 + 顶部控件并入） | `#chart-pref-btn` | `src/ui/chart-prefs.js`、`openChartPrefs()` / `saveChartPrefsDraft()`；保存后只影响以后导入的包 |
 | 每行占用条与色标 | `.tree-row > .tree-dot` / `.tree-occ` | `renderTreeRows()` 用同一套调色板 |
 | 拖拽卡片改尺寸 | **已删除**（2026-11-09 用户裁定：图表大小由宫格动态决定，不允许自由拉伸） | — |
@@ -174,6 +179,19 @@
 
 > 契约见 `.trellis/spec/frontend/transfer-s3-webdav.md`。
 > **无服务端直传、无 cron**：本插件禁止后台插件；`serverTransfer` 能力表全 false。
+
+### N. 恢复上传：Luker 8 MiB 分片（2026-11-10）
+
+| 功能 | UI 入口 | 源码落点 |
+| --- | --- | --- |
+| 云酒馆大包恢复穿过 CF 100 MB 单请求上限 | 导出区「上传」 | `src/ui/host-bridge.js` 的 `tryLukerChunkedRestore()` |
+| 分片协议纯逻辑（8 MiB / 413 减半 / 3 次重试） | — | `src/core/chunked-restore.js` |
+| 旧版/无分片端点宿主的整包回退 | 自动 | `postRestoreWithFallback()` |
+| 仅清单包在插件内查看并安装 | 图表卡头 `[data-extmanifest]` | `index.js` 的 `readPackageExtensionManifest()` / `openExtensionManifest`；`host-bridge.js` 的 `renderExtensionInstallerModal()` |
+
+> 契约见 `.trellis/spec/frontend/large-pack-upload.md`。
+> 分片端点：`POST /api/users/restore-backup/uploads` → `PUT …/{uploadId}/chunks/{offset}` →
+> `POST …/finalize` → `POST /api/users/restore-backup`（`{uploadId, handle, mode, selection}`）。
 
 ---
 

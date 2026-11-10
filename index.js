@@ -11,7 +11,7 @@ import { zipIo, readZipEntryManifest } from './src/core/zip-io.js';
 import { splitArchiveEntries } from './src/core/splitter.js';
 import { mergeConvertedBlobs } from './src/core/merge-packages.js';
 import {
-  ORIGINS, isStorageSupported, saveFile, getFile, deleteFile, listStoredFiles,
+  ORIGINS, isStorageSupported, saveFile, getFile, deleteFile, listStoredFiles, clearStoredFiles,
 } from './src/storage/db.js';
 import { buildChartTree, fmtMB, splitLimitOf } from './src/core/chart-model.js';
 import { DEFAULT_FILENAME_TEMPLATE, TARGET_PLATFORMS, resolveFilename, namedBlob } from './src/core/naming.js';
@@ -29,6 +29,7 @@ import {
   uploadUserFile, userFilesSupported, sanitizeUserFileName, verifyUserFiles, deleteUserFile,
   readHostStorageQuota,
   isHostAccountWindowAvailable, openHostStoragePage, listHostExtensions,
+  renderExtensionInstallerModal,
   opfsTmpHandle, opfsHandleToFile, opfsTmpCleanup,
 } from './src/ui/host-bridge.js';
 import { packPrivateContainer } from './src/core/private-container.js';
@@ -46,7 +47,7 @@ import { mountDebugProbe } from './src/app/task-runtime.js';
 import { createConversionRunner, readPausedMarker, clearPausedMarker } from './src/app/conversion-runner.js';
 import { beginHostPull, beginNativePull } from './src/app/pull-entry.js';
 import { buildAssetList, summarizeExtensions } from './src/core/asset-list.js';
-import { deriveExtensionEntry } from './src/core/extension-manifest.js';
+import { deriveExtensionEntry, normalizeManifestEntries } from './src/core/extension-manifest.js';
 import { objectKey } from './src/core/s3-client.js';
 import { createTransferTarget } from './src/core/transfer-target.js';
 import { createTransferRunner } from './src/app/transfer-runner.js';
@@ -166,7 +167,7 @@ async function main(root) {
 
   function toPackage(record) {
     const zone = zoneOfOrigin(record.origin);
-    const layout = state.layoutById.get(record.id) || record.layout || 'unknown';
+    const layout = record.layout || state.layoutById.get(record.id) || 'unknown';
     const sizeBytes = record.size || 0;
     return {
       id: record.id,
@@ -177,6 +178,8 @@ async function main(root) {
       mb: sizeBytes / (1024 * 1024),
       ts: record.createdAt || Date.now(),
       time: clockOf(record.createdAt),
+      /** 产物声明的目标布局（转换时写入）；用于区分结构相同但平台不同的 TT / PT 包。 */
+      declaredLayout: record.layout || '',
       origin: record.origin === ORIGINS.LAN ? t('origin.remote')
         : record.origin === ORIGINS.EXPORT_COPY ? t('origin.exportCopy')
         : record.origin === ORIGINS.SPLIT_PART ? t('origin.split')
@@ -205,11 +208,37 @@ async function main(root) {
     void refreshStorageQuota();
   }
 
+  /** 读取包内 `_convert/extensions-manifest.json`；没有则返回空数组。只解压这一条。 */
+  async function readPackageExtensionManifest(blob) {
+    if (!blob) return [];
+    const reader = await zipIo.openReader(blob);
+    try {
+      for await (const entry of reader.entries()) {
+        const entryName = String(entry.fileName || '').replace(/\\/g, '/');
+        if (entryName === '_convert/extensions-manifest.json') {
+          const text = new TextDecoder().decode(await entry.read());
+          return normalizeManifestEntries(JSON.parse(text));
+        }
+        try { entry.skip?.(); } catch { /* 目录条目 / 已跳过 */ }
+      }
+    } catch {
+      return [];
+    } finally {
+      await reader.close();
+    }
+    return [];
+  }
+
   async function ensurePlan(pkgId, targetName = null) {
     const pkg = pkgById(pkgId);
     if (!pkg) return null;
     const code = targetCodeOf(targetName || view.getState().target);
     const key = `${pkgId}::${code}`;
+    // 清单读取不依赖 plan 缓存：即使整包被判定「未识别」，也要能在插件里看到扩展清单。
+    if (!pkg.extManifest) {
+      const b = await blobOf(pkg);
+      if (b) pkg.extManifest = await readPackageExtensionManifest(b).catch(() => []);
+    }
     if (state.planCache.has(key)) return state.planCache.get(key);
     const blob = await blobOf(pkg);
     if (!blob) { logger.warn(t('log.scanSkipped', { name: pkg.name })); return null; }
@@ -236,12 +265,14 @@ async function main(root) {
       state.planCache.set(key, { plan, tree, target: code });
       state.nodesById.set(pkgId, tree);
       state.extensionsById.set(pkgId, plan.extensions || []);
-      if (plan.sourceLayout) state.layoutById.set(pkgId, plan.sourceLayout);
+      if (plan.sourceLayout && !pkgById(pkgId)?.declaredLayout) state.layoutById.set(pkgId, plan.sourceLayout);
       const live = pkgById(pkgId);
       if (live) {
         live.nodes = tree;
         live.extensions = plan.extensions || [];
-        live.host = HOST_CODE[plan.sourceLayout] || live.host;
+        live.extManifest = pkg.extManifest || [];
+        // 产物包保留转换时声明的目标布局：PT 产物与 TT 结构相同，重新识别只会得到 tt。
+        if (!live.declaredLayout) live.host = HOST_CODE[plan.sourceLayout] || live.host;
         live.unrecognized = plan.totalSourceFiles === 0;
       }
       view.setPackages(state.packages);
@@ -755,20 +786,26 @@ async function main(root) {
   }
 
   async function restoreSelectedConfirmed(targets) {
-    const ok = await confirmDialog(t('modal.confirmRestore', { name: targets[0].name }));
+    const ok = await confirmDialog(targets.length > 1
+      ? t('modal.confirmRestoreMany', { n: targets.length })
+      : t('modal.confirmRestore', { name: targets[0].name }));
     if (!ok) return;
     if (state.busy) return;
     state.busy = true;
     try {
-      view.setProgress(25, t('progress.restoring'));
-      const blob = await blobOf(targets[0]);
-      const result = host.platform === 'luker'
-        ? await restoreToLuker(blob, {})
-        : await restoreToHost(blob, { mode: 'merge', platform: host.platform });
-      if (result && result.nothingRestored) throw new Error(t('error.nothingRestored'));
-      try { await importRestoredChatsIntoLibrary(blob); } catch { /* 纯库模式可选 */ }
+      for (let i = 0; i < targets.length; i += 1) {
+        const pkg = targets[i];
+        view.setProgress(Math.round((i / targets.length) * 90) + 5, t('progress.restoring'));
+        const blob = await blobOf(pkg);
+        if (!blob) throw new Error(t('toast.selectExportPack'));
+        const result = host.platform === 'luker'
+          ? await restoreToLuker(blob, {})
+          : await restoreToHost(blob, { mode: 'merge', platform: host.platform });
+        if (result && result.nothingRestored) throw new Error(t('error.nothingRestored'));
+        try { await importRestoredChatsIntoLibrary(blob); } catch { /* 纯库模式可选 */ }
+        logger.info(t('log.restored', { name: pkg.name }));
+      }
       view.setProgress(100, t('progress.restoreDone'));
-      logger.info(t('log.restored', { name: targets[0].name }));
       view.toast(t('toast.restoreDone'));
     } catch (err) {
       logger.error(t('log.restoreFailed', { msg: err.message }));
@@ -1229,45 +1266,6 @@ async function main(root) {
     }
   }
 
-  /** 合并上传：多个导入包原样合并成一个新的导入包（不改内容，只并条目）。 */
-  async function mergeUpload(packages) {
-    if (state.busy) return;
-    if (!packages || packages.length < 2) { view.toast(t('lan.atLeastTwo')); return; }
-    state.busy = true;
-    try {
-      const blobs = [];
-      for (const pkg of packages) {
-        const blob = await blobOf(pkg);
-        if (blob) blobs.push(blob);
-      }
-      if (blobs.length < 2) { view.toast(t('toast.convertFailed')); return; }
-      view.setProgress(20, t('progress.merging'));
-      const merged = await mergeConvertedBlobs(blobs, { compressionLevel: 5 });
-      if (!merged.ok) {
-        view.setProgress(0, t('progress.convertFailed'));
-        showMergeConflicts(merged.conflicts);
-        return;
-      }
-      const id = `merged-${Date.now()}`;
-      const name = `merged_${packages.length}packs.zip`;
-      await saveFile({
-        id, name, size: merged.blob.size, blob: namedBlob(merged.blob, name),
-        layout: 'unknown', role: 'source', origin: ORIGINS.UPLOAD,
-        metadata: { mergedFrom: packages.map((p) => p.id) },
-      });
-      await syncPackages();
-      await ensurePlan(id);
-      view.setProgress(100, t('progress.exportReady'));
-      view.toast(t('toast.mergeDone', { n: packages.length }));
-      logger.info(t('log.mergeUpload', { n: packages.length, files: merged.fileCount }));
-    } catch (err) {
-      logger.error(t('log.mergeUploadFailed', { msg: err.message }));
-      view.setProgress(0, t('progress.convertFailed'));
-    } finally {
-      state.busy = false;
-    }
-  }
-
   async function exportLibrary() {
     try {
       const pack = await exportLibraryToPack({});
@@ -1379,7 +1377,6 @@ async function main(root) {
     actions: {
       fetch: fetchFromHost,
       generate,
-      mergeUpload,
       restore: restoreSelected,
       copyBack,
       deleteSelected,
@@ -1394,6 +1391,13 @@ async function main(root) {
       pendingClear: () => exportQueue.clear(),
       reportDownload: downloadReport,
       exportAssetList,
+      openExtensionManifest: async (pkgId) => {
+        const pkg = pkgById(pkgId);
+        if (!pkg?.extManifest?.length) { view.toast(t('toast.noExtensionManifest')); return; }
+        await renderExtensionInstallerModal(pkg.extManifest, undefined, {
+          targetPlatform: hostLayoutCode(host.platform),
+        });
+      },
       backupSelectedToCloud,
       importCloudPack,
       lan: lanActions,
@@ -1506,9 +1510,17 @@ async function main(root) {
     },
   });
 
+  // 设置项：每次加载清空浏览器里的暂存数据包（不含设置/偏好/日志）。
+  if (settings.clearPackagesOnLoad) {
+    try {
+      await clearStoredFiles();
+      logger.info(t('log.storageCleared'));
+    } catch (err) {
+      logger.warn(t('log.workspaceReadFailed', { msg: err?.message || String(err) }));
+    }
+  }
   await syncPackages();
-  async function refreshStorageQuota() {
-    // 三条读数彼此独立：任一失败都不能拖垮其余读数（尤其不能让「存储页可用」被配额异常吞掉）。
+  async function refreshStorageQuota() {    // 三条读数彼此独立：任一失败都不能拖垮其余读数（尤其不能让「存储页可用」被配额异常吞掉）。
     const [browser, hostQuota, pageAvailable] = await Promise.all([
       Promise.resolve().then(() => readBrowserQuota()).catch(() => null),
       host.platform === 'luker'

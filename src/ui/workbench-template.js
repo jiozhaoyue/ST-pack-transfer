@@ -20,6 +20,7 @@ export function getWorkbenchHtml() {
     </header>
 
     <div class="app-body">
+    <div class="top-actions" id="top-actions"></div>
     <main class="app-main" id="view-workbench">
       <div class="mobile-switch" id="mobile-switch" hidden>
         <button type="button" class="msw active" data-mview="chart" data-i18n="chart.title"></button>
@@ -276,13 +277,13 @@ export function getWorkbenchHtml() {
               <button class="help-btn" data-help="zone" data-i18n-title="zones.help">?</button>
             </div>
           </div>
-          <div class="zone-actions action-row" id="action-row"></div>
           <div class="zone-tabs" id="zone-tabs">
             <button class="zone-tab active" data-zone="import"><span data-i18n="zones.import"></span><span class="count" id="count-import">4</span></button>
             <button class="zone-tab" data-zone="export"><span data-i18n="zones.export"></span><span class="count" id="count-export">1</span></button>
           </div>
           <div class="pending-exports" id="pending-exports" hidden></div>
           <div class="zone-body" id="zone-body"></div>
+          <div class="zone-foot-actions" id="zone-actions-bottom"></div>
         </section>
 
       </div>

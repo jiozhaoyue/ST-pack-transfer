@@ -58,11 +58,13 @@ export function zoneOfOrigin(origin) {
  */
 export function copyBackRecord(pkg, { now = Date.now(), random = Math.random } = {}) {
   const id = `pkg-${now}-${String(random()).slice(2, 7)}`;
+  const layout = pkg?.declaredLayout || '';
   return {
     id,
     name: pkg?.name || '',
     role: 'source',
     origin: 'export-copy',
+    ...(layout ? { layout } : {}),
     metadata: { copiedFrom: pkg?.id || null },
   };
 }
