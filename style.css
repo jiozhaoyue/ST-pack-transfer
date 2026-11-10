@@ -545,11 +545,11 @@
   #app.app-container .batch-bar button:disabled{opacity:.45;cursor:not-allowed}
   #app.app-container .zone-empty{padding:16px;text-align:center;color:var(--muted-2);font-size:11.5px}
 
-  /* 顶部全局动作：从宿主拉取 / 导出扩展清单 / 迁移与备份 */
-  #app.app-container .top-actions{flex:0 0 auto;display:flex;gap:6px;flex-wrap:wrap;align-items:center;
-    padding:7px 12px;border-bottom:1px solid var(--border);
-    background:color-mix(in srgb,var(--panel-3) 45%,transparent)}
+  /* 页头全局动作：与标题同排，不占独立行（从宿主拉取 / 导出扩展清单 / 迁移与备份） */
+  #app.app-container .top-actions{flex:0 1 auto;display:flex;gap:6px;flex-wrap:nowrap;align-items:center;
+    min-width:0;overflow:hidden}
   #app.app-container .top-actions:empty{display:none}
+  #app.app-container .top-actions .btn{flex:0 0 auto;white-space:nowrap}
   #app.app-container .zone-foot-actions{flex:0 0 auto;display:flex;gap:6px;flex-wrap:wrap;align-items:center;
     padding:7px 9px;border-top:1px solid var(--border);
     background:color-mix(in srgb,var(--panel-3) 35%,transparent)}
