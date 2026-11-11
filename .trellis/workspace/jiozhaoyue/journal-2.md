@@ -1426,3 +1426,44 @@ Topics: [.trellis/spec/frontend/workbench-single-view.md](../../spec/frontend/wo
 
 - Dev Luker 8003 起来后补宿主源下钻与扩展管理宿主页签实机取证
 - OAuth 端到端需用户先登记回调地址（协议/主机/端口完全一致）
+
+
+## Session 78: 迁移面板头同构（无 ×）+ 扩展管理凭据页 / 安装区折叠
+<!-- trellis-session: v=2 fp=f7996b84aee8bf23 -->
+
+**Date**: 2026-11-11
+**Task**: 迁移面板头同构（无 ×）+ 扩展管理凭据页 / 安装区折叠
+**Branch**: `main`
+
+### Summary
+
+迁移与备份面板头改为与图表/扩展管理完全同构：panel-head--switch + 共享 [data-view-switch]（存储图表/扩展管理/迁移与备份）+ panel-actions 内两个页签，删除自写标题块与关闭按钮（全站迁移面板内 × 数量 0）。扩展管理安装页签改名凭据，安装入口全部下移到宿主页底部 details 折叠区（默认收起、可完全收起），新增 refreshInstallArea 避免进度刷新重拉宿主列表。
+Topics: [.trellis/spec/frontend/workbench-single-view.md](../../spec/frontend/workbench-single-view.md), [.trellis/spec/frontend/extension-git-manager.md](../../spec/frontend/extension-git-manager.md)
+
+### Main Changes
+
+- 迁移面板头与另两个面板同构，禁止标题块与任何 ×；离开靠切换行
+- 扩展管理页签 宿主/凭据/打包；凭据页只留账号与 OAuth
+- 安装区移入宿主页底部 #extmgr-install-block（details，默认收起）
+- refreshInstallArea() 只重绘安装区，避免高频重绘重拉宿主扩展
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `77f0699` | feat(ui): 迁移面板头同构（无 ×）+ 扩展管理改「凭据」、安装区下移可收起 |
+
+### Testing
+
+- [OK] 六守卫全绿（控件 88 / 节点 106）
+- [OK] npm run build exit 0
+- [OK] 全量 npm test 1119 passed / 2 skipped
+- [OK] 无头截图取证：桌面/手机、迁移面板 ×=0、宿主页折叠/展开、凭据页无安装控件
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- Dev Luker 8003 起来后补宿主源与扩展管理实机取证

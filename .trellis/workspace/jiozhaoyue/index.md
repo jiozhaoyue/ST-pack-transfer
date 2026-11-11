@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-2.md`
-- **Total Sessions**: 77
+- **Total Sessions**: 78
 - **Last Active**: 2026-11-11
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-2.md` | ~1428 | Active |
+| `journal-2.md` | ~1469 | Active |
 | `journal-1.md` | ~2491 | Archived |
 <!-- @@@/auto:active-documents -->
 
@@ -30,6 +30,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 78 | 2026-11-11 | 迁移面板头同构（无 ×）+ 扩展管理凭据页 / 安装区折叠 | `77f0699` | `main` |
 | 77 | 2026-11-11 | 视图切换入面板头 / 扩展管理改版·OAuth / 动作入口归位 | `a9ab2c9`, `62054d7`, `dbbd8cd` | `main` |
 | 76 | 2026-11-11 | 统一存储审查面板落地（浏览器/宿主同面板） | `d8fb38f`, `22b9cc4`, `e4ee291` | `main` |
 | 75 | 2026-11-11 | Session 75 交接：统一存储审查面板 | `5fe7dc1` | `main` |
