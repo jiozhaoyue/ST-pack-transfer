@@ -47,13 +47,16 @@
 | 局域网互传 | ❌ | ✅ `/api/sync/v1/*`（服务端↔服务端） | ✅ 但为 Rust 命令，扩展不可 invoke | ❌ |
 | 云端对象存储 | ❌ | ✅ S3 Sync | ✅ TT-Sync v2 | ❌ |
 | WebDAV | ❌ | ❌ | ❌ | ❌ |
-| 存储面板 / 配额 | ❌ | ✅ storage-inspector | ❌ | ❌ |
+| 存储面板 / 配额（原生） | ❌ | ✅ `storage-inspector.js` | ❌ | ❌ |
+
+> 本插件在四宿主都提供**自建存储审查面板**（浏览器源全平台可用）；Luker 额外复用其原生数据源。
 
 ### 2.3 插件功能来源
 
 | 插件功能 | 来源 |
 | --- | --- |
-| 从宿主拉取数据包 / 写回恢复 / 扩展清单与安装 / 存储配额 | **优先用宿主原生**，缺失时自建兜底或如实提示 |
+| 从宿主拉取数据包 / 写回恢复 / 扩展清单与安装 | **优先用宿主原生**，缺失时自建兜底或如实提示 |
+| 存储审查（浏览器 / 宿主两处配额） | **同一自建面板**；宿主数据源只在 Luker 可用，其余宿主如实显示「未提供」 |
 | 四酒馆格式互转 / 局域网互传 / S3 与 WebDAV 仓库 / 条目级差量 / 暂停续传 | **自建**（四家都没有） |
 
 ## 三、功能总览
@@ -105,13 +108,20 @@
 - 一键备份：全量时间戳快照（保留最近 N 份）或内容寻址增量备份集（任一版本可独立恢复）。
 - 选包只认左侧数据包列表的选中项，面板内不另设文件选择器。
 
-### 3.6 其它
+### 3.6 存储审查
+
+- 顶部两处配额（浏览器 / 宿主）打开**同一个面板**；点哪一行进入，面板初始就显示哪一侧，
+  面板内可随时切换数据源。
+- 面包屑逐层下钻：localStorage / sessionStorage 按键、IndexedDB 库与表、Cache Storage 缓存；
+  配额行、堆叠条、图例、列表同屏，列表是唯一滚动区。
+- **只读**：不删除、不改写任何键 / 库 / 缓存；浏览器不提供的大小如实显示 `?`，不伪造 0。
+- 宿主数据源仅 Luker 提供（复用其 Storage Inspector）；其它宿主如实显示「未提供」。
+
+### 3.7 其它
 
 - **教程 = 演示模式**：打开先选「数据包转换 / 上传宿主 / 从宿主拉取 / 扩展管理 / 迁移备份」，
-  在**占位数据**上直接操作（可勾选、生成、删除、查看配额明细）；顶部横幅随时「退出教程」，
+  在**占位数据**上直接操作（可勾选、生成、删除、打开存储审查）；顶部横幅随时「退出教程」，
   退出后完整还原，全程不写入任何真实数据或宿主。
-- **浏览器配额可查看占用明细**：点「浏览器配额」查看当前浏览器的占用明细（IndexedDB / Cache Storage /
-  localStorage 等，直接读浏览器，与宿主无关）。
 - 纯库模式：给聊天库补齐磁盘缺失的聊天 / 从库导出 / 还原后入库（上游接口未实现，未在真实环境跑通）。
 - 三形态：独立网页、酒馆插件（全屏模态）、`file://` 单文件离线版。
 - 可选后端增强：装了 Authority 时产物可服务端托管；没装则静默降级，功能不缺。
@@ -175,9 +185,11 @@ npm run preview      # 本地预览 dist（4173）
 ## 六、开发与质量
 
 - 功能清单与源码落点：[docs/DEVELOPER-GUIDE.md](docs/DEVELOPER-GUIDE.md)（**改代码先读它**）
-- 分层规范与踩坑记录：[.trellis/spec/](.trellis/spec/)
-- 当前计划与状态：[docs/PLAN-2026-11-11-ui-fixes-next.md](docs/PLAN-2026-11-11-ui-fixes-next.md)
-- 存储审查面板实施契约：[docs/HANDOFF-2026-11-11-storage-inspector.md](docs/HANDOFF-2026-11-11-storage-inspector.md)
+- 分层规范与踩坑记录：[.trellis/spec/](.trellis/spec/)；存储审查面板规范：
+  [.trellis/spec/frontend/storage-inspector.md](.trellis/spec/frontend/storage-inspector.md)
+- 当前计划与状态：[docs/PLAN-2026-11-11.md](docs/PLAN-2026-11-11.md)
+- 存储审查面板实现契约与取证：[docs/HANDOFF-2026-11-11-storage-inspector.md](docs/HANDOFF-2026-11-11-storage-inspector.md)
+- 最近一次会话交接：[.trellis/workspace/jiozhaoyue/HANDOFF-2026-11-11-2.md](.trellis/workspace/jiozhaoyue/HANDOFF-2026-11-11-2.md)
 
 ```bash
 npm test                      # 单元测试（纯逻辑层无 DOM 依赖）

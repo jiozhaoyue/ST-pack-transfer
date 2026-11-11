@@ -50,7 +50,9 @@
 | 局域网互传 | ❌ | ✅ `/api/sync/v1/*`（服务端 ↔ 服务端） | ✅ 但为 **Rust 命令**，扩展不可 invoke | ❌ |
 | 云端对象存储 | ❌ | ✅ S3 Sync（加密桶 / 冲突决策 / Undo） | ✅ TT-Sync v2 | ❌ |
 | WebDAV | ❌ | ❌ | ❌ | ❌ |
-| 存储面板 / 配额 | ❌ | ✅ `storage-inspector.js` | ❌ | ❌ |
+| 存储面板 / 配额（原生） | ❌ | ✅ `storage-inspector.js` | ❌ | ❌ |
+
+> 本插件另有**自建存储审查面板**（四宿主可用，浏览器源全平台；宿主数据源仅 Luker），见 §二·O。
 
 #### 0.3 插件功能来源：哪些直接用原生
 
@@ -80,7 +82,7 @@
 | --- | --- | --- |
 | 从当前宿主拉取整份用户数据 | 顶部全局动作条 `#btn-fetch` / 宿主原生界面注入按钮 | `index.js` 的 `fetchFromHost()` / `pullFromNativeUi()`；`src/ui/host-bridge.js` 的 `openNativeBackupUi()` / `fetchHostBackup()` |
 | 迁移与备份 / 导出扩展清单 | 顶部全局动作条 `#transfer-open-btn` / `#btn-host-assetlist` | `src/ui/workbench-view.js` 的 `renderTopActions()` |
-| **Luker 2.9+ 账户窗口**（备份页注入 / 存储页跳转 / 勾选读取） | 账户 → Backup / Storage | `openHostAccountWindow()` / `openHostStoragePage()` / `readNativeBackupSelection()`；契约见 `.trellis/spec/frontend/luker-2.9-account-window.md` |
+| **Luker 2.9+ 账户窗口**（备份页注入 / 勾选读取；存储页跳转能力保留但**配额行已改走自建面板**） | 账户 → Backup / Storage | `openHostAccountWindow()` / `openHostStoragePage()` / `readNativeBackupSelection()`；契约见 `.trellis/spec/frontend/luker-2.9-account-window.md` |
 | **原生界面生命周期**（拉取后自动关闭、宿主原生导出优先） | 原生界面「从宿主拉取」 | `closeNativeBackupUi()` / `isNativeExportBusy()` / `watchNativeExportStart()`；契约见 `.trellis/spec/frontend/host-native-pull-lifecycle.md` |
 | 细粒度类目勾选（10 类目 + 3 特殊类目） | `#chart-stack` 的类目卡与选择树 | `src/ui/workbench-view.js` 的 `renderTreeRows()`、`src/core/inspect.js`、`src/core/chart-model.js` |
 | 类目内逐文件穿透排除 | 同一棵选择树 | `src/ui/workbench-view.js` 的 `renderTreeRows()`、`src/ui/host-bridge.js` 的 `exclude` 链路 |
@@ -167,7 +169,7 @@
 | 存储配额两行（浏览器 / 宿主）：两行都打开**同一个存储审查面板**（占满内容区），面板内可切换数据源；初始来源 = 点击的那一行。只读 | `src/ui/workbench-view.js` 的 `renderQuota()` / `renderStorageInspector()` / `openStorageInspector()` / `siRequest()`；`src/core/storage-inspector-model.js`（纯逻辑）；`src/ui/storage-inspector-browser.js`（浏览器 provider）；`index.js` 的 `actions.storageInspector`；`src/ui/host-bridge.js` 的 `fetchHostStorageInspect()` / `hostStorageInspectCapability()`。契约见 [HANDOFF-2026-11-11-storage-inspector.md](./HANDOFF-2026-11-11-storage-inspector.md) |
 | 教程演示模式（占位数据可操作；退出整体还原；不写真实数据/宿主） | `#btn-guide` / 教程菜单 / `#tutorial-banner-exit` | `src/ui/workbench-view.js` 的 `enterTutorialMode()` / `exitTutorialMode()` / `demoTutorialActions()` / `buildDemoPackages()`；模板 `#tutorial-banner` |
 | 目标任务式教程（选目标 → 逐步高亮；按平台与桌面/手机视图自适应；目标缺失时卡片居中保留） | `#btn-guide` → 目标菜单 | `src/ui/workbench-view.js` 的 `TUTORIAL_GOALS` / `renderTutorial()` / `tutorialPrepareStep()` / `centerTutorialCard()` |
-| 宿主配额读数（Luker 同源兜底） | `src/ui/host-bridge.js` 的 `readHostStorageQuota()`（`RestProvider`） |
+| 宿主配额读数（Luker `RestProvider`，供配额行） | `src/ui/host-bridge.js` 的 `readHostStorageQuota()`；面板内的逐层读取走 `fetchHostStorageInspect()` |
 | 导出扩展资产列表（官方扁平 JSON，可导入「下载扩展和资源菜单」） | 每张图表卡 `[data-assetlist]`；空态 `#btn-assetlist-host` | `src/core/asset-list.js`、`src/ui/host-bridge.js` 的 `listHostExtensions()`、`index.js` 的 `exportPackageAssetList()` / `exportHostAssetList()`；契约见 `.trellis/spec/frontend/asset-list-export.md` |
 | 设置分组可收起（提示 / 导出 / 日志） | `src/ui/settings-panel.js` 的 `buildSettingsHtml()`（三个 `<details>`） |
 | 图表单独最大化 + 逐层下钻（勾选逻辑不变） | `src/ui/workbench-view.js` 的 `chartCardHtml()` / `volScopedNodes()` / `volBreadcrumbHtml()`；**最大化只铺满 `#app.app-container`，不是浏览器视口全屏**（`style.css` 的 `.vol-card.is-max` 用 `position:absolute`） |
@@ -278,6 +280,19 @@
 > 分片端点：`POST /api/users/restore-backup/uploads` → `PUT …/{uploadId}/chunks/{offset}` →
 > `POST …/finalize` → `POST /api/users/restore-backup`（`{uploadId, handle, mode, selection}`）。
 
+### O. 存储审查面板（2026-11-11）
+
+| 功能 | UI 入口 | 源码落点 |
+| --- | --- | --- |
+| 浏览器 / 宿主同一面板，初始来源跟随点击行，面板内可切换 | `#quota-head` 两行 → `#storage-inspector-view` | `src/ui/workbench-view.js` 的 `renderQuota()` / `renderStorageInspector()` / `openStorageInspector()` / `siSwitchSource()` / `siRequest()` |
+| 浏览器 L0 五类与下钻（localStorage / sessionStorage / IndexedDB / Cache Storage / 配额），只读 | 面板内列表与面包屑 | `src/ui/storage-inspector-browser.js`、`src/core/storage-inspector-model.js`（纯逻辑） |
+| 宿主数据源（Luker `RestProvider`；失败回落 `POST /api/users/storage/inspect`） | 面板「宿主」页签 | `src/ui/host-bridge.js` 的 `fetchHostStorageInspect()` / `hostStorageInspectCapability()`；`index.js` 的 `actions.storageInspector` |
+| 占满内容区（隐藏数据包列与分隔条，网格改单列） | — | `syncMainView()` + `style.css` 的 `[data-si="1"]` / `.si-*` |
+
+> 契约与验收：`.trellis/spec/frontend/storage-inspector.md`；
+> 取证脚本 `scripts/ui-verify-storage-inspector.cjs`（本地专属，前置 `npm run build` + 4173）。
+> 非 Luker 宿主显示「当前宿主未提供存储审查」，不伪造数字；浏览器测不到的大小显示 `?`。
+
 ---
 
 ## 三、分层与硬性边界
@@ -287,7 +302,8 @@ src/core/     纯逻辑，**禁止 DOM / window / fetch**（可在 Node/Vitest �
               新增：asset-list.js（官方资产列表）、transfer-plan.js（分片台账）、
               webdav-client.js、transfer-target.js、host-capabilities.js、
               ext-pack.js（扩展折叠为打包单元）、git-url.js（仓库地址归一）、
-              git-accounts.js（账号库）、git-site.js（站点 API 端点/归一）
+              git-accounts.js（账号库）、git-site.js（站点 API 端点/归一）、
+              storage-inspector-model.js（存储审查的纯逻辑：尺寸/配色/点阵/归一）
 src/app/      转换/传输编排（task-runtime / conversion-runner / transfer-runner / pull-entry）
 src/ui/       可 DOM；host-bridge.js 是宿主差异的唯一落点；git-remote.js 是 Git 站点网络的唯一落点
 src/storage/  IndexedDB + 可选 Authority 适配器
@@ -381,6 +397,8 @@ npm run preview      # 本地静态服务器托管 dist，默认 4173
 | commit 安装 | 宿主 `git clone --branch` **不接受 commit SHA**；插件仍可传，失败信息原样回显并建议改用分支/标签 |
 | 私有仓库凭据 | 只能拼进交给宿主克隆的 URL；宿主可能写入扩展 `.git/config`，插件无法回收（安装前弹窗告知） |
 | 更新检查 | 只比对本地/远端 `manifest.json` 版本；任一缺失即 `unknown`，不自动更新 |
+| 宿主存储审查实机 | 面板与宿主数据源按 Luker 契约实现；**真实 Luker 实例下钻未取证**（8003 运行时可补）。能力判定与端点回落有单测；ST/TT/PT 如实显示「未提供」 |
+| 宿主存储审查删除能力 | 首版**只读**（用户 2026-11-11 裁定）；Luker 原生 inspector 支持删除，本插件不复刻 |
 
 ---
 
@@ -388,6 +406,7 @@ npm run preview      # 本地静态服务器托管 dist，默认 4173
 
 - `.trellis/spec/frontend/` —— 分层规范（目录结构 / 组件 / 状态管理 / 宿主能力 / 质量 / DOM 写入作用域 / 迁移三篇）
   - `workbench-single-view.md` §7.3 —— 局域网互传整面板替换
+  - `storage-inspector.md` —— 存储审查面板（浏览器 / 宿主同面板、provider 契约、验收脚本）
   - `host-native-pull-lifecycle.md` —— 宿主原生导出界面的打开 / 拉取 / 关闭 / 让路
 - `.trellis/spec/backend/` —— 核心层规范
 - `.trellis/workflow.md` —— 任务流
