@@ -26,3 +26,4 @@
 19. **注入频率**：会话启动强制注入一次；之后 UserPromptSubmit **每 5 条用户消息注入一次**，不逐条刷屏。
 20. **检索门禁**：本会话未完成 Web/GitHub 检索前，search-gate 拦截实现类写操作；规划目录 `.trellis/`、`docs/`、`tasks/` 与只读操作放行；紧急禁用 `TRELLIS_SEARCH_GATE=0`。
 21. **本地专属目录永不入库**（2026-11-05 用户明令）：`test/` `e2e/` `scripts/` `fixtures/` **绝对不纳入版本控制**、**绝不上传到任何云端仓库**（含 S3 包仓库）；禁止 `git add -f` 强制加入。判据：`git ls-files test e2e scripts fixtures` 恒为空。
+22. **文档与 README 同步**（2026-11-11 用户明令）：每次功能更新 / 行为变更，必须在**同一次提交内**同步更新 `docs/DEVELOPER-GUIDE.md` 与 `README.md`；判据：`git diff` 中改动的 `src/` 文件必须在两份文档里有对应条目或读法更新，只改代码不改文档视为未完成。

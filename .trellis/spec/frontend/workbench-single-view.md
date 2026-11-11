@@ -627,8 +627,12 @@ dev server 已能直接跑正式 UI，demo 只剩维护成本与误导风险。
   为 0 时回退 `window.innerWidth`），阈值 `MOBILE_MAX_WIDTH = 860`，写 `#app.dataset.view`；
   CSS 不再写第二套 `@media` 布局，只认 `[data-view="mobile"]`。
 - 容器尺寸变化必须重判：`ResizeObserver(#app)` + `requestAnimationFrame` 合帧（插件模态拉宽时 window 尺寸不变）。
-- 切页行始终在滚动容器之外，手机态必须有 3 项（存储图表 / 数据包 / 扩展管理）；桌面态数据包列常显。
-- 行序：全局动作条（`#top-actions`）在切页行（`#view-switch`）**之上**（2026-11-11 用户裁定）。
+- 切页行始终在滚动容器之外；手机态必须有 3 项（存储图表 / 数据包 / 扩展管理）；桌面态数据包列常显。
+- **2026-11-11 修订**：切换按钮不再占用页头下的独立行，改为落在**各面板自己的面板头**里
+  （`#chart-card` / `#extension-view` / `#zone-card` 三处 `[data-view-switch]` 宿主；
+  桌面只渲染 2 项、数据包宿主为空且 `hidden`；手机渲染 3 项）。桌面端页头下没有切换行。
+  手机端面板头分两行：上一行切换按钮、下一行原面板按钮（`.panel-head--switch` 在 `[data-view="mobile"]` 下换行）。
+- 行序：全局动作条（`#top-actions`）在 `.app-main` 之前（2026-11-11 用户裁定）。
 
 ### 15.4 验收
 

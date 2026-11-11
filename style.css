@@ -616,11 +616,12 @@
   #app.app-container .batch-bar button:disabled{opacity:.45;cursor:not-allowed}
   #app.app-container .zone-empty{padding:16px;text-align:center;color:var(--muted-2);font-size:11.5px}
 
-  /* 顶栏下的视图切换行：桌面 2 个（图表 / 扩展管理），手机 3 个（图表 / 数据包 / 扩展管理） */
-  #app.app-container .view-switch{flex:0 0 auto;display:flex;gap:4px;padding:6px 10px;border-bottom:1px solid var(--border);
-    background:color-mix(in srgb,var(--panel-3) 30%,transparent);overflow-x:auto}
-  #app.app-container .view-switch-btn{border:1px solid transparent;background:transparent;color:var(--muted);
-    padding:5px 12px;border-radius:7px;font-size:12px;white-space:nowrap;flex:0 0 auto}
+  /* 面板头内的视图切换：桌面 2 个（图表 / 扩展管理），手机 3 个（图表 / 数据包 / 扩展管理）。
+     桌面与面板头同排；手机切到面板头第一行，原面板按钮落到下一行。 */
+  #app.app-container .view-switch{display:flex;align-items:center;gap:4px;min-width:0;flex:0 1 auto;overflow-x:auto}
+  #app.app-container .view-switch-btn{display:inline-flex;align-items:center;gap:6px;border:1px solid transparent;
+    background:transparent;color:var(--muted);padding:4px 10px;border-radius:7px;font-size:12px;white-space:nowrap;flex:0 0 auto}
+  #app.app-container .view-switch-btn .ico{width:15px;height:15px;flex:0 0 auto;color:currentColor}
   #app.app-container .view-switch-btn.active{background:var(--accent-soft);border-color:var(--accent);color:var(--text)}
   /* 全局动作独立成行：手机允许换行，绝不再挤在页头导致按钮显示不出来 */
   #app.app-container .global-actions,
@@ -865,6 +866,11 @@
   #app.app-container[data-view="mobile"] #host-badge-text{display:inline;white-space:nowrap}
   #app.app-container[data-view="mobile"] .header-actions{gap:4px;margin-left:auto}
   #app.app-container[data-view="mobile"] .header-actions .icon-btn{flex:0 0 auto}
+  /* 手机面板头两行：第一行视图切换，第二行原面板按钮 */
+  #app.app-container[data-view="mobile"] .panel-head--switch{flex-wrap:wrap;row-gap:6px}
+  #app.app-container[data-view="mobile"] .panel-head--switch > .view-switch{order:-1;flex:1 1 100%;justify-content:flex-start}
+  #app.app-container[data-view="mobile"] .panel-head--switch > .panel-actions{flex:1 1 100%;margin-left:0}
+  #app.app-container[data-view="mobile"] .panel-head--switch > .panel-title--zone{display:none}
   #app.app-container[data-view="mobile"] .field select{max-width:150px}
   #app.app-container[data-view="mobile"] .panel-title .source-chip{max-width:150px}
 

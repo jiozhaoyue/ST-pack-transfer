@@ -26,15 +26,11 @@ export function getWorkbenchHtml() {
 
     <div class="app-body">
     <div class="global-actions" id="top-actions"></div>
-    <div class="view-switch" id="view-switch"></div>
     <main class="app-main" id="view-workbench">
       <div class="col-chart">
         <section class="panel chart-card" id="chart-card">
-          <div class="panel-head">
-            <div class="panel-title">
-              <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 5h16v14H4z"/><path d="M4 10h16M9 10v9M15 10v9"/></svg>
-              <span data-i18n="chart.title"></span>
-            </div>
+          <div class="panel-head panel-head--switch">
+            <div class="view-switch" data-view-switch></div>
             <div class="panel-actions">
               <button class="icon-btn chart-pref-btn" id="chart-pref-btn" data-i18n-title="chart.prefsBtn" data-i18n-aria="chart.prefsBtn">
                 <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h8M16 7h4M4 12h4M12 12h8M4 17h10M18 17h2"/><circle cx="14" cy="7" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="16" cy="17" r="2"/></svg>
@@ -298,11 +294,8 @@ export function getWorkbenchHtml() {
         </section>
 
         <section class="panel extension-view" id="extension-view" hidden>
-          <div class="panel-head">
-            <div class="panel-title">
-              <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M10 3h4v4a2 2 0 1 0 4 0V3h3v7h-3a2 2 0 1 1 0 4h3v7h-7v-3a2 2 0 1 0-4 0v3H3v-7h3a2 2 0 1 1 0-4H3V3h7z"/></svg>
-              <span data-i18n="extmgr.title"></span>
-            </div>
+          <div class="panel-head panel-head--switch">
+            <div class="view-switch" data-view-switch></div>
             <div class="panel-actions">
               <div class="segmented" id="extmgr-tabs">
                 <button class="seg-btn active" data-exttab="install" data-i18n="extmgr.tabInstall"></button>
@@ -321,11 +314,12 @@ export function getWorkbenchHtml() {
 
       <div class="col-side">
         <section class="panel zone-card" id="zone-card">
-          <div class="panel-head">
-            <div class="panel-title">
+          <div class="panel-head panel-head--switch">
+            <div class="panel-title panel-title--zone">
               <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 7h16v13H4z"/><path d="M8 7V4h8v3"/><path d="M4 12h16"/></svg>
               <span data-i18n="zones.title"></span>
             </div>
+            <div class="view-switch" data-view-switch data-view-switch-zone hidden></div>
             <div class="panel-actions">
               <button class="help-btn" data-help="zone" data-i18n-title="zones.help">?</button>
             </div>
