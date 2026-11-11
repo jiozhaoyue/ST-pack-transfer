@@ -1511,3 +1511,51 @@ Topics: [.trellis/spec/frontend/workbench-single-view.md](../../spec/frontend/wo
 ### Next Steps
 
 - Dev Luker 8003 起来后补开发模式自动更新与迁移教程实机取证
+
+
+## Session 80: P1 铺满与教程浮层 + 开发者页 / 恢复模式 / 待导出合并 / 设置三态（含 P2/P3 交接）
+<!-- trellis-session: v=2 fp=84ed983cf9c2dcd3 -->
+
+**Date**: 2026-11-11
+**Task**: P1 铺满与教程浮层 + 开发者页 / 恢复模式 / 待导出合并 / 设置三态（含 P2/P3 交接）
+**Branch**: `main`
+
+### Summary
+
+第七轮裁定落地 P1：桌面整窗口铺满、切换行顺序改为 存储图表/迁移与备份/扩展管理、教程跳过只关浮层（横幅可重开）、全局选择锁、凭据页改名开发者、Git 账号与宿主列表可折叠、安装区底部按钮向上展开、占位扩展改读 src/data/demo-extensions.json（GitHub st 前缀仓库）。同时收口前几轮：恢复模式归位、待导出两列删除并入导出区、迁移 ? 教程、教程不自动退出、演示数据 4 宿主 7+3 包、开发模式自动更新、设置三态与凭据双写、导出默认含凭据。P2（父子勾选/间隔可配/管理员服务端分区/误装拒绝/帮助补全）与 P3（Git 可视化只读，本地+登记云端）尚未开工。
+Topics: [.trellis/spec/frontend/workbench-single-view.md](../../spec/frontend/workbench-single-view.md), [.trellis/spec/frontend/extension-git-manager.md](../../spec/frontend/extension-git-manager.md), [.trellis/spec/frontend/i18n-and-settings.md](../../spec/frontend/i18n-and-settings.md)
+
+### Main Changes
+
+- P1：桌面 100vw×100vh 铺满、选择锁、切换行顺序交换、教程跳过不退出且可重开、开发者页签、宿主列表折叠、安装区底部向上展开
+- 占位数据改读 src/data/demo-extensions.json（GitHub st 前缀 9 仓库，含 1 个 server 占位）
+- 恢复模式归位到 #zone-tabs 右侧；#pending-exports 两列区块删除，队列条目渲染进导出区
+- 教程：迁移 ? 教程、走完不退出、图标改书本；演示数据 4 宿主 7 导入 + 3 导出
+- 开发者自动更新（silent/prompt，toastr 可取消 + 刷新提示）；设置三态与凭据双写、导出默认含凭据
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `2ee9617` | feat(ui): 恢复模式归位 + 待导出并入导出区 + 迁移教程 + 开发模式自动更新 |
+| `1ed73d9` | feat(settings): 三态关闭/取消/保存 + 凭据双写 + 导出默认含凭据 |
+| `3710a00` | docs: 同步设置三态 / 凭据双写 / 导出默认值 |
+| `826a558` | docs(trellis): 补记 Session 79 台账 |
+| `9b91f3f` | feat(ui): P1 铺满/顺序/教程重开/选择锁/开发者页/折叠与向上展开 + 占位数据读文件 |
+| `8ce80c4` | docs: 同步 P1（铺满/顺序/教程重开/选择锁/开发者页/折叠） |
+
+### Testing
+
+- [OK] 六守卫全绿（控件 90 / 节点 106）；npm run build exit 0
+- [OK] 全量 npm test 1119 passed / 2 skipped
+- [OK] 无头取证：铺满 1280×900 零边距、顺序三项、页签 宿主/开发者/打包、9 个占位扩展、跳过→横幅→重开
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- P2：父项自动更新套子项（间隔/模式）、逐扩展勾选与全选反选、间隔与模式入设置默认 6h+仅提醒
+- P2：管理员服务端插件分区 + 前后端误装拒绝 + HELP.extmgr 补全 + 更新失败可删后重装
+- P3：先出桌面/手机 Git 可视化切换草图，再做本地 .git + 登记云端只读视图（分支/提交/diff/状态）
