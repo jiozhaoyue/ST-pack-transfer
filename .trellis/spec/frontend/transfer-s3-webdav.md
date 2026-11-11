@@ -48,7 +48,7 @@
 
 ## 4. UI
 
-- 动作行只留 `#transfer-open-btn`；面板 `#transfer-view` 一级 tab：局域网 / 公网。
+- 入口是面板头切换行第 4 项 `[data-wbview="transfer"]`；面板 `#transfer-view` 一级 tab：局域网 / 公网。
 - 公网内 `#cloud-provider-tabs` 二级切换：S3 / WebDAV。
 - 备份方式 `#cloud-mode-select`：`full`（全量时间戳快照）/ `set`（增量备份集）；
   配套 `#cloud-set-name`、`#cloud-retention`。

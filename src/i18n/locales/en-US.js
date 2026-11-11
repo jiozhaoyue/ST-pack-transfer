@@ -289,6 +289,8 @@ export default {
   'extmgr.reportTitle': 'Install report',
   'extmgr.reportExpand': 'Click to expand',
   'extmgr.reportCollapse': 'Click to collapse',
+  'extmgr.installDoneTitle': 'Installed',
+  'extmgr.installDoneDesc': '{n} extensions installed; reload the page to apply.',
   'extmgr.packHint': 'This page filters extensions only: checked ones go into the output; chats, characters, lorebooks and other categories still follow the storage chart. Output keeps the target host layout.',
   'extmgr.packEmpty': 'No extensions to choose: load a package first, or this package has none',
   'extmgr.packFiles': '{files} files · {size}',

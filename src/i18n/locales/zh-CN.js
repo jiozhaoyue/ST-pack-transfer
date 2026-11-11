@@ -292,6 +292,8 @@ export default {
   'extmgr.reportTitle': '安装报告',
   'extmgr.reportExpand': '点击展开',
   'extmgr.reportCollapse': '点击收起',
+  'extmgr.installDoneTitle': '安装完成',
+  'extmgr.installDoneDesc': '成功安装 {n} 个扩展；刷新页面后生效。',
   'extmgr.packHint': '这里只过滤扩展：勾选决定哪些扩展进入产物；聊天、角色、世界书等其它类目仍按存储图表里的勾选，互不影响。产物仍按目标宿主布局生成。',
   'extmgr.packEmpty': '当前没有可选择的扩展：先载入数据包，或该包不含扩展',
   'extmgr.packFiles': '{files} 个文件 · {size}',
