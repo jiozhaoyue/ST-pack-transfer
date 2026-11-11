@@ -23,6 +23,8 @@ export const SETTINGS_DEFAULTS = Object.freeze({
   clearPackagesOnLoad: false,
   /** 上传恢复成功后是否自动刷新页面；默认关闭（用户 2026-11-11 裁定）。 */
   autoRefreshAfterUpload: false,
+  /** 退出数据包偏好时若有未保存改动先提醒；默认开启。 */
+  confirmDiscardChartPrefs: true,
   /** Git 凭据存储位置：server = 随宿主 extension_settings 落 settings.json；browser = 只存本机。 */
   gitCredentialStorage: 'server',
   /** Git 账号（结构见 src/core/git-accounts.js）。 */
@@ -46,6 +48,7 @@ export function normalizeSettings(input) {
     if (typeof input.clearLogOnLoad === 'boolean') out.clearLogOnLoad = input.clearLogOnLoad;
     if (typeof input.clearPackagesOnLoad === 'boolean') out.clearPackagesOnLoad = input.clearPackagesOnLoad;
     if (typeof input.autoRefreshAfterUpload === 'boolean') out.autoRefreshAfterUpload = input.autoRefreshAfterUpload;
+    if (typeof input.confirmDiscardChartPrefs === 'boolean') out.confirmDiscardChartPrefs = input.confirmDiscardChartPrefs;
     if (input.gitCredentialStorage === 'browser' || input.gitCredentialStorage === 'server') {
       out.gitCredentialStorage = input.gitCredentialStorage;
     }
@@ -77,7 +80,8 @@ export function buildSettingsHtml(settings = {}) {
 
   const tips = setting('set-traffic', 'trafficPrompt', t('settings.trafficPrompt'), s.trafficPrompt)
     + setting('set-native-pull-notice', 'nativePullNotice', t('settings.nativePullNotice'), s.nativePullNotice)
-    + setting('set-auto-tutorial', 'autoTutorial', t('settings.autoTutorial'), s.autoTutorial);
+    + setting('set-auto-tutorial', 'autoTutorial', t('settings.autoTutorial'), s.autoTutorial)
+    + setting('set-confirm-discard-prefs', 'confirmDiscardChartPrefs', t('settings.confirmDiscardChartPrefs'), s.confirmDiscardChartPrefs);
 
   const exportGroup = setting('set-delete-after-export', 'deleteAfterExport', t('settings.deleteAfterExport'), s.deleteAfterExport)
     + setting('set-clear-packages', 'clearPackagesOnLoad', t('settings.clearPackagesOnLoad'), s.clearPackagesOnLoad)
@@ -104,6 +108,8 @@ export function readSettings(root) {
   if (nativePullEl && typeof nativePullEl.checked === 'boolean') out.nativePullNotice = nativePullEl.checked;
   const tutorialEl = root.querySelector?.('[data-setting="autoTutorial"]');
   if (tutorialEl && typeof tutorialEl.checked === 'boolean') out.autoTutorial = tutorialEl.checked;
+  const confirmDiscardEl = root.querySelector?.('[data-setting="confirmDiscardChartPrefs"]');
+  if (confirmDiscardEl && typeof confirmDiscardEl.checked === 'boolean') out.confirmDiscardChartPrefs = confirmDiscardEl.checked;
   const deleteEl = root.querySelector?.('[data-setting="deleteAfterExport"]');
   if (deleteEl && typeof deleteEl.checked === 'boolean') out.deleteAfterExport = deleteEl.checked;
 

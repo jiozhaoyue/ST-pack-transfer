@@ -164,7 +164,8 @@
 | 功能 | 源码落点 |
 | --- | --- |
 | 结构化实时日志（等级按钮自带条数 / 毫秒时间戳 / 条数上限 / 加载时清空） | `src/ui/workbench-view.js` 的 `renderLog()` / `nowTime()` / `logLimit()`；`test` 外无独立模块 |
-| 存储配额两行（浏览器 / 宿主），点击跳宿主原生存储页对应分页 | `src/ui/workbench-view.js` 的 `renderQuota()`；`src/ui/host-bridge.js` 的 `openHostStoragePage()` / `openHostAccountWindow()` |
+| 存储配额两行（浏览器 / 宿主），点击跳宿主原生存储页对应分页 | `src/ui/workbench-view.js` 的 `renderQuota()`；`src/ui/host-bridge.js` 的 `openHostStoragePage()` / `openHostAccountWindow()`；`index.js` 的 `readBrowserQuota()`（`quota=0` 时仍返回已用量，显示「配额不限/未知」，不显示假 0） |
+| 目标任务式教程（选目标 → 逐步高亮；按平台与桌面/手机视图自适应；目标缺失时卡片居中保留） | `#btn-guide` | `src/ui/workbench-view.js` 的 `TUTORIAL_GOALS` / `renderTutorial()` / `tutorialPrepareStep()` / `centerTutorialCard()`；入口 `openTutorial()` |
 | 宿主配额读数（Luker 同源兜底） | `src/ui/host-bridge.js` 的 `readHostStorageQuota()`（`RestProvider`） |
 | 导出扩展资产列表（官方扁平 JSON，可导入「下载扩展和资源菜单」） | 每张图表卡 `[data-assetlist]`；空态 `#btn-assetlist-host` | `src/core/asset-list.js`、`src/ui/host-bridge.js` 的 `listHostExtensions()`、`index.js` 的 `exportPackageAssetList()` / `exportHostAssetList()`；契约见 `.trellis/spec/frontend/asset-list-export.md` |
 | 设置分组可收起（提示 / 导出 / 日志） | `src/ui/settings-panel.js` 的 `buildSettingsHtml()`（三个 `<details>`） |
@@ -237,7 +238,8 @@
 | 图表格式切换（单条多色 / 圆环） | 每张卡的 `[data-chartfmt-toggle]` 图标按钮 | `chartFmtOf()` / `volChartHtml()`；状态 `state.chartFmt[key]` |
 | 图表占比动态跟随勾选 | 自动 | `selectedMbMap()` / `volChartData()`；取消勾选后色块与 `tree-occ` 同步重算 |
 | 最大化逐层下钻 | 图表卡 `⤢` + 分类行 | `renderTreeRows()` 在 `drill` 态只渲染下钻按钮，面包屑 `data-volcrumb` 返回 |
-| 数据包偏好（占位勾选 + 顶部控件并入） | `#chart-pref-btn` | `src/ui/chart-prefs.js`、`openChartPrefs()` / `saveChartPrefsDraft()`；保存后只影响以后导入的包。**覆盖/增量已移出偏好**，改到数据包列表顶部 `#delta-toggle` |
+| 数据包偏好（占位勾选 + 顶部控件并入） | `#chart-pref-btn` | `src/ui/chart-prefs.js`、`openChartPrefs()` / `saveChartPrefsDraft()`；保存后只影响以后导入的包。**覆盖/增量已移出偏好**，改到数据包列表顶部 `#delta-toggle`。再次点击按钮退出；有未保存改动先弹确认（设置项 `confirmDiscardChartPrefs`，默认开） |
+| 包名模板（默认折叠；按钮带 ✎ +「包名」+ 展开箭头；展开后预览独占下一行） | `#filename-toggle` / `#filename-row` | `src/ui/workbench-view.js` 的 `renderFilenamePreview()`；`style.css` 的 `.filename-toggle` / `.filename-edit` / `.filename-preview` |
 | 每行占用条与色标 | `.tree-row > .tree-dot` / `.tree-occ` | `renderTreeRows()` 用同一套调色板 |
 | 拖拽卡片改尺寸 | **已删除**（2026-11-09 用户裁定：图表大小由宫格动态决定，不允许自由拉伸） | — |
 

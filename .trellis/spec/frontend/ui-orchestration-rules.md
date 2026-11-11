@@ -58,6 +58,7 @@
 | `HELP_TOPICS` 双向不悬空：主题 key ⇔ 模板 `data-wb-module` 一一对应 | 新增模块必须同步写帮助 | `test/help-topics.test.js` |
 | 帮助可长：分区标题 ≤ 12 字，条目可为完整句子；四酒馆规则必须与 README 同源（README 改则帮助同步改） | 渲染结果断言 | `test/workbench-session.test.js` + 评审 |
 | 引导可重放、可退出、高亮真实控件 | — | `e2e`（workbench-shell A2） |
+| 教程按目标组织（转换 / 上传宿主 / 从宿主拉取 / 扩展管理 / 迁移备份），不再分基础/高级；步骤随平台与桌面/手机视图自适应 | 逐步点击全程卡片可见；窄屏自动切到目标所在页 | `src/ui/workbench-view.js` 的 `TUTORIAL_GOALS` / `tutorialPrepareStep()`；不变量见 `i18n-and-settings.md §4.1` |
 
 ---
 

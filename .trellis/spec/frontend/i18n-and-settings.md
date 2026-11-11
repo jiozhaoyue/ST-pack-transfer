@@ -90,6 +90,17 @@
   `requestAnimationFrame` 合帧重算。
 - 单测：`test/tutorial-anchor.test.js`（普通视口 / transform / 翻转 / clamp）。
 
+### 4.1 目标任务式教程（2026-11-11）
+
+- **结构**：`TUTORIAL_GOALS`（转换 / 上传宿主 / 从宿主拉取 / 扩展管理 / 迁移备份），
+  打开先出目标菜单，选一个再逐步演示；**不再区分基础 / 高级**。
+  `when()` 按 `state.mode` 过滤：独立 Web 不显示「上传宿主 / 从宿主拉取」。
+- **不变量（硬）**：目标元素不存在或不可见时，卡片必须 `centerTutorialCard()` 居中保留；
+  **禁止** `card.style.display='none'`。旧实现因此出现「点下一步教程消失」
+  （第二步锚定 `#chart-stack .vol-card`，未载入数据包时不存在）。
+- **视图自适应**：`tutorialPrepareStep(step)` 在每步前按 `step.view`（chart / zone / extension）
+  与 `step.zone` 切换主视图、手机分页与分区 tab；电脑拖窄成手机后由 `resize` 触发重绘自动跟过去。
+
 ## 5. 宿主图表降级
 
 - 无宿主清单（ST / 独立 Web / 无 `hostTree`）时：

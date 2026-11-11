@@ -224,6 +224,8 @@ const state = {
   packages: INITIAL_PACKAGES.map(p=>({...p})),
   selectedPkgs:new Set(), mergeMode:false, privateFiles:[], expanded:{}, collapsedVol:{}, sel:{}, log:loadPersistedLog(), logLevel:'ALL',
   noTrafficPrompt:false,
+  /* 退出数据包偏好时若有未保存改动的提醒开关（设置项，默认开）。 */
+  confirmDiscardChartPrefs:true,
   volMaxKey:null, volPath:{},
   task:null, pendingExports:[],
   chartFmt:{}, chartLayout:loadChartLayout(),
@@ -231,7 +233,7 @@ const state = {
   prefMode:false, prefDraft:null, prefAppliedPkgs:new Set(),
   storage:{ browser:null, host:null, page:null },
   cloud:{ provider:'s3', config:loadCloudConfig(), webdav:loadWebdavConfig(), busy:false, status:'', list:[] },
-  sort:'time-desc', filter:'all', tutorialStep:0, tutorialOpen:false, tutorialKind:'basic',
+  sort:'time-desc', filter:'all', tutorialStep:0, tutorialOpen:false, tutorialGoal:null,
   sourceKey:'host:luker', seq:{}, libraryExport:false,
   transfer:{ open:false, tab:'lan' },
   lan:{
@@ -398,9 +400,12 @@ function detectView(){
   return hostViewportWidth() <= MOBILE_MAX_WIDTH ? 'mobile' : 'desktop';
 }
 function syncView(){
+  const prev = state.view;
   state.view = detectView();
   const app = document.getElementById('app');
   if(app) app.dataset.view = state.view;
+  /* 徽标文案随宽度切换（窄态只留宿主名）：宽度变化后必须重写，否则仍显示「XX 插件」。 */
+  if(prev !== state.view && document.getElementById('host-badge-text')) renderHeader();
 }
 /* 视图切换：桌面 = 存储图表 / 扩展管理（数据包列常显）；手机 = 存储图表 / 数据包 / 扩展管理。 */
 function renderViewSwitch(){
@@ -485,7 +490,11 @@ function renderHeader(){
   if(!isWeb){ icon.src=h.icon; icon.dataset.host=state.host; }
   const badge=document.getElementById('host-badge');
   badge.title = isWeb ? t('header.webTitle') : t('header.hostTitle', { host: h.full });
-  document.getElementById('host-badge-text').textContent = isWeb ? t('header.web') : t('header.plugin', { host: h.full });
+  /* 窄态（手机视图）去掉「插件」二字，避免徽标被压缩成图标；任何形态都必须有可读文字。 */
+  const compact = state.view === 'mobile';
+  document.getElementById('host-badge-text').textContent = isWeb
+    ? t('header.web')
+    : (compact ? t('header.hostOnly', { host: h.full }) : t('header.plugin', { host: h.full }));
   renderTargetPicker();
 }
 function renderTargetPicker(){
@@ -629,7 +638,7 @@ function renderQuota(){
     const pct=hasReading && total>0 ? Math.max(0,Math.min(100,Math.round(cell.used/total*100))) : 0;
     let val;
     if(!hasReading) val=emptyText;
-    else if(total<=0) val=gb(cell.used)+' · '+t('quota.unlimited');
+    else if(total<=0) val=gb(cell.used)+' · '+t('quota.unknownTotal');
     else val=gb(cell.used)+' / '+gb(total)+' · '+pct+'%';
     return '<button type="button" class="quota-row'+(hasReading?'':' is-disabled')+((openable||!showPageHint)?'':' is-nopage')+'"'
       +' data-quota-kind="'+kind+'" title="'+escapeHtml(openable?t('quota.openHostPage'):t('quota.noHostPage'))+'">'
@@ -1193,6 +1202,26 @@ function cancelChartPrefs(){
   state.prefMode = false; state.prefDraft = null; state.prefSnapshot = null;
   syncTopControls();
   renderAll();
+}
+/* 偏好草稿是否有改动：字段与勾选组都要比，否则「改了勾选却没弹出提醒」。 */
+function chartPrefsDirty(){
+  if(!state.prefMode) return false;
+  const snap = state.prefSnapshot || {};
+  const fields = ['target','splitMb','compression','filenameTemplate','extensionMode','gitMode','keepDev'];
+  if(fields.some((k)=>state[k] !== snap[k])) return true;
+  const draft = state.prefDraft || normalizeChartPrefs(chartPrefs);
+  const base = normalizeChartPrefs(chartPrefs);
+  const norm = (x)=>[...(x.checkedGroups || [])].sort().join('|');
+  return norm(draft) !== norm(base);
+}
+/* 二次点击偏好按钮：无改动直接退出；有改动先问「是否放弃」（可被设置项关闭）。 */
+function toggleChartPrefs(){
+  if(!state.prefMode){ openChartPrefs(); return; }
+  if(!chartPrefsDirty() || state.confirmDiscardChartPrefs === false){ cancelChartPrefs(); return; }
+  openModal(t('chart.prefsDiscardTitle'), t('chart.prefsDiscardDesc'), [], [
+    { label:t('chart.prefsDiscardStay'), onClick:()=>{ closeModal(); } },
+    { label:t('chart.prefsDiscardConfirm'), danger:true, onClick:()=>{ closeModal(); cancelChartPrefs(); } },
+  ]);
 }
 function saveChartPrefsDraft(){
   const checked = [...document.querySelectorAll('[data-prefgroup]:checked')].map((el)=>el.dataset.prefgroup);
@@ -2809,26 +2838,105 @@ function openHelp(key){
   showPane('help');
 }
 
-/* ── 教程 ── */
-const TUTORIAL_BASIC=[
-  { sel:'#target-select', title:'tutorial.basic.0.title', desc:'tutorial.basic.0.desc' },
-  { sel:'#chart-stack .vol-card', title:'tutorial.basic.1.title', desc:'tutorial.basic.1.desc' },
-  { sel:'#chart-stack .chart-tree', title:'tutorial.basic.2.title', desc:'tutorial.basic.2.desc' },
-  { sel:'#delta-toggle', title:'tutorial.basic.3.title', desc:'tutorial.basic.3.desc' },
-  { sel:'#split-input', title:'tutorial.basic.4.title', desc:'tutorial.basic.4.desc' },
-  { sel:'#zone-actions-bottom', title:'tutorial.basic.5.title', desc:'tutorial.basic.5.desc' },
-  { sel:'#zone-card', title:'tutorial.basic.6.title', desc:'tutorial.basic.6.desc' }
+/* ── 教程（目标任务式） ──
+   打开先选目标，再逐步高亮演示；不再区分「基础 / 高级」。
+   步骤按平台（宿主 / Web）与当前视图（桌面 / 手机）动态适配：
+   · 目标落在隐藏列时，先把视图切到对应页（电脑突然变窄也能自动跟过去）；
+   · 目标在结构上不存在（例如还没载入数据包）时，卡片居中保留并如实说明，绝不整张消失。 */
+const TUTORIAL_GOALS=[
+  {
+    id:'convert', label:'tutorial.goal.convert', note:'tutorial.goal.convertNote',
+    steps:[
+      { sel:'#target-select', view:'chart', title:'tutorial.convert.target', desc:'tutorial.convert.targetDesc' },
+      { sel:'#chart-stack', view:'chart', title:'tutorial.convert.chart', desc:'tutorial.convert.chartDesc' },
+      { sel:'#delta-toggle', view:'zone', title:'tutorial.convert.delta', desc:'tutorial.convert.deltaDesc' },
+      { sel:'#split-input', view:'chart', title:'tutorial.convert.split', desc:'tutorial.convert.splitDesc' },
+      { sel:'#zone-actions-bottom', view:'zone', zone:'import', title:'tutorial.convert.generate', desc:'tutorial.convert.generateDesc' },
+      { sel:'#zone-body', view:'zone', zone:'export', title:'tutorial.convert.export', desc:'tutorial.convert.exportDesc' }
+    ]
+  },
+  {
+    id:'restore', label:'tutorial.goal.restore', note:'tutorial.goal.restoreNote',
+    when:()=>state.mode!=='web',
+    steps:[
+      { sel:'#dropzone', view:'zone', zone:'import', title:'tutorial.restore.pick', desc:'tutorial.restore.pickDesc' },
+      { sel:'#chart-stack', view:'chart', title:'tutorial.restore.check', desc:'tutorial.restore.checkDesc' },
+      { sel:'#zone-actions-bottom', view:'zone', zone:'import', title:'tutorial.restore.generate', desc:'tutorial.restore.generateDesc' },
+      { sel:'#zone-tabs', view:'zone', zone:'export', title:'tutorial.restore.switch', desc:'tutorial.restore.switchDesc' },
+      { sel:'#zone-actions-bottom', view:'zone', zone:'export', title:'tutorial.restore.upload', desc:'tutorial.restore.uploadDesc' }
+    ]
+  },
+  {
+    id:'pull', label:'tutorial.goal.pull', note:'tutorial.goal.pullNote',
+    when:()=>state.mode!=='web',
+    steps:[
+      { sel:'#btn-fetch', view:'chart', title:'tutorial.pull.entry', desc:'tutorial.pull.entryDesc' },
+      { sel:'#chart-stack', view:'chart', title:'tutorial.pull.result', desc:'tutorial.pull.resultDesc' },
+      { sel:'#zone-card', view:'zone', title:'tutorial.pull.pack', desc:'tutorial.pull.packDesc' }
+    ]
+  },
+  {
+    id:'extensions', label:'tutorial.goal.extensions', note:'tutorial.goal.extensionsNote',
+    steps:[
+      { sel:'#view-switch', view:'chart', title:'tutorial.ext.entry', desc:'tutorial.ext.entryDesc' },
+      { sel:'#extmgr-tabs', view:'extension', title:'tutorial.ext.tabs', desc:'tutorial.ext.tabsDesc' },
+      { sel:'#extension-body', view:'extension', title:'tutorial.ext.install', desc:'tutorial.ext.installDesc' }
+    ]
+  },
+  {
+    id:'transfer', label:'tutorial.goal.transfer', note:'tutorial.goal.transferNote',
+    steps:[
+      { sel:'#transfer-open-btn', view:'chart', title:'tutorial.transfer.entry', desc:'tutorial.transfer.entryDesc' },
+      { sel:'#transfer-tabs', view:'chart', title:'tutorial.transfer.tabs', desc:'tutorial.transfer.tabsDesc' }
+    ]
+  }
 ];
-const TUTORIAL_ADV=[
-  { sel:'#dropzone', title:'tutorial.adv.0.title', desc:'tutorial.adv.0.desc' },
-  { sel:'#chart-stack', title:'tutorial.adv.1.title', desc:'tutorial.adv.1.desc' },
-  { sel:'#target-select', title:'tutorial.adv.2.title', desc:'tutorial.adv.2.desc' },
-  { sel:'#split-input', title:'tutorial.adv.3.title', desc:'tutorial.adv.3.desc' },
-  { sel:'#zone-actions-bottom', title:'tutorial.adv.4.title', desc:'tutorial.adv.4.desc' }
-];
-function tutorialSet(){ return state.tutorialKind==='adv' ? TUTORIAL_ADV : TUTORIAL_BASIC; }
+function currentTutorialGoal(){ return TUTORIAL_GOALS.find((g)=>g.id===state.tutorialGoal) || null; }
+function tutorialSteps(){ const g=currentTutorialGoal(); return g ? g.steps : []; }
+function tutorialGuessView(sel){
+  if(/#(extension|extmgr)/.test(sel)) return 'extension';
+  if(/#(zone|delta|dropzone|btn-generate|btn-upload|btn-download|btn-copyback|btn-delete|pending)/.test(sel)) return 'zone';
+  return 'chart';
+}
+/* 让当前步骤的目标可见：切换主视图 / 数据包分区；已是目标状态时什么都不做（防抖动）。 */
+function tutorialPrepareStep(step){
+  if(!step) return;
+  const view = step.view || tutorialGuessView(step.sel);
+  let changed = false;
+  if(state.transfer.open){ state.transfer.open=false; changed=true; }
+  if(view==='extension'){
+    if(state.mainView!=='extension' || state.mobileView!=='extension'){
+      state.mainView='extension'; state.mobileView='extension'; changed=true;
+    }
+  }else if(view==='zone'){
+    if(state.mobileView!=='zone'){ state.mobileView='zone'; changed=true; }
+    if(state.mainView==='extension'){ state.mainView='chart'; changed=true; }
+  }else if(state.mainView!=='chart' || state.mobileView!=='chart'){
+    state.mainView='chart'; state.mobileView='chart'; changed=true;
+  }
+  if(step.zone && state.zone!==step.zone){
+    state.zone=step.zone;
+    state.selectedPkgs=new Set();
+    state.source={type:'host',pkgId:null}; state.sourceKey='host:'+state.host;
+    changed=true;
+  }
+  if(!changed) return;
+  syncMainView();
+  if(view==='extension') renderExtensionView();
+  if(step.zone || view==='zone'){ renderZones(); renderActions(); }
+}
+function centerTutorialCard(card, overlay){
+  if(!card || !overlay) return;
+  const ow=overlay.clientWidth||window.innerWidth||330;
+  const oh=overlay.clientHeight||window.innerHeight||480;
+  const w=Math.min(330, Math.max(220, ow-24));
+  card.style.display='';
+  card.style.width=w+'px';
+  card.style.left=Math.max(12, Math.round((ow-w)/2))+'px';
+  card.style.top=Math.max(12, Math.round((oh-220)/2))+'px';
+}
 function openTutorial(){
-  state.tutorialOpen=true; state.tutorialStep=0; state.tutorialKind='basic';
+  state.tutorialOpen=true; state.tutorialStep=0; state.tutorialGoal=null;
   const overlay=document.getElementById('tutorial-overlay');
   if(!overlay) return;
   /* 首帧禁用位置过渡：蒙层必须立即铺满，不能从上一坐标飞过来（2026-11-09 用户反馈）。 */
@@ -2838,33 +2946,90 @@ function openTutorial(){
   if(typeof requestAnimationFrame==='function') requestAnimationFrame(()=>requestAnimationFrame(settle));
   else settle();
 }
-function closeTutorial(){ state.tutorialOpen=false; document.getElementById('tutorial-overlay').classList.remove('open'); }
+function closeTutorial(){
+  state.tutorialOpen=false; state.tutorialGoal=null; state.tutorialStep=0;
+  document.getElementById('tutorial-overlay').classList.remove('open');
+}
 function renderTutorial(){
-  const set=tutorialSet();
-  const step=set[state.tutorialStep];
-  document.getElementById('tutorial-title').textContent=t(step.title);
-  document.getElementById('tutorial-desc').textContent=t(step.desc);
-  const dots=document.getElementById('tutorial-dots'); dots.innerHTML=set.map((_,i)=>'<i class="'+(i===state.tutorialStep?'on':'')+'"></i>').join('');
-  document.getElementById('tutorial-prev').disabled=state.tutorialStep===0;
-  document.getElementById('tutorial-next').textContent=state.tutorialStep===set.length-1?t('tutorial.done'):t('tutorial.next');
-  document.getElementById('tutorial-adv').textContent=state.tutorialKind==='adv'?t('tutorial.basic'):t('tutorial.adv');
-  const el=document.querySelector(step.sel);
+  const overlay=document.getElementById('tutorial-overlay');
+  if(!overlay) return;
+  const title=document.getElementById('tutorial-title');
+  const desc=document.getElementById('tutorial-desc');
+  const goals=document.getElementById('tutorial-goals');
+  const dots=document.getElementById('tutorial-dots');
+  const prev=document.getElementById('tutorial-prev');
+  const next=document.getElementById('tutorial-next');
+  const adv=document.getElementById('tutorial-adv');
   const ring=document.getElementById('tutorial-ring');
   const card=document.getElementById('tutorial-card');
-  const overlay=document.getElementById('tutorial-overlay');
-  /* 目标不存在时隐藏高亮环：保留上一帧的位置比不显示更糟（R6.4 锚定失败）。 */
-  if(!el){ ring.style.display='none'; card.style.display='none'; return; }
-  ring.style.display=''; card.style.display='';
-  if(overlay){
-    const anchor=tutorialAnchor(el.getBoundingClientRect(), overlay.getBoundingClientRect());
-    ring.style.left=anchor.ring.left+'px';
-    ring.style.top=anchor.ring.top+'px';
-    ring.style.width=anchor.ring.width+'px';
-    ring.style.height=anchor.ring.height+'px';
-    card.style.left=anchor.card.left+'px';
-    card.style.top=anchor.card.top+'px';
-    card.style.width=anchor.card.width+'px';
+  const goal=currentTutorialGoal();
+
+  /* 首页：选目标（按平台过滤；Web 形态没有宿主，不显示宿主相关目标）。 */
+  if(!goal){
+    title.textContent=t('tutorial.goalTitle');
+    desc.textContent=t('tutorial.goalHint');
+    if(goals){
+      goals.hidden=false;
+      goals.innerHTML=TUTORIAL_GOALS.filter((g)=>!g.when || g.when()).map((g)=>
+        '<button type="button" class="tut-goal" data-tutgoal="'+g.id+'">'
+        +'<span class="tg-name">'+t(g.label)+'</span>'
+        +'<span class="tg-note">'+t(g.note)+'</span></button>'
+      ).join('');
+    }
+    if(dots) dots.innerHTML='';
+    if(prev) prev.hidden=true;
+    if(next) next.hidden=true;
+    if(adv) adv.hidden=true;
+    ring.style.display='none';
+    centerTutorialCard(card, overlay);
+    return;
   }
+
+  const steps=tutorialSteps();
+  if(!steps.length) return;
+  if(state.tutorialStep>=steps.length) state.tutorialStep=steps.length-1;
+  const step=steps[state.tutorialStep];
+  if(goals){ goals.hidden=true; goals.innerHTML=''; }
+  if(prev){ prev.hidden=false; prev.disabled=state.tutorialStep===0; }
+  if(next){ next.hidden=false; next.textContent=state.tutorialStep>=steps.length-1?t('tutorial.done'):t('tutorial.next'); }
+  if(adv){ adv.hidden=false; adv.textContent=t('tutorial.changeGoal'); }
+  title.textContent=t(step.title);
+  desc.textContent=t(step.desc);
+  if(dots) dots.innerHTML=steps.map((_,i)=>'<i class="'+(i===state.tutorialStep?'on':'')+'"></i>').join('');
+
+  tutorialPrepareStep(step);
+
+  const el=document.querySelector(step.sel);
+  const rect=el?el.getBoundingClientRect():null;
+  const visible=!!rect && rect.width>0 && rect.height>0;
+  if(!visible){
+    /* 结构性缺失（如还没载入数据包）时卡片保持居中可见——教程绝不因找不到锚点而消失。 */
+    ring.style.display='none';
+    centerTutorialCard(card, overlay);
+    return;
+  }
+  ring.style.display='';
+  card.style.display='';
+  const anchor=tutorialAnchor(rect, overlay.getBoundingClientRect());
+  ring.style.left=anchor.ring.left+'px';
+  ring.style.top=anchor.ring.top+'px';
+  ring.style.width=anchor.ring.width+'px';
+  ring.style.height=anchor.ring.height+'px';
+  card.style.left=anchor.card.left+'px';
+  card.style.top=anchor.card.top+'px';
+  card.style.width=anchor.card.width+'px';
+  ensureTutorialVisible(el);
+}
+/* 目标在滚动容器外时滚进来；只在完全不可见时执行，避免滚动回调互相触发。 */
+function ensureTutorialVisible(el){
+  try{
+    const main=document.querySelector('.app-main');
+    const r=el.getBoundingClientRect();
+    const h=main?main.getBoundingClientRect():{top:0,bottom:(window.innerHeight||0)};
+    if(r.top < h.top+8 || r.bottom > h.bottom-8){
+      el.scrollIntoView({ block:'center', inline:'nearest' });
+    }
+  }catch{ /* 无布局环境静默 */ }
 }
 
 /* ── 全名查看（面板内提示，不使用固定定位浮层） ── */
@@ -2935,7 +3100,7 @@ function bind(){
     if(!row) return;
     const open=row.hidden;
     row.hidden=!open;
-    if(btn) btn.setAttribute('aria-expanded',open?'true':'false');
+    if(btn){ btn.setAttribute('aria-expanded',open?'true':'false'); btn.classList.toggle('is-open',open); }
   });
   if(typeof window!=='undefined'){
     window.addEventListener('resize',()=>{ syncView(); syncMainView(); });
@@ -3111,7 +3276,7 @@ function bind(){
     filenameInput.addEventListener('input',()=>{ state.filenameTemplate=filenameInput.value; renderFilenamePreview(); });
   }
 
-  document.getElementById('chart-pref-btn')?.addEventListener('click', openChartPrefs);
+  document.getElementById('chart-pref-btn')?.addEventListener('click', toggleChartPrefs);
 
   const stackEl=document.getElementById('chart-stack');
   const scopeFromEl=el=>{ const h=el.closest('[data-scope]'); return h?h.dataset.scope:null; };
@@ -3374,15 +3539,20 @@ function bind(){
   });
 
   document.getElementById('tutorial-skip').addEventListener('click',closeTutorial);
+  document.getElementById('tutorial-goals')?.addEventListener('click',(e)=>{
+    const b=e.target.closest('[data-tutgoal]'); if(!b) return;
+    const g=TUTORIAL_GOALS.find((x)=>x.id===b.dataset.tutgoal);
+    if(!g) return;
+    state.tutorialGoal=g.id; state.tutorialStep=0; renderTutorial();
+  });
   document.getElementById('tutorial-prev').addEventListener('click',()=>{ if(state.tutorialStep>0){ state.tutorialStep--; renderTutorial(); } });
   document.getElementById('tutorial-next').addEventListener('click',()=>{
-    const set=tutorialSet();
-    if(state.tutorialStep>=set.length-1){ closeTutorial(); toast(t('toast.tutorialDone')); }
+    const steps=tutorialSteps();
+    if(state.tutorialStep>=steps.length-1){ closeTutorial(); toast(t('toast.tutorialDone')); }
     else{ state.tutorialStep++; renderTutorial(); }
   });
   document.getElementById('tutorial-adv').addEventListener('click',()=>{
-    state.tutorialKind = state.tutorialKind==='adv' ? 'basic' : 'adv';
-    state.tutorialStep=0; renderTutorial();
+    state.tutorialGoal=null; state.tutorialStep=0; renderTutorial();
   });
   document.addEventListener('keydown',(e)=>{ if(e.key!=='Escape') return;
     if(confirmDialogEl()?.open) return; // 原生 dialog 自行处理 Esc
@@ -3801,6 +3971,7 @@ initChartSplitters();
     getState() { return state; },
     applySettings(s) {
       if(!s) return;
+      state.confirmDiscardChartPrefs = s.confirmDiscardChartPrefs !== false;
       renderChart();
     },
     openTutorial,

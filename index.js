@@ -1607,11 +1607,22 @@ async function main(root) {
   } catch { /* 隐私模式 */ }
 }
 
-/** 浏览器真实配额（字节）。不可用时返回 null，界面显示「未提供读数」。 */
+/**
+ * 浏览器真实配额（字节）。
+ * API 不可用返回 null（界面显示「未提供读数」）；quota 为 0 时**仍返回已用量**，
+ * 由界面显示「已用 X · 配额不限/未知」——不允许把「读不到总量」渲染成假 0 总量。
+ */
 async function readBrowserQuota() {
   try {
+    if (typeof navigator === 'undefined' || !navigator.storage?.estimate) return null;
     const { usage, quota } = await navigator.storage.estimate();
-    return quota > 0 ? { used: usage || 0, total: quota } : null;
+    const used = Number(usage);
+    const total = Number(quota);
+    if (!Number.isFinite(used) && !Number.isFinite(total)) return null;
+    return {
+      used: Number.isFinite(used) ? used : 0,
+      total: Number.isFinite(total) && total > 0 ? total : 0,
+    };
   } catch {
     return null;
   }
