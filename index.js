@@ -29,7 +29,8 @@ import {
   uploadUserFile, userFilesSupported, sanitizeUserFileName, verifyUserFiles, deleteUserFile,
   readHostStorageQuota,
   fetchHostStorageInspect, hostStorageInspectCapability, listHostExtensions,
-  installExtensionBatch,
+  installExtensionBatch, deleteExtensionViaHost,
+  readHostIdentity, listServerPlugins, readHostExtensionGit,
   opfsTmpHandle, opfsHandleToFile, opfsTmpCleanup,
 } from './src/ui/host-bridge.js';
 import { packPrivateContainer } from './src/core/private-container.js';
@@ -1423,7 +1424,8 @@ async function main(root) {
   function openSettings() {
     view.openSettingsView(buildSettingsHtml(settings), {
       onSave: (body) => {
-        Object.assign(settings, readSettings(body));
+        /* base 传入当前设置：只覆盖对话框里存在的控件，Git 账号 / 安装登记等原样保留。 */
+        Object.assign(settings, readSettings(body, settings));
         saveSettings(settings);
         view.applySettings?.(settings);
         view.backToWorkbench();
@@ -1505,6 +1507,10 @@ async function main(root) {
         onLog: (line) => view.extLogAppend(line),
       }),
       listHostExtensions: () => listHostExtensions(host.platform),
+      hostIdentity: () => readHostIdentity(),
+      listServerPlugins: () => listServerPlugins(),
+      hostExtensionGit: (name, opts) => readHostExtensionGit(name, opts),
+      deleteExtension: (name, isGlobal) => deleteExtensionViaHost(name, isGlobal),
       backupSelectedToCloud,
       importCloudPack,
       lan: lanActions,

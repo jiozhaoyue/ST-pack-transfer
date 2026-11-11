@@ -759,6 +759,126 @@ export async function listHostExtensions(platform) {
   };
 }
 
+/** POST JSON（带 CSRF 与有界超时）；失败返回 `{ok:false}`，不抛。 */
+async function postJsonBounded(url, body, label) {
+  try {
+    const token = await getCsrfToken().catch(() => null);
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers['X-CSRF-Token'] = token;
+    const response = await fetchWithTimeout(url, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers,
+      body: JSON.stringify(body && typeof body === 'object' ? body : {}),
+    }, { timeoutMs: 10_000, label });
+    if (!response.ok) return { ok: false, status: response.status };
+    const text = await response.text().catch(() => '');
+    if (!text) return { ok: true, data: null };
+    try {
+      return { ok: true, data: JSON.parse(text) };
+    } catch {
+      return { ok: false, status: response.status, reason: 'invalid-json' };
+    }
+  } catch (err) {
+    return { ok: false, status: 0, reason: String(err?.message || err) };
+  }
+}
+
+/**
+ * 当前登录用户身份（管理员识别的**唯一**判据是宿主返回的 `admin` 布尔）。
+ *
+ * `GET /api/users/me` 的响应里 `admin` 是宿主事实；插件不按用户昵称或平台猜管理员。
+ * 非插件宿主 / 未登录 / 读不到 ⇒ `ok:false`，调用方不显示管理员专属分区。
+ *
+ * @returns {Promise<{ok:boolean, handle?:string, name?:string, admin?:boolean, status?:number, reason?:string}>}
+ */
+export async function readHostIdentity() {
+  if (typeof fetch !== 'function') return { ok: false, reason: 'no-fetch' };
+  const res = await getJsonBounded('/api/users/me', '读取当前用户身份');
+  if (!res.ok || !res.data || typeof res.data !== 'object') {
+    return {
+      ok: false,
+      status: res.status || 0,
+      reason: res.reason || (res.status ? `http-${res.status}` : 'unavailable'),
+    };
+  }
+  return {
+    ok: true,
+    handle: String(res.data.handle || ''),
+    name: String(res.data.name || ''),
+    /* 只认布尔 true；字符串 "false"/缺省一律按非管理员处理。 */
+    admin: res.data.admin === true,
+  };
+}
+
+/**
+ * 管理员专属：列出宿主 `plugins/` 里的服务端插件（只读）。
+ *
+ * 端点事实：`POST /api/users/plugins/list`（users-admin 路由，`requireAdminMiddleware`），
+ * 返回 `{ ok, enabled, pluginsPath, plugins: [{ directory, packageName, version, description, remoteUrl, dependencyStatus }] }`。
+ * 非管理员会被宿主拒绝 ⇒ 调用方**不显示分区**，不得伪造空列表。
+ *
+ * @returns {Promise<{ok:boolean, enabled?:boolean, pluginsPath?:string, plugins?:Array<object>, status?:number, reason?:string}>}
+ */
+export async function listServerPlugins() {
+  if (typeof fetch !== 'function') return { ok: false, reason: 'no-fetch' };
+  const res = await postJsonBounded('/api/users/plugins/list', {}, '读取服务端插件');
+  if (!res.ok) return { ok: false, status: res.status || 0, reason: res.reason || `http-${res.status || 0}` };
+  const data = res.data;
+  if (!data || typeof data !== 'object' || !Array.isArray(data.plugins)) {
+    return { ok: false, status: 200, reason: 'shape-unrecognized' };
+  }
+  return {
+    ok: true,
+    enabled: data.enabled === true,
+    pluginsPath: String(data.pluginsPath || ''),
+    plugins: data.plugins.map((plugin) => ({
+      directory: String(plugin?.directory || ''),
+      packageName: String(plugin?.packageName || ''),
+      version: String(plugin?.version || ''),
+      description: String(plugin?.description || ''),
+      remoteUrl: String(plugin?.remoteUrl || ''),
+      dependencyStatus: plugin?.dependencyStatus && typeof plugin.dependencyStatus === 'object'
+        ? plugin.dependencyStatus : null,
+    })).filter((plugin) => plugin.directory),
+  };
+}
+
+/**
+ * 读取宿主已装扩展的本地 Git 状态（只读）：分支 / HEAD / 是否最新 / origin，以及分支列表。
+ *
+ * - `POST /api/extensions/version` → `{ currentBranchName, currentCommitHash, isUpToDate, remoteUrl, remoteCommitHash }`；
+ * - `POST /api/extensions/branches` → `[{ name, commit, current, label }]`。
+ *
+ * 宿主对「不是 Git 仓库 / HEAD 为空」不会报错，而是回空字符串 —— 这正是「历史已丢失」的事实，
+ * 调用方必须如实展示，不得伪造提交。工作区状态（未提交改动）宿主**没有**只读端点，
+ * 因此固定返回 `workingTree.supported=false`。
+ *
+ * @param {string} name 扩展目录名
+ * @param {{global?:boolean}} [options]
+ */
+export async function readHostExtensionGit(name, { global = false } = {}) {
+  const extensionName = String(name || '').trim();
+  if (!extensionName) return { ok: false, reason: 'bad-name' };
+  if (typeof fetch !== 'function') return { ok: false, reason: 'no-fetch' };
+  const body = { extensionName, global: !!global };
+  const [version, branches] = await Promise.all([
+    postJsonBounded('/api/extensions/version', body, '读取扩展 Git 版本'),
+    postJsonBounded('/api/extensions/branches', body, '读取扩展分支'),
+  ]);
+  const versionData = version.ok && version.data && typeof version.data === 'object' ? version.data : null;
+  const historyLost = !versionData || !String(versionData.currentCommitHash || '').trim();
+  return {
+    ok: !!versionData || branches.ok,
+    historyLost,
+    version: versionData,
+    versionReason: version.ok ? '' : (version.reason || `http-${version.status || 0}`),
+    branches: branches.ok && Array.isArray(branches.data) ? branches.data : [],
+    branchesReason: branches.ok ? '' : (branches.reason || `http-${branches.status || 0}`),
+    workingTree: { supported: false, reason: 'host-endpoint-absent' },
+  };
+}
+
 /**
  * 判定宿主 Storage Inspector 模块命名空间是否可用（纯函数，便于单测）。
  *

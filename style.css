@@ -644,6 +644,93 @@
   #app.app-container .ext-report-bar[aria-expanded="true"]{border-top-color:var(--accent)}
   #app.app-container .ext-data-row{flex-wrap:wrap}
   #app.app-container .ext-install{display:flex;flex-direction:column;gap:8px;min-height:0}
+  /* 安装扩展 = 面板固定页脚：紧贴安装报告条，展开区在按钮上方并自带上限滚动 */
+  #app.app-container .ext-footer{flex:0 0 auto;display:flex;flex-direction:column;gap:6px;padding:6px 9px;
+    border-top:1px solid var(--border);background:color-mix(in srgb,var(--panel-3) 70%,transparent)}
+  #app.app-container .ext-footer .ext-install-area{max-height:46vh;overflow:auto}
+  #app.app-container .ext-footer .ext-install-area[hidden]{display:none}
+  #app.app-container .ext-footer > .btn{width:100%}
+  #app.app-container .ext-install-toggle{display:flex;align-items:center;justify-content:center;gap:7px}
+  #app.app-container .ext-install-toggle .ext-install-ico{flex:0 0 auto;color:var(--accent)}
+  #app.app-container .ext-install-toggle .ext-chev{flex:0 0 auto;transition:transform .16s ease;transform:rotate(180deg)}
+  #app.app-container .ext-install-toggle.is-open .ext-chev{transform:rotate(0deg)}
+  /* 宿主页顶部工具条：与存储图表的横线控件同一形态（一行按钮 + 右侧排序） */
+  #app.app-container .ext-toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:6px 10px;
+    border-bottom:1px solid var(--border)}
+  #app.app-container .ext-toolbar .field{flex:0 0 auto}
+  #app.app-container .ext-spacer{flex:1 1 auto}
+  /* 折叠头统一形态：标题 + 数量徽标 + 可点击箭头 + 展开提示 */
+  #app.app-container .ext-summary{display:flex;align-items:center;gap:7px;cursor:pointer;list-style:none;font-size:11.5px;
+    color:var(--text);font-weight:600;padding:6px 8px}
+  #app.app-container .ext-summary::-webkit-details-marker{display:none}
+  #app.app-container .ext-summary-label{display:inline-flex;align-items:center;gap:6px;min-width:0}
+  #app.app-container .ext-summary .ext-chev{flex:0 0 auto;color:var(--muted);transition:transform .16s ease}
+  #app.app-container details[open] > .ext-summary .ext-chev{transform:rotate(180deg)}
+  #app.app-container .ext-summary-hint{margin-left:auto;font-size:10.5px;font-weight:400;color:var(--muted-2)}
+  #app.app-container details[open] > .ext-summary .ext-summary-hint{display:none}
+  #app.app-container .ext-count{display:inline-block;min-width:16px;padding:0 5px;border-radius:99px;font-size:10px;
+    line-height:16px;text-align:center;color:var(--muted);background:var(--panel-3);border:1px solid var(--border)}
+  #app.app-container .ext-host-list{flex:0 0 auto;border:1px solid var(--border);border-radius:8px;
+    background:color-mix(in srgb,var(--panel-3) 45%,transparent)}
+  #app.app-container .ext-host-list .ext-list{padding:0 8px 8px}
+  #app.app-container .ext-list-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:0 8px 6px;
+    font-size:10.5px;color:var(--muted)}
+  #app.app-container .ext-list-hint{color:var(--muted-2)}
+  #app.app-container .ext-dev-actions{display:inline-flex;align-items:center;gap:5px;flex-wrap:wrap}
+  #app.app-container .ext-dev-actions .btn{padding:2px 7px;font-size:10.5px}
+  #app.app-container .ext-drag{flex:0 0 auto;display:inline-flex;align-items:center;color:var(--muted-2);cursor:grab}
+  #app.app-container .ext-drag:active{cursor:grabbing}
+  #app.app-container .ext-entry.is-dragging{opacity:.55;border-style:dashed}
+  #app.app-container .ext-entry[data-extrow]:hover{border-color:var(--border-strong)}
+  /* 开发者页：父项「自动更新」+ 子项（间隔 / 模式），子项随父项禁用 */
+  #app.app-container .ext-dev-block{display:flex;flex-direction:column;gap:6px;padding:6px 8px;border:1px solid var(--border);
+    border-radius:8px;background:color-mix(in srgb,var(--panel-3) 55%,transparent)}
+  #app.app-container .ext-dev-sub{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding-left:18px}
+  #app.app-container .ext-dev-sub .text_pole{width:78px}
+  #app.app-container .ext-dev-sub select.text_pole{width:auto;min-width:96px}
+  #app.app-container .ext-dev-check{flex:0 0 auto;width:16px;display:inline-flex;align-items:center;justify-content:center}
+  #app.app-container .ext-dev-check input{margin:0}
+  #app.app-container .ext-dev-bar{justify-content:flex-start}
+  #app.app-container .ext-server-block{flex:0 0 auto;border:1px solid var(--border);border-radius:8px;
+    background:color-mix(in srgb,var(--panel-3) 45%,transparent)}
+  #app.app-container .ext-server-block > summary{cursor:pointer;padding:6px 8px;font-size:11.5px;color:var(--text);font-weight:600}
+  #app.app-container .ext-server-block .ext-note{margin:0 8px 6px}
+  #app.app-container .ext-server-block .ext-list{padding:0 8px 8px}
+  #app.app-container .ext-server-row{border-left:2px solid var(--accent)}
+  #app.app-container .ext-server-note{margin:0}
+  /* 数据包列：数据包 / Git 页签互换（仅开发者模式） */
+  #app.app-container .zone-side-tabs{flex:0 0 auto}
+  #app.app-container .zone-side-panel{flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
+  #app.app-container .zone-side-panel[hidden]{display:none}
+  #app.app-container .git-viz-body{flex:1 1 auto;min-height:0;overflow:auto;padding:8px;display:flex;flex-direction:column;gap:8px}
+  #app.app-container .git-viz-list{display:flex;flex-direction:column;gap:4px;flex:0 0 auto}
+  #app.app-container .git-viz-row{display:flex;align-items:center;gap:6px;width:100%;text-align:left;cursor:pointer;
+    padding:5px 7px;border:1px solid var(--border);border-radius:7px;background:transparent;color:var(--text);font-size:11.5px}
+  #app.app-container .git-viz-row.active{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,transparent)}
+  #app.app-container .git-viz-name{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  #app.app-container .git-viz-tag{flex:0 0 auto;color:var(--muted-2);font-size:10.5px}
+  #app.app-container .git-viz-detail{display:flex;flex-direction:column;gap:6px;flex:0 0 auto}
+  #app.app-container .git-viz-head{display:flex;align-items:center;gap:8px}
+  #app.app-container .git-viz-title{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  #app.app-container .git-viz-meta{display:flex;flex-direction:column;gap:2px;font-size:11px;color:var(--muted)}
+  #app.app-container .git-viz-sec{display:flex;flex-direction:column;gap:4px}
+  #app.app-container .git-viz-sec > h5{margin:0;font-size:11px;color:var(--muted-2);font-weight:600}
+  #app.app-container .git-viz-branch{justify-content:flex-start}
+  #app.app-container .git-viz-branch.is-current{border-left:2px solid var(--accent)}
+  #app.app-container .git-viz-tags{display:flex;gap:5px;flex-wrap:wrap}
+  #app.app-container .git-viz-tagitem{font-size:10.5px;padding:2px 6px;border:1px solid var(--border);border-radius:99px;color:var(--muted)}
+  #app.app-container .git-viz-commit{display:flex;align-items:center;gap:6px;width:100%;text-align:left;cursor:pointer;
+    padding:4px 6px;border:1px solid transparent;border-radius:6px;background:transparent;color:var(--text);font-size:11px}
+  #app.app-container .git-viz-commit:hover{border-color:var(--border)}
+  #app.app-container .git-viz-sha{flex:0 0 auto;font-family:Consolas,monospace;color:var(--accent)}
+  #app.app-container .git-viz-msg{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  #app.app-container .git-viz-date{flex:0 0 auto;color:var(--muted-2);font-size:10.5px}
+  #app.app-container .git-viz-file{border:1px solid var(--border);border-radius:7px;padding:4px 6px}
+  #app.app-container .git-viz-file > summary{cursor:pointer;display:flex;gap:8px;font-size:11px;color:var(--text)}
+  #app.app-container .git-viz-path{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  #app.app-container .git-viz-stat{flex:0 0 auto;color:var(--muted-2);font-size:10.5px}
+  #app.app-container .git-viz-patch{margin:6px 0 0;max-height:40vh;overflow:auto;font-size:10.5px;line-height:1.4;
+    white-space:pre-wrap;word-break:break-word;color:var(--muted);user-select:text}
   #app.app-container .ext-label{font-size:11px;color:var(--muted)}
   #app.app-container .ext-note{font-size:11px;line-height:1.45;color:var(--muted);padding:6px 8px;border:1px solid var(--border);
     border-radius:8px;background:color-mix(in srgb,var(--panel-3) 55%,transparent)}

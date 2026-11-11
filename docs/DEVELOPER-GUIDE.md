@@ -218,14 +218,14 @@
 | **恢复模式**（原「数据包模式」）与覆盖/增量 | 数据包 `导入 / 导出` 页签**右侧**同一行 | `workbench-template.js` 的 `#zone-tabs > #zone-mode-row`；`workbench-view.js` 的 `renderZoneModeRow()`；文案 `chart.deltaLabel` |
 | 从宿主拉取 | 同上，仅在导入分区显示 | `#btn-fetch` → `doFetch()` |
 | **待导出两列区块已删除** | — | 模板无 `#pending-exports`；队列条目由 `renderZones()` 用 `pendingCardHtml()` 渲染到导出区，动作仍走 `pendingDownload` / `pendingStash` / `pendingRemove` |
-| **开发模式自动更新** | 扩展管理 → 宿主 → 每个 Git 已装扩展行尾下拉（关闭 / 静默 / 提示） | `workbench-view.js` 的 `runDevAutoUpdate()` / `nativeToast()`；设置项 `gitDevMode`（`settings-panel.js` 白名单 + 归一） |
+| **自动更新（父项 + 逐扩展勾选）** | 扩展管理 → 开发者：父项「自动更新」+ 子项「检查间隔」「模式」；宿主页逐扩展复选框与全选/反选/取消 | `workbench-view.js` 的 `devAutoUpdateHtml()` / `runDevAutoUpdate()` / `persistDevSelection()`；设置项 `devMode` / `gitAutoUpdate` / `gitUpdateIntervalHours`（默认 6）/ `gitUpdateMode`（`notify` 默认）/ `gitUpdateSelected` / `gitAutoUpdateLastAt` |
 | 迁移与备份教程 | 迁移面板头 `?` | `HELP.transfer`（局域网互传 / 云端仓库 / 恢复模式） |
 | 教程模式不自动退出 | 头部书本图标 `#btn-guide` / 横幅「退出教程」 | `tutorial-next` 最后一步只回目标菜单；`closeTutorial()` 才是退出 |
 | 设置三态（×保留草稿 / 取消丢弃 / 保存持久化） | 设置面板顶部 × 与底部按钮 | `workbench-view.js` 的 `captureSettingsDraft()` / `applySettingsDraft()` / `openSettingsView()`；`state.settingsDraft` 仅内存 |
 | 桌面整窗口铺满 / 选择锁 | `#app` 全屏、除日志与输入框外不可选 | `style.css` 的 `#app.app-container:not([data-view="mobile"])` 与 `user-select` 例外块 |
 | 切换行顺序（迁移与备份在扩展管理前） | 各面板头 `[data-view-switch]` | `workbench-view.js` 的 `renderViewSwitch()` 项序 |
 | 教程跳过 / 重新打开 | 浮层「跳过」、横幅「重新打开教程」 | `hideTutorialOverlay()`（只关浮层）与 `#tutorial-banner-reopen` → `openTutorial()` |
-| 开发者页签 / 宿主列表折叠 / 安装区向上展开 | 扩展管理 | `workbench-view.js` 的 `renderExtInstalled()`（`.ext-host-list`、`#extmgr-install-toggle`）；`state.extAccountsOpen=false` 默认收起 |
+| 开发者页签 / 宿主列表 / 安装页脚 | 扩展管理 | 宿主页顶部 `ext-toolbar`（按钮 + 排序）、列表头 `ext-list-head`（数量 + 自动更新勾选组）、可拖拽排序行；安装扩展是面板**固定页脚** `#extmgr-install-block`（`renderExtInstalled()` / `syncExtInstallBlock()`），紧贴安装报告条 |
 | 演示占位扩展读文件 | 教程模式宿主列表 | `src/data/demo-extensions.json`（GitHub `st` 前缀仓库生成，禁止 JS 硬编码） |
 | 凭据双写（导出不必回读 settings.json） | 设置 → 数据 / 扩展管理 → 凭据 | `src/ui/settings-store.js` 的 `saveSettings()`：localStorage 与宿主 `extension_settings` 始终同写 |
 | 导出默认值（登录凭据默认勾选、OAuth 子项默认不勾） | 设置 → 数据 | `src/ui/settings-panel.js` 的 `dataGroup`；`src/ui/plugin-data.js` 的 `buildPluginData()` |
@@ -248,6 +248,29 @@
 > `extension_settings` 写入服务端 `settings.json`（有服务器/管理员权限者可见），
 > 可在账号区改成「仅浏览器」；任何展示位置必须脱敏。私有仓库安装时凭据会被拼进
 > 交给宿主克隆的 URL，宿主可能写入该扩展的 `.git/config`。
+
+### K4. P2 / P3：开发者层级 · 管理员分区 · 误装预案 · Git 可视化（2026-11-11 第二轮）
+
+| 功能 | UI 入口 | 源码落点 |
+| --- | --- | --- |
+| **开发者模式开关** | 设置 → 行为「开发者模式」 | `settings-panel.js` 的 `devMode`（默认关闭）；`workbench-view.js` 的 `sideTabAllowed()` / `renderZoneSide()` |
+| **开发者页父子结构** | 扩展管理 → 开发者：父项「自动更新」+ 子项「检查间隔（小时）」「模式（仅提醒 / 直接更新）」 | `devAutoUpdateHtml()` / `bindDevBlock()`；父项未勾时子项 `disabled` |
+| **逐扩展勾选 + 全选/反选/取消** | 宿主页列表头 | `persistDevSelection()`；`settings.gitUpdateSelected` 是唯一事实源 |
+| **可配置间隔与模式** | 开发者页子项 | `settings.gitUpdateIntervalHours`（默认 6，1–168）/ `settings.gitUpdateMode`（`notify` 默认 / `auto`）；`runDevAutoUpdate()` **只读设置，不硬编码**；`gitAutoUpdateLastAt` 记录上次检查，未到间隔跳过 |
+| **更新失败预案** | 更新检查结果行「删除后重装」 | `reinstallWithConfirm()` → `reinstallExtension()`：二次确认后 `deleteExtensionViaHost()` 再按登记仓库重装 |
+| **管理员识别** | 宿主页 | `host-bridge.js` 的 `readHostIdentity()`：唯一判据是 `GET /api/users/me` 的 `admin === true`；非管理员不显示分区、不伪造 |
+| **服务端插件分区** | 宿主页（仅管理员） | `listServerPlugins()`（`POST /api/users/plugins/list`，`requireAdminMiddleware`）→ `serverPluginBlockHtml()`；可折叠、显示 `enabled` 与 `pluginsPath` |
+| **前后端误装拒绝** | 安装执行前 | `src/core/plugin-kind.js` 的 `classifyPluginKind()`（manifest.json ⇒ 前端扩展；仅 package.json ⇒ 服务端插件）；`preflightExtEntry()` 用 `rawFile('manifest.json' / 'package.json')` 识别；`runExtInstall()` 拦截并给替代措施 |
+| **`?` 帮助补全** | 扩展管理 `?` | `HELP.extmgr` 新增「开发者页」「前端扩展与服务端插件」「Git 可视化」三段 |
+| **Git 可视化（只读）** | 设置开开发者模式后，数据包列头「数据包 / Git」分段按钮 | `workbench-template.js` 的 `#zone-side-tabs` / `#zone-side-git`；`workbench-view.js` 的 `renderZoneSide()` / `renderGitViz()` / `loadGitTarget()` / `loadGitCommitDiff()` |
+| 本地 `.git` 读取 | Git 视图 | `host-bridge.js` 的 `readHostExtensionGit()`：`POST /api/extensions/version`（分支 / HEAD / 是否最新 / remoteUrl）+ `/branches`；HEAD 为空 ⇒ 如实显示「历史已丢失」 |
+| 云端只读信息 | Git 视图 | `src/core/git-site.js` 的 `tagsEndpoint()` / `commitDetailEndpoint()` / `remoteFileUrl()` / `normalizeCommitList()` / `normalizeTags()` / `normalizeCommitFiles()`；`git-remote.js` 的 `listTags()` / `listCommits()` / `commitDetail()` / `rawFile()`；只取最近 20 条提交，不拉全量历史 |
+| 模型与判据 | — | `src/core/git-viz.js` 的 `normalizeLocalGit()` / `gitStateOf()` / `mergeBranches()` / `buildGitSummary()` / `selectGitTargets()` / `diffStat()`；工作区状态宿主无端点 ⇒ 显示「宿主未提供」 |
+| 排序 | 宿主页工具条「排序」+ 拖拽行 | `installedRowRecords()` / `sortedInstalledRecords()` / `reorderInstalled()`；`settings.extOrder` 保存自定义顺序，`extSort` 保存排序方式 |
+| **设置读取回归修复** | 设置面板保存 | `readSettings(root, base)`：只覆盖对话框里真实存在的控件，`gitAccounts` / `gitInstalls` / 自动更新等不再被默认值清空 |
+
+> **纪律**：Git 可视化只读，不提供检出 / 切换 / 提交 / 合并；识别不出插件类型时保持 `unknown`
+>（不猜、不拦截）；宿主端点读不到就显示「未提供」或「历史已丢失」，**不得伪造提交或空分区**。
 
 ### L. 工作台布局：执行卡取消 · 进度条常驻 · 图表网格（2026-11-05）
 

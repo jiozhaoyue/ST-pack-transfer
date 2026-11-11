@@ -32,7 +32,24 @@ export const SETTINGS_DEFAULTS = Object.freeze({
   /** 安装来源登记（更新检查用）：{name, url, ref, at}。 */
   gitInstalls: [],
   /** 开发模式自动更新：{扩展名: 'silent' | 'prompt'}；缺省即关闭。 */
+  /** 旧版逐扩展三档（保留读取兼容）；新版用 gitUpdateSelected + gitUpdateMode，缺省即关闭。 */
   gitDevMode: {},
+  /** 开发者模式：打开后才出现 Git 可视化入口（数据包列「数据包 / Git」页签）；默认关闭。 */
+  devMode: false,
+  /** 自动更新总开关（逐扩展参与见 gitUpdateSelected）。 */
+  gitAutoUpdate: false,
+  /** 自动更新检查间隔（小时），默认 6；范围 1–168。 */
+  gitUpdateIntervalHours: 6,
+  /** 自动更新模式：notify = 仅提醒后更新；auto = 直接更新。 */
+  gitUpdateMode: 'notify',
+  /** 参与自动更新的扩展名（宿主页逐扩展勾选）。 */
+  gitUpdateSelected: [],
+  /** 上次自动检查时间（毫秒时间戳）；0 = 从未检查。 */
+  gitAutoUpdateLastAt: 0,
+  /** 宿主页扩展列表的自定义顺序（拖拽排序；只存名字）。 */
+  extOrder: [],
+  /** 宿主页排序方式：custom（拖拽顺序）/ name / version / source。 */
+  extSort: 'custom',
 });
 
 export const SETTING_KEYS = Object.freeze(Object.keys(SETTINGS_DEFAULTS));
@@ -72,6 +89,28 @@ export function normalizeSettings(input) {
       }
       out.gitDevMode = modes;
     }
+    if (typeof input.devMode === 'boolean') out.devMode = input.devMode;
+    if (typeof input.gitAutoUpdate === 'boolean') out.gitAutoUpdate = input.gitAutoUpdate;
+    const interval = Number(input.gitUpdateIntervalHours);
+    if (Number.isFinite(interval)) {
+      out.gitUpdateIntervalHours = Math.max(1, Math.min(168, Math.round(interval)));
+    }
+    if (input.gitUpdateMode === 'auto' || input.gitUpdateMode === 'notify') {
+      out.gitUpdateMode = input.gitUpdateMode;
+    }
+    if (Array.isArray(input.gitUpdateSelected)) {
+      out.gitUpdateSelected = [...new Set(
+        input.gitUpdateSelected.filter((name) => typeof name === 'string' && name),
+      )];
+    }
+    const lastAt = Number(input.gitAutoUpdateLastAt);
+    if (Number.isFinite(lastAt) && lastAt >= 0) out.gitAutoUpdateLastAt = lastAt;
+    if (Array.isArray(input.extOrder)) {
+      out.extOrder = [...new Set(input.extOrder.filter((name) => typeof name === 'string' && name))];
+    }
+    if (input.extSort === 'custom' || input.extSort === 'name' || input.extSort === 'version' || input.extSort === 'source') {
+      out.extSort = input.extSort;
+    }
   }
   return out;
 }
@@ -90,7 +129,8 @@ export function buildSettingsHtml(settings = {}) {
   const tips = setting('set-traffic', 'trafficPrompt', t('settings.trafficPrompt'), s.trafficPrompt)
     + setting('set-native-pull-notice', 'nativePullNotice', t('settings.nativePullNotice'), s.nativePullNotice)
     + setting('set-auto-tutorial', 'autoTutorial', t('settings.autoTutorial'), s.autoTutorial)
-    + setting('set-confirm-discard-prefs', 'confirmDiscardChartPrefs', t('settings.confirmDiscardChartPrefs'), s.confirmDiscardChartPrefs);
+    + setting('set-confirm-discard-prefs', 'confirmDiscardChartPrefs', t('settings.confirmDiscardChartPrefs'), s.confirmDiscardChartPrefs)
+    + setting('set-dev-mode', 'devMode', t('settings.devMode'), s.devMode);
 
   const exportGroup = setting('set-delete-after-export', 'deleteAfterExport', t('settings.deleteAfterExport'), s.deleteAfterExport)
     + setting('set-clear-packages', 'clearPackagesOnLoad', t('settings.clearPackagesOnLoad'), s.clearPackagesOnLoad)
@@ -117,9 +157,21 @@ export function buildSettingsHtml(settings = {}) {
 }
 
 /** 从弹窗 DOM 读回开关与选项；缺失项保持默认。 */
-export function readSettings(root) {
-  const out = { ...SETTINGS_DEFAULTS };
+/**
+ * 从弹窗 DOM 读回开关与选项。
+ *
+ * `base` 是面板外的既有设置（Git 账号 / 安装登记 / 自动更新等不在本对话框里的键）：
+ * 只覆盖对话框里真实存在的控件，其余键**原样保留**。此前以默认值起步，
+ * 保存一次设置就会把 Git 账号与安装登记整段清空（2026-11-11 实测缺陷）。
+ *
+ * @param {{querySelector?:Function}} root
+ * @param {object} [base]
+ */
+export function readSettings(root, base = SETTINGS_DEFAULTS) {
+  const out = normalizeSettings(base);
   if (!root) return out;
+  const devModeEl = root.querySelector?.('[data-setting="devMode"]');
+  if (devModeEl && typeof devModeEl.checked === 'boolean') out.devMode = devModeEl.checked;
   const trafficEl = root.querySelector?.('[data-setting="trafficPrompt"]');
   if (trafficEl && typeof trafficEl.checked === 'boolean') out.trafficPrompt = trafficEl.checked;
   const nativePullEl = root.querySelector?.('[data-setting="nativePullNotice"]');
