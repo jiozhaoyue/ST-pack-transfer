@@ -635,6 +635,17 @@
   /* 内联扩展管理（与存储图表同层，不是浮层） */
   #app.app-container .extension-view{flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
   #app.app-container .extension-body{flex:1 1 auto;min-height:0;overflow:auto;padding:9px;display:flex;flex-direction:column;gap:8px}
+  /* 报告常驻底部：不随页签切换；点击展开后占满扩展管理正文区 */
+  #app.app-container .ext-report-panel{flex:1 1 auto;min-height:0;overflow:auto;padding:9px}
+  #app.app-container .ext-report-bar{flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:6px 10px;
+    border-top:1px solid var(--border);background:color-mix(in srgb,var(--panel-3) 70%,transparent);
+    cursor:pointer;font-size:11.5px;color:var(--muted)}
+  #app.app-container .ext-report-bar .erb-title{color:var(--text);font-weight:600}
+  #app.app-container .ext-report-bar .erb-sum{flex:0 0 auto}
+  #app.app-container .ext-report-bar .erb-hint{margin-left:auto;color:var(--muted-2);white-space:nowrap}
+  #app.app-container .ext-report-bar:hover{color:var(--text)}
+  #app.app-container .ext-report-bar[aria-expanded="true"]{border-top-color:var(--accent)}
+  #app.app-container .ext-data-row{flex-wrap:wrap}
   #app.app-container .ext-install{display:flex;flex-direction:column;gap:8px;min-height:0}
   #app.app-container .ext-label{font-size:11px;color:var(--muted)}
   #app.app-container .ext-note{font-size:11px;line-height:1.45;color:var(--muted);padding:6px 8px;border:1px solid var(--border);
@@ -658,6 +669,17 @@
   #app.app-container .ext-accounts > summary{cursor:pointer;font-size:11.5px;color:var(--muted);list-style:none}
   #app.app-container .ext-accounts > summary::-webkit-details-marker{display:none}
   #app.app-container .ext-accounts[open] > summary{color:var(--text)}
+  /* OAuth 登录：回调地址与跨域限制必须始终可见 */
+  #app.app-container .ext-oauth{display:flex;flex-direction:column;gap:7px;padding:8px;border:1px solid var(--border);
+    border-radius:8px;background:var(--panel-3)}
+  #app.app-container .ext-oauth > summary{cursor:pointer;font-size:11.5px;color:var(--muted);list-style:none}
+  #app.app-container .ext-oauth > summary::-webkit-details-marker{display:none}
+  #app.app-container .ext-oauth[open] > summary{color:var(--text)}
+  #app.app-container .oauth-redirect-row{align-items:flex-start}
+  #app.app-container .oauth-redirect{flex:1 1 auto;min-width:0;overflow-wrap:anywhere;font-size:11px;color:var(--text)}
+  #app.app-container .help-view-body .help-intro{margin:0 0 12px;font-size:11.5px;color:var(--muted);line-height:1.7}
+  #app.app-container .help-view-body .help-links{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+  #app.app-container .help-view-body .help-links a{font-size:11.5px;color:var(--accent);text-decoration:underline}
   #app.app-container .ext-note.privacy{border-color:color-mix(in srgb,var(--optional) 45%,var(--border));color:var(--text)}
   #app.app-container .acc-add .text_pole{flex:1 1 130px;min-width:110px}
   #app.app-container .acc-row{gap:6px}

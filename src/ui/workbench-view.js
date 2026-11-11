@@ -35,6 +35,9 @@ import {
   findAccountFor, maskAccounts, ACCOUNT_SITES,
 } from '../core/git-accounts.js';
 import { compareVersions } from '../core/git-site.js';
+import {
+  oauthProvider, buildAuthorizeUrl, randomToken, makePkce, parseOAuthCallback, exchangeOAuthCode,
+} from '../core/git-oauth.js';
 import { createGitRemote } from './git-remote.js';
 import { t } from '../i18n/index.js';
 import { loadSettings, saveSettings } from './settings-store.js';
@@ -219,7 +222,8 @@ let chartPrefs = typeof localStorage !== 'undefined' ? loadChartPrefs() : normal
 
 const state = {
   host:'luker', mode:'plugin', view:'desktop', mainView:'chart', mobileView:'chart', pane:'workbench', zone:'import',
-  extTab:'install', extEntries:[], extResults:[], extLog:[], extRunning:false, extInstalled:null, extManifestPrefill:[],
+  extTab:'host', extEntries:[], extResults:[], extRunning:false, extInstalled:null, extManifestPrefill:[],
+  extReportOpen:false,
   extAccountTests:[], extUpdate:null, extAccountsOpen:true,
   source:{ type:'host', pkgId:null }, target:'SillyTavern', targetManual:false,
   delta: 'overwrite', splitMb: chartPrefs.splitMb,
@@ -455,6 +459,7 @@ function syncMainView(){
   /* 存储审查面板占满内容区：同时隐藏数据包列与分隔条，网格改为单列（见 style.css [data-si]）。 */
   const siActive = !!state.storageInspector?.open && !transferOpen;
   if(app) app.dataset.si = siActive ? '1' : '';
+  syncTopActions();
   const chartCol=document.querySelector('.col-chart');
   const side=document.querySelector('.col-side');
   const splitter=document.querySelector('.splitter-v');
@@ -1676,6 +1681,82 @@ function reasonText(reason){
 }
 function accountForRepo(parsed){ return parsed && parsed.ok ? findAccountFor(gitAccountList(), parsed) : null; }
 
+/* ── OAuth（授权码 + PKCE）──
+   约束必须如实标注：回调地址 = 本页 origin + path，协议/主机/端口任一不同都不匹配
+   （127.0.0.1 与 localhost 是两个来源，端口一变就要重新登记）。
+   GitHub 的 token 端点无 CORS，浏览器直连不可用，只能走自建代理或 PAT。 */
+const OAUTH_PENDING_KEY='stpt.oauth.pending';
+function oauthRedirectUri(){ return location.origin + location.pathname; }
+function isRemoteOrigin(){
+  const h=String(location.hostname||'').toLowerCase();
+  return !(h==='localhost' || h==='127.0.0.1' || h==='::1' || h==='[::1]' || h.endsWith('.localhost'));
+}
+function oauthHintText(){
+  const base=t('extmgr.oauthGitHubBlocked');
+  return isRemoteOrigin() ? base+' '+t('extmgr.oauthCloudHint') : base;
+}
+async function startOAuth(body){
+  if(state.tutorialMode){ toast(t('extmgr.oauthTutorial')); return; }
+  const read=(sel)=>String(body.querySelector(sel)?.value||'').trim();
+  const site=read('[data-oauthsite]')||'github';
+  const baseUrl=read('[data-oauthbase]');
+  const clientId=read('[data-oauthclient]');
+  const clientSecret=read('[data-oauthsecret]');
+  const proxyUrl=read('[data-oauthproxy]');
+  if(!clientId){ toast(t('extmgr.oauthNeedClient')); return; }
+  const provider=oauthProvider(site, baseUrl);
+  if(!provider){ toast(t('extmgr.oauthFailed',{reason:'unsupported'})); return; }
+  if(!proxyUrl && !provider.browserToken){ toast(t('extmgr.oauthGitHubBlocked')); return; }
+  if(!proxyUrl && provider.clientSecret && !clientSecret){ toast(t('extmgr.oauthNeedSecret',{site:site})); return; }
+  const {verifier, challenge}=await makePkce();
+  if(!proxyUrl && provider.browserToken && !challenge){ toast(t('extmgr.oauthPkceMissing')); return; }
+  const stateToken=randomToken(16);
+  const redirectUri=oauthRedirectUri();
+  try {
+    sessionStorage.setItem(OAUTH_PENDING_KEY, JSON.stringify({
+      site, baseUrl, clientId, clientSecret, proxyUrl,
+      state:stateToken, verifier, redirectUri, ts:Date.now(),
+    }));
+  } catch { toast(t('extmgr.oauthFailed',{reason:'storage'})); return; }
+  const url=buildAuthorizeUrl({ site, baseUrl, clientId, redirectUri, state:stateToken, codeChallenge:challenge });
+  if(!url){ toast(t('extmgr.oauthFailed',{reason:'unsupported'})); return; }
+  toast(t('extmgr.oauthPending'));
+  location.href=url;
+}
+let oauthCallbackHandled=false;
+async function completeOAuthFromUrl(){
+  if(oauthCallbackHandled) return;
+  oauthCallbackHandled=true;
+  const cb=parseOAuthCallback(location.search);
+  if(!cb) return;
+  const clearUrl=()=>{ try { history.replaceState({},'',location.pathname+location.hash); } catch { /* 非关键 */ } };
+  const clearPending=()=>{ try { sessionStorage.removeItem(OAUTH_PENDING_KEY); } catch { /* 非关键 */ } };
+  if(state.tutorialMode){ clearPending(); clearUrl(); return; }
+  let pending=null;
+  try { pending=JSON.parse(sessionStorage.getItem(OAUTH_PENDING_KEY)||'null'); } catch { pending=null; }
+  if(cb.error){ clearPending(); clearUrl(); toast(t('extmgr.oauthFailed',{reason:cb.errorDescription||cb.error})); return; }
+  if(!pending || pending.state!==cb.state || Date.now()-Number(pending.ts||0)>15*60*1000){
+    clearPending(); clearUrl(); toast(t('extmgr.oauthExpired')); return;
+  }
+  const res=await exchangeOAuthCode({
+    site:pending.site, baseUrl:pending.baseUrl, clientId:pending.clientId,
+    clientSecret:pending.clientSecret, code:cb.code, redirectUri:pending.redirectUri,
+    codeVerifier:pending.verifier, proxyUrl:pending.proxyUrl,
+  });
+  clearPending(); clearUrl();
+  if(!res.ok){ toast(t('extmgr.oauthFailed',{reason:res.detail||res.error})); return; }
+  const provider=oauthProvider(pending.site, pending.baseUrl);
+  const draft={
+    site:pending.site, baseUrl:pending.baseUrl, username:'',
+    secret:res.accessToken, label:(provider?.label||pending.site)+' OAuth', authKind:'oauth', createdAt:Date.now(),
+  };
+  persistAccountList(addAccount(gitAccountList(), draft));
+  const acc=gitAccountList().find((a)=>a.secret===res.accessToken);
+  const test=acc ? await gitRemote().testAccount(acc) : {ok:false};
+  renderExtensionView();
+  toast(test.ok ? t('extmgr.oauthSuccess',{login:test.login||draft.label}) : t('extmgr.accountAddedUnverified'));
+}
+
 function makeExtEntry(rawUrl, refHint = ''){
   const input=String(rawUrl||'').trim();
   const parsed=parseRepoUrl(input);
@@ -1832,6 +1913,27 @@ function accountRowHtml(acc){
     +'<button type="button" class="btn" data-accdel="'+escapeHtml(acc.id)+'">'+t('extmgr.accountDelete')+'</button>'
   +'</div>';
 }
+function oauthHtml(){
+  return '<details class="ext-oauth" data-extoauth>'
+    +'<summary>'+t('extmgr.oauthTitle')+'</summary>'
+    +'<div class="ext-note">'+t('extmgr.oauthNote')+'</div>'
+    +'<div class="ext-row oauth-redirect-row">'
+      +'<span class="et-label">'+t('extmgr.oauthRedirect')+'</span>'
+      +'<code class="oauth-redirect" data-oauthredirect>'+escapeHtml(oauthRedirectUri())+'</code>'
+      +'<button type="button" class="btn" data-oauthcopy>'+t('extmgr.oauthCopy')+'</button>'
+    +'</div>'
+    +'<div class="ext-row acc-add">'
+      +'<select class="text_pole" data-oauthsite>'+ACCOUNT_SITES.map((s)=>'<option value="'+s+'">'+s+'</option>').join('')+'</select>'
+      +'<input class="text_pole" data-oauthbase placeholder="'+t('extmgr.accountBase')+'">'
+      +'<input class="text_pole" data-oauthclient placeholder="'+t('extmgr.oauthClient')+'">'
+      +'<input class="text_pole" type="password" data-oauthsecret placeholder="'+t('extmgr.oauthSecret')+'">'
+      +'<input class="text_pole" data-oauthproxy placeholder="'+t('extmgr.oauthProxy')+'">'
+      +'<button type="button" class="btn accent" data-oauthstart>'+t('extmgr.oauthStart')+'</button>'
+      +'<button type="button" class="btn" data-tokenguide>'+t('extmgr.tokenGuide')+'</button>'
+    +'</div>'
+    +'<div class="ext-note">'+oauthHintText()+'</div>'
+  +'</details>';
+}
 function accountsHtml(){
   const list=gitAccountList();
   const mode=gitStorageMode();
@@ -1863,6 +1965,7 @@ function accountsHtml(){
     +'<div class="ext-row ext-actions">'
       +'<button type="button" class="btn" data-acctestall>'+t('extmgr.accountTestAll')+'</button>'
     +'</div>'
+    +oauthHtml()
   +'</details>';
 }
 function entryRowHtml(e,i){
@@ -1903,7 +2006,7 @@ function renderExtInstall(body){
     +'</div>'
     +'<div class="ext-list">'+(rows||'<div class="ext-empty">'+t('extmgr.empty')+'</div>')+'</div>'
     +'<div class="ext-row ext-actions">'
-      +'<button type="button" class="btn" id="extmgr-export-log">'+t('extmgr.exportLog')+'</button>'
+      +'<button type="button" class="btn" id="extmgr-open-log">'+t('extmgr.openLog')+'</button>'
       +'<button type="button" class="btn" id="extmgr-export-failed">'+t('extmgr.exportFailed')+'</button>'
       +'<button type="button" class="btn" id="extmgr-export-report">'+t('extmgr.exportReport')+'</button>'
       +'<span style="flex:1"></span>'
@@ -1969,7 +2072,8 @@ function renderExtInstall(body){
     }
     void runExtInstall();
   });
-  const exportLog=()=>downloadTextFile('extension-install.log', (state.extLog||[]).join('\n'));
+  /* 安装日志不再单独维护：全部日志统一进全局日志视图（报告与失败链接仍为本页独有）。 */
+  const openGlobalLog=()=>{ renderLog(); showPane('log'); };
   const exportFailed=()=>{
     const failed=(state.extResults||[]).filter((r)=>r.status==='failed').map((r)=>r.url);
     downloadTextFile('extension-install-failed.txt', failed.join('\n'));
@@ -1981,11 +2085,11 @@ function renderExtInstall(body){
       results:state.extResults||[] };
     downloadTextFile('extension-install-report.json', JSON.stringify(report,null,2));
   };
-  body.querySelector('#extmgr-export-log')?.addEventListener('click',exportLog);
+  body.querySelector('#extmgr-open-log')?.addEventListener('click',openGlobalLog);
   body.querySelector('#extmgr-export-failed')?.addEventListener('click',exportFailed);
   body.querySelector('#extmgr-export-report')?.addEventListener('click',exportReport);
   body.querySelector('#extmgr-clear')?.addEventListener('click',()=>{
-    state.extLinksText=''; state.extEntries=[]; state.extResults=[]; state.extLog=[]; renderExtensionView();
+    state.extLinksText=''; state.extEntries=[]; state.extResults=[]; renderExtensionView();
   });
 }
 function bindAccounts(body){
@@ -2001,6 +2105,12 @@ function bindAccounts(body){
     });
   });
   body.querySelector('[data-accadd]')?.addEventListener('click',()=>{ void addAccountFromForm(body); });
+  body.querySelector('[data-oauthstart]')?.addEventListener('click',()=>{ void startOAuth(body); });
+  body.querySelector('[data-oauthcopy]')?.addEventListener('click',async()=>{
+    try { await navigator.clipboard.writeText(oauthRedirectUri()); toast(t('extmgr.oauthCopied')); }
+    catch { toast(t('extmgr.oauthFailed',{reason:'clipboard'})); }
+  });
+  body.querySelector('[data-tokenguide]')?.addEventListener('click',()=>openHelp('gitToken'));
   body.querySelectorAll('[data-accdefault]').forEach((btn)=>{
     btn.addEventListener('click',()=>{
       persistAccountList(setDefaultAccount(gitAccountList(), btn.dataset.accdefault));
@@ -2031,7 +2141,7 @@ async function preflightAll(){
 }
 async function runExtInstall(){
   if(state.extRunning) return;
-  state.extRunning=true; state.extResults=[]; state.extLog=[];
+  state.extRunning=true; state.extResults=[];
   renderExtensionView();
   try {
     const payload=state.extEntries.map((e)=>{
@@ -2101,7 +2211,7 @@ async function checkExtUpdates(){
     rows.push({ name:reg.name, url:reg.url, ref:reg.ref||'', localVersion, remoteVersion, status, reason });
   }
   state.extUpdate={busy:false,rows,note:''};
-  if(state.extTab==='installed') renderExtensionView();
+  if(state.extTab==='host') renderExtensionView();
 }
 async function renderExtInstalled(body){
   body.innerHTML='<div class="ext-empty">'+t('extmgr.loading')+'</div>';
@@ -2110,7 +2220,7 @@ async function renderExtInstalled(body){
     const res=await actions.listHostExtensions?.();
     list=Array.isArray(res)?res:(Array.isArray(res?.items)?res.items:(Array.isArray(res?.list)?res.list:[]));
   } catch { list=[]; }
-  if(state.extTab!=='installed') return;
+  if(state.extTab!=='host' || state.extReportOpen) return;
   state.extInstalled=list;
   const rows=list.map((x)=>{
     const name=x?.name||x?.folder||x?.internalName||'';
@@ -2142,24 +2252,21 @@ async function renderExtInstalled(body){
 }
 function renderExtReport(body){
   const results=state.extResults||[];
-  const rows=results.map((r)=>'<div class="ext-entry is-'+(r.status==='ok'?'ok':'failed')+'">'
+  const logRows=results.map((r)=>'<div class="ext-entry is-'+(r.status==='ok'?'ok':'failed')+'">'
     +'<span class="ext-url" title="'+escapeHtml(r.url)+'">'+escapeHtml(r.url)+'</span>'
     +'<span class="ext-state">'+escapeHtml(r.branch||'')+' · '+extStatusText(r.status)+(r.error?' · '+escapeHtml(r.error):'')+'</span>'
     +(r.privateHint?'<span class="ext-flag-warn">'+t('extmgr.privateHintAfterFail')+'</span>':'')+'</div>').join('');
-  const log=(state.extLog||[]).join('\n');
   body.innerHTML='<div class="ext-install">'
     +'<div class="ext-row"><b>'+t('extmgr.reportSummary',{ok:results.filter(r=>r.status==='ok').length,failed:results.filter(r=>r.status==='failed').length})+'</b></div>'
-    +'<div class="ext-list">'+(rows||'<div class="ext-empty">'+t('extmgr.noReport')+'</div>')+'</div>'
-    +'<pre class="ext-log">'+escapeHtml(log||t('extmgr.noLog'))+'</pre>'
+    +'<div class="ext-list">'+(logRows||'<div class="ext-empty">'+t('extmgr.noReport')+'</div>')+'</div>'
     +'<div class="ext-row ext-actions">'
-      +'<button type="button" class="btn" id="extmgr-export-log2">'+t('extmgr.exportLog')+'</button>'
+      +'<button type="button" class="btn" id="extmgr-open-log2">'+t('extmgr.openLog')+'</button>'
       +'<button type="button" class="btn" id="extmgr-export-failed2">'+t('extmgr.exportFailed')+'</button>'
       +'<button type="button" class="btn" id="extmgr-export-report2">'+t('extmgr.exportReport')+'</button>'
     +'</div></div>';
-  const exportLog=()=>downloadTextFile('extension-install.log', log);
   const exportFailed=()=>downloadTextFile('extension-install-failed.txt', results.filter(r=>r.status==='failed').map(r=>r.url).join('\n'));
   const exportReport=()=>downloadTextFile('extension-install-report.json', JSON.stringify({generatedAt:new Date().toISOString(),results},null,2));
-  body.querySelector('#extmgr-export-log2')?.addEventListener('click',exportLog);
+  body.querySelector('#extmgr-open-log2')?.addEventListener('click',()=>{ renderLog(); showPane('log'); });
   body.querySelector('#extmgr-export-failed2')?.addEventListener('click',exportFailed);
   body.querySelector('#extmgr-export-report2')?.addEventListener('click',exportReport);
 }
@@ -2254,9 +2361,24 @@ function renderExtensionView(){
   const body=document.getElementById('extension-body');
   if(!body) return;
   document.querySelectorAll('#extmgr-tabs [data-exttab]').forEach(b=>b.classList.toggle('active',b.dataset.exttab===state.extTab));
-  if(state.extTab==='installed'){ void renderExtInstalled(body); return; }
+  const open=!!state.extReportOpen;
+  const bar=document.getElementById('extmgr-report-bar');
+  const panel=document.getElementById('extmgr-report-panel');
+  body.hidden=open;
+  if(panel) panel.hidden=!open;
+  if(bar){
+    const results=state.extResults||[];
+    bar.innerHTML='<span class="erb-title">'+t('extmgr.reportTitle')+'</span>'
+      +'<span class="erb-sum">'+t('extmgr.reportSummary',{ok:results.filter(r=>r.status==='ok').length,failed:results.filter(r=>r.status==='failed').length})+'</span>'
+      +'<span class="erb-hint">'+t(open?'extmgr.reportCollapse':'extmgr.reportExpand')+'</span>';
+    bar.setAttribute('aria-expanded',open?'true':'false');
+  }
+  if(panel){
+    if(open) renderExtReport(panel); else panel.innerHTML='';
+  }
+  if(open) return;
+  if(state.extTab==='host'){ void renderExtInstalled(body); return; }
   if(state.extTab==='pack'){ renderExtPack(body); return; }
-  if(state.extTab==='report'){ renderExtReport(body); return; }
   renderExtInstall(body);
 }
 
@@ -2913,6 +3035,12 @@ function doDeleteSelected(){ actions.deleteSelected?.([...state.selectedPkgs]); 
 
 /* ── 面板内视图（设置 / 日志 / 帮助；确认框为顶层 dialog） ── */
 const PANES=['workbench','settings','log','help'];
+/* 整页视图（设置 / 日志 / 帮助 / 存储审查）占满插件：除页头外不留动作条或切换行。 */
+function syncTopActions(){
+  const bar=document.getElementById('top-actions');
+  if(!bar) return;
+  bar.hidden = state.pane!=='workbench' || !!state.storageInspector?.open;
+}
 function showPane(name){
   state.pane=PANES.includes(name)?name:'workbench';
   const main=document.getElementById('view-workbench');
@@ -2923,6 +3051,7 @@ function showPane(name){
   });
   document.querySelectorAll('.app-header .icon-btn').forEach(b=>b.classList.remove('active-view'));
   if(state.pane==='settings') document.getElementById('btn-settings')?.classList.add('active-view');
+  syncTopActions();
 }
 function backToWorkbench(){ showPane('workbench'); }
 
@@ -2940,6 +3069,14 @@ function openSettingsView(html,{onSave,onClose,onAction}={}){
   body.querySelectorAll('[data-action]').forEach(el=>{
     el.addEventListener('click',()=>onAction?.(el.dataset.action, el));
   });
+  const creds=body.querySelector('#set-include-creds');
+  const oauth=body.querySelector('#set-include-oauth');
+  if(creds && oauth){
+    creds.addEventListener('change',()=>{
+      oauth.disabled=!creds.checked;
+      if(!creds.checked) oauth.checked=false;
+    });
+  }
   showPane('settings');
 }
 
@@ -3005,6 +3142,23 @@ function openTrafficModal(onConfirm, { enabled = true, onNever, onCancel } = {})
   action:{ title:'help.action.title', sections:[
     { title:'help.action.flowTitle', points:['help.action.p1','help.action.p2','help.action.p3'] },
   ]},
+  extmgr:{ title:'help.extmgr.title', intro:'help.extmgr.intro', sections:[
+    { title:'help.extmgr.hostTitle', points:['help.extmgr.hostP1','help.extmgr.hostP2','help.extmgr.hostP3'] },
+    { title:'help.extmgr.installTitle', points:['help.extmgr.installP1','help.extmgr.installP2','help.extmgr.installP3'] },
+    { title:'help.extmgr.packTitle', points:['help.extmgr.packP1','help.extmgr.packP2'] },
+    { title:'help.extmgr.reportTitle', points:['help.extmgr.reportP1','help.extmgr.reportP2'] },
+    { title:'help.extmgr.dataTitle', points:['help.extmgr.dataP1','help.extmgr.dataP2'] },
+  ]},
+  gitToken:{ title:'help.gitToken.title', intro:'help.gitToken.intro', sections:[
+    { title:'help.gitToken.githubTitle', points:['help.gitToken.githubP1','help.gitToken.githubP2','help.gitToken.githubP3','help.gitToken.githubP4'],
+      links:[{href:'https://github.com/settings/personal-access-tokens/new',label:'help.gitToken.githubOpen'},{href:'https://github.com/settings/tokens/new?scopes=repo&description=ST-pack-transfer',label:'help.gitToken.githubClassic'}] },
+    { title:'help.gitToken.gitlabTitle', points:['help.gitToken.gitlabP1','help.gitToken.gitlabP2','help.gitToken.gitlabP3'],
+      links:[{href:'https://gitlab.com/-/user_settings/personal_access_tokens',label:'help.gitToken.gitlabOpen'}] },
+    { title:'help.gitToken.giteeTitle', points:['help.gitToken.giteeP1','help.gitToken.giteeP2','help.gitToken.giteeP3'],
+      links:[{href:'https://gitee.com/profile/personal_access_tokens',label:'help.gitToken.giteeOpen'}] },
+    { title:'help.gitToken.giteaTitle', points:['help.gitToken.giteaP1','help.gitToken.giteaP2'] },
+    { title:'help.gitToken.securityTitle', points:['help.gitToken.securityP1','help.gitToken.securityP2','help.gitToken.securityP3'] },
+  ]},
   log:{ title:'help.log.title', points:['help.log.p1','help.log.p2','help.log.p3'] }
 };
 function closeHelp(){
@@ -3020,14 +3174,19 @@ function openHelp(key){
   const body=document.getElementById('help-body');
   if(!title||!body) return;
   title.textContent=t(topic.title);
+  const linksHtml=(links)=>links&&links.length
+    ? '<div class="help-links">'+links.map((l)=>'<a href="'+l.href+'" target="_blank" rel="noopener noreferrer">'+t(l.label)+'</a>').join('')+'</div>'
+    : '';
+  const introHtml=topic.intro ? '<p class="help-intro">'+t(topic.intro)+'</p>' : '';
   if(topic.sections){
-    body.innerHTML=topic.sections.map(s=>
+    body.innerHTML=introHtml+topic.sections.map(s=>
       '<section class="help-sec"><h4>'+t(s.title)+'</h4><ul>'
         +s.points.map(x=>'<li>'+t(x)+'</li>').join('')
-      +'</ul></section>'
+      +'</ul>'+linksHtml(s.links)
+      +'</section>'
     ).join('');
   }else{
-    body.innerHTML='<ul>'+topic.points.map(x=>'<li>'+t(x)+'</li>').join('')+'</ul>';
+    body.innerHTML=introHtml+'<ul>'+topic.points.map(x=>'<li>'+t(x)+'</li>').join('')+'</ul>'+linksHtml(topic.links);
   }
   showPane('help');
 }
@@ -3529,12 +3688,17 @@ function bind(){
     syncMainView();
     if(v==='extension') renderExtensionView();
   });
-  document.getElementById('extension-close-btn')?.addEventListener('click',()=>{
-    state.mainView='chart'; if(state.view==='mobile') state.mobileView='chart'; syncMainView();
-  });
   document.getElementById('extmgr-tabs')?.addEventListener('click',(e)=>{
     const b=e.target.closest('[data-exttab]'); if(!b) return;
-    state.extTab=b.dataset.exttab; renderExtensionView();
+    state.extTab=b.dataset.exttab; state.extReportOpen=false; renderExtensionView();
+  });
+  const toggleExtReport=()=>{
+    state.extReportOpen=!state.extReportOpen;
+    renderExtensionView();
+  };
+  document.getElementById('extmgr-report-bar')?.addEventListener('click',toggleExtReport);
+  document.getElementById('extmgr-report-bar')?.addEventListener('keydown',(e)=>{
+    if(e.key==='Enter' || e.key===' '){ e.preventDefault(); toggleExtReport(); }
   });
   // 配额两行共用同一个存储审查面板；点哪一行，面板初始就显示哪一侧数据源。
   document.getElementById('quota-head')?.addEventListener('click',(e)=>{
@@ -3809,8 +3973,8 @@ function bind(){
     }
     const hostAssetList=e.target.closest('#btn-assetlist-host');
     if(hostAssetList){
-      // 宿主扩展清单导出已收束到「扩展管理 → 已装」页，不再单独弹导出。
-      state.extTab='installed'; state.mainView='extension';
+      // 宿主扩展清单导出已收束到「扩展管理 → 宿主」页，不再单独弹导出。
+      state.extTab='host'; state.mainView='extension';
       if(state.view==='mobile') state.mobileView='extension';
       syncMainView(); renderExtensionView();
       return;
@@ -4136,6 +4300,7 @@ initChartSplitters();
     renderStorageInspector();
     renderPendingExports();
     renderCloud();
+    void completeOAuthFromUrl();
   }
 
   /** 扩展组未勾选但用户选了「仅清单」：保留扩展元数据扫描，实体仍由 manifest 模式丢弃。 */
@@ -4308,6 +4473,7 @@ initChartSplitters();
   }
 
   return {
+    isTutorialMode() { return !!state.tutorialMode; },
     setPackages(list) {
       if(state.tutorialMode) return;
       const next = (list || []).map((pkg) => ({ ...pkg }));
@@ -4424,7 +4590,7 @@ initChartSplitters();
       if(hit){ hit.status=update.status; if(update.error) hit.error=update.error; }
       if(state.extRunning) renderExtensionView();
     },
-    extLogAppend(line){ if(line) state.extLog.push(String(line)); },
+    extLogAppend(line){ if(line) log('INFO', String(line)); },
     setExtensionResults(results){ state.extResults=Array.isArray(results)?results:[]; renderExtensionView(); },
     setActivePackage(id) { if(state.tutorialMode) return; state.source = { type: 'package', pkgId: id }; state.sourceKey = 'pkg:' + id; renderAll(); },
     pushLog(level, msg) { log(String(level || 'INFO').toUpperCase(), msg); },

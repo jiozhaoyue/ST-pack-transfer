@@ -58,6 +58,7 @@ export function normalizeAccount(input) {
     username,
     secret,
     label: typeof input.label === 'string' && input.label.trim() ? input.label.trim() : (username || host),
+    authKind: input.authKind === 'oauth' ? 'oauth' : 'token',
     isDefault: !!input.isDefault,
     createdAt: Number(input.createdAt) || 0,
   };

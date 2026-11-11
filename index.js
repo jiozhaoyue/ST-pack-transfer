@@ -41,6 +41,7 @@ import { mountLanTransferPanel } from './src/ui/lan-transfer-panel.js';
 import { createBrowserStorageProvider } from './src/ui/storage-inspector-browser.js';
 import { qr } from './src/ui/qr.js';
 import { buildSettingsHtml, readSettings } from './src/ui/settings-panel.js';
+import { buildPluginData, applyPluginData, isPluginData, downloadPluginData } from './src/ui/plugin-data.js';
 import { loadSettings, saveSettings } from './src/ui/settings-store.js';
 import { applyI18n } from './src/i18n/dom.js';
 import { getLocale, onLocaleChange, setLocale, t } from './src/i18n/index.js';
@@ -1409,6 +1410,16 @@ async function main(root) {
     await run();
   }
 
+  function pickJsonFile() {
+    return new Promise((resolve) => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.json,application/json';
+      input.addEventListener('change', () => resolve(input.files?.[0] || null), { once: true });
+      input.click();
+    });
+  }
+
   function openSettings() {
     view.openSettingsView(buildSettingsHtml(settings), {
       onSave: (body) => {
@@ -1417,6 +1428,40 @@ async function main(root) {
         view.applySettings?.(settings);
         view.backToWorkbench();
         view.toast(t('settings.saved'));
+      },
+      onAction: async (name) => {
+        if (name === 'plugin-export') {
+          const includeCredentials = !!document.querySelector('#set-include-creds')?.checked;
+          const includeOAuth = includeCredentials && !!document.querySelector('#set-include-oauth')?.checked;
+          const data = buildPluginData({ includeCredentials, includeOAuth });
+          const ok = downloadPluginData(data);
+          view.toast(ok
+            ? (includeCredentials
+              ? t('settings.dataExportedCreds', { n: data.settings.gitAccounts.length })
+              : t('settings.dataExported'))
+            : t('settings.dataBadFile'));
+          return;
+        }
+        if (name === 'plugin-import') {
+          if (view.isTutorialMode?.()) { view.toast(t('settings.dataImportTutorial')); return; }
+          const file = await pickJsonFile();
+          if (!file) return;
+          let data = null;
+          try { data = JSON.parse(await file.text()); } catch { data = null; }
+          if (!isPluginData(data)) { view.toast(t('settings.dataBadFile')); return; }
+          const accounts = Array.isArray(data.settings?.gitAccounts) ? data.settings.gitAccounts.length : 0;
+          view.openModal(t('settings.dataImportTitle'), t('settings.dataImportDesc', { accounts }), [], [
+            { label: t('modal.cancel'), onClick: () => view.closeModal?.() },
+            { label: t('settings.dataImport'), primary: true, onClick: () => {
+              const res = applyPluginData(data);
+              if (!res.ok) { view.toast(t('settings.dataBadFile')); return; }
+              Object.assign(settings, loadSettings());
+              view.applySettings?.(settings);
+              view.toast(t('settings.dataImport'));
+              setTimeout(() => location.reload(), 600);
+            } },
+          ]);
+        }
       },
     });
   }

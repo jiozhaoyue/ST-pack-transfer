@@ -298,15 +298,16 @@ export function getWorkbenchHtml() {
             <div class="view-switch" data-view-switch></div>
             <div class="panel-actions">
               <div class="segmented" id="extmgr-tabs">
-                <button class="seg-btn active" data-exttab="install" data-i18n="extmgr.tabInstall"></button>
+                <button class="seg-btn active" data-exttab="host" data-i18n="extmgr.tabHost"></button>
+                <button class="seg-btn" data-exttab="install" data-i18n="extmgr.tabInstall"></button>
                 <button class="seg-btn" data-exttab="pack" data-i18n="extmgr.tabPack"></button>
-                <button class="seg-btn" data-exttab="installed" data-i18n="extmgr.tabInstalled"></button>
-                <button class="seg-btn" data-exttab="report" data-i18n="extmgr.tabReport"></button>
               </div>
-              <button class="icon-btn" id="extension-close-btn" data-i18n-title="header.close">×</button>
+              <button class="help-btn" data-help="extmgr" data-i18n-title="extmgr.help">?</button>
             </div>
           </div>
           <div class="extension-body" id="extension-body"></div>
+          <div class="ext-report-bar" id="extmgr-report-bar" role="button" tabindex="0"></div>
+          <div class="ext-report-panel" id="extmgr-report-panel" hidden></div>
         </section>
       </div>
 
