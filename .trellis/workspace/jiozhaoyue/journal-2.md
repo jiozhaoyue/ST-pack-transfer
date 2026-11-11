@@ -1382,3 +1382,47 @@ Topics: [.trellis/research/11-11-chart-maximize-and-extension-manager.md](../../
 
 - Dev Luker（8003）启动后补宿主源实机下钻取证
 - 删除能力维持只读；如要开放须先过用户裁定
+
+
+## Session 77: 视图切换入面板头 / 扩展管理改版·OAuth / 动作入口归位
+<!-- trellis-session: v=2 fp=f5e210da89acb383 -->
+
+**Date**: 2026-11-11
+**Task**: 视图切换入面板头 / 扩展管理改版·OAuth / 动作入口归位
+**Branch**: `main`
+
+### Summary
+
+三个已提交的 UI 阶段补记台账：视图切换进面板头并删独立切换行；扩展管理改版（宿主/安装/打包 + 报告条 + OAuth PKCE + 设置→数据导入导出）；取消全局三按钮行并按场景归位动作入口。复核时六守卫全绿、build exit 0、全量 npm test 1119 passed/2 skipped，并修正 3 处陈旧断言。
+Topics: [.trellis/spec/frontend/workbench-single-view.md](../../spec/frontend/workbench-single-view.md), [.trellis/spec/frontend/extension-git-manager.md](../../spec/frontend/extension-git-manager.md), [.trellis/spec/frontend/i18n-and-settings.md](../../spec/frontend/i18n-and-settings.md)
+
+### Main Changes
+
+- 视图切换移入三个面板头的 [data-view-switch] 宿主，桌面删 #view-switch；手机面板头两行
+- 扩展管理改版：无 ✕（? 打开教程）、宿主/安装/打包页签、报告条常驻展开占满、安装日志并入全局日志
+- src/core/git-oauth.js：授权码 + PKCE、回调必须完全同源、GitHub token 端点无 CORS 如实标注
+- src/ui/plugin-data.js：整插件配置导入导出放设置→数据，凭据与 OAuth 令牌默认不跟随
+- 取消 #top-actions 三按钮行：迁移备份入面板头第 4 项，从宿主拉取入数据包模式行，刷新改按需出现
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `a9ab2c9` | feat(ui): 视图切换移入面板头，桌面去掉独立切换行 |
+| `62054d7` | feat(extmgr): 扩展管理改版 · OAuth 登录 · 插件数据导入导出 |
+| `dbbd8cd` | feat(ui): 取消全局三按钮行，动作入口按场景归位 |
+
+### Testing
+
+- [OK] npm test 全量 1119 passed / 2 skipped（116 文件，115 passed / 1 skipped）
+- [OK] 六条静态守卫全绿；npm run build exit 0
+- [OK] 修正陈旧断言：settings 勾选 8→10、listHostExtensions type→sourceType（objectContaining）
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- Dev Luker 8003 起来后补宿主源下钻与扩展管理宿主页签实机取证
+- OAuth 端到端需用户先登记回调地址（协议/主机/端口完全一致）
