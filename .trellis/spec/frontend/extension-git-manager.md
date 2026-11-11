@@ -80,3 +80,31 @@ GitLab `/<group>/<sub>/<repo>/-/tree/<ref>`、`.git` 后缀、query/hash、`http
 
 - `test/git-url.test.js`（13）、`test/git-accounts.test.js`（7）、`test/git-site.test.js`（9）。
 - `scripts/ui-verify-ext-git.cjs`（本地专属）：`/tree/dev` 归一、私有提示弹窗、账号脱敏、仅浏览器落盘。
+
+## 8. OAuth 登录与令牌指引（2026-11-11）
+
+**契约**：账号区新增「OAuth 登录」区块与「令牌获取指引」一页教程；OAuth 走**授权码 + PKCE**，
+不要求把 client secret 写进前端（Gitee / 自建 Gitea / GitHub 代理除外）。
+
+| 事实 | 结论 | 证据 |
+| --- | --- | --- |
+| GitLab `POST /oauth/token` 返回 `Access-Control-Allow-Origin: *` | 浏览器可换 token | 2026-11-11 `curl -X OPTIONS` |
+| Gitee `POST /oauth/token` 同样允许 CORS | 浏览器可换 token（需 client_secret） | 同上 |
+| GitHub `/login/oauth/access_token` 与 `/login/device/code` 返回 404 且无 CORS 头 | **浏览器直连不可用**；只能用 PAT 或自建代理 | 同上 |
+| 回调地址 = `location.origin + location.pathname` | 协议 / 主机 / 端口任一不同都不匹配；`127.0.0.1` ≠ `localhost`，端口一变要重登记 | `oauthRedirectUri()` |
+
+**实现落点**：
+
+- `src/core/git-oauth.js`：`oauthProvider()`（端点与能力事实）、`buildAuthorizeUrl()`、
+  `makePkce()`、`parseOAuthCallback()`、`exchangeOAuthCode({proxyUrl})`。
+- `src/ui/workbench-view.js`：`startOAuth()` 写 `sessionStorage['stpt.oauth.pending']` 后跳转；
+  `completeOAuthFromUrl()` 在 `renderAll()` 首次执行时处理回调，校验 `state` 与 15 分钟有效期，
+  成功即按普通账号落盘（label = `<站点> OAuth`）并测试。
+- 代理协议：`POST <proxyUrl>` JSON `{site, baseUrl, clientId, clientSecret, code, redirectUri, codeVerifier}`，
+  返回 `{access_token}`。GitHub 必须走代理（或 PAT）。
+- 教程：`HELP.gitToken`，含 GitHub / GitLab / Gitee / 自建 Gitea 的**可点击令牌页链接**、
+  步骤与**最小权限**（GitHub Contents/Metadata 只读；GitLab `read_repository`；Gitee `projects`；Gitea `read:repository`）。
+
+**禁止**：把 GitHub 的 OAuth 描述成「浏览器可直接登录」；伪造成功；把 token 写进日志或报告。
+**验收**：`test/git-oauth.test.js`（7 项）；`scripts/ui-verify-oauth.cjs`（本地专属，
+断言 OAuth 区块、回调地址一致、帮助页链接、GitHub 限制说明、日志并入全局）。

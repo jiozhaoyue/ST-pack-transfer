@@ -201,7 +201,9 @@
 | 功能 | UI 入口 | 源码落点 |
 | --- | --- | --- |
 | 视图切换（桌面 2 / 手机 3；桌面数据包列常显） | 各面板头内 `[data-view-switch]`（图表 / 扩展管理 / 数据包；手机上一行切换、下一行原面板按钮） | `src/ui/workbench-view.js` 的 `renderViewSwitch()` / `syncMainView()` |
-| 扩展管理整面板（安装 / 已装 / 报告） | `#extension-view` | 同文件的 `renderExtensionView()` / `renderExtInstall()` / `renderExtInstalled()` / `renderExtReport()` |
+| 扩展管理整面板（宿主 / 安装 / 打包） | `#extension-view` | 同文件的 `renderExtensionView()` / `renderExtInstall()` / `renderExtInstalled()` / `renderExtPack()` |
+| **报告常驻底部（不随页签）** | `#extmgr-report-bar` / `#extmgr-report-panel` | `renderExtensionView()` 的展开逻辑 + `renderExtReport()`；展开时隐藏 `#extension-body` |
+| **插件数据导入导出 JSON** | 设置 → 数据 | `src/ui/plugin-data.js` 的 `buildPluginData()` / `applyPluginData()`；凭据需勾选，OAuth 需再勾一次；导入后重载 |
 | 批量安装（多行链接 / `.txt` / `.json`；`url \| 分支`、`url#分支`） | 安装页文本框与文件上传 | 同文件的 `parseExtEntries()`；执行端 `src/ui/host-bridge.js` 的 `installExtensionBatch()` |
 | 导出日志 / 失败链接 txt / 安装报告 JSON | 安装页与报告页底部按钮 | 同文件的 `downloadTextFile()` |
 | 宿主扩展清单导出收束 | 已装页「导出扩展清单」 | `index.js` 的 `exportAssetList()`（`source:'host'`） |
@@ -209,6 +211,9 @@
 | **打包页：按数据包选择扩展** | 扩展管理 → 打包 | `src/ui/workbench-view.js` 的 `renderExtPack()`；扩展折叠为单元的纯逻辑在 `src/core/ext-pack.js`（`extensionUnitsOf` / `extensionUnitName`） |
 | **每包独立 Git 模式** | 打包页组头 / 图表卡 `[data-gitmode]` | `state.gitModeByPkg` + `packageGitMode(pkg)`；`getExportOptions(pkg)` 与合并计划按包取值 |
 | **Git 账号（多站点多账号）** | 扩展管理 → 安装页「Git 账号」 | `src/core/git-accounts.js`（归一/增删/默认/匹配/脱敏）；`src/ui/git-remote.js`（测试账号）；持久化在 `settings-store.js` 与 `extension_settings` |
+| **OAuth 登录（授权码 + PKCE）** | 账号区「OAuth 登录」 | `src/core/git-oauth.js`（端点事实 / PKCE / 换 token）；`workbench-view.js` 的 `startOAuth()` / `completeOAuthFromUrl()`；待完成态存 `sessionStorage['stpt.oauth.pending']` |
+| **令牌获取指引（一页教程）** | 账号区「令牌获取指引」→ 帮助视图 `gitToken` | `workbench-view.js` 的 `HELP.gitToken`（含站点链接与最小权限）；帮助渲染支持 `intro` / `links` |
+| **安装日志 = 全局日志** | 安装页 / 报告页「查看日志」 | `extLogAppend()` 写入 `state.log`；`renderExtReport()` 不再有独立日志块；报告与失败链接仍为本页独有 |
 | **凭据存储位置（服务端 / 仅浏览器）** | 账号区单选项 | `settings-panel.js` 的 `gitCredentialStorage`；`settings-store.js` 的 `saveSettings()` 在 browser 模式写回空的 `gitAccounts` 覆盖服务端副本 |
 | **URL 归一（含 `/tree/<ref>`）** | 安装条目行 | `src/core/git-url.js` 的 `parseRepoUrl()` / `refineRefWithBranches()`；仓库页地址必须解析成「根 + ref」——宿主用 URL 最后一段做目录名 |
 | **分支列举 / 仓库摘要 / 私有预检** | 条目行「列分支」与解析后自动预检 | `src/core/git-site.js`（端点/鉴权/归一）+ `src/ui/git-remote.js`（有界超时 fetch） |

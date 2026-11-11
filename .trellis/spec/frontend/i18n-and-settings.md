@@ -171,3 +171,26 @@ npm run dev       # 3040 → 仅开发热重载（demo 页已废弃，见 workbe
 - 判据：未确认时 `#chart-stack` 的 DOM 不变；取消后输入框回到旧值；确定后再改值会再次弹确认。
 - 实测（2026-11-05 浏览器）：输入 128 时 `stackLen` 保持 1001 不变；取消后 `value=''`；
   确定后 `value='128'`；再输 256 重新弹确认，取消回退 128。
+
+## 9. 整个插件的配置导入导出（2026-11-11 用户裁定）
+
+**位置**：设置视图 → 「数据」分组（不在扩展管理页）。
+
+**收录范围**（`src/ui/plugin-data.js`）：
+
+- `settings`：`loadSettings()` 全量（含 `gitAccounts` / `gitInstalls` / 凭据存储位置 / 默认目标等）。
+- `chartPrefs`：`loadChartPrefs()`；`chartLayout`：`localStorage['stpt.chartLayout']`。
+- `cloud`：`localStorage['st-pack-transfer:s3']`；`webdav`：`localStorage['st-pack-transfer:webdav']`。
+- **不含**：数据包（IndexedDB/OPFS）、待导出产物、日志。界面上如实写明。
+
+**凭据规则**：
+
+- 「包含登录凭据」默认关闭 ⇒ `settings.gitAccounts` 导出为空数组。
+- 只有同时勾选「包含 OAuth 令牌」才导出 `authKind === 'oauth'` 的账号；该勾选在未勾凭据时禁用。
+- 导入端只在 `data.includeCredentials === true` 时覆盖账号，否则保留现有账号（避免"没导凭据"被当成"清空账号"）。
+
+**导入**：确认后应用设置 / 图表偏好 / 布局 / 云与 WebDAV，账号合并（`addAccount`），
+随后 `location.reload()` 让图表偏好与布局生效；文案明确告知会重载。
+
+**守卫**：设置面板内的按钮用 `data-action="plugin-export|plugin-import"`，由 `openSettingsView` 的
+`onAction` 分发；不新增模板节点。

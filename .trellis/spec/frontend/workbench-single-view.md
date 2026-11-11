@@ -364,6 +364,13 @@ dev server 已能直接跑正式 UI，demo 只剩维护成本与误导风险。
 **例外**：教程全屏引导、`#st-converter-modal-overlay`（插件外壳）仍是固定定位；
 新增**任何**业务浮层前必须先过用户裁定。
 
+**整页视图占满插件（2026-11-11 用户裁定）**：设置 / 日志 / 帮助 / 存储审查这类占满插件的视图，
+除页头外**不得**残留其它常驻行（全局动作条 `#top-actions` 与切换行都不许有）。
+实现：`workbench-view.js` 的 `syncTopActions()`——`state.pane !== 'workbench'` 或
+`state.storageInspector.open` 时给 `#top-actions` 置 `hidden`；`showPane()` 与 `syncMainView()` 都调用它。
+判据：打开日志 / 设置 / 帮助 / 存储审查后 `#top-actions` 的 `getBoundingClientRect()` 不可见，
+视图从页头下沿占满到插件底部。
+
 ---
 
 ## 11. 执行卡取消 · 进度条置底 · 图表网格（2026-11-05 用户裁定）
@@ -602,7 +609,7 @@ dev server 已能直接跑正式 UI，demo 只剩维护成本与误导风险。
 
 ### 15.1 扩展管理的「打包」页
 
-- 位置：`#extension-view` 的第四个 tab（安装 / 打包 / 已装 / 报告）。
+- 位置：`#extension-view` 的三个页签之一（宿主 / 安装 / 打包）；宿主页常显安装报告条于面板底部。
 - 组织方式：**跟随图表逻辑**——每个已载入数据包一组，不切包；组头显示包名、已选数、模式与 Git 选择器。
 - 粒度：一个扩展目录一行（`src/core/ext-pack.js` 的 `extensionUnitsOf`）。路径形态覆盖
   `extensions/<n>`、`extensions/third-party/<n>`、`public/scripts/extensions/third-party/<n>`、

@@ -91,10 +91,19 @@ export function buildSettingsHtml(settings = {}) {
     + '<input class="text_pole" type="number" min="50" max="5000" step="50" data-setting="logMaxEntries" value="' + s.logMaxEntries + '"></label>'
     + setting('set-clear-log', 'clearLogOnLoad', t('settings.clearLogOnLoad'), s.clearLogOnLoad);
 
+  const dataGroup = '<div class="ext-row">'
+      + '<button type="button" class="btn" data-action="plugin-export">' + t('settings.exportData') + '</button>'
+      + '<button type="button" class="btn" data-action="plugin-import">' + t('settings.importData') + '</button>'
+    + '</div>'
+    + '<label class="check"><input type="checkbox" id="set-include-creds"> ' + t('settings.includeCreds') + '</label>'
+    + '<label class="check"><input type="checkbox" id="set-include-oauth" disabled> ' + t('settings.includeOauth') + '</label>'
+    + '<div class="ext-note">' + t('settings.dataNote') + '</div>';
+
   return '<div class="settings-grid">'
     + group('behavior', t('settings.groupBehavior'), tips, true)
     + group('export', t('settings.groupExport'), exportGroup, true)
     + group('log', t('settings.groupLog'), logging, false)
+    + group('data', t('settings.groupData'), dataGroup, false)
     + '</div>';
 }
 
