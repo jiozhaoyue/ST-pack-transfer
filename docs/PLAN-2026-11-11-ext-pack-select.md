@@ -98,4 +98,3 @@
 - [x] 响应式统一：JS 阈值 640→860，并与 CSS 合并为单一 `data-view` 判据；`#top-actions` 与 `#view-switch` 换位
 - [x] 目标小测试 + 守卫（`ext-pack` 6 项通过；六守卫全绿；构建 exit 0）
 - [x] UI 取证：六档宽度无溢出且切页正确；fixture 包打包页勾选与图表树双向同步、每包 Git 保持
-- [ ] P2-1..P2-4 / C1..C3
