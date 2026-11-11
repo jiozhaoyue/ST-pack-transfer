@@ -3,7 +3,7 @@
 > 面向**改这个仓的人**。用户向说明见 [README.md](../README.md)；跨会话的架构规范见 `.trellis/spec/`。
 > 本文登记**已经实现的功能**与它们的源码落点。**未实现的不写进来**——"文档有、代码无"是本仓明确禁止的形态。
 >
-> 最后核对：2026-11-10（本轮功能改动对照 `src/` 与目标测试；未跑全量）。
+> 最后核对：2026-11-11（本轮功能改动对照 `src/` 与目标测试；未跑全量）。
 
 ---
 
@@ -112,6 +112,9 @@
 | 合并写入（`merge`：覆盖同名、不删独有） | 恢复模态 `name:restore-mode` | `src/ui/host-bridge.js` 的 `restoreToHost()` |
 | 覆盖写入（二次警示） | 同上 | 同上 |
 | 批量恢复编排 | 恢复模态 | `src/core/restore-batch.js` |
+| **跨引擎裸 SQL 转储净化**（`_engine_dump.bin` / `_engine_meta.json`） | 自动 | `src/core/engine-sanitize.js`；`index.js` 的 `restoreSelectedConfirmed()`。PG→文件系统、文件系统→PG、PG→PG 不兼容一律剔除后走标准便携恢复，避免 `settings_pkey` 主键冲突；纯引擎转储包如实提示并跳过 |
+| **批量恢复容错与报告**（单包失败不中断、完整报告、保留/丢弃部分成果、进度落盘） | 恢复完成模态 | `index.js` 的 `restoreSelectedConfirmed()`（`stpt.restoreProgress`）；`src/ui/workbench-view.js` 的 `showRestoreReport()` |
+| **上传后刷新**（设置默认关；否则报告内提供「刷新页面」） | 设置 → 导出 / 恢复报告 | `src/ui/settings-panel.js` 的 `autoRefreshAfterUpload`；`index.js` 恢复完成分支 |
 | **目标写入门禁**（无备份/过期确认/目标变化/权限未知 ⇒ 零写入） | `#restore-backup-confirmed` | `src/ui/migration-controller.js` 的 `guardedRestore()` / `buildTargetEvidence()` |
 
 ### E. 迁移计划与安全判定（S1–S4，2026-10-13）
@@ -165,7 +168,9 @@
 | 宿主配额读数（Luker 同源兜底） | `src/ui/host-bridge.js` 的 `readHostStorageQuota()`（`RestProvider`） |
 | 导出扩展资产列表（官方扁平 JSON，可导入「下载扩展和资源菜单」） | 每张图表卡 `[data-assetlist]`；空态 `#btn-assetlist-host` | `src/core/asset-list.js`、`src/ui/host-bridge.js` 的 `listHostExtensions()`、`index.js` 的 `exportPackageAssetList()` / `exportHostAssetList()`；契约见 `.trellis/spec/frontend/asset-list-export.md` |
 | 设置分组可收起（提示 / 导出 / 日志） | `src/ui/settings-panel.js` 的 `buildSettingsHtml()`（三个 `<details>`） |
-| 图表单独最大化 + 逐层下钻（勾选逻辑不变） | `src/ui/workbench-view.js` 的 `chartCardHtml()` / `volScopedNodes()` / `volBreadcrumbHtml()` |
+| 图表单独最大化 + 逐层下钻（勾选逻辑不变） | `src/ui/workbench-view.js` 的 `chartCardHtml()` / `volScopedNodes()` / `volBreadcrumbHtml()`；**最大化只铺满 `#app.app-container`，不是浏览器视口全屏**（`style.css` 的 `.vol-card.is-max` 用 `position:absolute`） |
+| 扩展未勾选时的「保持不选 / 仅清单」 | `src/ui/workbench-view.js` 的 `extensionToolsHtml()` / `extensionManifestOnly()`；仅清单时保留扩展元数据扫描、实体由 manifest 模式丢弃 |
+| 私有配置目标宿主兼容标记 | `src/ui/workbench-view.js` 的 `privateHostCode()` / `nodePrivateIncompatible()`；跨宿主仍打包到 `_compat/`，树内显示「不兼容」 |
 
 ### J. file:// 单文件离线产物（S7，2026-10-13）
 
@@ -177,7 +182,6 @@
 | 验证 | `e2e/standalone/specs/offline-single-file.e2e.cjs`（28 断言） |
 
 ### K. 局域网互传（整面板视图，2026-11-05）
-
 | 功能 | UI 入口 | 源码落点 |
 | --- | --- | --- |
 | 用「迁移与备份」面板**完整替换**左侧图表面板 | `#chart-card` 动作行的 `#transfer-open-btn` | `src/ui/workbench-template.js`（`#transfer-view` + `#transfer-tabs`）、`src/ui/workbench-view.js` 的 `renderTransfer()` / `renderLan()` |
@@ -187,6 +191,22 @@
 
 > 新的承载面契约见 `.trellis/spec/frontend/workbench-single-view.md` §7.3；
 > 旧「执行卡内折叠块」模型（`.lan-block` / `#lan-toggle` / `.col-side.lan-open`）已废弃。
+
+### K2. 内联扩展管理（2026-11-11）
+
+| 功能 | UI 入口 | 源码落点 |
+| --- | --- | --- |
+| 视图切换（桌面 2 / 手机 3；桌面数据包列常显） | 顶栏下 `#view-switch` | `src/ui/workbench-view.js` 的 `renderViewSwitch()` / `syncMainView()` |
+| 扩展管理整面板（安装 / 已装 / 报告） | `#extension-view` | 同文件的 `renderExtensionView()` / `renderExtInstall()` / `renderExtInstalled()` / `renderExtReport()` |
+| 批量安装（多行链接 / `.txt` / `.json`；`url \| 分支`、`url#分支`） | 安装页文本框与文件上传 | 同文件的 `parseExtEntries()`；执行端 `src/ui/host-bridge.js` 的 `installExtensionBatch()` |
+| 导出日志 / 失败链接 txt / 安装报告 JSON | 安装页与报告页底部按钮 | 同文件的 `downloadTextFile()` |
+| 宿主扩展清单导出收束 | 已装页「导出扩展清单」 | `index.js` 的 `exportAssetList()`（`source:'host'`） |
+| 包清单入口收束 | 图表卡 `[data-extmanifest]` → 扩展管理并预填 | `index.js` 的 `openExtensionManifest` → `view.openExtensionManager()` |
+
+> 宿主「从宿主拉取」注入只允许落在**备份**动作区：ST/TT 的 `.userBackupButton`、
+> Luker 的 `.backupActionRow`（必须含 `.backupDownloadButton`）或 2.9+ `.dw-foot`（含
+> `[data-act="backup-go"]`）、TT 的 `#data_migration_export_button`、PT 的 `#ptdm-export`。
+> **禁止**回退到「首个 `.backupActionRow`」——日志查看器同用该类名，会注错（2026-11-11 实测）。
 
 ### L. 工作台布局：执行卡取消 · 进度条常驻 · 图表网格（2026-11-05）
 
@@ -204,7 +224,7 @@
 | 图表格式切换（单条多色 / 圆环） | 每张卡的 `[data-chartfmt-toggle]` 图标按钮 | `chartFmtOf()` / `volChartHtml()`；状态 `state.chartFmt[key]` |
 | 图表占比动态跟随勾选 | 自动 | `selectedMbMap()` / `volChartData()`；取消勾选后色块与 `tree-occ` 同步重算 |
 | 最大化逐层下钻 | 图表卡 `⤢` + 分类行 | `renderTreeRows()` 在 `drill` 态只渲染下钻按钮，面包屑 `data-volcrumb` 返回 |
-| 数据包偏好（占位勾选 + 顶部控件并入） | `#chart-pref-btn` | `src/ui/chart-prefs.js`、`openChartPrefs()` / `saveChartPrefsDraft()`；保存后只影响以后导入的包 |
+| 数据包偏好（占位勾选 + 顶部控件并入） | `#chart-pref-btn` | `src/ui/chart-prefs.js`、`openChartPrefs()` / `saveChartPrefsDraft()`；保存后只影响以后导入的包。**覆盖/增量已移出偏好**，改到数据包列表顶部 `#delta-toggle` |
 | 每行占用条与色标 | `.tree-row > .tree-dot` / `.tree-occ` | `renderTreeRows()` 用同一套调色板 |
 | 拖拽卡片改尺寸 | **已删除**（2026-11-09 用户裁定：图表大小由宫格动态决定，不允许自由拉伸） | — |
 

@@ -2042,10 +2042,50 @@ export async function installExtensionViaHost({ url, branch, replace = false }) 
     try {
       detail = await response.text();
     } catch { /* 忽略 */ }
+    /* Luker 的 `extensions.enabled=false` 会统一拦截所有扩展端点（含 /install），
+       清单安装在这种模式下不可用；白名单/权限拦截则回 403 但不带 disabled 语义。 */
+    if (response.status === 403 && /(disabled|not\s*enabled|feature\s*flag)/i.test(detail)) {
+      throw new Error('宿主已禁用扩展（extensions.enabled=false），清单安装不可用；请在宿主 config.yaml 打开扩展后重试');
+    }
+    if (response.status === 403) {
+      throw new Error(`宿主拒绝安装（403，可能被扩展白名单/黑名单或权限拦截）${detail ? `: ${detail}` : ''}`);
+    }
     throw new Error(`安装失败 (${response.status})${detail ? `: ${detail}` : ''}`);
   }
 
   return await response.json().catch(() => ({ success: true }));
+}
+
+/**
+ * 批量安装（内联扩展管理的执行端）：逐条调用宿主原生 install，单条失败不中断。
+ * `branch` / `version` / `ref` 统一作为宿主的 `branch` 参数（分支或标签）。
+ * @param {Array<{url:string,branch?:string,version?:string,ref?:string,replace?:boolean}>} entries
+ * @param {{onEntry?:Function,onLog?:Function}} [hooks]
+ * @returns {Promise<Array<{url:string,branch:string,status:'ok'|'failed',error?:string}>>}
+ */
+export async function installExtensionBatch(entries, { onEntry, onLog } = {}) {
+  const results = [];
+  const list = Array.isArray(entries) ? entries : [];
+  for (const entry of list) {
+    const url = String(entry?.url || '').trim();
+    if (!url) continue;
+    const branch = String(entry?.branch || entry?.version || entry?.ref || 'main').trim() || 'main';
+    onEntry?.({ url, branch, status: 'installing' });
+    onLog?.(`[${new Date().toISOString()}] installing ${url} (${branch})`);
+    try {
+      await installExtensionViaHost({ url, branch, replace: !!entry.replace });
+      onEntry?.({ url, branch, status: 'ok' });
+      onLog?.(`[${new Date().toISOString()}] OK ${url}`);
+      results.push({ url, branch, status: 'ok' });
+    } catch (err) {
+      const message = err?.message || String(err);
+      onEntry?.({ url, branch, status: 'failed', error: message });
+      onLog?.(`[${new Date().toISOString()}] FAIL ${url}: ${message}`);
+      results.push({ url, branch, status: 'failed', error: message });
+    }
+  }
+  onLog?.(`[${new Date().toISOString()}] finished: ${results.filter((r) => r.status === 'ok').length} ok / ${results.filter((r) => r.status === 'failed').length} failed`);
+  return results;
 }
 
 /**
@@ -3237,13 +3277,17 @@ export function mountLukerBackupManagerButton(onPull) {
     }
 
     // ≤2.8：备份管理器弹层里的动作行。只认含原生 ZIP 下载按钮的行——日志查看器弹层
-    // 同样用 .userBackupManager + .backupActionRow（2026-11-08 实测），不限定会注错容器。
-    // 可见过滤跳过已关闭未移除的残留弹层；:has 失配时退回旧行为（取首个动作行）。
+    // 同样用 .userBackupManager + .backupActionRow（2026-11-08 实测），**绝不回退**到
+    // 「取首个动作行」：那会把「从宿主拉取」注进日志查看器（2026-11-11 用户实测）。
     const rows = Array.from(document.querySelectorAll('.userBackupManager .backupActionRow'))
       .filter((el) => el.querySelector?.('.backupDownloadButton') && isElementVisible(el));
-    const row = rows[0]
-      || document.querySelector('.userBackupManager .backupActionRow');
-    if (!row) return;
+    const row = rows[0];
+    const stale = document.getElementById(BTN_ID);
+    if (!row) {
+      // 页面已切到日志/其它弹层：把可能残留的旧入口一并清掉。
+      if (stale && typeof stale.remove === 'function') stale.remove();
+      return;
+    }
 
     // 幂等 + 自愈：按钮已在**当前**动作行里才跳过；残留在旧弹层里的同名按钮挪到当前行
     // （全局 getElementById 命中残留弹层会挡住新弹层的注入——2026-11-08 实测回归）。

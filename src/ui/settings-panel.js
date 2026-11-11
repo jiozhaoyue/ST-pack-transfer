@@ -20,6 +20,8 @@ export const SETTINGS_DEFAULTS = Object.freeze({
   clearLogOnLoad: true,
   /** 每次加载插件是否清空浏览器里暂存的数据包（IndexedDB files + OPFS packages）。 */
   clearPackagesOnLoad: false,
+  /** 上传恢复成功后是否自动刷新页面；默认关闭（用户 2026-11-11 裁定）。 */
+  autoRefreshAfterUpload: false,
 });
 
 export const SETTING_KEYS = Object.freeze(Object.keys(SETTINGS_DEFAULTS));
@@ -36,6 +38,7 @@ export function normalizeSettings(input) {
     if (Number.isFinite(logMax)) out.logMaxEntries = Math.max(50, Math.min(5000, Math.round(logMax)));
     if (typeof input.clearLogOnLoad === 'boolean') out.clearLogOnLoad = input.clearLogOnLoad;
     if (typeof input.clearPackagesOnLoad === 'boolean') out.clearPackagesOnLoad = input.clearPackagesOnLoad;
+    if (typeof input.autoRefreshAfterUpload === 'boolean') out.autoRefreshAfterUpload = input.autoRefreshAfterUpload;
   }
   return out;
 }
@@ -56,7 +59,8 @@ export function buildSettingsHtml(settings = {}) {
     + setting('set-auto-tutorial', 'autoTutorial', t('settings.autoTutorial'), s.autoTutorial);
 
   const exportGroup = setting('set-delete-after-export', 'deleteAfterExport', t('settings.deleteAfterExport'), s.deleteAfterExport)
-    + setting('set-clear-packages', 'clearPackagesOnLoad', t('settings.clearPackagesOnLoad'), s.clearPackagesOnLoad);
+    + setting('set-clear-packages', 'clearPackagesOnLoad', t('settings.clearPackagesOnLoad'), s.clearPackagesOnLoad)
+    + setting('set-auto-refresh', 'autoRefreshAfterUpload', t('settings.autoRefreshAfterUpload'), s.autoRefreshAfterUpload);
 
   const logging = '<label class="et-git"><span>' + t('settings.logMaxEntries') + '</span>'
     + '<input class="text_pole" type="number" min="50" max="5000" step="50" data-setting="logMaxEntries" value="' + s.logMaxEntries + '"></label>'
@@ -90,6 +94,9 @@ export function readSettings(root) {
 
   const clearPackagesEl = root.querySelector?.('[data-setting="clearPackagesOnLoad"]');
   if (clearPackagesEl && typeof clearPackagesEl.checked === 'boolean') out.clearPackagesOnLoad = clearPackagesEl.checked;
+
+  const autoRefreshEl = root.querySelector?.('[data-setting="autoRefreshAfterUpload"]');
+  if (autoRefreshEl && typeof autoRefreshEl.checked === 'boolean') out.autoRefreshAfterUpload = autoRefreshEl.checked;
 
   return normalizeSettings(out);
 }
