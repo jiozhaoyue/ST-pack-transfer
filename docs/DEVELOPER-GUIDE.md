@@ -222,6 +222,11 @@
 | 迁移与备份教程 | 迁移面板头 `?` | `HELP.transfer`（局域网互传 / 云端仓库 / 恢复模式） |
 | 教程模式不自动退出 | 头部书本图标 `#btn-guide` / 横幅「退出教程」 | `tutorial-next` 最后一步只回目标菜单；`closeTutorial()` 才是退出 |
 | 设置三态（×保留草稿 / 取消丢弃 / 保存持久化） | 设置面板顶部 × 与底部按钮 | `workbench-view.js` 的 `captureSettingsDraft()` / `applySettingsDraft()` / `openSettingsView()`；`state.settingsDraft` 仅内存 |
+| 桌面整窗口铺满 / 选择锁 | `#app` 全屏、除日志与输入框外不可选 | `style.css` 的 `#app.app-container:not([data-view="mobile"])` 与 `user-select` 例外块 |
+| 切换行顺序（迁移与备份在扩展管理前） | 各面板头 `[data-view-switch]` | `workbench-view.js` 的 `renderViewSwitch()` 项序 |
+| 教程跳过 / 重新打开 | 浮层「跳过」、横幅「重新打开教程」 | `hideTutorialOverlay()`（只关浮层）与 `#tutorial-banner-reopen` → `openTutorial()` |
+| 开发者页签 / 宿主列表折叠 / 安装区向上展开 | 扩展管理 | `workbench-view.js` 的 `renderExtInstalled()`（`.ext-host-list`、`#extmgr-install-toggle`）；`state.extAccountsOpen=false` 默认收起 |
+| 演示占位扩展读文件 | 教程模式宿主列表 | `src/data/demo-extensions.json`（GitHub `st` 前缀仓库生成，禁止 JS 硬编码） |
 | 凭据双写（导出不必回读 settings.json） | 设置 → 数据 / 扩展管理 → 凭据 | `src/ui/settings-store.js` 的 `saveSettings()`：localStorage 与宿主 `extension_settings` 始终同写 |
 | 导出默认值（登录凭据默认勾选、OAuth 子项默认不勾） | 设置 → 数据 | `src/ui/settings-panel.js` 的 `dataGroup`；`src/ui/plugin-data.js` 的 `buildPluginData()` |
 | **Git 账号（多站点多账号）** | 扩展管理 → 安装页「Git 账号」 | `src/core/git-accounts.js`（归一/增删/默认/匹配/脱敏）；`src/ui/git-remote.js`（测试账号）；持久化在 `settings-store.js` 与 `extension_settings` |
