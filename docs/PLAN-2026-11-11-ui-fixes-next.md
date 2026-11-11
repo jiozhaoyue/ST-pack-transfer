@@ -43,6 +43,11 @@
 
 ### U3. 浏览器配额必须在所有平台完整显示，并可展开占用明细
 
+> **2026-11-11 追加纠正：内联展开作废。** 用户裁定：明细必须**占满插件容器 `#app.app-container`**，
+> UI 与逻辑照抄 Luker storage inspector；宿主行与浏览器行同一套面板，只换数据源。
+> 实施契约见 [`HANDOFF-2026-11-11-storage-inspector.md`](./HANDOFF-2026-11-11-storage-inspector.md)；
+> 下文仅保留当时的内联设计记录。
+
 - **现状**：`index.js:1611` 的 `readBrowserQuota()` 在 `quota<=0` 时返回 `null`
   ⇒ `renderQuota()` 显示「未提供」；且浏览器行被错误挂上「宿主未提供」尾巴、点击跳宿主存储页。
 - **要求**：浏览器行**只读浏览器**、与宿主无关；点击就地展开占用明细（像 Luker 的 storage-inspector）；

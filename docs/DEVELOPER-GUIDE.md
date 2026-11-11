@@ -164,7 +164,7 @@
 | 功能 | 源码落点 |
 | --- | --- |
 | 结构化实时日志（等级按钮自带条数 / 毫秒时间戳 / 条数上限 / 加载时清空） | `src/ui/workbench-view.js` 的 `renderLog()` / `nowTime()` / `logLimit()`；`test` 外无独立模块 |
-| 存储配额两行（浏览器 / 宿主）：**浏览器行可展开占用明细**（只读浏览器，不经宿主）；宿主行点击跳宿主原生存储页 | `src/ui/workbench-view.js` 的 `renderQuota()` / `renderQuotaDetails()`；`index.js` 的 `readBrowserUsageDetails()`（`navigator.storage.estimate()` 分项 + localStorage/sessionStorage 自算 + 本插件 IndexedDB/OPFS）；`src/ui/host-bridge.js` 的 `openHostStoragePage()` / `openHostAccountWindow()` |
+| 存储配额两行（浏览器 / 宿主）：浏览器行当前为**内联明细（过渡实现，将替换为占满 `#app.app-container` 的统一存储审查面板）**；宿主行点击跳宿主原生存储页 | `src/ui/workbench-view.js` 的 `renderQuota()`（过渡内联 `renderQuotaDetails()`）；`index.js` 的 `readBrowserUsageDetails()`；`src/ui/host-bridge.js` 的 `openHostStoragePage()`。目标契约见 [HANDOFF-2026-11-11-storage-inspector.md](./HANDOFF-2026-11-11-storage-inspector.md) |
 | 教程演示模式（占位数据可操作；退出整体还原；不写真实数据/宿主） | `#btn-guide` / 教程菜单 / `#tutorial-banner-exit` | `src/ui/workbench-view.js` 的 `enterTutorialMode()` / `exitTutorialMode()` / `demoTutorialActions()` / `buildDemoPackages()`；模板 `#tutorial-banner` |
 | 目标任务式教程（选目标 → 逐步高亮；按平台与桌面/手机视图自适应；目标缺失时卡片居中保留） | `#btn-guide` → 目标菜单 | `src/ui/workbench-view.js` 的 `TUTORIAL_GOALS` / `renderTutorial()` / `tutorialPrepareStep()` / `centerTutorialCard()` |
 | 宿主配额读数（Luker 同源兜底） | `src/ui/host-bridge.js` 的 `readHostStorageQuota()`（`RestProvider`） |

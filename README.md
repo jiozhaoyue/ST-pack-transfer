@@ -110,7 +110,7 @@
 - **教程 = 演示模式**：打开先选「数据包转换 / 上传宿主 / 从宿主拉取 / 扩展管理 / 迁移备份」，
   在**占位数据**上直接操作（可勾选、生成、删除、查看配额明细）；顶部横幅随时「退出教程」，
   退出后完整还原，全程不写入任何真实数据或宿主。
-- **浏览器配额可展开**：点「浏览器配额」行就地展开占用明细（IndexedDB / Cache Storage /
+- **浏览器配额可查看占用明细**：点「浏览器配额」查看当前浏览器的占用明细（IndexedDB / Cache Storage /
   localStorage 等，直接读浏览器，与宿主无关）。
 - 纯库模式：给聊天库补齐磁盘缺失的聊天 / 从库导出 / 还原后入库（上游接口未实现，未在真实环境跑通）。
 - 三形态：独立网页、酒馆插件（全屏模态）、`file://` 单文件离线版。
@@ -177,6 +177,7 @@ npm run preview      # 本地预览 dist（4173）
 - 功能清单与源码落点：[docs/DEVELOPER-GUIDE.md](docs/DEVELOPER-GUIDE.md)（**改代码先读它**）
 - 分层规范与踩坑记录：[.trellis/spec/](.trellis/spec/)
 - 当前计划与状态：[docs/PLAN-2026-11-11-ui-fixes-next.md](docs/PLAN-2026-11-11-ui-fixes-next.md)
+- 存储审查面板实施契约：[docs/HANDOFF-2026-11-11-storage-inspector.md](docs/HANDOFF-2026-11-11-storage-inspector.md)
 
 ```bash
 npm test                      # 单元测试（纯逻辑层无 DOM 依赖）
