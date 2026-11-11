@@ -128,11 +128,8 @@ export function saveSettings(settings) {
       /* 隐私模式 / 配额不足：静默降级，不阻塞 */
     }
   }
-  /* 「仅浏览器」：服务端那份必须被清空，否则用户以为没存服务器、实际还留着。
-     这里写回一个 gitAccounts 为空的副本，宿主保存时即覆盖旧值。 */
-  const hostCopy = normalized.gitCredentialStorage === 'browser'
-    ? { ...normalized, gitAccounts: [] }
-    : normalized;
-  saveHostSettings(hostCopy);
+  /* 凭据双写：服务端 settings.json 与浏览器 localStorage 都保留完整副本，
+     导出插件数据时直接读本地，不必回读 settings.json（2026-11-11 用户裁定）。 */
+  saveHostSettings(normalized);
   return normalized;
 }

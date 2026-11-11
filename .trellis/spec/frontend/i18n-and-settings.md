@@ -194,3 +194,27 @@ npm run dev       # 3040 → 仅开发热重载（demo 页已废弃，见 workbe
 
 **守卫**：设置面板内的按钮用 `data-action="plugin-export|plugin-import"`，由 `openSettingsView` 的
 `onAction` 分发；不新增模板节点。
+
+## 10. 设置三态 / 凭据双写 / 导出默认值（2026-11-11 用户裁定）
+
+### 10.1 设置面板三态
+
+| 操作 | 语义 | 持久化 |
+| --- | --- | --- |
+| 顶部 `×`（`#settings-close`） | 关闭设置界面，**保留内存草稿**（`state.settingsDraft`） | 否，**刷新页面即丢** |
+| 底部「取消」（`#settings-cancel`，文案 `modal.cancel`） | 丢弃草稿并关闭 | 否 |
+| 底部「保存」（`#settings-save`） | `saveSettings()`：localStorage + 宿主 `settings.json` 双写 | 是 |
+
+- 草稿只存内存（`captureSettingsDraft` / `applySettingsDraft`），**不得**写 localStorage 冒充已保存。
+- 保存与取消都会清空 `state.settingsDraft`；重开设置时草稿存在则回填。
+
+### 10.2 Git 凭据双写
+
+- `saveSettings()` **始终**把完整设置（含 `gitAccounts`）同时写 localStorage 与宿主 `extension_settings`；
+  不再有「仅浏览器就清空服务端副本」的分支。
+- 原因：导出插件数据要能**直接读本地**，不必回读 `settings.json`。
+
+### 10.3 导出勾选默认值
+
+- 「包含登录凭据」默认**勾选**；「包含 OAuth 令牌」是它的子项，默认**不勾选**，取消父项时自动取消并禁用。
+- 面板文案 `settings.dataNote` 必须如实描述这两个默认值。

@@ -348,7 +348,7 @@ export function getWorkbenchHtml() {
       </div>
       <div class="view-body" id="settings-body"></div>
       <div class="view-actions">
-        <button class="btn" id="settings-cancel" data-i18n="modal.close"></button>
+        <button class="btn" id="settings-cancel" data-i18n="modal.cancel"></button>
         <button class="btn accent" id="settings-save" data-i18n="modal.save"></button>
       </div>
     </section>
