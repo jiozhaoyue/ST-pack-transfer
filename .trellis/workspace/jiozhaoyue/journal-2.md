@@ -1307,3 +1307,38 @@ Topics: [.trellis/research/11-11-chart-maximize-and-extension-manager.md](../../
 ### Next Steps
 
 - 按计划依次修 U1–U6，并在 4173 多宽度取证
+
+
+## Session 75: Session 75 交接：统一存储审查面板
+<!-- trellis-session: v=2 fp=cbe1c70dc6b5cb29 -->
+
+**Date**: 2026-11-11
+**Task**: Session 75 交接：统一存储审查面板
+**Branch**: `main`
+
+### Summary
+
+用户裁定存储明细改为占满插件容器的统一面板（照抄 Luker），内联方案作废；已写实施契约，代码待实现。
+
+### Main Changes
+
+- 交付 docs/HANDOFF-2026-11-11-storage-inspector.md（统一 provider 契约 / 文件级改点 / 10 条验收判据 / 待裁定项）
+- DEV GUIDE、PLAN、README 标注浏览器配额内联实现为过渡方案并指向交接
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `5fe7dc1` | docs(handoff): 统一存储审查面板契约（占满插件 DOM） |
+
+### Testing
+
+- [OK] 文档引用逐条核对：readHostStorageQuota / openHostStoragePage / Luker /storage/inspect 端点与模板路径
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 按 HANDOFF 实现：storageInspector 模板 + 视图 + 浏览器 provider + 宿主 provider + 六守卫 + 4173 多宽度取证
