@@ -170,7 +170,7 @@
 | 教程演示模式（占位数据可操作；退出整体还原；不写真实数据/宿主） | `#btn-guide` / 教程菜单 / `#tutorial-banner-exit` | `src/ui/workbench-view.js` 的 `enterTutorialMode()` / `exitTutorialMode()` / `demoTutorialActions()` / `buildDemoPackages()`；模板 `#tutorial-banner` |
 | 目标任务式教程（选目标 → 逐步高亮；按平台与桌面/手机视图自适应；目标缺失时卡片居中保留） | `#btn-guide` → 目标菜单 | `src/ui/workbench-view.js` 的 `TUTORIAL_GOALS` / `renderTutorial()` / `tutorialPrepareStep()` / `centerTutorialCard()` |
 | 宿主配额读数（Luker `RestProvider`，供配额行） | `src/ui/host-bridge.js` 的 `readHostStorageQuota()`；面板内的逐层读取走 `fetchHostStorageInspect()` |
-| 导出扩展资产列表（官方扁平 JSON，可导入「下载扩展和资源菜单」） | 每张图表卡 `[data-assetlist]`；空态 `#btn-assetlist-host` | `src/core/asset-list.js`、`src/ui/host-bridge.js` 的 `listHostExtensions()`、`index.js` 的 `exportPackageAssetList()` / `exportHostAssetList()`；契约见 `.trellis/spec/frontend/asset-list-export.md` |
+| 导出扩展资产列表（官方扁平 JSON，可导入「下载扩展和资源菜单」） | 每张图表卡 `[data-assetlist]`；扩展管理 → 宿主页工具条 `#extmgr-export-assetlist`（空态不再提供入口） | `src/core/asset-list.js`、`src/ui/host-bridge.js` 的 `listHostExtensions()`、`index.js` 的 `exportPackageAssetList()` / `exportHostAssetList()`；契约见 `.trellis/spec/frontend/asset-list-export.md` |
 | 设置分组可收起（提示 / 导出 / 日志） | `src/ui/settings-panel.js` 的 `buildSettingsHtml()`（三个 `<details>`） |
 | 图表单独最大化 + 逐层下钻（勾选逻辑不变） | `src/ui/workbench-view.js` 的 `chartCardHtml()` / `volScopedNodes()` / `volBreadcrumbHtml()`；**最大化只铺满 `#app.app-container`，不是浏览器视口全屏**（`style.css` 的 `.vol-card.is-max` 用 `position:absolute`） |
 | 扩展未勾选时的「保持不选 / 仅清单」 | `src/ui/workbench-view.js` 的 `extensionToolsHtml()` / `extensionManifestOnly()`；仅清单时保留扩展元数据扫描、实体由 manifest 模式丢弃 |
@@ -226,7 +226,10 @@
 | 切换行顺序（迁移与备份在扩展管理前） | 各面板头 `[data-view-switch]` | `workbench-view.js` 的 `renderViewSwitch()` 项序 |
 | 教程跳过 / 重新打开 | 浮层「跳过」、横幅「重新打开教程」 | `hideTutorialOverlay()`（只关浮层）与 `#tutorial-banner-reopen` → `openTutorial()` |
 | 开发者页签 / 宿主列表 / 安装页脚 | 扩展管理 | 宿主页顶部 `ext-toolbar`（按钮 + 排序）、列表头 `ext-list-head`（数量 + 自动更新勾选组）、可拖拽排序行；安装扩展是面板**固定页脚** `#extmgr-install-block`（`renderExtInstalled()` / `syncExtInstallBlock()`），紧贴安装报告条 |
-| 演示占位扩展读文件 | 教程模式宿主列表 | `src/data/demo-extensions.json`（GitHub `st` 前缀仓库生成，禁止 JS 硬编码） |
+| **扩展作用域互转（全局 ⇄ 用户）** | 扩展管理 → 宿主页每行「移至全局 / 移至用户」（**仅管理员**渲染） | 宿主 `POST /api/extensions/move`；`src/ui/host-bridge.js` 的 `moveExtensionViaHost()`、`src/ui/workbench-view.js` 的 `moveScopeWithConfirm()` / `moveInstalledExtension()`；`index.js` 的 `actions.moveExtension` |
+| **安装到全局** | 扩展管理 → 宿主页安装区「安装到全局」（**仅管理员**可见） | `src/ui/host-bridge.js` 的 `installExtensionBatch()` 透传 `global` 给 `installExtensionViaHost()`；`workbench-view.js` 的 `renderExtInstall()` / `runExtInstall()` |
+| **加载顺序只读展示** | 扩展列表 `#N` 徽标 + 排序「加载顺序」；**不提供编辑**（宿主无写回端点） | `src/core/asset-list.js` 的 `manifestToExtension().loadingOrder`；`workbench-view.js` 的 `installedRowRecords()` / `sortedInstalledRecords()` |
+| 演示占位扩展读数据模块 | 教程模式宿主列表 | `src/data/demo-extensions.js`（GitHub `st` 前缀仓库生成；**必须是 ESM 而不是 JSON**，否则浏览器直装整图失败——见 K2 段落与 2026-11-11 事故记录） |
 | 凭据双写（导出不必回读 settings.json） | 设置 → 数据 / 扩展管理 → 凭据 | `src/ui/settings-store.js` 的 `saveSettings()`：localStorage 与宿主 `extension_settings` 始终同写 |
 | 导出默认值（登录凭据默认勾选、OAuth 子项默认不勾） | 设置 → 数据 | `src/ui/settings-panel.js` 的 `dataGroup`；`src/ui/plugin-data.js` 的 `buildPluginData()` |
 | **Git 账号（多站点多账号）** | 扩展管理 → 安装页「Git 账号」 | `src/core/git-accounts.js`（归一/增删/默认/匹配/脱敏）；`src/ui/git-remote.js`（测试账号）；持久化在 `settings-store.js` 与 `extension_settings` |
@@ -376,13 +379,14 @@ index.js      根控制器：detectHost → applyPluginUi → ExportQueue + Task
 ## 四、质量门槛与命令
 
 ```bash
-npm test                      # Vitest 全量（2026-10-13 基线：718 passed / 2 skipped / 71 文件）
+npm test                      # Vitest 全量（2026-11-11 基线：1152 passed / 2 skipped / 120 文件）
 npx vitest run test/xxx.test.js
 npm run check:css-scope       # CSS 双前缀
 npm run check:dom-injection   # innerHTML 未转义插值
 npm run check:template-source # 单一模板源 + 必需节点 id
 npm run check:dom-scope       # 宿主 DOM 写入作用域
 npm run check:control-consumer# 控件消费点
+npm run check:no-bundler-only# 宿主直装：禁止 JSON 静态导入 / node: / 裸包名 / Vite 专有语法
 npm run build                 # GitHub Pages 静态站点（base=./）
 npm run preview               # 本地静态服务器托管 dist（4173）——**UI 验收唯一入口**
 npm run build:offline         # file:// 单文件离线产物

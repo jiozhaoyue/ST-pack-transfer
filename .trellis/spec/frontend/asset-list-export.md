@@ -12,8 +12,8 @@
 - 每个条目只允许五键：`id / type / name / description / url`。
 - `type` 当前固定为 `extension`；`url` 必须是 `http(s)`。
 - 只保留可下载条目；**没有任何可下载条目时不得生成空文件冒充成功**。
-- **使用教程不能写进 JSON**（会破坏 `Array.isArray`）。教程放在两处：导出按钮的
-  `title`（`empty.assetListHint`）与导出成功 toast（`toast.assetListExported`），
+- **使用教程不能写进 JSON**（会破坏 `Array.isArray`）。空态入口已按用户裁定删除，
+  教程只保留在导出成功 toast（`toast.assetListExported`），
   文案固定为「保存为 index.json → 酒馆 → 下载扩展和资源菜单 → Asset URL → 加载资产列表」。
 
 ## 2. 数据来源
@@ -29,7 +29,8 @@
 1. `GET /api/extensions/discover`（权威；ST / Luker 客户端自己使用该端点）；
 2. 根 `GET /api/extensions` 仅作兼容兜底；
 3. 逐条 `GET /scripts/extensions/<name>/manifest.json`，取
-   `display_name / description / version / author / homePage`；
+   `display_name / description / version / author / homePage`，并保留 `loading_order`
+   作为**只读**加载顺序事实（`loadingOrder`，见 `extension-git-manager.md` §14）；
 4. `homePage` 缺失 ⇒ 条目保留但 `url:''`，导出时被过滤；
 5. 端点形状不认识或全部失败 ⇒ `{ok:false}`，UI 显示「当前宿主未提供扩展清单」；
 6. 端点成功但数组为空 ⇒ `ok:true, total:0`（真实空清单，与「不支持」区分）。
@@ -41,7 +42,7 @@
 | 位置 | DOM | 行为 |
 | --- | --- | --- |
 | 每张图表卡 | `[data-assetlist]` + `data-assetpkgs` | 导出该包/合并包的扩展资产列表 |
-| 从宿主拉取空态卡 | `#btn-assetlist-host` | 调宿主 discover + manifest 导出 |
+| 扩展管理 → 宿主页工具条 | `#extmgr-export-assetlist` | 调宿主 discover + manifest 导出（空态**不再**提供入口） |
 
 设置「诊断」里的导出按钮**已删除**（用户裁定：不要第三处）。
 

@@ -227,3 +227,41 @@ GitLab `/<group>/<sub>/<repo>/-/tree/<ref>`、`.git` 后缀、query/hash、`http
 `host-bridge.js`（`readHostExtensionGit`）、`git-remote.js`（`listTags` / `listCommits` / `commitDetail` / `rawFile`）。
 
 **验收**：`test/git-viz.test.js`（9）、`test/git-site-viz.test.js`（6）、`test/plugin-kind.test.js`（4）。
+
+## 13. 作用域互转：全局 ⇄ 用户（2026-11-11 追加）
+
+**端点事实**（`POST /api/extensions/move`，SillyTavern 与 Luker 上游同源；2026-11-11 核对两端
+`src/endpoints/extensions.js` 的 `/move` 处理器）：
+
+| 字段 | 语义 |
+| --- | --- |
+| `extensionName` | 扩展**目录名**（不含 `third-party/` 前缀）；宿主只做 `sanitize()` |
+| `source` / `destination` | `global` 或 `local`；宿主把**任何非 `global`** 都当作用户目录 |
+| 结果 | 204 成功；404 源目录不存在；409 目标已存在或源=目标；403 非管理员 |
+
+- **双向移动都要求管理员**：两端服务端都先判 `request.user.profile.admin`；原生客户端也只在
+  `isAdmin()` 时开放入口（`public/scripts/extensions.js` 的 `onMoveClick()`）。
+- 插件判据唯一：`readHostIdentity().admin === true`（`GET /api/users/me`）；非管理员**不渲染**按钮。
+- 实现落点：`src/ui/host-bridge.js` 的 `moveExtensionViaHost()`（CSRF、120 s 超时、原文截断）；
+  `src/ui/workbench-view.js` 的 `moveScopeWithConfirm()` / `moveInstalledExtension()`；
+  `index.js` 的 `actions.moveExtension`。失败按 `forbidden / conflict / not-found / network`
+  如实回显，不静默、不伪造成功。
+- 安装到全局：`installExtensionViaHost({ url, branch, replace, global })` 透传宿主；
+  `installExtensionBatch()` 读 `entry.global`。界面只在管理员时显示「安装到全局」，默认仍是用户作用域。
+
+## 14. 扩展加载顺序（只读事实，2026-11-11 取证）
+
+**事实**：`manifest.json` 的 `loading_order`（数字，越小越早）。缺失时 `parseInt(undefined)` 为 `NaN`，
+比较器把它当 0 处理，等价于「最早」，同值再按 `display_name` 排序。
+
+| 宿主 | 排序与执行 | 证据 |
+| --- | --- | --- |
+| SillyTavern | 升序排序，同值用 `display_name` 兜底；**逐个 `await` 串行激活** | `public/scripts/extensions.js` 的 `sortManifestsByOrder` 与 `activateExtensions()` |
+| Luker | 同一升序；**同 `loading_order` 组内并行**，组与组之间串行（等上一组 `activate` 全部 settle） | `public/scripts/extensions.js` 的 `activateExtensions()`（函数注释写明组语义与真实踩坑案例） |
+
+- 原生 UI **没有**调整真实加载顺序的入口；`sortManifestsByName` / `sortManifestsByOrder` 只作用于
+  **列表显示**（`loadExtensionSettings` 的排序开关）。
+- 宿主扩展端点只有 install / update / move / delete / version / branches / switch / discover，
+  **没有**写回 `manifest.json` 的端点。
+- 因此「手动调整」= 编辑该扩展自己的 `manifest.json` 的 `loading_order` 后刷新页面
+  （全局扩展需要管理员/文件权限）。本插件只展示 `#N` 并支持按它排序，**不得**提供伪编辑控件。

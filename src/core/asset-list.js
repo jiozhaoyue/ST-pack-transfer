@@ -113,6 +113,10 @@ export function manifestToExtension(folder, manifest = {}, extra = {}) {
     author: text(manifest.author),
     url: text(manifest.homePage || manifest.homepage || extra.url),
     sourceType: text(extra.sourceType) || 'local',
+    /* 加载顺序事实（只读）：manifest.loading_order；缺失/非法时为 null，调用方必须显示「未提供」。 */
+    loadingOrder: Number.isFinite(Number(manifest?.loading_order)) && String(manifest?.loading_order ?? '') !== ''
+      ? Number(manifest.loading_order)
+      : null,
   };
 }
 
