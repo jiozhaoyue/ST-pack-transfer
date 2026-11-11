@@ -42,7 +42,7 @@
 - **加载顺序**：`manifestToExtension()` 保留 `loadingOrder`；列表显示 `#N` 并新增「加载顺序」排序。
   **只读**：宿主没有写回 manifest 的端点，插件不提供伪编辑。
 - **空态按钮**：删除 `#btn-assetlist-host` 及其事件分支、i18n 键；入口只剩图表卡与扩展管理工具条。
-- **防回归**：`scripts/no-bundler-only.js` + `npm run check:no-bundler-only`，
+- **防回归**：`tooling/no-bundler-only.js`（入库）+ `npm run check:no-bundler-only`，
   拦截 JSON 静态导入、`node:` 静态导入、裸包名、Vite 专有语法（`?raw` / `import.meta.env` 等）。
 
 ## 4. 契约与文档
