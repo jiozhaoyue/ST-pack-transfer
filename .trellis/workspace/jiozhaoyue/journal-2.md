@@ -1645,3 +1645,45 @@ Topics: [.trellis/spec/frontend/extension-git-manager.md](../../spec/frontend/ex
 ### Status
 
 [OK] **Completed**
+
+
+## Session 84: 宿主直装修复 + 原生扩展作用域互转/加载顺序（Session 84）
+<!-- trellis-session: v=2 fp=3220a76951543a48 -->
+
+**Date**: 2026-11-11
+**Task**: 宿主直装修复 + 原生扩展作用域互转/加载顺序（Session 84）
+**Branch**: `main`
+
+### Summary
+
+修复 JSON 静态导入导致的宿主整图加载失败；新增管理员作用域互转与安装到全局；加载顺序只读展示；删除无包空态导出按钮；新增宿主直装守卫
+Topics: [.trellis/spec/frontend/extension-git-manager.md](../../spec/frontend/extension-git-manager.md), [.trellis/spec/frontend/asset-list-export.md](../../spec/frontend/asset-list-export.md)
+
+### Main Changes
+
+- 演示数据 JSON → ESM，根因是浏览器直装不能 import JSON
+- moveExtensionViaHost / 安装 global / 管理员作用域互转
+- loading_order 只读展示与排序
+- 删除 #btn-assetlist-host 与死 i18n 键
+- check:no-bundler-only 守卫（scripts 本地专属）
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `5bd092d` | fix(host): 修复宿主直装整图失败 + 原生作用域互转与加载顺序 |
+
+### Testing
+
+- [OK] vitest 1152 passed / 2 skipped / 120 文件
+- [OK] 六条既有守卫 + no-bundler-only 全绿
+- [OK] npm run build 成功（5.01s）
+- [OK] 纯静态+Playwright：index.js 200，无模块加载失败
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 在 Dev 实例实机点一次作用域互转与安装到全局

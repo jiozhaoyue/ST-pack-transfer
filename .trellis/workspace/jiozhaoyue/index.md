@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-2.md`
-- **Total Sessions**: 83
+- **Total Sessions**: 84
 - **Last Active**: 2026-11-11
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-2.md` | ~1647 | Active |
+| `journal-2.md` | ~1689 | Active |
 | `journal-1.md` | ~2491 | Archived |
 <!-- @@@/auto:active-documents -->
 
@@ -30,6 +30,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 84 | 2026-11-11 | 宿主直装修复 + 原生扩展作用域互转/加载顺序（Session 84） | `5bd092d` | `main` |
 | 83 | 2026-11-11 | 自动更新失败退避 + 全部运行阈值可调 | - | `main` |
 | 82 | 2026-11-11 | 逐扩展自动更新（5 秒级）/ 批量更新卸载 / 清单统一入口 / Git 常显 / 教程居中 | - | `main` |
 | 81 | 2026-11-11 | P2 开发者层级 / 管理员分区 / 误装拒绝 / P3 Git 只读可视化 + 宿主页版式返工 | - | `main` |

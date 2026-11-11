@@ -236,7 +236,7 @@ npm run preview      # 本地预览 dist（4173）
   [.trellis/spec/frontend/storage-inspector.md](.trellis/spec/frontend/storage-inspector.md)
 - 当前计划与状态：[docs/PLAN-2026-11-11.md](docs/PLAN-2026-11-11.md)
 - 存储审查面板实现契约与取证：[docs/HANDOFF-2026-11-11-storage-inspector.md](docs/HANDOFF-2026-11-11-storage-inspector.md)
-- 最近一次会话交接：[.trellis/workspace/jiozhaoyue/HANDOFF-2026-11-11-2.md](.trellis/workspace/jiozhaoyue/HANDOFF-2026-11-11-2.md)
+- 最近一次会话交接：[.trellis/workspace/jiozhaoyue/HANDOFF-2026-11-11-8.md](.trellis/workspace/jiozhaoyue/HANDOFF-2026-11-11-8.md)
 
 ```bash
 npm test                      # 单元测试（纯逻辑层无 DOM 依赖）
