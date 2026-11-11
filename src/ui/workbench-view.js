@@ -42,6 +42,8 @@ import { createGitRemote } from './git-remote.js';
 import { t } from '../i18n/index.js';
 import { loadSettings, saveSettings } from './settings-store.js';
 import { loadChartPrefs, saveChartPrefs, normalizeChartPrefs } from './chart-prefs.js';
+/* 占位/演示扩展清单从数据文件读取（禁止在 JS 里硬编码仓库清单）。 */
+import demoExtensionsData from '../data/demo-extensions.json';
 
 /**
  * 教程锚点纯几何：用 overlay 自身矩形做基准，兼容宿主容器的 transform。
@@ -224,7 +226,7 @@ const state = {
   host:'luker', mode:'plugin', view:'desktop', mainView:'chart', mobileView:'chart', pane:'workbench', zone:'import',
   extTab:'host', extEntries:[], extResults:[], extRunning:false, extInstalled:null, extManifestPrefill:[],
   extReportOpen:false, extInstallOpen:false, devAutoRan:false, settingsDraft:null,
-  extAccountTests:[], extUpdate:null, extAccountsOpen:true,
+  extAccountTests:[], extUpdate:null, extAccountsOpen:false,
   source:{ type:'host', pkgId:null }, target:'SillyTavern', targetManual:false,
   delta: 'overwrite', splitMb: chartPrefs.splitMb,
   compression: chartPrefs.compression,
@@ -437,8 +439,8 @@ function renderViewSwitch(){
   const mobile=state.view==='mobile';
   const items=[{id:'chart',label:t('view.chart')}];
   if(mobile) items.push({id:'zone',label:t('view.zone')});
-  items.push({id:'extension',label:t('view.extension')});
   items.push({id:'transfer',label:t('transfer.open')});
+  items.push({id:'extension',label:t('view.extension')});
   const active=state.transfer.open ? 'transfer' : (mobile?state.mobileView:state.mainView);
   const html=items.map(it=>'<button type="button" class="view-switch-btn'+(it.id===active?' active':'')+'" data-wbview="'+it.id
     +'" aria-pressed="'+(it.id===active)+'">'+viewSwitchIcon(it.id)+'<span>'+it.label+'</span></button>').join('');
@@ -2328,17 +2330,27 @@ async function renderExtInstalled(body){
     +'<button type="button" class="btn" id="extmgr-check-updates"'+(upd&&upd.busy?' disabled':'')+'>'+t('extmgr.checkUpdates')+'</button>'
     +'<button type="button" class="btn" id="extmgr-refresh-installed">'+t('extmgr.refresh')+'</button>'
     +'<span style="flex:1"></span></div>'
+    +'<details class="ext-host-list" open>'
+    +'<summary>'+t('extmgr.hostListTitle',{n:list.length})+'</summary>'
     +'<div class="ext-list">'+(rows||'<div class="ext-empty">'+t('extmgr.noneInstalled')+'</div>')+'</div>'
+    +'</details>'
     +updBlock
-    +'<details class="ext-install-block" id="extmgr-install-block"'+(state.extInstallOpen?' open':'')+'>'
-    +'<summary>'+t('extmgr.installBlock')+'</summary>'
-    +'<div class="ext-install-area" id="extmgr-install-area"></div>'
-    +'</details></div>';
+    +'<div class="ext-install-block" id="extmgr-install-block">'
+    +'<div class="ext-install-area" id="extmgr-install-area"'+(state.extInstallOpen?'':' hidden')+'></div>'
+    +'<button type="button" class="btn" id="extmgr-install-toggle" aria-expanded="'+(state.extInstallOpen?'true':'false')+'">'
+    +t('extmgr.installBlock')+(state.extInstallOpen?' ▲':' ▲')+'</button>'
+    +'</div></div>';
   body.querySelector('#extmgr-export-assetlist')?.addEventListener('click',()=>actions.exportAssetList?.({source:'host'}));
   body.querySelector('#extmgr-check-updates')?.addEventListener('click',()=>{ void checkExtUpdates(); });
   body.querySelector('#extmgr-refresh-installed')?.addEventListener('click',()=>{ state.extInstalled=null; state.extUpdate=null; renderExtensionView(); });
-  const installBlock=body.querySelector('#extmgr-install-block');
-  installBlock?.addEventListener('toggle',()=>{ state.extInstallOpen=!!installBlock.open; });
+  const installToggle=body.querySelector('#extmgr-install-toggle');
+  installToggle?.addEventListener('click',()=>{
+    state.extInstallOpen=!state.extInstallOpen;
+    const area=body.querySelector('#extmgr-install-area');
+    if(area) area.hidden=!state.extInstallOpen;
+    installToggle.setAttribute('aria-expanded',state.extInstallOpen?'true':'false');
+    if(state.extInstallOpen) refreshInstallArea();
+  });
   refreshInstallArea();
   body.querySelectorAll('[data-dev]').forEach((el)=>el.addEventListener('change',()=>{
     const s=gitSettings(); const map={...(s.gitDevMode||{})};
@@ -3433,7 +3445,7 @@ function demoTutorialActions(real){
   wrap.onTargetChange=undefined;
   wrap.privateFiles={ list:()=>[], verify:async()=>({ ok:true, verified:{} }), remove:async()=>({ ok:true }) };
   wrap.installExtensions=async()=>{ demoOnly(); return []; };
-  wrap.listHostExtensions=async()=>{ demoOnly(); return []; };
+  wrap.listHostExtensions=async()=>({ items: demoExtensionsData.items });
   wrap.lan=Object.fromEntries(['generate','applyAnswer','acceptOffer','retry','cancel','abandon'].map((k)=>[k, demoOnly]));
   wrap.storageInspector=async (source,path)=>demoStorageInspect(source,path);
   return wrap;
@@ -3662,6 +3674,12 @@ function centerTutorialCard(card, overlay){
   card.style.left=Math.max(12, Math.round((ow-w)/2))+'px';
   card.style.top=Math.max(12, Math.round((oh-220)/2))+'px';
 }
+/** 只关浮层，不退出演示模式（2026-11-11 用户裁定：跳过 ≠ 回正常模式）。 */
+function hideTutorialOverlay(){
+  const overlay=document.getElementById('tutorial-overlay');
+  if(overlay) overlay.classList.remove('open');
+  state.tutorialOpen=false;
+}
 function openTutorial(){
   if(!state.tutorialMode) enterTutorialMode();
   state.tutorialOpen=true; state.tutorialStep=0; state.tutorialGoal=null;
@@ -3796,6 +3814,7 @@ function bind(){
     else openTutorial();
   });
   document.getElementById('tutorial-banner-exit')?.addEventListener('click',closeTutorial);
+  document.getElementById('tutorial-banner-reopen')?.addEventListener('click',openTutorial);
   document.getElementById('btn-settings').addEventListener('click',()=>actions.settings?.());
   const extModeClick = (e) => {
     const extBtn = e.target.closest('[data-setting-extmode]');
@@ -4294,7 +4313,7 @@ function bind(){
     navigator.clipboard?.writeText(logText()).then(()=>toast(t('toast.logCopied'))).catch(()=>toast(t('toast.copyFailed')));
   });
 
-  document.getElementById('tutorial-skip').addEventListener('click',closeTutorial);
+  document.getElementById('tutorial-skip').addEventListener('click',hideTutorialOverlay);
   document.getElementById('tutorial-goals')?.addEventListener('click',(e)=>{
     const b=e.target.closest('[data-tutgoal]'); if(!b) return;
     const g=TUTORIAL_GOALS.find((x)=>x.id===b.dataset.tutgoal);
@@ -4316,7 +4335,7 @@ function bind(){
     if(state.volMaxKey){ state.volPath[state.volMaxKey]=[]; state.volMaxKey=null; renderChart(); return; }
     if(state.storageInspector.open){ closeStorageInspector(); return; }
     if(state.pane!=='workbench'){ backToWorkbench(); return; }
-    closeTutorial();
+    hideTutorialOverlay();
   });
   let tutorialRaf=0;
   const scheduleTutorial=()=>{
