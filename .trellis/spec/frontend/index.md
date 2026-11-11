@@ -39,6 +39,7 @@
 | [S3 / WebDAV 传输](./transfer-s3-webdav.md) | 共用分片/清单/断点协议；S3 HEAD/Range/multipart；WebDAV OPTIONS/PROPFIND/MKCOL 全降级；405/401/409/CORS 分类；`#transfer-view` 统一面板 | ✅ 就位（2026-11-09；小规模单测 `transfer-plan` / `transfer-runner` / `webdav-client`） |
 | [宿主能力矩阵与原生复用判据](./host-capability-matrix.md) | **四宿主 × 传输/备份能力矩阵**、插件各能力来源判定（用原生 / 补位 / 自建）、**原生 LAN Sync 为何接不了插件包**（单位是类目文件不是 zip）、**三层分层裁定**、TT 可抄的设计清单 | ✅ 就位（2026-11-10 用户裁定「三层分层」） |
 | [四宿主备份入口事实表](./host-backup-entries.md) | DOM 锚点、导出端点、各宿主文档清单、插件行为边界、硬规则、Luker 2.9 窗口、实测阻塞与对应实现 | ✅ 就位（2026-11-10 从 `host-capabilities.md` 拆出） |
+| [扩展管理与 Git 账号](./extension-git-manager.md) | **宿主安装契约**（URL 最后一段=目录名 ⇒ `/tree/<ref>` 必须解析成「根+ref」；`branch` 不收 commit）· URL 归一规则 · 多站点多账号与**凭据存储位置**（服务端/仅浏览器）· 私有仓凭据注入的风险 · 站点 API 端点/鉴权 · 更新检查只读判据 | ✅ 就位（2026-11-11 P2；单测 29 例 + UI 取证脚本） |
 
 > 上述三份“迁移”文档是经用户批准记录的**后续目标契约**，不是当前实现事实；其中拟新增签名、测试和验收均有状态标注。不得据此宣称产品已完成迁移向导或双击离线交付。
 

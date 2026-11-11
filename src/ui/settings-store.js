@@ -105,6 +105,15 @@ export function loadSettings() {
     ...(localData && typeof localData === 'object' ? localData : {}),
     ...(hostData && typeof hostData === 'object' ? hostData : {}),
   };
+  /* 「仅浏览器」模式下，服务端那份是不该存在的空壳；账号只能取本地，
+     否则会被 host 的空数组覆盖，用户会以为自己的账号丢了。 */
+  const storageMode = (hostData && hostData.gitCredentialStorage)
+    || (localData && localData.gitCredentialStorage)
+    || merged.gitCredentialStorage;
+  if (storageMode === 'browser') {
+    merged.gitCredentialStorage = 'browser';
+    merged.gitAccounts = (localData && Array.isArray(localData.gitAccounts)) ? localData.gitAccounts : [];
+  }
 
   return normalizeSettings(merged);
 }
@@ -119,6 +128,11 @@ export function saveSettings(settings) {
       /* 隐私模式 / 配额不足：静默降级，不阻塞 */
     }
   }
-  saveHostSettings(normalized);
+  /* 「仅浏览器」：服务端那份必须被清空，否则用户以为没存服务器、实际还留着。
+     这里写回一个 gitAccounts 为空的副本，宿主保存时即覆盖旧值。 */
+  const hostCopy = normalized.gitCredentialStorage === 'browser'
+    ? { ...normalized, gitAccounts: [] }
+    : normalized;
+  saveHostSettings(hostCopy);
   return normalized;
 }

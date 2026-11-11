@@ -596,3 +596,46 @@ dev server 已能直接跑正式 UI，demo 只剩维护成本与误导风险。
 
 **测试**：`test/s3-client.test.js`（路径/签名/XML 解析/降级）、`test/s3-crypto.test.js`（加解密往返）。
 
+---
+
+## 15. 扩展打包选择 · 每包 Git · 响应式单一判据（2026-11-11 用户裁定）
+
+### 15.1 扩展管理的「打包」页
+
+- 位置：`#extension-view` 的第四个 tab（安装 / 打包 / 已装 / 报告）。
+- 组织方式：**跟随图表逻辑**——每个已载入数据包一组，不切包；组头显示包名、已选数、模式与 Git 选择器。
+- 粒度：一个扩展目录一行（`src/core/ext-pack.js` 的 `extensionUnitsOf`）。路径形态覆盖
+  `extensions/<n>`、`extensions/third-party/<n>`、`public/scripts/extensions/third-party/<n>`、
+  `data/extensions/third-party/<n>`、`_tauritavern/extension-sources/<n>.json`。
+  **`third-party/` 必须优先判定**，否则整个第三方目录会被折成一个叫 `third-party` 的假扩展。
+- 勾选语义：写 `state.sel['pkg:'+id+'::'+leaf.id]`，与图表树**同源**；任一侧改动后另一侧重渲染即同步。
+- 「本体全量」= **只过滤扩展**：聊天 / 角色 / 世界书等类目仍按图表树勾选，两侧互不影响。
+- 仅清单态（`extensionManifestOnly(pkg)`）下勾选不生效，界面如实标注并禁用，不假装可选。
+- 产物仍按目标宿主布局生成（选择只决定哪些扩展条目被写出，不改目标映射）。
+
+### 15.2 每包 Git 模式
+
+- `state.gitModeByPkg[pkgId]`；未设置时回落到全局 `state.gitMode`（偏好里的默认值）。
+- `getExportOptions(pkg)` 与合并计划的 `optionsByPkg` 都走 `packageGitMode(pkg)`，因此两次转换可以不同。
+- 图表卡 `[data-gitmode="<pkgId>"]` 与打包页 `[data-packgit="<pkgId>"]` 写同一份状态。
+
+### 15.3 响应式：`data-view` 是唯一判据（真实事故）
+
+- **事故**：JS 在 `window.innerWidth <= 640` 切手机态，CSS 在 `@media (max-width:860px)` 就堆叠；
+  641–860px 出现「布局已堆叠、但切页行只有 2 个按钮（无数据包）」⇒ 数据包面板只能缩在下方且无法完整查看。
+- **规则**：窄屏判定只有一个来源——`detectView()` 读容器宽度（`#app` 的 `getBoundingClientRect().width`，
+  为 0 时回退 `window.innerWidth`），阈值 `MOBILE_MAX_WIDTH = 860`，写 `#app.dataset.view`；
+  CSS 不再写第二套 `@media` 布局，只认 `[data-view="mobile"]`。
+- 容器尺寸变化必须重判：`ResizeObserver(#app)` + `requestAnimationFrame` 合帧（插件模态拉宽时 window 尺寸不变）。
+- 切页行始终在滚动容器之外，手机态必须有 3 项（存储图表 / 数据包 / 扩展管理）；桌面态数据包列常显。
+- 行序：全局动作条（`#top-actions`）在切页行（`#view-switch`）**之上**（2026-11-11 用户裁定）。
+
+### 15.4 验收
+
+- `test/ext-pack.test.js`（6 项：五种路径形态 / third-party 优先 / 体积求和 / 清单叶子）。
+- `scripts/ui-verify-responsive.cjs`（本地专属）：1280/900/800/700/500/380 六档，断言无横向溢出、
+  `data-view` 与按钮数一致、手机态可切到数据包、扩展管理 4 个 tab。
+- `scripts/ui-verify-ext-pack.cjs`（本地专属）：载入 `fixtures/fixture-l.zip`，断打包页勾选 ↔ 图表树
+  `group:extensions` 双向同步、每包 Git 改 `strip` 后保持。
+
+

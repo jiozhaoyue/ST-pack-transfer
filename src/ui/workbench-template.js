@@ -20,8 +20,8 @@ export function getWorkbenchHtml() {
     </header>
 
     <div class="app-body">
-    <div class="view-switch" id="view-switch"></div>
     <div class="global-actions" id="top-actions"></div>
+    <div class="view-switch" id="view-switch"></div>
     <main class="app-main" id="view-workbench">
       <div class="col-chart">
         <section class="panel chart-card" id="chart-card">
@@ -265,6 +265,7 @@ export function getWorkbenchHtml() {
             <div class="panel-actions">
               <div class="segmented" id="extmgr-tabs">
                 <button class="seg-btn active" data-exttab="install" data-i18n="extmgr.tabInstall"></button>
+                <button class="seg-btn" data-exttab="pack" data-i18n="extmgr.tabPack"></button>
                 <button class="seg-btn" data-exttab="installed" data-i18n="extmgr.tabInstalled"></button>
                 <button class="seg-btn" data-exttab="report" data-i18n="extmgr.tabReport"></button>
               </div>

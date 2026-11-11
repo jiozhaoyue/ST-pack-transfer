@@ -5,6 +5,7 @@
  * 属于图表选择面，不得回到这里。
  */
 import { t } from '../i18n/index.js';
+import { normalizeAccounts } from '../core/git-accounts.js';
 
 /** 设置默认值。新增项必须同步 zh-CN / en-US 文案与测试。 */
 export const SETTINGS_DEFAULTS = Object.freeze({
@@ -22,6 +23,12 @@ export const SETTINGS_DEFAULTS = Object.freeze({
   clearPackagesOnLoad: false,
   /** 上传恢复成功后是否自动刷新页面；默认关闭（用户 2026-11-11 裁定）。 */
   autoRefreshAfterUpload: false,
+  /** Git 凭据存储位置：server = 随宿主 extension_settings 落 settings.json；browser = 只存本机。 */
+  gitCredentialStorage: 'server',
+  /** Git 账号（结构见 src/core/git-accounts.js）。 */
+  gitAccounts: [],
+  /** 安装来源登记（更新检查用）：{name, url, ref, at}。 */
+  gitInstalls: [],
 });
 
 export const SETTING_KEYS = Object.freeze(Object.keys(SETTINGS_DEFAULTS));
@@ -39,6 +46,20 @@ export function normalizeSettings(input) {
     if (typeof input.clearLogOnLoad === 'boolean') out.clearLogOnLoad = input.clearLogOnLoad;
     if (typeof input.clearPackagesOnLoad === 'boolean') out.clearPackagesOnLoad = input.clearPackagesOnLoad;
     if (typeof input.autoRefreshAfterUpload === 'boolean') out.autoRefreshAfterUpload = input.autoRefreshAfterUpload;
+    if (input.gitCredentialStorage === 'browser' || input.gitCredentialStorage === 'server') {
+      out.gitCredentialStorage = input.gitCredentialStorage;
+    }
+    if (Array.isArray(input.gitAccounts)) out.gitAccounts = normalizeAccounts(input.gitAccounts);
+    if (Array.isArray(input.gitInstalls)) {
+      out.gitInstalls = input.gitInstalls
+        .filter((x) => x && typeof x === 'object' && typeof x.name === 'string' && x.name)
+        .map((x) => ({
+          name: String(x.name),
+          url: typeof x.url === 'string' ? x.url : '',
+          ref: typeof x.ref === 'string' ? x.ref : '',
+          at: Number(x.at) || 0,
+        }));
+    }
   }
   return out;
 }
