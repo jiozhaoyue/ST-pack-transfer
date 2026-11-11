@@ -1202,3 +1202,34 @@ Topics: [.trellis/spec/frontend/large-pack-upload.md](../../spec/frontend/large-
 
 - 在 Cloud-Luker 实测 >100 MB 分片恢复（需用户授权对外写操作）
 - README 四酒馆规则变更时同步 zh-CN/en-US 的 help.chart.rule*
+
+
+## Session 72: 图表放大/引擎转储/扩展管理 P1
+<!-- trellis-session: v=2 fp=df46eacb4d4a5514 -->
+
+**Date**: 2026-11-11
+**Task**: 图表放大/引擎转储/扩展管理 P1
+**Branch**: `main`
+
+### Summary
+
+图表放大改为铺满插件容器；新增 engine-sanitize 净化 Luker 引擎转储（PG↔文件系统、PG→PG 不兼容）；批量恢复逐包容错+报告+保留/丢弃；内联扩展管理 P1（批量安装/分支版本/日志/失败链接/报告）；从宿主拉取只注入备份区。目标测试169项、六守卫与构建全绿；浏览器预览取证未完成。
+Topics: [.trellis/research/11-11-chart-maximize-and-extension-manager.md](../../research/11-11-chart-maximize-and-extension-manager.md)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `b9719a8` | feat: 图表放大铺满插件容器 + 内联扩展管理与恢复容错 |
+
+### Testing
+
+- [OK] 14文件119项 + 注入4文件50项通过；六守卫全绿；npm run build exit 0
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 浏览器预览取证；P2/P3 移植 st-git-improve 能力
