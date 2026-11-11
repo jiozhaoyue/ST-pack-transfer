@@ -196,6 +196,49 @@ provider.fetch(pathArray) => Promise<{
 
 ---
 
+## 十、执行记录（2026-11-11 本轮实施）
+
+**用户追加裁定**：两行打开的是**同一个面板**，面板内可直接切换数据源；**点哪一行进入，面板初始显示哪一侧**。
+
+实施口径（在 §八 三项待裁定上取本文推荐值，用户要求「把所有的都完成」）：
+
+| 项 | 本轮取值 |
+| --- | --- |
+| 删除能力 | **不做**。只读，`canDelete` 一律忽略 |
+| 非 Luker 宿主 | 宿主源照常可切，面板显示「当前宿主未提供存储审查」，不伪造数字 |
+| 入口命名 | 沿用「浏览器配额 / 宿主配额」两行，两行都打开同一面板 |
+| 面板占位 | 占满 `.app-main` 内容区（隐藏数据包列与分隔条），非视口全屏、非内联块 |
+| 数据源切换 | 面板头 `segmented` 页签（浏览器 / 宿主）；独立 Web 态隐藏宿主页签 |
+
+改点落位：
+
+- `src/core/storage-inspector-model.js`（新）— 纯逻辑：尺寸格式、配色类、点阵填充、面包屑路径、响应归一。
+- `src/ui/storage-inspector-browser.js`（新）— 浏览器 provider（L0 五类 + 下钻，只读）。
+- `src/ui/host-bridge.js` — 新增 `fetchHostStorageInspect(path)` / `hostStorageInspectCapability(platform)`。
+- `src/ui/workbench-template.js` — 新增 `#storage-inspector-view` 面板骨架。
+- `src/ui/workbench-view.js` — 删除内联 `#quota-details`；新增 `renderStorageInspector` / `openStorageInspector` / `closeStorageInspector`。
+- `style.css` — 面板样式，全部挂 `#app.app-container`，颜色复用既有 `--vc-c1..c12`。
+- `index.js` — `actions.storageInspector(source, path)`；删除 `readBrowserUsageDetails` / `webStorageBytes` / `readOpfsUsage`。
+- i18n — 新增 `si.*` 系列（zh/en 同步）。
+
+**执行状态**
+
+- [x] 模型 / 浏览器 provider / 宿主适配 / 模板骨架 / 视图渲染 / 样式 / 文案 / 控制器接线
+- [x] 六守卫全绿（css-scope / dom-injection / template-source / dom-scope / control-consumer / i18n）
+- [x] 目标测试：新增 28 项（模型 14 / 浏览器 provider 10 / 宿主适配 4），三个文件共 33 项通过；
+      既有守卫与视图相关 120 项通过（control-consumer / single-template-source / dom-scope /
+      i18n / copy-audit / workbench-session / plugin / selection-defaults / tutorial-anchor / git-mode）
+- [x] `npm run build` exit 0
+- [x] 4173 静态预览取证（Playwright，1280 / 380）：**26/26 通过、页面零错误**
+      —— 面板填满内容区、`data-si=1`、数据包列与分隔条让位、L0 五类齐全、堆叠条有底色、
+      `sessionStorage` 下钻键一一对应、IndexedDB 库名与 `?` 大小、面包屑返回、刷新、关闭回图表、
+      Web Storage 逐键不变、初始来源跟随点击行、手机态零溢出且点阵隐藏。
+      截图 `test-results/shots/si-desktop-1280.png` / `si-mobile-380.png`（不纳版本控制）。
+- 未取证项：真实 Luker 实例下的宿主源下钻（本机没有运行中的 Dev 实例）；ST/TT/PT 的
+  「未提供」态由 `hostStorageInspectCapability` 纯函数保证，已有单测；宿主端点回落路径有 mock 单测。
+
+---
+
 ## 九、本轮之前已完成（与本文无关，勿回退）
 
 - U1/U2 页头与徽标；U4/U5 包名行；U6 偏好二次点击确认。

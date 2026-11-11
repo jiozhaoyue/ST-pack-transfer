@@ -38,6 +38,7 @@
 | [资产列表导出](./asset-list-export.md) | **只输出官方扁平 JSON 数组**（`id/type/name/description/url`），供「下载扩展和资源菜单」加载；入口只在每张图表卡与从宿主拉取；宿主 discover + manifest 取 URL；无 URL 如实提示 | ✅ 就位（2026-11-09；单测 `test/asset-list.test.js`） |
 | [S3 / WebDAV 传输](./transfer-s3-webdav.md) | 共用分片/清单/断点协议；S3 HEAD/Range/multipart；WebDAV OPTIONS/PROPFIND/MKCOL 全降级；405/401/409/CORS 分类；`#transfer-view` 统一面板 | ✅ 就位（2026-11-09；小规模单测 `transfer-plan` / `transfer-runner` / `webdav-client`） |
 | [宿主能力矩阵与原生复用判据](./host-capability-matrix.md) | **四宿主 × 传输/备份能力矩阵**、插件各能力来源判定（用原生 / 补位 / 自建）、**原生 LAN Sync 为何接不了插件包**（单位是类目文件不是 zip）、**三层分层裁定**、TT 可抄的设计清单 | ✅ 就位（2026-11-10 用户裁定「三层分层」） |
+| [存储审查面板](./storage-inspector.md) | **浏览器 / 宿主同一个面板**：初始来源 = 点击的那一行，面板内可切换；占满 `.app-main` 内容区；只读；provider 响应契约；浏览器 L0 五类与下钻；宿主能力显式声明表；`?` 不伪造；验收脚本 `ui-verify-storage-inspector.cjs` | ✅ 就位（2026-11-11；UI 取证 26/26，桌面 1280 + 手机 380） |
 | [四宿主备份入口事实表](./host-backup-entries.md) | DOM 锚点、导出端点、各宿主文档清单、插件行为边界、硬规则、Luker 2.9 窗口、实测阻塞与对应实现 | ✅ 就位（2026-11-10 从 `host-capabilities.md` 拆出） |
 | [扩展管理与 Git 账号](./extension-git-manager.md) | **宿主安装契约**（URL 最后一段=目录名 ⇒ `/tree/<ref>` 必须解析成「根+ref」；`branch` 不收 commit）· URL 归一规则 · 多站点多账号与**凭据存储位置**（服务端/仅浏览器）· 私有仓凭据注入的风险 · 站点 API 端点/鉴权 · 更新检查只读判据 | ✅ 就位（2026-11-11 P2；单测 29 例 + UI 取证脚本） |
 

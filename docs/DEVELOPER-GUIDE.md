@@ -59,7 +59,7 @@
 | 从宿主拉取数据包 | 原生端点 | 原生端点 + selection | 原生端点 | 原生端点 + moduleIds | **用原生** |
 | 写回 / 恢复宿主 | 无原生恢复端点 | 原生 + 8 MiB 分片 | 原生导入端点 | 原生导入 + 预览 | **用原生** |
 | 扩展清单 / 批量安装 | 原生 `discover` + manifest | 同左 + 原生安装器 | 原生 | 原生（当前 501） | **原生 + 增强** |
-| 存储面板 / 配额 | 自建兜底 | 原生面板优先 | 自建兜底 | 自建兜底 | **原生优先** |
+| 存储面板 / 配额 | 自建（浏览器源） | 原生数据源（`RestProvider`） | 自建（浏览器源） | 自建（浏览器源） | **原生数据优先** |
 | 四酒馆格式互转 | 插件 | 插件 | 插件 | 插件 | **自建**（四家都没有） |
 | 局域网互传 | 插件 | 插件 | 插件 | 插件 | **自建**（原生接不了，见下） |
 | S3 / WebDAV 包仓库 | 插件 | 插件 | 插件 | 插件 | **自建**（Luker↔Luker 用原生） |
@@ -164,7 +164,7 @@
 | 功能 | 源码落点 |
 | --- | --- |
 | 结构化实时日志（等级按钮自带条数 / 毫秒时间戳 / 条数上限 / 加载时清空） | `src/ui/workbench-view.js` 的 `renderLog()` / `nowTime()` / `logLimit()`；`test` 外无独立模块 |
-| 存储配额两行（浏览器 / 宿主）：浏览器行当前为**内联明细（过渡实现，将替换为占满 `#app.app-container` 的统一存储审查面板）**；宿主行点击跳宿主原生存储页 | `src/ui/workbench-view.js` 的 `renderQuota()`（过渡内联 `renderQuotaDetails()`）；`index.js` 的 `readBrowserUsageDetails()`；`src/ui/host-bridge.js` 的 `openHostStoragePage()`。目标契约见 [HANDOFF-2026-11-11-storage-inspector.md](./HANDOFF-2026-11-11-storage-inspector.md) |
+| 存储配额两行（浏览器 / 宿主）：两行都打开**同一个存储审查面板**（占满内容区），面板内可切换数据源；初始来源 = 点击的那一行。只读 | `src/ui/workbench-view.js` 的 `renderQuota()` / `renderStorageInspector()` / `openStorageInspector()` / `siRequest()`；`src/core/storage-inspector-model.js`（纯逻辑）；`src/ui/storage-inspector-browser.js`（浏览器 provider）；`index.js` 的 `actions.storageInspector`；`src/ui/host-bridge.js` 的 `fetchHostStorageInspect()` / `hostStorageInspectCapability()`。契约见 [HANDOFF-2026-11-11-storage-inspector.md](./HANDOFF-2026-11-11-storage-inspector.md) |
 | 教程演示模式（占位数据可操作；退出整体还原；不写真实数据/宿主） | `#btn-guide` / 教程菜单 / `#tutorial-banner-exit` | `src/ui/workbench-view.js` 的 `enterTutorialMode()` / `exitTutorialMode()` / `demoTutorialActions()` / `buildDemoPackages()`；模板 `#tutorial-banner` |
 | 目标任务式教程（选目标 → 逐步高亮；按平台与桌面/手机视图自适应；目标缺失时卡片居中保留） | `#btn-guide` → 目标菜单 | `src/ui/workbench-view.js` 的 `TUTORIAL_GOALS` / `renderTutorial()` / `tutorialPrepareStep()` / `centerTutorialCard()` |
 | 宿主配额读数（Luker 同源兜底） | `src/ui/host-bridge.js` 的 `readHostStorageQuota()`（`RestProvider`） |

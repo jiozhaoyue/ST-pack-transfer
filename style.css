@@ -191,21 +191,57 @@
   #app.app-container .quota-fill{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--keep));border-radius:999px}
   #app.app-container .quota-fill.warn{background:linear-gradient(90deg,var(--optional),var(--drop))}
   #app.app-container .quota-val{font-variant-numeric:tabular-nums;white-space:nowrap}
-  #app.app-container .quota-nopage{flex:0 0 auto;font-size:10px;color:var(--muted);opacity:.8;white-space:nowrap}
-  /* 浏览器配额明细：展开在配额表头内部，不弹浮层 */
-  #app.app-container .quota-row .qd-caret{flex:0 0 auto;font-size:9px;color:var(--muted);transition:transform .15s}
-  #app.app-container .quota-row[aria-expanded="true"] .qd-caret{transform:rotate(90deg)}
-  #app.app-container .quota-details{display:flex;flex-direction:column;gap:3px;padding:5px 2px 3px;
-    border-top:1px dashed var(--border)}
-  #app.app-container .quota-details[hidden]{display:none !important}
-  #app.app-container .quota-detail-title{font-size:10.5px;color:var(--muted);margin-bottom:2px}
-  #app.app-container .quota-detail-row{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:11px;color:var(--muted)}
-  #app.app-container .quota-detail-row .qd-label{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  #app.app-container .quota-detail-row .qd-val{flex:0 0 auto;color:var(--text);font-variant-numeric:tabular-nums;white-space:nowrap}
-  #app.app-container .quota-detail-note{font-size:10.5px;color:var(--muted);line-height:1.4}
-  #app.app-container .quota-row.is-disabled{opacity:.55}
-  #app.app-container .quota-row.is-disabled .quota-bar{background:repeating-linear-gradient(45deg,var(--panel-3),var(--panel-3) 4px,transparent 4px,transparent 8px)}
-  #app.app-container .quota-empty{color:var(--muted);font-size:11px;padding:3px 0}
+  /* 两行都是「打开存储审查面板」入口；读数缺失时不伪造 0 */
+  #app.app-container .quota-row .qd-caret{flex:0 0 auto;font-size:11px;color:var(--muted)}
+  #app.app-container .quota-row.is-empty{opacity:.7}
+  #app.app-container .quota-row.is-empty .quota-bar{background:repeating-linear-gradient(45deg,var(--panel-3),var(--panel-3) 4px,transparent 4px,transparent 8px)}
+
+  /* ── 存储审查面板：占满内容区（隐藏数据包列），结构照 Luker storage-inspector ── */
+  #app.app-container[data-si="1"] .app-main{grid-template-columns:minmax(0,1fr);padding:10px}
+  #app.app-container .storage-inspector-view{flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
+  #app.app-container #storage-inspector-view[hidden]{display:none!important}
+  #app.app-container .si-body{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;gap:8px;padding:8px 10px 10px}
+  #app.app-container .si-breadcrumbs{display:flex;align-items:center;gap:2px;flex-wrap:wrap;min-height:20px;font-size:11.5px}
+  #app.app-container .si-crumb{border:0;background:none;padding:0;font:inherit;color:var(--muted);cursor:pointer;white-space:nowrap}
+  #app.app-container .si-crumb:hover{color:var(--accent);text-decoration:underline}
+  #app.app-container .si-crumb.is-current{color:var(--text);font-weight:600;cursor:default}
+  #app.app-container .si-crumb-sep{color:var(--muted);opacity:.7}
+  #app.app-container .si-quota{display:flex;align-items:baseline;gap:6px;font-size:11.5px;color:var(--muted);min-height:18px}
+  #app.app-container .si-quota-used{font-weight:600;color:var(--text);font-variant-numeric:tabular-nums}
+  #app.app-container .si-quota-used.is-over{color:var(--drop)}
+  #app.app-container .si-quota-total{font-variant-numeric:tabular-nums}
+  #app.app-container .si-bar{display:flex;width:100%;height:12px;border-radius:4px;overflow:hidden;
+    background:var(--panel-3);border:1px solid var(--border);flex:0 0 auto}
+  #app.app-container .si-bar-seg{height:100%;min-width:2px;background:var(--vc,var(--accent))}
+  #app.app-container .si-legend{display:flex;flex-wrap:wrap;gap:4px 10px;font-size:10.5px;color:var(--muted);flex:0 0 auto}
+  #app.app-container .si-legend-item{display:inline-flex;align-items:center;gap:4px;min-width:0}
+  #app.app-container .si-legend-dot{width:9px;height:9px;border-radius:2px;background:var(--vc,var(--accent));flex:0 0 auto}
+  #app.app-container .si-legend-text{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:240px}
+  #app.app-container .si-list{flex:1 1 auto;min-height:0;overflow-y:auto;border-top:1px solid var(--border);
+    padding-top:4px;scrollbar-width:thin}
+  #app.app-container .si-row{display:flex;align-items:center;gap:8px;padding:6px;border-radius:6px;
+    font-size:11.5px;color:var(--text);white-space:nowrap;min-width:0}
+  #app.app-container .si-row.is-drill{cursor:pointer}
+  #app.app-container .si-row.is-drill:hover{background:var(--panel-3)}
+  #app.app-container .si-row-ico{display:inline-flex;align-items:center;justify-content:center;width:22px;
+    flex:0 0 auto;color:var(--vc,var(--accent))}
+  #app.app-container .si-row-ico .si-ico{width:15px;height:15px}
+  #app.app-container .si-row-label{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis}
+  #app.app-container .si-row-count{color:var(--muted);font-size:10.5px;margin-left:6px}
+  #app.app-container .si-row-dots{display:inline-flex;gap:2px;width:44px;flex:0 0 auto;color:var(--vc,var(--accent))}
+  #app.app-container .si-dot{width:5px;height:5px;border-radius:50%;background:var(--border)}
+  #app.app-container .si-dot.on{background:currentColor}
+  #app.app-container .si-row-size{flex:0 0 auto;color:var(--muted);font-variant-numeric:tabular-nums;
+    min-width:52px;text-align:right}
+  #app.app-container .si-row-chev{flex:0 0 auto;color:var(--muted)}
+  #app.app-container .si-row.is-sensitive .si-row-ico{color:var(--drop)}
+  #app.app-container .si-state{padding:10px 2px;font-size:11.5px;color:var(--muted);flex:0 0 auto}
+  #app.app-container .si-state.si-error{display:flex;align-items:center;gap:10px;color:var(--drop)}
+  #app.app-container .si-error-msg{min-width:0;overflow:hidden;text-overflow:ellipsis}
+  #app.app-container .si-state[hidden]{display:none!important}
+  /* 竖屏：唯一滚动容器仍是 .app-main —— 面板与列表都不再各自滚 */
+  #app.app-container[data-view="mobile"] .si-list{overflow:visible;max-height:none;flex:0 0 auto}
+  #app.app-container[data-view="mobile"] .si-row-dots{display:none}
 
   /* 滚动条绝对保守：只在溢出时出现，一律细化 */
   #app.app-container .chart-stack,
