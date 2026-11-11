@@ -108,3 +108,25 @@ GitLab `/<group>/<sub>/<repo>/-/tree/<ref>`、`.git` 后缀、query/hash、`http
 **禁止**：把 GitHub 的 OAuth 描述成「浏览器可直接登录」；伪造成功；把 token 写进日志或报告。
 **验收**：`test/git-oauth.test.js`（7 项）；`scripts/ui-verify-oauth.cjs`（本地专属，
 断言 OAuth 区块、回调地址一致、帮助页链接、GitHub 限制说明、日志并入全局）。
+
+## 9. 页签归属：宿主 / 凭据 / 打包（2026-11-11 用户裁定）
+
+**契约**：
+
+- 页签顺序固定 `宿主 / 凭据 / 打包`，默认 `宿主`；页签 DOM 仍是面板头 `.panel-actions` 里的
+  `.segmented > .seg-btn[data-exttab]`，没有新增容器或样式。
+- **凭据页**（`data-exttab="cred"`，`renderExtCredentials()`）只渲染账号列表、凭据存储位置、
+  OAuth 区块与令牌指引；**不得**出现链接输入、上传 / 粘贴 / 分支、解析、开始安装、安装列表、
+  失败链接导出等安装控件，也不提供「去安装」跳转。
+- **安装区**全部搬到宿主页**下半**：已装列表之后再追加
+  `<details class="ext-install-block" id="extmgr-install-block">`，默认收起（`state.extInstallOpen=false`），
+  summary 文案 `extmgr.installBlock`；展开状态只在本次会话内记住。
+- 安装区内容 = 链接输入 / 上传 / 粘贴 / 默认分支 / 解析 / 开始安装 / 待装列表（含分支与预检状态）/
+  打开日志 / 导出失败链接 / 导出报告 / 清空；绑定函数仍是 `renderExtInstall()`。
+- **重绘纪律**：安装进度、预检、分支列表等高频刷新只调用 `refreshInstallArea()`
+  （只重绘 `#extmgr-install-area`），**不得**用 `renderExtensionView()`，否则每次都会重新拉取宿主已装扩展。
+- 安装成功后的收尾刷新（`finally`）仍可整页重绘一次，用于刷新已装列表。
+
+**判据**：`宿主` 页 `#extmgr-install-block` 存在且 `open=false`；展开后 `#extmgr-install-area` 内
+`#extmgr-run` / `#extmgr-links` 存在；`凭据` 页 `#extmgr-run` 与 `#extmgr-install-block` 均不存在；
+页签显示文本为 `宿主 / 凭据 / 打包`。

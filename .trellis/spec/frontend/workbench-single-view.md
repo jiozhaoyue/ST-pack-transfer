@@ -611,7 +611,8 @@ dev server 已能直接跑正式 UI，demo 只剩维护成本与误导风险。
 
 ### 15.1 扩展管理的「打包」页
 
-- 位置：`#extension-view` 的三个页签之一（宿主 / 安装 / 打包）；宿主页常显安装报告条于面板底部。
+- 位置：`#extension-view` 的三个页签之一（宿主 / 凭据 / 打包）；宿主页常显安装报告条于面板底部，
+  底部另有可完全收起的「安装扩展」折叠区（`#extmgr-install-block`，默认收起）。
 - 组织方式：**跟随图表逻辑**——每个已载入数据包一组，不切包；组头显示包名、已选数、模式与 Git 选择器。
 - 粒度：一个扩展目录一行（`src/core/ext-pack.js` 的 `extensionUnitsOf`）。路径形态覆盖
   `extensions/<n>`、`extensions/third-party/<n>`、`public/scripts/extensions/third-party/<n>`、
@@ -651,4 +652,38 @@ dev server 已能直接跑正式 UI，demo 只剩维护成本与误导风险。
 - `scripts/ui-verify-ext-pack.cjs`（本地专属）：载入 `fixtures/fixture-l.zip`，断打包页勾选 ↔ 图表树
   `group:extensions` 双向同步、每包 Git 改 `strip` 后保持。
 
+## 16. 迁移与备份面板头同构（2026-11-11 用户裁定）
+
+**契约**：`#transfer-view` 的面板头与 `#chart-card` / `#extension-view` **完全同一套 DOM 与渲染逻辑**，
+不得为它另写标题块、独立页签渲染或独立关闭逻辑。
+
+```
+<section class="panel transfer-view" id="transfer-view" hidden>
+  <div class="panel-head panel-head--switch">
+    <div class="view-switch" data-view-switch></div>       ← renderViewSwitch() 统一渲染
+    <div class="panel-actions">
+      <div class="segmented transfer-tabs" id="transfer-tabs">  ← 只有这两个页签
+        <button class="seg-btn" data-transfer-tab="lan">局域网互传</button>
+        <button class="seg-btn" data-transfer-tab="cloud">云端仓库</button>
+      </div>
+    </div>
+  </div>
+  ...
+```
+
+- 切换行内容由 `renderViewSwitch()` 决定：桌面 `存储图表 / 扩展管理 / 迁移与备份`，
+  手机再加 `数据包`；`迁移与备份` 打开时该项为 active。**不为迁移面板做第二套切换渲染。**
+- **禁止** `.panel-title`（迁移标题块）与任何 `×` 关闭按钮；离开迁移面板只能点切换行里的
+  `存储图表` / `扩展管理`（`#view-workbench` 上既有的 `[data-wbview]` 委托已覆盖）。
+- 页签仍是 `.panel-actions` 内的 `.segmented > .seg-btn`，与 `#extmgr-tabs` 同构，
+  **不新增容器、不新增样式**。
+- 手机形态沿用 `.panel-head--switch` 既有两行规则（第一行切换按钮，第二行面板动作）。
+
+**判据**（`scripts/ui-shot-transfer-head.cjs`，本地专属）：
+
+- `#transfer-view .panel-head` 的 class 含 `panel-head--switch`，内部存在 `[data-view-switch]`；
+- 切换按钮文本为 `存储图表 / 扩展管理 / 迁移与备份`，active 为 `迁移与备份`；
+- `#transfer-close-btn` 不存在，`#transfer-view` 内 `×` 按钮数为 0；
+- `.panel-title` 不存在；`#transfer-tabs` 内只有 `局域网互传 / 云端仓库` 两项；
+- 点切换行的 `存储图表` 后 `#transfer-view` 隐藏、`#chart-card` 显示。
 
