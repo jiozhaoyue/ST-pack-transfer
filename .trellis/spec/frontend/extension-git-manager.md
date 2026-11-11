@@ -265,3 +265,28 @@ GitLab `/<group>/<sub>/<repo>/-/tree/<ref>`、`.git` 后缀、query/hash、`http
   **没有**写回 `manifest.json` 的端点。
 - 因此「手动调整」= 编辑该扩展自己的 `manifest.json` 的 `loading_order` 后刷新页面
   （全局扩展需要管理员/文件权限）。本插件只展示 `#N` 并支持按它排序，**不得**提供伪编辑控件。
+
+## 15. 扩展写操作串行队列（2026-11-11，规避宿主 staging 竞态）
+
+**宿主事实**（Luker 2.9.0-rc.1，ST 同源）：`POST /api/extensions/update|install` 进入写入前会调用
+`makeStagingPath()`（`src/sync/staging.js`）：
+- 在目标同级建隐藏目录 `.luker-staging-<label>-<hex>`；
+- 建之前先 `sweepStaleStaging(parentDir)`：`readdir` 列出条目 → 逐条 `lstat` →
+  删除**早于本进程启动**的 staging 条目。
+
+**缺陷**：两个更新并发 ⇒ 两个 `sweepStaleStaging` 列出同一批旧条目 ⇒ A 删除后，
+B 的 `lstat` 抛 `ENOENT` ⇒ 该扩展本次更新失败。失败项随机、重试可能成功。
+触发前提是同级目录确实存在上一进程残留的 `.luker-staging-*`（例如强制结束进程）。
+
+**插件侧能做的与不能做的**：
+- 启动期自动更新发生在 `bootstrapExtensions()` 内、`activateExtensions()` **之前**，
+  任何扩展脚本都尚未加载 ⇒ 插件**无法拦截**它，不能在前端补掉这个服务端竞态。
+- 缓解：在宿主 `config.yaml` 关闭 `extensions.autoUpdate`（本机已改 `false`，
+  备份 `config.yaml.bak-20261111-autoupdate`），改由本插件逐扩展更新。
+- 代码契约：`workbench-view.js` 的 `queueExtMutation()` 把**所有**插件发起的写操作串成
+  一条 Promise 链：`runExtInstall` / `updateInstalledExtension` / `uninstallInstalled` /
+  `reinstallExtension` / `moveInstalledExtension`。手动、批量、自动更新共用同一条链。
+- **禁止**把扩展写操作改回并发（如批量更新用 `Promise.all`）；会重新触发 ENOENT。
+
+**上游修复建议**（不由本插件修改宿主源码）：`sweepStaleStaging` 的 `lstat` 加
+`try/catch`，`ENOENT` 直接 `continue`；或对同一 `parentDir` 的 sweep 加进程内互斥。
