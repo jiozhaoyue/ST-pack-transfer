@@ -233,15 +233,12 @@ npm run dev       # 3040 → 仅开发热重载（demo 页已废弃，见 workbe
 
 | 键 | 默认 | 归一 |
 | --- | --- | --- |
-| `devMode` | `false` | 仅布尔 |
-| `gitAutoUpdate` | `false` | 仅布尔 |
-| `gitUpdateIntervalHours` | `6` | 数字，夹在 1–168 |
-| `gitUpdateMode` | `notify` | `notify` / `auto` |
-| `gitUpdateSelected` | `[]` | 字符串数组、去重、剔除空值 |
-| `gitAutoUpdateLastAt` | `0` | 非负数字 |
+| `gitAutoUpdateRules` | `{}` | `{扩展名: {mode:'notify'|'auto', intervalSec, url?, global?}}`；间隔夹在 5–86400 秒 |
 | `extOrder` | `[]` | 字符串数组、去重 |
 | `extSort` | `custom` | `custom` / `name` / `version` / `source` |
 
-- 业务代码**禁止**硬编码 6 小时或 `notify`；一律 `loadSettings().gitUpdateIntervalHours` / `gitUpdateMode`。
+- 业务代码**禁止**硬编码轮询间隔或模式；一律读 `settings.gitAutoUpdateRules`，间隔过 `normalizeUpdateInterval()`。
+- **自动更新只在宿主页每条扩展上设置**（2026-11-11 第三轮裁定）；设置页不再出现 `devMode` / `gitAutoUpdate` /
+  `gitUpdateIntervalHours` / `gitUpdateMode` / `gitUpdateSelected`。
+- 旧模型在 `normalizeUpdateRules()` 中一次性迁移为逐扩展规则（`gitUpdateSelected` → `{mode, intervalSec}`）。
 - 演示模式（教程）下这些设置**只读**：`persistDev()` 直接返回当前设置，不写 localStorage / 宿主。
-- 旧键 `gitDevMode`（逐扩展三档）保留读取兼容，但界面不再使用；新模型是「父项 + 勾选 + 全局模式」。

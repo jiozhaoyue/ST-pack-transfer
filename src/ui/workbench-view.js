@@ -45,6 +45,7 @@ import {
 import { createGitRemote } from './git-remote.js';
 import { t } from '../i18n/index.js';
 import { loadSettings, saveSettings } from './settings-store.js';
+import { normalizeUpdateInterval } from './settings-panel.js';
 import { loadChartPrefs, saveChartPrefs, normalizeChartPrefs } from './chart-prefs.js';
 /* 占位/演示扩展清单从数据文件读取（禁止在 JS 里硬编码仓库清单）。 */
 import demoExtensionsData from '../data/demo-extensions.json';
@@ -229,7 +230,7 @@ let chartPrefs = typeof localStorage !== 'undefined' ? loadChartPrefs() : normal
 const state = {
   host:'luker', mode:'plugin', view:'desktop', mainView:'chart', mobileView:'chart', pane:'workbench', zone:'import',
   extTab:'host', extEntries:[], extResults:[], extRunning:false, extInstalled:null, extManifestPrefill:[],
-  extReportOpen:false, extInstallOpen:false, devAutoRan:false, settingsDraft:null,
+  extReportOpen:false, extInstallOpen:false, settingsDraft:null,
   extAccountTests:[], extUpdate:null, extAccountsOpen:false,
   /* 服务端插件清单（仅管理员）：null = 未读取；[] = 已读取但为空。 */
   extServerPlugins:null, extHostAdmin:false, extServerOpen:true,
@@ -1618,7 +1619,8 @@ function renderZoneModeRow(){
 /* ── Git 可视化（只读；数据包列「数据包 / Git」页签互换） ──
    云端：该扩展登记仓库（gitInstalls 同源）的分支 / 标签 / 最近提交 / 单次 diff。
    不提供检出 / 提交 / 合并；历史被清理就如实显示「历史已丢失」。 */
-function sideTabAllowed(){ return !!loadSettings().devMode; }
+/* Git 页签常显（用户 2026-11-11 裁定：看不到等于没有；不再用开发者模式开关藏起来）。 */
+function sideTabAllowed(){ return true; }
 function renderZoneSide(){
   const allowed=sideTabAllowed();
   if(!allowed) state.sideTab='zone';
@@ -2160,11 +2162,6 @@ function persistDev(patch){
   if(state.tutorialMode) return loadSettings();
   return saveSettings({ ...loadSettings(), ...patch });
 }
-/** 参与自动更新的扩展名集合（宿主页逐扩展勾选，单一事实源）。 */
-function devUpdateSelected(){
-  const s=loadSettings();
-  return new Set(Array.isArray(s.gitUpdateSelected)?s.gitUpdateSelected:[]);
-}
 /** 折叠头箭头（可点击打开的可视提示，纯 CSS 旋转）。 */
 function chevronSvg(){ return '<svg class="ext-chev" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>'; }
 /** 拖拽手柄（扩展排序）。 */
@@ -2176,54 +2173,6 @@ function extSummaryHtml(label, count){
     +chevronSvg()
     +'<span class="ext-summary-hint">'+t('extmgr.expandHint')+'</span>'
   +'</summary>';
-}
-/** 开发者页：父项「自动更新」+ 子项「检查间隔」「模式」；间隔与模式不拆成两个区块。 */
-function devAutoUpdateHtml(){
-  const s=loadSettings();
-  const on=!!s.gitAutoUpdate;
-  const hours=Number(s.gitUpdateIntervalHours)||6;
-  const mode=s.gitUpdateMode==='auto'?'auto':'notify';
-  return '<div class="ext-dev-block" data-devblock>'
-    +'<label class="check"><input type="checkbox" data-devparent'+(on?' checked':'')+'> '+t('extmgr.autoUpdate')+'</label>'
-    +'<div class="ext-dev-sub">'
-    +'<label class="et-git"><span>'+t('extmgr.autoInterval')+'</span>'
-    +'<input class="text_pole" type="number" min="1" max="168" step="1" data-devinterval value="'+hours+'"'+(on?'':' disabled')+'></label>'
-    +'<label class="et-git"><span>'+t('extmgr.autoMode')+'</span>'
-    +'<select class="text_pole" data-devmode'+(on?'':' disabled')+'>'
-    +'<option value="notify"'+(mode==='notify'?' selected':'')+'>'+t('extmgr.autoModeNotify')+'</option>'
-    +'<option value="auto"'+(mode==='auto'?' selected':'')+'>'+t('extmgr.autoModeAuto')+'</option>'
-    +'</select></label>'
-    +'</div>'
-    +'<div class="ext-note">'+t('extmgr.autoNote')+'</div>'
-    +'</div>';
-}
-function bindDevBlock(body){
-  const block=body.querySelector('[data-devblock]');
-  if(!block) return;
-  const parent=block.querySelector('[data-devparent]');
-  const intervalEl=block.querySelector('[data-devinterval]');
-  const modeEl=block.querySelector('[data-devmode]');
-  const syncChildren=()=>{
-    const on=!!parent?.checked;
-    if(intervalEl) intervalEl.disabled=!on;
-    if(modeEl) modeEl.disabled=!on;
-  };
-  syncChildren();
-  parent?.addEventListener('change',()=>{
-    persistDev({ gitAutoUpdate: !!parent.checked });
-    syncChildren();
-    toast(t('extmgr.devSaved'));
-  });
-  intervalEl?.addEventListener('change',()=>{
-    const hours=Math.max(1,Math.min(168,Math.round(Number(intervalEl.value)||6)));
-    intervalEl.value=String(hours);
-    persistDev({ gitUpdateIntervalHours: hours });
-    toast(t('extmgr.devSaved'));
-  });
-  modeEl?.addEventListener('change',()=>{
-    persistDev({ gitUpdateMode: modeEl.value==='auto'?'auto':'notify' });
-    toast(t('extmgr.devSaved'));
-  });
 }
 function accountsHtml(){
   const list=gitAccountList();
@@ -2305,10 +2254,10 @@ function syncExtInstallBlock(){
   }
 }
 /** 凭据（开发者）页：自动更新父子块 + 账号 / 存储位置 / OAuth / 令牌指引，不含任何安装控件。 */
+/** 开发者页：Git 账号 / 存储位置 / OAuth / 令牌指引（自动更新已搬到宿主页每条扩展）。 */
 function renderExtCredentials(body){
-  body.innerHTML='<div class="ext-install">'+devAutoUpdateHtml()+accountsHtml()+'</div>';
+  body.innerHTML='<div class="ext-install">'+accountsHtml()+'</div>';
   bindAccounts(body);
-  bindDevBlock(body);
 }
 function renderExtInstall(body){
   const rows=state.extEntries.map(entryRowHtml).join('');
@@ -2563,58 +2512,55 @@ function nativeToast(msg,opts){
   return false;
 }
 /**
- * 自动更新：父项总开关 + 逐扩展勾选 + 全局间隔/模式（全部读设置，禁止硬编码）。
- * - `auto`：发现新版本直接装；`notify`：先弹原生浮层 8s，点击通知即取消本次更新。
- * - 每次会话只跑一次；间隔未到直接跳过；演示模式只读不写。
- * - 读不到本地/远端版本、版本不高于本地、仓库不可达：一律静默跳过，不伪造结果。
+ * 逐扩展自动更新（2026-11-11 第二轮用户裁定）：规则只在宿主页每条扩展上设置。
+ * - 最小 5 秒轮询；`auto` 直接更新，`notify` 先弹原生浮层（可点击取消）。
+ * - 读不到本地/远端版本、版本不高于本地、仓库不可达：静默跳过，不伪造结果。
+ * - 演示模式只读不写。
  */
-async function runDevAutoUpdate(){
-  if(state.devAutoRan) return;
-  state.devAutoRan=true;
+let autoUpdateTimer=0;
+const autoUpdateLastAt=new Map();
+function scheduleAutoUpdates(){
+  if(autoUpdateTimer){ clearTimeout(autoUpdateTimer); autoUpdateTimer=0; }
+  if(state.tutorialMode) return;
+  const rules=loadSettings().gitAutoUpdateRules||{};
+  const intervals=Object.values(rules).map((rule)=>normalizeUpdateInterval(rule?.intervalSec));
+  if(!intervals.length) return;
+  const delay=Math.max(5000, Math.min(...intervals)*1000);
+  autoUpdateTimer=setTimeout(()=>{ autoUpdateTimer=0; void runAutoUpdateTick(); }, delay);
+}
+async function runAutoUpdateTick(){
   const s=gitSettings();
-  if(!s.devMode || !s.gitAutoUpdate) return;
-  const hours=Math.max(1,Math.min(168,Number(s.gitUpdateIntervalHours)||6));
-  const lastAt=Number(s.gitAutoUpdateLastAt)||0;
-  if(lastAt && Date.now()-lastAt < hours*3600*1000) return;
-  const selected=new Set(Array.isArray(s.gitUpdateSelected)?s.gitUpdateSelected:[]);
-  const regs=(s.gitInstalls||[]).filter((r)=>selected.has(r.name));
-  if(!regs.length) return;
-  const mode=s.gitUpdateMode==='auto'?'auto':'notify';
-  for(const reg of regs){
-    const parsed=parseRepoUrl(reg.url);
+  const rules=s.gitAutoUpdateRules||{};
+  const now=Date.now();
+  for(const [name,rule] of Object.entries(rules)){
+    if(!rule) continue;
+    const intervalSec=normalizeUpdateInterval(rule.intervalSec);
+    const last=autoUpdateLastAt.get(name)||0;
+    if(now-last < intervalSec*1000) continue;
+    autoUpdateLastAt.set(name, now);
+    const reg=(s.gitInstalls||[]).find((r)=>r.name===name);
+    const remoteUrl=String(reg?.url||rule.url||'').trim();
+    if(!remoteUrl) continue;
+    const parsed=parseRepoUrl(remoteUrl);
     if(!parsed.ok) continue;
     const acc=accountForRepo(parsed);
-    const localVersion=await fetchLocalManifestVersion(reg.name);
+    const localVersion=await fetchLocalManifestVersion(name);
     if(!localVersion) continue;
-    const res=await gitRemote().remoteManifest(parsed, reg.ref, acc);
+    const res=await gitRemote().remoteManifest(parsed, reg?.ref||'', acc);
     if(!res.ok) continue;
     let remoteVersion='';
     try { remoteVersion=String(JSON.parse(res.text).version||''); } catch { continue; }
     if(!remoteVersion || compareVersions(remoteVersion, localVersion)<=0) continue;
-    const runUpdate=async()=>{
-      const credential=acc ? { kind: acc.username?'basic':'token', username:acc.username, secret:acc.secret } : null;
-      const items=await actions.installExtensions?.([{ url:reg.url, branch:reg.ref||'', ref:reg.ref||'', credential, replace:true }]);
-      const failed=Array.isArray(items) ? items.find((r)=>r.status!=='ok') : null;
-      if(failed){
-        state.extUpdateFail={...(state.extUpdateFail||{}),[reg.name]:failed.error||t('extmgr.updateFailed')};
-        nativeToast(t('extmgr.devUpdateFailed',{name:reg.name}));
-        return;
-      }
-      nativeToast(t('extmgr.devUpdated',{name:reg.name})+' · '+t('extmgr.devRefresh'), {
-        onclick:()=>{ try{ window.location.reload(); }catch{ /* 宿主可能禁止重载 */ } },
-      });
-    };
-    if(mode==='auto'){ await runUpdate(); continue; }
+    const runUpdate=async()=>{ await updateInstalledExtension(name,{ref:reg?.ref||'', url:remoteUrl}); };
+    if(rule.mode==='auto'){ await runUpdate(); continue; }
     let cancelled=false;
-    nativeToast(t('extmgr.devFound',{name:reg.name,from:localVersion,to:remoteVersion}), {
+    nativeToast(t('extmgr.devFound',{name,from:localVersion,to:remoteVersion}), {
       onclick:()=>{ cancelled=true; toast(t('extmgr.devCancelled')); },
     });
-    await new Promise((resolve)=>setTimeout(resolve,8000));
+    await new Promise((resolve)=>setTimeout(resolve, Math.max(3000, Math.min(8000, intervalSec*1000))));
     if(!cancelled) await runUpdate();
   }
-  if(!state.tutorialMode){
-    saveSettings({ ...gitSettings(), gitAutoUpdateLastAt: Date.now() });
-  }
+  scheduleAutoUpdates();
 }
 /** 扩展来源标记（本地 / 全局）；服务端插件走独立分区，不混进这张表。 */
 function extSourceTag(sourceType){
@@ -2668,34 +2614,95 @@ async function loadServerPlugins(){
   if(state.extTab==='host') renderExtensionView();
 }
 /** 逐扩展勾选写回设置（演示模式只读）。 */
-function persistDevSelection(body){
-  const boxes=[...body.querySelectorAll('[data-devext]')];
-  const names=boxes.filter((el)=>el.checked).map((el)=>el.dataset.devext);
-  persistDev({ gitUpdateSelected:names });
-  const info=body.querySelector('#extmgr-dev-count');
-  if(info) info.textContent=t('extmgr.autoSelectedN',{n:names.length,total:boxes.length});
+/** 逐扩展自动更新规则写回（演示模式只读）。 */
+function saveUpdateRule(name, mode, intervalSec, extra = {}){
+  if(!name) return;
+  const s=loadSettings();
+  const rules={...(s.gitAutoUpdateRules||{})};
+  if(!mode || mode==='off') delete rules[name];
+  else {
+    rules[name]={ mode: mode==='auto'?'auto':'notify', intervalSec:normalizeUpdateInterval(intervalSec) };
+    if(extra.url) rules[name].url=String(extra.url);
+    if(extra.global) rules[name].global=!!extra.global;
+  }
+  persistDev({ gitAutoUpdateRules:rules });
 }
-/** 单个已登记扩展的更新（replace=true），失败如实记录，供「删除后重装」使用。 */
-async function updateRegisteredExtension(name){
+/** 解析自动更新要用的远端地址：优先安装登记，其次宿主 .git 的 origin。 */
+async function resolveUpdateRepo(name){
+  const s=loadSettings();
+  const reg=(s.gitInstalls||[]).find((r)=>r.name===name);
+  if(reg?.url) return { url:reg.url, global:false };
+  const item=(state.extInstalled||[]).find((row)=>String(row?.id||row?.folder||row?.name||'')===name);
+  const isGlobal=String(item?.sourceType||'')==='global';
+  let res=null;
+  try { res=await actions.hostExtensionGit?.(name,{global:isGlobal}); } catch { res=null; }
+  const remote=String(res?.version?.remoteUrl||'').trim();
+  return remote ? { url:remote, global:isGlobal } : null;
+}
+/** 单个扩展更新：有远端地址走「安装并覆盖」（可指定版本 / 分支）；否则用宿主原生 update 端点。 */
+async function updateInstalledExtension(name, { ref = '', url = '' } = {}){
+  if(!name) return;
   const s=gitSettings();
   const reg=(s.gitInstalls||[]).find((r)=>r.name===name);
-  if(!reg){ toast(t('extmgr.noRegistry')); return; }
-  const parsed=parseRepoUrl(reg.url);
-  const acc=parsed.ok?accountForRepo(parsed):null;
-  const credential=acc ? { kind: acc.username?'basic':'token', username:acc.username, secret:acc.secret } : null;
-  const items=await actions.installExtensions?.([
-    { url:reg.url, branch:reg.ref||'', ref:reg.ref||'', credential, replace:true },
-  ])||[];
-  const failed=items.find((r)=>r.status!=='ok');
+  const item=(state.extInstalled||[]).find((row)=>String(row?.id||row?.folder||row?.name||'')===name);
+  const isGlobal=String(item?.sourceType||'')==='global';
+  const remoteUrl=String(url||reg?.url||'').trim();
+  let failed=null;
+  if(remoteUrl){
+    const parsed=parseRepoUrl(remoteUrl);
+    const acc=parsed.ok?accountForRepo(parsed):null;
+    const credential=acc ? { kind: acc.username?'basic':'token', username:acc.username, secret:acc.secret } : null;
+    const branch=String(ref||reg?.ref||'').trim();
+    const items=await actions.installExtensions?.([
+      { url:remoteUrl, branch, ref:branch, credential, replace:true },
+    ])||[];
+    failed=items.find((r)=>r.status!=='ok')||null;
+  } else {
+    const res=await actions.updateExtension?.(name, isGlobal);
+    if(!res || !res.ok) failed={error:res?.error||t('extmgr.updateHostUnavailable')};
+  }
   state.extUpdateFail={...(state.extUpdateFail||{})};
   if(failed){
     state.extUpdateFail[name]=failed.error||t('extmgr.updateFailed');
-    toast(t('extmgr.updateFailed'));
+    toast(t('extmgr.updateFailed')+(failed.error?' · '+failed.error:''));
   } else {
     delete state.extUpdateFail[name];
     toast(t('extmgr.devUpdated',{name})+' · '+t('extmgr.devRefresh'));
   }
   renderExtensionView();
+}
+async function batchUpdateInstalled(names, ref){
+  for(const name of (Array.isArray(names)?names:[])) await updateInstalledExtension(name,{ref});
+}
+function uninstallWithConfirm(name){
+  if(!name) return;
+  openModal(t('extmgr.uninstallTitle'), t('extmgr.uninstallDesc',{name}), [], [
+    {label:t('modal.cancel'),onClick:closeModal},
+    {label:t('extmgr.uninstallConfirm'),danger:true,onClick:()=>{ closeModal(); void uninstallInstalled(name); }},
+  ]);
+}
+function batchUninstallWithConfirm(names){
+  const list=(Array.isArray(names)?names:[]).filter(Boolean);
+  if(!list.length) return;
+  openModal(t('extmgr.uninstallBatchTitle'), t('extmgr.uninstallBatchDesc',{n:list.length}),
+    ['<div class="rep-grid">'+list.map((name)=>'<div class="rep-row"><span>'+escapeHtml(name)+'</span></div>').join('')+'</div>'],
+    [
+      {label:t('modal.cancel'),onClick:closeModal},
+      {label:t('extmgr.uninstallConfirm'),danger:true,onClick:()=>{ closeModal(); void batchUninstallInstalled(list); }},
+    ]);
+}
+async function uninstallInstalled(name){
+  const item=(state.extInstalled||[]).find((row)=>String(row?.id||row?.folder||row?.name||'')===name);
+  const isGlobal=String(item?.sourceType||'')==='global';
+  let ok=false;
+  try { ok=!!(await actions.deleteExtension?.(name, isGlobal)); } catch { ok=false; }
+  if(!ok){ toast(t('extmgr.deleteFailed')); return; }
+  toast(t('extmgr.uninstalled',{name}));
+  state.extInstalled=null;
+  renderExtensionView();
+}
+async function batchUninstallInstalled(names){
+  for(const name of (Array.isArray(names)?names:[])) await uninstallInstalled(name);
 }
 /** 更新失败预案：二次确认后删除扩展再重新安装（插件连续动作）。 */
 function reinstallWithConfirm(name){
@@ -2774,31 +2781,37 @@ async function renderExtInstalled(body){
   } catch { list=[]; }
   if(state.extTab!=='host' || state.extReportOpen) return;
   state.extInstalled=list;
-  const installedGit=new Set((loadSettings().gitInstalls||[]).map((r)=>r.name));
-  const selected=devUpdateSelected();
   const s=loadSettings();
+  const installedGit=new Set((s.gitInstalls||[]).map((r)=>r.name));
+  const rules=s.gitAutoUpdateRules||{};
   const sort=['custom','name','version','source'].includes(s.extSort)?s.extSort:'custom';
   const records=sortedInstalledRecords(installedRowRecords(), sort);
   const rows=records.map(({x,name,version})=>{
     const registered=installedGit.has(name);
-    const box=registered
-      ? '<label class="check ext-dev-check"><input type="checkbox" data-devext="'+escapeHtml(name)+'"'+(selected.has(name)?' checked':'')+'></label>'
-      : '<span class="ext-dev-check"></span>';
-    return '<div class="ext-entry is-ok'+(registered?' ext-dev-row':'')+'" role="listitem"'
-      +' draggable="true" data-extrow="'+escapeHtml(name)+'">'
-      +'<span class="ext-drag" title="'+t('extmgr.dragHint')+'">'+gripSvg()+'</span>'+box
+    const rule=rules[name]||null;
+    /* 自动更新只在宿主页每条扩展上设置（用户 2026-11-11 裁定）：模式 + 秒级轮询（最小 5 秒）。 */
+    const auto='<span class="ext-auto">'
+      +'<select class="text_pole ext-up-mode" data-upmode="'+escapeHtml(name)+'" title="'+t('extmgr.autoUpdate')+'">'
+        +'<option value="off"'+(rule?'':' selected')+'>'+t('extmgr.devOff')+'</option>'
+        +'<option value="notify"'+(rule?.mode==='notify'?' selected':'')+'>'+t('extmgr.autoModeNotify')+'</option>'
+        +'<option value="auto"'+(rule?.mode==='auto'?' selected':'')+'>'+t('extmgr.autoModeAuto')+'</option>'
+      +'</select>'
+      +'<input class="text_pole ext-up-sec" type="number" min="5" step="5" data-upinterval="'+escapeHtml(name)+'"'
+        +' value="'+(normalizeUpdateInterval(rule?.intervalSec)) +'"'+(rule?'':' disabled')+' title="'+t('extmgr.autoIntervalSeconds')+'">'
+      +'<span class="ext-unit">'+t('extmgr.seconds')+'</span>'
+    +'</span>';
+    return '<div class="ext-entry is-ok ext-ext-row" role="listitem" draggable="true" data-extrow="'+escapeHtml(name)+'">'
+      +'<span class="ext-drag" title="'+t('extmgr.dragHint')+'">'+gripSvg()+'</span>'
+      +'<label class="check ext-dev-check"><input type="checkbox" data-extsel="'+escapeHtml(name)+'"></label>'
       +'<span class="ext-url" title="'+escapeHtml(name)+'">'+escapeHtml(name)+'</span>'
       +'<span class="ext-state">'+escapeHtml(version)+'</span>'
-      +extSourceTag(x?.sourceType)+'</div>';
+      +extSourceTag(x?.sourceType)
+      +auto
+      +'<span class="ext-row-actions">'
+        +'<button type="button" class="btn" data-extupdate="'+escapeHtml(name)+'">'+t('extmgr.updateNow')+'</button>'
+        +'<button type="button" class="btn danger" data-extremove="'+escapeHtml(name)+'">'+t('extmgr.uninstall')+'</button>'
+      +'</span></div>';
   }).join('');
-  const devActions=installedGit.size
-    ? '<span class="ext-dev-actions">'
-      +'<span class="ext-state" id="extmgr-dev-count">'+t('extmgr.autoSelectedN',{n:selected.size,total:installedGit.size})+'</span>'
-      +'<button type="button" class="btn" data-devall>'+t('extmgr.selectAll')+'</button>'
-      +'<button type="button" class="btn" data-devinvert>'+t('extmgr.invert')+'</button>'
-      +'<button type="button" class="btn" data-devnone>'+t('extmgr.selectNone')+'</button>'
-      +'</span>'
-    : '';
   const upd=state.extUpdate;
   const fails=state.extUpdateFail||{};
   const updRows=upd && Array.isArray(upd.rows)
@@ -2837,7 +2850,15 @@ async function renderExtInstalled(body){
     +'<span class="ext-list-count">'+t('extmgr.listCount',{n:list.length})+'</span>'
     +(sort==='custom'?'<span class="ext-list-hint">'+t('extmgr.dragHint')+'</span>':'')
     +'<span class="ext-spacer"></span>'
-    +devActions
+    +'<span class="ext-sel-actions">'
+      +'<span class="ext-state" id="extmgr-sel-count">'+t('extmgr.selectedN',{n:0,total:list.length})+'</span>'
+      +'<button type="button" class="btn" data-extall>'+t('extmgr.selectAll')+'</button>'
+      +'<button type="button" class="btn" data-extinvert>'+t('extmgr.invert')+'</button>'
+      +'<button type="button" class="btn" data-extnone>'+t('extmgr.selectNone')+'</button>'
+      +'<button type="button" class="btn accent" data-extbatchupdate>'+t('extmgr.batchUpdate')+'</button>'
+      +'<button type="button" class="btn danger" data-extbatchremove>'+t('extmgr.batchUninstall')+'</button>'
+      +'<input class="text_pole ext-batch-ref" data-extref placeholder="'+t('extmgr.refOptional')+'">'
+    +'</span>'
   +'</div>';
   body.innerHTML='<div class="ext-install">'
     +toolbar
@@ -2878,20 +2899,80 @@ async function renderExtInstalled(body){
     });
   });
   refreshInstallArea();
-  body.querySelectorAll('[data-devext]').forEach((el)=>el.addEventListener('change',()=>persistDevSelection(body)));
-  body.querySelectorAll('[data-devall],[data-devinvert],[data-devnone]').forEach((btn)=>btn.addEventListener('click',()=>{
-    const boxes=[...body.querySelectorAll('[data-devext]')];
-    if(btn.hasAttribute('data-devall')) boxes.forEach((box)=>{ box.checked=true; });
-    else if(btn.hasAttribute('data-devinvert')) boxes.forEach((box)=>{ box.checked=!box.checked; });
-    else boxes.forEach((box)=>{ box.checked=false; });
-    persistDevSelection(body);
+  /* 批量选择只用于「更新 / 卸载」批量操作，不再承担自动更新参与集。 */
+  const selCount=()=>{
+    const n=body.querySelectorAll('[data-extsel]:checked').length;
+    const el=body.querySelector('#extmgr-sel-count');
+    if(el) el.textContent=t('extmgr.selectedN',{n,total:list.length});
+    return n;
+  };
+  body.querySelectorAll('[data-extsel]').forEach((box)=>box.addEventListener('change',selCount));
+  body.querySelectorAll('[data-extall],[data-extinvert],[data-extnone]').forEach((btn)=>btn.addEventListener('click',()=>{
+    body.querySelectorAll('[data-extsel]').forEach((box)=>{
+      if(btn.hasAttribute('data-extall')) box.checked=true;
+      else if(btn.hasAttribute('data-extinvert')) box.checked=!box.checked;
+      else box.checked=false;
+    });
+    selCount();
+  }));
+  const selectedNames=()=>[...body.querySelectorAll('[data-extsel]:checked')].map((box)=>box.dataset.extsel);
+  const refValue=()=>String(body.querySelector('[data-extref]')?.value||'').trim();
+  body.querySelector('[data-extbatchupdate]')?.addEventListener('click',()=>{
+    const names=selectedNames();
+    if(!names.length){ toast(t('extmgr.selectNoneHint')); return; }
+    void batchUpdateInstalled(names, refValue());
+  });
+  body.querySelector('[data-extbatchremove]')?.addEventListener('click',()=>{
+    const names=selectedNames();
+    if(!names.length){ toast(t('extmgr.selectNoneHint')); return; }
+    batchUninstallWithConfirm(names);
+  });
+  /* 逐扩展自动更新：模式 + 秒级间隔（最小 5 秒），只写 settings.gitAutoUpdateRules。 */
+  body.querySelectorAll('[data-upmode]').forEach((modeEl)=>modeEl.addEventListener('change',async()=>{
+    const name=modeEl.dataset.upmode;
+    const holder=modeEl.closest('.ext-auto');
+    const intervalEl=holder?.querySelector('[data-upinterval]');
+    if(modeEl.value==='off'){
+      saveUpdateRule(name,'off',0);
+      if(intervalEl) intervalEl.disabled=true;
+      scheduleAutoUpdates();
+      toast(t('extmgr.devSaved'));
+      return;
+    }
+    const sec=normalizeUpdateInterval(intervalEl?.value);
+    /* 未登记仓库时，现场向宿主 .git 解析 origin；解析不到就不允许开启，避免假装会自动更新。 */
+    const resolved=await resolveUpdateRepo(name);
+    if(!resolved){
+      modeEl.value='off';
+      if(intervalEl) intervalEl.disabled=true;
+      saveUpdateRule(name,'off',0);
+      scheduleAutoUpdates();
+      toast(t('extmgr.autoNeedsRepo'));
+      return;
+    }
+    saveUpdateRule(name, modeEl.value, sec, resolved);
+    if(intervalEl){ intervalEl.disabled=false; intervalEl.value=String(sec); }
+    scheduleAutoUpdates();
+    toast(t('extmgr.devSaved'));
+  }));
+  body.querySelectorAll('[data-upinterval]').forEach((input)=>input.addEventListener('change',()=>{
+    const holder=input.closest('.ext-auto');
+    const modeEl=holder?.querySelector('[data-upmode]');
+    if(!modeEl || modeEl.value==='off') return;
+    const sec=normalizeUpdateInterval(input.value);
+    input.value=String(sec);
+    const prev=(loadSettings().gitAutoUpdateRules||{})[input.dataset.upinterval]||{};
+    saveUpdateRule(input.dataset.upinterval, modeEl.value, sec, { url:prev.url, global:prev.global });
+    scheduleAutoUpdates();
+    toast(t('extmgr.devSaved'));
   }));
   const serverBox=body.querySelector('[data-extserver]');
   serverBox?.addEventListener('toggle',()=>{ state.extServerOpen=!!serverBox.open; });
-  body.querySelectorAll('[data-extupdate]').forEach((btn)=>btn.addEventListener('click',()=>{ void updateRegisteredExtension(btn.dataset.extupdate); }));
+  body.querySelectorAll('[data-extupdate]').forEach((btn)=>btn.addEventListener('click',()=>{ void updateInstalledExtension(btn.dataset.extupdate,{ref:refValue()}); }));
   body.querySelectorAll('[data-extreinstall]').forEach((btn)=>btn.addEventListener('click',()=>reinstallWithConfirm(btn.dataset.extreinstall)));
+  body.querySelectorAll('[data-extremove]').forEach((btn)=>btn.addEventListener('click',()=>uninstallWithConfirm(btn.dataset.extremove)));
   void loadServerPlugins();
-  void runDevAutoUpdate();
+  scheduleAutoUpdates();
 }
 function renderExtReport(body){
   const results=state.extResults||[];
@@ -4201,15 +4282,16 @@ function tutorialPrepareStep(step){
   if(view==='extension') renderExtensionView();
   if(step.zone || view==='zone'){ renderZones(); renderActions(); }
 }
+/** 教程卡片一律居中于浮层（用户 2026-11-11 裁定）：不再贴着目标元素跑。 */
 function centerTutorialCard(card, overlay){
   if(!card || !overlay) return;
   const ow=overlay.clientWidth||window.innerWidth||330;
-  const oh=overlay.clientHeight||window.innerHeight||480;
-  const w=Math.min(330, Math.max(220, ow-24));
+  const w=Math.min(360, Math.max(240, ow-24));
   card.style.display='';
   card.style.width=w+'px';
-  card.style.left=Math.max(12, Math.round((ow-w)/2))+'px';
-  card.style.top=Math.max(12, Math.round((oh-220)/2))+'px';
+  card.style.left='50%';
+  card.style.top='50%';
+  card.style.transform='translate(-50%,-50%)';
 }
 /** 只关浮层，不退出演示模式（2026-11-11 用户裁定：跳过 ≠ 回正常模式）。 */
 function hideTutorialOverlay(){
@@ -4302,7 +4384,7 @@ function renderTutorial(){
   ring.style.height=anchor.ring.height+'px';
   card.style.left=anchor.card.left+'px';
   card.style.top=anchor.card.top+'px';
-  card.style.width=anchor.card.width+'px';
+  centerTutorialCard(card, overlay);
   ensureTutorialVisible(el);
 }
 /* 目标在滚动容器外时滚进来；只在完全不可见时执行，避免滚动回调互相触发。 */

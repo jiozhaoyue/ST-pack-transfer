@@ -751,11 +751,19 @@ dev server 已能直接跑正式 UI，demo 只剩维护成本与误导风险。
 ### 18.2 数据包列「数据包 / Git」页签
 
 - 数据包列面板头 `.panel-actions` 内新增 `.segmented#zone-side-tabs`（`数据包 / Git`），
-  `settings.devMode === false` 时整体 `hidden` 并强制 `state.sideTab='zone'`。
+  **常显**（2026-11-11 第三轮裁定：不再用开发者模式开关藏起来）。
 - 数据包内容放进 `#zone-side-zone`，Git 内容放进 `#zone-side-git`（`.git-viz`），二者同一列内互换；
   渲染入口 `renderZoneSide()`（`renderAll()` / `applySettings()` / 页签点击都会调用）。
 - 手机形态不新增入口：Git 仍是「数据包」视图内的页签（`syncMainView()` 的行不作为第二套判据）。
 
-**判据**（本地 Playwright）：`#zone-side-tabs` 在未开开发者模式时 `hidden === true`；
+**判据**（本地 Playwright）：`#zone-side-tabs` 常显（`hidden === false`）且两个页签可互换；
 宿主页 `.ext-toolbar .btn` 数量 ≥ 3 且存在 `[data-extsort]`；`.ext-list-head` 文本含 `共 N 项`；
-summary 文本不含「点击折叠」；`#extmgr-install-block` 与 `#extmgr-report-bar` 间隙 0。
+summary 文本不含「点击折叠」；`#extmgr-install-block` 与 `#extmgr-report-bar` 间隙 0；
+每行有 `[data-upmode]` / `[data-upinterval]`（`min=5`）/ 更新 / 卸载；列表头有批量更新与批量卸载。
+
+### 18.3 教程浮层：卡片居中 + 字号（2026-11-11 第三轮）
+
+- **教程卡片一律居中于浮层**：`centerTutorialCard()` 用 `left/top:50% + translate(-50%,-50%)`，
+  不再跟随目标元素；目标高亮环（`#tutorial-ring`）仍按锚点定位。
+- 段落 / 目标名 / 目标说明字号为 12 / 12.5 / 11.5px；`#app` 基准字号仍是 14px。
+- **判据**：卡片中心与浮层中心偏差 `|dx| ≤ 1px`、`|dy| ≤ 1px`；`?` 帮助按钮必须有可见的 `?` 字符。

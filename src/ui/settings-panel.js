@@ -31,21 +31,11 @@ export const SETTINGS_DEFAULTS = Object.freeze({
   gitAccounts: [],
   /** 安装来源登记（更新检查用）：{name, url, ref, at}。 */
   gitInstalls: [],
-  /** 开发模式自动更新：{扩展名: 'silent' | 'prompt'}；缺省即关闭。 */
-  /** 旧版逐扩展三档（保留读取兼容）；新版用 gitUpdateSelected + gitUpdateMode，缺省即关闭。 */
+  /** 旧版逐扩展三档（只保留读取兼容，界面不再使用）。 */
   gitDevMode: {},
-  /** 开发者模式：打开后才出现 Git 可视化入口（数据包列「数据包 / Git」页签）；默认关闭。 */
-  devMode: false,
-  /** 自动更新总开关（逐扩展参与见 gitUpdateSelected）。 */
-  gitAutoUpdate: false,
-  /** 自动更新检查间隔（小时），默认 6；范围 1–168。 */
-  gitUpdateIntervalHours: 6,
-  /** 自动更新模式：notify = 仅提醒后更新；auto = 直接更新。 */
-  gitUpdateMode: 'notify',
-  /** 参与自动更新的扩展名（宿主页逐扩展勾选）。 */
-  gitUpdateSelected: [],
-  /** 上次自动检查时间（毫秒时间戳）；0 = 从未检查。 */
-  gitAutoUpdateLastAt: 0,
+  /** 逐扩展自动更新规则：{扩展名: {mode:'notify'|'auto', intervalSec}}；缺省即关闭。
+   *  2026-11-11 第二轮用户裁定：自动更新只在宿主页每条扩展上设置，支持最短 5 秒轮询。 */
+  gitAutoUpdateRules: {},
   /** 宿主页扩展列表的自定义顺序（拖拽排序；只存名字）。 */
   extOrder: [],
   /** 宿主页排序方式：custom（拖拽顺序）/ name / version / source。 */
@@ -53,6 +43,41 @@ export const SETTINGS_DEFAULTS = Object.freeze({
 });
 
 export const SETTING_KEYS = Object.freeze(Object.keys(SETTINGS_DEFAULTS));
+
+/** 自动更新轮询间隔（秒）：用户裁定最短 5 秒；上限一天。 */
+export const UPDATE_INTERVAL_MIN_SEC = 5;
+export const UPDATE_INTERVAL_MAX_SEC = 86400;
+
+/** 间隔夹紧（秒）。 */
+export function normalizeUpdateInterval(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 300;
+  return Math.max(UPDATE_INTERVAL_MIN_SEC, Math.min(UPDATE_INTERVAL_MAX_SEC, Math.round(n)));
+}
+
+/**
+ * 逐扩展自动更新规则归一：`{扩展名: {mode:'notify'|'auto', intervalSec}}`。
+ * 兼容旧模型（`gitUpdateSelected` + `gitUpdateIntervalHours` + `gitUpdateMode`）一次性迁移。
+ */
+export function normalizeUpdateRules(input) {
+  const out = {};
+  const rules = input?.gitAutoUpdateRules;
+  if (rules && typeof rules === 'object' && !Array.isArray(rules)) {
+    for (const [name, rule] of Object.entries(rules)) {
+      if (!name || !rule || typeof rule !== 'object') continue;
+      if (rule.mode !== 'notify' && rule.mode !== 'auto') continue;
+      out[name] = { mode: rule.mode, intervalSec: normalizeUpdateInterval(rule.intervalSec) };
+    }
+    return out;
+  }
+  const legacy = Array.isArray(input?.gitUpdateSelected) ? input.gitUpdateSelected : [];
+  const legacyMode = input?.gitUpdateMode === 'auto' ? 'auto' : 'notify';
+  const legacySec = normalizeUpdateInterval((Number(input?.gitUpdateIntervalHours) || 6) * 3600);
+  for (const name of legacy) {
+    if (typeof name === 'string' && name) out[name] = { mode: legacyMode, intervalSec: legacySec };
+  }
+  return out;
+}
 
 /** 白名单归一：只保留已知键，非法/缺省回默认。 */
 export function normalizeSettings(input) {
@@ -89,22 +114,7 @@ export function normalizeSettings(input) {
       }
       out.gitDevMode = modes;
     }
-    if (typeof input.devMode === 'boolean') out.devMode = input.devMode;
-    if (typeof input.gitAutoUpdate === 'boolean') out.gitAutoUpdate = input.gitAutoUpdate;
-    const interval = Number(input.gitUpdateIntervalHours);
-    if (Number.isFinite(interval)) {
-      out.gitUpdateIntervalHours = Math.max(1, Math.min(168, Math.round(interval)));
-    }
-    if (input.gitUpdateMode === 'auto' || input.gitUpdateMode === 'notify') {
-      out.gitUpdateMode = input.gitUpdateMode;
-    }
-    if (Array.isArray(input.gitUpdateSelected)) {
-      out.gitUpdateSelected = [...new Set(
-        input.gitUpdateSelected.filter((name) => typeof name === 'string' && name),
-      )];
-    }
-    const lastAt = Number(input.gitAutoUpdateLastAt);
-    if (Number.isFinite(lastAt) && lastAt >= 0) out.gitAutoUpdateLastAt = lastAt;
+    out.gitAutoUpdateRules = normalizeUpdateRules(input);
     if (Array.isArray(input.extOrder)) {
       out.extOrder = [...new Set(input.extOrder.filter((name) => typeof name === 'string' && name))];
     }
@@ -129,8 +139,7 @@ export function buildSettingsHtml(settings = {}) {
   const tips = setting('set-traffic', 'trafficPrompt', t('settings.trafficPrompt'), s.trafficPrompt)
     + setting('set-native-pull-notice', 'nativePullNotice', t('settings.nativePullNotice'), s.nativePullNotice)
     + setting('set-auto-tutorial', 'autoTutorial', t('settings.autoTutorial'), s.autoTutorial)
-    + setting('set-confirm-discard-prefs', 'confirmDiscardChartPrefs', t('settings.confirmDiscardChartPrefs'), s.confirmDiscardChartPrefs)
-    + setting('set-dev-mode', 'devMode', t('settings.devMode'), s.devMode);
+    + setting('set-confirm-discard-prefs', 'confirmDiscardChartPrefs', t('settings.confirmDiscardChartPrefs'), s.confirmDiscardChartPrefs);
 
   const exportGroup = setting('set-delete-after-export', 'deleteAfterExport', t('settings.deleteAfterExport'), s.deleteAfterExport)
     + setting('set-clear-packages', 'clearPackagesOnLoad', t('settings.clearPackagesOnLoad'), s.clearPackagesOnLoad)
@@ -170,8 +179,6 @@ export function buildSettingsHtml(settings = {}) {
 export function readSettings(root, base = SETTINGS_DEFAULTS) {
   const out = normalizeSettings(base);
   if (!root) return out;
-  const devModeEl = root.querySelector?.('[data-setting="devMode"]');
-  if (devModeEl && typeof devModeEl.checked === 'boolean') out.devMode = devModeEl.checked;
   const trafficEl = root.querySelector?.('[data-setting="trafficPrompt"]');
   if (trafficEl && typeof trafficEl.checked === 'boolean') out.trafficPrompt = trafficEl.checked;
   const nativePullEl = root.querySelector?.('[data-setting="nativePullNotice"]');

@@ -631,6 +631,16 @@ const EXTENSION_LIST_ENDPOINTS = Object.freeze([
   '/api/extensions',
 ]);
 
+/**
+ * 恢复 / 导入后的「扩展清单」统一入口（用户 2026-11-11 裁定）：
+ * 不再弹独立安装浮层，而是交给扩展管理 → 宿主 → 安装扩展
+ * （同一处控制安装 / 更新 / 指定版本或分支）。由 index.js 注册 `view.openExtensionManager`。
+ */
+let extensionManifestSink = null;
+export function setExtensionManifestSink(handler) {
+  extensionManifestSink = typeof handler === 'function' ? handler : null;
+}
+
 /** 逐条读取 manifest 的并发上限：宿主可能装了几十个扩展，串行会让按钮长时间无响应。 */
 const EXTENSION_MANIFEST_CONCURRENCY = 4;
 
@@ -2074,18 +2084,18 @@ async function maybeOpenExtensionInstaller(zipBlob) {
             const embeddedCount = entries.filter((e) => e.availability === AVAILABILITY.EMBEDDED).length;
             const installableCount = entries.filter((e) => e.availability === AVAILABILITY.INSTALLABLE).length;
             const unavailableCount = entries.filter((e) => e.availability === AVAILABILITY.UNAVAILABLE).length;
-            if (shouldAutoOpenInstaller(entries)) {
+            if (installableCount > 0 && extensionManifestSink) {
               logger.info(
-                `检测到包内 ${entries.length} 个扩展清单（可在线安装 ${installableCount} 个），正在呼出扩展安装面板...`,
+                `检测到包内 ${entries.length} 个扩展清单（可在线安装 ${installableCount} 个），已转到扩展管理 → 宿主 → 安装扩展`,
               );
-              renderExtensionInstallerModal(entries, undefined, { embeddedCount, unavailableCount });
+              extensionManifestSink({ entries, embeddedCount, unavailableCount, installableCount });
             } else {
-              // 无可在线安装项：不打扰用户，仅提示并提供手动入口（决策 D-4）
+              // 无可在线安装项 / 没有统一入口：不打扰用户，仅如实记录（决策 D-4）
               logger.info(
-                `本包含 ${entries.length} 个扩展，其中 0 个可在线安装`
+                `本包含 ${entries.length} 个扩展，其中 ${installableCount} 个可在线安装`
                 + `${embeddedCount > 0 ? `（${embeddedCount} 个实体已随恢复写入）` : ''}`
                 + `${unavailableCount > 0 ? `，${unavailableCount} 个缺少可用 Git URL` : ''}。`
-                + '如需重装，请从扩展设置抽屉手动开始。',
+                + '如需重装，请到扩展管理 → 宿主 → 安装扩展手动开始。',
               );
             }
           }
@@ -2328,6 +2338,42 @@ export async function deleteExtensionViaHost(extensionName, isGlobal = false) {
     body: JSON.stringify({ extensionName, global: isGlobal }),
   });
   return response.ok;
+}
+
+/**
+ * 调用宿主 `/api/extensions/update`（宿主原生 git 更新，写操作）。
+ * `force=false` 时宿主自行判断是否落后；用于「已装扩展列表」的逐条 / 批量更新。
+ * @param {string} extensionName
+ * @param {boolean} [isGlobal=false]
+ * @returns {Promise<{ok:boolean, error?:string}>}
+ */
+export async function updateExtensionViaHost(extensionName, isGlobal = false) {
+  const name = String(extensionName || '').trim();
+  if (!name) return { ok: false, error: 'missing extension name' };
+  try {
+    const token = await getCsrfToken();
+    const response = await fetchWithTimeout('/api/extensions/update', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { 'X-CSRF-Token': token } : {}),
+      },
+      body: JSON.stringify({ extensionName: name, global: !!isGlobal, force: false }),
+    }, { timeoutMs: 120_000, label: '更新宿主扩展' });
+    if (!response.ok) {
+      let detail = '';
+      try { detail = scrubUrlCredentials(await response.text()); } catch { /* 忽略 */ }
+      return {
+        ok: false,
+        error: `更新失败 (${response.status})${detail ? `: ${detail.slice(0, 300)}` : ''}`,
+      };
+    }
+    /* 宿主成功时返回文本摘要；不解析也不伪造版本号。 */
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: scrubUrlCredentials(err?.message || String(err)) };
+  }
 }
 
 /**

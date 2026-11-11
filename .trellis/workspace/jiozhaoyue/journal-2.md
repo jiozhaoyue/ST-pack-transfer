@@ -1588,3 +1588,32 @@ Topics: [.trellis/spec/frontend/extension-git-manager.md](../../spec/frontend/ex
 ### Status
 
 [OK] **Completed**
+
+
+## Session 82: 逐扩展自动更新（5 秒级）/ 批量更新卸载 / 清单统一入口 / Git 常显 / 教程居中
+<!-- trellis-session: v=2 fp=00c711eb075abf0f -->
+
+**Date**: 2026-11-11
+**Task**: 逐扩展自动更新（5 秒级）/ 批量更新卸载 / 清单统一入口 / Git 常显 / 教程居中
+**Branch**: `main`
+
+### Summary
+
+按用户第三轮裁定：自动更新从开发者页搬回宿主页每条扩展，支持 5 秒级轮询与仅提醒/直接更新；列表内加逐条与批量更新/卸载及指定版本分支；数据包恢复的扩展清单改为统一进宿主页安装区（移除独立浮层）；Git 页签常显；教程卡片居中于浮层；修复数据包面板 ? 被删与设置页默认字号偏小的问题。守卫全绿、build exit 0、全量 1142 passed。
+Topics: [.trellis/spec/frontend/extension-git-manager.md](../../spec/frontend/extension-git-manager.md)
+
+### Main Changes
+
+- settings：删除全局自动更新键，新增 gitAutoUpdateRules（5–86400 秒，旧模型迁移）
+- 宿主页：逐扩展模式/间隔、更新/卸载、批量全选反选取消、批量更新卸载、指定版本分支
+- host-bridge：updateExtensionViaHost + setExtensionManifestSink；恢复清单统一进安装区
+- Git 页签常显；教程卡片居中；? 恢复；字号体检
+- 规范与指南：§9–§12 / §18.3 / §11、DEVELOPER-GUIDE K4、README
+
+### Git Commits
+
+(No commits - planning session)
+
+### Status
+
+[OK] **Completed**

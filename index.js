@@ -31,6 +31,7 @@ import {
   fetchHostStorageInspect, hostStorageInspectCapability, listHostExtensions,
   installExtensionBatch, deleteExtensionViaHost,
   readHostIdentity, listServerPlugins, readHostExtensionGit,
+  updateExtensionViaHost, setExtensionManifestSink,
   opfsTmpHandle, opfsHandleToFile, opfsTmpCleanup,
 } from './src/ui/host-bridge.js';
 import { packPrivateContainer } from './src/core/private-container.js';
@@ -1511,6 +1512,7 @@ async function main(root) {
       listServerPlugins: () => listServerPlugins(),
       hostExtensionGit: (name, opts) => readHostExtensionGit(name, opts),
       deleteExtension: (name, isGlobal) => deleteExtensionViaHost(name, isGlobal),
+      updateExtension: (name, isGlobal) => updateExtensionViaHost(name, isGlobal),
       backupSelectedToCloud,
       importCloudPack,
       lan: lanActions,
@@ -1575,6 +1577,12 @@ async function main(root) {
     logger,
     t,
     opfs: { tmpHandle: opfsTmpHandle, handleToFile: opfsHandleToFile, cleanup: opfsTmpCleanup },
+  });
+  /* 数据包恢复出来的扩展清单统一进「扩展管理 → 宿主 → 安装扩展」，不再弹独立安装浮层。 */
+  setExtensionManifestSink(({ entries } = {}) => {
+    const list = Array.isArray(entries) ? entries : [];
+    if (!list.length) return;
+    view.openExtensionManager(list);
   });
   exportQueue.subscribe(() => view.setPendingExports(exportQueue.items));
   view.setPendingExports(exportQueue.items);

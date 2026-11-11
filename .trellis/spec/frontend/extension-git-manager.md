@@ -115,9 +115,9 @@ GitLab `/<group>/<sub>/<repo>/-/tree/<ref>`、`.git` 后缀、query/hash、`http
 
 - 页签顺序固定 `宿主 / 开发者 / 打包`，默认 `宿主`；页签 DOM 仍是面板头 `.panel-actions` 里的
   `.segmented > .seg-btn[data-exttab]`，没有新增容器或样式（内部键仍是 `cred`）。
-- **开发者页**（`data-exttab="cred"`，`renderExtCredentials()`）= 自动更新父子块 + 账号列表 + 凭据存储位置 +
-  OAuth 区块 + 令牌指引；**不得**出现链接输入、上传 / 粘贴 / 分支、解析、开始安装、安装列表、
-  失败链接导出等安装控件，也不提供「去安装」跳转。
+- **开发者页**（`data-exttab="cred"`，`renderExtCredentials()`）= 账号列表 + 凭据存储位置 +
+  OAuth 区块 + 令牌指引（自动更新已回到宿主页每条扩展，不在此页）；**不得**出现链接输入、
+  上传 / 粘贴 / 分支、解析、开始安装、安装列表、失败链接导出等安装控件，也不提供「去安装」跳转。
 - **宿主页版式**（2026-11-11 第二轮用户裁定，见 `workbench-single-view.md` §18）：
   - 顶部是横线工具条 `.ext-toolbar`（导出清单 / 检查更新 / 刷新 + 右侧排序），与存储图表的横线控件同形；
   - 列表头 `.ext-list-head` 才显示数量（`共 N 项`）、拖拽提示与自动更新勾选组；折叠头 summary **只写标题**
@@ -136,35 +136,47 @@ GitLab `/<group>/<sub>/<repo>/-/tree/<ref>`、`.git` 后缀、query/hash、`http
 - **折叠可点击性是硬要求**：`Git 账号` / `OAuth 登录` / `已装扩展` / `服务端插件` 的 summary 必须有
   箭头（`.ext-chev`，展开时旋转 180°）、`cursor:pointer` 与「点击展开 / 收起」提示；数量用 `.ext-count` 徽标，
   **不得**只写「Git 账号（0）」让人不知道能点开。
+- **列表内管理**：每行有「更新 / 卸载」与逐扩展自动更新（模式 + 秒级间隔）；列表头有全选 / 反选 / 取消 /
+  批量更新 / 批量卸载 / 「指定版本 / 分支」。更新与卸载都必须如实回显宿主结果，失败不静默。
+- **数据包恢复的扩展清单统一入口**：`maybeOpenExtensionInstaller()` 不再弹独立浮层，
+  通过 `setExtensionManifestSink()` 交给 `view.openExtensionManager(entries)` → 宿主页底部安装区；
+  安装 / 更新 / 指定版本分支都在同一处。
 
 **判据**（本地 Playwright 取证）：`#extmgr-install-block` 的父节点是 `#extension-view`，`insideBody === false`；
 `footer.bottom === reportBar.top`（间隙 0）；展开后 `area.bottom <= button.top`；`#extension-body` 内
 `.ext-toolbar` 有 3 个按钮 + `[data-extsort]`，`.ext-list-head` 含 `共 N 项`，summary 不含「点击折叠」字样。
 
-## 10. 自动更新：父项总开关 + 逐扩展勾选（2026-11-11 第二轮裁定）
+## 10. 自动更新：逐扩展设置 + 秒级轮询（2026-11-11 第三轮裁定）
 
-**设置项**（全部在 `settings-panel.js` 白名单 + 归一，业务代码禁止硬编码）：
+**用户裁定**：自动更新**只在宿主页每条已装扩展上设置**（不再有开发者页父项 / 全局开关）；
+可设置短至 **5 秒**轮询；模式与之前一致（关闭 / 仅提醒 / 直接更新）。
+
+**设置项**（`settings-panel.js` 白名单 + 归一）：
 
 | 键 | 默认 | 语义 |
 | --- | --- | --- |
-| `devMode` | `false` | 开发者模式；关闭时数据包列不出现「Git」页签 |
-| `gitAutoUpdate` | `false` | 父项总开关 |
-| `gitUpdateIntervalHours` | `6` | 检查间隔（1–168，夹紧） |
-| `gitUpdateMode` | `notify` | `notify` 仅提醒 / `auto` 直接更新 |
-| `gitUpdateSelected` | `[]` | 参与自动更新的扩展名（宿主页逐扩展勾选） |
-| `gitAutoUpdateLastAt` | `0` | 上次检查时间戳；未到间隔直接跳过 |
+| `gitAutoUpdateRules` | `{}` | `{扩展名: {mode:'notify'|'auto', intervalSec, url?, global?}}`；缺省即关闭 |
+| `extOrder` / `extSort` | `[]` / `custom` | 宿主列表自定义顺序与排序方式 |
 
-**运行契约**（`runDevAutoUpdate()`）：
+- `intervalSec` 由 `normalizeUpdateInterval()` 夹在 **5–86400 秒**；非法值回落 300 秒。
+- 旧模型（`gitUpdateSelected` + `gitUpdateIntervalHours` + `gitUpdateMode`）在 `normalizeUpdateRules()`
+  中一次性迁移为逐扩展规则；`devMode` / `gitAutoUpdate` / `gitAutoUpdateLastAt` 已删除。
 
-- `devMode && gitAutoUpdate` 才运行；每次会话只跑一次（`state.devAutoRan`），且校验间隔；
-- 参与集只取 `gitUpdateSelected`；模式取 `gitUpdateMode`；
+**运行契约**（`scheduleAutoUpdates()` / `runAutoUpdateTick()`）：
+
+- 只有存在规则时才起 `setTimeout` 循环，最小间隔 5 秒；演示模式不启动、不写设置。
+- 远端地址优先取 `gitInstalls` 登记；未登记时现场读宿主 `.git` 的 `remoteUrl`
+  （`readHostExtensionGit`），解析不到就拒绝开启并提示，**不假装会自动更新**。
 - `auto` 直接 `installExtensions([{ url, ref, replace:true, credential }])`；
-  `notify` 先弹宿主原生浮层（`globalThis.toastr.info`，10 秒、可点击），点击通知即取消本次更新，超时才执行；
-- 更新成功后再用原生浮层提示「点击刷新页面」；失败则记录到 `state.extUpdateFail` 并提示；
-- 读不到本地 / 远端版本、版本不高于本地、仓库不可达时**静默跳过**，不伪造结果；
-- 演示模式下只读不写。
+  `notify` 先弹宿主原生浮层（可点击取消），超时才更新。
+- 读不到本地 / 远端版本、版本不高于本地、仓库不可达：静默跳过，不伪造结果。
+- 更新失败记录到 `state.extUpdateFail`，可在更新检查行「删除后重装」。
 
-**禁止**：逐扩展三档 `select` 回潮（已被勾选模型取代）；未更新却提示已更新；在演示模式写入真实设置。
+**列表内批量管理**：每行有「更新 / 卸载」，列表头有全选 / 反选 / 取消 / 批量更新 / 批量卸载 +
+可选「指定版本 / 分支」。更新走登记仓库（`install … replace:true`）或宿主 `POST /api/extensions/update`；
+卸载走 `POST /api/extensions/delete`，批量卸载需二次确认。
+
+**禁止**：把自动更新重新做成全局开关；未登记又读不到 origin 时仍然显示「已开启」；在演示模式写入真实设置。
 
 ## 11. 管理员分区与前后端误装（2026-11-11 第二轮）
 
@@ -182,8 +194,8 @@ GitLab `/<group>/<sub>/<repo>/-/tree/<ref>`、`.git` 后缀、query/hash、`http
 
 ## 12. Git 可视化（只读，2026-11-11 第二轮）
 
-**入口**：`settings.devMode === true` 时，数据包列面板头出现 `.segmented`（`数据包 / Git`），同一列内互换；
-关闭开发者模式即隐藏并强制回到数据包。桌面与手机同一套逻辑（手机上它就是「数据包」视图内的页签）。
+**入口（常显）**：数据包列面板头固定有 `.segmented`（`数据包 / Git`），同一列内互换；
+不再由开发者模式开关控制（用户裁定：看不到等于没有）。桌面与手机同一套逻辑。
 
 **数据源（只读）**：
 
