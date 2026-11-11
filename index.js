@@ -11,7 +11,7 @@ import { zipIo, readZipEntryManifest } from './src/core/zip-io.js';
 import { splitArchiveEntries } from './src/core/splitter.js';
 import { mergeConvertedBlobs } from './src/core/merge-packages.js';
 import {
-  ORIGINS, isStorageSupported, saveFile, getFile, deleteFile, listStoredFiles, clearStoredFiles,
+  ORIGINS, isStorageSupported, saveFile, getFile, deleteFile, listStoredFiles, clearStoredFiles, getStorageUsage,
 } from './src/storage/db.js';
 import { buildChartTree, fmtMB, splitLimitOf } from './src/core/chart-model.js';
 import { DEFAULT_FILENAME_TEMPLATE, TARGET_PLATFORMS, resolveFilename, namedBlob } from './src/core/naming.js';
@@ -1466,6 +1466,7 @@ async function main(root) {
         const result = await openHostStoragePage(kind, host.platform);
         if (!result.ok) view.toast(t('quota.noHostPage'));
       },
+      browserUsageDetails: readBrowserUsageDetails,
       uploadRequest: () => root.querySelector('#file-input')?.click(),
       uploadPrivate,
       privateFiles: {
@@ -1605,6 +1606,93 @@ async function main(root) {
       else view.openTutorial();
     }
   } catch { /* 隐私模式 */ }
+}
+
+/**
+ * 浏览器占用明细（直接读浏览器，**完全不经过宿主**）。
+ * 数据源：navigator.storage.estimate() 的 usageDetails（Chrome 提供分项）、
+ * localStorage / sessionStorage 自算字节、本插件 IndexedDB 暂存与 OPFS 文件。
+ * 浏览器不提供的分项如实缺失，界面提示「不提供分项」，绝不伪造。
+ */
+async function readBrowserUsageDetails() {
+  let usage = 0;
+  let quota = 0;
+  let usageDetails = null;
+  try {
+    if (navigator?.storage?.estimate) {
+      const est = await navigator.storage.estimate();
+      usage = Number(est?.usage) || 0;
+      quota = Number(est?.quota) || 0;
+      usageDetails = est?.usageDetails && typeof est.usageDetails === 'object' ? est.usageDetails : null;
+    }
+  } catch { /* 隐私模式 */ }
+
+  const items = [];
+  if (usageDetails) {
+    for (const key of ['indexedDB', 'caches', 'serviceWorkerRegistrations', 'fileSystems']) {
+      if (typeof usageDetails[key] === 'number') items.push({ key, bytes: usageDetails[key] });
+    }
+  }
+  for (const kind of ['localStorage', 'sessionStorage']) {
+    const bytes = webStorageBytes(kind);
+    if (bytes >= 0) items.push({ key: kind, bytes });
+  }
+
+  let app = null;
+  try {
+    const u = await getStorageUsage();
+    app = { count: u.count, bytes: u.totalBytes, byOrigin: u.byOrigin };
+  } catch { /* 无 IndexedDB */ }
+
+  let opfs = null;
+  try {
+    opfs = await readOpfsUsage();
+  } catch { /* 无 OPFS */ }
+
+  return {
+    used: usage,
+    total: quota,
+    items,
+    hasBreakdown: items.length > 0,
+    app,
+    opfs,
+  };
+}
+
+function webStorageBytes(kind) {
+  try {
+    const s = kind === 'localStorage' ? globalThis.localStorage : globalThis.sessionStorage;
+    if (!s) return -1;
+    let bytes = 0;
+    for (let i = 0; i < s.length; i += 1) {
+      const key = s.key(i) || '';
+      const val = s.getItem(key) || '';
+      bytes += (key.length + val.length) * 2;
+    }
+    return bytes;
+  } catch {
+    return -1;
+  }
+}
+
+async function readOpfsUsage() {
+  if (typeof navigator === 'undefined' || typeof navigator.storage?.getDirectory !== 'function') return null;
+  const root = await navigator.storage.getDirectory();
+  let bytes = 0;
+  let files = 0;
+  const walk = async (dir) => {
+    for await (const entry of dir.values()) {
+      if (entry.kind === 'file') {
+        const file = await entry.getFile();
+        bytes += file.size;
+        files += 1;
+      } else {
+        await walk(entry);
+      }
+    }
+  };
+  await walk(root);
+  return { bytes, files };
 }
 
 /**
