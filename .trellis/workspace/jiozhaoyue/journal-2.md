@@ -1272,3 +1272,38 @@ Topics: [.trellis/research/11-11-chart-maximize-and-extension-manager.md](../../
 
 - Dev 实例实测私有仓安装与更新检查（需真实账号与 Dev 端口）
 - TT/PT 宿主上的扩展安装通道实测
+
+
+## Session 74: UI 修复计划与交接（下一轮执行）
+<!-- trellis-session: v=2 fp=1bc4805208b2fb95 -->
+
+**Date**: 2026-11-11
+**Task**: UI 修复计划与交接（下一轮执行）
+**Branch**: `main`
+
+### Summary
+
+按用户实测反馈整理六条 UI 问题的根因、改点与判据，写下一轮执行计划与交接文档；本轮不实现。
+
+### Main Changes
+
+- 新增 docs/PLAN-2026-11-11-ui-fixes-next.md（六条逐项判据）
+- 新增 HANDOFF-2026-11-11.md（状态/关键文件/验证命令/未验证边界）
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `aa48f7a` | docs(ui): 下一轮六条 UI 修复计划与 2026-11-11 交接 |
+
+### Testing
+
+- [OK] 本轮为文档轮；上轮 core 29 例 + 六守卫 + 三个 UI 取证全绿
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 按计划依次修 U1–U6，并在 4173 多宽度取证
