@@ -104,8 +104,8 @@ export function buildSettingsHtml(settings = {}) {
       + '<button type="button" class="btn" data-action="plugin-export">' + t('settings.exportData') + '</button>'
       + '<button type="button" class="btn" data-action="plugin-import">' + t('settings.importData') + '</button>'
     + '</div>'
-    + '<label class="check"><input type="checkbox" id="set-include-creds"> ' + t('settings.includeCreds') + '</label>'
-    + '<label class="check"><input type="checkbox" id="set-include-oauth" disabled> ' + t('settings.includeOauth') + '</label>'
+    + '<label class="check"><input type="checkbox" id="set-include-creds" checked> ' + t('settings.includeCreds') + '</label>'
+    + '<label class="check check-sub"><input type="checkbox" id="set-include-oauth"> ' + t('settings.includeOauth') + '</label>'
     + '<div class="ext-note">' + t('settings.dataNote') + '</div>';
 
   return '<div class="settings-grid">'

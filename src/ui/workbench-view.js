@@ -223,7 +223,7 @@ let chartPrefs = typeof localStorage !== 'undefined' ? loadChartPrefs() : normal
 const state = {
   host:'luker', mode:'plugin', view:'desktop', mainView:'chart', mobileView:'chart', pane:'workbench', zone:'import',
   extTab:'host', extEntries:[], extResults:[], extRunning:false, extInstalled:null, extManifestPrefill:[],
-  extReportOpen:false, extInstallOpen:false, devAutoRan:false,
+  extReportOpen:false, extInstallOpen:false, devAutoRan:false, settingsDraft:null,
   extAccountTests:[], extUpdate:null, extAccountsOpen:true,
   source:{ type:'host', pkgId:null }, target:'SillyTavern', targetManual:false,
   delta: 'overwrite', splitMb: chartPrefs.splitMb,
@@ -3146,27 +3146,55 @@ function showPane(name){
 }
 function backToWorkbench(){ showPane('workbench'); }
 
+/** 设置草稿：只在 × 关闭时落内存，刷新页面即丢；保存/取消都会清空。 */
+function captureSettingsDraft(body){
+  const draft={};
+  body.querySelectorAll('[data-setting]').forEach((el)=>{
+    draft[el.dataset.setting]= el.type==='checkbox' ? !!el.checked : el.value;
+  });
+  draft.__includeCreds=!!body.querySelector('#set-include-creds')?.checked;
+  draft.__includeOauth=!!body.querySelector('#set-include-oauth')?.checked;
+  return draft;
+}
+function applySettingsDraft(body){
+  const draft=state.settingsDraft;
+  if(!draft) return;
+  body.querySelectorAll('[data-setting]').forEach((el)=>{
+    if(!Object.prototype.hasOwnProperty.call(draft,el.dataset.setting)) return;
+    const v=draft[el.dataset.setting];
+    if(el.type==='checkbox') el.checked=!!v; else el.value=v;
+  });
+  const creds=body.querySelector('#set-include-creds');
+  if(creds && typeof draft.__includeCreds==='boolean') creds.checked=draft.__includeCreds;
+  const oauth=body.querySelector('#set-include-oauth');
+  if(oauth && typeof draft.__includeOauth==='boolean') oauth.checked=draft.__includeOauth;
+}
 function openSettingsView(html,{onSave,onClose,onAction}={}){
   const body=document.getElementById('settings-body');
   if(!body) return;
   body.innerHTML=html||'';
-  const done=()=>{ onClose?.(); backToWorkbench(); };
+  /* 三态：× = 关闭但保留草稿（内存，刷新即丢）；取消 = 丢弃改动；保存 = 双写持久化。 */
+  const closeKeep=()=>{ state.settingsDraft=captureSettingsDraft(body); onClose?.(); backToWorkbench(); };
+  const closeDrop=()=>{ state.settingsDraft=null; onClose?.(); backToWorkbench(); };
+  applySettingsDraft(body);
   const save=document.getElementById('settings-save');
-  if(save) save.onclick=()=>{ onSave?.(body); };
-  ['settings-cancel','settings-close'].forEach(id=>{
-    const b=document.getElementById(id);
-    if(b) b.onclick=done;
-  });
+  if(save) save.onclick=()=>{ state.settingsDraft=null; onSave?.(body); };
+  const closeX=document.getElementById('settings-close');
+  if(closeX) closeX.onclick=closeKeep;
+  const cancelBtn=document.getElementById('settings-cancel');
+  if(cancelBtn) cancelBtn.onclick=closeDrop;
   body.querySelectorAll('[data-action]').forEach(el=>{
     el.addEventListener('click',()=>onAction?.(el.dataset.action, el));
   });
   const creds=body.querySelector('#set-include-creds');
   const oauth=body.querySelector('#set-include-oauth');
   if(creds && oauth){
-    creds.addEventListener('change',()=>{
+    const syncCredChildren=()=>{
       oauth.disabled=!creds.checked;
       if(!creds.checked) oauth.checked=false;
-    });
+    };
+    syncCredChildren();
+    creds.addEventListener('change',syncCredChildren);
   }
   showPane('settings');
 }

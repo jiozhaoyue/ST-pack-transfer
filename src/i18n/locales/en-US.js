@@ -254,7 +254,7 @@ export default {
   'settings.importData': 'Import plugin data',
   'settings.includeCreds': 'Include credentials',
   'settings.includeOauth': 'Include OAuth tokens',
-  'settings.dataNote': 'Exports the whole plugin configuration (settings, chart prefs and layout, cloud and WebDAV, accounts); data packs and artifacts are not included. OAuth tokens do not follow by default.',
+  'settings.dataNote': 'Exports the whole plugin configuration (settings, chart prefs and layout, cloud and WebDAV, accounts); data packs and artifacts are not included. Login credentials are included by default; OAuth tokens are a sub-item and stay off by default.',
   'settings.dataExported': 'Plugin data exported (no credentials)',
   'settings.dataExportedCreds': 'Plugin data exported ({n} accounts)',
   'settings.dataBadFile': 'Not a valid plugin data file',

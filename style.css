@@ -783,6 +783,7 @@
   #app.app-container .help-view-body .help-sec:last-child{margin-bottom:0}
   #app.app-container .help-view-body .help-sec h4{margin:0 0 4px;font-size:12px;color:var(--text);font-weight:600}
   #app.app-container .view-body .check{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);margin:8px 0}
+  #app.app-container .view-body .check-sub{padding-left:18px}
   #app.app-container .settings-grid{display:flex;flex-direction:column;gap:2px}
   #app.app-container .set-group{border:1px solid var(--border);border-radius:8px;background:var(--panel-2);overflow:hidden}
   #app.app-container .set-group + .set-group{margin-top:6px}

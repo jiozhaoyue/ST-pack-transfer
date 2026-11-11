@@ -257,7 +257,7 @@ export default {
   'settings.importData': '导入插件数据',
   'settings.includeCreds': '包含登录凭据',
   'settings.includeOauth': '包含 OAuth 令牌',
-  'settings.dataNote': '导出整个插件的配置（设置、图表偏好与布局、云仓库与 WebDAV、账号）；不含数据包与产物。OAuth 令牌默认不跟随。',
+  'settings.dataNote': '导出整个插件的配置（设置、图表偏好与布局、云仓库与 WebDAV、账号）；不含数据包与产物。默认包含登录凭据；OAuth 令牌是它的子项，默认不包含。',
   'settings.dataExported': '插件数据已导出（未含凭据）',
   'settings.dataExportedCreds': '插件数据已导出（含 {n} 个账号）',
   'settings.dataBadFile': '不是有效的插件数据文件',
