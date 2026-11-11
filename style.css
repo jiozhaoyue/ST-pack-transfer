@@ -592,6 +592,32 @@
   #app.app-container .ext-entry.is-ok .ext-state{color:var(--keep)}
   #app.app-container .ext-entry.is-failed .ext-state{color:var(--drop)}
   #app.app-container .ext-entry.is-installing .ext-state{color:var(--optional)}
+  /* Git 账号与打包条目（扩展管理） */
+  #app.app-container .ext-accounts{display:flex;flex-direction:column;gap:7px;padding:8px;border:1px solid var(--border);
+    border-radius:9px;background:color-mix(in srgb,var(--panel-3) 45%,transparent)}
+  #app.app-container .ext-accounts > summary{cursor:pointer;font-size:11.5px;color:var(--muted);list-style:none}
+  #app.app-container .ext-accounts > summary::-webkit-details-marker{display:none}
+  #app.app-container .ext-accounts[open] > summary{color:var(--text)}
+  #app.app-container .ext-note.privacy{border-color:color-mix(in srgb,var(--optional) 45%,var(--border));color:var(--text)}
+  #app.app-container .acc-add .text_pole{flex:1 1 130px;min-width:110px}
+  #app.app-container .acc-row{gap:6px}
+  #app.app-container .acc-star{flex:0 0 auto;width:22px;height:22px;padding:0;border:1px solid var(--border);
+    border-radius:6px;background:transparent;color:var(--muted);font-size:12px;line-height:1}
+  #app.app-container .acc-star.active{color:var(--optional);border-color:var(--optional)}
+  #app.app-container .acc-tests{flex-wrap:wrap;gap:6px}
+  #app.app-container .acc-test{font-size:10.5px;padding:2px 7px;border:1px solid var(--border);border-radius:999px;color:var(--muted)}
+  #app.app-container .acc-test.is-ok{color:var(--keep);border-color:color-mix(in srgb,var(--keep) 55%,var(--border))}
+  #app.app-container .acc-test.is-failed{color:var(--drop);border-color:color-mix(in srgb,var(--drop) 55%,var(--border))}
+  #app.app-container .ext-pack-entry{flex-direction:column;align-items:stretch;gap:5px}
+  #app.app-container .ext-line{display:flex;align-items:center;gap:6px;min-width:0;flex-wrap:wrap}
+  #app.app-container .ext-line .ext-url{flex:1 1 180px}
+  #app.app-container .ext-line .ext-branch{flex:0 0 170px;font-size:11px;padding:3px 6px}
+  #app.app-container .ext-sub{display:flex;align-items:center;gap:7px;flex-wrap:wrap;font-size:10.5px;color:var(--muted)}
+  #app.app-container .ext-sub .acc-kind{border:1px solid var(--border);border-radius:999px;padding:1px 7px;white-space:nowrap}
+  #app.app-container .ext-note-inline.is-warn{color:var(--optional)}
+  #app.app-container .ext-flag-warn{color:var(--drop);border:1px solid color-mix(in srgb,var(--drop) 55%,var(--border));
+    border-radius:999px;padding:1px 7px;white-space:nowrap}
+  #app.app-container .upd-row .ext-state.is-warn{color:var(--optional)}
   #app.app-container .ext-empty{color:var(--muted);font-size:12px;padding:10px;text-align:center}
   #app.app-container .ext-actions{border-top:1px solid var(--border);padding-top:7px}
   #app.app-container .ext-log{margin:0;max-height:220px;overflow:auto;white-space:pre-wrap;word-break:break-all;
@@ -719,8 +745,10 @@
     text-decoration:underline;margin-right:auto;padding-left:0}
   #app.app-container .tutorial-card .acts button.link:hover{color:var(--text)}
 
-  /* 移动端：窄屏布局 */
-  #app.app-container[data-view="mobile"]{width:390px;max-width:100%;height:min(820px,calc(100vh - 110px));margin:0 auto}
+  /* 移动端：窄屏布局（唯一判据是 data-view，由 JS 按容器宽度设置；
+     不再另设 @media 断点，否则会与 JS 阈值打架，出现「已堆叠却没有数据包切页按钮」） */
+  #app.app-container[data-view="mobile"]{width:100%;max-width:100%;height:min(820px,calc(100vh - 110px));
+    min-height:0;margin:0 auto}
   #app.app-container[data-view="mobile"] .splitter-v{display:none}
   /* 手机端左右切换：切换哪一列可见；唯一滚动容器仍是 .app-main —— 不做第二个滚动条 */
   #app.app-container .mobile-switch{display:none;gap:4px;padding:3px;margin:0 2px;
@@ -770,36 +798,11 @@
   #app.app-container[data-view="mobile"] .field select{max-width:150px}
   #app.app-container[data-view="mobile"] .panel-title .source-chip{max-width:150px}
 
-  @media (max-width:860px){
-    /* 窄屏固定容器高度：滚动交给 .app-main，进度条底栏始终留在视口底部 */
-    #app.app-container{height:calc(100vh - 96px);min-height:520px}
-    #app.app-container .app-main{display:flex;flex-direction:column;gap:10px;overflow:auto}
-    #app.app-container .splitter-v{display:none}
-    #app.app-container .app-main > *, #app.app-container .col-side > *{flex:0 0 auto}
-    #app.app-container .col-chart{flex:0 0 auto}
-    #app.app-container .col-side{display:contents}
-    #app.app-container .vol-collapse{display:inline-flex}
-    #app.app-container .vol-card .chart-tree{max-height:none;overflow:visible}
-    #app.app-container .chart-card{flex:0 0 auto}
-    #app.app-container .cloud-view{flex:0 0 auto}
-    #app.app-container .cloud-grid{grid-template-columns:minmax(0,1fr)}
-    #app.app-container .cloud-body{overflow:visible}
-    /* 竖屏：唯一滚动容器是 .app-main —— 内部一律不滚 */
-    #app.app-container .app-main{overflow-y:auto;overflow-x:hidden}
-    #app.app-container .chart-stack{overflow:visible;max-height:none;height:auto}
-    #app.app-container .zone-body{overflow:visible}
-    #app.app-container .zone-body > .card-list{overflow:visible;max-height:none}
-    /* 竖屏空态：两张引导卡并排压紧 */
-    #app.app-container .chart-empty-guide{grid-template-columns:repeat(2,minmax(0,1fr));
-      gap:8px;padding:8px 4px;margin:0}
-    #app.app-container .empty-guide-card{gap:5px;padding:9px 7px;border-radius:9px}
-    #app.app-container .empty-guide-card .guide-icon{width:28px;height:28px}
-    #app.app-container .empty-guide-card .guide-icon svg{width:17px;height:17px}
-    #app.app-container .empty-guide-card .guide-title{font-size:12px}
-    #app.app-container .empty-guide-card .guide-desc{font-size:10.5px;line-height:1.35;
-      min-height:0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-    #app.app-container .empty-guide-card .btn{min-height:26px;padding:4px 8px;font-size:11px}
-  }
+  /* 窄屏不再用 @media 重复一套布局：JS 按容器宽度写 data-view="mobile"，
+     上一段 [data-view="mobile"] 规则即唯一布局来源（2026-11-11 统一）。 */
+
+
+
 
 
 /* ── 作用域内 reset ── */

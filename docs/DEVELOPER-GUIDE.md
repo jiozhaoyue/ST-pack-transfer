@@ -202,11 +202,24 @@
 | 导出日志 / 失败链接 txt / 安装报告 JSON | 安装页与报告页底部按钮 | 同文件的 `downloadTextFile()` |
 | 宿主扩展清单导出收束 | 已装页「导出扩展清单」 | `index.js` 的 `exportAssetList()`（`source:'host'`） |
 | 包清单入口收束 | 图表卡 `[data-extmanifest]` → 扩展管理并预填 | `index.js` 的 `openExtensionManifest` → `view.openExtensionManager()` |
+| **打包页：按数据包选择扩展** | 扩展管理 → 打包 | `src/ui/workbench-view.js` 的 `renderExtPack()`；扩展折叠为单元的纯逻辑在 `src/core/ext-pack.js`（`extensionUnitsOf` / `extensionUnitName`） |
+| **每包独立 Git 模式** | 打包页组头 / 图表卡 `[data-gitmode]` | `state.gitModeByPkg` + `packageGitMode(pkg)`；`getExportOptions(pkg)` 与合并计划按包取值 |
+| **Git 账号（多站点多账号）** | 扩展管理 → 安装页「Git 账号」 | `src/core/git-accounts.js`（归一/增删/默认/匹配/脱敏）；`src/ui/git-remote.js`（测试账号）；持久化在 `settings-store.js` 与 `extension_settings` |
+| **凭据存储位置（服务端 / 仅浏览器）** | 账号区单选项 | `settings-panel.js` 的 `gitCredentialStorage`；`settings-store.js` 的 `saveSettings()` 在 browser 模式写回空的 `gitAccounts` 覆盖服务端副本 |
+| **URL 归一（含 `/tree/<ref>`）** | 安装条目行 | `src/core/git-url.js` 的 `parseRepoUrl()` / `refineRefWithBranches()`；仓库页地址必须解析成「根 + ref」——宿主用 URL 最后一段做目录名 |
+| **分支列举 / 仓库摘要 / 私有预检** | 条目行「列分支」与解析后自动预检 | `src/core/git-site.js`（端点/鉴权/归一）+ `src/ui/git-remote.js`（有界超时 fetch） |
+| **私有仓安装（凭据注入）** | 安装执行 | `host-bridge.js` 的 `installExtensionBatch()` 用 `buildAuthedUrl()` 拼进交给宿主的 URL；日志/报告用 `scrubUrlCredentials()` 脱敏 |
+| **更新检查（只读）** | 已装页「检查更新」 | `workbench-view.js` 的 `checkExtUpdates()`；本地版本读宿主静态 `manifest.json`，远端读 raw manifest，`compareVersions()` 比较 |
 
 > 宿主「从宿主拉取」注入只允许落在**备份**动作区：ST/TT 的 `.userBackupButton`、
 > Luker 的 `.backupActionRow`（必须含 `.backupDownloadButton`）或 2.9+ `.dw-foot`（含
 > `[data-act="backup-go"]`）、TT 的 `#data_migration_export_button`、PT 的 `#ptdm-export`。
 > **禁止**回退到「首个 `.backupActionRow`」——日志查看器同用该类名，会注错（2026-11-11 实测）。
+>
+> **凭据隐私是产品事实，不是可选文案**：插件没有自有远端；凭据默认随宿主
+> `extension_settings` 写入服务端 `settings.json`（有服务器/管理员权限者可见），
+> 可在账号区改成「仅浏览器」；任何展示位置必须脱敏。私有仓库安装时凭据会被拼进
+> 交给宿主克隆的 URL，宿主可能写入该扩展的 `.git/config`。
 
 ### L. 工作台布局：执行卡取消 · 进度条常驻 · 图表网格（2026-11-05）
 
@@ -269,9 +282,11 @@
 ```
 src/core/     纯逻辑，**禁止 DOM / window / fetch**（可在 Node/Vitest 直接跑）
               新增：asset-list.js（官方资产列表）、transfer-plan.js（分片台账）、
-              webdav-client.js、transfer-target.js、host-capabilities.js
+              webdav-client.js、transfer-target.js、host-capabilities.js、
+              ext-pack.js（扩展折叠为打包单元）、git-url.js（仓库地址归一）、
+              git-accounts.js（账号库）、git-site.js（站点 API 端点/归一）
 src/app/      转换/传输编排（task-runtime / conversion-runner / transfer-runner / pull-entry）
-src/ui/       可 DOM；host-bridge.js 是宿主差异的唯一落点
+src/ui/       可 DOM；host-bridge.js 是宿主差异的唯一落点；git-remote.js 是 Git 站点网络的唯一落点
 src/storage/  IndexedDB + 可选 Authority 适配器
 src/vendor/   zip.js / fzstd / fontawesome 本地副本 —— **勿升级改动**
 public/       仅 file-protocol-notice.js
@@ -359,6 +374,10 @@ npm run preview      # 本地静态服务器托管 dist，默认 4173
 | 自动备份 | 两条路：① **全量时间戳快照**（每次独立新包，保留最近 N 份）；② **内容寻址增量备份集**（只传新增/修改条目，每版一张完整清单，任一张可独立恢复）。**加密可选**：填口令即逐片加密，留空即不加密。**无 cron、无服务端直传**（用户禁止后台插件）。**不做差量链**（用户 2026-11-09 裁定 D-8） |
 | WebDAV 真机 | 协议与降级分支已单测覆盖；**尚未在真实 WebDAV 服务器上跑过**（含 405/401/CORS 实测） |
 | 静态 UI 验收 | `npm run build && npm run preview` 只覆盖独立 Web / 插件模板本身；宿主注入（账户面板、原生按钮）仍需 Dev 实例 |
+| Git 账号与安装 | 站点 API 只在用户主动操作时请求；GitHub/GitLab/Gitee 支持 CORS，**自建 Gitea 视实例配置**，失败一律显示「未提供」/原因码 |
+| commit 安装 | 宿主 `git clone --branch` **不接受 commit SHA**；插件仍可传，失败信息原样回显并建议改用分支/标签 |
+| 私有仓库凭据 | 只能拼进交给宿主克隆的 URL；宿主可能写入扩展 `.git/config`，插件无法回收（安装前弹窗告知） |
+| 更新检查 | 只比对本地/远端 `manifest.json` 版本；任一缺失即 `unknown`，不自动更新 |
 
 ---
 

@@ -33,6 +33,7 @@ import {
   summarizeExtensions,
 } from '../core/asset-list.js';
 import { capabilityState } from '../core/host-capabilities.js';
+import { buildAuthedUrl, scrubUrlCredentials } from '../core/git-url.js';
 import {
   RESTORE_UPLOAD_BASE,
   RESTORE_UPLOAD_CHUNK_SIZE,
@@ -2040,7 +2041,7 @@ export async function installExtensionViaHost({ url, branch, replace = false }) 
   if (!response.ok) {
     let detail = '';
     try {
-      detail = await response.text();
+      detail = scrubUrlCredentials(await response.text());
     } catch { /* 忽略 */ }
     /* Luker 的 `extensions.enabled=false` 会统一拦截所有扩展端点（含 /install），
        清单安装在这种模式下不可用；白名单/权限拦截则回 403 但不带 disabled 语义。 */
@@ -2069,16 +2070,22 @@ export async function installExtensionBatch(entries, { onEntry, onLog } = {}) {
   for (const entry of list) {
     const url = String(entry?.url || '').trim();
     if (!url) continue;
-    const branch = String(entry?.branch || entry?.version || entry?.ref || 'main').trim() || 'main';
+    /* 空 ref 表示「用仓库默认分支」——不要强行填 main（很多仓库默认是 master）。
+       ref 可以是分支、标签或 commit（commit 宿主多半不支持，失败信息会原样回传）。 */
+    const branch = String(entry?.branch ?? entry?.ref ?? entry?.version ?? '').trim();
+    /* 私有仓库只能靠宿主服务端克隆：凭据拼进交给宿主的 URL（内存里拼、日志里抹）。
+       界面与返回值一律用**不含凭据**的 url，避免 token 进日志 / 报告文件。 */
+    const credential = entry?.credential || null;
+    const target = buildAuthedUrl(url, credential);
     onEntry?.({ url, branch, status: 'installing' });
-    onLog?.(`[${new Date().toISOString()}] installing ${url} (${branch})`);
+    onLog?.(`[${new Date().toISOString()}] installing ${url} (${branch || 'default branch'})${target.authed ? ' · 已注入凭据' : ''}`);
     try {
-      await installExtensionViaHost({ url, branch, replace: !!entry.replace });
+      await installExtensionViaHost({ url: target.url, branch, replace: !!entry.replace });
       onEntry?.({ url, branch, status: 'ok' });
       onLog?.(`[${new Date().toISOString()}] OK ${url}`);
       results.push({ url, branch, status: 'ok' });
     } catch (err) {
-      const message = err?.message || String(err);
+      const message = scrubUrlCredentials(err?.message || String(err));
       onEntry?.({ url, branch, status: 'failed', error: message });
       onLog?.(`[${new Date().toISOString()}] FAIL ${url}: ${message}`);
       results.push({ url, branch, status: 'failed', error: message });

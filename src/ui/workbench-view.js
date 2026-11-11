@@ -24,8 +24,16 @@ import {
 import { decryptBytes, isEncrypted } from '../core/s3-crypto.js';
 import { mergeChartTrees } from '../core/merge-packages.js';
 import { EXTENSION_MODES, GIT_MODES } from '../core/export-modes.js';
+import { extensionUnitsOf } from '../core/ext-pack.js';
+import { parseRepoUrl, refineRefWithBranches, isCommitRef } from '../core/git-url.js';
+import {
+  normalizeAccounts, addAccount, removeAccount, setDefaultAccount,
+  findAccountFor, maskAccounts, ACCOUNT_SITES,
+} from '../core/git-accounts.js';
+import { compareVersions } from '../core/git-site.js';
+import { createGitRemote } from './git-remote.js';
 import { t } from '../i18n/index.js';
-import { loadSettings } from './settings-store.js';
+import { loadSettings, saveSettings } from './settings-store.js';
 import { loadChartPrefs, saveChartPrefs, normalizeChartPrefs } from './chart-prefs.js';
 
 /**
@@ -204,12 +212,14 @@ let chartPrefs = typeof localStorage !== 'undefined' ? loadChartPrefs() : normal
 const state = {
   host:'luker', mode:'plugin', view:'desktop', mainView:'chart', mobileView:'chart', pane:'workbench', zone:'import',
   extTab:'install', extEntries:[], extResults:[], extLog:[], extRunning:false, extInstalled:null, extManifestPrefill:[],
+  extAccountTests:[], extUpdate:null, extAccountsOpen:true,
   source:{ type:'host', pkgId:null }, target:'SillyTavern', targetManual:false,
   delta: 'overwrite', splitMb: chartPrefs.splitMb,
   compression: chartPrefs.compression,
   extensionMode: chartPrefs.extensionMode,
   extUncheckedMode: 'none',
   gitMode: chartPrefs.gitMode,
+  gitModeByPkg: {},
   keepDev: chartPrefs.keepDev,
   packages: INITIAL_PACKAGES.map(p=>({...p})),
   selectedPkgs:new Set(), mergeMode:false, privateFiles:[], expanded:{}, collapsedVol:{}, sel:{}, log:loadPersistedLog(), logLevel:'ALL',
@@ -310,6 +320,12 @@ function walk(nodes,fn){ for(const n of nodes){ fn(n); walk(n.children||[],fn); 
 function treeKey(scope,id){ return scope+'::'+id; }
 function isChecked(n,scope){ const k=treeKey(scope,n.id); return state.sel[k]!==undefined ? state.sel[k] : !!n.checked; }
 function setChecked(n,scope,val){ state.sel[treeKey(scope,n.id)]=val; walk(n.children||[],c=>{ state.sel[treeKey(scope,c.id)]=val; }); }
+/** 每包独立 git 模式：未单独设置时沿用全局默认（偏好里保存的那份）。 */
+function packageGitMode(pkg){
+  const own = pkg && state.gitModeByPkg[pkg.id];
+  if([GIT_MODES.KEEP,GIT_MODES.MINIMAL,GIT_MODES.STRIP].includes(own)) return own;
+  return state.gitMode;
+}
 function syncAncestors(nodes,scope){
   for(const n of nodes){
     if(n.children && n.children.length){
@@ -367,10 +383,19 @@ function hostFilterHtml(){
     +'</select></label>';
 }
 
-/* ── 视图形态与移动端左右切换 ── */
+/* ── 视图形态与移动端左右切换 ──
+   判定阈值必须与 CSS 的堆叠阈值**同一份**：此前 JS 用 640、CSS 用 860，
+   641–860px 会出现「已经堆叠但没有数据包切页按钮」的坏态（2026-11-11 实测）。
+   容器宽度优先：插件模态可能比窗口窄，只看 window.innerWidth 会误判成桌面。 */
+const MOBILE_MAX_WIDTH = 860;
+function hostViewportWidth(){
+  const app = typeof document !== 'undefined' ? document.getElementById('app') : null;
+  const w = app ? app.getBoundingClientRect().width : 0;
+  if(w > 0) return w;
+  return typeof window !== 'undefined' ? window.innerWidth : 1024;
+}
 function detectView(){
-  const w = typeof window !== 'undefined' ? window.innerWidth : 1024;
-  return w <= 640 ? 'mobile' : 'desktop';
+  return hostViewportWidth() <= MOBILE_MAX_WIDTH ? 'mobile' : 'desktop';
 }
 function syncView(){
   state.view = detectView();
@@ -831,6 +856,7 @@ function extensionToolsHtml(pkg, assetPkgs, { scope, nodes } = {}){
     +'</div>';
   }
   const full = state.extensionMode !== EXTENSION_MODES.MANIFEST;
+  const gitPkgId = pkg && pkg.id ? String(pkg.id) : '';
   return '<div class="extension-tools" data-exttools="1">'
     +(hasExt
       ? '<span class="et-label">'+t('extension.label')+'</span>'
@@ -839,10 +865,10 @@ function extensionToolsHtml(pkg, assetPkgs, { scope, nodes } = {}){
           +'<button class="seg-btn'+(full?'':' active')+'" data-extmode="manifest">'+t('extension.manifest')+'</button>'
         +'</div>'
         +(full
-          ? '<label class="et-git"><span>'+t('extension.git')+'</span><select class="text_pole" data-gitmode>'
-              +'<option value="keep"'+(state.gitMode===GIT_MODES.KEEP?' selected':'')+'>'+t('extension.gitKeep')+'</option>'
-              +'<option value="minimal"'+(state.gitMode===GIT_MODES.MINIMAL?' selected':'')+'>'+t('extension.gitMinimal')+'</option>'
-              +'<option value="strip"'+(state.gitMode===GIT_MODES.STRIP?' selected':'')+'>'+t('extension.gitStrip')+'</option>'
+          ? '<label class="et-git"><span>'+t('extension.git')+'</span><select class="text_pole" data-gitmode="'+escapeHtml(gitPkgId)+'">'
+              +'<option value="keep"'+(packageGitMode(pkg)===GIT_MODES.KEEP?' selected':'')+'>'+t('extension.gitKeep')+'</option>'
+              +'<option value="minimal"'+(packageGitMode(pkg)===GIT_MODES.MINIMAL?' selected':'')+'>'+t('extension.gitMinimal')+'</option>'
+              +'<option value="strip"'+(packageGitMode(pkg)===GIT_MODES.STRIP?' selected':'')+'>'+t('extension.gitStrip')+'</option>'
             +'</select></label>'
             +'<label class="check et-keepdev"><input type="checkbox" data-keepdev'+(state.keepDev?' checked':'')+'> '+t('extension.keepDev')+'</label>'
           : '')
@@ -1415,40 +1441,157 @@ function extStatusText(status){
   if(status==='installing') return t('extmgr.statusInstalling');
   return t('extmgr.statusPending');
 }
-function parseExtEntries(text, defaultBranch){
+/* ── Git 账号 / 预检 / 分支（扩展管理） ── */
+let gitRemoteInstance = null;
+function gitRemote(){ return gitRemoteInstance || (gitRemoteInstance = createGitRemote()); }
+function gitSettings(){ return loadSettings(); }
+function gitAccountList(){ return normalizeAccounts(gitSettings().gitAccounts); }
+function persistGit(patch){ const s=gitSettings(); return saveSettings({ ...s, ...patch }); }
+function gitStorageMode(){ return gitSettings().gitCredentialStorage === 'browser' ? 'browser' : 'server'; }
+function reasonText(reason){
+  const key={ network:'extmgr.reasonNetwork', unauthorized:'extmgr.reasonUnauthorized',
+    forbidden:'extmgr.reasonForbidden', 'not-found':'extmgr.reasonNotFound',
+    http:'extmgr.reasonHttp', unsupported:'extmgr.reasonUnsupported' }[reason] || 'extmgr.reasonHttp';
+  return t(key);
+}
+function accountForRepo(parsed){ return parsed && parsed.ok ? findAccountFor(gitAccountList(), parsed) : null; }
+
+function makeExtEntry(rawUrl, refHint = ''){
+  const input=String(rawUrl||'').trim();
+  const parsed=parseRepoUrl(input);
+  const ref=String(refHint || parsed.ref || '').trim();
+  return {
+    input, parsed,
+    url: parsed.ok ? parsed.cloneUrl : input,
+    ref, branch: ref,
+    refKind: ref ? (isCommitRef(ref) ? 'commit' : 'ref') : '',
+    status: 'pending', note: '', noteKind: '',
+    branches: [], info: null, privateHint: false, busy: false,
+  };
+}
+
+function parseExtEntries(text, defaultRef){
   const out=[];
   const raw=String(text||'').trim();
   if(!raw) return out;
-  const branchOf=(v)=>String(v||defaultBranch||'main').trim()||'main';
+  const push=(u, ref)=>{ const e=makeExtEntry(u, ref || defaultRef || ''); if(e.parsed.ok) out.push(e); };
   if(raw.startsWith('[') || raw.startsWith('{')){
     try {
       const data=JSON.parse(raw);
       const arr=Array.isArray(data)?data:(Array.isArray(data.links)?data.links:Array.isArray(data.extensions)?data.extensions:[]);
       for(const item of arr){
-        if(typeof item==='string'){ out.push({url:item.trim(), branch:branchOf(''), status:'pending'}); continue; }
-        const url=item&&(item.url||item.link||item.repo); if(!url) continue;
-        out.push({url:String(url).trim(), branch:branchOf(item.branch||item.version||item.ref), status:'pending'});
+        if(typeof item==='string'){ push(item, ''); continue; }
+        const u=item&&(item.url||item.link||item.repo); if(!u) continue;
+        push(String(u), item.branch||item.version||item.ref||'');
       }
       return out;
     } catch { /* 不是 JSON，按行解析 */ }
   }
   for(const line of raw.split(/\r?\n/)){
     const s=line.trim(); if(!s || s.startsWith('#')) continue;
-    let url=s, branch=branchOf('');
-    if(s.includes('|')){
-      const p=s.split('|'); url=p[0].trim(); branch=branchOf(p[1]);
-    } else {
+    let u=s, ref='';
+    if(s.includes('|')){ const p=s.split('|'); u=p[0].trim(); ref=p[1].trim(); }
+    else {
       const m=/^(\S+)\s+(\S+)$/.exec(s);
-      if(m){ url=m[1]; branch=branchOf(m[2]); }
-      else {
-        const h=/^(\S+)#(\S+)$/.exec(s);
-        if(h){ url=h[1]; branch=branchOf(h[2]); }
-      }
+      if(m){ u=m[1]; ref=m[2]; }
+      else { const h=/^(\S+)#(\S+)$/.exec(s); if(h){ u=h[1]; ref=h[2]; } }
     }
-    if(!/^https?:\/\/\S+/i.test(url)) continue;
-    out.push({url, branch, status:'pending'});
+    push(u, ref);
   }
   return out;
+}
+
+/** 仓库摘要预检：识别公开/私有，私有或 404 时给出「需要登录」结论。
+ *  `silent` 时不自渲染（批量预检最后统一渲染一次，避免 N 次重排）。 */
+async function preflightExtEntry(entry, { silent = false } = {}){
+  if(!entry || !entry.parsed?.ok) return;
+  const acc=accountForRepo(entry.parsed);
+  entry.busy=true;
+  const res=await gitRemote().repoInfo(entry.parsed, acc);
+  entry.busy=false;
+  if(res.ok){
+    entry.info=res.info;
+    entry.privateHint=res.info.visibility==='private';
+    entry.note=entry.privateHint ? t('extmgr.privateRepo')
+      : (res.info.description || t('extmgr.publicRepo'));
+    entry.noteKind=entry.privateHint?'warn':'info';
+  } else {
+    const needsLogin=res.reason==='unauthorized' || res.reason==='not-found';
+    entry.info=null;
+    entry.privateHint=needsLogin && !acc;
+    entry.note=needsLogin ? t('extmgr.preflightNeedsLogin')
+      : t('extmgr.preflightFailed',{reason:reasonText(res.reason)});
+    entry.noteKind=needsLogin?'warn':'muted';
+  }
+  if(!silent) renderExtensionView();
+}
+
+async function listEntryBranches(i){
+  const entry=state.extEntries[i]; if(!entry||!entry.parsed?.ok) return;
+  const acc=accountForRepo(entry.parsed);
+  entry.busy=true; renderExtensionView();
+  const res=await gitRemote().listBranches(entry.parsed, acc);
+  entry.busy=false;
+  if(res.ok && res.branches.length){
+    entry.branches=res.branches;
+    entry.ref=refineRefWithBranches(entry.ref, res.branches) || res.branches[0];
+    entry.branch=entry.ref;
+    entry.note=t('extmgr.branchesFound',{n:res.branches.length});
+    entry.noteKind='info';
+  } else if(res.ok){
+    entry.note=t('extmgr.branchesEmpty'); entry.noteKind='muted';
+  } else {
+    entry.note=t('extmgr.preflightFailed',{reason:reasonText(res.reason)}); entry.noteKind='warn';
+  }
+  renderExtensionView();
+}
+
+function persistAccountList(list){ persistGit({ gitAccounts: list }); }
+
+async function addAccountFromForm(body){
+  const read=(sel)=>String(body.querySelector(sel)?.value||'').trim();
+  const secret=read('[data-accsecret]');
+  if(!secret){ toast(t('extmgr.accountSecretRequired')); return; }
+  const draft={
+    site: read('[data-accsite]')||'github',
+    baseUrl: read('[data-accbase]'),
+    username: read('[data-accuser]'),
+    secret,
+    label: read('[data-acclabel]'),
+    createdAt: Date.now(),
+  };
+  const list=addAccount(gitAccountList(), draft);
+  persistAccountList(list);
+  const target=list.find((a)=>a.secret===secret && a.site===draft.site);
+  const res=target ? await gitRemote().testAccount(target) : {ok:false};
+  toast(res.ok
+    ? t('extmgr.accountAdded',{login:res.login||draft.label||draft.site})
+    : t('extmgr.accountAddedUnverified'));
+  renderExtensionView();
+}
+
+function removeAccountWithConfirm(id){
+  const acc=gitAccountList().find((a)=>a.id===id);
+  if(!acc) return;
+  openModal(t('extmgr.accountDeleteTitle'), t('extmgr.accountDeleteDesc',{label:acc.label}), [], [
+    {label:t('modal.cancel'),onClick:closeModal},
+    {label:t('extmgr.accountDelete'),danger:true,onClick:()=>{
+      persistAccountList(removeAccount(gitAccountList(), id));
+      closeModal(); renderExtensionView();
+    }},
+  ]);
+}
+
+async function testAllAccounts(){
+  const list=gitAccountList();
+  if(!list.length){ toast(t('extmgr.accountNone')); return; }
+  const results=[];
+  for(const acc of list){
+    const res=await gitRemote().testAccount(acc);
+    results.push({label:acc.label,ok:res.ok,login:res.login||'',reason:res.reason||''});
+  }
+  state.extAccountTests=results;
+  renderExtensionView();
 }
 function downloadTextFile(name, text){
   try {
@@ -1458,15 +1601,74 @@ function downloadTextFile(name, text){
     setTimeout(()=>URL.revokeObjectURL(url),1000);
   } catch { toast(t('extmgr.exportFailed')); }
 }
-function renderExtInstall(body){
-  const rows=state.extEntries.map((e,i)=>{
-    return '<div class="ext-entry is-'+(e.status||'pending')+'">'
+function accountRowHtml(acc){
+  const masked=maskAccounts([acc])[0];
+  return '<div class="ext-entry acc-row is-ok">'
+    +'<button type="button" class="acc-star'+(acc.isDefault?' active':'')+'" data-accdefault="'+escapeHtml(acc.id)+'" title="'+t('extmgr.accountDefault')+'">'+(acc.isDefault?'★':'☆')+'</button>'
+    +'<span class="ext-url" title="'+escapeHtml(acc.host)+'">'+escapeHtml(acc.label)+'</span>'
+    +'<span class="ext-state">'+escapeHtml(acc.site)+' · '+escapeHtml(acc.host)
+      +' · '+escapeHtml((acc.username?acc.username+' · ':'')+(masked?masked.secret:''))+'</span>'
+    +'<button type="button" class="btn" data-acctest="'+escapeHtml(acc.id)+'">'+t('extmgr.accountTest')+'</button>'
+    +'<button type="button" class="btn" data-accdel="'+escapeHtml(acc.id)+'">'+t('extmgr.accountDelete')+'</button>'
+  +'</div>';
+}
+function accountsHtml(){
+  const list=gitAccountList();
+  const mode=gitStorageMode();
+  const tests=state.extAccountTests||[];
+  const testLine=tests.length
+    ? '<div class="ext-row acc-tests">'+tests.map((r)=>'<span class="acc-test '+(r.ok?'is-ok':'is-failed')+'">'
+        +escapeHtml(r.label)+' · '+(r.ok?t('extmgr.accountOk',{login:r.login||'-'}):reasonText(r.reason))+'</span>').join('')+'</div>'
+    : '';
+  return '<details class="ext-accounts" data-extaccounts'+(state.extAccountsOpen?' open':'')+'>'
+    +'<summary>'+t('extmgr.accountsTitle',{n:list.length})+'</summary>'
+    +'<div class="ext-note privacy">'+t('extmgr.privacyNote')+'</div>'
+    +'<div class="ext-row">'
+      +'<span class="et-label">'+t('extmgr.storageLabel')+'</span>'
+      +'<label class="check"><input type="radio" name="accstorage" data-accstorage="server"'+(mode==='server'?' checked':'')+'> '+t('extmgr.storeServer')+'</label>'
+      +'<label class="check"><input type="radio" name="accstorage" data-accstorage="browser"'+(mode==='browser'?' checked':'')+'> '+t('extmgr.storeBrowser')+'</label>'
+    +'</div>'
+    +'<div class="ext-row acc-add">'
+      +'<select class="text_pole" data-accsite>'+ACCOUNT_SITES.map((s)=>'<option value="'+s+'">'+s+'</option>').join('')+'</select>'
+      +'<input class="text_pole" data-accbase placeholder="'+t('extmgr.accountBase')+'">'
+      +'<input class="text_pole" data-accuser placeholder="'+t('extmgr.accountUser')+'">'
+      +'<input class="text_pole" type="password" data-accsecret placeholder="'+t('extmgr.accountSecret')+'">'
+      +'<input class="text_pole" data-acclabel placeholder="'+t('extmgr.accountLabel')+'">'
+      +'<button type="button" class="btn" data-accadd>'+t('extmgr.accountAdd')+'</button>'
+    +'</div>'
+    +'<div class="ext-list">'+(list.length
+      ? list.map(accountRowHtml).join('')
+      : '<div class="ext-empty">'+t('extmgr.accountNone')+'</div>')+'</div>'
+    +testLine
+    +'<div class="ext-row ext-actions">'
+      +'<button type="button" class="btn" data-acctestall>'+t('extmgr.accountTestAll')+'</button>'
+    +'</div>'
+  +'</details>';
+}
+function entryRowHtml(e,i){
+  const datalistId='extbr-'+i;
+  const opts=e.branches.map((b)=>'<option value="'+escapeHtml(b)+'"></option>').join('');
+  const kind=e.refKind==='commit' ? t('extmgr.refCommit')
+    : (e.ref ? t('extmgr.refBranch') : t('extmgr.refDefault'));
+  return '<div class="ext-entry ext-pack-entry is-'+(e.status||'pending')+'">'
+    +'<div class="ext-line">'
       +'<span class="ext-url" title="'+escapeHtml(e.url)+'">'+escapeHtml(e.url)+'</span>'
-      +'<input class="text_pole ext-branch" data-extbranch="'+i+'" value="'+escapeHtml(e.branch||'main')+'" placeholder="main">'
+      +'<input class="text_pole ext-branch" data-extbranch="'+i+'" value="'+escapeHtml(e.ref)+'" list="'+datalistId+'" placeholder="'+t('extmgr.refPlaceholder')+'">'
+      +'<datalist id="'+datalistId+'">'+opts+'</datalist>'
+      +'<button type="button" class="btn" data-extbranches="'+i+'"'+(e.busy?' disabled':'')+'>'+t('extmgr.listBranches')+'</button>'
       +'<span class="ext-state">'+extStatusText(e.status)+(e.error?' · '+escapeHtml(e.error):'')+'</span>'
-      +'</div>';
-  }).join('');
+    +'</div>'
+    +'<div class="ext-sub">'
+      +'<span class="acc-kind">'+kind+'</span>'
+      +(e.note?'<span class="ext-note-inline is-'+(e.noteKind||'muted')+'">'+escapeHtml(e.note)+'</span>':'')
+      +(e.privateHint?'<span class="ext-flag-warn">'+t('extmgr.privateBadge')+'</span>':'')
+    +'</div>'
+  +'</div>';
+}
+function renderExtInstall(body){
+  const rows=state.extEntries.map(entryRowHtml).join('');
   body.innerHTML='<div class="ext-install">'
+    + accountsHtml()
     +'<label class="ext-label">'+t('extmgr.linksLabel')+'</label>'
     +'<div class="ext-note">'+t('extmgr.policyNote')+'</div>'
     +'<textarea id="extmgr-links" class="text_pole" rows="5" placeholder="'+t('extmgr.linksPlaceholder')+'">'+escapeHtml(state.extLinksText||'')+'</textarea>'
@@ -1474,7 +1676,7 @@ function renderExtInstall(body){
       +'<input type="file" id="extmgr-file" accept=".txt,.json,.jsonl" hidden>'
       +'<button type="button" class="btn" id="extmgr-pick">'+t('extmgr.upload')+'</button>'
       +'<button type="button" class="btn" id="extmgr-paste">'+t('extmgr.paste')+'</button>'
-      +'<label class="ext-branch-def"><span>'+t('extmgr.defaultBranch')+'</span><input id="extmgr-branch" class="text_pole" value="'+escapeHtml(state.extDefaultBranch||'main')+'"></label>'
+      +'<label class="ext-branch-def"><span>'+t('extmgr.defaultBranch')+'</span><input id="extmgr-branch" class="text_pole" value="'+escapeHtml(state.extDefaultBranch||'')+'" placeholder="'+t('extmgr.refPlaceholder')+'"></label>'
       +'<span style="flex:1"></span>'
       +'<button type="button" class="btn" id="extmgr-parse">'+t('extmgr.parse')+'</button>'
       +'<button type="button" class="btn accent" id="extmgr-run"'+(state.extRunning?' disabled':'')+'>'+t('extmgr.install')+'</button>'
@@ -1490,41 +1692,62 @@ function renderExtInstall(body){
   const ta=body.querySelector('#extmgr-links');
   ta?.addEventListener('input',()=>{ state.extLinksText=ta.value; });
   const branchEl=body.querySelector('#extmgr-branch');
-  branchEl?.addEventListener('input',()=>{ state.extDefaultBranch=branchEl.value.trim()||'main'; });
+  branchEl?.addEventListener('input',()=>{ state.extDefaultBranch=branchEl.value.trim(); });
   body.querySelector('#extmgr-pick')?.addEventListener('click',()=>body.querySelector('#extmgr-file')?.click());
   body.querySelector('#extmgr-file')?.addEventListener('change',async(e)=>{
     const file=e.target.files?.[0]; if(!file) return;
     try { state.extLinksText=await file.text(); } catch { state.extLinksText=''; }
     state.extEntries=parseExtEntries(state.extLinksText, state.extDefaultBranch);
     renderExtensionView();
+    void preflightAll();
   });
   body.querySelector('#extmgr-paste')?.addEventListener('click',async()=>{
     try {
       const text=await navigator.clipboard.readText();
-      if(text){ state.extLinksText=text; state.extEntries=parseExtEntries(text, state.extDefaultBranch); renderExtensionView(); }
-      else toast(t('extmgr.pasteEmpty'));
+      if(text){
+        state.extLinksText=text;
+        state.extEntries=parseExtEntries(text, state.extDefaultBranch);
+        renderExtensionView();
+        void preflightAll();
+      } else toast(t('extmgr.pasteEmpty'));
     } catch { toast(t('extmgr.pasteEmpty')); }
   });
   body.querySelector('#extmgr-parse')?.addEventListener('click',()=>{
     state.extEntries=parseExtEntries(state.extLinksText||ta?.value||'', state.extDefaultBranch);
     if(!state.extEntries.length) toast(t('extmgr.parseEmpty'));
     renderExtensionView();
+    void preflightAll();
   });
   body.querySelectorAll('[data-extbranch]').forEach((el)=>{
-    el.addEventListener('input',()=>{ const i=Number(el.dataset.extbranch); if(state.extEntries[i]) state.extEntries[i].branch=el.value.trim()||'main'; });
+    el.addEventListener('input',()=>{
+      const i=Number(el.dataset.extbranch); const e=state.extEntries[i]; if(!e) return;
+      e.ref=el.value.trim(); e.branch=e.ref;
+      e.refKind=e.ref ? (isCommitRef(e.ref)?'commit':'ref') : '';
+    });
   });
-  body.querySelector('#extmgr-run')?.addEventListener('click',async()=>{
+  body.querySelectorAll('[data-extbranches]').forEach((btn)=>{
+    btn.addEventListener('click',()=>{ void listEntryBranches(Number(btn.dataset.extbranches)); });
+  });
+  bindAccounts(body);
+  body.querySelector('#extmgr-run')?.addEventListener('click',()=>{
     if(state.extRunning) return;
     if(!state.extEntries.length) state.extEntries=parseExtEntries(state.extLinksText||ta?.value||'', state.extDefaultBranch);
     if(!state.extEntries.length){ toast(t('extmgr.parseEmpty')); return; }
-    state.extRunning=true; state.extResults=[]; state.extLog=[];
-    renderExtensionView();
-    try {
-      state.extResults=await actions.installExtensions?.(state.extEntries)||[];
-    } finally {
-      state.extRunning=false;
-      renderExtensionView();
+    const needLogin=state.extEntries.filter((e)=>e.privateHint && !accountForRepo(e.parsed));
+    if(needLogin.length){
+      openModal(t('extmgr.privateTitle'), t('extmgr.privateDesc',{n:needLogin.length}),
+        ['<div class="rep-grid">'+needLogin.map((e)=>'<div class="rep-row"><span>'+escapeHtml(e.parsed.repo||e.url)+'</span><b>'+t('extmgr.privateBadge')+'</b></div>').join('')+'</div>'],
+        [
+          {label:t('extmgr.privateAccount'),primary:true,onClick:()=>{
+            closeModal();
+            const box=document.querySelector('[data-extaccounts]');
+            if(box){ box.open=true; box.scrollIntoView({block:'nearest'}); }
+          }},
+          {label:t('extmgr.privateProceed'),onClick:()=>{ closeModal(); void runExtInstall(); }},
+        ]);
+      return;
     }
+    void runExtInstall();
   });
   const exportLog=()=>downloadTextFile('extension-install.log', (state.extLog||[]).join('\n'));
   const exportFailed=()=>{
@@ -1545,6 +1768,121 @@ function renderExtInstall(body){
     state.extLinksText=''; state.extEntries=[]; state.extResults=[]; state.extLog=[]; renderExtensionView();
   });
 }
+function bindAccounts(body){
+  const box=body.querySelector('[data-extaccounts]');
+  box?.addEventListener('toggle',()=>{ state.extAccountsOpen=!!box.open; });
+  body.querySelectorAll('[data-accstorage]').forEach((el)=>{
+    el.addEventListener('change',()=>{
+      if(!el.checked) return;
+      const browser=el.dataset.accstorage==='browser';
+      persistGit({ gitCredentialStorage: browser?'browser':'server' });
+      toast(browser?t('extmgr.storeBrowserSet'):t('extmgr.storeServerSet'));
+      renderExtensionView();
+    });
+  });
+  body.querySelector('[data-accadd]')?.addEventListener('click',()=>{ void addAccountFromForm(body); });
+  body.querySelectorAll('[data-accdefault]').forEach((btn)=>{
+    btn.addEventListener('click',()=>{
+      persistAccountList(setDefaultAccount(gitAccountList(), btn.dataset.accdefault));
+      renderExtensionView();
+    });
+  });
+  body.querySelectorAll('[data-accdel]').forEach((btn)=>{
+    btn.addEventListener('click',()=>removeAccountWithConfirm(btn.dataset.accdel));
+  });
+  body.querySelectorAll('[data-acctest]').forEach((btn)=>{
+    btn.addEventListener('click',async()=>{
+      const acc=gitAccountList().find((a)=>a.id===btn.dataset.acctest);
+      if(!acc) return;
+      const res=await gitRemote().testAccount(acc);
+      state.extAccountTests=[{label:acc.label,ok:res.ok,login:res.login||'',reason:res.reason||''}];
+      renderExtensionView();
+    });
+  });
+  body.querySelector('[data-acctestall]')?.addEventListener('click',()=>{ void testAllAccounts(); });
+}
+async function preflightAll(){
+  /* 并发预检（浏览器自带上限约 6 连接），完成后只重排一次 —— 逐条 await 20 个仓库
+     在站点不可达时要等 160s，界面会像卡死。 */
+  const list=state.extEntries.slice(0,20);
+  if(!list.length) return;
+  await Promise.all(list.map((entry)=>preflightExtEntry(entry,{silent:true})));
+  if(state.extTab==='install') renderExtensionView();
+}
+async function runExtInstall(){
+  if(state.extRunning) return;
+  state.extRunning=true; state.extResults=[]; state.extLog=[];
+  renderExtensionView();
+  try {
+    const payload=state.extEntries.map((e)=>{
+      const acc=accountForRepo(e.parsed);
+      const credential=acc ? { kind: acc.username?'basic':'token', username:acc.username, secret:acc.secret } : null;
+      return { url:e.url, branch:e.ref, ref:e.ref, credential, replace:false };
+    });
+    state.extResults=await actions.installExtensions?.(payload)||[];
+    /* 失败项补上「该仓库是私有/需要登录」的结论，报告里不再只给一句宿主原文。 */
+    state.extResults=(state.extResults||[]).map((r)=>{
+      const hit=state.extEntries.find((e)=>e.url===r.url);
+      return hit?.privateHint && r.status==='failed' ? { ...r, privateHint:true } : r;
+    });
+    const ok=(state.extResults||[]).filter((r)=>r.status==='ok');
+    if(ok.length){
+      const s=gitSettings();
+      const reg=new Map((s.gitInstalls||[]).map((x)=>[x.name,x]));
+      for(const r of ok){
+        const p=parseRepoUrl(r.url);
+        if(p.ok) reg.set(p.repo,{ name:p.repo, url:p.cloneUrl, ref:r.branch||'', at:Date.now() });
+      }
+      saveSettings({ ...s, gitInstalls:[...reg.values()] });
+    }
+  } finally {
+    state.extRunning=false;
+    renderExtensionView();
+  }
+}
+async function fetchLocalManifestVersion(name){
+  try {
+    const res=await fetch(`/scripts/extensions/third-party/${encodeURIComponent(name)}/manifest.json`,
+      { credentials:'same-origin', cache:'no-store' });
+    if(!res.ok) return '';
+    const data=await res.json().catch(()=>null);
+    return data ? String(data.version||'') : '';
+  } catch { return ''; }
+}
+function updateStatusText(row){
+  if(row.status==='update') return t('extmgr.updateAvailable');
+  if(row.status==='latest') return t('extmgr.upToDate');
+  if(row.status==='ahead') return t('extmgr.localAhead');
+  return t('extmgr.updateUnknown');
+}
+/* 更新检查：只读。本地版本取宿主静态 manifest，远端版本取原始 manifest.json，
+   任一侧拿不到就如实显示「未知」，不伪造「已最新」。 */
+async function checkExtUpdates(){
+  const regs=(gitSettings().gitInstalls||[]).slice();
+  if(!regs.length){ state.extUpdate={busy:false,rows:[],note:t('extmgr.noRegistry')}; renderExtensionView(); return; }
+  state.extUpdate={busy:true,rows:[],note:''}; renderExtensionView();
+  const rows=[];
+  for(const reg of regs){
+    const parsed=parseRepoUrl(reg.url);
+    const acc=parsed.ok ? accountForRepo(parsed) : null;
+    const localVersion=await fetchLocalManifestVersion(reg.name);
+    let remoteVersion=''; let reason='';
+    if(parsed.ok){
+      const res=await gitRemote().remoteManifest(parsed, reg.ref, acc);
+      if(res.ok){
+        try { remoteVersion=String(JSON.parse(res.text).version||''); } catch { remoteVersion=''; }
+      } else reason=res.reason||'http';
+    } else reason='unsupported';
+    let status='unknown';
+    if(localVersion && remoteVersion){
+      const cmp=compareVersions(remoteVersion, localVersion);
+      status = cmp>0 ? 'update' : (cmp===0 ? 'latest' : 'ahead');
+    }
+    rows.push({ name:reg.name, url:reg.url, ref:reg.ref||'', localVersion, remoteVersion, status, reason });
+  }
+  state.extUpdate={busy:false,rows,note:''};
+  if(state.extTab==='installed') renderExtensionView();
+}
 async function renderExtInstalled(body){
   body.innerHTML='<div class="ext-empty">'+t('extmgr.loading')+'</div>';
   let list=[];
@@ -1559,19 +1897,35 @@ async function renderExtInstalled(body){
     const version=x?.version||x?.manifest?.version||'';
     return '<div class="ext-entry is-ok"><span class="ext-url" title="'+escapeHtml(name)+'">'+escapeHtml(name)+'</span><span class="ext-state">'+escapeHtml(version)+'</span></div>';
   }).join('');
+  const upd=state.extUpdate;
+  const updRows=upd && Array.isArray(upd.rows)
+    ? upd.rows.map((r)=>'<div class="ext-entry upd-row is-'+(r.status==='update'?'update':r.status==='latest'?'ok':'pending')+'">'
+        +'<span class="ext-url" title="'+escapeHtml(r.url)+'">'+escapeHtml(r.name)+'</span>'
+        +'<span class="ext-state">'+t('extmgr.updateVersions',{local:r.localVersion||'-',remote:r.remoteVersion||'-'})+'</span>'
+        +'<span class="ext-state'+(r.status==='update'?' is-warn':'')+'">'+updateStatusText(r)+(r.reason?' · '+reasonText(r.reason):'')+'</span>'
+      +'</div>').join('')
+    : '';
+  const updBlock=upd
+    ? '<div class="ext-note">'+(upd.busy ? t('extmgr.updateChecking') : (upd.note||t('extmgr.updateHint')))+'</div>'
+      +'<div class="ext-list">'+(updRows||'')+'</div>'
+    : '';
   body.innerHTML='<div class="ext-install"><div class="ext-row">'
     +'<button type="button" class="btn" id="extmgr-export-assetlist">'+t('extmgr.exportAssetList')+'</button>'
+    +'<button type="button" class="btn" id="extmgr-check-updates"'+(upd&&upd.busy?' disabled':'')+'>'+t('extmgr.checkUpdates')+'</button>'
     +'<button type="button" class="btn" id="extmgr-refresh-installed">'+t('extmgr.refresh')+'</button>'
     +'<span style="flex:1"></span></div>'
-    +'<div class="ext-list">'+(rows||'<div class="ext-empty">'+t('extmgr.noneInstalled')+'</div>')+'</div></div>';
+    +'<div class="ext-list">'+(rows||'<div class="ext-empty">'+t('extmgr.noneInstalled')+'</div>')+'</div>'
+    +updBlock+'</div>';
   body.querySelector('#extmgr-export-assetlist')?.addEventListener('click',()=>actions.exportAssetList?.({source:'host'}));
-  body.querySelector('#extmgr-refresh-installed')?.addEventListener('click',()=>{ state.extInstalled=null; renderExtensionView(); });
+  body.querySelector('#extmgr-check-updates')?.addEventListener('click',()=>{ void checkExtUpdates(); });
+  body.querySelector('#extmgr-refresh-installed')?.addEventListener('click',()=>{ state.extInstalled=null; state.extUpdate=null; renderExtensionView(); });
 }
 function renderExtReport(body){
   const results=state.extResults||[];
   const rows=results.map((r)=>'<div class="ext-entry is-'+(r.status==='ok'?'ok':'failed')+'">'
     +'<span class="ext-url" title="'+escapeHtml(r.url)+'">'+escapeHtml(r.url)+'</span>'
-    +'<span class="ext-state">'+escapeHtml(r.branch||'')+' · '+extStatusText(r.status)+(r.error?' · '+escapeHtml(r.error):'')+'</span></div>').join('');
+    +'<span class="ext-state">'+escapeHtml(r.branch||'')+' · '+extStatusText(r.status)+(r.error?' · '+escapeHtml(r.error):'')+'</span>'
+    +(r.privateHint?'<span class="ext-flag-warn">'+t('extmgr.privateHintAfterFail')+'</span>':'')+'</div>').join('');
   const log=(state.extLog||[]).join('\n');
   body.innerHTML='<div class="ext-install">'
     +'<div class="ext-row"><b>'+t('extmgr.reportSummary',{ok:results.filter(r=>r.status==='ok').length,failed:results.filter(r=>r.status==='failed').length})+'</b></div>'
@@ -1589,11 +1943,99 @@ function renderExtReport(body){
   body.querySelector('#extmgr-export-failed2')?.addEventListener('click',exportFailed);
   body.querySelector('#extmgr-export-report2')?.addEventListener('click',exportReport);
 }
+/* ── 打包页：按数据包分组选择要打包的扩展 ──
+   口径（用户 2026-11-11）：只过滤扩展，其它类目仍按存储图表里的勾选；
+   产物仍按目标宿主布局生成（选择只影响哪些扩展条目被写出）。 */
+function packRowHtml(pkg, unit, disabled){
+  const scope='pkg:'+pkg.id;
+  const on=unit.leaves.length>0 && unit.leaves.every((n)=>isChecked(n,scope));
+  return '<label class="ext-entry pack-row'+(on?' is-ok':'')+'">'
+    +'<input type="checkbox" data-packext="'+escapeHtml(unit.name)+'" data-packpkg="'+escapeHtml(pkg.id)+'"'
+      +(on?' checked':'')+(disabled?' disabled':'')+'>'
+    +'<span class="ext-url" title="'+escapeHtml(unit.name)+'">'+escapeHtml(unit.name)+'</span>'
+    +'<span class="ext-state">'+t('extmgr.packFiles',{files:unit.files,size:fmtMB(unit.mb)})+'</span>'
+    +'</label>';
+}
+function packGroupHtml(pkg, units, manifestOnly){
+  const scope='pkg:'+pkg.id;
+  const sel=units.filter((u)=>u.leaves.length>0 && u.leaves.every((n)=>isChecked(n,scope))).length;
+  return '<div class="pack-group" data-packgroup="'+escapeHtml(pkg.id)+'">'
+    +'<div class="ext-row pack-head">'
+      +'<b class="pack-name" title="'+escapeHtml(pkg.name||pkg.id)+'">'+escapeHtml(pkg.name||pkg.id)+'</b>'
+      +'<span class="ext-state">'+t('extmgr.packSubset',{sel,total:units.length})+' · '
+        +(manifestOnly?t('extmgr.packManifestOnly'):t('extmgr.packFull'))+'</span>'
+      +'<span style="flex:1"></span>'
+      +(manifestOnly?'':'<label class="et-git"><span>'+t('extension.git')+'</span><select class="text_pole" data-packgit="'+escapeHtml(pkg.id)+'">'
+        +'<option value="keep"'+(packageGitMode(pkg)===GIT_MODES.KEEP?' selected':'')+'>'+t('extension.gitKeep')+'</option>'
+        +'<option value="minimal"'+(packageGitMode(pkg)===GIT_MODES.MINIMAL?' selected':'')+'>'+t('extension.gitMinimal')+'</option>'
+        +'<option value="strip"'+(packageGitMode(pkg)===GIT_MODES.STRIP?' selected':'')+'>'+t('extension.gitStrip')+'</option>'
+      +'</select></label>')
+      +'<button type="button" class="btn" data-packall="'+escapeHtml(pkg.id)+'"'+(manifestOnly?' disabled':'')+'>'+t('extmgr.packAll')+'</button>'
+      +'<button type="button" class="btn" data-packnone="'+escapeHtml(pkg.id)+'"'+(manifestOnly?' disabled':'')+'>'+t('extmgr.packNone')+'</button>'
+    +'</div>'
+    +'<div class="ext-list">'+units.map((u)=>packRowHtml(pkg,u,manifestOnly)).join('')+'</div>'
+  +'</div>';
+}
+function renderExtPack(body){
+  const pkgs=(state.packages||[]).filter((p)=>p&&p.id);
+  const groups=[];
+  for(const pkg of pkgs){
+    const group=findNode(packageNodes(pkg).nodes,'group:extensions');
+    if(!group) continue;
+    const units=extensionUnitsOf(group);
+    if(!units.length) continue;
+    groups.push({pkg,units,manifestOnly:extensionManifestOnly(pkg,'pkg:'+pkg.id)});
+  }
+  if(!groups.length){ body.innerHTML='<div class="ext-empty">'+t('extmgr.packEmpty')+'</div>'; return; }
+  body.innerHTML='<div class="ext-install">'
+    +'<div class="ext-note">'+t('extmgr.packHint')+'</div>'
+    +groups.map((g)=>packGroupHtml(g.pkg,g.units,g.manifestOnly)).join('')
+    +'</div>';
+  body.querySelectorAll('[data-packext]').forEach((el)=>{
+    const pkg=(state.packages||[]).find((p)=>p.id===el.dataset.packpkg);
+    if(!pkg) return;
+    const group=findNode(packageNodes(pkg).nodes,'group:extensions');
+    const unit=group ? extensionUnitsOf(group).find((u)=>u.name===el.dataset.packext) : null;
+    if(!unit) return;
+    const scope='pkg:'+pkg.id;
+    const states=unit.leaves.map((n)=>isChecked(n,scope));
+    el.indeterminate=states.some(Boolean) && !states.every(Boolean);
+    el.addEventListener('change',()=>{
+      unit.leaves.forEach((n)=>setChecked(n,scope,el.checked));
+      renderChart();
+      renderExtensionView();
+    });
+  });
+  body.querySelectorAll('[data-packall],[data-packnone]').forEach((btn)=>{
+    btn.addEventListener('click',()=>{
+      const id=btn.dataset.packall||btn.dataset.packnone;
+      const val=!!btn.dataset.packall;
+      const pkg=(state.packages||[]).find((p)=>p.id===id);
+      if(!pkg) return;
+      const group=findNode(packageNodes(pkg).nodes,'group:extensions');
+      if(!group) return;
+      const scope='pkg:'+pkg.id;
+      extensionUnitsOf(group).forEach((u)=>u.leaves.forEach((n)=>setChecked(n,scope,val)));
+      renderChart();
+      renderExtensionView();
+    });
+  });
+  body.querySelectorAll('[data-packgit]').forEach((sel)=>{
+    sel.addEventListener('change',()=>{
+      const id=sel.dataset.packgit;
+      state.gitModeByPkg[id]=[GIT_MODES.KEEP,GIT_MODES.MINIMAL,GIT_MODES.STRIP].includes(sel.value)
+        ? sel.value : GIT_MODES.KEEP;
+      renderChart();
+      renderExtensionView();
+    });
+  });
+}
 function renderExtensionView(){
   const body=document.getElementById('extension-body');
   if(!body) return;
   document.querySelectorAll('#extmgr-tabs [data-exttab]').forEach(b=>b.classList.toggle('active',b.dataset.exttab===state.extTab));
   if(state.extTab==='installed'){ void renderExtInstalled(body); return; }
+  if(state.extTab==='pack'){ renderExtPack(body); return; }
   if(state.extTab==='report'){ renderExtReport(body); return; }
   renderExtInstall(body);
 }
@@ -2498,6 +2940,19 @@ function bind(){
   if(typeof window!=='undefined'){
     window.addEventListener('resize',()=>{ syncView(); syncMainView(); });
   }
+  /* 容器宽度变化同样要重判（插件模态拉宽/拉窄时 window 尺寸不变）。
+     rAF 合帧：拖拽模态边缘会连续触发，逐次重排会卡。 */
+  if(typeof ResizeObserver!=='undefined'){
+    const app=document.getElementById('app');
+    if(app){
+      let raf=0;
+      const ro=new ResizeObserver(()=>{
+        if(raf) return;
+        raf=requestAnimationFrame(()=>{ raf=0; syncView(); syncMainView(); });
+      });
+      ro.observe(app);
+    }
+  }
 
   document.querySelectorAll('[data-help]').forEach(b=>b.addEventListener('click',e=>{ e.stopPropagation(); openHelp(b.dataset.help); }));
 
@@ -2806,7 +3261,9 @@ function bind(){
     }
     const git=e.target.closest('[data-gitmode]');
     if(git){
-      state.gitMode = [GIT_MODES.KEEP,GIT_MODES.MINIMAL,GIT_MODES.STRIP].includes(git.value) ? git.value : GIT_MODES.KEEP;
+      const val = [GIT_MODES.KEEP,GIT_MODES.MINIMAL,GIT_MODES.STRIP].includes(git.value) ? git.value : GIT_MODES.KEEP;
+      const pid = git.dataset.gitmode;
+      if(pid) state.gitModeByPkg[pid]=val; else state.gitMode=val;
       return;
     }
     const prefGit=e.target.closest('[data-prefgitmode]');
@@ -3099,7 +3556,7 @@ initChartSplitters();
         ui: {
           compression: state.compression,
           extensionMode: mergedManifestOnly ? EXTENSION_MODES.MANIFEST : state.extensionMode,
-          gitMode: state.gitMode,
+          gitMode: packageGitMode(pkg),
           keepDev: state.keepDev,
           target: state.target,
         },
@@ -3116,7 +3573,7 @@ initChartSplitters();
       ui: {
         compression: state.compression,
         extensionMode: extensionManifestOnly(pkg, scope) ? EXTENSION_MODES.MANIFEST : state.extensionMode,
-        gitMode: state.gitMode,
+        gitMode: packageGitMode(pkg),
         keepDev: state.keepDev,
         target: state.target,
       },
@@ -3304,16 +3761,19 @@ initChartSplitters();
       const list=Array.isArray(entries)?entries:[];
       if(list.length){
         state.extEntries=list.map((e)=>{
-          if(typeof e==='string') return { url:e, branch:'main', status:'pending' };
-          return { url:String(e.url||e.link||'').trim(), branch:String(e.branch||e.version||e.ref||'main'), status:'pending' };
-        }).filter((e)=>e.url);
-        state.extLinksText=state.extEntries.map((e)=>e.url+(e.branch&&e.branch!=='main'?' | '+e.branch:'')).join('\n');
+          if(typeof e==='string') return makeExtEntry(e);
+          return makeExtEntry(String(e.url||e.link||'').trim(), String(e.branch||e.version||e.ref||''));
+        }).filter((e)=>e.parsed.ok);
+        state.extLinksText=state.extEntries
+          .map((e)=>e.url+(e.ref?' | '+e.ref:''))
+          .join('\n');
       }
       state.extTab='install';
       state.mainView='extension';
       if(state.view==='mobile') state.mobileView='extension';
       syncMainView();
       renderExtensionView();
+      if(state.extEntries.length) void preflightAll();
     },
     /** index.js 的批量安装进度回调：更新单条状态。 */
     extEntryUpdate(update){
