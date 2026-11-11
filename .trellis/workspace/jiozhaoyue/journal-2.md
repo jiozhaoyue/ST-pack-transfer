@@ -1367,6 +1367,7 @@ Topics: [.trellis/research/11-11-chart-maximize-and-extension-manager.md](../../
 |------|---------|
 | `d8fb38f` | feat(ui): 统一存储审查面板（浏览器/宿主同面板，来源跟随点击行） |
 | `22b9cc4` | docs: 存储审查面板全量文档同步（README / DEV GUIDE / 帮助 / 交接） |
+| `e4ee291` | docs(help): 帮助页新增「存储审查」章节 + Session 76 台账 |
 
 ### Testing
 
