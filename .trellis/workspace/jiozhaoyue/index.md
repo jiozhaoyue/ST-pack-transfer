@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-2.md`
-- **Total Sessions**: 75
+- **Total Sessions**: 76
 - **Last Active**: 2026-11-11
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-2.md` | ~1344 | Active |
+| `journal-2.md` | ~1382 | Active |
 | `journal-1.md` | ~2491 | Archived |
 <!-- @@@/auto:active-documents -->
 
@@ -30,6 +30,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 76 | 2026-11-11 | 统一存储审查面板落地（浏览器/宿主同面板） | `d8fb38f`, `22b9cc4` | `main` |
 | 75 | 2026-11-11 | Session 75 交接：统一存储审查面板 | `5fe7dc1` | `main` |
 | 74 | 2026-11-11 | UI 修复计划与交接（下一轮执行） | `aa48f7a` | `main` |
 | 73 | 2026-11-11 | 扩展选择打包 + 每包 Git + P2（URL 归一/账号/更新检查） | `b8550a6` | `main` |

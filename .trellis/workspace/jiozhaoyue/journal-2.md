@@ -1342,3 +1342,42 @@ Topics: [.trellis/research/11-11-chart-maximize-and-extension-manager.md](../../
 ### Next Steps
 
 - 按 HANDOFF 实现：storageInspector 模板 + 视图 + 浏览器 provider + 宿主 provider + 六守卫 + 4173 多宽度取证
+
+
+## Session 76: 统一存储审查面板落地（浏览器/宿主同面板）
+<!-- trellis-session: v=2 fp=daab017d276a1729 -->
+
+**Date**: 2026-11-11
+**Task**: 统一存储审查面板落地（浏览器/宿主同面板）
+**Branch**: `main`
+
+### Summary
+
+存储明细改为统一面板并完成文档同步
+
+### Main Changes
+
+- 两行配额共用 #storage-inspector-view：初始来源=点击行，面板内可切换；占满内容区且只读
+- 浏览器 L0 五类与下钻（storage-inspector-browser.js + 纯模型）；宿主源经 RestProvider，非 Luker 如实未提供
+- 删除内联明细与宿主存储页跳转；README / DEV GUIDE / 应用内帮助 / 规范页全量同步
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `d8fb38f` | feat(ui): 统一存储审查面板（浏览器/宿主同面板，来源跟随点击行） |
+| `22b9cc4` | docs: 存储审查面板全量文档同步（README / DEV GUIDE / 帮助 / 交接） |
+
+### Testing
+
+- [OK] 六守卫全绿；28 项新单测（模型 14 / 浏览器 10 / 宿主适配 4），三文件 33 项通过
+- [OK] 4173 + Playwright 取证 26/26、页面零错误（1280 / 380）；npm run build exit 0
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- Dev Luker（8003）启动后补宿主源实机下钻取证
+- 删除能力维持只读；如要开放须先过用户裁定
