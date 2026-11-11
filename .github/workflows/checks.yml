@@ -1,0 +1,33 @@
+name: host-direct checks
+
+# 目的：拦住「只能在打包器里成立」的写法。
+# 酒馆插件是 git clone 直装、不经打包器；2026-11-11 的 JSON 静态导入曾让整张模块图
+# 在宿主里失败（Failed to fetch dynamically imported module），而本地 build 完全正常。
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Host direct-load guard
+        run: npm run check:no-bundler-only
+
+      - name: Build (sanity)
+        run: npm run build -- --base=./
