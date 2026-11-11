@@ -29,10 +29,11 @@ import {
   uploadUserFile, userFilesSupported, sanitizeUserFileName, verifyUserFiles, deleteUserFile,
   readHostStorageQuota,
   isHostAccountWindowAvailable, openHostStoragePage, listHostExtensions,
-  renderExtensionInstallerModal,
+  installExtensionBatch,
   opfsTmpHandle, opfsHandleToFile, opfsTmpCleanup,
 } from './src/ui/host-bridge.js';
 import { packPrivateContainer } from './src/core/private-container.js';
+import { sanitizeEngineDumpForRestore } from './src/core/engine-sanitize.js';
 import { loadPrivateFiles, addPrivateFile, removePrivateFile } from './src/ui/private-files-store.js';
 import { ORIGIN_ZONE, zoneOfOrigin, copyBackRecord } from './src/core/zone-model.js';
 import { exportLibraryToPack, importRestoredChatsIntoLibrary } from './src/ui/chat-store-inject.js';
@@ -98,7 +99,7 @@ function ensureConverterModal() {
   applyI18n(app);
   overlay.appendChild(app);
   document.body.appendChild(overlay); // dom-scope:allow 自绘全屏模态必须挂 body
-  overlay.addEventListener('click', (event) => { if (event.target === overlay) overlay.style.display = 'none'; });
+  // 插件界面不允许点击面板外区域关闭：关闭只认页头 × 按钮（用户 2026-11-11 裁定）。
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape' && overlay.style.display !== 'none') overlay.style.display = 'none';
   });
@@ -762,13 +763,18 @@ async function main(root) {
     if (!ids.length) { view.toast(t('toast.selectDeleteFirst')); return; }
     const ok = await confirmDialog(t('modal.confirmDelete', { n: ids.length }));
     if (!ok) return;
+    await removePackages(ids);
+    view.toast(t('toast.deleted'));
+  }
+
+  /** 无二次确认的删除（供「丢弃成功项」等已确认动作复用）。 */
+  async function removePackages(ids) {
     for (const id of ids) {
       try { await deleteFile(id); } catch { /* 已不存在 */ }
       state.nodesById.delete(id);
       state.layoutById.delete(id);
     }
     await syncPackages();
-    view.toast(t('toast.deleted'));
   }
 
   async function restoreSelected(ids) {
@@ -792,27 +798,76 @@ async function main(root) {
     if (!ok) return;
     if (state.busy) return;
     state.busy = true;
+    const results = [];
+    const record = { startedAt: Date.now(), total: targets.length, done: 0, results };
+    persistRestoreProgress(record);
     try {
       for (let i = 0; i < targets.length; i += 1) {
         const pkg = targets[i];
+        const row = { id: pkg.id, name: pkg.name, status: 'failed', message: '', note: '' };
         view.setProgress(Math.round((i / targets.length) * 90) + 5, t('progress.restoring'));
-        const blob = await blobOf(pkg);
-        if (!blob) throw new Error(t('toast.selectExportPack'));
-        const result = host.platform === 'luker'
-          ? await restoreToLuker(blob, {})
-          : await restoreToHost(blob, { mode: 'merge', platform: host.platform });
-        if (result && result.nothingRestored) throw new Error(t('error.nothingRestored'));
-        try { await importRestoredChatsIntoLibrary(blob); } catch { /* 纯库模式可选 */ }
-        logger.info(t('log.restored', { name: pkg.name }));
+        try {
+          const blob = await blobOf(pkg);
+          if (!blob) throw new Error(t('toast.selectExportPack'));
+          /* 跨引擎 / 跨实例的裸 SQL 转储会撞目标主键：先剔除，走标准便携恢复。 */
+          const sane = await sanitizeEngineDumpForRestore(blob, {
+            onProgress: (done, total) => {
+              if (total > 0) view.setProgress(Math.round((i / targets.length) * 90) + 5 + Math.round((done / total) * 3), t('progress.restoring'));
+            },
+          });
+          if (sane.reason === 'engine-only') {
+            row.status = 'skipped';
+            row.message = t('restore.engineOnly');
+            logger.warn(t('log.restoreFailed', { msg: row.message }));
+            results.push(row);
+            record.done = i + 1;
+            persistRestoreProgress(record);
+            continue;
+          }
+          if (sane.changed) {
+            row.note = t('restore.engineStripped', { files: sane.stripped.join(', ') });
+            logger.warn(row.note);
+          }
+          const result = host.platform === 'luker'
+            ? await restoreToLuker(sane.blob, {})
+            : await restoreToHost(sane.blob, { mode: 'merge', platform: host.platform });
+          if (result && result.nothingRestored) throw new Error(t('error.nothingRestored'));
+          try { await importRestoredChatsIntoLibrary(sane.blob); } catch { /* 纯库模式可选 */ }
+          row.status = 'ok';
+          logger.info(t('log.restored', { name: pkg.name }));
+        } catch (err) {
+          row.message = err?.message || String(err);
+          logger.error(t('log.restoreFailed', { msg: row.message }));
+        }
+        results.push(row);
+        record.done = i + 1;
+        persistRestoreProgress(record);
       }
-      view.setProgress(100, t('progress.restoreDone'));
-      view.toast(t('toast.restoreDone'));
-    } catch (err) {
-      logger.error(t('log.restoreFailed', { msg: err.message }));
-      view.setProgress(0, t('progress.restoreFailed'));
     } finally {
       state.busy = false;
     }
+    const okCount = results.filter((r) => r.status === 'ok').length;
+    const failed = results.filter((r) => r.status === 'failed').length;
+    view.setProgress(failed ? 0 : 100, failed ? t('progress.restoreFailed') : t('progress.restoreDone'));
+    if (!failed) view.toast(t('toast.restoreDone'));
+    view.showRestoreReport(results, {
+      onKeepPartial: () => { persistRestoreProgress({ ...record, finishedAt: Date.now() }); },
+      onDiscardPartial: async () => {
+        const doneIds = results.filter((r) => r.status === 'ok').map((r) => r.id);
+        if (doneIds.length) await removePackages(doneIds);
+        persistRestoreProgress({ ...record, finishedAt: Date.now(), discarded: true });
+      },
+      onRefresh: () => { if (typeof window !== 'undefined') window.location.reload(); },
+    });
+    // 自动刷新默认关闭；仅无失败且设置显式打开时执行，避免挡住失败报告。
+    if (settings.autoRefreshAfterUpload && failed === 0 && typeof window !== 'undefined') {
+      setTimeout(() => window.location.reload(), 800);
+    }
+  }
+
+  const RESTORE_PROGRESS_KEY = 'stpt.restoreProgress';
+  function persistRestoreProgress(record) {
+    try { localStorage.setItem(RESTORE_PROGRESS_KEY, JSON.stringify(record)); } catch { /* 隐私模式 */ }
   }
 
   /**
@@ -1394,10 +1449,14 @@ async function main(root) {
       openExtensionManifest: async (pkgId) => {
         const pkg = pkgById(pkgId);
         if (!pkg?.extManifest?.length) { view.toast(t('toast.noExtensionManifest')); return; }
-        await renderExtensionInstallerModal(pkg.extManifest, undefined, {
-          targetPlatform: hostLayoutCode(host.platform),
-        });
+        // 扩展相关入口统一收进内联「扩展管理」，不再弹浮层。
+        view.openExtensionManager(pkg.extManifest);
       },
+      installExtensions: async (entries) => installExtensionBatch(entries, {
+        onEntry: (entry) => view.extEntryUpdate(entry),
+        onLog: (line) => view.extLogAppend(line),
+      }),
+      listHostExtensions: () => listHostExtensions(host.platform),
       backupSelectedToCloud,
       importCloudPack,
       lan: lanActions,

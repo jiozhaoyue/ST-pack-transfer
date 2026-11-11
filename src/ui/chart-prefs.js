@@ -18,7 +18,6 @@ export const CHART_PREF_DEFAULTS = Object.freeze({
   compression: '5',
   splitMb: '',
   filenameTemplate: '{target}_{user}_{part}_{datetime}.zip',
-  delta: 'overwrite',
   extensionMode: 'full',
   gitMode: 'minimal',
   keepDev: false,
@@ -47,7 +46,6 @@ export function normalizeChartPrefs(input) {
   if (typeof input.filenameTemplate === 'string' && input.filenameTemplate.trim()) {
     out.filenameTemplate = input.filenameTemplate.trim();
   }
-  if (['overwrite', 'incremental'].includes(input.delta)) out.delta = input.delta;
   if (['full', 'manifest'].includes(input.extensionMode)) out.extensionMode = input.extensionMode;
   if (['keep', 'minimal', 'strip'].includes(input.gitMode)) out.gitMode = input.gitMode;
   if (typeof input.keepDev === 'boolean') out.keepDev = input.keepDev;

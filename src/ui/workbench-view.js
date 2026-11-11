@@ -202,11 +202,13 @@ function persistChartLayout(){
 let chartPrefs = typeof localStorage !== 'undefined' ? loadChartPrefs() : normalizeChartPrefs(null);
 
 const state = {
-  host:'luker', mode:'plugin', view:'desktop', mobileView:'chart', pane:'workbench', zone:'import',
+  host:'luker', mode:'plugin', view:'desktop', mainView:'chart', mobileView:'chart', pane:'workbench', zone:'import',
+  extTab:'install', extEntries:[], extResults:[], extLog:[], extRunning:false, extInstalled:null, extManifestPrefill:[],
   source:{ type:'host', pkgId:null }, target:'SillyTavern', targetManual:false,
-  delta: chartPrefs.delta, splitMb: chartPrefs.splitMb,
+  delta: 'overwrite', splitMb: chartPrefs.splitMb,
   compression: chartPrefs.compression,
   extensionMode: chartPrefs.extensionMode,
+  extUncheckedMode: 'none',
   gitMode: chartPrefs.gitMode,
   keepDev: chartPrefs.keepDev,
   packages: INITIAL_PACKAGES.map(p=>({...p})),
@@ -375,18 +377,37 @@ function syncView(){
   const app = document.getElementById('app');
   if(app) app.dataset.view = state.view;
 }
-/* 手机端：存储图表与数据包左右切换；同一时刻只显示一页，各页各自纵向滚动到尽头。 */
-function renderMobileView(){
-  const sw = document.getElementById('mobile-switch');
-  const chart = document.querySelector('.col-chart');
-  const side = document.querySelector('.col-side');
+/* 视图切换：桌面 = 存储图表 / 扩展管理（数据包列常显）；手机 = 存储图表 / 数据包 / 扩展管理。 */
+function renderViewSwitch(){
+  const host=document.getElementById('view-switch');
+  if(!host) return;
+  const mobile=state.view==='mobile';
+  const items=[{id:'chart',label:t('view.chart')}];
+  if(mobile) items.push({id:'zone',label:t('view.zone')});
+  items.push({id:'extension',label:t('view.extension')});
+  const active=mobile?state.mobileView:state.mainView;
+  host.innerHTML=items.map(it=>'<button type="button" class="view-switch-btn'+(it.id===active?' active':'')+'" data-wbview="'+it.id+'">'+it.label+'</button>').join('');
+}
+function syncMainView(){
+  state.view = detectView();
+  const app = document.getElementById('app');
+  if(app) app.dataset.view = state.view;
   const mobile = state.view === 'mobile';
-  if(sw) sw.hidden = !mobile;
-  if(chart) chart.hidden = mobile && state.mobileView !== 'chart';
-  if(side) side.hidden = mobile && state.mobileView !== 'zone';
-  document.querySelectorAll('[data-mview]').forEach(b=>{
-    b.classList.toggle('active', b.dataset.mview === state.mobileView);
-  });
+  const primary = mobile ? state.mobileView : state.mainView;
+  const chartCol=document.querySelector('.col-chart');
+  const side=document.querySelector('.col-side');
+  if(chartCol) chartCol.hidden = mobile && primary === 'zone';
+  if(side) side.hidden = mobile && primary !== 'zone';
+  const transferOpen = !!state.transfer.open;
+  const chartCard=document.getElementById('chart-card');
+  const extView=document.getElementById('extension-view');
+  const transferView=document.getElementById('transfer-view');
+  const showExt = !transferOpen && primary === 'extension';
+  const showChart = !transferOpen && !showExt;
+  if(chartCard) chartCard.hidden = !showChart;
+  if(extView) extView.hidden = !showExt;
+  if(transferView) transferView.hidden = !transferOpen;
+  renderViewSwitch();
 }
 
 /* ── 渲染：头部 ── */
@@ -399,6 +420,28 @@ const TARGETS=[
 ];
 /** 宿主平台 → 目标平台默认值（偏好 target=auto 时生效）。 */
 const HOST_TO_TARGET = { st:'SillyTavern', luker:'Luker', tt:'TauriTavern', pt:'PureTavern' };
+/** 私有配置所属宿主（布局码）：Luker 边车 / TT 应用私有 / PT 兼容区；通用密钥返回空串。 */
+function privateHostCode(path){
+  const p=String(path||'').toLowerCase();
+  if(/\.luker-state\.|(^|\/)(stats|macros)\.json$|_compat\/luker\//.test(p)) return 'l';
+  if(/tauritavern-settings\.json|_tauritavern\/|_compat\/tt\//.test(p)) return 'tt';
+  if(/_compat\/pt\//.test(p)) return 'pt';
+  return '';
+}
+function targetHostCode(){
+  const hit=TARGETS.find(x=>x.value===state.target);
+  const code=hit?hit.host:'st';
+  return code==='luker'?'l':code;
+}
+function privateIncompatible(path){
+  const code=privateHostCode(path);
+  if(!code) return false;
+  return code!==targetHostCode();
+}
+function nodePrivateIncompatible(n){
+  if(n.privateConfig && privateIncompatible(n.path)) return true;
+  return (n.children||[]).some(nodePrivateIncompatible);
+}
 function targetForHost(hostKey){
   const pref = chartPrefs.target;
   if (pref && pref !== 'auto') {
@@ -606,7 +649,7 @@ function renderTreeRows(nodes,depth,scope,readonly,tools,totalMb,drill,colorMap,
       +'<input class="tree-check" type="checkbox" data-check="'+n.id+'"'+(checked?' checked':'')+(indeterminate?' data-ind="1"':'')+(readonly?' disabled':'')+'>'
       +(depth===0 && colorCls ? '<span class="tree-dot '+colorCls+'" aria-hidden="true"></span>' : '')
       +svg(n.icon,'tree-ico')
-      +'<span class="tree-label'+(inMax&&hasKids?' is-drill':'')+'"'+(inMax&&hasKids?' data-voldrill="'+n.id+'"':'')+' title="'+n.label+'">'+n.label+(n.badge?'<span class="sub">'+n.badge+'</span>':'')+(n.note?'<span class="sub">'+n.note+'</span>':'')+'</span>'
+      +'<span class="tree-label'+(inMax&&hasKids?' is-drill':'')+'"'+(inMax&&hasKids?' data-voldrill="'+n.id+'"':'')+' title="'+n.label+'">'+n.label+(n.badge?'<span class="sub">'+n.badge+'</span>':'')+(n.note?'<span class="sub">'+n.note+'</span>':'')+(nodePrivateIncompatible(n)?'<span class="sub is-incompat" title="'+t('private.incompatibleHint')+'">'+t('private.incompatible')+'</span>':'')+'</span>'
       +'<span class="tree-pill '+pillCls+'">'+pillText+'</span>'
       +(hasKids && !readonly ? '<span class="row-bulk">'
         +'<button data-suball="all" data-subnode="'+n.id+'" title="'+t('chart.selectAll')+'">✓</button>'
@@ -765,13 +808,28 @@ function chartCardHtml(o, place){
 }
 
 /** 扩展组内的模式/ Git / 构建配置控件（只有完整扩展时才显示 Git）；导出扩展清单也在这一条。 */
-function extensionToolsHtml(pkg, assetPkgs){
+function extensionToolsHtml(pkg, assetPkgs, { scope, nodes } = {}){
   const hasExt = (pkg?.extensions && pkg.extensions.length) || !!findNode(pkg?.nodes || [], 'group:extensions');
+  const treeNodes = nodes || (pkg ? packageNodes(pkg).nodes : []);
+  const extNode = findNode(treeNodes, 'group:extensions');
+  const extChecked = extNode ? isChecked(extNode, scope || ('pkg:' + (pkg?.id || ''))) : true;
   const pkgs = Array.isArray(assetPkgs) ? assetPkgs.filter(Boolean) : [];
   const listBtn = pkgs.length
     ? '<button type="button" class="et-list-btn" data-assetlist="1" data-assetpkgs="'+escapeHtml(pkgs.join(','))+'" title="'+t('chart.exportAssetList')+'">'+t('chart.exportAssetList')+'</button>'
     : '';
   if(!hasExt && !listBtn) return '';
+  /* 扩展组未勾选：不再直接丢弃，给用户「保持不选 / 仅清单」二选一。
+     仅清单会在生成时保留扩展元数据、只产出 _convert/extensions-manifest.json。 */
+  if(hasExt && !extChecked){
+    return '<div class="extension-tools ext-unchecked" data-exttools="1">'
+      +'<span class="et-label">'+t('extension.uncheckedLabel')+'</span>'
+      +'<div class="segmented et-mode">'
+        +'<button class="seg-btn'+(state.extUncheckedMode!=='manifest'?' active':'')+'" data-extunchecked="none">'+t('extension.uncheckedKeep')+'</button>'
+        +'<button class="seg-btn'+(state.extUncheckedMode==='manifest'?' active':'')+'" data-extunchecked="manifest">'+t('extension.manifest')+'</button>'
+      +'</div>'
+      +listBtn
+    +'</div>';
+  }
   const full = state.extensionMode !== EXTENSION_MODES.MANIFEST;
   return '<div class="extension-tools" data-exttools="1">'
     +(hasExt
@@ -956,7 +1014,7 @@ function renderChart(){
       const scope=mergeScope(target.pkgs);
       const extOwner=target.pkgs.find(p=>p.extensions&&p.extensions.length)||target.pkgs[0];
       const assetPkgs=target.pkgs.map(p=>p.id);
-      const extTools=extensionToolsHtml(extOwner, assetPkgs);
+      const extTools=extensionToolsHtml(extOwner, assetPkgs, { scope, nodes });
       vols.forEach(v=>defs.push({
         key:'merge-'+v.i, scope, nodes:v.nodes,
         idxText:t('chart.mergedBadge',{n:target.pkgs.length}),
@@ -975,7 +1033,7 @@ function renderChart(){
     const vols=volumesOf(pkg, tree.nodes);
     const multi=vols.length>1;
     const notice=tree.unrecognized ? '<div class="chart-unavailable"><b>'+t('chart.unrecognizedTitle')+'</b></div>' : '';
-    const extTools=extensionToolsHtml(pkg, [pkg.id]);
+    const extTools=extensionToolsHtml(pkg, [pkg.id], { scope:'pkg:'+pkg.id, nodes:tree.nodes });
     vols.forEach(v=>defs.push({
       key:pkg.id+'-'+v.i, scope:'pkg:'+pkg.id, nodes:v.nodes,
       idxText: seqLabel(pkg),
@@ -1085,7 +1143,7 @@ function chartPrefsHtml(){
 function openChartPrefs(){
   if(state.prefMode) return;
   state.prefSnapshot = {
-    target: state.target, targetManual: state.targetManual, delta: state.delta,
+    target: state.target, targetManual: state.targetManual,
     splitMb: state.splitMb, compression: state.compression,
     extensionMode: state.extensionMode, gitMode: state.gitMode, keepDev: state.keepDev,
     filenameTemplate: state.filenameTemplate,
@@ -1094,7 +1152,6 @@ function openChartPrefs(){
   state.prefMode = true;
   state.target = targetValueOfCode(chartPrefs.target);
   state.targetManual = chartPrefs.target !== 'auto';
-  state.delta = chartPrefs.delta;
   state.splitMb = chartPrefs.splitMb;
   state.compression = chartPrefs.compression;
   state.filenameTemplate = chartPrefs.filenameTemplate;
@@ -1119,7 +1176,6 @@ function saveChartPrefsDraft(){
     compression: state.compression,
     splitMb: state.splitMb,
     filenameTemplate: state.filenameTemplate,
-    delta: state.delta,
     extensionMode: state.extensionMode,
     gitMode: state.gitMode,
     keepDev: state.keepDev,
@@ -1145,7 +1201,6 @@ function applyPrefsToPackage(pkg){
 function applyTopControlsFromPrefs(){
   state.target = targetValueOfCode(chartPrefs.target);
   state.targetManual = chartPrefs.target !== 'auto';
-  state.delta = chartPrefs.delta;
   state.splitMb = chartPrefs.splitMb;
   state.compression = chartPrefs.compression;
   state.filenameTemplate = chartPrefs.filenameTemplate;
@@ -1284,11 +1339,12 @@ function renderTopActions(){
     ? '<button class="btn" id="btn-library-export">'+svg('db','ico')+t('action.libraryExport')+'</button>'
     : '';
   row.innerHTML='<button class="btn" id="btn-fetch">'+svg('cloud','ico')+t('action.fetch')+'</button>'
-    +'<button class="btn" id="btn-host-assetlist">'+svg('file','ico')+t('action.exportHostAssetList')+'</button>'
     +libBtn
-    +'<button class="btn" id="transfer-open-btn">'+svg('bolt','ico')+t('transfer.open')+'</button>';
+    +'<button class="btn" id="transfer-open-btn">'+svg('bolt','ico')+t('transfer.open')+'</button>'
+    +'<button class="btn" id="btn-refresh-page">'+svg('bolt','ico')+t('action.refreshPage')+'</button>';
   row.querySelector('#btn-fetch')?.addEventListener('click',()=>doFetch());
   row.querySelector('#btn-library-export')?.addEventListener('click',()=>actions.libraryExport?.());
+  row.querySelector('#btn-refresh-page')?.addEventListener('click',()=>{ if(typeof window!=='undefined') window.location.reload(); });
 }
 function renderActions(){
   renderTopActions();
@@ -1305,7 +1361,7 @@ function renderActions(){
     : '';
   const selectedLabel=hasSel
     ? '<span class="lbl">'+t('zones.selected',{n:state.selectedPkgs.size})+'</span>'
-    : '';
+    : '<span class="zone-hint">'+t('zones.selectHint')+'</span>';
   if(state.zone==='import'){
     row.innerHTML=taskBtns+selectedLabel
       +(hasSel?'<button class="btn accent" id="btn-generate">'+svg('archive','ico')+t('action.generatePack')+'</button>':'')
@@ -1352,17 +1408,203 @@ function setLanQr(id, text, show){
   try { box.innerHTML=qr.encodeSvg(text); box.hidden=false; }
   catch { box.hidden=true; box.innerHTML=''; }
 }
+/* ── 扩展管理（内联视图，不是浮层） ── */
+function extStatusText(status){
+  if(status==='ok') return t('extmgr.statusOk');
+  if(status==='failed') return t('extmgr.statusFailed');
+  if(status==='installing') return t('extmgr.statusInstalling');
+  return t('extmgr.statusPending');
+}
+function parseExtEntries(text, defaultBranch){
+  const out=[];
+  const raw=String(text||'').trim();
+  if(!raw) return out;
+  const branchOf=(v)=>String(v||defaultBranch||'main').trim()||'main';
+  if(raw.startsWith('[') || raw.startsWith('{')){
+    try {
+      const data=JSON.parse(raw);
+      const arr=Array.isArray(data)?data:(Array.isArray(data.links)?data.links:Array.isArray(data.extensions)?data.extensions:[]);
+      for(const item of arr){
+        if(typeof item==='string'){ out.push({url:item.trim(), branch:branchOf(''), status:'pending'}); continue; }
+        const url=item&&(item.url||item.link||item.repo); if(!url) continue;
+        out.push({url:String(url).trim(), branch:branchOf(item.branch||item.version||item.ref), status:'pending'});
+      }
+      return out;
+    } catch { /* 不是 JSON，按行解析 */ }
+  }
+  for(const line of raw.split(/\r?\n/)){
+    const s=line.trim(); if(!s || s.startsWith('#')) continue;
+    let url=s, branch=branchOf('');
+    if(s.includes('|')){
+      const p=s.split('|'); url=p[0].trim(); branch=branchOf(p[1]);
+    } else {
+      const m=/^(\S+)\s+(\S+)$/.exec(s);
+      if(m){ url=m[1]; branch=branchOf(m[2]); }
+      else {
+        const h=/^(\S+)#(\S+)$/.exec(s);
+        if(h){ url=h[1]; branch=branchOf(h[2]); }
+      }
+    }
+    if(!/^https?:\/\/\S+/i.test(url)) continue;
+    out.push({url, branch, status:'pending'});
+  }
+  return out;
+}
+function downloadTextFile(name, text){
+  try {
+    const blob=new Blob([String(text||'')],{type:'text/plain;charset=utf-8'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a'); a.href=url; a.download=name; a.click();
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+  } catch { toast(t('extmgr.exportFailed')); }
+}
+function renderExtInstall(body){
+  const rows=state.extEntries.map((e,i)=>{
+    return '<div class="ext-entry is-'+(e.status||'pending')+'">'
+      +'<span class="ext-url" title="'+escapeHtml(e.url)+'">'+escapeHtml(e.url)+'</span>'
+      +'<input class="text_pole ext-branch" data-extbranch="'+i+'" value="'+escapeHtml(e.branch||'main')+'" placeholder="main">'
+      +'<span class="ext-state">'+extStatusText(e.status)+(e.error?' · '+escapeHtml(e.error):'')+'</span>'
+      +'</div>';
+  }).join('');
+  body.innerHTML='<div class="ext-install">'
+    +'<label class="ext-label">'+t('extmgr.linksLabel')+'</label>'
+    +'<div class="ext-note">'+t('extmgr.policyNote')+'</div>'
+    +'<textarea id="extmgr-links" class="text_pole" rows="5" placeholder="'+t('extmgr.linksPlaceholder')+'">'+escapeHtml(state.extLinksText||'')+'</textarea>'
+    +'<div class="ext-row">'
+      +'<input type="file" id="extmgr-file" accept=".txt,.json,.jsonl" hidden>'
+      +'<button type="button" class="btn" id="extmgr-pick">'+t('extmgr.upload')+'</button>'
+      +'<button type="button" class="btn" id="extmgr-paste">'+t('extmgr.paste')+'</button>'
+      +'<label class="ext-branch-def"><span>'+t('extmgr.defaultBranch')+'</span><input id="extmgr-branch" class="text_pole" value="'+escapeHtml(state.extDefaultBranch||'main')+'"></label>'
+      +'<span style="flex:1"></span>'
+      +'<button type="button" class="btn" id="extmgr-parse">'+t('extmgr.parse')+'</button>'
+      +'<button type="button" class="btn accent" id="extmgr-run"'+(state.extRunning?' disabled':'')+'>'+t('extmgr.install')+'</button>'
+    +'</div>'
+    +'<div class="ext-list">'+(rows||'<div class="ext-empty">'+t('extmgr.empty')+'</div>')+'</div>'
+    +'<div class="ext-row ext-actions">'
+      +'<button type="button" class="btn" id="extmgr-export-log">'+t('extmgr.exportLog')+'</button>'
+      +'<button type="button" class="btn" id="extmgr-export-failed">'+t('extmgr.exportFailed')+'</button>'
+      +'<button type="button" class="btn" id="extmgr-export-report">'+t('extmgr.exportReport')+'</button>'
+      +'<span style="flex:1"></span>'
+      +'<button type="button" class="btn" id="extmgr-clear">'+t('extmgr.clear')+'</button>'
+    +'</div></div>';
+  const ta=body.querySelector('#extmgr-links');
+  ta?.addEventListener('input',()=>{ state.extLinksText=ta.value; });
+  const branchEl=body.querySelector('#extmgr-branch');
+  branchEl?.addEventListener('input',()=>{ state.extDefaultBranch=branchEl.value.trim()||'main'; });
+  body.querySelector('#extmgr-pick')?.addEventListener('click',()=>body.querySelector('#extmgr-file')?.click());
+  body.querySelector('#extmgr-file')?.addEventListener('change',async(e)=>{
+    const file=e.target.files?.[0]; if(!file) return;
+    try { state.extLinksText=await file.text(); } catch { state.extLinksText=''; }
+    state.extEntries=parseExtEntries(state.extLinksText, state.extDefaultBranch);
+    renderExtensionView();
+  });
+  body.querySelector('#extmgr-paste')?.addEventListener('click',async()=>{
+    try {
+      const text=await navigator.clipboard.readText();
+      if(text){ state.extLinksText=text; state.extEntries=parseExtEntries(text, state.extDefaultBranch); renderExtensionView(); }
+      else toast(t('extmgr.pasteEmpty'));
+    } catch { toast(t('extmgr.pasteEmpty')); }
+  });
+  body.querySelector('#extmgr-parse')?.addEventListener('click',()=>{
+    state.extEntries=parseExtEntries(state.extLinksText||ta?.value||'', state.extDefaultBranch);
+    if(!state.extEntries.length) toast(t('extmgr.parseEmpty'));
+    renderExtensionView();
+  });
+  body.querySelectorAll('[data-extbranch]').forEach((el)=>{
+    el.addEventListener('input',()=>{ const i=Number(el.dataset.extbranch); if(state.extEntries[i]) state.extEntries[i].branch=el.value.trim()||'main'; });
+  });
+  body.querySelector('#extmgr-run')?.addEventListener('click',async()=>{
+    if(state.extRunning) return;
+    if(!state.extEntries.length) state.extEntries=parseExtEntries(state.extLinksText||ta?.value||'', state.extDefaultBranch);
+    if(!state.extEntries.length){ toast(t('extmgr.parseEmpty')); return; }
+    state.extRunning=true; state.extResults=[]; state.extLog=[];
+    renderExtensionView();
+    try {
+      state.extResults=await actions.installExtensions?.(state.extEntries)||[];
+    } finally {
+      state.extRunning=false;
+      renderExtensionView();
+    }
+  });
+  const exportLog=()=>downloadTextFile('extension-install.log', (state.extLog||[]).join('\n'));
+  const exportFailed=()=>{
+    const failed=(state.extResults||[]).filter((r)=>r.status==='failed').map((r)=>r.url);
+    downloadTextFile('extension-install-failed.txt', failed.join('\n'));
+  };
+  const exportReport=()=>{
+    const report={ generatedAt:new Date().toISOString(), total:(state.extResults||[]).length,
+      ok:(state.extResults||[]).filter((r)=>r.status==='ok').length,
+      failed:(state.extResults||[]).filter((r)=>r.status==='failed').length,
+      results:state.extResults||[] };
+    downloadTextFile('extension-install-report.json', JSON.stringify(report,null,2));
+  };
+  body.querySelector('#extmgr-export-log')?.addEventListener('click',exportLog);
+  body.querySelector('#extmgr-export-failed')?.addEventListener('click',exportFailed);
+  body.querySelector('#extmgr-export-report')?.addEventListener('click',exportReport);
+  body.querySelector('#extmgr-clear')?.addEventListener('click',()=>{
+    state.extLinksText=''; state.extEntries=[]; state.extResults=[]; state.extLog=[]; renderExtensionView();
+  });
+}
+async function renderExtInstalled(body){
+  body.innerHTML='<div class="ext-empty">'+t('extmgr.loading')+'</div>';
+  let list=[];
+  try {
+    const res=await actions.listHostExtensions?.();
+    list=Array.isArray(res)?res:(Array.isArray(res?.items)?res.items:(Array.isArray(res?.list)?res.list:[]));
+  } catch { list=[]; }
+  if(state.extTab!=='installed') return;
+  state.extInstalled=list;
+  const rows=list.map((x)=>{
+    const name=x?.name||x?.folder||x?.internalName||'';
+    const version=x?.version||x?.manifest?.version||'';
+    return '<div class="ext-entry is-ok"><span class="ext-url" title="'+escapeHtml(name)+'">'+escapeHtml(name)+'</span><span class="ext-state">'+escapeHtml(version)+'</span></div>';
+  }).join('');
+  body.innerHTML='<div class="ext-install"><div class="ext-row">'
+    +'<button type="button" class="btn" id="extmgr-export-assetlist">'+t('extmgr.exportAssetList')+'</button>'
+    +'<button type="button" class="btn" id="extmgr-refresh-installed">'+t('extmgr.refresh')+'</button>'
+    +'<span style="flex:1"></span></div>'
+    +'<div class="ext-list">'+(rows||'<div class="ext-empty">'+t('extmgr.noneInstalled')+'</div>')+'</div></div>';
+  body.querySelector('#extmgr-export-assetlist')?.addEventListener('click',()=>actions.exportAssetList?.({source:'host'}));
+  body.querySelector('#extmgr-refresh-installed')?.addEventListener('click',()=>{ state.extInstalled=null; renderExtensionView(); });
+}
+function renderExtReport(body){
+  const results=state.extResults||[];
+  const rows=results.map((r)=>'<div class="ext-entry is-'+(r.status==='ok'?'ok':'failed')+'">'
+    +'<span class="ext-url" title="'+escapeHtml(r.url)+'">'+escapeHtml(r.url)+'</span>'
+    +'<span class="ext-state">'+escapeHtml(r.branch||'')+' · '+extStatusText(r.status)+(r.error?' · '+escapeHtml(r.error):'')+'</span></div>').join('');
+  const log=(state.extLog||[]).join('\n');
+  body.innerHTML='<div class="ext-install">'
+    +'<div class="ext-row"><b>'+t('extmgr.reportSummary',{ok:results.filter(r=>r.status==='ok').length,failed:results.filter(r=>r.status==='failed').length})+'</b></div>'
+    +'<div class="ext-list">'+(rows||'<div class="ext-empty">'+t('extmgr.noReport')+'</div>')+'</div>'
+    +'<pre class="ext-log">'+escapeHtml(log||t('extmgr.noLog'))+'</pre>'
+    +'<div class="ext-row ext-actions">'
+      +'<button type="button" class="btn" id="extmgr-export-log2">'+t('extmgr.exportLog')+'</button>'
+      +'<button type="button" class="btn" id="extmgr-export-failed2">'+t('extmgr.exportFailed')+'</button>'
+      +'<button type="button" class="btn" id="extmgr-export-report2">'+t('extmgr.exportReport')+'</button>'
+    +'</div></div>';
+  const exportLog=()=>downloadTextFile('extension-install.log', log);
+  const exportFailed=()=>downloadTextFile('extension-install-failed.txt', results.filter(r=>r.status==='failed').map(r=>r.url).join('\n'));
+  const exportReport=()=>downloadTextFile('extension-install-report.json', JSON.stringify({generatedAt:new Date().toISOString(),results},null,2));
+  body.querySelector('#extmgr-export-log2')?.addEventListener('click',exportLog);
+  body.querySelector('#extmgr-export-failed2')?.addEventListener('click',exportFailed);
+  body.querySelector('#extmgr-export-report2')?.addEventListener('click',exportReport);
+}
+function renderExtensionView(){
+  const body=document.getElementById('extension-body');
+  if(!body) return;
+  document.querySelectorAll('#extmgr-tabs [data-exttab]').forEach(b=>b.classList.toggle('active',b.dataset.exttab===state.extTab));
+  if(state.extTab==='installed'){ void renderExtInstalled(body); return; }
+  if(state.extTab==='report'){ renderExtReport(body); return; }
+  renderExtInstall(body);
+}
+
 function renderTransfer(){
-  const open=!!state.transfer.open;
-  const chart=document.getElementById('chart-card');
-  const view=document.getElementById('transfer-view');
-  if(chart) chart.hidden=open;
-  if(view) view.hidden=!open;
   document.querySelectorAll('[data-transfer-tab]').forEach(b=>{
     const on=b.dataset.transferTab===state.transfer.tab;
     b.classList.toggle('active',on);
     b.setAttribute('aria-selected',on?'true':'false');
   });
+  syncMainView();
 }
 function renderLan(){
   const L=state.lan;
@@ -2222,11 +2464,21 @@ function bind(){
   ['modal-extra','settings-body'].forEach(id => document.getElementById(id)?.addEventListener('click', extModeClick));
   document.getElementById('btn-close')?.addEventListener('click',()=>actions.close?.());
 
-  // 手机端：存储图表 / 数据包 左右切换
-  document.getElementById('mobile-switch')?.addEventListener('click',(e)=>{
-    const b=e.target.closest('[data-mview]'); if(!b) return;
-    state.mobileView = b.dataset.mview==='zone' ? 'zone' : 'chart';
-    renderMobileView();
+  // 视图切换：桌面 2 个（图表 / 扩展管理），手机 3 个（图表 / 数据包 / 扩展管理）
+  document.getElementById('view-switch')?.addEventListener('click',(e)=>{
+    const b=e.target.closest('[data-wbview]'); if(!b) return;
+    const v=b.dataset.wbview;
+    if(state.view==='mobile') state.mobileView = (v==='zone'||v==='extension') ? v : 'chart';
+    else state.mainView = v==='extension' ? 'extension' : 'chart';
+    syncMainView();
+    if(v==='extension') renderExtensionView();
+  });
+  document.getElementById('extension-close-btn')?.addEventListener('click',()=>{
+    state.mainView='chart'; if(state.view==='mobile') state.mobileView='chart'; syncMainView();
+  });
+  document.getElementById('extmgr-tabs')?.addEventListener('click',(e)=>{
+    const b=e.target.closest('[data-exttab]'); if(!b) return;
+    state.extTab=b.dataset.exttab; renderExtensionView();
   });
   // 浏览器 / 宿主配额：点击跳到宿主原生存储页的对应分页（能力由控制器探测后传入）。
   document.getElementById('quota-head')?.addEventListener('click',(e)=>{
@@ -2244,17 +2496,13 @@ function bind(){
     if(btn) btn.setAttribute('aria-expanded',open?'true':'false');
   });
   if(typeof window!=='undefined'){
-    window.addEventListener('resize',()=>{ syncView(); renderMobileView(); });
+    window.addEventListener('resize',()=>{ syncView(); syncMainView(); });
   }
 
   document.querySelectorAll('[data-help]').forEach(b=>b.addEventListener('click',e=>{ e.stopPropagation(); openHelp(b.dataset.help); }));
 
   // ── 顶部全局动作（按钮随 renderTopActions 重建）──
   document.getElementById('top-actions').addEventListener('click',(e)=>{
-    if(e.target.closest('#btn-host-assetlist')){
-      actions.exportAssetList?.({source:'host'});
-      return;
-    }
     if(e.target.closest('#transfer-open-btn')){
       state.transfer.open=true;
       if(state.transfer.tab!=='lan' && state.transfer.tab!=='cloud') state.transfer.tab='lan';
@@ -2340,8 +2588,11 @@ function bind(){
 
   document.getElementById('zone-tabs').addEventListener('click',e=>{
     const b=e.target.closest('.zone-tab'); if(!b) return;
+    /* 切区必须让「选中集合」与「当前来源」一起失效并整体重绘：
+       否则包卡的选中环会留下，而图表已被清空（2026-11-11 实测）。 */
     state.zone=b.dataset.zone; state.selectedPkgs=new Set();
-    renderZones(); renderActions();
+    state.source={type:'host', pkgId:null}; state.sourceKey='host:'+state.host;
+    renderAll();
   });
 
   const targetBtn=document.getElementById('target-btn');
@@ -2469,7 +2720,13 @@ function bind(){
       return;
     }
     const hostAssetList=e.target.closest('#btn-assetlist-host');
-    if(hostAssetList){ actions.exportAssetList?.({source:'host'}); return; }
+    if(hostAssetList){
+      // 宿主扩展清单导出已收束到「扩展管理 → 已装」页，不再单独弹导出。
+      state.extTab='installed'; state.mainView='extension';
+      if(state.view==='mobile') state.mobileView='extension';
+      syncMainView(); renderExtensionView();
+      return;
+    }
     const cardAssetList=e.target.closest('[data-assetlist]');
     if(cardAssetList){
       const pkgIds=String(cardAssetList.dataset.assetpkgs||'').split(',').filter(Boolean);
@@ -2485,6 +2742,12 @@ function bind(){
     const extMode=e.target.closest('[data-extmode]');
     if(extMode){
       state.extensionMode = extMode.dataset.extmode==='manifest' ? EXTENSION_MODES.MANIFEST : EXTENSION_MODES.FULL;
+      renderChart();
+      return;
+    }
+    const extUnchecked=e.target.closest('[data-extunchecked]');
+    if(extUnchecked){
+      state.extUncheckedMode = extUnchecked.dataset.extunchecked==='manifest' ? 'manifest' : 'none';
       renderChart();
       return;
     }
@@ -2773,17 +3036,35 @@ initChartSplitters();
     renderZones();
     renderActions();
     renderChart();
-    renderMobileView();
+    syncMainView();
     renderPendingExports();
     renderCloud();
   }
 
+  /** 扩展组未勾选但用户选了「仅清单」：保留扩展元数据扫描，实体仍由 manifest 模式丢弃。 */
+  function extensionManifestOnly(pkg, scopeArg) {
+    if (state.extUncheckedMode !== 'manifest') return false;
+    const scope = scopeArg || ('pkg:' + pkg.id);
+    const extNode = findNode(packageNodes(pkg).nodes, 'group:extensions');
+    return !!extNode && !isChecked(extNode, scope);
+  }
+  function extensionLeafIds(pkg) {
+    const extNode = findNode(packageNodes(pkg).nodes, 'group:extensions');
+    const ids = new Set();
+    if (extNode) walk([extNode], (n) => { if (!(n.children && n.children.length)) ids.add(n.id); });
+    return ids;
+  }
+
   function getExcludedPaths(pkg) {
     const scope = 'pkg:' + pkg.id;
+    const manifestOnly = extensionManifestOnly(pkg, scope);
+    const extIds = manifestOnly ? extensionLeafIds(pkg) : null;
     const excluded = new Set();
     walk(packageNodes(pkg).nodes, (n) => {
       if (n.children && n.children.length) return;
       if (n.action === 'DROP') return;
+      // 仅清单模式：扩展条目不能排除，否则转换器看不到 manifest/git 元数据。
+      if (manifestOnly && extIds.has(n.id)) return;
       if (!isChecked(n, scope)) excluded.add(n.label && n.path ? n.path : n.id);
     });
     return excluded;
@@ -2796,6 +3077,8 @@ initChartSplitters();
   function getMergedPlan(pkgs) {
     const nodes = mergeChartTrees(pkgs.map((pkg) => ({ pkgId: pkg.id, nodes: packageNodes(pkg).nodes })));
     const scope = mergeScope(pkgs);
+    const mergedExt = findNode(nodes, 'group:extensions');
+    const mergedManifestOnly = state.extUncheckedMode === 'manifest' && !!mergedExt && !isChecked(mergedExt, scope);
     const excludedByPkg = {};
     for (const pkg of pkgs) {
       const excluded = new Set();
@@ -2803,6 +3086,7 @@ initChartSplitters();
         if (n.children && n.children.length) return;
         if (n.srcPkgId !== pkg.id) return;
         if (n.action === 'DROP') return;
+        if (mergedManifestOnly && String(n.path || '').startsWith('extensions/')) return;
         if (!isChecked(n, scope)) excluded.add(n.path || n.id);
       });
       excludedByPkg[pkg.id] = excluded;
@@ -2814,7 +3098,7 @@ initChartSplitters();
         isChecked: (n) => (n.srcPkgId && n.srcPkgId !== pkg.id ? false : isChecked(n, scope)),
         ui: {
           compression: state.compression,
-          extensionMode: state.extensionMode,
+          extensionMode: mergedManifestOnly ? EXTENSION_MODES.MANIFEST : state.extensionMode,
           gitMode: state.gitMode,
           keepDev: state.keepDev,
           target: state.target,
@@ -2831,7 +3115,7 @@ initChartSplitters();
       isChecked: (n) => isChecked(n, scope),
       ui: {
         compression: state.compression,
-        extensionMode: state.extensionMode,
+        extensionMode: extensionManifestOnly(pkg, scope) ? EXTENSION_MODES.MANIFEST : state.extensionMode,
         gitMode: state.gitMode,
         keepDev: state.keepDev,
         target: state.target,
@@ -2891,11 +3175,56 @@ initChartSplitters();
     );
   }
 
+  /**
+   * 批量恢复报告：逐包状态 + 失败原因 + 引擎转储剔除说明。
+   * 不再「首包失败即整体失败」：成功的算成果，失败的留给用户重试。
+   */
+  function showRestoreReport(results, { onKeepPartial, onDiscardPartial, onRefresh } = {}) {
+    const list = Array.isArray(results) ? results : [];
+    const rows = list.map((r) => {
+      const ok = r.status === 'ok';
+      const skipped = r.status === 'skipped';
+      const status = ok ? t('restore.statusOk') : skipped ? t('restore.statusSkipped') : t('restore.statusFailed');
+      return '<div class="rep-row restore-row ' + (ok ? 'is-ok' : skipped ? 'is-skip' : 'is-bad') + '">'
+        + '<span class="rr-name" title="' + escapeHtml(r.name) + '">' + escapeHtml(r.name) + '</span>'
+        + '<b>' + status + '</b>'
+        + (r.message ? '<span class="rr-msg">' + escapeHtml(r.message) + '</span>' : '')
+        + (r.note ? '<span class="rr-note">' + escapeHtml(r.note) + '</span>' : '')
+        + '</div>';
+    }).join('');
+    const okCount = list.filter((r) => r.status === 'ok').length;
+    const badCount = list.filter((r) => r.status !== 'ok').length;
+    const actions = [];
+    if (okCount > 0) {
+      actions.push({ label: t('restore.keepPartial'), primary: true, onClick: () => { closeModal(); onKeepPartial?.(); } });
+      actions.push({ label: t('restore.discardPartial'), danger: true, onClick: () => { closeModal(); onDiscardPartial?.(); } });
+    } else {
+      actions.push({ label: t('modal.close'), primary: true, onClick: () => closeModal() });
+    }
+    actions.push({ label: t('restore.refreshNow'), onClick: () => { closeModal(); onRefresh?.(); } });
+    openModal(
+      t('restore.reportTitle'),
+      t('restore.reportDesc', { ok: okCount, failed: badCount }),
+      ['<div class="rep-grid restore-report">' + (rows || '<div class="rep-row"><span>-</span><b>0</b></div>') + '</div>'],
+      actions,
+    );
+  }
+
   return {
     setPackages(list) {
       const next = (list || []).map((pkg) => ({ ...pkg }));
       const fresh = next.filter((pkg) => !state.prefAppliedPkgs.has(pkg.id) && Array.isArray(pkg.nodes) && pkg.nodes.length);
       state.packages = next;
+      /* 包被删除后，选中集合与当前来源都必须同步失效：
+         否则会残留「已选 N 项」动作条，或出现「包卡选中环在、图表没有」。 */
+      const alive = new Set(next.map((pkg) => pkg.id));
+      for (const id of [...state.selectedPkgs]) {
+        if (!alive.has(id)) state.selectedPkgs.delete(id);
+      }
+      if (state.source.type === 'package' && !alive.has(state.source.pkgId)) {
+        state.source = { type: 'host', pkgId: null };
+        state.sourceKey = 'host:' + state.host;
+      }
       if (fresh.length) {
         fresh.forEach((pkg) => { applyPrefsToPackage(pkg); state.prefAppliedPkgs.add(pkg.id); });
         applyTopControlsFromPrefs();
@@ -2968,6 +3297,33 @@ initChartSplitters();
     /** 本次待导出（内存队列）；空数组即隐藏整块。 */
     setPendingExports(items) { state.pendingExports = Array.isArray(items) ? items : []; renderPendingExports(); },
     showReport,
+    showRestoreReport,
+    renderExtensionView,
+    /** 从图表卡「清单」或包选择入口进入扩展管理，并预填条目。 */
+    openExtensionManager(entries){
+      const list=Array.isArray(entries)?entries:[];
+      if(list.length){
+        state.extEntries=list.map((e)=>{
+          if(typeof e==='string') return { url:e, branch:'main', status:'pending' };
+          return { url:String(e.url||e.link||'').trim(), branch:String(e.branch||e.version||e.ref||'main'), status:'pending' };
+        }).filter((e)=>e.url);
+        state.extLinksText=state.extEntries.map((e)=>e.url+(e.branch&&e.branch!=='main'?' | '+e.branch:'')).join('\n');
+      }
+      state.extTab='install';
+      state.mainView='extension';
+      if(state.view==='mobile') state.mobileView='extension';
+      syncMainView();
+      renderExtensionView();
+    },
+    /** index.js 的批量安装进度回调：更新单条状态。 */
+    extEntryUpdate(update){
+      if(!update || !update.url) return;
+      const hit=state.extEntries.find((e)=>e.url===update.url);
+      if(hit){ hit.status=update.status; if(update.error) hit.error=update.error; }
+      if(state.extRunning) renderExtensionView();
+    },
+    extLogAppend(line){ if(line) state.extLog.push(String(line)); },
+    setExtensionResults(results){ state.extResults=Array.isArray(results)?results:[]; renderExtensionView(); },
     setActivePackage(id) { state.source = { type: 'package', pkgId: id }; state.sourceKey = 'pkg:' + id; renderAll(); },
     pushLog(level, msg) { log(String(level || 'INFO').toUpperCase(), msg); },
     openModal,
