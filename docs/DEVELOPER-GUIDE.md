@@ -210,6 +210,17 @@
 | 包清单入口收束 | 图表卡 `[data-extmanifest]` → 扩展管理并预填 | `index.js` 的 `openExtensionManifest` → `view.openExtensionManager()` |
 | **打包页：按数据包选择扩展** | 扩展管理 → 打包 | `src/ui/workbench-view.js` 的 `renderExtPack()`；扩展折叠为单元的纯逻辑在 `src/core/ext-pack.js`（`extensionUnitsOf` / `extensionUnitName`） |
 | **每包独立 Git 模式** | 打包页组头 / 图表卡 `[data-gitmode]` | `state.gitModeByPkg` + `packageGitMode(pkg)`；`getExportOptions(pkg)` 与合并计划按包取值 |
+
+### K3. 数据包页签行 / 恢复模式 / 待导出合并 / 开发模式（2026-11-11）
+
+| 功能 | UI 入口 | 源码落点 |
+| --- | --- | --- |
+| **恢复模式**（原「数据包模式」）与覆盖/增量 | 数据包 `导入 / 导出` 页签**右侧**同一行 | `workbench-template.js` 的 `#zone-tabs > #zone-mode-row`；`workbench-view.js` 的 `renderZoneModeRow()`；文案 `chart.deltaLabel` |
+| 从宿主拉取 | 同上，仅在导入分区显示 | `#btn-fetch` → `doFetch()` |
+| **待导出两列区块已删除** | — | 模板无 `#pending-exports`；队列条目由 `renderZones()` 用 `pendingCardHtml()` 渲染到导出区，动作仍走 `pendingDownload` / `pendingStash` / `pendingRemove` |
+| **开发模式自动更新** | 扩展管理 → 宿主 → 每个 Git 已装扩展行尾下拉（关闭 / 静默 / 提示） | `workbench-view.js` 的 `runDevAutoUpdate()` / `nativeToast()`；设置项 `gitDevMode`（`settings-panel.js` 白名单 + 归一） |
+| 迁移与备份教程 | 迁移面板头 `?` | `HELP.transfer`（局域网互传 / 云端仓库 / 恢复模式） |
+| 教程模式不自动退出 | 头部书本图标 `#btn-guide` / 横幅「退出教程」 | `tutorial-next` 最后一步只回目标菜单；`closeTutorial()` 才是退出 |
 | **Git 账号（多站点多账号）** | 扩展管理 → 安装页「Git 账号」 | `src/core/git-accounts.js`（归一/增删/默认/匹配/脱敏）；`src/ui/git-remote.js`（测试账号）；持久化在 `settings-store.js` 与 `extension_settings` |
 | **OAuth 登录（授权码 + PKCE）** | 账号区「OAuth 登录」 | `src/core/git-oauth.js`（端点事实 / PKCE / 换 token）；`workbench-view.js` 的 `startOAuth()` / `completeOAuthFromUrl()`；待完成态存 `sessionStorage['stpt.oauth.pending']` |
 | **令牌获取指引（一页教程）** | 账号区「令牌获取指引」→ 帮助视图 `gitToken` | `workbench-view.js` 的 `HELP.gitToken`（含站点链接与最小权限）；帮助渲染支持 `intro` / `links` |

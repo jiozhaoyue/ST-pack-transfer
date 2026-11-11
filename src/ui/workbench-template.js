@@ -12,7 +12,7 @@ export function getWorkbenchHtml() {
       </div>
       <div class="header-actions">
         <span class="badge accent" id="host-badge"><img class="host-icon" id="host-badge-icon" alt=""><svg class="gh-icon" id="host-badge-gh" viewBox="0 0 24 24" width="14" height="14" fill="currentColor" hidden><path d="M12 2A10 10 0 0 0 2 12c0 4.42 2.87 8.17 6.84 9.5.5.09.68-.22.68-.48v-1.7c-2.78.6-3.37-1.34-3.37-1.34-.45-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.89 1.53 2.34 1.09 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.56-1.11-4.56-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02a9.5 9.5 0 0 1 5 0c1.9-1.29 2.74-1.02 2.74-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.69-4.57 4.94.36.31.68.92.68 1.85v2.74c0 .27.18.58.69.48A10 10 0 0 0 22 12A10 10 0 0 0 12 2z"/></svg><span id="host-badge-text"></span></span>
-        <button class="icon-btn" id="btn-guide" data-i18n-title="header.guide">?</button>
+        <button class="icon-btn" id="btn-guide" data-i18n-title="header.guide"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5z"/><path d="M4 20.5A2.5 2.5 0 0 1 6.5 18H20v3H6.5"/></svg></button>
         <button class="icon-btn" id="btn-locale" data-i18n-title="settings.locale"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.7 3.8 5.7 3.8 9s-1.3 6.3-3.8 9c-2.5-2.7-3.8-5.7-3.8-9S9.5 5.7 12 3z"/></svg></button>
         <button class="icon-btn" id="btn-settings" data-i18n-title="header.settings"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
         <button class="icon-btn" id="btn-close" data-i18n-title="header.close">×</button>
@@ -98,6 +98,7 @@ export function getWorkbenchHtml() {
                 <button type="button" class="seg-btn active" data-transfer-tab="lan" data-i18n="action.lan"></button>
                 <button type="button" class="seg-btn" data-transfer-tab="cloud" data-i18n="cloud.open"></button>
               </div>
+              <button class="help-btn" data-help="transfer" data-i18n-title="transfer.help">?</button>
             </div>
           </div>
           <div class="transfer-body">
@@ -323,7 +324,6 @@ export function getWorkbenchHtml() {
           <div class="zone-tabs" id="zone-tabs">
             <button class="zone-tab active" data-zone="import"><span data-i18n="zones.import"></span><span class="count" id="count-import">4</span></button>
             <button class="zone-tab" data-zone="export"><span data-i18n="zones.export"></span><span class="count" id="count-export">1</span></button>
-          </div>
           <div class="zone-delta-row" id="zone-mode-row">
             <button type="button" class="btn zone-fetch-btn" id="btn-fetch"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M7 18a4 4 0 0 1 0-8 5 5 0 0 1 9.6-1.4A3.5 3.5 0 0 1 18 18z"/></svg><span data-i18n="action.fetch"></span></button>
             <span class="zone-mode-extra" id="zone-mode-extra"></span>
@@ -333,7 +333,7 @@ export function getWorkbenchHtml() {
               <button class="seg-btn" data-delta="incremental" data-i18n="chart.incremental"></button>
             </div>
           </div>
-          <div class="pending-exports" id="pending-exports" hidden></div>
+          </div>
           <div class="zone-body" id="zone-body"></div>
           <div class="zone-foot-actions" id="zone-actions-bottom"></div>
         </section>

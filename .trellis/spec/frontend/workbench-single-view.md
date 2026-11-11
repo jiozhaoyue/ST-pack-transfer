@@ -687,3 +687,32 @@ dev server 已能直接跑正式 UI，demo 只剩维护成本与误导风险。
 - `.panel-title` 不存在；`#transfer-tabs` 内只有 `局域网互传 / 云端仓库` 两项；
 - 点切换行的 `存储图表` 后 `#transfer-view` 隐藏、`#chart-card` 显示。
 
+## 17. 数据包页签行 / 恢复模式 / 演示数据 / 教程模式（2026-11-11 用户裁定）
+
+### 17.1 恢复模式归位
+
+- `#zone-tabs` 一行内：左侧 `导入 / 导出` 两个页签，右侧同一行放
+  `#btn-fetch`（仅导入）+ `#zone-mode-extra` + `#zone-mode-row`（`恢复模式` 标签 + `覆盖 / 增量`）。
+- `#zone-mode-row` **不再**是页签下方的独立行；`renderZoneModeRow()` 仍按 `state.zone` 控制显隐。
+- `chart.deltaLabel` 文案为「恢复模式 / Restore mode」；不得再出现「数据包模式」。
+
+### 17.2 待导出两列区块已删除
+
+- 模板中**不得**再出现 `#pending-exports` / `.pending-head` / `.pending-row`。
+- 导出队列（`ExportQueue`）条目改为在**导出区列表**中渲染（`pendingCardHtml()`），
+  仍提供下载 / 存入工作区 / 移除，动作走 `pendingDownload` / `pendingStash` / `pendingRemove`。
+- 对应 CSS 与 `pending.title` / `pending.clear` 文案一并删除，禁止残留死引用。
+
+### 17.3 演示数据（教程模式）
+
+- 导入区 6–10 个包，**四个宿主全覆盖**且同宿主可多包；体积覆盖 **16 MB 与 4 GB** 两端。
+- 导出区至少 3 个包，另可含 1 个转换产物条目。
+- `enterTutorialMode()` 的默认选中源取「第一个导入包」，禁止写死旧 id（曾写死 `demo-st` 导致选中失效）。
+
+### 17.4 教程模式生命周期
+
+- 教程最后一步点「下一步」**只回到目标菜单**，不退出演示模式；退出有两条显式路径：
+  头部教程开关 `#btn-guide`、横幅「退出教程」。
+- 教程模式图标为书本图标，**不得**再用 `?`（`?` 仅用于面板帮助按钮）。
+- 迁移与备份面板头必须有 `help-btn[data-help="transfer"]`，内容含局域网互传 / 云端仓库 / 恢复模式三段。
+

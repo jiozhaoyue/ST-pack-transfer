@@ -223,7 +223,7 @@ let chartPrefs = typeof localStorage !== 'undefined' ? loadChartPrefs() : normal
 const state = {
   host:'luker', mode:'plugin', view:'desktop', mainView:'chart', mobileView:'chart', pane:'workbench', zone:'import',
   extTab:'host', extEntries:[], extResults:[], extRunning:false, extInstalled:null, extManifestPrefill:[],
-  extReportOpen:false, extInstallOpen:false,
+  extReportOpen:false, extInstallOpen:false, devAutoRan:false,
   extAccountTests:[], extUpdate:null, extAccountsOpen:true,
   source:{ type:'host', pkgId:null }, target:'SillyTavern', targetManual:false,
   delta: 'overwrite', splitMb: chartPrefs.splitMb,
@@ -1555,7 +1555,18 @@ function renderZones(){
   }else{
     html+='<div class="card-list">'+list.map(pkgCard).join('')+'</div>';
   }
+  if(state.zone==='export'){
+    const queue=state.pendingExports||[];
+    if(queue.length) html+='<div class="card-list" id="pending-cards">'+queue.map(pendingCardHtml).join('')+'</div>';
+  }
   body.innerHTML=html;
+  body.querySelectorAll('[data-pending-act]').forEach(btn=>btn.addEventListener('click',()=>{
+    const id=btn.closest('[data-pending]')?.dataset.pending;
+    if(!id) return;
+    if(btn.dataset.pendingAct==='download') actions.pendingDownload?.(id);
+    else if(btn.dataset.pendingAct==='stash') actions.pendingStash?.(id);
+    else actions.pendingRemove?.(id);
+  }));
   body.querySelector('#sort-select')?.addEventListener('change',e=>{ state.sort=e.target.value; renderZones(); });
   body.querySelector('#host-filter')?.addEventListener('change',e=>{ state.filter=e.target.value; renderZones(); });
   body.querySelector('#dropzone')?.addEventListener('click',()=>{
@@ -2229,6 +2240,53 @@ async function checkExtUpdates(){
   state.extUpdate={busy:false,rows,note:''};
   if(state.extTab==='host') renderExtensionView();
 }
+/** 宿主的原生浮层优先：有 toastr 就用它的可点击通知，没有才退回本插件 toast。 */
+function nativeToast(msg,opts){
+  const tr=globalThis.toastr;
+  if(tr && typeof tr.info==='function'){
+    tr.info(msg,'',Object.assign({closeButton:true,newestOnTop:true,timeOut:10000,tapToDismiss:true},opts||{}));
+    return true;
+  }
+  toast(msg);
+  return false;
+}
+/** 开发模式自动更新：静默直接装；提示模式先弹原生浮层，点击即取消，超时才更新。 */
+async function runDevAutoUpdate(){
+  if(state.devAutoRan) return;
+  state.devAutoRan=true;
+  const s=gitSettings();
+  const modes=s.gitDevMode||{};
+  const regs=(s.gitInstalls||[]).filter((r)=>modes[r.name]);
+  for(const reg of regs){
+    const parsed=parseRepoUrl(reg.url);
+    if(!parsed.ok) continue;
+    const acc=accountForRepo(parsed);
+    const localVersion=await fetchLocalManifestVersion(reg.name);
+    if(!localVersion) continue;
+    const res=await gitRemote().remoteManifest(parsed, reg.ref, acc);
+    if(!res.ok) continue;
+    let remoteVersion='';
+    try { remoteVersion=String(JSON.parse(res.text).version||''); } catch { continue; }
+    if(!remoteVersion || compareVersions(remoteVersion, localVersion)<=0) continue;
+    const runUpdate=async()=>{
+      const credential=acc ? { kind: acc.username?'basic':'token', username:acc.username, secret:acc.secret } : null;
+      const items=await actions.installExtensions?.([{ url:reg.url, branch:reg.ref||'', ref:reg.ref||'', credential, replace:true }]);
+      const ok=Array.isArray(items) ? items.some((r)=>r.status==='ok') : true;
+      if(ok){
+        nativeToast(t('extmgr.devUpdated',{name:reg.name})+' · '+t('extmgr.devRefresh'), {
+          onclick:()=>{ try{ window.location.reload(); }catch{} },
+        });
+      }
+    };
+    if(modes[reg.name]==='silent'){ await runUpdate(); continue; }
+    let cancelled=false;
+    nativeToast(t('extmgr.devFound',{name:reg.name,from:localVersion,to:remoteVersion}), {
+      onclick:()=>{ cancelled=true; toast(t('extmgr.devCancelled')); },
+    });
+    await new Promise((resolve)=>setTimeout(resolve,8000));
+    if(!cancelled) await runUpdate();
+  }
+}
 async function renderExtInstalled(body){
   body.innerHTML='<div class="ext-empty">'+t('extmgr.loading')+'</div>';
   let list=[];
@@ -2238,10 +2296,20 @@ async function renderExtInstalled(body){
   } catch { list=[]; }
   if(state.extTab!=='host' || state.extReportOpen) return;
   state.extInstalled=list;
+  const devModes=gitSettings().gitDevMode||{};
+  const installedGit=new Set((gitSettings().gitInstalls||[]).map((r)=>r.name));
   const rows=list.map((x)=>{
     const name=x?.name||x?.folder||x?.internalName||'';
     const version=x?.version||x?.manifest?.version||'';
-    return '<div class="ext-entry is-ok"><span class="ext-url" title="'+escapeHtml(name)+'">'+escapeHtml(name)+'</span><span class="ext-state">'+escapeHtml(version)+'</span></div>';
+    const dev=devModes[name]||'off';
+    const devSel=installedGit.has(name)
+      ? '<select class="text_pole ext-dev" data-dev="'+escapeHtml(name)+'">'
+        +'<option value="off"'+(dev==='off'?' selected':'')+'>'+t('extmgr.devOff')+'</option>'
+        +'<option value="silent"'+(dev==='silent'?' selected':'')+'>'+t('extmgr.devSilent')+'</option>'
+        +'<option value="prompt"'+(dev==='prompt'?' selected':'')+'>'+t('extmgr.devPrompt')+'</option>'
+        +'</select>'
+      : '';
+    return '<div class="ext-entry is-ok"><span class="ext-url" title="'+escapeHtml(name)+'">'+escapeHtml(name)+'</span><span class="ext-state">'+escapeHtml(version)+'</span>'+devSel+'</div>';
   }).join('');
   const upd=state.extUpdate;
   const updRows=upd && Array.isArray(upd.rows)
@@ -2272,6 +2340,13 @@ async function renderExtInstalled(body){
   const installBlock=body.querySelector('#extmgr-install-block');
   installBlock?.addEventListener('toggle',()=>{ state.extInstallOpen=!!installBlock.open; });
   refreshInstallArea();
+  body.querySelectorAll('[data-dev]').forEach((el)=>el.addEventListener('change',()=>{
+    const s=gitSettings(); const map={...(s.gitDevMode||{})};
+    if(el.value==='off') delete map[el.dataset.dev]; else map[el.dataset.dev]=el.value;
+    saveSettings({...s, gitDevMode:map});
+    toast(t('extmgr.devSaved'));
+  }));
+  void runDevAutoUpdate();
 }
 function renderExtReport(body){
   const results=state.extResults||[];
@@ -3155,6 +3230,11 @@ function openTrafficModal(onConfirm, { enabled = true, onNever, onCancel } = {})
     { title:'help.zone.extTitle', points:['help.zone.extP1','help.zone.extP2','help.zone.extP3','help.zone.extP4'] },
     { title:'help.zone.assetTitle', points:['help.zone.assetP1','help.zone.assetP2','help.zone.assetP3'] },
   ]},
+  transfer:{ title:'help.transfer.title', intro:'help.transfer.intro', sections:[
+    { title:'help.transfer.lanTitle', points:['help.transfer.lanP1','help.transfer.lanP2','help.transfer.lanP3'] },
+    { title:'help.transfer.cloudTitle', points:['help.transfer.cloudP1','help.transfer.cloudP2','help.transfer.cloudP3'] },
+    { title:'help.transfer.restoreTitle', points:['help.transfer.restoreP1','help.transfer.restoreP2','help.transfer.restoreP3'] },
+  ]},
   action:{ title:'help.action.title', sections:[
     { title:'help.action.flowTitle', points:['help.action.p1','help.action.p2','help.action.p3'] },
   ]},
@@ -3235,42 +3315,44 @@ function cloneDemoState(){
 }
 function buildDemoPackages(){
   const L=(k)=>t('demo.'+k);
-  const st=[
-    node('group:characters',L('characters'),18,'keep',{icon:'user',expanded:true,children:[
-      node('char:demo-1','Mira',9,'keep',{icon:'user'}),
-      node('char:demo-2','Kai',9,'keep',{icon:'user'}),
+  const gb=(mb)=>Math.round((mb/1024)*100)/100;
+  /* 演示数据：四个宿主全覆盖、同宿主多包、体积覆盖 16 MB – 4 GB；导出区同样多条。 */
+  const tree=(mb)=>[
+    node('group:characters',L('characters'),gb(mb*0.12),'keep',{icon:'user',expanded:true,children:[
+      node('char:demo-1','Mira',gb(mb*0.07),'keep',{icon:'user'}),
+      node('char:demo-2','Kai',gb(mb*0.05),'keep',{icon:'user'}),
     ]}),
-    node('group:chats',L('chats'),64,'keep',{icon:'chat',expanded:true,children:[
-      node('chat:demo-1',L('chatMira'),40,'keep',{icon:'chat'}),
-      node('chat:demo-2',L('chatKai'),24,'keep',{icon:'chat'}),
+    node('group:chats',L('chats'),gb(mb*0.45),'keep',{icon:'chat',expanded:true,children:[
+      node('chat:demo-1',L('chatMira'),gb(mb*0.28),'keep',{icon:'chat'}),
+      node('chat:demo-2',L('chatKai'),gb(mb*0.17),'keep',{icon:'chat'}),
     ]}),
-    node('group:worldinfo',L('worldinfo'),22,'keep',{icon:'book',children:[
-      node('world:demo-1',L('world'),14,'keep',{icon:'book'}),
-      node('world:demo-2',L('lore'),8,'optional',{icon:'book'}),
+    node('group:worldinfo',L('worldinfo'),gb(mb*0.15),'keep',{icon:'book',children:[
+      node('world:demo-1',L('world'),gb(mb*0.10),'keep',{icon:'book'}),
+      node('world:demo-2',L('lore'),gb(mb*0.05),'optional',{icon:'book'}),
     ]}),
-    node('group:presets',L('presets'),6,'optional',{icon:'sliders'}),
-    node('group:images',L('images'),10,'optional',{icon:'image'}),
-    node('group:extensions',L('extensions'),8,'keep',{icon:'puzzle',children:[
-      node('ext:demo-1',L('extOne'),8,'keep',{icon:'puzzle'}),
+    node('group:presets',L('presets'),gb(mb*0.03),'optional',{icon:'sliders'}),
+    node('group:images',L('images'),gb(mb*0.15),'optional',{icon:'image'}),
+    node('group:extensions',L('extensions'),gb(mb*0.10),'keep',{icon:'puzzle',children:[
+      node('ext:demo-1',L('extOne'),gb(mb*0.10),'keep',{icon:'puzzle'}),
     ]}),
     node('group:vectors',L('vectors'),0,'drop',{icon:'brain'}),
   ];
-  const luker=[
-    node('group:characters',L('characters'),12,'keep',{icon:'user'}),
-    node('group:chats',L('chats'),38,'keep',{icon:'chat'}),
-    node('group:worldinfo',L('worldinfo'),10,'keep',{icon:'book'}),
-    node('group:images',L('images'),4,'optional',{icon:'image'}),
-  ];
-  const tt=[
-    node('group:characters',L('characters'),6,'keep',{icon:'user'}),
-    node('group:chats',L('chats'),18,'keep',{icon:'chat'}),
-    node('group:worldinfo',L('worldinfo'),6,'keep',{icon:'book'}),
-    node('group:presets',L('presets'),2,'optional',{icon:'sliders'}),
-  ];
+  const mk=(id,name,host,mb,time,zone)=>({
+    id, name, host, size: mb>=1024 ? (mb/1024)+' GB' : mb+' MB', time, mb, zone,
+    origin:'demo', unrecognized:false, nodes:tree(mb),
+  });
   return [
-    { id:'demo-st', name:'demo_st_export.zip', host:'st', size:'128 MB', time:'09:12', mb:128, zone:'import', origin:'demo', unrecognized:false, nodes:st },
-    { id:'demo-luker', name:'luker_backup_demo.zip', host:'luker', size:'64 MB', time:L('timeYesterday'), mb:64, zone:'import', origin:'demo', unrecognized:false, nodes:luker },
-    { id:'demo-tt', name:'tauritavern_demo.zip', host:'tt', size:'32 MB', time:L('timeOlder'), mb:32, zone:'export', origin:'demo', unrecognized:false, nodes:tt },
+    mk('demo-st-4g','st_full_backup_4g.zip','st',4096,'09:12','import'),
+    mk('demo-st-512','st_userdata_512m.zip','st',512,L('timeYesterday'),'import'),
+    mk('demo-luker-15g','luker_backup_1.5g.zip','luker',1536,'08:40','import'),
+    mk('demo-luker-96','luker_chats_96m.zip','luker',96,L('timeOlder'),'import'),
+    mk('demo-tt-640','tauritavern_demo_640m.zip','tt',640,L('timeOlder'),'import'),
+    mk('demo-pt-16','puretavern_min_16m.zip','pt',16,'07:55','import'),
+    { id:'demo-unknown-48', name:'unknown_layout_48m.zip', host:'unknown', size:'48 MB',
+      time:L('timeOlder'), mb:48, zone:'import', origin:'demo', unrecognized:true, nodes:[] },
+    mk('demo-exp-st-2g','demo_st_export_2g.zip','st',2048,'09:20','export'),
+    mk('demo-exp-luker-256','demo_luker_export_256m.zip','luker',256,'09:18','export'),
+    mk('demo-exp-pt-32','demo_pt_export_32m.zip','pt',32,'09:16','export'),
   ];
 }
 function buildDemoHostTree(){
@@ -3294,7 +3376,7 @@ function demoTutorialActions(real){
   wrap.generate=()=>{
     if(!state.selectedPkgs.size){ toast(t('zones.selectHint')); return; }
     state.pendingExports=[pending('demo_converted.zip',96), ...(state.pendingExports||[])];
-    renderPendingExports(); renderActions();
+    renderZones(); renderActions();
     toast(t('toast.tutorialSimulated'));
   };
   wrap.deleteSelected=(ids)=>{
@@ -3314,8 +3396,8 @@ function demoTutorialActions(real){
     state.selectedPkgs=new Set();
     renderAll(); toast(t('toast.tutorialSimulated'));
   };
-  wrap.pendingRemove=(id)=>{ state.pendingExports=(state.pendingExports||[]).filter((x)=>x.id!==id); renderPendingExports(); };
-  wrap.pendingClear=()=>{ state.pendingExports=[]; renderPendingExports(); };
+  wrap.pendingRemove=(id)=>{ state.pendingExports=(state.pendingExports||[]).filter((x)=>x.id!==id); renderZones(); };
+  wrap.pendingClear=()=>{ state.pendingExports=[]; renderZones(); };
   wrap.settings=()=>demoOnly();
   /* 关闭插件 = 先退出演示还原真实状态，再执行真实关闭，避免下次打开还停在演示态。 */
   wrap.close=()=>{ if(state.tutorialMode) closeTutorial(); real?.close?.(); };
@@ -3417,9 +3499,10 @@ function enterTutorialMode(){
   state.tutorialStep=0;
   state.tutorialGoal=null;
   state.packages=buildDemoPackages();
-  state.selectedPkgs=new Set(['demo-st']);
-  state.source={ type:'package', pkgId:'demo-st' };
-  state.sourceKey='pkg:demo-st';
+  const firstImport=(state.packages||[]).find((p)=>p.zone==='import')||null;
+  state.selectedPkgs=new Set(firstImport?[firstImport.id]:[]);
+  state.source=firstImport ? { type:'package', pkgId:firstImport.id } : { type:'host', pkgId:null };
+  state.sourceKey=firstImport ? ('pkg:'+firstImport.id) : ('host:'+state.host);
   state.zone='import';
   state.hostTree=buildDemoHostTree();
   state.storage={ browser:{ used:9.4*DEMO_GB, total:32*DEMO_GB }, host:null, page:{ available:false } };
@@ -3463,6 +3546,7 @@ const TUTORIAL_GOALS=[
     steps:[
       { sel:'#target-select', view:'chart', title:'tutorial.convert.target', desc:'tutorial.convert.targetDesc' },
       { sel:'#chart-stack', view:'chart', title:'tutorial.convert.chart', desc:'tutorial.convert.chartDesc' },
+      { sel:'#zone-body', view:'zone', zone:'import', title:'tutorial.convert.import', desc:'tutorial.convert.importDesc' },
       { sel:'#delta-toggle', view:'zone', zone:'export', title:'tutorial.convert.delta', desc:'tutorial.convert.deltaDesc' },
       { sel:'#split-input', view:'chart', title:'tutorial.convert.split', desc:'tutorial.convert.splitDesc' },
       { sel:'#zone-actions-bottom', view:'zone', zone:'import', title:'tutorial.convert.generate', desc:'tutorial.convert.generateDesc' },
@@ -3501,7 +3585,8 @@ const TUTORIAL_GOALS=[
     id:'transfer', label:'tutorial.goal.transfer', note:'tutorial.goal.transferNote',
     steps:[
       { sel:'#chart-card .view-switch-btn[data-wbview="transfer"]', view:'chart', title:'tutorial.transfer.entry', desc:'tutorial.transfer.entryDesc' },
-      { sel:'#transfer-tabs', view:'chart', title:'tutorial.transfer.tabs', desc:'tutorial.transfer.tabsDesc' }
+      { sel:'#transfer-tabs', view:'chart', title:'tutorial.transfer.tabs', desc:'tutorial.transfer.tabsDesc' },
+      { sel:'#transfer-view .help-btn[data-help="transfer"]', view:'chart', title:'tutorial.transfer.help', desc:'tutorial.transfer.helpDesc' },
     ]
   }
 ];
@@ -4191,7 +4276,8 @@ function bind(){
   document.getElementById('tutorial-prev').addEventListener('click',()=>{ if(state.tutorialStep>0){ state.tutorialStep--; renderTutorial(); } });
   document.getElementById('tutorial-next').addEventListener('click',()=>{
     const steps=tutorialSteps();
-    if(state.tutorialStep>=steps.length-1){ closeTutorial(); toast(t('toast.tutorialDone')); }
+    /* 教程走完不退出演示模式：只回到目标菜单，退出必须由用户关掉教程开关。 */
+    if(state.tutorialStep>=steps.length-1){ state.tutorialStep=0; state.tutorialGoal=null; renderTutorial(); toast(t('toast.tutorialDone')); }
     else{ state.tutorialStep++; renderTutorial(); }
   });
   document.getElementById('tutorial-adv').addEventListener('click',()=>{
@@ -4309,7 +4395,6 @@ initChartSplitters();
     renderChart();
     syncMainView();
     renderStorageInspector();
-    renderPendingExports();
     renderCloud();
     void completeOAuthFromUrl();
   }
@@ -4397,29 +4482,17 @@ initChartSplitters();
   }
 
   /* ── 渲染：本次待导出（内存队列，不入库） ── */
-  function renderPendingExports(){
-    const host=document.getElementById('pending-exports');
-    if(!host) return;
-    const list=state.pendingExports||[];
-    host.hidden=list.length===0;
-    if(!list.length){ host.innerHTML=''; return; }
-    host.innerHTML='<div class="pending-head"><span>'+t('pending.title',{n:list.length})+'</span>'
-      +'<button class="mini" id="pending-clear">'+t('pending.clear')+'</button></div>'
-      +'<div class="pending-list">'+list.map(it=>'<div class="pending-row" data-id="'+escapeHtml(it.id)+'">'
-        +'<span class="pending-name" title="'+escapeHtml(it.name)+'">'+escapeHtml(it.name)+'</span>'
-        +'<span class="pending-size">'+fmtMB((it.blob?.size||0)/1048576)+'</span>'
-        +'<button class="mini" data-act="download">'+t('pending.download')+'</button>'
-        +'<button class="mini" data-act="stash">'+t('pending.stash')+'</button>'
-        +'<button class="mini" data-act="remove">'+t('pending.remove')+'</button>'
-        +'</div>').join('')+'</div>';
-    host.querySelector('#pending-clear')?.addEventListener('click',()=>actions.pendingClear?.());
-    host.querySelectorAll('[data-act]').forEach(btn=>btn.addEventListener('click',()=>{
-      const id=btn.closest('[data-id]')?.dataset.id;
-      if(!id) return;
-      if(btn.dataset.act==='download') actions.pendingDownload?.(id);
-      else if(btn.dataset.act==='stash') actions.pendingStash?.(id);
-      else actions.pendingRemove?.(id);
-    }));
+  /* 待导出队列不再是独立两列区块：作为导出区的条目渲染，动作仍走 pending* 通道。 */
+  function pendingCardHtml(it){
+    const mb=(it.blob?.size||0)/1048576;
+    return '<div class="pkg-card is-export" data-pending="'+escapeHtml(it.id)+'">'
+      +'<span class="pkg-icon-wrap"><span class="pkg-icon" data-host="st">'+svg('file','tree-ico')+'</span></span>'
+      +'<div class="pkg-info"><div class="pkg-name"><span class="pkg-name-txt" title="'+escapeHtml(it.name)+'">'+escapeHtml(it.name)+'</span></div>'
+      +'<div class="pkg-meta"><span class="pending-size">'+fmtMB(mb)+'</span>'
+      +'<button class="mini" data-pending-act="download">'+t('pending.download')+'</button>'
+      +'<button class="mini" data-pending-act="stash">'+t('pending.stash')+'</button>'
+      +'<button class="mini" data-pending-act="remove">'+t('pending.remove')+'</button>'
+      +'</div></div></div>';
   }
 
   /** 转换报告：结构化的计数 + 三类清单，全部来自 `Report#toJSON()` 的纯对象。 */
@@ -4571,7 +4644,7 @@ initChartSplitters();
     /** 任务条：running / paused / null。只影响动作行的暂停·继续·中止三键。 */
     setTask(task) { if(state.tutorialMode) return; state.task = task || null; renderActions(); },
     /** 本次待导出（内存队列）；空数组即隐藏整块。 */
-    setPendingExports(items) { if(state.tutorialMode) return; state.pendingExports = Array.isArray(items) ? items : []; renderPendingExports(); },
+    setPendingExports(items) { if(state.tutorialMode) return; state.pendingExports = Array.isArray(items) ? items : []; renderZones(); },
     showReport,
     showRestoreReport,
     renderExtensionView,

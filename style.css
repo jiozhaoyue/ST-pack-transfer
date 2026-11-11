@@ -1068,24 +1068,6 @@
 }
 
 /* ── 本次待导出（内存队列，2026-11-05 恢复接线） ── */
-#app.app-container .pending-exports{
-  display:flex;flex-direction:column;gap:6px;
-  padding:8px 10px;border-top:1px solid var(--border);
-}
-#app.app-container #pending-exports[hidden]{display:none!important}
-#app.app-container .pending-head{
-  display:flex;align-items:center;justify-content:space-between;gap:8px;
-  font-size:12px;white-space:nowrap;
-}
-#app.app-container .pending-list{display:flex;flex-direction:column;gap:4px;max-height:180px;overflow:auto}
-#app.app-container .pending-row{display:flex;align-items:center;gap:8px;font-size:12px}
-#app.app-container .pending-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-#app.app-container .pending-size{flex-shrink:0;color:var(--optional)}
-#app.app-container .pending-row .mini,#app.app-container .pending-head .mini{
-  flex-shrink:0;background:transparent;border:1px solid var(--border);color:inherit;
-  border-radius:6px;padding:2px 8px;cursor:pointer;font-size:12px;white-space:nowrap;
-}
-#app.app-container .pending-row .mini:hover,#app.app-container .pending-head .mini:hover{border-color:var(--accent)}
 
 /* ── 转换报告（模态内） ── */
 #app.app-container .rep-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:1px}

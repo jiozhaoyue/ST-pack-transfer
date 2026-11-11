@@ -130,3 +130,18 @@ GitLab `/<group>/<sub>/<repo>/-/tree/<ref>`、`.git` 后缀、query/hash、`http
 **判据**：`宿主` 页 `#extmgr-install-block` 存在且 `open=false`；展开后 `#extmgr-install-area` 内
 `#extmgr-run` / `#extmgr-links` 存在；`凭据` 页 `#extmgr-run` 与 `#extmgr-install-block` 均不存在；
 页签显示文本为 `宿主 / 凭据 / 打包`。
+
+## 10. 开发模式自动更新（2026-11-11 用户裁定）
+
+**契约**：宿主页每个**经 Git 安装**（`gitInstalls` 有同名登记）的扩展行尾提供一个 `select`，
+三档：`关闭 / 静默更新 / 提示后更新`，值存 `settings.gitDevMode: {扩展名: 'silent'|'prompt'}`（缺省即关闭）。
+
+- **静默**：启动时发现远端 manifest 版本高于本地（`compareVersions(remote, local) > 0`）即直接
+  `installExtensions([{ url, ref, replace:true, credential }])`，不打断用户。
+- **提示**：先弹**宿主原生浮层**（`globalThis.toastr.info`，10 秒、可点击），点击该通知即取消本次更新；
+  超时未取消才执行更新。无 toastr 时退回插件内 `toast`。
+- 更新成功后再用原生浮层提示「点击刷新页面」，点击执行 `location.reload()`。
+- 凭据走既有 `accountForRepo()`；读不到本地或远端版本、版本不高于本地、仓库不可达时**静默跳过**，不伪造结果。
+- 每次会话只跑一次（`state.devAutoRan`），避免与「检查更新」重复。
+
+**禁止**：把开发模式写成全局开关（必须逐扩展）；在演示模式下写入真实设置；未更新却提示已更新。
