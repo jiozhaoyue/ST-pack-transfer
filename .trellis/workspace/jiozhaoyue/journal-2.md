@@ -1233,3 +1233,42 @@ Topics: [.trellis/research/11-11-chart-maximize-and-extension-manager.md](../../
 ### Next Steps
 
 - 浏览器预览取证；P2/P3 移植 st-git-improve 能力
+
+
+## Session 73: 扩展选择打包 + 每包 Git + P2（URL 归一/账号/更新检查）
+<!-- trellis-session: v=2 fp=903aa18f059a0b3e -->
+
+**Date**: 2026-11-11
+**Task**: 扩展选择打包 + 每包 Git + P2（URL 归一/账号/更新检查）
+**Branch**: `main`
+
+### Summary
+
+扩展管理新增打包页（多包分组、只过滤扩展、每包 Git）；响应式统一 data-view 并交换动作条/切页条；实现 URL 归一、站点分支与摘要、多账号凭据（服务端/仅浏览器）、私有仓提示、只读更新检查；README 与开发者文档重排。
+
+### Main Changes
+
+- 扩展管理「打包」页 + core/ext-pack
+- 每包 gitMode；图表卡与打包页同源
+- core/git-url · git-accounts · git-site + ui/git-remote
+- 账号存储服务端/仅浏览器，全链路脱敏
+- 响应式单一判据 data-view（修 641–860px）
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `b8550a6` | feat(ext): 扩展选择打包 + 每包 Git + P2（URL 归一 / 账号 / 更新检查） |
+
+### Testing
+
+- [OK] core 29 例 + 六守卫 + build + 三个 UI 取证脚本全绿
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- Dev 实例实测私有仓安装与更新检查（需真实账号与 Dev 端口）
+- TT/PT 宿主上的扩展安装通道实测

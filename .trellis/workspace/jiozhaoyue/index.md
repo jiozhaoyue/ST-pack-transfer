@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-2.md`
-- **Total Sessions**: 72
+- **Total Sessions**: 73
 - **Last Active**: 2026-11-11
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-2.md` | ~1235 | Active |
+| `journal-2.md` | ~1274 | Active |
 | `journal-1.md` | ~2491 | Archived |
 <!-- @@@/auto:active-documents -->
 
@@ -30,6 +30,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 73 | 2026-11-11 | 扩展选择打包 + 每包 Git + P2（URL 归一/账号/更新检查） | `b8550a6` | `main` |
 | 72 | 2026-11-11 | 图表放大/引擎转储/扩展管理 P1 | `b9719a8` | `main` |
 | 71 | 2026-11-10 | Session 71：动作落点重构 / 图表下钻 / 云上传分片 | `1c9e943` | `main` |
 | 70 | 2026-11-10 | Session 70 交接：图表动态宫格 / 数据包偏好 / Luker 式配色 | `46899f9` | `main` |
