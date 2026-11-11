@@ -155,17 +155,22 @@
   #app.app-container .segmented button{border:0;background:transparent;padding:4px 9px;font-size:11px;color:var(--muted)}
   #app.app-container .segmented button.active{background:var(--accent-soft);color:var(--text)}
   #app.app-container .split-sim{font-size:10px;color:var(--muted-2);white-space:nowrap}
-  /* 文件名模板：默认折叠；展开后标签与输入框同一行，绝不换行 */
-  #app.app-container .filename-row{display:flex;flex-direction:row;align-items:center;gap:6px;padding:6px 10px 8px;
-    border-bottom:1px solid var(--border);flex-wrap:nowrap}
-  #app.app-container .filename-row .field{flex:0 0 auto;white-space:nowrap}
-  #app.app-container .filename-row textarea{flex:1 1 auto;min-width:0;width:auto;box-sizing:border-box;height:26px;
-    min-height:26px;padding:3px 7px;resize:none;white-space:nowrap;overflow-x:auto;overflow-y:hidden;
+  /* 包名编辑：按钮带「包名」文字与展开/收起箭头（U4） */
+  #app.app-container .filename-toggle.icon-btn{width:auto;gap:5px;padding:0 8px;font-size:11px;color:var(--muted);white-space:nowrap}
+  #app.app-container .filename-toggle.icon-btn .chev{transition:transform .15s ease}
+  #app.app-container .filename-toggle.icon-btn.is-open .chev{transform:rotate(90deg)}
+  /* 文件名模板：默认折叠；展开后「标签+输入框」一行，预览另起一行独占宽度（U5） */
+  #app.app-container .filename-row{display:flex;flex-direction:column;align-items:stretch;gap:6px;padding:6px 10px 8px;
+    border-bottom:1px solid var(--border)}
+  #app.app-container .filename-edit{display:flex;align-items:center;gap:6px;min-width:0}
+  #app.app-container .filename-edit .field{flex:0 0 auto;white-space:nowrap}
+  #app.app-container .filename-edit textarea{flex:1 1 auto;min-width:0;width:auto;box-sizing:border-box;height:26px;
+    min-height:26px;resize:none;white-space:nowrap;overflow-x:auto;overflow-y:hidden;
     background:var(--panel-3);border:1px solid var(--border);border-radius:7px;padding:6px 8px;
     font-family:Consolas,"Cascadia Mono",monospace;font-size:11px;line-height:1.5;color:var(--text)}
-  #app.app-container .filename-row textarea:focus{outline:none;border-color:var(--accent)}
-  #app.app-container .filename-preview{flex:0 1 auto;max-width:38%;font-family:Consolas,"Cascadia Mono",monospace;font-size:10px;color:var(--muted);
-    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+  #app.app-container .filename-edit textarea:focus{outline:none;border-color:var(--accent)}
+  #app.app-container .filename-preview{font-family:Consolas,"Cascadia Mono",monospace;font-size:10px;color:var(--muted);
+    white-space:pre-wrap;word-break:break-all;overflow-wrap:anywhere;min-width:0;line-height:1.45}
 
   /* 配额表头：常驻两行，不折叠 */
   #app.app-container .quota-head{display:flex;flex-direction:column;gap:7px;padding:9px 12px;border-bottom:1px solid var(--border)}
@@ -734,6 +739,15 @@
   #app.app-container .tutorial-overlay.instant .tutorial-card{transition:none}
   #app.app-container .tutorial-card .tt{font-size:13px;font-weight:600;margin-bottom:6px}
   #app.app-container .tutorial-card .td{font-size:11px;color:var(--muted);line-height:1.6;margin-bottom:9px}
+  /* 目标任务选择（教程首页）：每行一个目标 + 一句说明 */
+  #app.app-container .tutorial-card .goals{display:flex;flex-direction:column;gap:6px;margin:2px 0 10px}
+  #app.app-container .tutorial-card .goals[hidden]{display:none}
+  #app.app-container .tutorial-card .tut-goal{display:flex;flex-direction:column;align-items:flex-start;gap:2px;width:100%;
+    text-align:left;border:1px solid var(--border);background:var(--panel-3);border-radius:8px;padding:7px 9px;color:var(--text)}
+  #app.app-container .tutorial-card .tut-goal:hover{border-color:var(--accent)}
+  #app.app-container .tutorial-card .tut-goal .tg-name{font-size:12px;font-weight:600}
+  #app.app-container .tutorial-card .tut-goal .tg-note{font-size:10.5px;color:var(--muted);line-height:1.4}
+  #app.app-container .tutorial-card .acts button[hidden]{display:none}
   #app.app-container .tutorial-card .dots{display:flex;gap:4px;margin-bottom:9px}
   #app.app-container .tutorial-card .dots i{width:6px;height:6px;border-radius:50%;background:var(--border-strong)}
   #app.app-container .tutorial-card .dots i.on{background:var(--accent)}
@@ -790,11 +804,12 @@
     min-height:0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
   #app.app-container[data-view="mobile"] .empty-guide-card .btn{min-height:26px;padding:4px 8px;font-size:11px}
   #app.app-container[data-view="mobile"] .vol-card .chart-tree{height:auto;max-height:260px}
-  #app.app-container[data-view="mobile"] .app-title .sub{display:none}
-  /* 手机页头：标题与徽标收紧，给图标按钮留出完整可见的空间 */
-  #app.app-container[data-view="mobile"] .app-title h1{font-size:14px;overflow:hidden;text-overflow:ellipsis}
-  #app.app-container[data-view="mobile"] #host-badge-text{display:none}
-  #app.app-container[data-view="mobile"] .header-actions{gap:4px}
+  /* 手机页头：只留徽标 + 全部功能按钮；标题文字隐藏，徽标文字必须保留（U1/U2） */
+  #app.app-container[data-view="mobile"] .app-title{display:none}
+  #app.app-container[data-view="mobile"] #host-badge{flex:0 0 auto}
+  #app.app-container[data-view="mobile"] #host-badge-text{display:inline;white-space:nowrap}
+  #app.app-container[data-view="mobile"] .header-actions{gap:4px;margin-left:auto}
+  #app.app-container[data-view="mobile"] .header-actions .icon-btn{flex:0 0 auto}
   #app.app-container[data-view="mobile"] .field select{max-width:150px}
   #app.app-container[data-view="mobile"] .panel-title .source-chip{max-width:150px}
 

@@ -107,6 +107,8 @@
 
 ### 3.6 其它
 
+- **教程按目标演示**：打开先选「数据包转换 / 上传宿主 / 从宿主拉取 / 扩展管理 / 迁移备份」，
+  再逐步高亮；步骤跟随当前平台（Web / 宿主）与手机 / 电脑视图自动切页，未载入数据包时也不会中断。
 - 纯库模式：给聊天库补齐磁盘缺失的聊天 / 从库导出 / 还原后入库（上游接口未实现，未在真实环境跑通）。
 - 三形态：独立网页、酒馆插件（全屏模态）、`file://` 单文件离线版。
 - 可选后端增强：装了 Authority 时产物可服务端托管；没装则静默降级，功能不缺。
@@ -171,7 +173,7 @@ npm run preview      # 本地预览 dist（4173）
 
 - 功能清单与源码落点：[docs/DEVELOPER-GUIDE.md](docs/DEVELOPER-GUIDE.md)（**改代码先读它**）
 - 分层规范与踩坑记录：[.trellis/spec/](.trellis/spec/)
-- 当前计划与状态：[docs/PLAN-2026-11-11-ext-pack-select.md](docs/PLAN-2026-11-11-ext-pack-select.md)
+- 当前计划与状态：[docs/PLAN-2026-11-11-ui-fixes-next.md](docs/PLAN-2026-11-11-ui-fixes-next.md)
 
 ```bash
 npm test                      # 单元测试（纯逻辑层无 DOM 依赖）

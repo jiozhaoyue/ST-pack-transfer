@@ -63,14 +63,18 @@ export function getWorkbenchHtml() {
                 <option value="9" data-i18n="chart.compression9"></option>
               </select>
             </label>
-            <button type="button" class="icon-btn filename-toggle" id="filename-toggle" data-i18n-title="chart.filename" aria-expanded="false">
-              <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5l7 7-7 7"/></svg>
+            <button type="button" class="icon-btn filename-toggle" id="filename-toggle" data-i18n-title="chart.filename" data-i18n-aria="chart.filename" aria-expanded="false">
+              <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 20h4l10-10-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg>
+              <span data-i18n="chart.filename"></span>
+              <svg class="chev" viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5l7 7-7 7"/></svg>
             </button>
           </div>
 
           <div class="filename-row" id="filename-row" hidden>
-            <label class="field" for="filename-template" data-i18n="chart.filename"></label>
-            <textarea id="filename-template" rows="1" spellcheck="false">{target}_{user}_{part}_{datetime}.zip</textarea>
+            <div class="filename-edit">
+              <label class="field" for="filename-template" data-i18n="chart.filenameLabel"></label>
+              <textarea id="filename-template" rows="1" spellcheck="false">{target}_{user}_{part}_{datetime}.zip</textarea>
+            </div>
             <span class="filename-preview" id="filename-preview"></span>
           </div>
 
@@ -375,9 +379,10 @@ export function getWorkbenchHtml() {
   <div class="tutorial-card" id="tutorial-card">
     <div class="tt" id="tutorial-title"></div>
     <div class="td" id="tutorial-desc"></div>
+    <div class="goals" id="tutorial-goals" hidden></div>
     <div class="dots" id="tutorial-dots"></div>
     <div class="acts">
-      <button id="tutorial-adv" class="link" data-i18n="tutorial.adv"></button>
+      <button id="tutorial-adv" class="link" data-i18n="tutorial.changeGoal"></button>
       <button id="tutorial-skip" data-i18n="tutorial.skip"></button>
       <button id="tutorial-prev" data-i18n="tutorial.prev"></button>
       <button id="tutorial-next" class="primary" data-i18n="tutorial.next"></button>
