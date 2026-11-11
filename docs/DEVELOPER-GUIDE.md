@@ -253,16 +253,15 @@
 
 | 功能 | UI 入口 | 源码落点 |
 | --- | --- | --- |
-| **开发者模式开关** | 设置 → 行为「开发者模式」 | `settings-panel.js` 的 `devMode`（默认关闭）；`workbench-view.js` 的 `sideTabAllowed()` / `renderZoneSide()` |
-| **开发者页父子结构** | 扩展管理 → 开发者：父项「自动更新」+ 子项「检查间隔（小时）」「模式（仅提醒 / 直接更新）」 | `devAutoUpdateHtml()` / `bindDevBlock()`；父项未勾时子项 `disabled` |
-| **逐扩展勾选 + 全选/反选/取消** | 宿主页列表头 | `persistDevSelection()`；`settings.gitUpdateSelected` 是唯一事实源 |
-| **可配置间隔与模式** | 开发者页子项 | `settings.gitUpdateIntervalHours`（默认 6，1–168）/ `settings.gitUpdateMode`（`notify` 默认 / `auto`）；`runDevAutoUpdate()` **只读设置，不硬编码**；`gitAutoUpdateLastAt` 记录上次检查，未到间隔跳过 |
+| **逐扩展自动更新（模式 + 秒级轮询）** | 宿主页每行：关闭 / 仅提醒 / 直接更新 + 间隔（秒，最小 5） | `workbench-view.js` 的 `saveUpdateRule()` / `resolveUpdateRepo()` / `scheduleAutoUpdates()` / `runAutoUpdateTick()`；规则存 `settings.gitAutoUpdateRules` |
+| **列表内批量管理** | 列表头：全选 / 反选 / 取消 / 批量更新 / 批量卸载 / 指定版本分支 | `batchUpdateInstalled()` / `batchUninstallWithConfirm()`；逐条 `updateInstalledExtension()` / `uninstallWithConfirm()`；宿主 `POST /api/extensions/update`（`updateExtensionViaHost`）与 `/delete` |
+| **数据包扩展清单统一入口** | 恢复后自动进「宿主 → 安装扩展」 | `host-bridge.js` 的 `setExtensionManifestSink()`；`index.js` 注册 `view.openExtensionManager(entries)`；独立安装浮层不再使用 |
 | **更新失败预案** | 更新检查结果行「删除后重装」 | `reinstallWithConfirm()` → `reinstallExtension()`：二次确认后 `deleteExtensionViaHost()` 再按登记仓库重装 |
 | **管理员识别** | 宿主页 | `host-bridge.js` 的 `readHostIdentity()`：唯一判据是 `GET /api/users/me` 的 `admin === true`；非管理员不显示分区、不伪造 |
 | **服务端插件分区** | 宿主页（仅管理员） | `listServerPlugins()`（`POST /api/users/plugins/list`，`requireAdminMiddleware`）→ `serverPluginBlockHtml()`；可折叠、显示 `enabled` 与 `pluginsPath` |
 | **前后端误装拒绝** | 安装执行前 | `src/core/plugin-kind.js` 的 `classifyPluginKind()`（manifest.json ⇒ 前端扩展；仅 package.json ⇒ 服务端插件）；`preflightExtEntry()` 用 `rawFile('manifest.json' / 'package.json')` 识别；`runExtInstall()` 拦截并给替代措施 |
 | **`?` 帮助补全** | 扩展管理 `?` | `HELP.extmgr` 新增「开发者页」「前端扩展与服务端插件」「Git 可视化」三段 |
-| **Git 可视化（只读）** | 设置开开发者模式后，数据包列头「数据包 / Git」分段按钮 | `workbench-template.js` 的 `#zone-side-tabs` / `#zone-side-git`；`workbench-view.js` 的 `renderZoneSide()` / `renderGitViz()` / `loadGitTarget()` / `loadGitCommitDiff()` |
+| **Git 可视化（只读，常显）** | 数据包列头「数据包 / Git」分段按钮（不再需要开关） | `workbench-template.js` 的 `#zone-side-tabs` / `#zone-side-git`；`workbench-view.js` 的 `renderZoneSide()` / `renderGitViz()` / `loadGitTarget()` / `loadGitCommitDiff()` |
 | 本地 `.git` 读取 | Git 视图 | `host-bridge.js` 的 `readHostExtensionGit()`：`POST /api/extensions/version`（分支 / HEAD / 是否最新 / remoteUrl）+ `/branches`；HEAD 为空 ⇒ 如实显示「历史已丢失」 |
 | 云端只读信息 | Git 视图 | `src/core/git-site.js` 的 `tagsEndpoint()` / `commitDetailEndpoint()` / `remoteFileUrl()` / `normalizeCommitList()` / `normalizeTags()` / `normalizeCommitFiles()`；`git-remote.js` 的 `listTags()` / `listCommits()` / `commitDetail()` / `rawFile()`；只取最近 20 条提交，不拉全量历史 |
 | 模型与判据 | — | `src/core/git-viz.js` 的 `normalizeLocalGit()` / `gitStateOf()` / `mergeBranches()` / `buildGitSummary()` / `selectGitTargets()` / `diffStat()`；工作区状态宿主无端点 ⇒ 显示「宿主未提供」 |

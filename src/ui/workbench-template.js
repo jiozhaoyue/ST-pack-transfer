@@ -331,7 +331,7 @@ export function getWorkbenchHtml() {
                 <button type="button" class="seg-btn active" data-sidetab="zone" data-i18n="view.zone"></button>
                 <button type="button" class="seg-btn" data-sidetab="git" data-i18n="gitv.title"></button>
               </div>
-              <button class="help-btn" data-help="zone" data-i18n-title="zones.help"></button>
+              <button class="help-btn" data-help="zone" data-i18n-title="zones.help">?</button>
             </div>
           </div>
           <div class="zone-side-panel" id="zone-side-zone">
