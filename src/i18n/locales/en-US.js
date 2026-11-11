@@ -415,7 +415,7 @@ export default {
 
   'help.chart.title': 'Storage chart',
   'help.chart.p1': 'The chart is the only workbench',
-  'help.chart.p2': 'Two quota rows at the top',
+  'help.chart.p2': 'Click either quota row to open the storage inspector and switch sides',
   'help.chart.p3': 'Checked = export scope',
   'help.chart.p4': 'Each part gets its own chart',
   'help.chart.p5': 'Multiple selected packs show multiple charts',

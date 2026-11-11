@@ -418,7 +418,7 @@ export default {
 
   'help.chart.title': '存储图表',
   'help.chart.p1': '图表是唯一工作台',
-  'help.chart.p2': '顶部显示两处配额',
+  'help.chart.p2': '顶部两处配额，点任一处打开存储审查，左右可切换',
   'help.chart.p3': '勾选即导出范围',
   'help.chart.p4': '分卷后每卷一张图表',
   'help.chart.p5': '多选包时同时显示多组图表',
