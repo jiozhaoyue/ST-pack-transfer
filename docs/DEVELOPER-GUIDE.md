@@ -80,8 +80,8 @@
 
 | 功能 | UI 入口 | 源码落点 |
 | --- | --- | --- |
-| 从当前宿主拉取整份用户数据 | 顶部全局动作条 `#btn-fetch` / 宿主原生界面注入按钮 | `index.js` 的 `fetchFromHost()` / `pullFromNativeUi()`；`src/ui/host-bridge.js` 的 `openNativeBackupUi()` / `fetchHostBackup()` |
-| 迁移与备份 / 导出扩展清单 | 顶部全局动作条 `#transfer-open-btn` / `#btn-host-assetlist` | `src/ui/workbench-view.js` 的 `renderTopActions()` |
+| 从当前宿主拉取整份用户数据 | 数据包模式行 `#btn-fetch`（**仅导入分区**）/ 宿主原生界面注入按钮 | `index.js` 的 `fetchFromHost()` / `pullFromNativeUi()`；`src/ui/host-bridge.js` 的 `openNativeBackupUi()` / `fetchHostBackup()` |
+| 迁移与备份 / 导出扩展清单 | 面板头切换行 `[data-wbview="transfer"]`（☁️）/ 扩展管理 → 宿主页 | `src/ui/workbench-view.js` 的 `renderViewSwitch()`（transfer 项）/ `renderExtInstalled()` |
 | **Luker 2.9+ 账户窗口**（备份页注入 / 勾选读取；存储页跳转能力保留但**配额行已改走自建面板**） | 账户 → Backup / Storage | `openHostAccountWindow()` / `openHostStoragePage()` / `readNativeBackupSelection()`；契约见 `.trellis/spec/frontend/luker-2.9-account-window.md` |
 | **原生界面生命周期**（拉取后自动关闭、宿主原生导出优先） | 原生界面「从宿主拉取」 | `closeNativeBackupUi()` / `isNativeExportBusy()` / `watchNativeExportStart()`；契约见 `.trellis/spec/frontend/host-native-pull-lifecycle.md` |
 | 细粒度类目勾选（10 类目 + 3 特殊类目） | `#chart-stack` 的类目卡与选择树 | `src/ui/workbench-view.js` 的 `renderTreeRows()`、`src/core/inspect.js`、`src/core/chart-model.js` |
@@ -188,7 +188,7 @@
 ### K. 局域网互传（整面板视图，2026-11-05）
 | 功能 | UI 入口 | 源码落点 |
 | --- | --- | --- |
-| 用「迁移与备份」面板**完整替换**左侧图表面板 | `#chart-card` 动作行的 `#transfer-open-btn` | `src/ui/workbench-template.js`（`#transfer-view` + `#transfer-tabs`）、`src/ui/workbench-view.js` 的 `renderTransfer()` / `renderLan()` |
+| 用「迁移与备份」面板**完整替换**左侧图表面板 | 面板头切换行 `[data-wbview="transfer"]` | `src/ui/workbench-template.js`（`#transfer-view` + `#transfer-tabs`）、`src/ui/workbench-view.js` 的 `renderTransfer()` / `renderLan()` |
 | 关闭面板、回到图表 | `#transfer-close-btn` | 同上 |
 | 一级 tab：局域网 / 公网 | `#transfer-tabs` | `src/ui/workbench-view.js` 的 `renderTransfer()` |
 | WebRTC 分块传输 / 二维码信令 / 续传 | 局域网 pane 内发送与接收区 | `src/core/lan-transfer.js`、`src/ui/lan-transfer-panel.js` |
@@ -236,7 +236,7 @@
 | --- | --- | --- |
 | 顶层面板只剩图表面板与数据包面板 | — | `src/ui/workbench-template.js`：`.col-chart`（`#chart-card` / `#lan-view`）+ `.col-side`（`#zone-card`） |
 | 动作按钮并入数据包面板底部 | `#zone-card > #zone-actions-bottom` | `workbench-view.js` 的 `renderActions()`（仅在勾选后出现） |
-| 顶部全局动作条 | `.app-body > #top-actions` | `renderTopActions()`：从宿主拉取 / 导出扩展清单 / 迁移与备份 |
+| 全局动作条（**2026-11-11 已取消**） | — | 从宿主拉取改到 `#zone-mode-row`（仅导入）；迁移与备份进入面板头切换行；刷新只在安装/恢复完成提示里出现 |
 | 导出区多选「上传」 | `#btn-upload` | `index.js` 的 `restoreSelectedConfirmed()` 逐包顺序恢复；任一失败即停止并报错 |
 | 进度条为常驻底栏，所有视图共用 | `#workbench-progress`（`.app-body` 末位子项） | `workbench-template.js` 模板末尾；`setProgress()` 写 `#progress-fill` / `#progress-label` / `#progress-pct` |
 | 点击进度条打开日志 | `#workbench-progress` 的 click | `workbench-view.js` 的 `bind()`（`renderLog()` + `showPane('log')`） |

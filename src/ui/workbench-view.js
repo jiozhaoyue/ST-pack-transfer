@@ -426,7 +426,8 @@ function syncView(){
 const VIEW_SWITCH_ICONS={
   chart:'<path d="M4 5h16v14H4z"/><path d="M4 10h16M9 10v9M15 10v9"/>',
   zone:'<path d="M4 7h16v13H4z"/><path d="M8 7V4h8v3"/><path d="M4 12h16"/>',
-  extension:'<path d="M10 3h4v4a2 2 0 1 0 4 0V3h3v7h-3a2 2 0 1 1 0 4h3v7h-7v-3a2 2 0 1 0-4 0v3H3v-7h3a2 2 0 1 1 0-4H3V3h7z"/>'
+  extension:'<path d="M10 3h4v4a2 2 0 1 0 4 0V3h3v7h-3a2 2 0 1 1 0 4h3v7h-7v-3a2 2 0 1 0-4 0v3H3v-7h3a2 2 0 1 1 0-4H3V3h7z"/>',
+  transfer:'<path d="M7 18a4 4 0 0 1 0-8 5 5 0 0 1 9.6-1.4A3.5 3.5 0 0 1 18 18z"/>'
 };
 function viewSwitchIcon(id){
   const path=VIEW_SWITCH_ICONS[id]||'';
@@ -437,7 +438,8 @@ function renderViewSwitch(){
   const items=[{id:'chart',label:t('view.chart')}];
   if(mobile) items.push({id:'zone',label:t('view.zone')});
   items.push({id:'extension',label:t('view.extension')});
-  const active=mobile?state.mobileView:state.mainView;
+  items.push({id:'transfer',label:t('transfer.open')});
+  const active=state.transfer.open ? 'transfer' : (mobile?state.mobileView:state.mainView);
   const html=items.map(it=>'<button type="button" class="view-switch-btn'+(it.id===active?' active':'')+'" data-wbview="'+it.id
     +'" aria-pressed="'+(it.id===active)+'">'+viewSwitchIcon(it.id)+'<span>'+it.label+'</span></button>').join('');
   document.querySelectorAll('[data-view-switch]').forEach((host)=>{
@@ -459,7 +461,6 @@ function syncMainView(){
   /* 存储审查面板占满内容区：同时隐藏数据包列与分隔条，网格改为单列（见 style.css [data-si]）。 */
   const siActive = !!state.storageInspector?.open && !transferOpen;
   if(app) app.dataset.si = siActive ? '1' : '';
-  syncTopActions();
   const chartCol=document.querySelector('.col-chart');
   const side=document.querySelector('.col-side');
   const splitter=document.querySelector('.splitter-v');
@@ -1579,23 +1580,21 @@ function fitPackageNames(){
   });
 }
 
-/* ── 渲染：顶部全局动作 + 分区底部动作（勾选后才出现） ── */
-function renderTopActions(){
-  const row=document.getElementById('top-actions');
-  if(!row) return;
-  const libBtn=state.libraryExport
-    ? '<button class="btn" id="btn-library-export">'+svg('db','ico')+t('action.libraryExport')+'</button>'
-    : '';
-  row.innerHTML='<button class="btn" id="btn-fetch">'+svg('cloud','ico')+t('action.fetch')+'</button>'
-    +libBtn
-    +'<button class="btn" id="transfer-open-btn">'+svg('bolt','ico')+t('transfer.open')+'</button>'
-    +'<button class="btn" id="btn-refresh-page">'+svg('bolt','ico')+t('action.refreshPage')+'</button>';
-  row.querySelector('#btn-fetch')?.addEventListener('click',()=>doFetch());
-  row.querySelector('#btn-library-export')?.addEventListener('click',()=>actions.libraryExport?.());
-  row.querySelector('#btn-refresh-page')?.addEventListener('click',()=>{ if(typeof window!=='undefined') window.location.reload(); });
+/* ── 渲染：数据包模式行（导入 = 从宿主拉取；导出 = 覆盖/增量） ── */
+function renderZoneModeRow(){
+  const fetchBtn=document.getElementById('btn-fetch');
+  if(fetchBtn) fetchBtn.hidden = state.zone!=='import';
+  const extra=document.getElementById('zone-mode-extra');
+  if(extra){
+    extra.innerHTML = (state.zone==='import' && state.libraryExport)
+      ? '<button class="btn" id="btn-library-export">'+svg('db','ico')+t('action.libraryExport')+'</button>'
+      : '';
+    extra.querySelector('#btn-library-export')?.addEventListener('click',()=>actions.libraryExport?.());
+  }
+  document.querySelectorAll('.zone-delta-label, #delta-toggle').forEach(el=>{ el.hidden = state.zone!=='export'; });
 }
 function renderActions(){
-  renderTopActions();
+  renderZoneModeRow();
   const row=document.getElementById('zone-actions-bottom');
   if(!row) return;
   const hasSel=state.selectedPkgs.size>0;
@@ -2164,6 +2163,15 @@ async function runExtInstall(){
         if(p.ok) reg.set(p.repo,{ name:p.repo, url:p.cloneUrl, ref:r.branch||'', at:Date.now() });
       }
       saveSettings({ ...s, gitInstalls:[...reg.values()] });
+    }
+    if(ok.length && !state.tutorialMode){
+      openModal(t('extmgr.installDoneTitle'), t('extmgr.installDoneDesc',{n:ok.length}), [], [
+        {label:t('modal.close'),onClick:closeModal},
+        {label:t('action.refreshPage'),primary:true,onClick:()=>{
+          closeModal();
+          if(typeof window!=='undefined') window.location.reload();
+        }},
+      ]);
     }
   } finally {
     state.extRunning=false;
@@ -3035,12 +3043,6 @@ function doDeleteSelected(){ actions.deleteSelected?.([...state.selectedPkgs]); 
 
 /* ── 面板内视图（设置 / 日志 / 帮助；确认框为顶层 dialog） ── */
 const PANES=['workbench','settings','log','help'];
-/* 整页视图（设置 / 日志 / 帮助 / 存储审查）占满插件：除页头外不留动作条或切换行。 */
-function syncTopActions(){
-  const bar=document.getElementById('top-actions');
-  if(!bar) return;
-  bar.hidden = state.pane!=='workbench' || !!state.storageInspector?.open;
-}
 function showPane(name){
   state.pane=PANES.includes(name)?name:'workbench';
   const main=document.getElementById('view-workbench');
@@ -3051,7 +3053,6 @@ function showPane(name){
   });
   document.querySelectorAll('.app-header .icon-btn').forEach(b=>b.classList.remove('active-view'));
   if(state.pane==='settings') document.getElementById('btn-settings')?.classList.add('active-view');
-  syncTopActions();
 }
 function backToWorkbench(){ showPane('workbench'); }
 
@@ -3447,7 +3448,7 @@ const TUTORIAL_GOALS=[
     steps:[
       { sel:'#target-select', view:'chart', title:'tutorial.convert.target', desc:'tutorial.convert.targetDesc' },
       { sel:'#chart-stack', view:'chart', title:'tutorial.convert.chart', desc:'tutorial.convert.chartDesc' },
-      { sel:'#delta-toggle', view:'zone', title:'tutorial.convert.delta', desc:'tutorial.convert.deltaDesc' },
+      { sel:'#delta-toggle', view:'zone', zone:'export', title:'tutorial.convert.delta', desc:'tutorial.convert.deltaDesc' },
       { sel:'#split-input', view:'chart', title:'tutorial.convert.split', desc:'tutorial.convert.splitDesc' },
       { sel:'#zone-actions-bottom', view:'zone', zone:'import', title:'tutorial.convert.generate', desc:'tutorial.convert.generateDesc' },
       { sel:'#zone-body', view:'zone', zone:'export', title:'tutorial.convert.export', desc:'tutorial.convert.exportDesc' }
@@ -3484,7 +3485,7 @@ const TUTORIAL_GOALS=[
   {
     id:'transfer', label:'tutorial.goal.transfer', note:'tutorial.goal.transferNote',
     steps:[
-      { sel:'#transfer-open-btn', view:'chart', title:'tutorial.transfer.entry', desc:'tutorial.transfer.entryDesc' },
+      { sel:'#chart-card .view-switch-btn[data-wbview="transfer"]', view:'chart', title:'tutorial.transfer.entry', desc:'tutorial.transfer.entryDesc' },
       { sel:'#transfer-tabs', view:'chart', title:'tutorial.transfer.tabs', desc:'tutorial.transfer.tabsDesc' }
     ]
   }
@@ -3683,6 +3684,13 @@ function bind(){
     const b=e.target.closest('[data-wbview]'); if(!b) return;
     const v=b.dataset.wbview;
     closeStorageInspector();
+    if(v==='transfer'){
+      state.transfer.open=true;
+      if(state.transfer.tab!=='lan' && state.transfer.tab!=='cloud') state.transfer.tab='lan';
+      renderTransfer(); renderLan(); renderCloud();
+      return;
+    }
+    if(state.transfer.open){ state.transfer.open=false; renderTransfer(); }
     if(state.view==='mobile') state.mobileView = (v==='zone'||v==='extension') ? v : 'chart';
     else state.mainView = v==='extension' ? 'extension' : 'chart';
     syncMainView();
@@ -3752,16 +3760,8 @@ function bind(){
 
   document.querySelectorAll('[data-help]').forEach(b=>b.addEventListener('click',e=>{ e.stopPropagation(); openHelp(b.dataset.help); }));
 
-  // ── 顶部全局动作（按钮随 renderTopActions 重建）──
-  document.getElementById('top-actions').addEventListener('click',(e)=>{
-    if(e.target.closest('#transfer-open-btn')){
-      closeStorageInspector();
-      state.transfer.open=true;
-      if(state.transfer.tab!=='lan' && state.transfer.tab!=='cloud') state.transfer.tab='lan';
-      renderTransfer(); renderLan(); renderCloud();
-      return;
-    }
-  });
+  // ── 数据包模式行：导入时显示「从宿主拉取」，导出时显示覆盖/增量 ──
+  document.getElementById('btn-fetch')?.addEventListener('click',()=>doFetch());
   document.getElementById('transfer-close-btn')?.addEventListener('click',()=>{
     state.transfer.open=false;
     renderTransfer(); renderLan(); renderCloud();
