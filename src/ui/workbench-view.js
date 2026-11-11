@@ -2973,6 +2973,7 @@ function openTrafficModal(onConfirm, { enabled = true, onNever, onCancel } = {})
 
 /* ── 帮助视图 ── */const HELP={
   chart:{ title:'help.chart.title', sections:[
+    { title:'help.chart.storageTitle', points:['help.chart.storageP1','help.chart.storageP2','help.chart.storageP3'] },
     { title:'help.chart.rulesTitle', points:['help.chart.ruleST','help.chart.ruleL','help.chart.ruleTT','help.chart.rulePT'] },
     { title:'help.chart.selectTitle', points:['help.chart.selectP1','help.chart.selectP2','help.chart.selectP3','help.chart.selectP4'] },
     { title:'help.chart.compatTitle', points:['help.chart.compatP1','help.chart.compatP2','help.chart.compatP3'] },
