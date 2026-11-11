@@ -2411,7 +2411,33 @@ async function preflightAll(){
   await Promise.all(list.map((entry)=>preflightExtEntry(entry,{silent:true})));
   refreshInstallArea();
 }
-async function runExtInstall(){
+/**
+ * 扩展写操作串行队列（2026-11-11，Luker staging 竞态）。
+ *
+ * 宿主 `/api/extensions/update|install` 会先 `makeStagingPath()`：建 `.luker-staging-*`
+ * 并顺带清扫同级残留。两个请求并发时，A 的清扫会删掉 B 刚列出的条目，
+ * B 的 `lstat` 直接 ENOENT（上游 `src/sync/staging.js` 的 `sweepStaleStaging`），
+ * 表现为「每次失败的扩展随机、重试可能成功」。
+ *
+ * 插件无法阻止宿主**启动期**的并发更新（它发生在任何扩展脚本加载之前），
+ * 但插件自己发起的变更必须严格串行：手动 / 批量 / 自动更新 / 卸载 / 重装 / 移动 / 安装
+ * 共用这一条链，绝不并发打宿主端点。
+ *
+ * @template T
+ * @param {() => Promise<T>} task
+ * @returns {Promise<T>}
+ */
+let extMutationChain=Promise.resolve();
+function queueExtMutation(task){
+  const run=extMutationChain.then(task, task);
+  extMutationChain=run.then(()=>undefined, ()=>undefined);
+  return run;
+}
+
+function runExtInstall(){
+  return queueExtMutation(runExtInstallNow);
+}
+async function runExtInstallNow(){
   if(state.extRunning) return;
   /* 前后端误装预案：已识别为服务端插件的仓库拒绝装进扩展目录，并给替代措施。
      未识别的（kind=unknown）不拦，仍按宿主真实结果如实报告。 */
@@ -2671,7 +2697,10 @@ async function resolveUpdateRepo(name){
   return remote ? { url:remote, global:isGlobal } : null;
 }
 /** 单个扩展更新：有远端地址走「安装并覆盖」（可指定版本 / 分支）；否则用宿主原生 update 端点。 */
-async function updateInstalledExtension(name, { ref = '', url = '' } = {}){
+function updateInstalledExtension(name, opts){
+  return queueExtMutation(()=>updateInstalledExtensionNow(name, opts));
+}
+async function updateInstalledExtensionNow(name, { ref = '', url = '' } = {}){
   if(!name) return false;
   const s=gitSettings();
   const reg=(s.gitInstalls||[]).find((r)=>r.name===name);
@@ -2723,7 +2752,10 @@ function batchUninstallWithConfirm(names){
       {label:t('extmgr.uninstallConfirm'),danger:true,onClick:()=>{ closeModal(); void batchUninstallInstalled(list); }},
     ]);
 }
-async function uninstallInstalled(name){
+function uninstallInstalled(name){
+  return queueExtMutation(()=>uninstallInstalledNow(name));
+}
+async function uninstallInstalledNow(name){
   const item=(state.extInstalled||[]).find((row)=>String(row?.id||row?.folder||row?.name||'')===name);
   const isGlobal=String(item?.sourceType||'')==='global';
   let ok=false;
@@ -2745,7 +2777,10 @@ function reinstallWithConfirm(name){
     {label:t('extmgr.reinstallConfirm'),danger:true,onClick:()=>{ closeModal(); void reinstallExtension(name,isGlobal); }},
   ]);
 }
-async function reinstallExtension(name, isGlobal){
+function reinstallExtension(name, isGlobal){
+  return queueExtMutation(()=>reinstallExtensionNow(name, isGlobal));
+}
+async function reinstallExtensionNow(name, isGlobal){
   const s=gitSettings();
   const reg=(s.gitInstalls||[]).find((r)=>r.name===name);
   if(!reg){ toast(t('extmgr.noRegistry')); return; }
@@ -2794,7 +2829,10 @@ function moveScopeWithConfirm(name, sourceType){
   ]);
 }
 /** 执行移动：宿主返回 403/404/409 时按原因如实回显，不静默。 */
-async function moveInstalledExtension(name, source, destination){
+function moveInstalledExtension(name, source, destination){
+  return queueExtMutation(()=>moveInstalledExtensionNow(name, source, destination));
+}
+async function moveInstalledExtensionNow(name, source, destination){
   let res=null;
   try { res=await actions.moveExtension?.(name, source, destination); } catch { res=null; }
   if(!res || !res.ok){

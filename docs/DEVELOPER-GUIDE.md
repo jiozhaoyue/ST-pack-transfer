@@ -229,6 +229,7 @@
 | **扩展作用域互转（全局 ⇄ 用户）** | 扩展管理 → 宿主页每行「移至全局 / 移至用户」（**仅管理员**渲染） | 宿主 `POST /api/extensions/move`；`src/ui/host-bridge.js` 的 `moveExtensionViaHost()`、`src/ui/workbench-view.js` 的 `moveScopeWithConfirm()` / `moveInstalledExtension()`；`index.js` 的 `actions.moveExtension` |
 | **安装到全局** | 扩展管理 → 宿主页安装区「安装到全局」（**仅管理员**可见） | `src/ui/host-bridge.js` 的 `installExtensionBatch()` 透传 `global` 给 `installExtensionViaHost()`；`workbench-view.js` 的 `renderExtInstall()` / `runExtInstall()` |
 | **加载顺序只读展示** | 扩展列表 `#N` 徽标 + 排序「加载顺序」；**不提供编辑**（宿主无写回端点） | `src/core/asset-list.js` 的 `manifestToExtension().loadingOrder`；`workbench-view.js` 的 `installedRowRecords()` / `sortedInstalledRecords()` |
+| **扩展写操作全串行（规避宿主 staging 竞态）** | 扩展管理任意写操作：安装 / 更新 / 卸载 / 重装 / 移动；手动、批量、自动更新共用一条队列 | `src/ui/workbench-view.js` 的 `queueExtMutation()`；宿主竞态取证与上游修复建议见 `.trellis/spec/frontend/extension-git-manager.md` §15、`docs/research/luker-staging-race-2026-11-11.md` |
 | 演示占位扩展读数据模块 | 教程模式宿主列表 | `src/data/demo-extensions.js`（GitHub `st` 前缀仓库生成；**必须是 ESM 而不是 JSON**，否则浏览器直装整图失败——见 K2 段落与 2026-11-11 事故记录） |
 | 凭据双写（导出不必回读 settings.json） | 设置 → 数据 / 扩展管理 → 凭据 | `src/ui/settings-store.js` 的 `saveSettings()`：localStorage 与宿主 `extension_settings` 始终同写 |
 | 导出默认值（登录凭据默认勾选、OAuth 子项默认不勾） | 设置 → 数据 | `src/ui/settings-panel.js` 的 `dataGroup`；`src/ui/plugin-data.js` 的 `buildPluginData()` |
