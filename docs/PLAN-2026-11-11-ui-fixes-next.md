@@ -1,0 +1,96 @@
+# PLAN-2026-11-11 · 下一轮 UI 修复（用户实测反馈）
+
+> 来源：2026-11-11 用户实测反馈六条。**本轮只写文档与交接，不实现**；下一轮按本文件逐条执行。
+> 口径：只改 UI 与读数，不动 P2 的 Git/账号逻辑；每条都要在 4173 静态预览里取证（多宽度）。
+
+## 一、问题清单与判据
+
+### U1. Web 徽标没有文字
+
+- **现状**：`renderHeader()` 写 `#host-badge-text` 为 `header.web`（`zh-CN.js` = `Web`）或
+  `header.plugin`（`{host} 插件`）。而 `style.css:796` 的
+  `[data-view="mobile"] #host-badge-text{display:none}` 会把文字隐藏；
+  若容器宽度 ≤860（含窄预览面板），就会被判为 mobile ⇒ 徽标只剩图标。
+- **根因**：移动端藏字策略与「徽标必须有字」的新要求冲突。
+- **判据**：任何形态、任何宽度，徽标内都有可读文字（`Web` 或宿主名），不出现空徽标。
+- **改点**：`style.css` 移动端段去掉 `#host-badge-text` 的 `display:none`；
+  空间不足时改用短文本（见 U2），而不是隐藏。
+
+### U2. 手机版页头：只留徽标 + 按钮，按钮绝不被压缩
+
+- **现状**：移动端 `.app-title h1` 仍显示（`style.css:795` 只把字号缩到 14px）；
+  徽标文字被隐藏；`header-actions` 有 4 个 icon-btn（帮助 / 语言 / 设置 / 关闭）。
+- **要求**：手机版不显示「数据包转运」等标题文字；保留徽标 + 全部功能按钮；
+  按钮**不得压缩、不得换行**（必要时隐藏「插件」二字，插件态徽标只显示宿主名）。
+- **判据**：380 / 500 / 700 / 800px 下：标题文字不存在；四个按钮宽高完整、单行；
+  徽标有字（Web 或宿主名）。
+- **改点**：`style.css` 移动端段（隐藏 `.app-title`，`header-actions` 保持 `flex:0 0 auto;nowrap`）；
+  `renderHeader()` 在窄态使用短文本（新增 i18n `header.hostOnly` = 宿主名，或直接 `h.full`）。
+
+### U3. 浏览器配额必须在所有平台完整显示
+
+- **现状**：`index.js:1611` 的 `readBrowserQuota()` 在 `quota<=0` 时返回 `null`
+  ⇒ `renderQuota()` 显示「未提供」；浏览器读数直接走 `navigator.storage.estimate()`，
+  本身不经过宿主，但没有把「只有 usage、没有 quota」的情况表达出来。
+- **要求**：四宿主 + Web 形态都直接读浏览器（参照 Luker `storage-inspector.js` 的读法），
+  完整显示已用/总量；读不到 quota 就显示已用 + 「配额不限/未知」，**不允许显示假 0**。
+- **判据**：任一平台下浏览器行都有数值（usage 可读时）；`quota=0` 时显示
+  `已用 X · 配额不限/未知`；宿主行仍只在 Luker 出现，其它平台不伪造。
+- **改点**：`index.js` 的 `readBrowserQuota()`（返回 `{used, total}`，`total` 可为 0）；
+  `workbench-view.js` 的 `renderQuota()` 文案分支；`i18n` 增加「配额未知」。
+  可参考 Luker 的 `usageDetails`（若有）做分项展示，但不是必须。
+
+### U4. 包名按钮图标/字样不明
+
+- **现状**：`#filename-toggle`（`workbench-template.js:66`）固定是一个右向 chevron，
+  只切换 `#filename-row` 的 `hidden`；没有文字，也没有「展开/收起」图标差异。
+  用户误以为它是「展开」而不是「编辑包名」。
+- **要求**：换成能表明「编辑包名」的图标或加文字；展开/收起有可区分状态
+  （例如 ✎ → ▲，或文字「包名」+ 箭头方向变化）。
+- **判据**：收起状态下用户能看出它是「包名编辑」；点击后图标/文字变化；
+  `aria-expanded` 与可见状态一致。
+- **改点**：`workbench-template.js` 的按钮内容与 `data-i18n-title`；
+  `workbench-view.js:2932` 的切换逻辑（同步图标/文案）。
+
+### U5. 包名输入框与预览换行
+
+- **现状**：`.filename-row{display:flex;flex-direction:row}`（`style.css:159`），
+  textarea 与 `.filename-preview` 同一行，preview 被限到 `max-width:38%`，
+  长模板与预览互相挤压。
+- **要求**：输入框一行、预览另起一行；窄屏（380px）也不挤压、不截断到不可读。
+- **判据**：预览位于输入框下方且独占一行；380px 下仍完整可读（允许换行）；
+  收起/展开后布局不抖动。
+- **改点**：`style.css` 的 `.filename-row` 改列布局（或 `flex-wrap:wrap` +
+  `.filename-preview{flex:1 1 100%}`）；必要时 `workbench-template.js` 加一层容器。
+
+### U6. 数据包偏好按钮再次点击应退出
+
+- **现状**：`#chart-pref-btn` 只绑定 `openChartPrefs`（`workbench-view.js:3114`）；
+  `openChartPrefs()` 在 `state.prefMode` 为真时直接 `return`（`:1170`）；
+  `cancelChartPrefs()` 已存在但没有「再次点击」入口。
+- **要求**：再点一次 ⇒ 若草稿有改动，弹「是否放弃修改」；确认后回到正常图表。
+  提供「不再提示」（设置项，默认提醒）；无改动时直接退出，不打扰。
+- **判据**：
+  - 二次点击（有改动）⇒ 弹窗；选「放弃」⇒ `prefMode=false`、控件回滚、图表恢复；
+  - 选「继续编辑」⇒ 留在偏好态；
+  - 设置里关掉提示后，二次点击直接丢弃并退出；
+  - 无改动时二次点击直接退出。
+- **改点**：`workbench-view.js` 的 `#chart-pref-btn` 绑定（改成 toggle 语义）、
+  `cancelChartPrefs()` 复用；`settings-panel.js` 新增 `confirmDiscardChartPrefs`
+  （默认 `true`）；`settings-store.js` 白名单 + `i18n` 文案。
+
+## 二、执行顺序与验证
+
+1. U1 + U2（页头/徽标，一起改，同一份 CSS 与 `renderHeader`）。
+2. U3（配额读数与文案）。
+3. U4 + U5（包名行，同一块模板与 CSS）。
+4. U6（偏好二次点击 + 设置项）。
+5. 每步跑：`npm run build`、六守卫、`node scripts/ui-verify-responsive.cjs`；
+   新增/更新 `scripts/ui-verify-ui-fixes.cjs`（本地专属）覆盖六条判据。
+6. 完成后按项目规则提交并推送 `origin`。
+
+## 三、不要做的事
+
+- 不要动 P2 的 `git-url / git-accounts / git-site / git-remote` 与安装流程。
+- 不要为「按钮不被压缩」引入横向滚动条；正确做法是隐藏标题/缩写徽标文字。
+- 不要把配额读不到的情况显示成 0 或「不限」以外的假值。
