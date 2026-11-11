@@ -31,6 +31,8 @@ export const SETTINGS_DEFAULTS = Object.freeze({
   gitAccounts: [],
   /** 安装来源登记（更新检查用）：{name, url, ref, at}。 */
   gitInstalls: [],
+  /** 开发模式自动更新：{扩展名: 'silent' | 'prompt'}；缺省即关闭。 */
+  gitDevMode: {},
 });
 
 export const SETTING_KEYS = Object.freeze(Object.keys(SETTINGS_DEFAULTS));
@@ -62,6 +64,13 @@ export function normalizeSettings(input) {
           ref: typeof x.ref === 'string' ? x.ref : '',
           at: Number(x.at) || 0,
         }));
+    }
+    if (input.gitDevMode && typeof input.gitDevMode === 'object') {
+      const modes = {};
+      for (const [name, mode] of Object.entries(input.gitDevMode)) {
+        if (name && (mode === 'silent' || mode === 'prompt')) modes[String(name)] = mode;
+      }
+      out.gitDevMode = modes;
     }
   }
   return out;
