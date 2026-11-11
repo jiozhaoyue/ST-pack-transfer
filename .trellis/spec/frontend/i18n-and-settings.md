@@ -101,6 +101,20 @@
 - **视图自适应**：`tutorialPrepareStep(step)` 在每步前按 `step.view`（chart / zone / extension）
   与 `step.zone` 切换主视图、手机分页与分区 tab；电脑拖窄成手机后由 `resize` 触发重绘自动跟过去。
 
+### 4.2 教程演示模式（2026-11-11）
+
+- **准入**：点教程按钮/教程菜单 ⇒ `enterTutorialMode()`；整站换成 `buildDemoPackages()` 的占位数据
+  （3 个包、占位宿主树、占位待导出项、占位配额），并显示 `#tutorial-banner`。
+- **隔离（硬）**：进入时深拷贝整个 `state` 与 `chartPrefs`，退出时 `exitTutorialMode()` 整体还原；
+  演示期间 `actions` 换成 `demoTutorialActions()` 代理，默认所有外部动作只提示，
+  只有 generate / deleteSelected / copyBack / pending* 在**演示数据**上本地模拟。
+- **禁写（硬）**：`persistLog` / `persistChartLayout` / `saveChartPrefsDraft` / `persistCloudConfig` /
+  `persistWebdavConfig` / `persistGit` / 安装登记的 `saveSettings` 在 `state.tutorialMode` 时全部跳过；
+  `setPackages` / `setStorage` / `setTask` / `setPendingExports` / `setPrivateFiles` /
+  `setLibraryExport` / `setActivePackage` 在演示态忽略外部调用。
+- **退出路径**：教程「跳过 / 完成」、横幅「退出教程」、Escape、插件关闭按钮都会先还原再执行原动作。
+  横幅必须 `z-index:96`（高于教程蒙层 95），否则蒙层打开期间「退出教程」点不到。
+
 ## 5. 宿主图表降级
 
 - 无宿主清单（ST / 独立 Web / 无 `hostTree`）时：

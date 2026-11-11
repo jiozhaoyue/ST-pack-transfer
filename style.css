@@ -106,6 +106,13 @@
   #app.app-container .badge .gh-icon{flex:0 0 auto}
   #app.app-container .badge .gh-icon[hidden], #app.app-container .badge .host-icon[hidden]{display:none}
   #app.app-container .badge.accent{border-color:var(--accent);color:var(--text);background:var(--accent-soft)}
+  /* 教程演示模式横幅：始终在页头下方，明示占位数据与退出入口。
+     教程蒙层 z-index:95 覆盖全屏，横幅必须在其之上，否则「退出教程」点不到。 */
+  #app.app-container .tutorial-banner{position:relative;z-index:96;flex:0 0 auto;display:flex;align-items:center;gap:10px;padding:6px 12px;
+    background:var(--accent-soft);border-bottom:1px solid var(--accent);font-size:11px;color:var(--text)}
+  #app.app-container .tutorial-banner[hidden]{display:none !important}
+  #app.app-container .tutorial-banner .tb-text{flex:1 1 auto;min-width:0;line-height:1.45}
+  #app.app-container .tutorial-banner .btn{flex:0 0 auto;min-height:24px;padding:3px 9px;font-size:11px}
   #app.app-container .icon-btn{position:relative;width:28px;height:28px;display:inline-flex;align-items:center;justify-content:center;
     border:1px solid var(--border);background:var(--panel-3);border-radius:8px;color:var(--muted);padding:0}
   #app.app-container .icon-btn:hover{color:var(--text);border-color:var(--border-strong)}
@@ -185,6 +192,17 @@
   #app.app-container .quota-fill.warn{background:linear-gradient(90deg,var(--optional),var(--drop))}
   #app.app-container .quota-val{font-variant-numeric:tabular-nums;white-space:nowrap}
   #app.app-container .quota-nopage{flex:0 0 auto;font-size:10px;color:var(--muted);opacity:.8;white-space:nowrap}
+  /* 浏览器配额明细：展开在配额表头内部，不弹浮层 */
+  #app.app-container .quota-row .qd-caret{flex:0 0 auto;font-size:9px;color:var(--muted);transition:transform .15s}
+  #app.app-container .quota-row[aria-expanded="true"] .qd-caret{transform:rotate(90deg)}
+  #app.app-container .quota-details{display:flex;flex-direction:column;gap:3px;padding:5px 2px 3px;
+    border-top:1px dashed var(--border)}
+  #app.app-container .quota-details[hidden]{display:none !important}
+  #app.app-container .quota-detail-title{font-size:10.5px;color:var(--muted);margin-bottom:2px}
+  #app.app-container .quota-detail-row{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:11px;color:var(--muted)}
+  #app.app-container .quota-detail-row .qd-label{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  #app.app-container .quota-detail-row .qd-val{flex:0 0 auto;color:var(--text);font-variant-numeric:tabular-nums;white-space:nowrap}
+  #app.app-container .quota-detail-note{font-size:10.5px;color:var(--muted);line-height:1.4}
   #app.app-container .quota-row.is-disabled{opacity:.55}
   #app.app-container .quota-row.is-disabled .quota-bar{background:repeating-linear-gradient(45deg,var(--panel-3),var(--panel-3) 4px,transparent 4px,transparent 8px)}
   #app.app-container .quota-empty{color:var(--muted);font-size:11px;padding:3px 0}
@@ -726,13 +744,14 @@
   #app.app-container .toast.show{opacity:1;transform:translate(-50%,0)}
 
   /* 教程 */
-  #app.app-container .tutorial-overlay{position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:95;display:none}
+  #app.app-container .tutorial-overlay{position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:95;display:none;
+    pointer-events:none}
   #app.app-container .tutorial-overlay.open{display:block}
   #app.app-container .tutorial-ring{position:fixed;border:2px solid var(--accent);border-radius:9px;pointer-events:none;
     box-shadow:0 0 0 9999px rgba(0,0,0,.42);
     transition:left .16s ease, top .16s ease, width .16s ease, height .16s ease}
   #app.app-container .tutorial-card{position:fixed;width:min(330px,calc(100vw - 24px));background:var(--panel);
-    border:1px solid var(--accent);border-radius:11px;padding:12px;box-shadow:var(--shadow);
+    border:1px solid var(--accent);border-radius:11px;padding:12px;box-shadow:var(--shadow);pointer-events:auto;
     transition:left .16s ease, top .16s ease}
   /* 首次打开：蒙层立即覆盖，位置过渡从下一帧才启用。 */
   #app.app-container .tutorial-overlay.instant .tutorial-ring,

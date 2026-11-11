@@ -19,6 +19,11 @@ export function getWorkbenchHtml() {
       </div>
     </header>
 
+    <div class="tutorial-banner" id="tutorial-banner" hidden>
+      <span class="tb-text" data-i18n="tutorial.modeBanner"></span>
+      <button type="button" class="btn" id="tutorial-banner-exit" data-i18n="tutorial.exitMode"></button>
+    </div>
+
     <div class="app-body">
     <div class="global-actions" id="top-actions"></div>
     <div class="view-switch" id="view-switch"></div>

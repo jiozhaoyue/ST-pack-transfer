@@ -169,9 +169,12 @@ function loadPersistedLog() {
 }
 
 function persistLog() {
+  if (state.tutorialMode) return;
   if (typeof localStorage === 'undefined' || logPersistTimer) return;
   logPersistTimer = setTimeout(() => {
     logPersistTimer = 0;
+    /* 进入演示前已排队的写入也必须拦下：否则定时器会在演示期间落到 localStorage。 */
+    if (state.tutorialMode) return;
     try {
       let list = state.log.slice(-logLimit());
       let raw = JSON.stringify(list);
@@ -204,6 +207,7 @@ function loadChartLayout(){
   } catch { return normalizeChartLayout(null); }
 }
 function persistChartLayout(){
+  if(state.tutorialMode) return;
   try { localStorage.setItem(CHART_LAYOUT_KEY, JSON.stringify(state.chartLayout)); } catch { /* 仅本会话 */ }
 }
 
@@ -232,8 +236,10 @@ const state = {
   filenameTemplate: chartPrefs.filenameTemplate,
   prefMode:false, prefDraft:null, prefAppliedPkgs:new Set(),
   storage:{ browser:null, host:null, page:null },
+  /* 浏览器配额明细：展开状态 + 异步读数（直接读浏览器，不经宿主）。 */
+  browserDetailsOpen:false, browserDetails:null,
   cloud:{ provider:'s3', config:loadCloudConfig(), webdav:loadWebdavConfig(), busy:false, status:'', list:[] },
-  sort:'time-desc', filter:'all', tutorialStep:0, tutorialOpen:false, tutorialGoal:null,
+  sort:'time-desc', filter:'all', tutorialStep:0, tutorialOpen:false, tutorialGoal:null, tutorialMode:false,
   sourceKey:'host:luker', seq:{}, libraryExport:false,
   transfer:{ open:false, tab:'lan' },
   lan:{
@@ -625,34 +631,72 @@ function volumesFor(totalMb,nodes){
   return buckets.map((b,i)=>({ i:i+1, n:buckets.length, mb:Math.round(b.mb), nodes:buildVolumeTree(b.chunks),
     over: b.mb>limit+0.5 }));
 }
+function fmtBytes(bytes){
+  if(!Number.isFinite(bytes)) return '—';
+  if(bytes>=1073741824) return (bytes/1073741824).toFixed(1)+' GB';
+  if(bytes>=1048576) return (bytes/1048576).toFixed(1)+' MB';
+  if(bytes>=1024) return (bytes/1024).toFixed(1)+' KB';
+  return Math.max(0,Math.round(bytes))+' B';
+}
 function renderQuota(){
   const head=document.getElementById('quota-head');
   if(!head) return;
-  const gb=bytes=>(bytes/1073741824).toFixed(1)+' GB';
   // 宿主存储页能力由控制器探测后经 setStorage 传入；未提供时不伪造入口。
   const page=state.storage.page || { available:false };
-  const row=(label,ico,cell,emptyText,kind,showPageHint=true)=>{
+  const row=(label,ico,cell,emptyText,kind)=>{
+    const isBrowser=kind==='browser';
     const openable=!!page.available;
     const hasReading=!!cell && typeof cell.used==='number';
     const total=hasReading && typeof cell.total==='number' ? cell.total : 0;
     const pct=hasReading && total>0 ? Math.max(0,Math.min(100,Math.round(cell.used/total*100))) : 0;
     let val;
     if(!hasReading) val=emptyText;
-    else if(total<=0) val=gb(cell.used)+' · '+t('quota.unknownTotal');
-    else val=gb(cell.used)+' / '+gb(total)+' · '+pct+'%';
-    return '<button type="button" class="quota-row'+(hasReading?'':' is-disabled')+((openable||!showPageHint)?'':' is-nopage')+'"'
-      +' data-quota-kind="'+kind+'" title="'+escapeHtml(openable?t('quota.openHostPage'):t('quota.noHostPage'))+'">'
+    else if(total<=0) val=fmtBytes(cell.used)+' · '+t('quota.unknownTotal');
+    else val=fmtBytes(cell.used)+' / '+fmtBytes(total)+' · '+pct+'%';
+    /* 浏览器行与宿主无关：不挂任何宿主提示，点击只在本面板展开/收起占用明细。 */
+    const title=isBrowser ? t('quota.browserDetails') : (openable?t('quota.openHostPage'):t('quota.noHostPage'));
+    const canOpen=isBrowser ? hasReading : openable;
+    return '<button type="button" class="quota-row'+(hasReading?'':' is-disabled')+(canOpen?'':' is-nopage')+'"'
+      +' data-quota-kind="'+kind+'" title="'+escapeHtml(title)+'"'
+      +(isBrowser?' aria-expanded="'+(state.browserDetailsOpen?'true':'false')+'"':'')+'>'
       +'<span class="q-label">'+svg(ico,'tree-ico')+label+'</span>'
       +'<span class="quota-bar"><span class="quota-fill'+(pct>85?' warn':'')+'" style="width:'+pct+'%"></span></span>'
       +'<span class="quota-val">'+val+'</span>'
-      +((openable||!showPageHint)?'':'<span class="quota-nopage">'+t('quota.noHostPageShort')+'</span>')
+      +(isBrowser?'<span class="qd-caret" aria-hidden="true">▸</span>':'')
+      +(!isBrowser && !openable?'<span class="quota-nopage">'+t('quota.noHostPageShort')+'</span>':'')
       +'</button>';
   };
   const hostReadable=!!(HOSTS[state.host]||{}).readable;
   const isWeb=state.mode==='web';
-  // 独立 Web 态没有宿主，不伪造「Luker 宿主配额」行，也不给浏览器行挂「宿主未提供」尾巴。
-  head.innerHTML = row(t('quota.browser'),'db',state.storage.browser,t('quota.browserEmpty'),'browser',!isWeb)
-    + (isWeb ? '' : row(t('quota.host'),'shield',hostReadable ? state.storage.host : null,t('quota.hostEmpty'),'server'));
+  // 独立 Web 态没有宿主，不伪造「宿主配额」行；浏览器行照常展开明细。
+  head.innerHTML = row(t('quota.browser'),'db',state.storage.browser,t('quota.browserEmpty'),'browser')
+    + (isWeb ? '' : row(t('quota.host'),'shield',hostReadable ? state.storage.host : null,t('quota.hostEmpty'),'server'))
+    + '<div class="quota-details" id="quota-details" hidden></div>';
+  renderQuotaDetails();
+}
+/* 浏览器占用明细：数据来自 actions.browserUsageDetails()（直接读浏览器），只在展开时渲染。 */
+function renderQuotaDetails(){
+  const box=document.getElementById('quota-details');
+  if(!box) return;
+  if(!state.browserDetailsOpen){ box.hidden=true; box.innerHTML=''; return; }
+  box.hidden=false;
+  const d=state.browserDetails;
+  if(!d){ box.innerHTML='<div class="quota-detail-note">'+t('quota.loading')+'</div>'; return; }
+  if(d.error){ box.innerHTML='<div class="quota-detail-note">'+t('quota.detailFailed')+'</div>'; return; }
+  const parts=['<div class="quota-detail-title">'+t('quota.browserDetails')+'</div>'];
+  const list=(d.items||[]).map((it)=>'<div class="quota-detail-row">'
+    +'<span class="qd-label">'+t('quota.item.'+it.key)+'</span>'
+    +'<span class="qd-val">'+fmtBytes(it.bytes)+'</span></div>').join('');
+  parts.push(list || '<div class="quota-detail-note">'+t('quota.noBreakdown')+'</div>');
+  if(d.app){
+    parts.push('<div class="quota-detail-row"><span class="qd-label">'+t('quota.appFiles')+'</span>'
+      +'<span class="qd-val">'+d.app.count+' · '+fmtBytes(d.app.bytes)+'</span></div>');
+  }
+  if(d.opfs){
+    parts.push('<div class="quota-detail-row"><span class="qd-label">'+t('quota.opfsFiles')+'</span>'
+      +'<span class="qd-val">'+d.opfs.files+' · '+fmtBytes(d.opfs.bytes)+'</span></div>');
+  }
+  box.innerHTML=parts.join('');
 }
 function renderTreeRows(nodes,depth,scope,readonly,tools,totalMb,drill,colorMap,rootId,mbMap){
   let out='';
@@ -1225,7 +1269,7 @@ function toggleChartPrefs(){
 }
 function saveChartPrefsDraft(){
   const checked = [...document.querySelectorAll('[data-prefgroup]:checked')].map((el)=>el.dataset.prefgroup);
-  chartPrefs = saveChartPrefs({
+  const next = {
     checkedGroups: checked,
     target: targetCodeOf(state.target),
     compression: state.compression,
@@ -1234,7 +1278,9 @@ function saveChartPrefsDraft(){
     extensionMode: state.extensionMode,
     gitMode: state.gitMode,
     keepDev: state.keepDev,
-  });
+  };
+  /* 演示模式只改内存，不落 localStorage；退出时随快照整体还原。 */
+  chartPrefs = state.tutorialMode ? normalizeChartPrefs(next) : saveChartPrefs(next);
   state.prefMode = false; state.prefDraft = null; state.prefSnapshot = null;
   toast(t('chart.prefsSaved'));
   renderAll();
@@ -1475,7 +1521,10 @@ let gitRemoteInstance = null;
 function gitRemote(){ return gitRemoteInstance || (gitRemoteInstance = createGitRemote()); }
 function gitSettings(){ return loadSettings(); }
 function gitAccountList(){ return normalizeAccounts(gitSettings().gitAccounts); }
-function persistGit(patch){ const s=gitSettings(); return saveSettings({ ...s, ...patch }); }
+function persistGit(patch){
+  if(state.tutorialMode) return loadSettings();
+  const s=gitSettings(); return saveSettings({ ...s, ...patch });
+}
 function gitStorageMode(){ return gitSettings().gitCredentialStorage === 'browser' ? 'browser' : 'server'; }
 function reasonText(reason){
   const key={ network:'extmgr.reasonNetwork', unauthorized:'extmgr.reasonUnauthorized',
@@ -1855,7 +1904,7 @@ async function runExtInstall(){
       return hit?.privateHint && r.status==='failed' ? { ...r, privateHint:true } : r;
     });
     const ok=(state.extResults||[]).filter((r)=>r.status==='ok');
-    if(ok.length){
+    if(ok.length && !state.tutorialMode){
       const s=gitSettings();
       const reg=new Map((s.gitInstalls||[]).map((x)=>[x.name,x]));
       for(const r of ok){
@@ -2151,6 +2200,7 @@ function loadCloudConfig() {
   }
 }
 function persistCloudConfig(config) {
+  if (state.tutorialMode) return true;
   if (typeof localStorage === 'undefined') return false;
   try {
     localStorage.setItem(CLOUD_KEY, JSON.stringify(config));
@@ -2183,6 +2233,7 @@ function loadWebdavConfig() {
   }
 }
 function persistWebdavConfig(config) {
+  if (state.tutorialMode) return true;
   if (typeof localStorage === 'undefined') return false;
   try {
     localStorage.setItem(WEBDAV_KEY, JSON.stringify(config));
@@ -2838,6 +2889,187 @@ function openHelp(key){
   showPane('help');
 }
 
+/* ── 教程演示模式 ──
+   进入后整站切换为占位数据，用户可自由点按；所有外部动作被拦截，
+   不写 IndexedDB / OPFS / localStorage / 宿主。退出时整体还原进入前的状态，
+   因此演示模式对正常模式零影响（真实数据只在退出后重新显示，从未被改动）。 */
+const DEMO_GB = 1073741824;
+let tutorialStateSnapshot = null;
+let tutorialActionsSnapshot = null;
+let tutorialPrefsSnapshot = null;
+
+function cloneDemoValue(v){
+  if(v instanceof Set) return new Set([...v].map(cloneDemoValue));
+  if(v instanceof Map) return new Map([...v].map(([k,val])=>[cloneDemoValue(k), cloneDemoValue(val)]));
+  if(Array.isArray(v)) return v.map(cloneDemoValue);
+  if(v && typeof v==='object'){
+    const out={};
+    for(const k of Object.keys(v)) out[k]=cloneDemoValue(v[k]);
+    return out;
+  }
+  return v;
+}
+function cloneDemoState(){
+  if(typeof structuredClone==='function'){
+    try{ return structuredClone(state); }catch{ /* 含不可克隆值则走手动克隆 */ }
+  }
+  return cloneDemoValue(state);
+}
+function buildDemoPackages(){
+  const L=(k)=>t('demo.'+k);
+  const st=[
+    node('group:characters',L('characters'),18,'keep',{icon:'user',expanded:true,children:[
+      node('char:demo-1','Mira',9,'keep',{icon:'user'}),
+      node('char:demo-2','Kai',9,'keep',{icon:'user'}),
+    ]}),
+    node('group:chats',L('chats'),64,'keep',{icon:'chat',expanded:true,children:[
+      node('chat:demo-1',L('chatMira'),40,'keep',{icon:'chat'}),
+      node('chat:demo-2',L('chatKai'),24,'keep',{icon:'chat'}),
+    ]}),
+    node('group:worldinfo',L('worldinfo'),22,'keep',{icon:'book',children:[
+      node('world:demo-1',L('world'),14,'keep',{icon:'book'}),
+      node('world:demo-2',L('lore'),8,'optional',{icon:'book'}),
+    ]}),
+    node('group:presets',L('presets'),6,'optional',{icon:'sliders'}),
+    node('group:images',L('images'),10,'optional',{icon:'image'}),
+    node('group:extensions',L('extensions'),8,'keep',{icon:'puzzle',children:[
+      node('ext:demo-1',L('extOne'),8,'keep',{icon:'puzzle'}),
+    ]}),
+    node('group:vectors',L('vectors'),0,'drop',{icon:'brain'}),
+  ];
+  const luker=[
+    node('group:characters',L('characters'),12,'keep',{icon:'user'}),
+    node('group:chats',L('chats'),38,'keep',{icon:'chat'}),
+    node('group:worldinfo',L('worldinfo'),10,'keep',{icon:'book'}),
+    node('group:images',L('images'),4,'optional',{icon:'image'}),
+  ];
+  const tt=[
+    node('group:characters',L('characters'),6,'keep',{icon:'user'}),
+    node('group:chats',L('chats'),18,'keep',{icon:'chat'}),
+    node('group:worldinfo',L('worldinfo'),6,'keep',{icon:'book'}),
+    node('group:presets',L('presets'),2,'optional',{icon:'sliders'}),
+  ];
+  return [
+    { id:'demo-st', name:'demo_st_export.zip', host:'st', size:'128 MB', time:'09:12', mb:128, zone:'import', origin:'demo', unrecognized:false, nodes:st },
+    { id:'demo-luker', name:'luker_backup_demo.zip', host:'luker', size:'64 MB', time:L('timeYesterday'), mb:64, zone:'import', origin:'demo', unrecognized:false, nodes:luker },
+    { id:'demo-tt', name:'tauritavern_demo.zip', host:'tt', size:'32 MB', time:L('timeOlder'), mb:32, zone:'export', origin:'demo', unrecognized:false, nodes:tt },
+  ];
+}
+function buildDemoHostTree(){
+  const L=(k)=>t('demo.'+k);
+  return [
+    node('group:characters',L('characters'),40,'keep',{icon:'user'}),
+    node('group:chats',L('chats'),180,'keep',{icon:'chat'}),
+    node('group:worldinfo',L('worldinfo'),25,'keep',{icon:'book'}),
+    node('group:images',L('images'),60,'optional',{icon:'image'}),
+    node('group:vectors',L('vectors'),12,'drop',{icon:'brain'}),
+  ];
+}
+/* 演示动作：默认全部拦截（只提示）；少数动作在演示数据上做本地模拟，绝不触达真实通道。 */
+function demoTutorialActions(real){
+  const demoOnly = ()=>toast(t('toast.tutorialDemoOnly'));
+  const wrap={};
+  for(const key of Object.keys(real||{})){
+    wrap[key]=typeof real[key]==='function' ? demoOnly : real[key];
+  }
+  const pending=(name,mb)=>({ id:'demo-'+Date.now()+'-'+Math.random().toString(36).slice(2,6), name, blob:{ size:mb*1048576 } });
+  wrap.generate=()=>{
+    if(!state.selectedPkgs.size){ toast(t('zones.selectHint')); return; }
+    state.pendingExports=[pending('demo_converted.zip',96), ...(state.pendingExports||[])];
+    renderPendingExports(); renderActions();
+    toast(t('toast.tutorialSimulated'));
+  };
+  wrap.deleteSelected=(ids)=>{
+    const set=new Set(ids||[]);
+    state.packages=state.packages.filter((p)=>!set.has(p.id));
+    state.selectedPkgs=new Set([...state.selectedPkgs].filter((id)=>!set.has(id)));
+    if(state.source && set.has(state.source.pkgId)){ state.source={type:'host',pkgId:null}; state.sourceKey='host:'+state.host; }
+    renderAll(); toast(t('toast.tutorialSimulated'));
+  };
+  wrap.copyBack=(ids)=>{
+    const set=new Set(ids||[]);
+    const copies=state.packages.filter((p)=>set.has(p.id)).map((p)=>({
+      ...cloneDemoValue(p), id:'demo-copy-'+p.id, zone:'export',
+      name:String(p.name||'pack').replace(/\.zip$/i,'')+'_copy.zip',
+    }));
+    state.packages=[...state.packages, ...copies];
+    state.selectedPkgs=new Set();
+    renderAll(); toast(t('toast.tutorialSimulated'));
+  };
+  wrap.pendingRemove=(id)=>{ state.pendingExports=(state.pendingExports||[]).filter((x)=>x.id!==id); renderPendingExports(); };
+  wrap.pendingClear=()=>{ state.pendingExports=[]; renderPendingExports(); };
+  wrap.settings=()=>demoOnly();
+  /* 关闭插件 = 先退出演示还原真实状态，再执行真实关闭，避免下次打开还停在演示态。 */
+  wrap.close=()=>{ if(state.tutorialMode) closeTutorial(); real?.close?.(); };
+  wrap.onActivePackage=undefined;
+  wrap.onTargetChange=undefined;
+  wrap.privateFiles={ list:()=>[], verify:async()=>({ ok:true, verified:{} }), remove:async()=>({ ok:true }) };
+  wrap.installExtensions=async()=>{ demoOnly(); return []; };
+  wrap.listHostExtensions=async()=>{ demoOnly(); return []; };
+  wrap.lan=Object.fromEntries(['generate','applyAnswer','acceptOffer','retry','cancel','abandon'].map((k)=>[k, demoOnly]));
+  wrap.browserUsageDetails=async()=>({
+    used:9.4*DEMO_GB, total:32*DEMO_GB, hasBreakdown:true,
+    items:[
+      { key:'indexedDB', bytes:5.2*DEMO_GB },
+      { key:'caches', bytes:3.1*DEMO_GB },
+      { key:'localStorage', bytes:26*1024 },
+      { key:'sessionStorage', bytes:6*1024 },
+    ],
+    app:{ count:3, bytes:6.1*DEMO_GB },
+    opfs:{ files:2, bytes:1.2*DEMO_GB },
+  });
+  return wrap;
+}
+function setTutorialBanner(on){
+  const el=document.getElementById('tutorial-banner');
+  if(el) el.hidden=!on;
+}
+function enterTutorialMode(){
+  if(state.tutorialMode) return;
+  tutorialStateSnapshot=cloneDemoState();
+  tutorialActionsSnapshot=actions;
+  tutorialPrefsSnapshot=cloneDemoValue(chartPrefs);
+  actions=demoTutorialActions(actions);
+  state.tutorialMode=true;
+  state.tutorialOpen=true;
+  state.tutorialStep=0;
+  state.tutorialGoal=null;
+  state.packages=buildDemoPackages();
+  state.selectedPkgs=new Set(['demo-st']);
+  state.source={ type:'package', pkgId:'demo-st' };
+  state.sourceKey='pkg:demo-st';
+  state.zone='import';
+  state.hostTree=buildDemoHostTree();
+  state.storage={ browser:{ used:9.4*DEMO_GB, total:32*DEMO_GB }, host:null, page:{ available:false } };
+  state.browserDetailsOpen=false; state.browserDetails=null;
+  state.pendingExports=[{ id:'demo-export-seed', name:'demo_converted.zip', blob:{ size:96*1048576 } }];
+  state.task=null;
+  state.prefMode=false; state.prefDraft=null; state.prefSnapshot=null;
+  state.delta=false; state.mergeMode=false;
+  state.transfer.open=false;
+  state.filter='all'; state.sort='time-desc';
+  state.log=[];
+  setTutorialBanner(true);
+  renderAll();
+}
+function exitTutorialMode(){
+  if(!state.tutorialMode) return;
+  if(tutorialActionsSnapshot) actions=tutorialActionsSnapshot;
+  if(tutorialPrefsSnapshot){ try{ chartPrefs=tutorialPrefsSnapshot; }catch{ /* 只读环境 */ } }
+  tutorialActionsSnapshot=null; tutorialPrefsSnapshot=null;
+  const snap=tutorialStateSnapshot; tutorialStateSnapshot=null;
+  if(snap){
+    for(const k of Object.keys(state)) delete state[k];
+    Object.assign(state, snap);
+  }
+  state.tutorialMode=false;
+  state.tutorialOpen=false;
+  state.tutorialGoal=null;
+  state.tutorialStep=0;
+  setTutorialBanner(false);
+  renderAll();
+}
+
 /* ── 教程（目标任务式） ──
    打开先选目标，再逐步高亮演示；不再区分「基础 / 高级」。
    步骤按平台（宿主 / Web）与当前视图（桌面 / 手机）动态适配：
@@ -2936,6 +3168,7 @@ function centerTutorialCard(card, overlay){
   card.style.top=Math.max(12, Math.round((oh-220)/2))+'px';
 }
 function openTutorial(){
+  if(!state.tutorialMode) enterTutorialMode();
   state.tutorialOpen=true; state.tutorialStep=0; state.tutorialGoal=null;
   const overlay=document.getElementById('tutorial-overlay');
   if(!overlay) return;
@@ -2947,8 +3180,10 @@ function openTutorial(){
   else settle();
 }
 function closeTutorial(){
-  state.tutorialOpen=false; state.tutorialGoal=null; state.tutorialStep=0;
-  document.getElementById('tutorial-overlay').classList.remove('open');
+  const overlay=document.getElementById('tutorial-overlay');
+  if(overlay) overlay.classList.remove('open');
+  /* 关闭教程 = 退出演示模式，恢复进入前的真实状态。 */
+  exitTutorialMode();
 }
 function renderTutorial(){
   const overlay=document.getElementById('tutorial-overlay');
@@ -3060,7 +3295,12 @@ function setProgress(pct,label){
 
 /* ── 事件绑定 ── */
 function bind(){
-  document.getElementById('btn-guide').addEventListener('click',openTutorial);
+  document.getElementById('btn-guide').addEventListener('click',()=>{
+    /* 教程按钮是「演示模式」开关：进入时切换为占位数据，再点/退出时完整还原。 */
+    if(state.tutorialMode) closeTutorial();
+    else openTutorial();
+  });
+  document.getElementById('tutorial-banner-exit')?.addEventListener('click',closeTutorial);
   document.getElementById('btn-settings').addEventListener('click',()=>actions.settings?.());
   const extModeClick = (e) => {
     const extBtn = e.target.closest('[data-setting-extmode]');
@@ -3087,11 +3327,23 @@ function bind(){
     const b=e.target.closest('[data-exttab]'); if(!b) return;
     state.extTab=b.dataset.exttab; renderExtensionView();
   });
-  // 浏览器 / 宿主配额：点击跳到宿主原生存储页的对应分页（能力由控制器探测后传入）。
+  // 配额行：浏览器行展开/收起占用明细（只读浏览器）；宿主行才跳宿主存储页。
   document.getElementById('quota-head')?.addEventListener('click',(e)=>{
     const row=e.target.closest('[data-quota-kind]');
     if(!row) return;
-    actions.hostStoragePage?.(row.dataset.quotaKind);
+    const kind=row.dataset.quotaKind;
+    if(kind==='browser'){
+      state.browserDetailsOpen=!state.browserDetailsOpen;
+      state.browserDetails=null;
+      renderQuota();
+      if(state.browserDetailsOpen){
+        Promise.resolve(actions.browserUsageDetails?.())
+          .then((d)=>{ if(!state.browserDetailsOpen) return; state.browserDetails=d||null; renderQuota(); })
+          .catch(()=>{ if(!state.browserDetailsOpen) return; state.browserDetails={error:true}; renderQuota(); });
+      }
+      return;
+    }
+    actions.hostStoragePage?.(kind);
   });
   // 文件名模板默认折叠
   document.getElementById('filename-toggle')?.addEventListener('click',()=>{
@@ -3839,6 +4091,7 @@ initChartSplitters();
 
   return {
     setPackages(list) {
+      if(state.tutorialMode) return;
       const next = (list || []).map((pkg) => ({ ...pkg }));
       const fresh = next.filter((pkg) => !state.prefAppliedPkgs.has(pkg.id) && Array.isArray(pkg.nodes) && pkg.nodes.length);
       state.packages = next;
@@ -3892,10 +4145,11 @@ initChartSplitters();
     },
     getLan() { return state.lan; },
     setStorage(next) {
+      if(state.tutorialMode) return;
       state.storage = { ...state.storage, ...(next || {}) };
       renderQuota();
     },
-    setLibraryExport(on) { state.libraryExport = !!on; renderActions(); },
+    setLibraryExport(on) { if(state.tutorialMode) return; state.libraryExport = !!on; renderActions(); },
     /**
      * 拉取落库后的默认不勾选：备份快照 `backups/` 与原生资产 `user/`。
      * 只改插件侧选择状态，不触碰宿主原生界面的任何设置。
@@ -3917,12 +4171,12 @@ initChartSplitters();
       });
       renderChart();
     },
-    setPrivateFiles(list) { state.privateFiles = Array.isArray(list) ? list : []; renderChart(); },
+    setPrivateFiles(list) { if(state.tutorialMode) return; state.privateFiles = Array.isArray(list) ? list : []; renderChart(); },
     setZone(zone) { state.zone = zone; state.selectedPkgs = new Set(); renderAll(); },
     /** 任务条：running / paused / null。只影响动作行的暂停·继续·中止三键。 */
-    setTask(task) { state.task = task || null; renderActions(); },
+    setTask(task) { if(state.tutorialMode) return; state.task = task || null; renderActions(); },
     /** 本次待导出（内存队列）；空数组即隐藏整块。 */
-    setPendingExports(items) { state.pendingExports = Array.isArray(items) ? items : []; renderPendingExports(); },
+    setPendingExports(items) { if(state.tutorialMode) return; state.pendingExports = Array.isArray(items) ? items : []; renderPendingExports(); },
     showReport,
     showRestoreReport,
     renderExtensionView,
@@ -3954,7 +4208,7 @@ initChartSplitters();
     },
     extLogAppend(line){ if(line) state.extLog.push(String(line)); },
     setExtensionResults(results){ state.extResults=Array.isArray(results)?results:[]; renderExtensionView(); },
-    setActivePackage(id) { state.source = { type: 'package', pkgId: id }; state.sourceKey = 'pkg:' + id; renderAll(); },
+    setActivePackage(id) { if(state.tutorialMode) return; state.source = { type: 'package', pkgId: id }; state.sourceKey = 'pkg:' + id; renderAll(); },
     pushLog(level, msg) { log(String(level || 'INFO').toUpperCase(), msg); },
     openModal,
     closeModal,
