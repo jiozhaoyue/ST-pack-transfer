@@ -303,6 +303,14 @@ export function getWorkbenchHtml() {
             </div>
           </div>
           <div class="extension-body" id="extension-body"></div>
+          <div class="ext-footer" id="extmgr-install-block" hidden>
+            <div class="ext-install-area" id="extmgr-install-area" hidden></div>
+            <button type="button" class="btn ext-install-toggle" id="extmgr-install-toggle" aria-expanded="false">
+              <svg class="ext-install-ico" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M12 4v11"/><path d="M7 11l5 5 5-5"/><path d="M5 20h14"/></svg>
+              <span class="ext-install-label" data-i18n="extmgr.installBlock"></span>
+              <svg class="ext-chev" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+          </div>
           <div class="ext-report-bar" id="extmgr-report-bar" role="button" tabindex="0"></div>
           <div class="ext-report-panel" id="extmgr-report-panel" hidden></div>
         </section>
@@ -319,9 +327,14 @@ export function getWorkbenchHtml() {
             </div>
             <div class="view-switch" data-view-switch data-view-switch-zone hidden></div>
             <div class="panel-actions">
-              <button class="help-btn" data-help="zone" data-i18n-title="zones.help">?</button>
+              <div class="segmented zone-side-tabs" id="zone-side-tabs" hidden>
+                <button type="button" class="seg-btn active" data-sidetab="zone" data-i18n="view.zone"></button>
+                <button type="button" class="seg-btn" data-sidetab="git" data-i18n="gitv.title"></button>
+              </div>
+              <button class="help-btn" data-help="zone" data-i18n-title="zones.help"></button>
             </div>
           </div>
+          <div class="zone-side-panel" id="zone-side-zone">
           <div class="zone-tabs" id="zone-tabs">
             <button class="zone-tab active" data-zone="import"><span data-i18n="zones.import"></span><span class="count" id="count-import">4</span></button>
             <button class="zone-tab" data-zone="export"><span data-i18n="zones.export"></span><span class="count" id="count-export">1</span></button>
@@ -337,6 +350,13 @@ export function getWorkbenchHtml() {
           </div>
           <div class="zone-body" id="zone-body"></div>
           <div class="zone-foot-actions" id="zone-actions-bottom"></div>
+          </div>
+          <div class="zone-side-panel git-viz" id="zone-side-git" hidden>
+            <div class="git-viz-body">
+              <div class="git-viz-list" id="git-viz-list"></div>
+              <div class="git-viz-detail" id="git-viz-detail"></div>
+            </div>
+          </div>
         </section>
 
       </div>

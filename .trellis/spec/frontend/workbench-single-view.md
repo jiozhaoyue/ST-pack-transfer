@@ -716,3 +716,46 @@ dev server 已能直接跑正式 UI，demo 只剩维护成本与误导风险。
 - 教程模式图标为书本图标，**不得**再用 `?`（`?` 仅用于面板帮助按钮）。
 - 迁移与备份面板头必须有 `help-btn[data-help="transfer"]`，内容含局域网互传 / 云端仓库 / 恢复模式三段。
 
+
+## 18. 扩展管理宿主页版式与安装页脚 / 数据包列 Git 页签（2026-11-11 第二轮用户裁定）
+
+### 18.1 宿主页版式（与存储图表同一套语言）
+
+```
+#extension-view
+  .panel-head            ← 切换行 + 页签 + ?
+  #extension-body
+    .ext-install
+      .ext-toolbar       ← 一行横线按钮：导出清单 / 检查更新 / 刷新 … 右端「排序」select
+      details.ext-host-list
+        summary.ext-summary   ← 只有标题 + .ext-count 徽标 + .ext-chev + 「点击展开 / 收起」
+        .ext-list-head        ← 共 N 项 + 拖拽提示 + 自动更新勾选组（全选 / 反选 / 取消）
+        .ext-list[role=list]  ← 每条 [data-extrow][role=listitem]，带拖拽手柄
+      details.ext-server-block ← 仅管理员
+      更新检查结果
+  .ext-footer#extmgr-install-block  ← 固定页脚（面板级，不在 #extension-body 内）
+  .ext-report-bar
+```
+
+- 顶部必须是**横线工具条**（`border-bottom`，与 `.chart-controls` 同形），不得把按钮散落在正文。
+- 折叠头（summary）**只写标题**；数量只允许出现在**列表头** `.ext-list-head`（`共 N 项`）或 `.ext-count` 徽标里。
+  **禁止** `已装扩展（0 个，点击折叠）` 这类把数量 / 操作提示塞进标签的写法。
+- 每个可折叠块都必须让人一眼看出「能点开」：`.ext-chev` 箭头 + `cursor:pointer` + `点击展开 / 收起` 提示；
+  展开后箭头旋转 180°、提示隐藏。
+- 列表必须是 DOM 结构（容器 + 行 + 列表语义），不得渲染成裸文本行；行可拖拽排序，
+  自定义顺序存 `settings.extOrder`，排序方式存 `settings.extSort`。
+- **安装扩展 = 面板固定页脚**：在 `#extension-body` 之后、`#extmgr-report-bar` 之前；页脚底边与报告条顶边相接
+  （间隙 0），展开区在按钮上方并自带上限滚动（向上展开）。宿主/开发者/打包页切换与报告展开时由
+  `syncExtInstallBlock()` 控制显隐，按钮监听器只在 `bind()` 绑定一次。
+
+### 18.2 数据包列「数据包 / Git」页签
+
+- 数据包列面板头 `.panel-actions` 内新增 `.segmented#zone-side-tabs`（`数据包 / Git`），
+  `settings.devMode === false` 时整体 `hidden` 并强制 `state.sideTab='zone'`。
+- 数据包内容放进 `#zone-side-zone`，Git 内容放进 `#zone-side-git`（`.git-viz`），二者同一列内互换；
+  渲染入口 `renderZoneSide()`（`renderAll()` / `applySettings()` / 页签点击都会调用）。
+- 手机形态不新增入口：Git 仍是「数据包」视图内的页签（`syncMainView()` 的行不作为第二套判据）。
+
+**判据**（本地 Playwright）：`#zone-side-tabs` 在未开开发者模式时 `hidden === true`；
+宿主页 `.ext-toolbar .btn` 数量 ≥ 3 且存在 `[data-extsort]`；`.ext-list-head` 文本含 `共 N 项`；
+summary 文本不含「点击折叠」；`#extmgr-install-block` 与 `#extmgr-report-bar` 间隙 0。

@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-2.md`
-- **Total Sessions**: 80
+- **Total Sessions**: 81
 - **Last Active**: 2026-11-11
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-2.md` | ~1561 | Active |
+| `journal-2.md` | ~1590 | Active |
 | `journal-1.md` | ~2491 | Archived |
 <!-- @@@/auto:active-documents -->
 
@@ -30,6 +30,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 81 | 2026-11-11 | P2 开发者层级 / 管理员分区 / 误装拒绝 / P3 Git 只读可视化 + 宿主页版式返工 | - | `main` |
 | 80 | 2026-11-11 | P1 铺满与教程浮层 + 开发者页 / 恢复模式 / 待导出合并 / 设置三态（含 P2/P3 交接） | `2ee9617`, `1ed73d9`, `3710a00`, `826a558`, `9b91f3f`, `8ce80c4` | `main` |
 | 79 | 2026-11-11 | 恢复模式归位 / 待导出并入导出区 / 迁移教程 / 开发模式自动更新 / 设置三态与凭据双写 | `2ee9617`, `1ed73d9`, `3710a00` | `main` |
 | 78 | 2026-11-11 | 迁移面板头同构（无 ×）+ 扩展管理凭据页 / 安装区折叠 | `77f0699` | `main` |

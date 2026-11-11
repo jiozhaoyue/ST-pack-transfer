@@ -109,39 +109,99 @@ GitLab `/<group>/<sub>/<repo>/-/tree/<ref>`、`.git` 后缀、query/hash、`http
 **验收**：`test/git-oauth.test.js`（7 项）；`scripts/ui-verify-oauth.cjs`（本地专属，
 断言 OAuth 区块、回调地址一致、帮助页链接、GitHub 限制说明、日志并入全局）。
 
-## 9. 页签归属：宿主 / 凭据 / 打包（2026-11-11 用户裁定）
+## 9. 页签归属：宿主 / 开发者 / 打包（2026-11-11 用户裁定）
 
 **契约**：
 
-- 页签顺序固定 `宿主 / 凭据 / 打包`，默认 `宿主`；页签 DOM 仍是面板头 `.panel-actions` 里的
-  `.segmented > .seg-btn[data-exttab]`，没有新增容器或样式。
-- **凭据页**（`data-exttab="cred"`，`renderExtCredentials()`）只渲染账号列表、凭据存储位置、
-  OAuth 区块与令牌指引；**不得**出现链接输入、上传 / 粘贴 / 分支、解析、开始安装、安装列表、
+- 页签顺序固定 `宿主 / 开发者 / 打包`，默认 `宿主`；页签 DOM 仍是面板头 `.panel-actions` 里的
+  `.segmented > .seg-btn[data-exttab]`，没有新增容器或样式（内部键仍是 `cred`）。
+- **开发者页**（`data-exttab="cred"`，`renderExtCredentials()`）= 自动更新父子块 + 账号列表 + 凭据存储位置 +
+  OAuth 区块 + 令牌指引；**不得**出现链接输入、上传 / 粘贴 / 分支、解析、开始安装、安装列表、
   失败链接导出等安装控件，也不提供「去安装」跳转。
-- **安装区**全部搬到宿主页**下半**：已装列表之后再追加
-  `<details class="ext-install-block" id="extmgr-install-block">`，默认收起（`state.extInstallOpen=false`），
-  summary 文案 `extmgr.installBlock`；展开状态只在本次会话内记住。
+- **宿主页版式**（2026-11-11 第二轮用户裁定，见 `workbench-single-view.md` §18）：
+  - 顶部是横线工具条 `.ext-toolbar`（导出清单 / 检查更新 / 刷新 + 右侧排序），与存储图表的横线控件同形；
+  - 列表头 `.ext-list-head` 才显示数量（`共 N 项`）、拖拽提示与自动更新勾选组；折叠头 summary **只写标题**
+    （`已装扩展` + 数量徽标 + 箭头 + 展开提示），**禁止** `已装扩展（0 个，点击折叠）` 这类把数量写进标签的写法；
+  - 每条扩展是带 `role="listitem"` 的 `[data-extrow]` 行，含拖拽手柄；自定义顺序存 `settings.extOrder`，
+    排序方式存 `settings.extSort`（`custom` / `name` / `version` / `source`）。
+- **安装区是面板固定页脚**：`<div class="ext-footer" id="extmgr-install-block">` 位于 `#extension-body`
+  **之外**、`#extmgr-report-bar` 正上方（模板已有，不得再写进宿主页正文）；只在 `宿主` 页且报告未展开时显示。
+  展开状态 `state.extInstallOpen` 只在本次会话内记住；展开区 `#extmgr-install-area` 在按钮**上方**，
+  高度上限 46vh 自滚动（向上展开）。
 - 安装区内容 = 链接输入 / 上传 / 粘贴 / 默认分支 / 解析 / 开始安装 / 待装列表（含分支与预检状态）/
   打开日志 / 导出失败链接 / 导出报告 / 清空；绑定函数仍是 `renderExtInstall()`。
 - **重绘纪律**：安装进度、预检、分支列表等高频刷新只调用 `refreshInstallArea()`
   （只重绘 `#extmgr-install-area`），**不得**用 `renderExtensionView()`，否则每次都会重新拉取宿主已装扩展。
 - 安装成功后的收尾刷新（`finally`）仍可整页重绘一次，用于刷新已装列表。
+- **折叠可点击性是硬要求**：`Git 账号` / `OAuth 登录` / `已装扩展` / `服务端插件` 的 summary 必须有
+  箭头（`.ext-chev`，展开时旋转 180°）、`cursor:pointer` 与「点击展开 / 收起」提示；数量用 `.ext-count` 徽标，
+  **不得**只写「Git 账号（0）」让人不知道能点开。
 
-**判据**：`宿主` 页 `#extmgr-install-block` 存在且 `open=false`；展开后 `#extmgr-install-area` 内
-`#extmgr-run` / `#extmgr-links` 存在；`凭据` 页 `#extmgr-run` 与 `#extmgr-install-block` 均不存在；
-页签显示文本为 `宿主 / 凭据 / 打包`。
+**判据**（本地 Playwright 取证）：`#extmgr-install-block` 的父节点是 `#extension-view`，`insideBody === false`；
+`footer.bottom === reportBar.top`（间隙 0）；展开后 `area.bottom <= button.top`；`#extension-body` 内
+`.ext-toolbar` 有 3 个按钮 + `[data-extsort]`，`.ext-list-head` 含 `共 N 项`，summary 不含「点击折叠」字样。
 
-## 10. 开发模式自动更新（2026-11-11 用户裁定）
+## 10. 自动更新：父项总开关 + 逐扩展勾选（2026-11-11 第二轮裁定）
 
-**契约**：宿主页每个**经 Git 安装**（`gitInstalls` 有同名登记）的扩展行尾提供一个 `select`，
-三档：`关闭 / 静默更新 / 提示后更新`，值存 `settings.gitDevMode: {扩展名: 'silent'|'prompt'}`（缺省即关闭）。
+**设置项**（全部在 `settings-panel.js` 白名单 + 归一，业务代码禁止硬编码）：
 
-- **静默**：启动时发现远端 manifest 版本高于本地（`compareVersions(remote, local) > 0`）即直接
-  `installExtensions([{ url, ref, replace:true, credential }])`，不打断用户。
-- **提示**：先弹**宿主原生浮层**（`globalThis.toastr.info`，10 秒、可点击），点击该通知即取消本次更新；
-  超时未取消才执行更新。无 toastr 时退回插件内 `toast`。
-- 更新成功后再用原生浮层提示「点击刷新页面」，点击执行 `location.reload()`。
-- 凭据走既有 `accountForRepo()`；读不到本地或远端版本、版本不高于本地、仓库不可达时**静默跳过**，不伪造结果。
-- 每次会话只跑一次（`state.devAutoRan`），避免与「检查更新」重复。
+| 键 | 默认 | 语义 |
+| --- | --- | --- |
+| `devMode` | `false` | 开发者模式；关闭时数据包列不出现「Git」页签 |
+| `gitAutoUpdate` | `false` | 父项总开关 |
+| `gitUpdateIntervalHours` | `6` | 检查间隔（1–168，夹紧） |
+| `gitUpdateMode` | `notify` | `notify` 仅提醒 / `auto` 直接更新 |
+| `gitUpdateSelected` | `[]` | 参与自动更新的扩展名（宿主页逐扩展勾选） |
+| `gitAutoUpdateLastAt` | `0` | 上次检查时间戳；未到间隔直接跳过 |
 
-**禁止**：把开发模式写成全局开关（必须逐扩展）；在演示模式下写入真实设置；未更新却提示已更新。
+**运行契约**（`runDevAutoUpdate()`）：
+
+- `devMode && gitAutoUpdate` 才运行；每次会话只跑一次（`state.devAutoRan`），且校验间隔；
+- 参与集只取 `gitUpdateSelected`；模式取 `gitUpdateMode`；
+- `auto` 直接 `installExtensions([{ url, ref, replace:true, credential }])`；
+  `notify` 先弹宿主原生浮层（`globalThis.toastr.info`，10 秒、可点击），点击通知即取消本次更新，超时才执行；
+- 更新成功后再用原生浮层提示「点击刷新页面」；失败则记录到 `state.extUpdateFail` 并提示；
+- 读不到本地 / 远端版本、版本不高于本地、仓库不可达时**静默跳过**，不伪造结果；
+- 演示模式下只读不写。
+
+**禁止**：逐扩展三档 `select` 回潮（已被勾选模型取代）；未更新却提示已更新；在演示模式写入真实设置。
+
+## 11. 管理员分区与前后端误装（2026-11-11 第二轮）
+
+- **管理员唯一判据**：`GET /api/users/me` 返回的 `admin === true`（`readHostIdentity()`）。
+  非管理员**不显示**服务端插件分区、不伪造空列表；读不到身份同样按非管理员处理。
+- **服务端插件清单**：`POST /api/users/plugins/list`（`requireAdminMiddleware`）→
+  `{ ok, enabled, pluginsPath, plugins: [{directory, packageName, version, description, remoteUrl}] }`；
+  分区可折叠（`details.ext-server-block`），如实显示 `enabled === false` 与路径。
+- **插件类型识别**（`src/core/plugin-kind.js`）：仓库根有 `manifest.json` ⇒ 前端扩展；
+  无 manifest 但有 `package.json` ⇒ 服务端插件；两者都取不到 ⇒ `unknown`（不猜、不拦截）。
+- **误装拒绝**：`runExtInstall()` 在写入前拦截 `kind === 'server'` 的条目，弹出替代措施
+  （宿主管理面板 → 服务端插件；或把目录放到 `plugins/` 后重启）。**不得**静默装进扩展目录。
+- **更新失败预案**：更新检查结果行提供「删除后重装」，二次确认后
+  `deleteExtensionViaHost(name, global)` → 按 `gitInstalls` 登记重装；删除失败即停止，不继续重装。
+
+## 12. Git 可视化（只读，2026-11-11 第二轮）
+
+**入口**：`settings.devMode === true` 时，数据包列面板头出现 `.segmented`（`数据包 / Git`），同一列内互换；
+关闭开发者模式即隐藏并强制回到数据包。桌面与手机同一套逻辑（手机上它就是「数据包」视图内的页签）。
+
+**数据源（只读）**：
+
+| 侧 | 端点 / 来源 | 说明 |
+| --- | --- | --- |
+| 本地 | `POST /api/extensions/version` | `{currentBranchName, currentCommitHash, isUpToDate, remoteUrl, remoteCommitHash}` |
+| 本地 | `POST /api/extensions/branches` | `[{name, commit, current, label}]` |
+| 云端 | 站点 API（分支 / 标签 / 最近 20 条提交 / 单次提交 diff） | 仅限该扩展在 `gitInstalls` 登记的仓库 |
+| 工作区 | — | 宿主无只读端点 ⇒ 固定显示「宿主未提供」 |
+
+**判据与降级**：`currentCommitHash` 为空 ⇒ 「历史已丢失 / 非 Git 仓库」，不伪造提交；
+站点不可达 ⇒ 「未提供（原因）」；未登记仓库 ⇒ 只显示本地信息，不猜云端。
+
+**只读**：不渲染检出 / 切换 / 提交 / 合并按钮；分支与提交行只能点开查看。
+
+**核心函数**：`src/core/git-viz.js`（`normalizeLocalGit` / `gitStateOf` / `mergeBranches` /
+`buildGitSummary` / `selectGitTargets` / `diffStat`）、`git-site.js`（`tagsEndpoint` / `commitDetailEndpoint` /
+`remoteFileUrl` / `normalizeCommitList` / `normalizeTags` / `normalizeCommitFiles`）、
+`host-bridge.js`（`readHostExtensionGit`）、`git-remote.js`（`listTags` / `listCommits` / `commitDetail` / `rawFile`）。
+
+**验收**：`test/git-viz.test.js`（9）、`test/git-site-viz.test.js`（6）、`test/plugin-kind.test.js`（4）。

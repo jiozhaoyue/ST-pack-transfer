@@ -218,3 +218,30 @@ npm run dev       # 3040 → 仅开发热重载（demo 页已废弃，见 workbe
 
 - 「包含登录凭据」默认**勾选**；「包含 OAuth 令牌」是它的子项，默认**不勾选**，取消父项时自动取消并禁用。
 - 面板文案 `settings.dataNote` 必须如实描述这两个默认值。
+
+## 11. 设置读取只覆盖对话框控件 / 新增设置项（2026-11-11 第二轮）
+
+### 11.1 `readSettings(root, base)` 契约
+
+- 第二参数 `base` 是**面板外的既有设置**；函数从 `normalizeSettings(base)` 起步，只覆盖对话框里真实存在的
+  控件（`[data-setting]`），其余键**原样保留**。
+- 调用方必须传当前设置：`readSettings(body, settings)`（`index.js` 的 `openSettings`）。
+- 反例（已修复的缺陷）：此前以 `SETTINGS_DEFAULTS` 起步，保存一次设置就会把 `gitAccounts` / `gitInstalls` /
+  自动更新设置整段清空。回归测试：`test/settings-panel.test.js` 的「base 里的 Git 数据不被对话框默认值清空」。
+
+### 11.2 本轮新增键（`SETTINGS_DEFAULTS` + `normalizeSettings`）
+
+| 键 | 默认 | 归一 |
+| --- | --- | --- |
+| `devMode` | `false` | 仅布尔 |
+| `gitAutoUpdate` | `false` | 仅布尔 |
+| `gitUpdateIntervalHours` | `6` | 数字，夹在 1–168 |
+| `gitUpdateMode` | `notify` | `notify` / `auto` |
+| `gitUpdateSelected` | `[]` | 字符串数组、去重、剔除空值 |
+| `gitAutoUpdateLastAt` | `0` | 非负数字 |
+| `extOrder` | `[]` | 字符串数组、去重 |
+| `extSort` | `custom` | `custom` / `name` / `version` / `source` |
+
+- 业务代码**禁止**硬编码 6 小时或 `notify`；一律 `loadSettings().gitUpdateIntervalHours` / `gitUpdateMode`。
+- 演示模式（教程）下这些设置**只读**：`persistDev()` 直接返回当前设置，不写 localStorage / 宿主。
+- 旧键 `gitDevMode`（逐扩展三档）保留读取兼容，但界面不再使用；新模型是「父项 + 勾选 + 全局模式」。

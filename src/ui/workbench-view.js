@@ -35,6 +35,10 @@ import {
   findAccountFor, maskAccounts, ACCOUNT_SITES,
 } from '../core/git-accounts.js';
 import { compareVersions } from '../core/git-site.js';
+import { classifyPluginKind, PLUGIN_KINDS } from '../core/plugin-kind.js';
+import {
+  GIT_STATES, normalizeLocalGit, mergeBranches, buildGitSummary, selectGitTargets, diffStat,
+} from '../core/git-viz.js';
 import {
   oauthProvider, buildAuthorizeUrl, randomToken, makePkce, parseOAuthCallback, exchangeOAuthCode,
 } from '../core/git-oauth.js';
@@ -227,6 +231,10 @@ const state = {
   extTab:'host', extEntries:[], extResults:[], extRunning:false, extInstalled:null, extManifestPrefill:[],
   extReportOpen:false, extInstallOpen:false, devAutoRan:false, settingsDraft:null,
   extAccountTests:[], extUpdate:null, extAccountsOpen:false,
+  /* 服务端插件清单（仅管理员）：null = 未读取；[] = 已读取但为空。 */
+  extServerPlugins:null, extHostAdmin:false, extServerOpen:true,
+  /* 数据包列页签：zone = 数据包，git = Git 可视化（仅开发者模式）。 */
+  sideTab:'zone', gitListRequested:false, gitViz:{ name:'', loadedFor:'', loading:false, error:'', local:null, localMeta:null, branches:[], cloud:null, commits:[], tags:[], diff:null, diffLoading:false, diffError:'' },
   source:{ type:'host', pkgId:null }, target:'SillyTavern', targetManual:false,
   delta: 'overwrite', splitMb: chartPrefs.splitMb,
   compression: chartPrefs.compression,
@@ -1606,6 +1614,184 @@ function renderZoneModeRow(){
   }
   document.querySelectorAll('.zone-delta-label, #delta-toggle').forEach(el=>{ el.hidden = state.zone!=='export'; });
 }
+
+/* ── Git 可视化（只读；数据包列「数据包 / Git」页签互换） ──
+   云端：该扩展登记仓库（gitInstalls 同源）的分支 / 标签 / 最近提交 / 单次 diff。
+   不提供检出 / 提交 / 合并；历史被清理就如实显示「历史已丢失」。 */
+function sideTabAllowed(){ return !!loadSettings().devMode; }
+function renderZoneSide(){
+  const allowed=sideTabAllowed();
+  if(!allowed) state.sideTab='zone';
+  const tabs=document.getElementById('zone-side-tabs');
+  const zonePanel=document.getElementById('zone-side-zone');
+  const gitPanel=document.getElementById('zone-side-git');
+  if(tabs){
+    tabs.hidden=!allowed;
+    tabs.querySelectorAll('[data-sidetab]').forEach((btn)=>{
+      const on=btn.dataset.sidetab===state.sideTab;
+      btn.classList.toggle('active',on);
+      btn.setAttribute('aria-pressed',on?'true':'false');
+    });
+  }
+  if(zonePanel) zonePanel.hidden=state.sideTab==='git';
+  if(gitPanel) gitPanel.hidden=state.sideTab!=='git';
+  if(state.sideTab==='git') renderGitViz();
+}
+function gitStateText(stateCode){
+  if(stateCode===GIT_STATES.historyLost) return t('gitv.stateHistoryLost');
+  if(stateCode===GIT_STATES.upToDate) return t('gitv.stateUpToDate');
+  if(stateCode===GIT_STATES.outOfDate) return t('gitv.stateOutOfDate');
+  return t('gitv.stateUnknown');
+}
+function gitCommitRowsHtml(commits){
+  if(!Array.isArray(commits) || !commits.length) return '<div class="ext-empty">'+t('gitv.noCommits')+'</div>';
+  return commits.map((c)=>'<button type="button" class="git-viz-commit" data-gitcommit="'+escapeHtml(c.sha)+'">'
+    +'<span class="git-viz-sha">'+escapeHtml(c.shortSha||'')+'</span>'
+    +'<span class="git-viz-msg" title="'+escapeHtml(c.message||'')+'">'+escapeHtml(c.message||'')+'</span>'
+    +'<span class="git-viz-date">'+escapeHtml(String(c.date||'').slice(0,10))+'</span>'
+  +'</button>').join('');
+}
+function gitDetailHtml(row){
+  const g=state.gitViz;
+  if(!row) return '<div class="ext-empty">'+t('gitv.empty')+'</div>';
+  if(g.loading && g.name===row.name) return '<div class="ext-note">'+t('gitv.loading')+'</div>';
+  const install=(loadSettings().gitInstalls||[]).find((r)=>r.name===row.name)||null;
+  const summary=buildGitSummary({ name:row.name, install, local:g.local, cloud:g.cloud });
+  const historyNote=(g.name===row.name && !summary.hasHistory)
+    ? '<div class="ext-note is-warn">'+t('gitv.historyLost')+'</div>' : '';
+  const branchRows=g.branches.length
+    ? g.branches.map((b)=>'<div class="ext-entry git-viz-branch'+(b.current?' is-current':'')+'">'
+        +'<span class="ext-url">'+escapeHtml(b.name)+'</span>'
+        +'<span class="ext-state">'+escapeHtml(shortShaOf(b.commit))+'</span>'
+        +'<span class="ext-flag">'+t(b.current?'gitv.branchCurrent':'gitv.branchReadonly')+'</span>'
+      +'</div>').join('')
+    : '<div class="ext-empty">'+t('gitv.noBranches')+'</div>';
+  const tagRows=g.tags.length
+    ? g.tags.map((name)=>'<span class="git-viz-tagitem">'+escapeHtml(name)+'</span>').join('')
+    : '<span class="ext-note-inline">'+t('gitv.noTags')+'</span>';
+  const diff=g.diff;
+  const diffHtml=diff
+    ? '<div class="git-viz-diff">'+(diff.files.length
+        ? diff.files.map((f)=>'<details class="git-viz-file" open>'
+            +'<summary><span class="git-viz-path">'+escapeHtml(f.path)+'</span>'
+            +'<span class="git-viz-stat">'+(f.additions===null?'':('+'+f.additions))+' '+(f.deletions===null?'':('-'+f.deletions))+'</span></summary>'
+            +'<pre class="git-viz-patch">'+escapeHtml(f.patch||'')+'</pre>'
+          +'</details>').join('')
+        : '<div class="ext-empty">'+t('gitv.noDiff')+'</div>')+'</div>'
+    : (g.diffLoading ? '<div class="ext-note">'+t('gitv.diffLoading')+'</div>'
+      : (g.diffError ? '<div class="ext-note is-warn">'+t('gitv.diffFailed',{reason:g.diffError})+'</div>' : ''));
+  const cloudNote=summary.registered
+    ? '<div class="ext-note">'+t('gitv.cloudNote',{url:summary.remoteUrl||'-'})+'</div>'
+    : '<div class="ext-note is-warn">'+t('gitv.unregisteredNote')+'</div>';
+  return '<div class="git-viz-head"><b class="git-viz-title">'+escapeHtml(row.name)+'</b>'
+      +'<span class="ext-state">'+escapeHtml(row.version||'-')+'</span></div>'
+    +'<div class="git-viz-meta">'
+      +'<span>'+t('gitv.branch')+'：'+escapeHtml(summary.branch||t('gitv.unknown'))+'</span>'
+      +'<span>'+t('gitv.commit')+'：'+escapeHtml(summary.shortCommit||t('gitv.unknown'))+'</span>'
+      +'<span>'+t('gitv.state')+'：'+gitStateText(summary.state)+'</span>'
+    +'</div>'
+    +historyNote
+    +'<div class="ext-note">'+t('gitv.workingTree')+'</div>'
+    +cloudNote
+    +'<section class="git-viz-sec"><h5>'+t('gitv.branches')+'</h5><div class="ext-list">'+branchRows+'</div></section>'
+    +'<section class="git-viz-sec"><h5>'+t('gitv.tags')+'</h5><div class="git-viz-tags">'+tagRows+'</div></section>'
+    +'<section class="git-viz-sec"><h5>'+t('gitv.commits')+'</h5><div class="ext-list">'+gitCommitRowsHtml(g.commits)+'</div></section>'
+    +'<section class="git-viz-sec"><h5>'+t('gitv.diff')+'</h5>'+diffHtml+'</section>';
+}
+function shortShaOf(sha){ return String(sha||'').slice(0,8); }
+async function loadGitTarget(name){
+  const g=state.gitViz;
+  if(!name) return;
+  g.name=name; g.loadedFor=name; g.loading=true; g.error='';
+  g.local=null; g.localMeta=null; g.branches=[]; g.cloud=null; g.commits=[]; g.tags=[];
+  g.diff=null; g.diffError=''; g.diffLoading=false;
+  renderGitViz();
+  const item=(state.extInstalled||[]).find((x)=>String(x?.id||x?.folder||x?.name||'')===name);
+  const isGlobal=String(item?.sourceType||'')==='global';
+  const install=(loadSettings().gitInstalls||[]).find((r)=>r.name===name)||null;
+  let localRes=null;
+  try { localRes=await actions.hostExtensionGit?.(name,{global:isGlobal}); } catch { localRes=null; }
+  g.localMeta=localRes;
+  g.local=localRes && localRes.ok ? normalizeLocalGit(localRes.version,{name}) : null;
+  let cloud=null;
+  if(install?.url){
+    const parsed=parseRepoUrl(install.url);
+    if(parsed.ok){
+      const acc=accountForRepo(parsed);
+      const [branches,tags,commits]=await Promise.all([
+        gitRemote().listBranches(parsed,acc),
+        gitRemote().listTags(parsed,acc),
+        gitRemote().listCommits(parsed, install.ref||'', acc, {perPage:20}),
+      ]);
+      const reason=!branches.ok?branches.reason:(!tags.ok?tags.reason:(!commits.ok?commits.reason:''));
+      cloud={
+        branches:branches.ok?branches.branches:[],
+        tags:tags.ok?tags.tags:[],
+        commits:commits.ok?commits.commits:[],
+        error:reason?reasonText(reason):'',
+      };
+    } else {
+      cloud={branches:[],tags:[],commits:[],error:reasonText('unsupported')};
+    }
+  }
+  g.branches=mergeBranches(localRes?.branches||[], cloud?.branches||[]);
+  g.cloud=cloud;
+  g.commits=cloud?.commits||[];
+  g.tags=cloud?.tags||[];
+  g.loading=false;
+  renderGitViz();
+}
+async function loadGitCommitDiff(sha){
+  const g=state.gitViz;
+  const install=(loadSettings().gitInstalls||[]).find((r)=>r.name===g.name)||null;
+  if(!install?.url || !sha) return;
+  const parsed=parseRepoUrl(install.url);
+  g.diffLoading=true; g.diff=null; g.diffError='';
+  renderGitViz();
+  const acc=parsed.ok?accountForRepo(parsed):null;
+  const res=parsed.ok?await gitRemote().commitDetail(parsed, sha, acc):{ok:false,reason:'unsupported'};
+  g.diffLoading=false;
+  if(res.ok) g.diff={sha,files:res.files};
+  else g.diffError=reasonText(res.reason||'http');
+  renderGitViz();
+}
+function renderGitViz(){
+  const listEl=document.getElementById('git-viz-list');
+  const detailEl=document.getElementById('git-viz-detail');
+  if(!listEl||!detailEl) return;
+  const installs=loadSettings().gitInstalls||[];
+  const installed=Array.isArray(state.extInstalled)?state.extInstalled:[];
+  if(!installed.length && !state.gitListRequested){
+    state.gitListRequested=true;
+    void (async()=>{
+      let list=[];
+      try {
+        const res=await actions.listHostExtensions?.();
+        list=Array.isArray(res)?res:(Array.isArray(res?.items)?res.items:[]);
+      } catch { list=[]; }
+      state.extInstalled=list;
+      renderGitViz();
+    })();
+  }
+  const rows=selectGitTargets(installed, installs);
+  if(!rows.length){
+    listEl.innerHTML='<div class="ext-empty">'+t('gitv.empty')+'</div>';
+    detailEl.innerHTML='';
+    return;
+  }
+  if(!state.gitViz.name || !rows.some((r)=>r.name===state.gitViz.name)) state.gitViz.name=rows[0].name;
+  listEl.innerHTML=rows.map((r)=>'<button type="button" class="git-viz-row'+(r.name===state.gitViz.name?' active':'')+'" data-gitpick="'+escapeHtml(r.name)+'">'
+    +'<span class="git-viz-name" title="'+escapeHtml(r.name)+'">'+escapeHtml(r.name)+'</span>'
+    +'<span class="git-viz-tag">'+t(r.registered?'gitv.registered':'gitv.unregistered')+'</span>'
+  +'</button>').join('');
+  listEl.querySelectorAll('[data-gitpick]').forEach((btn)=>btn.addEventListener('click',()=>{
+    if(state.gitViz.name===btn.dataset.gitpick) return;
+    void loadGitTarget(btn.dataset.gitpick);
+  }));
+  detailEl.innerHTML=gitDetailHtml(rows.find((r)=>r.name===state.gitViz.name));
+  detailEl.querySelectorAll('[data-gitcommit]').forEach((btn)=>btn.addEventListener('click',()=>{ void loadGitCommitDiff(btn.dataset.gitcommit); }));
+  if(state.gitViz.loadedFor!==state.gitViz.name && !state.gitViz.loading) void loadGitTarget(state.gitViz.name);
+}
 function renderActions(){
   renderZoneModeRow();
   const row=document.getElementById('zone-actions-bottom');
@@ -1779,7 +1965,7 @@ function makeExtEntry(rawUrl, refHint = ''){
     ref, branch: ref,
     refKind: ref ? (isCommitRef(ref) ? 'commit' : 'ref') : '',
     status: 'pending', note: '', noteKind: '',
-    branches: [], info: null, privateHint: false, busy: false,
+    branches: [], info: null, privateHint: false, busy: false, kind: PLUGIN_KINDS.unknown,
   };
 }
 
@@ -1814,7 +2000,24 @@ function parseExtEntries(text, defaultRef){
   return out;
 }
 
-/** 仓库摘要预检：识别公开/私有，私有或 404 时给出「需要登录」结论。
+/**
+ * 识别仓库是前端扩展还是服务端插件：有 manifest.json ⇒ 扩展；只有 package.json ⇒ 服务端。
+ * 读不到就保持 unknown（不猜、不拦截）。
+ */
+async function detectExtEntryKind(entry, acc){
+  if(!entry?.parsed?.ok) return PLUGIN_KINDS.unknown;
+  const readJson=async(file)=>{
+    const res=await gitRemote().rawFile(entry.parsed, entry.ref, file, acc);
+    if(!res.ok || !res.text) return null;
+    try { return JSON.parse(res.text); } catch { return null; }
+  };
+  const manifest=await readJson('manifest.json');
+  if(manifest) return PLUGIN_KINDS.extension;
+  const pkg=await readJson('package.json');
+  if(pkg) return classifyPluginKind({ manifest:null, packageJson:pkg });
+  return PLUGIN_KINDS.unknown;
+}
+/** 仓库摘要预检：识别公开/私有 + 插件类型（前端扩展 / 服务端插件）。
  *  `silent` 时不自渲染（批量预检最后统一渲染一次，避免 N 次重排）。 */
 async function preflightExtEntry(entry, { silent = false } = {}){
   if(!entry || !entry.parsed?.ok) return;
@@ -1835,6 +2038,12 @@ async function preflightExtEntry(entry, { silent = false } = {}){
     entry.note=needsLogin ? t('extmgr.preflightNeedsLogin')
       : t('extmgr.preflightFailed',{reason:reasonText(res.reason)});
     entry.noteKind=needsLogin?'warn':'muted';
+  }
+  /* 类型识别独立于仓库可达性：拿不到就是 unknown，不阻断安装，也不误拦。 */
+  entry.kind=await detectExtEntryKind(entry, acc);
+  if(entry.kind===PLUGIN_KINDS.server){
+    entry.note=t('extmgr.serverRepoDetected');
+    entry.noteKind='warn';
   }
   if(!silent) renderExtensionView();
 }
@@ -1927,7 +2136,7 @@ function accountRowHtml(acc){
 }
 function oauthHtml(){
   return '<details class="ext-oauth" data-extoauth>'
-    +'<summary>'+t('extmgr.oauthTitle')+'</summary>'
+    +extSummaryHtml(t('extmgr.oauthTitle'))
     +'<div class="ext-note">'+t('extmgr.oauthNote')+'</div>'
     +'<div class="ext-row oauth-redirect-row">'
       +'<span class="et-label">'+t('extmgr.oauthRedirect')+'</span>'
@@ -1946,6 +2155,76 @@ function oauthHtml(){
     +'<div class="ext-note">'+oauthHintText()+'</div>'
   +'</details>';
 }
+/** 持久化开发者页设置；演示模式下只读不写（同一纪律：演示不得污染真实设置）。 */
+function persistDev(patch){
+  if(state.tutorialMode) return loadSettings();
+  return saveSettings({ ...loadSettings(), ...patch });
+}
+/** 参与自动更新的扩展名集合（宿主页逐扩展勾选，单一事实源）。 */
+function devUpdateSelected(){
+  const s=loadSettings();
+  return new Set(Array.isArray(s.gitUpdateSelected)?s.gitUpdateSelected:[]);
+}
+/** 折叠头箭头（可点击打开的可视提示，纯 CSS 旋转）。 */
+function chevronSvg(){ return '<svg class="ext-chev" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>'; }
+/** 拖拽手柄（扩展排序）。 */
+function gripSvg(){ return '<svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor" aria-hidden="true"><circle cx="9" cy="6" r="1.4"/><circle cx="15" cy="6" r="1.4"/><circle cx="9" cy="12" r="1.4"/><circle cx="15" cy="12" r="1.4"/><circle cx="9" cy="18" r="1.4"/><circle cx="15" cy="18" r="1.4"/></svg>'; }
+/** 折叠头：标题 + 数量徽标 + 箭头 + 展开提示（数量只在列表头显示，不进 summary 文案）。 */
+function extSummaryHtml(label, count){
+  return '<summary class="ext-summary">'
+    +'<span class="ext-summary-label">'+label+(Number.isFinite(count)?'<span class="ext-count">'+count+'</span>':'')+'</span>'
+    +chevronSvg()
+    +'<span class="ext-summary-hint">'+t('extmgr.expandHint')+'</span>'
+  +'</summary>';
+}
+/** 开发者页：父项「自动更新」+ 子项「检查间隔」「模式」；间隔与模式不拆成两个区块。 */
+function devAutoUpdateHtml(){
+  const s=loadSettings();
+  const on=!!s.gitAutoUpdate;
+  const hours=Number(s.gitUpdateIntervalHours)||6;
+  const mode=s.gitUpdateMode==='auto'?'auto':'notify';
+  return '<div class="ext-dev-block" data-devblock>'
+    +'<label class="check"><input type="checkbox" data-devparent'+(on?' checked':'')+'> '+t('extmgr.autoUpdate')+'</label>'
+    +'<div class="ext-dev-sub">'
+    +'<label class="et-git"><span>'+t('extmgr.autoInterval')+'</span>'
+    +'<input class="text_pole" type="number" min="1" max="168" step="1" data-devinterval value="'+hours+'"'+(on?'':' disabled')+'></label>'
+    +'<label class="et-git"><span>'+t('extmgr.autoMode')+'</span>'
+    +'<select class="text_pole" data-devmode'+(on?'':' disabled')+'>'
+    +'<option value="notify"'+(mode==='notify'?' selected':'')+'>'+t('extmgr.autoModeNotify')+'</option>'
+    +'<option value="auto"'+(mode==='auto'?' selected':'')+'>'+t('extmgr.autoModeAuto')+'</option>'
+    +'</select></label>'
+    +'</div>'
+    +'<div class="ext-note">'+t('extmgr.autoNote')+'</div>'
+    +'</div>';
+}
+function bindDevBlock(body){
+  const block=body.querySelector('[data-devblock]');
+  if(!block) return;
+  const parent=block.querySelector('[data-devparent]');
+  const intervalEl=block.querySelector('[data-devinterval]');
+  const modeEl=block.querySelector('[data-devmode]');
+  const syncChildren=()=>{
+    const on=!!parent?.checked;
+    if(intervalEl) intervalEl.disabled=!on;
+    if(modeEl) modeEl.disabled=!on;
+  };
+  syncChildren();
+  parent?.addEventListener('change',()=>{
+    persistDev({ gitAutoUpdate: !!parent.checked });
+    syncChildren();
+    toast(t('extmgr.devSaved'));
+  });
+  intervalEl?.addEventListener('change',()=>{
+    const hours=Math.max(1,Math.min(168,Math.round(Number(intervalEl.value)||6)));
+    intervalEl.value=String(hours);
+    persistDev({ gitUpdateIntervalHours: hours });
+    toast(t('extmgr.devSaved'));
+  });
+  modeEl?.addEventListener('change',()=>{
+    persistDev({ gitUpdateMode: modeEl.value==='auto'?'auto':'notify' });
+    toast(t('extmgr.devSaved'));
+  });
+}
 function accountsHtml(){
   const list=gitAccountList();
   const mode=gitStorageMode();
@@ -1955,7 +2234,7 @@ function accountsHtml(){
         +escapeHtml(r.label)+' · '+(r.ok?t('extmgr.accountOk',{login:r.login||'-'}):reasonText(r.reason))+'</span>').join('')+'</div>'
     : '';
   return '<details class="ext-accounts" data-extaccounts'+(state.extAccountsOpen?' open':'')+'>'
-    +'<summary>'+t('extmgr.accountsTitle',{n:list.length})+'</summary>'
+    +extSummaryHtml(t('extmgr.accountsTitle'), list.length)
     +'<div class="ext-note privacy">'+t('extmgr.privacyNote')+'</div>'
     +'<div class="ext-row">'
       +'<span class="et-label">'+t('extmgr.storageLabel')+'</span>'
@@ -1996,19 +2275,40 @@ function entryRowHtml(e,i){
     +'<div class="ext-sub">'
       +'<span class="acc-kind">'+kind+'</span>'
       +(e.note?'<span class="ext-note-inline is-'+(e.noteKind||'muted')+'">'+escapeHtml(e.note)+'</span>':'')
+      +(e.kind===PLUGIN_KINDS.server?'<span class="ext-flag-warn">'+t('extmgr.kindServer')+'</span>':'')
       +(e.privateHint?'<span class="ext-flag-warn">'+t('extmgr.privateBadge')+'</span>':'')
     +'</div>'
   +'</div>';
 }
 /** 安装区只重绘自己：宿主页的已装列表是异步拉取，不能被进度刷新连累。 */
+/** 安装区只重绘自己：宿主页的已装列表是异步拉取，不能被进度刷新连累。 */
 function refreshInstallArea(){
   const area=document.getElementById('extmgr-install-area');
   if(area) renderExtInstall(area);
 }
-/** 凭据页：账号 / 存储位置 / OAuth / 令牌指引，不含任何安装控件。 */
+/** 安装扩展是扩展管理面板的**固定页脚**：贴在面板底部、紧挨安装报告条，不随列表滚动。
+ *  只在宿主页显示；报告展开或切到开发者/打包页时隐藏。 */
+function syncExtInstallBlock(){
+  const block=document.getElementById('extmgr-install-block');
+  if(!block) return;
+  const show=state.extTab==='host' && !state.extReportOpen;
+  block.hidden=!show;
+  const area=document.getElementById('extmgr-install-area');
+  if(area) area.hidden=!state.extInstallOpen;
+  const btn=document.getElementById('extmgr-install-toggle');
+  if(btn){
+    btn.setAttribute('aria-expanded',state.extInstallOpen?'true':'false');
+    const label=btn.querySelector('.ext-install-label');
+    if(label) label.textContent=t('extmgr.installBlock');
+    else btn.textContent=t('extmgr.installBlock');
+    btn.classList.toggle('is-open',state.extInstallOpen);
+  }
+}
+/** 凭据（开发者）页：自动更新父子块 + 账号 / 存储位置 / OAuth / 令牌指引，不含任何安装控件。 */
 function renderExtCredentials(body){
-  body.innerHTML='<div class="ext-install">'+accountsHtml()+'</div>';
+  body.innerHTML='<div class="ext-install">'+devAutoUpdateHtml()+accountsHtml()+'</div>';
   bindAccounts(body);
+  bindDevBlock(body);
 }
 function renderExtInstall(body){
   const rows=state.extEntries.map(entryRowHtml).join('');
@@ -2161,6 +2461,16 @@ async function preflightAll(){
 }
 async function runExtInstall(){
   if(state.extRunning) return;
+  /* 前后端误装预案：已识别为服务端插件的仓库拒绝装进扩展目录，并给替代措施。
+     未识别的（kind=unknown）不拦，仍按宿主真实结果如实报告。 */
+  const serverEntries=(state.extEntries||[]).filter((e)=>e.kind===PLUGIN_KINDS.server);
+  if(serverEntries.length){
+    openModal(t('extmgr.misinstallTitle'), t('extmgr.misinstallDesc',{n:serverEntries.length}),
+      ['<div class="rep-grid">'+serverEntries.map((e)=>'<div class="rep-row"><span>'+escapeHtml(e.parsed?.repo||e.url)+'</span><b>'+t('extmgr.kindServer')+'</b></div>').join('')+'</div>',
+       '<div class="ext-note">'+t('extmgr.misinstallHow')+'</div>'],
+      [{label:t('modal.close'),onClick:closeModal}]);
+    return;
+  }
   state.extRunning=true; state.extResults=[];
   renderExtensionView();
   try {
@@ -2252,13 +2562,24 @@ function nativeToast(msg,opts){
   toast(msg);
   return false;
 }
-/** 开发模式自动更新：静默直接装；提示模式先弹原生浮层，点击即取消，超时才更新。 */
+/**
+ * 自动更新：父项总开关 + 逐扩展勾选 + 全局间隔/模式（全部读设置，禁止硬编码）。
+ * - `auto`：发现新版本直接装；`notify`：先弹原生浮层 8s，点击通知即取消本次更新。
+ * - 每次会话只跑一次；间隔未到直接跳过；演示模式只读不写。
+ * - 读不到本地/远端版本、版本不高于本地、仓库不可达：一律静默跳过，不伪造结果。
+ */
 async function runDevAutoUpdate(){
   if(state.devAutoRan) return;
   state.devAutoRan=true;
   const s=gitSettings();
-  const modes=s.gitDevMode||{};
-  const regs=(s.gitInstalls||[]).filter((r)=>modes[r.name]);
+  if(!s.devMode || !s.gitAutoUpdate) return;
+  const hours=Math.max(1,Math.min(168,Number(s.gitUpdateIntervalHours)||6));
+  const lastAt=Number(s.gitAutoUpdateLastAt)||0;
+  if(lastAt && Date.now()-lastAt < hours*3600*1000) return;
+  const selected=new Set(Array.isArray(s.gitUpdateSelected)?s.gitUpdateSelected:[]);
+  const regs=(s.gitInstalls||[]).filter((r)=>selected.has(r.name));
+  if(!regs.length) return;
+  const mode=s.gitUpdateMode==='auto'?'auto':'notify';
   for(const reg of regs){
     const parsed=parseRepoUrl(reg.url);
     if(!parsed.ok) continue;
@@ -2273,14 +2594,17 @@ async function runDevAutoUpdate(){
     const runUpdate=async()=>{
       const credential=acc ? { kind: acc.username?'basic':'token', username:acc.username, secret:acc.secret } : null;
       const items=await actions.installExtensions?.([{ url:reg.url, branch:reg.ref||'', ref:reg.ref||'', credential, replace:true }]);
-      const ok=Array.isArray(items) ? items.some((r)=>r.status==='ok') : true;
-      if(ok){
-        nativeToast(t('extmgr.devUpdated',{name:reg.name})+' · '+t('extmgr.devRefresh'), {
-          onclick:()=>{ try{ window.location.reload(); }catch{} },
-        });
+      const failed=Array.isArray(items) ? items.find((r)=>r.status!=='ok') : null;
+      if(failed){
+        state.extUpdateFail={...(state.extUpdateFail||{}),[reg.name]:failed.error||t('extmgr.updateFailed')};
+        nativeToast(t('extmgr.devUpdateFailed',{name:reg.name}));
+        return;
       }
+      nativeToast(t('extmgr.devUpdated',{name:reg.name})+' · '+t('extmgr.devRefresh'), {
+        onclick:()=>{ try{ window.location.reload(); }catch{ /* 宿主可能禁止重载 */ } },
+      });
     };
-    if(modes[reg.name]==='silent'){ await runUpdate(); continue; }
+    if(mode==='auto'){ await runUpdate(); continue; }
     let cancelled=false;
     nativeToast(t('extmgr.devFound',{name:reg.name,from:localVersion,to:remoteVersion}), {
       onclick:()=>{ cancelled=true; toast(t('extmgr.devCancelled')); },
@@ -2288,6 +2612,158 @@ async function runDevAutoUpdate(){
     await new Promise((resolve)=>setTimeout(resolve,8000));
     if(!cancelled) await runUpdate();
   }
+  if(!state.tutorialMode){
+    saveSettings({ ...gitSettings(), gitAutoUpdateLastAt: Date.now() });
+  }
+}
+/** 扩展来源标记（本地 / 全局）；服务端插件走独立分区，不混进这张表。 */
+function extSourceTag(sourceType){
+  if(sourceType==='global') return '<span class="ext-flag">'+t('extmgr.sourceGlobal')+'</span>';
+  if(sourceType==='local') return '<span class="ext-flag">'+t('extmgr.sourceLocal')+'</span>';
+  return '';
+}
+/** 管理员专属：「服务端插件」分区。非管理员不渲染、不伪造。 */
+function serverPluginBlockHtml(){
+  if(!state.extHostAdmin) return '';
+  if(state.extServerError){
+    return '<div class="ext-note ext-server-note">'+t('extmgr.serverUnavailable',{reason:state.extServerError})+'</div>';
+  }
+  if(state.extServerPlugins===null){
+    return '<div class="ext-note ext-server-note">'+t('extmgr.serverLoading')+'</div>';
+  }
+  const list=state.extServerPlugins;
+  const enabledTag=state.extServerEnabled===false
+    ? '<span class="ext-flag-warn">'+t('extmgr.serverDisabled')+'</span>' : '';
+  const rows=list.map((p)=>'<div class="ext-entry is-ok ext-server-row">'
+    +'<span class="ext-url" title="'+escapeHtml(p.remoteUrl||p.directory)+'">'+escapeHtml(p.directory||p.packageName)+'</span>'
+    +'<span class="ext-state">'+escapeHtml(p.version||'-')+(p.packageName?' · '+escapeHtml(p.packageName):'')+'</span>'
+  +'</div>').join('');
+  return '<details class="ext-server-block" data-extserver'+(state.extServerOpen?' open':'')+'>'
+    +extSummaryHtml(t('extmgr.serverTitle'), list.length)+enabledTag
+    +'<div class="ext-note">'+t('extmgr.serverNote')+'</div>'
+    +'<div class="ext-list">'+(rows||'<div class="ext-empty">'+t('extmgr.serverEmpty')+'</div>')+'</div>'
+    +(state.extServerPath?'<div class="ext-note ext-path">'+escapeHtml(state.extServerPath)+'</div>':'')
+  +'</details>';
+}
+/** 管理员身份 + 服务端插件清单只读一次；非管理员到此为止（不留空分区）。 */
+async function loadServerPlugins(){
+  if(state.extServerLoaded) return;
+  state.extServerLoaded=true;
+  let identity=null;
+  try { identity=await actions.hostIdentity?.(); } catch { identity=null; }
+  state.extHostAdmin=!!(identity && identity.ok && identity.admin);
+  state.extHostUser=identity?.handle||'';
+  if(!state.extHostAdmin) return;
+  let res=null;
+  try { res=await actions.listServerPlugins?.(); } catch { res=null; }
+  if(res && res.ok){
+    state.extServerPlugins=Array.isArray(res.plugins)?res.plugins:[];
+    state.extServerEnabled=res.enabled===true;
+    state.extServerPath=res.pluginsPath||'';
+    state.extServerError='';
+  } else {
+    state.extServerPlugins=[];
+    state.extServerError=res ? String(res.reason||('http-'+(res.status||0))) : 'unavailable';
+  }
+  if(state.extTab==='host') renderExtensionView();
+}
+/** 逐扩展勾选写回设置（演示模式只读）。 */
+function persistDevSelection(body){
+  const boxes=[...body.querySelectorAll('[data-devext]')];
+  const names=boxes.filter((el)=>el.checked).map((el)=>el.dataset.devext);
+  persistDev({ gitUpdateSelected:names });
+  const info=body.querySelector('#extmgr-dev-count');
+  if(info) info.textContent=t('extmgr.autoSelectedN',{n:names.length,total:boxes.length});
+}
+/** 单个已登记扩展的更新（replace=true），失败如实记录，供「删除后重装」使用。 */
+async function updateRegisteredExtension(name){
+  const s=gitSettings();
+  const reg=(s.gitInstalls||[]).find((r)=>r.name===name);
+  if(!reg){ toast(t('extmgr.noRegistry')); return; }
+  const parsed=parseRepoUrl(reg.url);
+  const acc=parsed.ok?accountForRepo(parsed):null;
+  const credential=acc ? { kind: acc.username?'basic':'token', username:acc.username, secret:acc.secret } : null;
+  const items=await actions.installExtensions?.([
+    { url:reg.url, branch:reg.ref||'', ref:reg.ref||'', credential, replace:true },
+  ])||[];
+  const failed=items.find((r)=>r.status!=='ok');
+  state.extUpdateFail={...(state.extUpdateFail||{})};
+  if(failed){
+    state.extUpdateFail[name]=failed.error||t('extmgr.updateFailed');
+    toast(t('extmgr.updateFailed'));
+  } else {
+    delete state.extUpdateFail[name];
+    toast(t('extmgr.devUpdated',{name})+' · '+t('extmgr.devRefresh'));
+  }
+  renderExtensionView();
+}
+/** 更新失败预案：二次确认后删除扩展再重新安装（插件连续动作）。 */
+function reinstallWithConfirm(name){
+  const item=(state.extInstalled||[]).find((x)=>String(x?.id||x?.folder||x?.name||'')===name);
+  const isGlobal=String(item?.sourceType||'')==='global';
+  openModal(t('extmgr.reinstallTitle'), t('extmgr.reinstallDesc',{name}), [], [
+    {label:t('modal.cancel'),onClick:closeModal},
+    {label:t('extmgr.reinstallConfirm'),danger:true,onClick:()=>{ closeModal(); void reinstallExtension(name,isGlobal); }},
+  ]);
+}
+async function reinstallExtension(name, isGlobal){
+  const s=gitSettings();
+  const reg=(s.gitInstalls||[]).find((r)=>r.name===name);
+  if(!reg){ toast(t('extmgr.noRegistry')); return; }
+  let removed=false;
+  try { removed=!!(await actions.deleteExtension?.(name, isGlobal)); } catch { removed=false; }
+  if(!removed){ toast(t('extmgr.deleteFailed')); return; }
+  const parsed=parseRepoUrl(reg.url);
+  const acc=parsed.ok?accountForRepo(parsed):null;
+  const credential=acc ? { kind: acc.username?'basic':'token', username:acc.username, secret:acc.secret } : null;
+  const items=await actions.installExtensions?.([
+    { url:reg.url, branch:reg.ref||'', ref:reg.ref||'', credential, replace:false },
+  ])||[];
+  const failed=items.find((r)=>r.status!=='ok');
+  state.extUpdateFail={...(state.extUpdateFail||{})};
+  if(failed){
+    state.extUpdateFail[name]=failed.error||t('extmgr.updateFailed');
+    toast(t('extmgr.updateFailed'));
+  } else {
+    delete state.extUpdateFail[name];
+    toast(t('extmgr.devUpdated',{name})+' · '+t('extmgr.devRefresh'));
+  }
+  renderExtensionView();
+}
+/** 宿主已装扩展的稳定记录（名字 / 版本 / 来源），排序与持久化都基于它。 */
+function installedRowRecords(){
+  return (state.extInstalled||[]).map((x)=>({
+    x,
+    name:String(x?.id||x?.folder||x?.name||''),
+    version:String(x?.version||x?.manifest?.version||''),
+    sourceType:String(x?.sourceType||''),
+  })).filter((row)=>row.name);
+}
+/** 排序：自定义（拖拽顺序）优先，其余按名称 / 版本 / 来源稳定排序。 */
+function sortedInstalledRecords(records, sort){
+  const order=new Map(((loadSettings().extOrder)||[]).map((name,index)=>[name,index]));
+  const arr=[...records];
+  if(sort==='name') arr.sort((a,b)=>a.name.localeCompare(b.name));
+  else if(sort==='version') arr.sort((a,b)=>compareVersions(b.version,a.version)||a.name.localeCompare(b.name));
+  else if(sort==='source') arr.sort((a,b)=>a.sourceType.localeCompare(b.sourceType)||a.name.localeCompare(b.name));
+  else arr.sort((a,b)=>(order.has(a.name)?order.get(a.name):Number.MAX_SAFE_INTEGER)
+    -(order.has(b.name)?order.get(b.name):Number.MAX_SAFE_INTEGER)||a.name.localeCompare(b.name));
+  return arr;
+}
+/** 拖拽排序：把 from 插到 to 的位置，写回 settings.extOrder 并切到自定义排序。 */
+function reorderInstalled(from, to){
+  if(!from || !to || from===to) return;
+  const names=installedRowRecords().map((row)=>row.name);
+  const s=loadSettings();
+  const base=(Array.isArray(s.extOrder)&&s.extOrder.length?s.extOrder:names).filter((name)=>names.includes(name));
+  for(const name of names) if(!base.includes(name)) base.push(name);
+  const fromIndex=base.indexOf(from);
+  const toIndex=base.indexOf(to);
+  if(fromIndex<0||toIndex<0) return;
+  base.splice(fromIndex,1);
+  base.splice(toIndex,0,from);
+  persistDev({ extOrder:base, extSort:'custom' });
+  renderExtensionView();
 }
 async function renderExtInstalled(body){
   body.innerHTML='<div class="ext-empty">'+t('extmgr.loading')+'</div>';
@@ -2298,66 +2774,123 @@ async function renderExtInstalled(body){
   } catch { list=[]; }
   if(state.extTab!=='host' || state.extReportOpen) return;
   state.extInstalled=list;
-  const devModes=gitSettings().gitDevMode||{};
-  const installedGit=new Set((gitSettings().gitInstalls||[]).map((r)=>r.name));
-  const rows=list.map((x)=>{
-    const name=x?.name||x?.folder||x?.internalName||'';
-    const version=x?.version||x?.manifest?.version||'';
-    const dev=devModes[name]||'off';
-    const devSel=installedGit.has(name)
-      ? '<select class="text_pole ext-dev" data-dev="'+escapeHtml(name)+'">'
-        +'<option value="off"'+(dev==='off'?' selected':'')+'>'+t('extmgr.devOff')+'</option>'
-        +'<option value="silent"'+(dev==='silent'?' selected':'')+'>'+t('extmgr.devSilent')+'</option>'
-        +'<option value="prompt"'+(dev==='prompt'?' selected':'')+'>'+t('extmgr.devPrompt')+'</option>'
-        +'</select>'
-      : '';
-    return '<div class="ext-entry is-ok"><span class="ext-url" title="'+escapeHtml(name)+'">'+escapeHtml(name)+'</span><span class="ext-state">'+escapeHtml(version)+'</span>'+devSel+'</div>';
+  const installedGit=new Set((loadSettings().gitInstalls||[]).map((r)=>r.name));
+  const selected=devUpdateSelected();
+  const s=loadSettings();
+  const sort=['custom','name','version','source'].includes(s.extSort)?s.extSort:'custom';
+  const records=sortedInstalledRecords(installedRowRecords(), sort);
+  const rows=records.map(({x,name,version})=>{
+    const registered=installedGit.has(name);
+    const box=registered
+      ? '<label class="check ext-dev-check"><input type="checkbox" data-devext="'+escapeHtml(name)+'"'+(selected.has(name)?' checked':'')+'></label>'
+      : '<span class="ext-dev-check"></span>';
+    return '<div class="ext-entry is-ok'+(registered?' ext-dev-row':'')+'" role="listitem"'
+      +' draggable="true" data-extrow="'+escapeHtml(name)+'">'
+      +'<span class="ext-drag" title="'+t('extmgr.dragHint')+'">'+gripSvg()+'</span>'+box
+      +'<span class="ext-url" title="'+escapeHtml(name)+'">'+escapeHtml(name)+'</span>'
+      +'<span class="ext-state">'+escapeHtml(version)+'</span>'
+      +extSourceTag(x?.sourceType)+'</div>';
   }).join('');
+  const devActions=installedGit.size
+    ? '<span class="ext-dev-actions">'
+      +'<span class="ext-state" id="extmgr-dev-count">'+t('extmgr.autoSelectedN',{n:selected.size,total:installedGit.size})+'</span>'
+      +'<button type="button" class="btn" data-devall>'+t('extmgr.selectAll')+'</button>'
+      +'<button type="button" class="btn" data-devinvert>'+t('extmgr.invert')+'</button>'
+      +'<button type="button" class="btn" data-devnone>'+t('extmgr.selectNone')+'</button>'
+      +'</span>'
+    : '';
   const upd=state.extUpdate;
+  const fails=state.extUpdateFail||{};
   const updRows=upd && Array.isArray(upd.rows)
-    ? upd.rows.map((r)=>'<div class="ext-entry upd-row is-'+(r.status==='update'?'update':r.status==='latest'?'ok':'pending')+'">'
+    ? upd.rows.map((r)=>{
+      const failed=!!fails[r.name];
+      const actionsHtml=(r.status==='update'||failed)
+        ? '<span class="ext-actions">'
+          +(r.status==='update'?'<button type="button" class="btn" data-extupdate="'+escapeHtml(r.name)+'">'+t('extmgr.updateNow')+'</button>':'')
+          +'<button type="button" class="btn" data-extreinstall="'+escapeHtml(r.name)+'">'+t('extmgr.reinstall')+'</button>'
+          +'</span>'
+        : '';
+      return '<div class="ext-entry upd-row is-'+(r.status==='update'?'update':failed?'failed':r.status==='latest'?'ok':'pending')+'">'
         +'<span class="ext-url" title="'+escapeHtml(r.url)+'">'+escapeHtml(r.name)+'</span>'
         +'<span class="ext-state">'+t('extmgr.updateVersions',{local:r.localVersion||'-',remote:r.remoteVersion||'-'})+'</span>'
         +'<span class="ext-state'+(r.status==='update'?' is-warn':'')+'">'+updateStatusText(r)+(r.reason?' · '+reasonText(r.reason):'')+'</span>'
-      +'</div>').join('')
+        +actionsHtml
+      +'</div>'
+        +(failed?'<div class="ext-sub"><span class="ext-note-inline is-warn">'+escapeHtml(fails[r.name])+'</span></div>':'');
+    }).join('')
     : '';
   const updBlock=upd
     ? '<div class="ext-note">'+(upd.busy ? t('extmgr.updateChecking') : (upd.note||t('extmgr.updateHint')))+'</div>'
       +'<div class="ext-list">'+(updRows||'')+'</div>'
     : '';
-  body.innerHTML='<div class="ext-install"><div class="ext-row">'
+  const sortOptions=[['custom','extmgr.sortCustom'],['name','extmgr.sortName'],['version','extmgr.sortVersion'],['source','extmgr.sortSource']];
+  const toolbar='<div class="ext-toolbar">'
     +'<button type="button" class="btn" id="extmgr-export-assetlist">'+t('extmgr.exportAssetList')+'</button>'
     +'<button type="button" class="btn" id="extmgr-check-updates"'+(upd&&upd.busy?' disabled':'')+'>'+t('extmgr.checkUpdates')+'</button>'
     +'<button type="button" class="btn" id="extmgr-refresh-installed">'+t('extmgr.refresh')+'</button>'
-    +'<span style="flex:1"></span></div>'
+    +'<span class="ext-spacer"></span>'
+    +'<label class="field"><span>'+t('extmgr.sortLabel')+'</span><select class="text_pole" data-extsort>'
+    +sortOptions.map(([value,key])=>'<option value="'+value+'"'+(sort===value?' selected':'')+'>'+t(key)+'</option>').join('')
+    +'</select></label>'
+  +'</div>';
+  const listHead='<div class="ext-list-head">'
+    +'<span class="ext-list-count">'+t('extmgr.listCount',{n:list.length})+'</span>'
+    +(sort==='custom'?'<span class="ext-list-hint">'+t('extmgr.dragHint')+'</span>':'')
+    +'<span class="ext-spacer"></span>'
+    +devActions
+  +'</div>';
+  body.innerHTML='<div class="ext-install">'
+    +toolbar
     +'<details class="ext-host-list" open>'
-    +'<summary>'+t('extmgr.hostListTitle',{n:list.length})+'</summary>'
-    +'<div class="ext-list">'+(rows||'<div class="ext-empty">'+t('extmgr.noneInstalled')+'</div>')+'</div>'
+    +extSummaryHtml(t('extmgr.hostListTitle'))
+    +listHead
+    +'<div class="ext-list" role="list">'+(rows||'<div class="ext-empty">'+t('extmgr.noneInstalled')+'</div>')+'</div>'
     +'</details>'
+    +serverPluginBlockHtml()
     +updBlock
-    +'<div class="ext-install-block" id="extmgr-install-block">'
-    +'<div class="ext-install-area" id="extmgr-install-area"'+(state.extInstallOpen?'':' hidden')+'></div>'
-    +'<button type="button" class="btn" id="extmgr-install-toggle" aria-expanded="'+(state.extInstallOpen?'true':'false')+'">'
-    +t('extmgr.installBlock')+(state.extInstallOpen?' ▲':' ▲')+'</button>'
-    +'</div></div>';
+    +'</div>';
   body.querySelector('#extmgr-export-assetlist')?.addEventListener('click',()=>actions.exportAssetList?.({source:'host'}));
   body.querySelector('#extmgr-check-updates')?.addEventListener('click',()=>{ void checkExtUpdates(); });
-  body.querySelector('#extmgr-refresh-installed')?.addEventListener('click',()=>{ state.extInstalled=null; state.extUpdate=null; renderExtensionView(); });
-  const installToggle=body.querySelector('#extmgr-install-toggle');
-  installToggle?.addEventListener('click',()=>{
-    state.extInstallOpen=!state.extInstallOpen;
-    const area=body.querySelector('#extmgr-install-area');
-    if(area) area.hidden=!state.extInstallOpen;
-    installToggle.setAttribute('aria-expanded',state.extInstallOpen?'true':'false');
-    if(state.extInstallOpen) refreshInstallArea();
+  body.querySelector('#extmgr-refresh-installed')?.addEventListener('click',()=>{ state.extInstalled=null; state.extUpdate=null; state.extUpdateFail={}; renderExtensionView(); });
+  syncExtInstallBlock();
+  body.querySelector('[data-extsort]')?.addEventListener('change',(e)=>{
+    persistDev({ extSort:e.target.value });
+    renderExtensionView();
+  });
+  /* 拖拽排序：HTML5 DnD，落点即插入位置；写回自定义顺序。 */
+  let dragName='';
+  body.querySelectorAll('[data-extrow]').forEach((row)=>{
+    row.addEventListener('dragstart',(e)=>{
+      dragName=row.dataset.extrow;
+      row.classList.add('is-dragging');
+      try { e.dataTransfer.setData('text/plain', dragName); e.dataTransfer.effectAllowed='move'; } catch { /* 非关键 */ }
+    });
+    row.addEventListener('dragend',()=>{ row.classList.remove('is-dragging'); dragName=''; });
+    row.addEventListener('dragover',(e)=>{
+      if(!dragName) return;
+      e.preventDefault();
+      try { e.dataTransfer.dropEffect='move'; } catch { /* 非关键 */ }
+    });
+    row.addEventListener('drop',(e)=>{
+      if(!dragName) return;
+      e.preventDefault();
+      reorderInstalled(dragName, row.dataset.extrow);
+    });
   });
   refreshInstallArea();
-  body.querySelectorAll('[data-dev]').forEach((el)=>el.addEventListener('change',()=>{
-    const s=gitSettings(); const map={...(s.gitDevMode||{})};
-    if(el.value==='off') delete map[el.dataset.dev]; else map[el.dataset.dev]=el.value;
-    saveSettings({...s, gitDevMode:map});
-    toast(t('extmgr.devSaved'));
+  body.querySelectorAll('[data-devext]').forEach((el)=>el.addEventListener('change',()=>persistDevSelection(body)));
+  body.querySelectorAll('[data-devall],[data-devinvert],[data-devnone]').forEach((btn)=>btn.addEventListener('click',()=>{
+    const boxes=[...body.querySelectorAll('[data-devext]')];
+    if(btn.hasAttribute('data-devall')) boxes.forEach((box)=>{ box.checked=true; });
+    else if(btn.hasAttribute('data-devinvert')) boxes.forEach((box)=>{ box.checked=!box.checked; });
+    else boxes.forEach((box)=>{ box.checked=false; });
+    persistDevSelection(body);
   }));
+  const serverBox=body.querySelector('[data-extserver]');
+  serverBox?.addEventListener('toggle',()=>{ state.extServerOpen=!!serverBox.open; });
+  body.querySelectorAll('[data-extupdate]').forEach((btn)=>btn.addEventListener('click',()=>{ void updateRegisteredExtension(btn.dataset.extupdate); }));
+  body.querySelectorAll('[data-extreinstall]').forEach((btn)=>btn.addEventListener('click',()=>reinstallWithConfirm(btn.dataset.extreinstall)));
+  void loadServerPlugins();
   void runDevAutoUpdate();
 }
 function renderExtReport(body){
@@ -2486,6 +3019,7 @@ function renderExtensionView(){
   if(panel){
     if(open) renderExtReport(panel); else panel.innerHTML='';
   }
+  syncExtInstallBlock();
   if(open) return;
   if(state.extTab==='host'){ void renderExtInstalled(body); return; }
   if(state.extTab==='pack'){ renderExtPack(body); return; }
@@ -3283,6 +3817,9 @@ function openTrafficModal(onConfirm, { enabled = true, onNever, onCancel } = {})
     { title:'help.extmgr.installTitle', points:['help.extmgr.installP1','help.extmgr.installP2','help.extmgr.installP3'] },
     { title:'help.extmgr.packTitle', points:['help.extmgr.packP1','help.extmgr.packP2'] },
     { title:'help.extmgr.reportTitle', points:['help.extmgr.reportP1','help.extmgr.reportP2'] },
+    { title:'help.extmgr.devTitle', points:['help.extmgr.devP1','help.extmgr.devP2','help.extmgr.devP3'] },
+    { title:'help.extmgr.kindTitle', points:['help.extmgr.kindP1','help.extmgr.kindP2','help.extmgr.kindP3'] },
+    { title:'help.extmgr.gitTitle', points:['help.extmgr.gitP1','help.extmgr.gitP2','help.extmgr.gitP3'] },
     { title:'help.extmgr.dataTitle', points:['help.extmgr.dataP1','help.extmgr.dataP2'] },
   ]},
   gitToken:{ title:'help.gitToken.title', intro:'help.gitToken.intro', sections:[
@@ -3909,6 +4446,18 @@ function bind(){
 
   // ── 数据包模式行：导入时显示「从宿主拉取」，导出时显示覆盖/增量 ──
   document.getElementById('btn-fetch')?.addEventListener('click',()=>doFetch());
+  /* 数据包列：数据包 / Git 页签互换（开发者模式才显示）。 */
+  document.getElementById('zone-side-tabs')?.addEventListener('click',(e)=>{
+    const b=e.target.closest('[data-sidetab]'); if(!b) return;
+    state.sideTab=b.dataset.sidetab==='git'?'git':'zone';
+    renderZoneSide();
+  });
+  /* 安装扩展是面板固定页脚：按钮只在模板里存在一份，监听器也只绑一次（禁止每次重绘重复绑定）。 */
+  document.getElementById('extmgr-install-toggle')?.addEventListener('click',()=>{
+    state.extInstallOpen=!state.extInstallOpen;
+    syncExtInstallBlock();
+    if(state.extInstallOpen) refreshInstallArea();
+  });
   document.getElementById('transfer-tabs')?.addEventListener('click',(e)=>{
     const b=e.target.closest('[data-transfer-tab]'); if(!b) return;
     state.transfer.tab=b.dataset.transferTab==='cloud'?'cloud':'lan';
@@ -4438,6 +4987,7 @@ initChartSplitters();
     state.seq = pkgSeq();
     renderHeader();
     renderZones();
+    renderZoneSide();
     renderActions();
     renderChart();
     syncMainView();
@@ -4743,6 +5293,7 @@ initChartSplitters();
       if(!s) return;
       state.confirmDiscardChartPrefs = s.confirmDiscardChartPrefs !== false;
       renderChart();
+      renderZoneSide();
     },
     openTutorial,
     renderLog,

@@ -70,6 +70,48 @@ export function commitsEndpoint(repo, ref, { perPage = 1 } = {}) {
   return `https://${repo.host}/api/v1/repos/${repo.owner}/${repo.repo}/commits?${refName}limit=${perPage}`;
 }
 
+/**
+ * 标签列表端点（Git 可视化只读：只取分支 / 标签 / 最近提交，不拉全量历史）。
+ * @param {object} repo parseRepoUrl 产物
+ * @param {{perPage?:number}} [options]
+ */
+export function tagsEndpoint(repo, { perPage = 50 } = {}) {
+  if (!repo?.ok) return null;
+  if (repo.site === SITES.GITHUB) {
+    return `https://api.github.com/repos/${repo.owner}/${repo.repo}/tags?per_page=${perPage}`;
+  }
+  if (repo.site === SITES.GITEE) {
+    return `https://gitee.com/api/v5/repos/${repo.owner}/${repo.repo}/tags?per_page=${perPage}`;
+  }
+  if (repo.site === SITES.GITLAB) {
+    const project = encodeURIComponent(`${repo.owner}/${repo.repo}`);
+    return `https://${repo.host}/api/v4/projects/${project}/repository/tags?per_page=${perPage}`;
+  }
+  return `https://${repo.host}/api/v1/repos/${repo.owner}/${repo.repo}/tags?limit=${perPage}`;
+}
+
+/**
+ * 单次提交详情端点（diff 面板）。
+ * GitLab 用 `/repository/commits/<sha>/diff`（返回 diff 数组）；其余站点用 commits/<sha>（含 files）。
+ * @param {object} repo parseRepoUrl 产物
+ * @param {string} sha 提交 SHA
+ */
+export function commitDetailEndpoint(repo, sha) {
+  if (!repo?.ok || !sha) return null;
+  const id = encodeURIComponent(String(sha));
+  if (repo.site === SITES.GITHUB) {
+    return `https://api.github.com/repos/${repo.owner}/${repo.repo}/commits/${id}`;
+  }
+  if (repo.site === SITES.GITEE) {
+    return `https://gitee.com/api/v5/repos/${repo.owner}/${repo.repo}/commits/${id}`;
+  }
+  if (repo.site === SITES.GITLAB) {
+    const project = encodeURIComponent(`${repo.owner}/${repo.repo}`);
+    return `https://${repo.host}/api/v4/projects/${project}/repository/commits/${id}/diff`;
+  }
+  return `https://${repo.host}/api/v1/repos/${repo.owner}/${repo.repo}/commits/${id}`;
+}
+
 /** 鉴权头（Gitee 走 query，故此处返回空对象）。 */
 export function authHeaders(site, token) {
   const t = String(token || '');
@@ -122,6 +164,62 @@ export function normalizeLatestCommit(payload) {
 }
 
 /**
+ * 提交列表归一（Git 可视化：只取最近 N 条，不拉全量历史）。
+ * @param {unknown} payload 站点 commits 接口响应
+ * @returns {Array<{sha:string, shortSha:string, message:string, author:string, date:string}>}
+ */
+export function normalizeCommitList(payload) {
+  const list = Array.isArray(payload) ? payload : [];
+  return list
+    .filter((row) => row && typeof row === 'object')
+    .map((row) => {
+      const sha = String(row.sha || row.id || row.commit?.id || row.commit?.sha || '');
+      const message = String(row.commit?.message || row.message || row.title || '').split('\n')[0];
+      const author = String(row.commit?.author?.name || row.author_name || row.author?.name || row.author?.login || '');
+      const date = String(
+        row.commit?.committer?.date || row.commit?.author?.date
+        || row.committed_date || row.created_at || row.authored_date || '',
+      );
+      return { sha, shortSha: sha.slice(0, 8), message, author, date };
+    })
+    .filter((row) => row.sha);
+}
+
+/**
+ * 标签列表归一：GitHub/Gitea/Gitee 用 `name`，GitLab 也用 `name`。
+ * @param {unknown} payload
+ * @returns {string[]}
+ */
+export function normalizeTags(payload) {
+  const list = Array.isArray(payload) ? payload : [];
+  return [...new Set(list.map((tag) => String(tag?.name || tag?.tag_name || '')).filter(Boolean))].sort();
+}
+
+/**
+ * 单次提交的变更文件归一。兼容两种形状：
+ * - GitHub / Gitee / Gitea：`{ files: [{ filename, additions, deletions, patch }] }`
+ * - GitLab：`[{ old_path, new_path, diff }]`
+ * @param {unknown} payload
+ * @returns {Array<{path:string, additions:number|null, deletions:number|null, patch:string}>}
+ */
+export function normalizeCommitFiles(payload) {
+  const rows = Array.isArray(payload)
+    ? payload
+    : (Array.isArray(payload?.files) ? payload.files : []);
+  return rows
+    .filter((row) => row && typeof row === 'object')
+    .map((row) => {
+      const path = String(row.filename || row.new_path || row.old_path || '');
+      const additions = Number.isFinite(Number(row.additions)) && row.additions !== undefined
+        ? Number(row.additions) : null;
+      const deletions = Number.isFinite(Number(row.deletions)) && row.deletions !== undefined
+        ? Number(row.deletions) : null;
+      return { path, additions, deletions, patch: String(row.patch || row.diff || '') };
+    })
+    .filter((row) => row.path);
+}
+
+/**
  * 远端 manifest.json 的原始地址（用于更新检查比对版本）。
  * @param {object} repo parseRepoUrl 产物
  * @param {string} ref 分支/标签（空时用默认分支名）
@@ -134,6 +232,24 @@ export function remoteManifestUrl(repo, ref) {
   if (repo.site === SITES.GITEE) return `https://gitee.com/${path}/raw/${r}/manifest.json`;
   if (repo.site === SITES.GITLAB) return `https://${repo.host}/${path}/-/raw/${r}/manifest.json`;
   return `https://${repo.host}/${path}/raw/branch/${r}/manifest.json`;
+}
+
+/**
+ * 仓库内任意文件的原始地址（前后端插件类型识别、manifest 读取）。
+ * @param {object} repo parseRepoUrl 产物
+ * @param {string} ref 分支/标签（空时用默认分支名）
+ * @param {string} file 仓库内相对路径，如 `manifest.json` / `package.json`
+ */
+export function remoteFileUrl(repo, ref, file) {
+  if (!repo?.ok) return '';
+  const r = String(ref || repo.ref || 'main');
+  const name = String(file || '').replace(/^\/+/, '');
+  if (!name) return '';
+  const path = `${repo.owner}/${repo.repo}`;
+  if (repo.site === SITES.GITHUB) return `https://raw.githubusercontent.com/${path}/${r}/${name}`;
+  if (repo.site === SITES.GITEE) return `https://gitee.com/${path}/raw/${r}/${name}`;
+  if (repo.site === SITES.GITLAB) return `https://${repo.host}/${path}/-/raw/${r}/${name}`;
+  return `https://${repo.host}/${path}/raw/branch/${r}/${name}`;
 }
 
 /** 语义化版本比较：a>b 返回 1，相等 0，a<b 返回 -1。非法输入按 0 段处理。 */

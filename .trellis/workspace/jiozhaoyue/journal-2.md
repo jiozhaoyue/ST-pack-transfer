@@ -1559,3 +1559,32 @@ Topics: [.trellis/spec/frontend/workbench-single-view.md](../../spec/frontend/wo
 - P2：父项自动更新套子项（间隔/模式）、逐扩展勾选与全选反选、间隔与模式入设置默认 6h+仅提醒
 - P2：管理员服务端插件分区 + 前后端误装拒绝 + HELP.extmgr 补全 + 更新失败可删后重装
 - P3：先出桌面/手机 Git 可视化切换草图，再做本地 .git + 登记云端只读视图（分支/提交/diff/状态）
+
+
+## Session 81: P2 开发者层级 / 管理员分区 / 误装拒绝 / P3 Git 只读可视化 + 宿主页版式返工
+<!-- trellis-session: v=2 fp=17c31a52cc02615b -->
+
+**Date**: 2026-11-11
+**Task**: P2 开发者层级 / 管理员分区 / 误装拒绝 / P3 Git 只读可视化 + 宿主页版式返工
+**Branch**: `main`
+
+### Summary
+
+完成 P2 七项与 P3 六项：自动更新父项+逐扩展勾选+可配置间隔/模式、管理员服务端插件分区、前后端误装拒绝、删除重装、HELP 补全；Git 只读可视化（本地 .git + 云端分支/标签/提交/diff）；按用户第二轮裁定把安装扩展改为面板固定页脚、宿主页加横线工具条与可拖拽排序列表、数量只进列表头、折叠头加箭头与展开提示；修复 readSettings 清空 Git 数据的缺陷。六条静态守卫全绿、build exit 0、全量 vitest 通过。
+Topics: [.trellis/spec/frontend/extension-git-manager.md](../../spec/frontend/extension-git-manager.md)
+
+### Main Changes
+
+- P2：devMode/gitAutoUpdate/gitUpdateIntervalHours/gitUpdateMode/gitUpdateSelected + runDevAutoUpdate 只读设置
+- P2：readHostIdentity/listServerPlugins 管理员分区；plugin-kind 误装拒绝；delete+reinstall 二次确认
+- P3：git-viz/plugin-kind 新核心 + git-site 只读端点 + readHostExtensionGit + 数据包列 Git 页签
+- 版式：安装扩展固定页脚（间隙 0 贴报告条）、横线工具条、列表头计数、拖拽排序、折叠箭头与展开提示
+- 文档：spec §9–§12 / workbench §18 / i18n §11 + DEVELOPER-GUIDE K4 + README
+
+### Git Commits
+
+(No commits - planning session)
+
+### Status
+
+[OK] **Completed**

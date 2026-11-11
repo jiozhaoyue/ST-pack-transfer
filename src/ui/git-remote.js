@@ -7,13 +7,19 @@
 import {
   branchesEndpoint,
   commitsEndpoint,
+  commitDetailEndpoint,
+  tagsEndpoint,
   repoInfoEndpoint,
   remoteManifestUrl,
+  remoteFileUrl,
   authHeaders,
   withTokenQuery,
   normalizeBranches,
   normalizeRepoInfo,
   normalizeLatestCommit,
+  normalizeCommitList,
+  normalizeTags,
+  normalizeCommitFiles,
   userEndpoint,
   normalizeUser,
 } from '../core/git-site.js';
@@ -103,6 +109,47 @@ export function createGitRemote({ fetchImpl = null, timeoutMs = GIT_REMOTE_TIMEO
     /** 取远端 manifest.json 文本（版本比对用；raw 域名的 CORS 视站点而定）。 */
     async remoteManifest(repo, ref = '', account = null) {
       const url = remoteManifestUrl(repo, ref);
+      if (!url) return { ok: false, reason: 'unsupported', text: '' };
+      const { headers } = authed(url, repo, account);
+      const r = await request(url, { headers, as: 'text' });
+      if (!r.ok) return { ok: false, reason: r.reason || reasonOf(r.status, false), status: r.status, text: '' };
+      return { ok: true, text: String(r.data || ''), status: r.status };
+    },
+
+
+    /** 标签列表（只取最近 N 个，不拉全量历史）。 */
+    async listTags(repo, account = null) {
+      const base = tagsEndpoint(repo);
+      if (!base) return { ok: false, reason: 'unsupported', tags: [] };
+      const { url, headers } = authed(base, repo, account);
+      const r = await request(url, { headers });
+      if (!r.ok) return { ok: false, reason: r.reason || reasonOf(r.status, false), status: r.status, tags: [] };
+      return { ok: true, tags: normalizeTags(r.data), status: r.status };
+    },
+
+    /** 最近提交（分页上限由调用方给，默认 20 条）。 */
+    async listCommits(repo, ref = '', account = null, { perPage = 20 } = {}) {
+      const base = commitsEndpoint(repo, ref, { perPage });
+      if (!base) return { ok: false, reason: 'unsupported', commits: [] };
+      const { url, headers } = authed(base, repo, account);
+      const r = await request(url, { headers });
+      if (!r.ok) return { ok: false, reason: r.reason || reasonOf(r.status, false), status: r.status, commits: [] };
+      return { ok: true, commits: normalizeCommitList(r.data), status: r.status };
+    },
+
+    /** 单次提交的文件级 diff。 */
+    async commitDetail(repo, sha, account = null) {
+      const base = commitDetailEndpoint(repo, sha);
+      if (!base) return { ok: false, reason: 'unsupported', files: [] };
+      const { url, headers } = authed(base, repo, account);
+      const r = await request(url, { headers });
+      if (!r.ok) return { ok: false, reason: r.reason || reasonOf(r.status, false), status: r.status, files: [] };
+      return { ok: true, files: normalizeCommitFiles(r.data), status: r.status };
+    },
+
+    /** 仓库内任意文件的原始文本（插件类型识别用）。 */
+    async rawFile(repo, ref, file, account = null) {
+      const url = remoteFileUrl(repo, ref, file);
       if (!url) return { ok: false, reason: 'unsupported', text: '' };
       const { headers } = authed(url, repo, account);
       const r = await request(url, { headers, as: 'text' });
