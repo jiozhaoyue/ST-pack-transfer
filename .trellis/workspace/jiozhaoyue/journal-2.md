@@ -1687,3 +1687,42 @@ Topics: [.trellis/spec/frontend/extension-git-manager.md](../../spec/frontend/ex
 ### Next Steps
 
 - 在 Dev 实例实机点一次作用域互转与安装到全局
+
+
+## Session 85: Luker staging 竞态根治 + 扩展写操作串行（Session 85）
+<!-- trellis-session: v=2 fp=51f9c05ed007db9e -->
+
+**Date**: 2026-11-11
+**Task**: Luker staging 竞态根治 + 扩展写操作串行（Session 85）
+**Branch**: `main`
+
+### Summary
+
+定位 Luker 启动并发更新与 sweepStaleStaging 的 ENOENT 竞态；关闭宿主 extensions.autoUpdate 并备份；插件写操作全部串行
+Topics: [.trellis/spec/frontend/extension-git-manager.md](../../spec/frontend/extension-git-manager.md)
+
+### Main Changes
+
+- queueExtMutation(): 安装/更新/卸载/重装/移动串行
+- 宿主 extensions.autoUpdate=false（config.yaml 已备份）
+- spec §15 + research 文档 + README/DEVELOPER-GUIDE
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `32fe768` | fix(ext): 扩展写操作全串行，规避 Luker staging 竞态 (ENOENT) |
+
+### Testing
+
+- [OK] vitest 1152 passed / 2 skipped / 120 文件
+- [OK] npm run build 成功（4.66s）
+- [OK] 宿主重启后 8060 监听、HTTP 200、bootstrap flag=false
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 观察后续启动是否仍有 ENOENT；如需更新扩展用串行队列/逐扩展自动更新

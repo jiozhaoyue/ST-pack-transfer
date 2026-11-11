@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-2.md`
-- **Total Sessions**: 84
+- **Total Sessions**: 85
 - **Last Active**: 2026-11-11
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-2.md` | ~1689 | Active |
+| `journal-2.md` | ~1728 | Active |
 | `journal-1.md` | ~2491 | Archived |
 <!-- @@@/auto:active-documents -->
 
@@ -30,6 +30,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 85 | 2026-11-11 | Luker staging 竞态根治 + 扩展写操作串行（Session 85） | `32fe768` | `main` |
 | 84 | 2026-11-11 | 宿主直装修复 + 原生扩展作用域互转/加载顺序（Session 84） | `5bd092d` | `main` |
 | 83 | 2026-11-11 | 自动更新失败退避 + 全部运行阈值可调 | - | `main` |
 | 82 | 2026-11-11 | 逐扩展自动更新（5 秒级）/ 批量更新卸载 / 清单统一入口 / Git 常显 / 教程居中 | - | `main` |
