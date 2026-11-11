@@ -860,6 +860,68 @@ async function readLukerStorageQuotaDirect() {
 }
 
 /**
+ * 宿主存储审查能力显式声明表（与 HOST_ACCOUNT_WINDOW 同一口径：禁止按平台猜测）。
+ * `false` = 已确认没有（面板显示「未提供」，不发起探测）；`true` = 已确认有。
+ */
+const HOST_STORAGE_INSPECT = Object.freeze({
+  st: false,
+  luker: true,
+  tt: false,
+  pt: false,
+});
+
+export function hostStorageInspectCapability(platform) {
+  if (platform === 'standalone' || !platform) return { supported: false, known: true };
+  const declared = HOST_STORAGE_INSPECT[platform];
+  return { supported: declared === true, known: declared !== undefined };
+}
+
+/**
+ * 读取宿主存储审查的一层结果（只读）。
+ *
+ * - 优先复用宿主自带模块的 `RestProvider`（L0–L4 的目录遍历全在宿主侧）；
+ * - 模块不可用时走同源端点兜底；
+ * - 两侧都失败则抛错（带 `code` / `status`），由面板显示「原因 + 重试」，绝不伪造空数据。
+ *
+ * @param {string[]} [pathArr]
+ * @returns {Promise<object>}`InspectorResponse`（见交接文档 §四）
+ */
+export async function fetchHostStorageInspect(pathArr = []) {
+  const path = Array.isArray(pathArr) ? pathArr.map(String) : [];
+  const mod = await loadStorageInspectorModule();
+  if (typeof mod?.RestProvider === 'function') {
+    try {
+      const provider = new mod.RestProvider({ kind: 'self' });
+      return await provider.fetch(path);
+    } catch (err) {
+      console.warn('[ST-pack-transfer] 宿主存储审查模块读取失败，改用同源端点：', err);
+    }
+  }
+  return fetchHostStorageInspectDirect(path);
+}
+
+async function fetchHostStorageInspectDirect(path) {
+  const token = await getCsrfToken();
+  const response = await fetchWithTimeout('/api/users/storage/inspect', {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { 'X-CSRF-Token': token } : {}),
+    },
+    body: JSON.stringify({ path }),
+  }, { timeoutMs: 15_000, label: 'hostStorageInspect' });
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    const err = new Error(body?.error?.message || response.statusText || `HTTP ${response.status}`);
+    err.code = body?.error?.code || 'E_UNKNOWN';
+    err.status = response.status;
+    throw err;
+  }
+  return response.json();
+}
+
+/**
  * 通过服务端 /version 端点二次校验宿主类型（第 2 级复核，R-A4）
  *
  * 实测响应形状（research/host-probe-results.md + 2026-10-14 四宿主取证）：

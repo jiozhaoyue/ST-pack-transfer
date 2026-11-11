@@ -265,6 +265,38 @@ export function getWorkbenchHtml() {
           </div>
         </section>
 
+        <section class="panel storage-inspector-view" id="storage-inspector-view" hidden>
+          <div class="panel-head">
+            <div class="panel-title">
+              <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v12c0 1.7 3.1 3 7 3s7-1.3 7-3V6"/><path d="M5 12c0 1.7 3.1 3 7 3s7-1.3 7-3"/></svg>
+              <span data-i18n="si.title"></span>
+            </div>
+            <div class="panel-actions">
+              <div class="segmented" id="si-source-tabs">
+                <button type="button" class="seg-btn active" data-si-source="browser" data-i18n="si.sourceBrowser"></button>
+                <button type="button" class="seg-btn" data-si-source="host" data-i18n="si.sourceHost"></button>
+              </div>
+              <button type="button" class="icon-btn" id="si-refresh" data-i18n-title="si.refresh" data-i18n-aria="si.refresh">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M20 12a8 8 0 1 1-2.6-5.9"/><path d="M20 4v4h-4"/></svg>
+              </button>
+              <button class="icon-btn" id="si-close" data-i18n-title="header.close">×</button>
+            </div>
+          </div>
+          <div class="si-body" id="si-body">
+            <nav class="si-breadcrumbs" id="si-breadcrumbs"></nav>
+            <div class="si-quota" id="si-quota"></div>
+            <div class="si-bar" id="si-bar"></div>
+            <div class="si-legend" id="si-legend"></div>
+            <div class="si-list" id="si-list"></div>
+            <div class="si-state" id="si-loading" hidden data-i18n="si.loading"></div>
+            <div class="si-state" id="si-empty" hidden></div>
+            <div class="si-state si-error" id="si-error" hidden>
+              <span class="si-error-msg" id="si-error-msg"></span>
+              <button type="button" class="menu_button" id="si-retry" data-i18n="si.retry"></button>
+            </div>
+          </div>
+        </section>
+
         <section class="panel extension-view" id="extension-view" hidden>
           <div class="panel-head">
             <div class="panel-title">

@@ -11,7 +11,7 @@ import { zipIo, readZipEntryManifest } from './src/core/zip-io.js';
 import { splitArchiveEntries } from './src/core/splitter.js';
 import { mergeConvertedBlobs } from './src/core/merge-packages.js';
 import {
-  ORIGINS, isStorageSupported, saveFile, getFile, deleteFile, listStoredFiles, clearStoredFiles, getStorageUsage,
+  ORIGINS, isStorageSupported, saveFile, getFile, deleteFile, listStoredFiles, clearStoredFiles,
 } from './src/storage/db.js';
 import { buildChartTree, fmtMB, splitLimitOf } from './src/core/chart-model.js';
 import { DEFAULT_FILENAME_TEMPLATE, TARGET_PLATFORMS, resolveFilename, namedBlob } from './src/core/naming.js';
@@ -28,7 +28,7 @@ import {
   isNativeExportBusy, closeNativeBackupUi, watchNativeExportStart,
   uploadUserFile, userFilesSupported, sanitizeUserFileName, verifyUserFiles, deleteUserFile,
   readHostStorageQuota,
-  isHostAccountWindowAvailable, openHostStoragePage, listHostExtensions,
+  fetchHostStorageInspect, hostStorageInspectCapability, listHostExtensions,
   installExtensionBatch,
   opfsTmpHandle, opfsHandleToFile, opfsTmpCleanup,
 } from './src/ui/host-bridge.js';
@@ -38,6 +38,7 @@ import { loadPrivateFiles, addPrivateFile, removePrivateFile } from './src/ui/pr
 import { ORIGIN_ZONE, zoneOfOrigin, copyBackRecord } from './src/core/zone-model.js';
 import { exportLibraryToPack, importRestoredChatsIntoLibrary } from './src/ui/chat-store-inject.js';
 import { mountLanTransferPanel } from './src/ui/lan-transfer-panel.js';
+import { createBrowserStorageProvider } from './src/ui/storage-inspector-browser.js';
 import { qr } from './src/ui/qr.js';
 import { buildSettingsHtml, readSettings } from './src/ui/settings-panel.js';
 import { loadSettings, saveSettings } from './src/ui/settings-store.js';
@@ -119,6 +120,8 @@ async function main(root) {
   root.dataset.host = hostKey;
 
   const settings = loadSettings();
+  /** 浏览器侧存储审查 provider（只读；与宿主无关，Node/Web/插件三形态同一份）。 */
+  const browserStorageProvider = createBrowserStorageProvider();
 
   const state = {
     packages: [],
@@ -1461,12 +1464,17 @@ async function main(root) {
       importCloudPack,
       lan: lanActions,
       settings: openSettings,
-      /** 配额行点击：跳到宿主原生存储页的对应分页；宿主没有就如实提示。 */
-      hostStoragePage: async (kind) => {
-        const result = await openHostStoragePage(kind, host.platform);
-        if (!result.ok) view.toast(t('quota.noHostPage'));
+      /**
+       * 存储审查面板的数据源：两侧共用同一 UI 与契约，这里只按 source 分流。
+       * 非 Luker 宿主显式返回 unavailable，面板如实显示「未提供」，不伪造空数据。
+       */
+      storageInspector: async (source, path) => {
+        if (source === 'host') {
+          if (!hostStorageInspectCapability(host.platform).supported) return { unavailable: true };
+          return fetchHostStorageInspect(path);
+        }
+        return browserStorageProvider.fetch(path);
       },
-      browserUsageDetails: readBrowserUsageDetails,
       uploadRequest: () => root.querySelector('#file-input')?.click(),
       uploadPrivate,
       privateFiles: {
@@ -1580,15 +1588,14 @@ async function main(root) {
     }
   }
   await syncPackages();
-  async function refreshStorageQuota() {    // 三条读数彼此独立：任一失败都不能拖垮其余读数（尤其不能让「存储页可用」被配额异常吞掉）。
-    const [browser, hostQuota, pageAvailable] = await Promise.all([
+  async function refreshStorageQuota() {    // 两条读数彼此独立：任一失败都不能拖垮另一条。
+    const [browser, hostQuota] = await Promise.all([
       Promise.resolve().then(() => readBrowserQuota()).catch(() => null),
       host.platform === 'luker'
         ? Promise.resolve().then(() => readHostStorageQuota()).catch(() => null)
         : Promise.resolve(null),
-      Promise.resolve().then(() => isHostAccountWindowAvailable(host.platform)).catch(() => false),
     ]);
-    view.setStorage({ browser, host: hostQuota, page: { available: pageAvailable } });
+    view.setStorage({ browser, host: hostQuota });
   }
   await refreshStorageQuota();
   if (typeof document !== 'undefined') {
@@ -1606,93 +1613,6 @@ async function main(root) {
       else view.openTutorial();
     }
   } catch { /* 隐私模式 */ }
-}
-
-/**
- * 浏览器占用明细（直接读浏览器，**完全不经过宿主**）。
- * 数据源：navigator.storage.estimate() 的 usageDetails（Chrome 提供分项）、
- * localStorage / sessionStorage 自算字节、本插件 IndexedDB 暂存与 OPFS 文件。
- * 浏览器不提供的分项如实缺失，界面提示「不提供分项」，绝不伪造。
- */
-async function readBrowserUsageDetails() {
-  let usage = 0;
-  let quota = 0;
-  let usageDetails = null;
-  try {
-    if (navigator?.storage?.estimate) {
-      const est = await navigator.storage.estimate();
-      usage = Number(est?.usage) || 0;
-      quota = Number(est?.quota) || 0;
-      usageDetails = est?.usageDetails && typeof est.usageDetails === 'object' ? est.usageDetails : null;
-    }
-  } catch { /* 隐私模式 */ }
-
-  const items = [];
-  if (usageDetails) {
-    for (const key of ['indexedDB', 'caches', 'serviceWorkerRegistrations', 'fileSystems']) {
-      if (typeof usageDetails[key] === 'number') items.push({ key, bytes: usageDetails[key] });
-    }
-  }
-  for (const kind of ['localStorage', 'sessionStorage']) {
-    const bytes = webStorageBytes(kind);
-    if (bytes >= 0) items.push({ key: kind, bytes });
-  }
-
-  let app = null;
-  try {
-    const u = await getStorageUsage();
-    app = { count: u.count, bytes: u.totalBytes, byOrigin: u.byOrigin };
-  } catch { /* 无 IndexedDB */ }
-
-  let opfs = null;
-  try {
-    opfs = await readOpfsUsage();
-  } catch { /* 无 OPFS */ }
-
-  return {
-    used: usage,
-    total: quota,
-    items,
-    hasBreakdown: items.length > 0,
-    app,
-    opfs,
-  };
-}
-
-function webStorageBytes(kind) {
-  try {
-    const s = kind === 'localStorage' ? globalThis.localStorage : globalThis.sessionStorage;
-    if (!s) return -1;
-    let bytes = 0;
-    for (let i = 0; i < s.length; i += 1) {
-      const key = s.key(i) || '';
-      const val = s.getItem(key) || '';
-      bytes += (key.length + val.length) * 2;
-    }
-    return bytes;
-  } catch {
-    return -1;
-  }
-}
-
-async function readOpfsUsage() {
-  if (typeof navigator === 'undefined' || typeof navigator.storage?.getDirectory !== 'function') return null;
-  const root = await navigator.storage.getDirectory();
-  let bytes = 0;
-  let files = 0;
-  const walk = async (dir) => {
-    for await (const entry of dir.values()) {
-      if (entry.kind === 'file') {
-        const file = await entry.getFile();
-        bytes += file.size;
-        files += 1;
-      } else {
-        await walk(entry);
-      }
-    }
-  };
-  await walk(root);
-  return { bytes, files };
 }
 
 /**

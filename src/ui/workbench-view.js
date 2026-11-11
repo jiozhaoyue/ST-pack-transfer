@@ -10,6 +10,10 @@
  */
 
 import { chartTreeFor, deriveExportOptions, annotateChatLinks, counterpartsOf, CHART_GROUPS } from '../core/chart-model.js';
+import {
+  normalizeResponse, stackSegments, dotFill, maxEntrySize,
+  formatSize, formatSizeOrUnknown, categoryColorClass, iconKey,
+} from '../core/storage-inspector-model.js';
 import { createS3Client, buildBaseUrl, normalizePrefix, objectKey } from '../core/s3-client.js';
 import { createWebdavClient } from '../core/webdav-client.js';
 import { createTransferTarget } from '../core/transfer-target.js';
@@ -235,9 +239,9 @@ const state = {
   chartFmt:{}, chartLayout:loadChartLayout(),
   filenameTemplate: chartPrefs.filenameTemplate,
   prefMode:false, prefDraft:null, prefAppliedPkgs:new Set(),
-  storage:{ browser:null, host:null, page:null },
-  /* 浏览器配额明细：展开状态 + 异步读数（直接读浏览器，不经宿主）。 */
-  browserDetailsOpen:false, browserDetails:null,
+  storage:{ browser:null, host:null },
+  /* 存储审查面板：浏览器 / 宿主同一套 UI，source 决定 provider；open 时占满内容区。 */
+  storageInspector:{ open:false, source:'browser', path:[], data:null, loading:false, error:null },
   cloud:{ provider:'s3', config:loadCloudConfig(), webdav:loadWebdavConfig(), busy:false, status:'', list:[] },
   sort:'time-desc', filter:'all', tutorialStep:0, tutorialOpen:false, tutorialGoal:null, tutorialMode:false,
   sourceKey:'host:luker', seq:{}, libraryExport:false,
@@ -430,19 +434,26 @@ function syncMainView(){
   if(app) app.dataset.view = state.view;
   const mobile = state.view === 'mobile';
   const primary = mobile ? state.mobileView : state.mainView;
+  const transferOpen = !!state.transfer.open;
+  /* 存储审查面板占满内容区：同时隐藏数据包列与分隔条，网格改为单列（见 style.css [data-si]）。 */
+  const siActive = !!state.storageInspector?.open && !transferOpen;
+  if(app) app.dataset.si = siActive ? '1' : '';
   const chartCol=document.querySelector('.col-chart');
   const side=document.querySelector('.col-side');
-  if(chartCol) chartCol.hidden = mobile && primary === 'zone';
-  if(side) side.hidden = mobile && primary !== 'zone';
-  const transferOpen = !!state.transfer.open;
+  const splitter=document.querySelector('.splitter-v');
+  if(chartCol) chartCol.hidden = !siActive && mobile && primary === 'zone';
+  if(side) side.hidden = siActive || (mobile && primary !== 'zone');
+  if(splitter) splitter.hidden = siActive;
   const chartCard=document.getElementById('chart-card');
   const extView=document.getElementById('extension-view');
   const transferView=document.getElementById('transfer-view');
-  const showExt = !transferOpen && primary === 'extension';
-  const showChart = !transferOpen && !showExt;
+  const siView=document.getElementById('storage-inspector-view');
+  const showExt = !transferOpen && !siActive && primary === 'extension';
+  const showChart = !transferOpen && !showExt && !siActive;
   if(chartCard) chartCard.hidden = !showChart;
   if(extView) extView.hidden = !showExt;
   if(transferView) transferView.hidden = !transferOpen;
+  if(siView) siView.hidden = !siActive;
   renderViewSwitch();
 }
 
@@ -631,72 +642,186 @@ function volumesFor(totalMb,nodes){
   return buckets.map((b,i)=>({ i:i+1, n:buckets.length, mb:Math.round(b.mb), nodes:buildVolumeTree(b.chunks),
     over: b.mb>limit+0.5 }));
 }
-function fmtBytes(bytes){
-  if(!Number.isFinite(bytes)) return '—';
-  if(bytes>=1073741824) return (bytes/1073741824).toFixed(1)+' GB';
-  if(bytes>=1048576) return (bytes/1048576).toFixed(1)+' MB';
-  if(bytes>=1024) return (bytes/1024).toFixed(1)+' KB';
-  return Math.max(0,Math.round(bytes))+' B';
-}
 function renderQuota(){
   const head=document.getElementById('quota-head');
   if(!head) return;
-  // 宿主存储页能力由控制器探测后经 setStorage 传入；未提供时不伪造入口。
-  const page=state.storage.page || { available:false };
+  // 两行都是「打开存储审查面板」的入口：面板里再切浏览器 / 宿主数据源。
   const row=(label,ico,cell,emptyText,kind)=>{
-    const isBrowser=kind==='browser';
-    const openable=!!page.available;
     const hasReading=!!cell && typeof cell.used==='number';
     const total=hasReading && typeof cell.total==='number' ? cell.total : 0;
     const pct=hasReading && total>0 ? Math.max(0,Math.min(100,Math.round(cell.used/total*100))) : 0;
     let val;
     if(!hasReading) val=emptyText;
-    else if(total<=0) val=fmtBytes(cell.used)+' · '+t('quota.unknownTotal');
-    else val=fmtBytes(cell.used)+' / '+fmtBytes(total)+' · '+pct+'%';
-    /* 浏览器行与宿主无关：不挂任何宿主提示，点击只在本面板展开/收起占用明细。 */
-    const title=isBrowser ? t('quota.browserDetails') : (openable?t('quota.openHostPage'):t('quota.noHostPage'));
-    const canOpen=isBrowser ? hasReading : openable;
-    return '<button type="button" class="quota-row'+(hasReading?'':' is-disabled')+(canOpen?'':' is-nopage')+'"'
-      +' data-quota-kind="'+kind+'" title="'+escapeHtml(title)+'"'
-      +(isBrowser?' aria-expanded="'+(state.browserDetailsOpen?'true':'false')+'"':'')+'>'
+    else if(total<=0) val=formatSize(cell.used)+' · '+t('quota.unknownTotal');
+    else val=formatSize(cell.used)+' / '+formatSize(total)+' · '+pct+'%';
+    return '<button type="button" class="quota-row'+(hasReading?'':' is-empty')+'"'
+      +' data-quota-kind="'+kind+'" title="'+escapeHtml(t('si.open'))+'">'
       +'<span class="q-label">'+svg(ico,'tree-ico')+label+'</span>'
       +'<span class="quota-bar"><span class="quota-fill'+(pct>85?' warn':'')+'" style="width:'+pct+'%"></span></span>'
       +'<span class="quota-val">'+val+'</span>'
-      +(isBrowser?'<span class="qd-caret" aria-hidden="true">▸</span>':'')
-      +(!isBrowser && !openable?'<span class="quota-nopage">'+t('quota.noHostPageShort')+'</span>':'')
+      +'<span class="qd-caret" aria-hidden="true">›</span>'
       +'</button>';
   };
   const hostReadable=!!(HOSTS[state.host]||{}).readable;
   const isWeb=state.mode==='web';
-  // 独立 Web 态没有宿主，不伪造「宿主配额」行；浏览器行照常展开明细。
   head.innerHTML = row(t('quota.browser'),'db',state.storage.browser,t('quota.browserEmpty'),'browser')
-    + (isWeb ? '' : row(t('quota.host'),'shield',hostReadable ? state.storage.host : null,t('quota.hostEmpty'),'server'))
-    + '<div class="quota-details" id="quota-details" hidden></div>';
-  renderQuotaDetails();
+    + (isWeb ? '' : row(t('quota.host'),'shield',hostReadable ? state.storage.host : null,t('quota.hostEmpty'),'server'));
 }
-/* 浏览器占用明细：数据来自 actions.browserUsageDetails()（直接读浏览器），只在展开时渲染。 */
-function renderQuotaDetails(){
-  const box=document.getElementById('quota-details');
-  if(!box) return;
-  if(!state.browserDetailsOpen){ box.hidden=true; box.innerHTML=''; return; }
-  box.hidden=false;
-  const d=state.browserDetails;
-  if(!d){ box.innerHTML='<div class="quota-detail-note">'+t('quota.loading')+'</div>'; return; }
-  if(d.error){ box.innerHTML='<div class="quota-detail-note">'+t('quota.detailFailed')+'</div>'; return; }
-  const parts=['<div class="quota-detail-title">'+t('quota.browserDetails')+'</div>'];
-  const list=(d.items||[]).map((it)=>'<div class="quota-detail-row">'
-    +'<span class="qd-label">'+t('quota.item.'+it.key)+'</span>'
-    +'<span class="qd-val">'+fmtBytes(it.bytes)+'</span></div>').join('');
-  parts.push(list || '<div class="quota-detail-note">'+t('quota.noBreakdown')+'</div>');
-  if(d.app){
-    parts.push('<div class="quota-detail-row"><span class="qd-label">'+t('quota.appFiles')+'</span>'
-      +'<span class="qd-val">'+d.app.count+' · '+fmtBytes(d.app.bytes)+'</span></div>');
+
+/* ── 存储审查面板（照 Luker storage-inspector：面包屑 / 配额 / 堆叠条 / 图例 / 列表） ── */
+let siSeq=0;
+const SI_DOTS=8;
+
+function siEntryLabel(entry){
+  if(entry?.labelKey) return t(entry.labelKey);
+  return String(entry?.label ?? entry?.key ?? '');
+}
+function siEntryCount(entry){
+  if(entry?.childCount===null || entry?.childCount===undefined) return '';
+  const n=Number(entry.childCount);
+  if(!Number.isFinite(n)) return '';
+  if(entry?.countUnit) return t('si.unit.'+entry.countUnit,{ n });
+  return String(n);
+}
+function siRowHtml(entry,maxSize){
+  const label=siEntryLabel(entry);
+  const count=siEntryCount(entry);
+  const filled=dotFill(entry.sizeBytes,maxSize,SI_DOTS);
+  let dots='';
+  for(let i=0;i<SI_DOTS;i+=1) dots+='<span class="si-dot'+(i<filled?' on':'')+'"></span>';
+  const mappedIcon=iconKey(entry.icon);
+  const rowIcon=mappedIcon==='file'&&entry.categoryKey ? iconKey(entry.categoryKey) : mappedIcon;
+  const sensitive=!!entry.isSensitive || entry.kind==='sensitive-blob';
+  return '<div class="si-row'+(entry.canDrill?' is-drill':'')+(sensitive?' is-sensitive':'')+'"'
+    +' data-si-key="'+escapeHtml(String(entry.key))+'"'+' data-si-drill="'+(entry.canDrill?'1':'0')+'">'
+    +'<span class="si-row-ico '+categoryColorClass(entry.categoryKey||entry.key)+'">'+svg(rowIcon,'si-ico')+'</span>'
+    +'<span class="si-row-label" title="'+escapeHtml(label)+'">'+escapeHtml(label)
+      +(count?'<span class="si-row-count">'+escapeHtml(count)+'</span>':'')+'</span>'
+    +'<span class="si-row-dots" aria-hidden="true">'+dots+'</span>'
+    +'<span class="si-row-size">'+escapeHtml(formatSizeOrUnknown(entry.sizeBytes))+'</span>'
+    +(entry.canDrill?'<span class="si-row-chev" aria-hidden="true">›</span>':'')
+    +'</div>';
+}
+function renderStorageInspector(){
+  const si=state.storageInspector;
+  const panel=document.getElementById('storage-inspector-view');
+  if(!panel) return;
+  const isWeb=state.mode==='web';
+  const tabs=document.getElementById('si-source-tabs');
+  if(tabs){
+    tabs.hidden=isWeb;
+    tabs.querySelectorAll('[data-si-source]').forEach((b)=>{
+      b.classList.toggle('active', b.dataset.siSource===si.source);
+    });
   }
-  if(d.opfs){
-    parts.push('<div class="quota-detail-row"><span class="qd-label">'+t('quota.opfsFiles')+'</span>'
-      +'<span class="qd-val">'+d.opfs.files+' · '+fmtBytes(d.opfs.bytes)+'</span></div>');
+  const data=si.data;
+  const loading=!!si.loading;
+  const error=si.error||'';
+  const unavailable=!!(data&&data.unavailable);
+  const entries=unavailable?[]:(data?.entries||[]);
+  const showBody=!loading && !error && !unavailable;
+  const crumbs=showBody && data?.breadcrumbs?.length ? data.breadcrumbs : [{ labelKey:'si.root', path:[] }];
+  const nav=document.getElementById('si-breadcrumbs');
+  if(nav){
+    nav.innerHTML=crumbs.map((c,i)=>{
+      const last=i===crumbs.length-1;
+      const text=escapeHtml(c.labelKey?t(c.labelKey):String(c.label??''));
+      if(last) return '<span class="si-crumb is-current">'+text+'</span>';
+      return '<button type="button" class="si-crumb" data-si-crumb="'+i+'">'+text+'</button>'
+        +'<span class="si-crumb-sep" aria-hidden="true">›</span>';
+    }).join('');
   }
-  box.innerHTML=parts.join('');
+  const quotaEl=document.getElementById('si-quota');
+  if(quotaEl){
+    const q=showBody?data?.quota:null;
+    if(!q) quotaEl.innerHTML='';
+    else{
+      const used=q.usedBytes==null?'?':formatSize(q.usedBytes);
+      const total=q.quotaBytes==null?t('si.unlimited'):formatSize(q.quotaBytes);
+      quotaEl.innerHTML='<span class="si-quota-used'+(q.over?' is-over':'')+'">'+escapeHtml(used)+'</span>'
+        +'<span class="si-quota-sep">/</span>'
+        +'<span class="si-quota-total">'+escapeHtml(total)+'</span>';
+    }
+  }
+  const segs=showBody?stackSegments(entries):[];
+  const bar=document.getElementById('si-bar');
+  if(bar){
+    bar.innerHTML=segs.map((s)=>'<span class="si-bar-seg '+s.colorClass+'" style="width:'+s.pct.toFixed(2)+'%"'
+      +' title="'+escapeHtml(siEntryLabel(s))+' · '+escapeHtml(formatSize(s.sizeBytes))+'"></span>').join('');
+  }
+  const legend=document.getElementById('si-legend');
+  if(legend){
+    legend.innerHTML=segs.map((s)=>'<span class="si-legend-item">'
+      +'<i class="si-legend-dot '+s.colorClass+'"></i>'
+      +'<span class="si-legend-text">'+escapeHtml(siEntryLabel(s))+' · '+escapeHtml(formatSize(s.sizeBytes))+'</span>'
+      +'</span>').join('');
+  }
+  const list=document.getElementById('si-list');
+  if(list){
+    if(!showBody) list.innerHTML='';
+    else{
+      const maxSize=maxEntrySize(entries);
+      list.innerHTML=entries.map((e)=>siRowHtml(e,maxSize)).join('');
+    }
+  }
+  const loadingEl=document.getElementById('si-loading');
+  if(loadingEl) loadingEl.hidden=!loading;
+  const errorEl=document.getElementById('si-error');
+  if(errorEl) errorEl.hidden=!error;
+  const errorMsg=document.getElementById('si-error-msg');
+  if(errorMsg) errorMsg.textContent=error;
+  const emptyEl=document.getElementById('si-empty');
+  if(emptyEl){
+    const empty=!loading && !error && (unavailable || entries.length===0);
+    emptyEl.hidden=!empty;
+    emptyEl.textContent=unavailable?t('si.unavailable'):t('si.empty');
+  }
+}
+function siRequest(path){
+  const si=state.storageInspector;
+  if(!si.open) return;
+  si.path=Array.isArray(path)?path.map(String):[];
+  si.loading=true; si.error=null; si.data=null;
+  renderStorageInspector();
+  const seq=++siSeq;
+  Promise.resolve()
+    .then(()=>actions.storageInspector?.(si.source,si.path))
+    .then((raw)=>{
+      if(seq!==siSeq || !state.storageInspector.open) return;
+      const s=state.storageInspector;
+      s.loading=false;
+      s.data=normalizeResponse(raw,s.source);
+      renderStorageInspector();
+    })
+    .catch((err)=>{
+      if(seq!==siSeq || !state.storageInspector.open) return;
+      const s=state.storageInspector;
+      s.loading=false;
+      s.error=(err?.code?String(err.code)+': ':'')+String(err?.message||err);
+      renderStorageInspector();
+    });
+}
+function openStorageInspector(source){
+  const si=state.storageInspector;
+  si.open=true;
+  si.source=source==='host'?'host':'browser';
+  if(state.view==='mobile') state.mobileView='chart';
+  syncMainView();
+  siRequest([]);
+}
+function closeStorageInspector(){
+  const si=state.storageInspector;
+  if(!si.open) return;
+  si.open=false; si.data=null; si.error=null; si.loading=false; si.path=[];
+  siSeq+=1;
+  syncMainView();
+}
+function siSwitchSource(source){
+  const si=state.storageInspector;
+  const next=source==='host'?'host':'browser';
+  if(next===si.source && si.data) return;
+  si.source=next;
+  siRequest([]);
 }
 function renderTreeRows(nodes,depth,scope,readonly,tools,totalMb,drill,colorMap,rootId,mbMap){
   let out='';
@@ -3007,18 +3132,82 @@ function demoTutorialActions(real){
   wrap.installExtensions=async()=>{ demoOnly(); return []; };
   wrap.listHostExtensions=async()=>{ demoOnly(); return []; };
   wrap.lan=Object.fromEntries(['generate','applyAnswer','acceptOffer','retry','cancel','abandon'].map((k)=>[k, demoOnly]));
-  wrap.browserUsageDetails=async()=>({
-    used:9.4*DEMO_GB, total:32*DEMO_GB, hasBreakdown:true,
-    items:[
-      { key:'indexedDB', bytes:5.2*DEMO_GB },
-      { key:'caches', bytes:3.1*DEMO_GB },
-      { key:'localStorage', bytes:26*1024 },
-      { key:'sessionStorage', bytes:6*1024 },
-    ],
-    app:{ count:3, bytes:6.1*DEMO_GB },
-    opfs:{ files:2, bytes:1.2*DEMO_GB },
-  });
+  wrap.storageInspector=async (source,path)=>demoStorageInspect(source,path);
   return wrap;
+}
+/* 演示用的存储审查数据：形状与真实 provider 相同、可下钻，零触达真实存储。 */
+function demoStorageInspect(source, pathArr){
+  const path=Array.isArray(pathArr)?pathArr.map(String):[];
+  const gb=DEMO_GB;
+  const quota={ usedBytes:9.4*gb, quotaBytes:32*gb, over:false };
+  if(source==='host'){
+    const cats=[
+      ['chats','Chats',4.1*gb,'comment',true],
+      ['characters','Characters',1.6*gb,'user',true],
+      ['worlds','Worldbooks',0.9*gb,'book',false],
+      ['images','Images',1.2*gb,'image',true],
+      ['attachments','Attachments',0.4*gb,'paperclip',false],
+      ['presets','Presets & Settings',0.12*gb,'sliders',false],
+      ['extensions','Extensions',0.3*gb,'puzzle-piece',false],
+      ['vectors','Vector Stores',0.6*gb,'brain',false],
+      ['backups','Backups',0.2*gb,'clock-rotate-left',false],
+      ['other','Other',0.08*gb,'box',false],
+    ];
+    if(path.length===0){
+      return {
+        path:[], breadcrumbs:[{ label:'Storage', path:[] }], quota,
+        entries:cats.map(([key,label,size,icon,drill])=>({
+          key, label, icon, kind:'demo', categoryKey:key,
+          sizeBytes:size, childCount:null, countUnit:'', canDrill:drill,
+        })),
+        isLeaf:false,
+      };
+    }
+    const cat=cats.find((c)=>c[0]===path[0]);
+    const leaf=(name,size)=>({
+      key:name, label:name, icon:'folder', kind:'demo', categoryKey:path[0],
+      sizeBytes:size, childCount:null, countUnit:'', canDrill:false,
+    });
+    const entries=path.length===1
+      ? [leaf('default-user',0.9*gb),leaf('Seraphina',0.7*gb),leaf('Kirin',0.5*gb)]
+      : [leaf('chat_2026-11-01.jsonl',12*gb/1024),leaf('chat_2026-11-02.jsonl',9*gb/1024)];
+    const breadcrumbs=[{ label:'Storage', path:[] },{ label:cat?cat[1]:path[0], path:[path[0]] }];
+    if(path.length>1) breadcrumbs.push({ label:path[1], path:path.slice(0,2) });
+    return { path, breadcrumbs, quota, entries, isLeaf:path.length>1 };
+  }
+  const cats=[
+    ['localStorage','localStorage',26*1024,'hard-drive',{ count:12, unit:'keys', drill:true }],
+    ['sessionStorage','sessionStorage',6*1024,'clock',{ count:4, unit:'keys', drill:true }],
+    ['indexeddb','IndexedDB',5.2*gb,'database',{ count:2, unit:'dbs', drill:true }],
+    ['cachestorage','Cache Storage',3.1*gb,'layer-group',{ count:1, unit:'caches', drill:true }],
+    ['quota','Storage Quota',9.4*gb,'chart-pie',{}],
+  ];
+  if(path.length===0){
+    return {
+      path:[], breadcrumbs:[{ labelKey:'si.root', path:[] }], quota,
+      entries:cats.map(([key,label,size,icon,more])=>({
+        key, labelKey:'si.cat.'+key, icon, kind:'category', categoryKey:key,
+        sizeBytes:size, childCount:more.count??null, countUnit:more.unit||'', canDrill:!!more.drill,
+      })),
+      isLeaf:false,
+    };
+  }
+  const leaf=(name,size,icon)=>({
+    key:name, label:name, icon:icon||'key', kind:'demo', categoryKey:path[0],
+    sizeBytes:size, childCount:null, countUnit:'', canDrill:false,
+  });
+  const entries=path[0]==='indexeddb'
+    ? [leaf('ST-pack-transfer',4.8*gb,'database'),leaf('BrowserSync',0.4*gb,'database')]
+    : path[0]==='cachestorage'
+      ? [leaf('st-assets',3.1*gb,'file-lines')]
+      : [leaf('stpt.chartLayout',2*1024),leaf('stpt.settings',1*1024),leaf('theme',512)];
+  return {
+    path,
+    breadcrumbs:[{ labelKey:'si.root', path:[] },{ labelKey:'si.cat.'+path[0], path:[path[0]] }],
+    quota,
+    entries,
+    isLeaf:true,
+  };
 }
 function setTutorialBanner(on){
   const el=document.getElementById('tutorial-banner');
@@ -3041,7 +3230,7 @@ function enterTutorialMode(){
   state.zone='import';
   state.hostTree=buildDemoHostTree();
   state.storage={ browser:{ used:9.4*DEMO_GB, total:32*DEMO_GB }, host:null, page:{ available:false } };
-  state.browserDetailsOpen=false; state.browserDetails=null;
+  state.storageInspector={ open:false, source:'browser', path:[], data:null, loading:false, error:null };
   state.pendingExports=[{ id:'demo-export-seed', name:'demo_converted.zip', blob:{ size:96*1048576 } }];
   state.task=null;
   state.prefMode=false; state.prefDraft=null; state.prefSnapshot=null;
@@ -3315,6 +3504,7 @@ function bind(){
   document.getElementById('view-switch')?.addEventListener('click',(e)=>{
     const b=e.target.closest('[data-wbview]'); if(!b) return;
     const v=b.dataset.wbview;
+    closeStorageInspector();
     if(state.view==='mobile') state.mobileView = (v==='zone'||v==='extension') ? v : 'chart';
     else state.mainView = v==='extension' ? 'extension' : 'chart';
     syncMainView();
@@ -3327,23 +3517,29 @@ function bind(){
     const b=e.target.closest('[data-exttab]'); if(!b) return;
     state.extTab=b.dataset.exttab; renderExtensionView();
   });
-  // 配额行：浏览器行展开/收起占用明细（只读浏览器）；宿主行才跳宿主存储页。
+  // 配额两行共用同一个存储审查面板；点哪一行，面板初始就显示哪一侧数据源。
   document.getElementById('quota-head')?.addEventListener('click',(e)=>{
     const row=e.target.closest('[data-quota-kind]');
     if(!row) return;
-    const kind=row.dataset.quotaKind;
-    if(kind==='browser'){
-      state.browserDetailsOpen=!state.browserDetailsOpen;
-      state.browserDetails=null;
-      renderQuota();
-      if(state.browserDetailsOpen){
-        Promise.resolve(actions.browserUsageDetails?.())
-          .then((d)=>{ if(!state.browserDetailsOpen) return; state.browserDetails=d||null; renderQuota(); })
-          .catch(()=>{ if(!state.browserDetailsOpen) return; state.browserDetails={error:true}; renderQuota(); });
-      }
-      return;
-    }
-    actions.hostStoragePage?.(kind);
+    openStorageInspector(row.dataset.quotaKind==='server'?'host':'browser');
+  });
+  document.getElementById('si-source-tabs')?.addEventListener('click',(e)=>{
+    const b=e.target.closest('[data-si-source]');
+    if(b) siSwitchSource(b.dataset.siSource);
+  });
+  document.getElementById('si-refresh')?.addEventListener('click',()=>siRequest(state.storageInspector.path));
+  document.getElementById('si-retry')?.addEventListener('click',()=>siRequest(state.storageInspector.path));
+  document.getElementById('si-close')?.addEventListener('click',()=>closeStorageInspector());
+  document.getElementById('si-breadcrumbs')?.addEventListener('click',(e)=>{
+    const b=e.target.closest('[data-si-crumb]');
+    if(!b) return;
+    const crumb=state.storageInspector.data?.breadcrumbs?.[Number(b.dataset.siCrumb)];
+    siRequest(Array.isArray(crumb?.path)?crumb.path:[]);
+  });
+  document.getElementById('si-list')?.addEventListener('click',(e)=>{
+    const row=e.target.closest('[data-si-key]');
+    if(!row || row.dataset.siDrill!=='1') return;
+    siRequest([...state.storageInspector.path,row.dataset.siKey]);
   });
   // 文件名模板默认折叠
   document.getElementById('filename-toggle')?.addEventListener('click',()=>{
@@ -3376,6 +3572,7 @@ function bind(){
   // ── 顶部全局动作（按钮随 renderTopActions 重建）──
   document.getElementById('top-actions').addEventListener('click',(e)=>{
     if(e.target.closest('#transfer-open-btn')){
+      closeStorageInspector();
       state.transfer.open=true;
       if(state.transfer.tab!=='lan' && state.transfer.tab!=='cloud') state.transfer.tab='lan';
       renderTransfer(); renderLan(); renderCloud();
@@ -3809,6 +4006,7 @@ function bind(){
   document.addEventListener('keydown',(e)=>{ if(e.key!=='Escape') return;
     if(confirmDialogEl()?.open) return; // 原生 dialog 自行处理 Esc
     if(state.volMaxKey){ state.volPath[state.volMaxKey]=[]; state.volMaxKey=null; renderChart(); return; }
+    if(state.storageInspector.open){ closeStorageInspector(); return; }
     if(state.pane!=='workbench'){ backToWorkbench(); return; }
     closeTutorial();
   });
@@ -3916,6 +4114,7 @@ initChartSplitters();
     renderActions();
     renderChart();
     syncMainView();
+    renderStorageInspector();
     renderPendingExports();
     renderCloud();
   }
