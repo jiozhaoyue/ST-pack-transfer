@@ -200,7 +200,7 @@
 
 | 功能 | UI 入口 | 源码落点 |
 | --- | --- | --- |
-| 视图切换（桌面 2 / 手机 3；桌面数据包列常显） | 顶栏下 `#view-switch` | `src/ui/workbench-view.js` 的 `renderViewSwitch()` / `syncMainView()` |
+| 视图切换（桌面 2 / 手机 3；桌面数据包列常显） | 各面板头内 `[data-view-switch]`（图表 / 扩展管理 / 数据包；手机上一行切换、下一行原面板按钮） | `src/ui/workbench-view.js` 的 `renderViewSwitch()` / `syncMainView()` |
 | 扩展管理整面板（安装 / 已装 / 报告） | `#extension-view` | 同文件的 `renderExtensionView()` / `renderExtInstall()` / `renderExtInstalled()` / `renderExtReport()` |
 | 批量安装（多行链接 / `.txt` / `.json`；`url \| 分支`、`url#分支`） | 安装页文本框与文件上传 | 同文件的 `parseExtEntries()`；执行端 `src/ui/host-bridge.js` 的 `installExtensionBatch()` |
 | 导出日志 / 失败链接 txt / 安装报告 JSON | 安装页与报告页底部按钮 | 同文件的 `downloadTextFile()` |

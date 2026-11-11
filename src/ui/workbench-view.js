@@ -417,16 +417,33 @@ function syncView(){
   /* 徽标文案随宽度切换（窄态只留宿主名）：宽度变化后必须重写，否则仍显示「XX 插件」。 */
   if(prev !== state.view && document.getElementById('host-badge-text')) renderHeader();
 }
-/* 视图切换：桌面 = 存储图表 / 扩展管理（数据包列常显）；手机 = 存储图表 / 数据包 / 扩展管理。 */
+/* 视图切换：桌面 = 存储图表 / 扩展管理（数据包列常显）；手机 = 存储图表 / 数据包 / 扩展管理。
+   切换按钮落在各面板自己的面板头里（图表 / 扩展管理 / 数据包），不再占用页头下的独立行。 */
+const VIEW_SWITCH_ICONS={
+  chart:'<path d="M4 5h16v14H4z"/><path d="M4 10h16M9 10v9M15 10v9"/>',
+  zone:'<path d="M4 7h16v13H4z"/><path d="M8 7V4h8v3"/><path d="M4 12h16"/>',
+  extension:'<path d="M10 3h4v4a2 2 0 1 0 4 0V3h3v7h-3a2 2 0 1 1 0 4h3v7h-7v-3a2 2 0 1 0-4 0v3H3v-7h3a2 2 0 1 1 0-4H3V3h7z"/>'
+};
+function viewSwitchIcon(id){
+  const path=VIEW_SWITCH_ICONS[id]||'';
+  return '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">'+path+'</svg>';
+}
 function renderViewSwitch(){
-  const host=document.getElementById('view-switch');
-  if(!host) return;
   const mobile=state.view==='mobile';
   const items=[{id:'chart',label:t('view.chart')}];
   if(mobile) items.push({id:'zone',label:t('view.zone')});
   items.push({id:'extension',label:t('view.extension')});
   const active=mobile?state.mobileView:state.mainView;
-  host.innerHTML=items.map(it=>'<button type="button" class="view-switch-btn'+(it.id===active?' active':'')+'" data-wbview="'+it.id+'">'+it.label+'</button>').join('');
+  const html=items.map(it=>'<button type="button" class="view-switch-btn'+(it.id===active?' active':'')+'" data-wbview="'+it.id
+    +'" aria-pressed="'+(it.id===active)+'">'+viewSwitchIcon(it.id)+'<span>'+it.label+'</span></button>').join('');
+  document.querySelectorAll('[data-view-switch]').forEach((host)=>{
+    /* 数据包面板只在手机形态参与切换；桌面数据包列常显，头部不出现切换按钮。 */
+    if(host.hasAttribute('data-view-switch-zone') && !mobile){
+      host.hidden=true; host.innerHTML=''; return;
+    }
+    host.hidden=false;
+    host.innerHTML=html;
+  });
 }
 function syncMainView(){
   state.view = detectView();
@@ -3300,7 +3317,7 @@ const TUTORIAL_GOALS=[
   {
     id:'extensions', label:'tutorial.goal.extensions', note:'tutorial.goal.extensionsNote',
     steps:[
-      { sel:'#view-switch', view:'chart', title:'tutorial.ext.entry', desc:'tutorial.ext.entryDesc' },
+      { sel:'#chart-card [data-view-switch]', view:'chart', title:'tutorial.ext.entry', desc:'tutorial.ext.entryDesc' },
       { sel:'#extmgr-tabs', view:'extension', title:'tutorial.ext.tabs', desc:'tutorial.ext.tabsDesc' },
       { sel:'#extension-body', view:'extension', title:'tutorial.ext.install', desc:'tutorial.ext.installDesc' }
     ]
@@ -3501,8 +3518,9 @@ function bind(){
   ['modal-extra','settings-body'].forEach(id => document.getElementById(id)?.addEventListener('click', extModeClick));
   document.getElementById('btn-close')?.addEventListener('click',()=>actions.close?.());
 
-  // 视图切换：桌面 2 个（图表 / 扩展管理），手机 3 个（图表 / 数据包 / 扩展管理）
-  document.getElementById('view-switch')?.addEventListener('click',(e)=>{
+  // 视图切换：桌面 2 个（图表 / 扩展管理），手机 3 个（图表 / 数据包 / 扩展管理）。
+  // 按钮分散在三个面板头里，事件委托挂在共同祖先上。
+  document.getElementById('view-workbench')?.addEventListener('click',(e)=>{
     const b=e.target.closest('[data-wbview]'); if(!b) return;
     const v=b.dataset.wbview;
     closeStorageInspector();
