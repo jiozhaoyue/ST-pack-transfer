@@ -39,40 +39,77 @@ export const SETTINGS_DEFAULTS = Object.freeze({
   /** 宿主页扩展列表的自定义顺序（拖拽排序；只存名字）。 */
   extOrder: [],
   /** 宿主页排序方式：custom（拖拽顺序）/ name / version / source。 */
+  /** 宿主页排序方式：custom（拖拽顺序）/ name / version / source。 */
   extSort: 'custom',
+  /** 自动更新策略（全部可手动调，代码不留运行阈值）：
+   *  最短 / 最长轮询、默认间隔、失败退避倍数与上限、提醒超时。 */
+  autoUpdateMinIntervalSec: 5,
+  autoUpdateMaxIntervalSec: 86400,
+  autoUpdateDefaultIntervalSec: 300,
+  autoUpdateFailureBackoff: 2,
+  autoUpdateFailureBackoffMaxSec: 3600,
+  autoUpdateNotifyTimeoutSec: 8,
 });
 
 export const SETTING_KEYS = Object.freeze(Object.keys(SETTINGS_DEFAULTS));
 
-/** 自动更新轮询间隔（秒）：用户裁定最短 5 秒；上限一天。 */
-export const UPDATE_INTERVAL_MIN_SEC = 5;
-export const UPDATE_INTERVAL_MAX_SEC = 86400;
-
-/** 间隔夹紧（秒）。 */
-export function normalizeUpdateInterval(value) {
+/** 数值夹紧（非法值回落 fallback）。 */
+function clampNumber(value, min, max, fallback) {
   const n = Number(value);
-  if (!Number.isFinite(n)) return 300;
-  return Math.max(UPDATE_INTERVAL_MIN_SEC, Math.min(UPDATE_INTERVAL_MAX_SEC, Math.round(n)));
+  if (!Number.isFinite(n)) return fallback;
+  return Math.max(min, Math.min(max, n));
+}
+
+/**
+ * 自动更新策略：**全部来自设置**，业务代码不得再写死任何运行阈值。
+ * @returns {{min:number,max:number,fallback:number,backoff:number,backoffMaxSec:number,notifyTimeoutSec:number}}
+ */
+export function updatePolicyOf(settings = SETTINGS_DEFAULTS) {
+  const s = settings && typeof settings === 'object' ? settings : SETTINGS_DEFAULTS;
+  const d = SETTINGS_DEFAULTS;
+  const min = Math.round(clampNumber(s.autoUpdateMinIntervalSec, 1, 86400, d.autoUpdateMinIntervalSec));
+  const max = Math.round(clampNumber(s.autoUpdateMaxIntervalSec, min, 604800, d.autoUpdateMaxIntervalSec));
+  const fallback = Math.round(clampNumber(s.autoUpdateDefaultIntervalSec, min, max, d.autoUpdateDefaultIntervalSec));
+  return {
+    min,
+    max,
+    fallback,
+    backoff: clampNumber(s.autoUpdateFailureBackoff, 1, 10, d.autoUpdateFailureBackoff),
+    backoffMaxSec: Math.round(clampNumber(s.autoUpdateFailureBackoffMaxSec, min, 604800, d.autoUpdateFailureBackoffMaxSec)),
+    notifyTimeoutSec: Math.round(clampNumber(s.autoUpdateNotifyTimeoutSec, 1, 86400, d.autoUpdateNotifyTimeoutSec)),
+  };
+}
+
+/** 间隔夹紧（秒），边界来自策略（不再有写死的 5 / 86400）。 */
+export function normalizeUpdateInterval(value, policy = updatePolicyOf()) {
+  return Math.round(clampNumber(value, policy.min, policy.max, policy.fallback));
+}
+
+/** 第 N 次失败后的等待秒数：`base × backoff^N`，上限来自策略。 */
+export function updateBackoffDelay(intervalSec, failures, policy = updatePolicyOf()) {
+  const base = normalizeUpdateInterval(intervalSec, policy);
+  const exponent = Math.max(0, Number(failures) || 0);
+  return Math.min(policy.backoffMaxSec, Math.round(base * Math.pow(policy.backoff, exponent)));
 }
 
 /**
  * 逐扩展自动更新规则归一：`{扩展名: {mode:'notify'|'auto', intervalSec}}`。
  * 兼容旧模型（`gitUpdateSelected` + `gitUpdateIntervalHours` + `gitUpdateMode`）一次性迁移。
  */
-export function normalizeUpdateRules(input) {
+export function normalizeUpdateRules(input, policy = updatePolicyOf(input)) {
   const out = {};
   const rules = input?.gitAutoUpdateRules;
   if (rules && typeof rules === 'object' && !Array.isArray(rules)) {
     for (const [name, rule] of Object.entries(rules)) {
       if (!name || !rule || typeof rule !== 'object') continue;
       if (rule.mode !== 'notify' && rule.mode !== 'auto') continue;
-      out[name] = { mode: rule.mode, intervalSec: normalizeUpdateInterval(rule.intervalSec) };
+      out[name] = { mode: rule.mode, intervalSec: normalizeUpdateInterval(rule.intervalSec, policy) };
     }
     return out;
   }
   const legacy = Array.isArray(input?.gitUpdateSelected) ? input.gitUpdateSelected : [];
   const legacyMode = input?.gitUpdateMode === 'auto' ? 'auto' : 'notify';
-  const legacySec = normalizeUpdateInterval((Number(input?.gitUpdateIntervalHours) || 6) * 3600);
+  const legacySec = normalizeUpdateInterval((Number(input?.gitUpdateIntervalHours) || 6) * 3600, policy);
   for (const name of legacy) {
     if (typeof name === 'string' && name) out[name] = { mode: legacyMode, intervalSec: legacySec };
   }
@@ -114,7 +151,17 @@ export function normalizeSettings(input) {
       }
       out.gitDevMode = modes;
     }
-    out.gitAutoUpdateRules = normalizeUpdateRules(input);
+    const clampInto = (key, lo, hi) => {
+      const value = Number(input[key]);
+      if (Number.isFinite(value)) out[key] = Math.max(lo, Math.min(hi, value));
+    };
+    clampInto('autoUpdateMinIntervalSec', 1, 86400);
+    clampInto('autoUpdateMaxIntervalSec', Math.max(1, out.autoUpdateMinIntervalSec), 604800);
+    clampInto('autoUpdateDefaultIntervalSec', out.autoUpdateMinIntervalSec, out.autoUpdateMaxIntervalSec);
+    clampInto('autoUpdateFailureBackoff', 1, 10);
+    clampInto('autoUpdateFailureBackoffMaxSec', out.autoUpdateMinIntervalSec, 604800);
+    clampInto('autoUpdateNotifyTimeoutSec', 1, 86400);
+    out.gitAutoUpdateRules = normalizeUpdateRules(input, updatePolicyOf(out));
     if (Array.isArray(input.extOrder)) {
       out.extOrder = [...new Set(input.extOrder.filter((name) => typeof name === 'string' && name))];
     }
@@ -157,8 +204,22 @@ export function buildSettingsHtml(settings = {}) {
     + '<label class="check check-sub"><input type="checkbox" id="set-include-oauth"> ' + t('settings.includeOauth') + '</label>'
     + '<div class="ext-note">' + t('settings.dataNote') + '</div>';
 
+  const numSetting = (key, label, min, max, step) => '<label class="et-git"><span>' + label + '</span>'
+    + '<input class="text_pole" type="number" min="' + min + '" max="' + max + '" step="' + step + '" data-setting="' + key + '" value="' + s[key] + '"></label>';
+  const autoGroup = '<div class="ext-note">' + t('settings.autoPolicyNote') + '</div>'
+    + '<div class="ext-row">'
+    + numSetting('autoUpdateMinIntervalSec', t('settings.autoMinInterval'), 1, 86400, 1)
+    + numSetting('autoUpdateMaxIntervalSec', t('settings.autoMaxInterval'), 1, 604800, 60)
+    + numSetting('autoUpdateDefaultIntervalSec', t('settings.autoDefaultInterval'), 1, 604800, 60)
+    + '</div><div class="ext-row">'
+    + numSetting('autoUpdateFailureBackoff', t('settings.autoBackoff'), 1, 10, 0.1)
+    + numSetting('autoUpdateFailureBackoffMaxSec', t('settings.autoBackoffMax'), 1, 604800, 60)
+    + numSetting('autoUpdateNotifyTimeoutSec', t('settings.autoNotifyTimeout'), 1, 86400, 1)
+    + '</div>';
+
   return '<div class="settings-grid">'
     + group('behavior', t('settings.groupBehavior'), tips, true)
+    + group('auto', t('settings.groupAuto'), autoGroup, false)
     + group('export', t('settings.groupExport'), exportGroup, true)
     + group('log', t('settings.groupLog'), logging, false)
     + group('data', t('settings.groupData'), dataGroup, false)
@@ -192,6 +253,15 @@ export function readSettings(root, base = SETTINGS_DEFAULTS) {
 
   const logMaxEl = root.querySelector?.('[data-setting="logMaxEntries"]');
   if (logMaxEl?.value) out.logMaxEntries = Number(logMaxEl.value);
+  /* 自动更新策略：全部从对话框读，缺省保留 base（不再写死阈值）。 */
+  for (const key of [
+    'autoUpdateMinIntervalSec', 'autoUpdateMaxIntervalSec', 'autoUpdateDefaultIntervalSec',
+    'autoUpdateFailureBackoff', 'autoUpdateFailureBackoffMaxSec', 'autoUpdateNotifyTimeoutSec',
+  ]) {
+    const el = root.querySelector?.('[data-setting="' + key + '"]');
+    const value = el?.value === '' || el?.value === undefined ? NaN : Number(el.value);
+    if (Number.isFinite(value)) out[key] = value;
+  }
 
   const clearLogEl = root.querySelector?.('[data-setting="clearLogOnLoad"]');
   if (clearLogEl && typeof clearLogEl.checked === 'boolean') out.clearLogOnLoad = clearLogEl.checked;

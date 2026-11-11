@@ -45,7 +45,7 @@ import {
 import { createGitRemote } from './git-remote.js';
 import { t } from '../i18n/index.js';
 import { loadSettings, saveSettings } from './settings-store.js';
-import { normalizeUpdateInterval } from './settings-panel.js';
+import { normalizeUpdateInterval, updatePolicyOf, updateBackoffDelay } from './settings-panel.js';
 import { loadChartPrefs, saveChartPrefs, normalizeChartPrefs } from './chart-prefs.js';
 /* 占位/演示扩展清单从数据文件读取（禁止在 JS 里硬编码仓库清单）。 */
 import demoExtensionsData from '../data/demo-extensions.json';
@@ -2519,46 +2519,71 @@ function nativeToast(msg,opts){
  */
 let autoUpdateTimer=0;
 const autoUpdateLastAt=new Map();
+/** 连续失败次数：用于指数退避（参数全部来自设置）。 */
+const autoUpdateFailures=new Map();
+function effectiveAutoDelaySec(name, rule, policy){
+  return updateBackoffDelay(rule.intervalSec, autoUpdateFailures.get(name)||0, policy);
+}
 function scheduleAutoUpdates(){
   if(autoUpdateTimer){ clearTimeout(autoUpdateTimer); autoUpdateTimer=0; }
   if(state.tutorialMode) return;
-  const rules=loadSettings().gitAutoUpdateRules||{};
-  const intervals=Object.values(rules).map((rule)=>normalizeUpdateInterval(rule?.intervalSec));
-  if(!intervals.length) return;
-  const delay=Math.max(5000, Math.min(...intervals)*1000);
-  autoUpdateTimer=setTimeout(()=>{ autoUpdateTimer=0; void runAutoUpdateTick(); }, delay);
+  const settings=loadSettings();
+  const policy=updatePolicyOf(settings);
+  const rules=settings.gitAutoUpdateRules||{};
+  const now=Date.now();
+  let nextAt=Infinity;
+  for(const [name,rule] of Object.entries(rules)){
+    if(!rule) continue;
+    const delaySec=effectiveAutoDelaySec(name,rule,policy);
+    const last=autoUpdateLastAt.get(name)||0;
+    nextAt=Math.min(nextAt, last+delaySec*1000);
+  }
+  if(!Number.isFinite(nextAt)) return;
+  const wait=Math.max(policy.min*1000, nextAt-now);
+  autoUpdateTimer=setTimeout(()=>{ autoUpdateTimer=0; void runAutoUpdateTick(); }, wait);
 }
 async function runAutoUpdateTick(){
-  const s=gitSettings();
-  const rules=s.gitAutoUpdateRules||{};
+  const settings=gitSettings();
+  const policy=updatePolicyOf(settings);
+  const rules=settings.gitAutoUpdateRules||{};
   const now=Date.now();
   for(const [name,rule] of Object.entries(rules)){
     if(!rule) continue;
-    const intervalSec=normalizeUpdateInterval(rule.intervalSec);
+    const delaySec=effectiveAutoDelaySec(name,rule,policy);
     const last=autoUpdateLastAt.get(name)||0;
-    if(now-last < intervalSec*1000) continue;
+    if(now-last < delaySec*1000) continue;
     autoUpdateLastAt.set(name, now);
-    const reg=(s.gitInstalls||[]).find((r)=>r.name===name);
+    const reg=(settings.gitInstalls||[]).find((r)=>r.name===name);
     const remoteUrl=String(reg?.url||rule.url||'').trim();
     if(!remoteUrl) continue;
     const parsed=parseRepoUrl(remoteUrl);
-    if(!parsed.ok) continue;
+    if(!parsed.ok){ autoUpdateFailures.set(name,(autoUpdateFailures.get(name)||0)+1); continue; }
     const acc=accountForRepo(parsed);
     const localVersion=await fetchLocalManifestVersion(name);
-    if(!localVersion) continue;
+    if(!localVersion){ autoUpdateFailures.set(name,(autoUpdateFailures.get(name)||0)+1); continue; }
     const res=await gitRemote().remoteManifest(parsed, reg?.ref||'', acc);
-    if(!res.ok) continue;
+    if(!res.ok){ autoUpdateFailures.set(name,(autoUpdateFailures.get(name)||0)+1); continue; }
     let remoteVersion='';
-    try { remoteVersion=String(JSON.parse(res.text).version||''); } catch { continue; }
-    if(!remoteVersion || compareVersions(remoteVersion, localVersion)<=0) continue;
-    const runUpdate=async()=>{ await updateInstalledExtension(name,{ref:reg?.ref||'', url:remoteUrl}); };
+    try { remoteVersion=String(JSON.parse(res.text).version||''); }
+    catch { autoUpdateFailures.set(name,(autoUpdateFailures.get(name)||0)+1); continue; }
+    if(!remoteVersion || compareVersions(remoteVersion, localVersion)<=0){
+      autoUpdateFailures.set(name,0);
+      continue;
+    }
+    const runUpdate=async()=>{
+      const ok=await updateInstalledExtension(name,{ref:reg?.ref||'', url:remoteUrl});
+      autoUpdateFailures.set(name, ok ? 0 : (autoUpdateFailures.get(name)||0)+1);
+    };
     if(rule.mode==='auto'){ await runUpdate(); continue; }
     let cancelled=false;
     nativeToast(t('extmgr.devFound',{name,from:localVersion,to:remoteVersion}), {
       onclick:()=>{ cancelled=true; toast(t('extmgr.devCancelled')); },
     });
-    await new Promise((resolve)=>setTimeout(resolve, Math.max(3000, Math.min(8000, intervalSec*1000))));
+    /* 提醒等待时长同样来自设置；不超过本轮间隔。 */
+    const waitSec=Math.max(1, Math.min(policy.notifyTimeoutSec, rule.intervalSec));
+    await new Promise((resolve)=>setTimeout(resolve, waitSec*1000));
     if(!cancelled) await runUpdate();
+    else autoUpdateFailures.set(name,0);
   }
   scheduleAutoUpdates();
 }
@@ -2618,13 +2643,16 @@ async function loadServerPlugins(){
 function saveUpdateRule(name, mode, intervalSec, extra = {}){
   if(!name) return;
   const s=loadSettings();
+  const policy=updatePolicyOf(s);
   const rules={...(s.gitAutoUpdateRules||{})};
   if(!mode || mode==='off') delete rules[name];
   else {
-    rules[name]={ mode: mode==='auto'?'auto':'notify', intervalSec:normalizeUpdateInterval(intervalSec) };
+    rules[name]={ mode: mode==='auto'?'auto':'notify', intervalSec:normalizeUpdateInterval(intervalSec, policy) };
     if(extra.url) rules[name].url=String(extra.url);
     if(extra.global) rules[name].global=!!extra.global;
   }
+  /* 用户手动改规则即清零失败计数（退避只惩罚自动失败，不惩罚人工操作）。 */
+  autoUpdateFailures.delete(name);
   persistDev({ gitAutoUpdateRules:rules });
 }
 /** 解析自动更新要用的远端地址：优先安装登记，其次宿主 .git 的 origin。 */
@@ -2641,7 +2669,7 @@ async function resolveUpdateRepo(name){
 }
 /** 单个扩展更新：有远端地址走「安装并覆盖」（可指定版本 / 分支）；否则用宿主原生 update 端点。 */
 async function updateInstalledExtension(name, { ref = '', url = '' } = {}){
-  if(!name) return;
+  if(!name) return false;
   const s=gitSettings();
   const reg=(s.gitInstalls||[]).find((r)=>r.name===name);
   const item=(state.extInstalled||[]).find((row)=>String(row?.id||row?.folder||row?.name||'')===name);
@@ -2670,6 +2698,7 @@ async function updateInstalledExtension(name, { ref = '', url = '' } = {}){
     toast(t('extmgr.devUpdated',{name})+' · '+t('extmgr.devRefresh'));
   }
   renderExtensionView();
+  return !failed;
 }
 async function batchUpdateInstalled(names, ref){
   for(const name of (Array.isArray(names)?names:[])) await updateInstalledExtension(name,{ref});
@@ -2784,6 +2813,7 @@ async function renderExtInstalled(body){
   const s=loadSettings();
   const installedGit=new Set((s.gitInstalls||[]).map((r)=>r.name));
   const rules=s.gitAutoUpdateRules||{};
+  const policy=updatePolicyOf(s);
   const sort=['custom','name','version','source'].includes(s.extSort)?s.extSort:'custom';
   const records=sortedInstalledRecords(installedRowRecords(), sort);
   const rows=records.map(({x,name,version})=>{
@@ -2796,8 +2826,8 @@ async function renderExtInstalled(body){
         +'<option value="notify"'+(rule?.mode==='notify'?' selected':'')+'>'+t('extmgr.autoModeNotify')+'</option>'
         +'<option value="auto"'+(rule?.mode==='auto'?' selected':'')+'>'+t('extmgr.autoModeAuto')+'</option>'
       +'</select>'
-      +'<input class="text_pole ext-up-sec" type="number" min="5" step="5" data-upinterval="'+escapeHtml(name)+'"'
-        +' value="'+(normalizeUpdateInterval(rule?.intervalSec)) +'"'+(rule?'':' disabled')+' title="'+t('extmgr.autoIntervalSeconds')+'">'
+      +'<input class="text_pole ext-up-sec" type="number" min="'+policy.min+'" max="'+policy.max+'" step="'+policy.min+'" data-upinterval="'+escapeHtml(name)+'"'
+        +' value="'+(normalizeUpdateInterval(rule?.intervalSec, policy)) +'"'+(rule?'':' disabled')+' title="'+t('extmgr.autoIntervalSeconds')+'">'
       +'<span class="ext-unit">'+t('extmgr.seconds')+'</span>'
     +'</span>';
     return '<div class="ext-entry is-ok ext-ext-row" role="listitem" draggable="true" data-extrow="'+escapeHtml(name)+'">'
@@ -2939,7 +2969,7 @@ async function renderExtInstalled(body){
       toast(t('extmgr.devSaved'));
       return;
     }
-    const sec=normalizeUpdateInterval(intervalEl?.value);
+    const sec=normalizeUpdateInterval(intervalEl?.value, updatePolicyOf(loadSettings()));
     /* 未登记仓库时，现场向宿主 .git 解析 origin；解析不到就不允许开启，避免假装会自动更新。 */
     const resolved=await resolveUpdateRepo(name);
     if(!resolved){
@@ -2959,7 +2989,7 @@ async function renderExtInstalled(body){
     const holder=input.closest('.ext-auto');
     const modeEl=holder?.querySelector('[data-upmode]');
     if(!modeEl || modeEl.value==='off') return;
-    const sec=normalizeUpdateInterval(input.value);
+    const sec=normalizeUpdateInterval(input.value, updatePolicyOf(loadSettings()));
     input.value=String(sec);
     const prev=(loadSettings().gitAutoUpdateRules||{})[input.dataset.upinterval]||{};
     saveUpdateRule(input.dataset.upinterval, modeEl.value, sec, { url:prev.url, global:prev.global });
