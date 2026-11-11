@@ -1090,3 +1090,24 @@
   margin:4px 0 0;font-size:11px;color:var(--optional);
 }
 
+/* ── 桌面整窗口铺满（2026-11-11 用户裁定）：零外边距、零圆角，页头/内容/底栏同在一个满屏容器内 ── */
+#app.app-container:not([data-view="mobile"]){
+  width:100vw;height:100vh;max-width:none;max-height:none;margin:0;border-radius:0;overflow:hidden;
+}
+/* ── 全局选择锁：除日志与文本输入外不可选中/复制（2026-11-11 用户裁定） ── */
+#app.app-container{user-select:none;-webkit-user-select:none}
+#app.app-container input,
+#app.app-container textarea,
+#app.app-container select,
+#app.app-container [contenteditable="true"],
+#app.app-container #log-body,
+#app.app-container #log-body *,
+#app.app-container .log-body,
+#app.app-container .log-body *,
+#app.app-container .help-view-body,
+#app.app-container .help-view-body *,
+#app.app-container .si-list,
+#app.app-container .si-list *{
+  user-select:text;-webkit-user-select:text;
+}
+
