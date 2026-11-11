@@ -91,17 +91,13 @@ export function getWorkbenchHtml() {
         </section>
 
         <section class="panel transfer-view" id="transfer-view" hidden>
-          <div class="panel-head">
-            <div class="panel-title">
-              <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M13 3L5 14h6l-1 7 8-11h-6z"/></svg>
-              <span data-i18n="transfer.title"></span>
-            </div>
+          <div class="panel-head panel-head--switch">
+            <div class="view-switch" data-view-switch></div>
             <div class="panel-actions">
               <div class="segmented transfer-tabs" id="transfer-tabs">
                 <button type="button" class="seg-btn active" data-transfer-tab="lan" data-i18n="action.lan"></button>
                 <button type="button" class="seg-btn" data-transfer-tab="cloud" data-i18n="cloud.open"></button>
               </div>
-              <button class="icon-btn" id="transfer-close-btn" data-i18n-title="header.close">×</button>
             </div>
           </div>
           <div class="transfer-body">
@@ -298,7 +294,7 @@ export function getWorkbenchHtml() {
             <div class="panel-actions">
               <div class="segmented" id="extmgr-tabs">
                 <button class="seg-btn active" data-exttab="host" data-i18n="extmgr.tabHost"></button>
-                <button class="seg-btn" data-exttab="install" data-i18n="extmgr.tabInstall"></button>
+                <button class="seg-btn" data-exttab="cred" data-i18n="extmgr.tabCred"></button>
                 <button class="seg-btn" data-exttab="pack" data-i18n="extmgr.tabPack"></button>
               </div>
               <button class="help-btn" data-help="extmgr" data-i18n-title="extmgr.help">?</button>

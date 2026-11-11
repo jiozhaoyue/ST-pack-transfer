@@ -188,8 +188,8 @@
 ### K. 局域网互传（整面板视图，2026-11-05）
 | 功能 | UI 入口 | 源码落点 |
 | --- | --- | --- |
-| 用「迁移与备份」面板**完整替换**左侧图表面板 | 面板头切换行 `[data-wbview="transfer"]` | `src/ui/workbench-template.js`（`#transfer-view` + `#transfer-tabs`）、`src/ui/workbench-view.js` 的 `renderTransfer()` / `renderLan()` |
-| 关闭面板、回到图表 | `#transfer-close-btn` | 同上 |
+| 用「迁移与备份」面板**完整替换**左侧图表面板 | 面板头切换行 `[data-wbview="transfer"]`（`存储图表 / 扩展管理 / 迁移与备份`） | `src/ui/workbench-template.js`（`#transfer-view` + `#transfer-tabs`）、`src/ui/workbench-view.js` 的 `renderTransfer()` / `renderLan()` |
+| 离开迁移面板、回到图表 | 面板头切换行里的「存储图表 / 扩展管理」（迁移面板头**没有** ×） | `renderViewSwitch()` + `#view-workbench` 的事件委托 |
 | 一级 tab：局域网 / 公网 | `#transfer-tabs` | `src/ui/workbench-view.js` 的 `renderTransfer()` |
 | WebRTC 分块传输 / 二维码信令 / 续传 | 局域网 pane 内发送与接收区 | `src/core/lan-transfer.js`、`src/ui/lan-transfer-panel.js` |
 
@@ -201,11 +201,11 @@
 | 功能 | UI 入口 | 源码落点 |
 | --- | --- | --- |
 | 视图切换（桌面 2 / 手机 3；桌面数据包列常显） | 各面板头内 `[data-view-switch]`（图表 / 扩展管理 / 数据包；手机上一行切换、下一行原面板按钮） | `src/ui/workbench-view.js` 的 `renderViewSwitch()` / `syncMainView()` |
-| 扩展管理整面板（宿主 / 安装 / 打包） | `#extension-view` | 同文件的 `renderExtensionView()` / `renderExtInstall()` / `renderExtInstalled()` / `renderExtPack()` |
+| 扩展管理整面板（宿主 / 凭据 / 打包） | `#extension-view` | 同文件的 `renderExtensionView()` / `renderExtInstalled()` / `renderExtCredentials()` / `renderExtPack()` |
 | **报告常驻底部（不随页签）** | `#extmgr-report-bar` / `#extmgr-report-panel` | `renderExtensionView()` 的展开逻辑 + `renderExtReport()`；展开时隐藏 `#extension-body` |
 | **插件数据导入导出 JSON** | 设置 → 数据 | `src/ui/plugin-data.js` 的 `buildPluginData()` / `applyPluginData()`；凭据需勾选，OAuth 需再勾一次；导入后重载 |
-| 批量安装（多行链接 / `.txt` / `.json`；`url \| 分支`、`url#分支`） | 安装页文本框与文件上传 | 同文件的 `parseExtEntries()`；执行端 `src/ui/host-bridge.js` 的 `installExtensionBatch()` |
-| 导出日志 / 失败链接 txt / 安装报告 JSON | 安装页与报告页底部按钮 | 同文件的 `downloadTextFile()` |
+| 批量安装（多行链接 / `.txt` / `.json`；`url \| 分支`、`url#分支`） | 宿主页底部「安装扩展」折叠区（`#extmgr-install-block`，默认收起） | 同文件的 `parseExtEntries()` / `renderExtInstall()` / `refreshInstallArea()`；执行端 `src/ui/host-bridge.js` 的 `installExtensionBatch()` |
+| 导出日志 / 失败链接 txt / 安装报告 JSON | 安装区与报告页底部按钮 | 同文件的 `downloadTextFile()` |
 | 宿主扩展清单导出收束 | 已装页「导出扩展清单」 | `index.js` 的 `exportAssetList()`（`source:'host'`） |
 | 包清单入口收束 | 图表卡 `[data-extmanifest]` → 扩展管理并预填 | `index.js` 的 `openExtensionManifest` → `view.openExtensionManager()` |
 | **打包页：按数据包选择扩展** | 扩展管理 → 打包 | `src/ui/workbench-view.js` 的 `renderExtPack()`；扩展折叠为单元的纯逻辑在 `src/core/ext-pack.js`（`extensionUnitsOf` / `extensionUnitName`） |

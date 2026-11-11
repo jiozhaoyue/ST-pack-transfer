@@ -223,7 +223,7 @@ let chartPrefs = typeof localStorage !== 'undefined' ? loadChartPrefs() : normal
 const state = {
   host:'luker', mode:'plugin', view:'desktop', mainView:'chart', mobileView:'chart', pane:'workbench', zone:'import',
   extTab:'host', extEntries:[], extResults:[], extRunning:false, extInstalled:null, extManifestPrefill:[],
-  extReportOpen:false,
+  extReportOpen:false, extInstallOpen:false,
   extAccountTests:[], extUpdate:null, extAccountsOpen:true,
   source:{ type:'host', pkgId:null }, target:'SillyTavern', targetManual:false,
   delta: 'overwrite', splitMb: chartPrefs.splitMb,
@@ -1987,10 +1987,19 @@ function entryRowHtml(e,i){
     +'</div>'
   +'</div>';
 }
+/** 安装区只重绘自己：宿主页的已装列表是异步拉取，不能被进度刷新连累。 */
+function refreshInstallArea(){
+  const area=document.getElementById('extmgr-install-area');
+  if(area) renderExtInstall(area);
+}
+/** 凭据页：账号 / 存储位置 / OAuth / 令牌指引，不含任何安装控件。 */
+function renderExtCredentials(body){
+  body.innerHTML='<div class="ext-install">'+accountsHtml()+'</div>';
+  bindAccounts(body);
+}
 function renderExtInstall(body){
   const rows=state.extEntries.map(entryRowHtml).join('');
   body.innerHTML='<div class="ext-install">'
-    + accountsHtml()
     +'<label class="ext-label">'+t('extmgr.linksLabel')+'</label>'
     +'<div class="ext-note">'+t('extmgr.policyNote')+'</div>'
     +'<textarea id="extmgr-links" class="text_pole" rows="5" placeholder="'+t('extmgr.linksPlaceholder')+'">'+escapeHtml(state.extLinksText||'')+'</textarea>'
@@ -2050,7 +2059,6 @@ function renderExtInstall(body){
   body.querySelectorAll('[data-extbranches]').forEach((btn)=>{
     btn.addEventListener('click',()=>{ void listEntryBranches(Number(btn.dataset.extbranches)); });
   });
-  bindAccounts(body);
   body.querySelector('#extmgr-run')?.addEventListener('click',()=>{
     if(state.extRunning) return;
     if(!state.extEntries.length) state.extEntries=parseExtEntries(state.extLinksText||ta?.value||'', state.extDefaultBranch);
@@ -2136,7 +2144,7 @@ async function preflightAll(){
   const list=state.extEntries.slice(0,20);
   if(!list.length) return;
   await Promise.all(list.map((entry)=>preflightExtEntry(entry,{silent:true})));
-  if(state.extTab==='install') renderExtensionView();
+  refreshInstallArea();
 }
 async function runExtInstall(){
   if(state.extRunning) return;
@@ -2253,10 +2261,17 @@ async function renderExtInstalled(body){
     +'<button type="button" class="btn" id="extmgr-refresh-installed">'+t('extmgr.refresh')+'</button>'
     +'<span style="flex:1"></span></div>'
     +'<div class="ext-list">'+(rows||'<div class="ext-empty">'+t('extmgr.noneInstalled')+'</div>')+'</div>'
-    +updBlock+'</div>';
+    +updBlock
+    +'<details class="ext-install-block" id="extmgr-install-block"'+(state.extInstallOpen?' open':'')+'>'
+    +'<summary>'+t('extmgr.installBlock')+'</summary>'
+    +'<div class="ext-install-area" id="extmgr-install-area"></div>'
+    +'</details></div>';
   body.querySelector('#extmgr-export-assetlist')?.addEventListener('click',()=>actions.exportAssetList?.({source:'host'}));
   body.querySelector('#extmgr-check-updates')?.addEventListener('click',()=>{ void checkExtUpdates(); });
   body.querySelector('#extmgr-refresh-installed')?.addEventListener('click',()=>{ state.extInstalled=null; state.extUpdate=null; renderExtensionView(); });
+  const installBlock=body.querySelector('#extmgr-install-block');
+  installBlock?.addEventListener('toggle',()=>{ state.extInstallOpen=!!installBlock.open; });
+  refreshInstallArea();
 }
 function renderExtReport(body){
   const results=state.extResults||[];
@@ -2387,7 +2402,7 @@ function renderExtensionView(){
   if(open) return;
   if(state.extTab==='host'){ void renderExtInstalled(body); return; }
   if(state.extTab==='pack'){ renderExtPack(body); return; }
-  renderExtInstall(body);
+  renderExtCredentials(body);
 }
 
 function renderTransfer(){
@@ -3762,10 +3777,6 @@ function bind(){
 
   // ── 数据包模式行：导入时显示「从宿主拉取」，导出时显示覆盖/增量 ──
   document.getElementById('btn-fetch')?.addEventListener('click',()=>doFetch());
-  document.getElementById('transfer-close-btn')?.addEventListener('click',()=>{
-    state.transfer.open=false;
-    renderTransfer(); renderLan(); renderCloud();
-  });
   document.getElementById('transfer-tabs')?.addEventListener('click',(e)=>{
     const b=e.target.closest('[data-transfer-tab]'); if(!b) return;
     state.transfer.tab=b.dataset.transferTab==='cloud'?'cloud':'lan';
@@ -4576,7 +4587,8 @@ initChartSplitters();
           .map((e)=>e.url+(e.ref?' | '+e.ref:''))
           .join('\n');
       }
-      state.extTab='install';
+      state.extTab='host';
+      state.extInstallOpen=true;
       state.mainView='extension';
       if(state.view==='mobile') state.mobileView='extension';
       syncMainView();
