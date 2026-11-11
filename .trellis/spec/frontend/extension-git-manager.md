@@ -157,19 +157,29 @@ GitLab `/<group>/<sub>/<repo>/-/tree/<ref>`、`.git` 后缀、query/hash、`http
 | --- | --- | --- |
 | `gitAutoUpdateRules` | `{}` | `{扩展名: {mode:'notify'|'auto', intervalSec, url?, global?}}`；缺省即关闭 |
 | `extOrder` / `extSort` | `[]` / `custom` | 宿主列表自定义顺序与排序方式 |
+| `autoUpdateMinIntervalSec` | `5` | 最短轮询间隔（秒），可手动调 |
+| `autoUpdateMaxIntervalSec` | `86400` | 最长轮询间隔（秒），可手动调 |
+| `autoUpdateDefaultIntervalSec` | `300` | 新规则默认间隔（秒） |
+| `autoUpdateFailureBackoff` | `2` | 失败退避倍数（指数退避） |
+| `autoUpdateFailureBackoffMaxSec` | `3600` | 退避上限（秒） |
+| `autoUpdateNotifyTimeoutSec` | `8` | 「仅提醒」等待多久后更新（秒，且不超过本轮间隔） |
 
-- `intervalSec` 由 `normalizeUpdateInterval()` 夹在 **5–86400 秒**；非法值回落 300 秒。
+- `intervalSec` 由 `normalizeUpdateInterval()` 按**上面三个间隔设置**夹紧（边界不再写死）；非法值回落默认间隔。
+- 所有运行阈值都来自 `updatePolicyOf(settings)`；代码里只保留单位换算与「最小 1 秒」的防零守卫。
 - 旧模型（`gitUpdateSelected` + `gitUpdateIntervalHours` + `gitUpdateMode`）在 `normalizeUpdateRules()`
   中一次性迁移为逐扩展规则；`devMode` / `gitAutoUpdate` / `gitAutoUpdateLastAt` 已删除。
 
 **运行契约**（`scheduleAutoUpdates()` / `runAutoUpdateTick()`）：
 
-- 只有存在规则时才起 `setTimeout` 循环，最小间隔 5 秒；演示模式不启动、不写设置。
+- 只有存在规则时才起 `setTimeout` 循环；下一次唤醒时间 = 所有规则的最早到期时间，
+  且不早于 `autoUpdateMinIntervalSec`；演示模式不启动、不写设置。
+- **失败退避**：每条规则维护连续失败计数，实际等待 = `intervalSec × backoff^failures`，
+  截断到 `autoUpdateFailureBackoffMaxSec`；成功一次（含「已最新」）即清零，用户手动改规则也清零。
 - 远端地址优先取 `gitInstalls` 登记；未登记时现场读宿主 `.git` 的 `remoteUrl`
   （`readHostExtensionGit`），解析不到就拒绝开启并提示，**不假装会自动更新**。
 - `auto` 直接 `installExtensions([{ url, ref, replace:true, credential }])`；
-  `notify` 先弹宿主原生浮层（可点击取消），超时才更新。
-- 读不到本地 / 远端版本、版本不高于本地、仓库不可达：静默跳过，不伪造结果。
+  `notify` 先弹宿主原生浮层（可点击取消），等待 `autoUpdateNotifyTimeoutSec`（且不超过本轮间隔）后更新。
+- 读不到本地 / 远端版本、仓库不可达：计一次失败并进入退避，不伪造结果。
 - 更新失败记录到 `state.extUpdateFail`，可在更新检查行「删除后重装」。
 
 **列表内批量管理**：每行有「更新 / 卸载」，列表头有全选 / 反选 / 取消 / 批量更新 / 批量卸载 +

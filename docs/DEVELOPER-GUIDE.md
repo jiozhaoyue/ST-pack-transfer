@@ -253,7 +253,7 @@
 
 | 功能 | UI 入口 | 源码落点 |
 | --- | --- | --- |
-| **逐扩展自动更新（模式 + 秒级轮询）** | 宿主页每行：关闭 / 仅提醒 / 直接更新 + 间隔（秒，最小 5） | `workbench-view.js` 的 `saveUpdateRule()` / `resolveUpdateRepo()` / `scheduleAutoUpdates()` / `runAutoUpdateTick()`；规则存 `settings.gitAutoUpdateRules` |
+| **逐扩展自动更新（模式 + 秒级轮询 + 失败退避）** | 宿主页每行：关闭 / 仅提醒 / 直接更新 + 间隔（秒）；策略在 设置 → 自动更新 | `saveUpdateRule()` / `resolveUpdateRepo()` / `scheduleAutoUpdates()` / `runAutoUpdateTick()`；策略来自 `updatePolicyOf()`，退避用 `updateBackoffDelay()`（`intervalSec × backoff^failures`，截断到上限） |
 | **列表内批量管理** | 列表头：全选 / 反选 / 取消 / 批量更新 / 批量卸载 / 指定版本分支 | `batchUpdateInstalled()` / `batchUninstallWithConfirm()`；逐条 `updateInstalledExtension()` / `uninstallWithConfirm()`；宿主 `POST /api/extensions/update`（`updateExtensionViaHost`）与 `/delete` |
 | **数据包扩展清单统一入口** | 恢复后自动进「宿主 → 安装扩展」 | `host-bridge.js` 的 `setExtensionManifestSink()`；`index.js` 注册 `view.openExtensionManager(entries)`；独立安装浮层不再使用 |
 | **更新失败预案** | 更新检查结果行「删除后重装」 | `reinstallWithConfirm()` → `reinstallExtension()`：二次确认后 `deleteExtensionViaHost()` 再按登记仓库重装 |

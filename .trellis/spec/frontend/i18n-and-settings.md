@@ -233,11 +233,18 @@ npm run dev       # 3040 → 仅开发热重载（demo 页已废弃，见 workbe
 
 | 键 | 默认 | 归一 |
 | --- | --- | --- |
-| `gitAutoUpdateRules` | `{}` | `{扩展名: {mode:'notify'|'auto', intervalSec, url?, global?}}`；间隔夹在 5–86400 秒 |
+| `gitAutoUpdateRules` | `{}` | `{扩展名: {mode:'notify'|'auto', intervalSec, url?, global?}}`；间隔按策略边界夹紧 |
+| `autoUpdateMinIntervalSec` | `5` | 最短轮询（秒） |
+| `autoUpdateMaxIntervalSec` | `86400` | 最长轮询（秒） |
+| `autoUpdateDefaultIntervalSec` | `300` | 默认间隔（秒） |
+| `autoUpdateFailureBackoff` | `2` | 失败退避倍数 |
+| `autoUpdateFailureBackoffMaxSec` | `3600` | 退避上限（秒） |
+| `autoUpdateNotifyTimeoutSec` | `8` | 提醒等待（秒） |
 | `extOrder` | `[]` | 字符串数组、去重 |
 | `extSort` | `custom` | `custom` / `name` / `version` / `source` |
 
-- 业务代码**禁止**硬编码轮询间隔或模式；一律读 `settings.gitAutoUpdateRules`，间隔过 `normalizeUpdateInterval()`。
+- 业务代码**禁止**硬编码任何自动更新阈值；一律读 `settings.gitAutoUpdateRules` 与 `updatePolicyOf(settings)`，
+  间隔过 `normalizeUpdateInterval(value, policy)`，退避过 `updateBackoffDelay(base, failures, policy)`。
 - **自动更新只在宿主页每条扩展上设置**（2026-11-11 第三轮裁定）；设置页不再出现 `devMode` / `gitAutoUpdate` /
   `gitUpdateIntervalHours` / `gitUpdateMode` / `gitUpdateSelected`。
 - 旧模型在 `normalizeUpdateRules()` 中一次性迁移为逐扩展规则（`gitUpdateSelected` → `{mode, intervalSec}`）。

@@ -1617,3 +1617,31 @@ Topics: [.trellis/spec/frontend/extension-git-manager.md](../../spec/frontend/ex
 ### Status
 
 [OK] **Completed**
+
+
+## Session 83: 自动更新失败退避 + 全部运行阈值可调
+<!-- trellis-session: v=2 fp=1a4d094a59c5552d -->
+
+**Date**: 2026-11-11
+**Task**: 自动更新失败退避 + 全部运行阈值可调
+**Branch**: `main`
+
+### Summary
+
+按用户裁定给逐扩展自动更新加入指数退避（间隔×倍数^连续失败，截断上限，成功或手动改规则清零），并把最短/最长/默认轮询、退避倍数与上限、提醒超时全部提升为设置项（设置→自动更新），代码不再写死；调度器按最早到期时间唤醒。守卫全绿、build exit 0、全量 1145 passed。
+Topics: [.trellis/spec/frontend/extension-git-manager.md](../../spec/frontend/extension-git-manager.md)
+
+### Main Changes
+
+- settings：新增 updatePolicyOf / updateBackoffDelay，六个策略键可手调
+- workbench：autoUpdateFailures 退避计数，调度按最早到期唤醒，提醒超时可调
+- 测试：策略夹紧、退避递增与上限、设置面板六项输入
+- 规范与指南：§10 / §11、K4、README
+
+### Git Commits
+
+(No commits - planning session)
+
+### Status
+
+[OK] **Completed**
