@@ -1467,3 +1467,47 @@ Topics: [.trellis/spec/frontend/workbench-single-view.md](../../spec/frontend/wo
 ### Next Steps
 
 - Dev Luker 8003 起来后补宿主源与扩展管理实机取证
+
+
+## Session 79: 恢复模式归位 / 待导出并入导出区 / 迁移教程 / 开发模式自动更新 / 设置三态与凭据双写
+<!-- trellis-session: v=2 fp=914738224aac419e -->
+
+**Date**: 2026-11-11
+**Task**: 恢复模式归位 / 待导出并入导出区 / 迁移教程 / 开发模式自动更新 / 设置三态与凭据双写
+**Branch**: `main`
+
+### Summary
+
+第五、六轮 UI 裁定落地：数据包模式改名恢复模式并移到页签右侧；删除本次待导出两列区块，产物并入导出区条目；迁移面板加 ? 教程；教程走完不退出演示模式且图标改书本；演示数据改为四宿主 7 导入/3 导出（16MB-4GB）；扩展管理新增逐扩展开发模式（静默/提示自动更新，原生 toast 可取消 + 刷新提示）；设置改为 × 保留草稿 / 取消丢弃 / 保存双写，Git 凭据始终双写，导出默认含登录凭据、OAuth 为子项默认不勾。
+Topics: [.trellis/spec/frontend/workbench-single-view.md](../../spec/frontend/workbench-single-view.md), [.trellis/spec/frontend/extension-git-manager.md](../../spec/frontend/extension-git-manager.md), [.trellis/spec/frontend/i18n-and-settings.md](../../spec/frontend/i18n-and-settings.md)
+
+### Main Changes
+
+- 恢复模式归位到 #zone-tabs 右侧；#pending-exports 两列区块删除，队列条目渲染进导出区
+- 迁移面板 ? 教程（局域网互传 / 云端仓库 / 恢复模式）；教程走完只回目标菜单，图标改书本
+- 演示数据：4 宿主、导入 7 / 导出 3，16 MB–4 GB；默认选中改为取第一个导入包
+- 开发模式：逐扩展 silent/prompt 自动更新，toastr 原生浮层可点击取消，完成后提示刷新
+- 设置三态：× 保留内存草稿（刷新即丢）/ 取消丢弃 / 保存双写 localStorage+settings.json
+- 凭据双写 + 导出默认含登录凭据（OAuth 子项默认不勾）
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `2ee9617` | feat(ui): 恢复模式归位 + 待导出并入导出区 + 迁移教程 + 开发模式自动更新 |
+| `1ed73d9` | feat(settings): 三态关闭/取消/保存 + 凭据双写 + 导出默认含凭据 |
+| `3710a00` | docs: 同步设置三态 / 凭据双写 / 导出默认值 |
+
+### Testing
+
+- [OK] 六守卫全绿；npm run build exit 0
+- [OK] 全量 npm test 1119 passed / 2 skipped（修正 settings 两组陈旧断言，新增 gitDevMode）
+- [OK] 无头取证：迁移 ? 与三段帮助、导入 7 包/导出 4 条、× 保留草稿/取消丢弃/保存写入 localStorage
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- Dev Luker 8003 起来后补开发模式自动更新与迁移教程实机取证
