@@ -89,10 +89,15 @@
 
 - **入口**：工作台左侧面板头内的切换按钮（存储图表 / 扩展管理；手机另有数据包），
   不再占用页头下的独立一行。
-- **页签**：宿主 / 凭据 / 打包；宿主页列出宿主已装扩展（可刷新、检查更新、导出清单），
 - **页签**：宿主 / 开发者 / 打包；宿主页顶部是横线工具条（导出清单 / 检查更新 / 刷新 + 排序），
   列表头显示数量、批量选择与批量更新 / 卸载、可选「指定版本 / 分支」；扩展行可**拖拽排序**（自定义顺序会被记住）；
   安装扩展是面板**固定页脚**，紧贴底部安装报告条，展开时内容向上出现；开发者页只放 Git 账号与 OAuth。
+- **作用域互转（原生联动）**：管理员在每条扩展行可「移至全局 / 移至用户」，走宿主
+  `POST /api/extensions/move`（**双向都需要管理员**）；非管理员不渲染按钮，403 如实回显。
+- **安装到全局**：管理员在安装区勾选「安装到全局」即装进
+  `public/scripts/extensions/third-party/`；默认仍装到当前用户，非管理员看不到该选项。
+- **加载顺序（只读）**：列表显示 `manifest.loading_order`（如 `#50`）并可按它排序；
+  宿主没有写回端点，插件**不提供伪编辑**——要调整请改扩展自己的 `manifest.json` 后刷新页面。
 - **逐扩展自动更新**：宿主页每条扩展可选「关闭 / 仅提醒 / 直接更新」，轮询间隔以秒计（最短 5 秒）；
   仅提醒模式用酒馆原生浮层通知，**点击通知即取消**本次更新，更新完成再用原生浮层提示刷新页面。
   未登记仓库的扩展会现场读取宿主 `.git` 的 origin，读不到就不允许开启，不假装会自动更新。
@@ -238,10 +243,10 @@ npm test                      # 单元测试（纯逻辑层无 DOM 依赖）
 npm run build && npm run preview   # UI 验收唯一入口（4173 静态服务器）
 npm run e2e:web               # 独立 Web / 云部署 / 单文件离线，不需要实例
 npm run e2e                   # 实例侧冒烟与功能矩阵（只连 Dev 实例）
-npm run check:css-scope check:dom-injection check:template-source check:dom-scope check:control-consumer check:i18n
+npm run check:css-scope check:dom-injection check:template-source check:dom-scope check:control-consumer check:i18n check:no-bundler-only
 ```
 
-静态守卫覆盖 CSS 作用域、宿主 DOM 写入范围、单一模板源、死控件、i18n；测试只锁不变量，不锁耗时。
+静态守卫覆盖 CSS 作用域、宿主 DOM 写入范围、单一模板源、死控件、i18n，以及**宿主直装**（禁止 JSON 静态导入 / `node:` 静态导入 / 裸包名 / Vite 专有语法）；测试只锁不变量，不锁耗时。
 
 ## 七、许可证
 

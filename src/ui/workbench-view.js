@@ -48,7 +48,8 @@ import { loadSettings, saveSettings } from './settings-store.js';
 import { normalizeUpdateInterval, updatePolicyOf, updateBackoffDelay } from './settings-panel.js';
 import { loadChartPrefs, saveChartPrefs, normalizeChartPrefs } from './chart-prefs.js';
 /* 占位/演示扩展清单从数据文件读取（禁止在 JS 里硬编码仓库清单）。 */
-import demoExtensionsData from '../data/demo-extensions.json';
+/* 演示数据必须是纯 ESM（浏览器直装不能 import JSON，见 src/data/demo-extensions.js 头注释）。 */
+import demoExtensionsData from '../data/demo-extensions.js';
 
 /**
  * 教程锚点纯几何：用 overlay 自身矩形做基准，兼容宿主容器的 transform。
@@ -230,7 +231,7 @@ let chartPrefs = typeof localStorage !== 'undefined' ? loadChartPrefs() : normal
 const state = {
   host:'luker', mode:'plugin', view:'desktop', mainView:'chart', mobileView:'chart', pane:'workbench', zone:'import',
   extTab:'host', extEntries:[], extResults:[], extRunning:false, extInstalled:null, extManifestPrefill:[],
-  extReportOpen:false, extInstallOpen:false, settingsDraft:null,
+  extReportOpen:false, extInstallOpen:false, extInstallGlobal:false, settingsDraft:null,
   extAccountTests:[], extUpdate:null, extAccountsOpen:false,
   /* 服务端插件清单（仅管理员）：null = 未读取；[] = 已读取但为空。 */
   extServerPlugins:null, extHostAdmin:false, extServerOpen:true,
@@ -1295,7 +1296,6 @@ function renderChart(){
         + '<div class="guide-title">' + t('empty.fetchTitle') + '</div>'
         + '<div class="guide-desc">' + t('empty.fetchDesc') + '</div>'
         + '<button type="button" class="btn accent" id="btn-empty-fetch">' + t('empty.fetchBtn') + '</button>'
-        + '<button type="button" class="btn" id="btn-assetlist-host" title="' + t('empty.assetListHint') + '">' + t('empty.assetListBtn') + '</button>'
       + '</div>'
       + '<div class="empty-guide-card guide-import">'
         + '<div class="guide-icon"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></div>'
@@ -2270,6 +2270,7 @@ function renderExtInstall(body){
       +'<button type="button" class="btn" id="extmgr-pick">'+t('extmgr.upload')+'</button>'
       +'<button type="button" class="btn" id="extmgr-paste">'+t('extmgr.paste')+'</button>'
       +'<label class="ext-branch-def"><span>'+t('extmgr.defaultBranch')+'</span><input id="extmgr-branch" class="text_pole" value="'+escapeHtml(state.extDefaultBranch||'')+'" placeholder="'+t('extmgr.refPlaceholder')+'"></label>'
+      +(state.extHostAdmin?'<label class="ext-branch-def" title="'+t('extmgr.installGlobalHint')+'"><input type="checkbox" id="extmgr-global"'+(state.extInstallGlobal?' checked':'')+'> <span>'+t('extmgr.installGlobal')+'</span></label>':'')
       +'<span style="flex:1"></span>'
       +'<button type="button" class="btn" id="extmgr-parse">'+t('extmgr.parse')+'</button>'
       +'<button type="button" class="btn accent" id="extmgr-run"'+(state.extRunning?' disabled':'')+'>'+t('extmgr.install')+'</button>'
@@ -2286,6 +2287,8 @@ function renderExtInstall(body){
   ta?.addEventListener('input',()=>{ state.extLinksText=ta.value; });
   const branchEl=body.querySelector('#extmgr-branch');
   branchEl?.addEventListener('input',()=>{ state.extDefaultBranch=branchEl.value.trim(); });
+  const globalEl=body.querySelector('#extmgr-global');
+  globalEl?.addEventListener('change',()=>{ state.extInstallGlobal=!!globalEl.checked; });
   body.querySelector('#extmgr-pick')?.addEventListener('click',()=>body.querySelector('#extmgr-file')?.click());
   body.querySelector('#extmgr-file')?.addEventListener('change',async(e)=>{
     const file=e.target.files?.[0]; if(!file) return;
@@ -2426,7 +2429,7 @@ async function runExtInstall(){
     const payload=state.extEntries.map((e)=>{
       const acc=accountForRepo(e.parsed);
       const credential=acc ? { kind: acc.username?'basic':'token', username:acc.username, secret:acc.secret } : null;
-      return { url:e.url, branch:e.ref, ref:e.ref, credential, replace:false };
+      return { url:e.url, branch:e.ref, ref:e.ref, credential, replace:false, global:state.extHostAdmin && state.extInstallGlobal===true };
     });
     state.extResults=await actions.installExtensions?.(payload)||[];
     /* 失败项补上「该仓库是私有/需要登录」的结论，报告里不再只给一句宿主原文。 */
@@ -2766,6 +2769,49 @@ async function reinstallExtension(name, isGlobal){
   }
   renderExtensionView();
 }
+
+/**
+ * 作用域互转（原生 `POST /api/extensions/move`）。
+ *
+ * 用户裁定（2026-11-11）：**管理员**可把扩展在「全局（所有用户）」与「仅当前用户」之间移动。
+ * 宿主对**双向**移动都要求管理员，因此非管理员一律不渲染按钮；插件不越权、不伪造结果。
+ * @param {string} name 扩展目录名
+ * @param {'global'|'local'} [sourceType] 当前作用域（缺省从列表行推导）
+ */
+function moveScopeWithConfirm(name, sourceType){
+  if(!name) return;
+  if(!state.extHostAdmin){ toast(t('extmgr.moveForbidden')); return; }
+  const item=(state.extInstalled||[]).find((row)=>String(row?.id||row?.folder||row?.name||'')===name);
+  const source=sourceType==='global'||sourceType==='local'
+    ? sourceType
+    : (String(item?.sourceType||'')==='global'?'global':'local');
+  const destination=source==='global'?'local':'global';
+  openModal(t('extmgr.moveTitle'), destination==='global'
+    ? t('extmgr.moveToGlobalDesc',{name})
+    : t('extmgr.moveToLocalDesc',{name}), [], [
+    {label:t('modal.cancel'),onClick:closeModal},
+    {label:t('extmgr.moveConfirm'),primary:true,onClick:()=>{ closeModal(); void moveInstalledExtension(name, source, destination); }},
+  ]);
+}
+/** 执行移动：宿主返回 403/404/409 时按原因如实回显，不静默。 */
+async function moveInstalledExtension(name, source, destination){
+  let res=null;
+  try { res=await actions.moveExtension?.(name, source, destination); } catch { res=null; }
+  if(!res || !res.ok){
+    const reason=res?.reason||'network';
+    const text=reason==='forbidden'?t('extmgr.moveForbidden')
+      :reason==='conflict'?t('extmgr.moveConflict')
+        :reason==='not-found'?t('extmgr.moveNotFound')
+          :t('extmgr.moveFailed');
+    toast(text);
+    return;
+  }
+  toast(t('extmgr.moved',{name}));
+  state.extInstalled=null;
+  state.extUpdate=null;
+  state.extUpdateFail={};
+  renderExtensionView();
+}
 /** 宿主已装扩展的稳定记录（名字 / 版本 / 来源），排序与持久化都基于它。 */
 function installedRowRecords(){
   return (state.extInstalled||[]).map((x)=>({
@@ -2773,6 +2819,8 @@ function installedRowRecords(){
     name:String(x?.id||x?.folder||x?.name||''),
     version:String(x?.version||x?.manifest?.version||''),
     sourceType:String(x?.sourceType||''),
+    /* manifest.loading_order：只作为**只读事实**展示；宿主没有写回端点，插件不得伪造可编辑。 */
+    loadingOrder:Number.isFinite(Number(x?.loadingOrder))&&String(x?.loadingOrder??'')!==''?Number(x.loadingOrder):null,
   })).filter((row)=>row.name);
 }
 /** 排序：自定义（拖拽顺序）优先，其余按名称 / 版本 / 来源稳定排序。 */
@@ -2782,6 +2830,7 @@ function sortedInstalledRecords(records, sort){
   if(sort==='name') arr.sort((a,b)=>a.name.localeCompare(b.name));
   else if(sort==='version') arr.sort((a,b)=>compareVersions(b.version,a.version)||a.name.localeCompare(b.name));
   else if(sort==='source') arr.sort((a,b)=>a.sourceType.localeCompare(b.sourceType)||a.name.localeCompare(b.name));
+  else if(sort==='order') arr.sort((a,b)=>(a.loadingOrder??Number.MAX_SAFE_INTEGER)-(b.loadingOrder??Number.MAX_SAFE_INTEGER)||a.name.localeCompare(b.name));
   else arr.sort((a,b)=>(order.has(a.name)?order.get(a.name):Number.MAX_SAFE_INTEGER)
     -(order.has(b.name)?order.get(b.name):Number.MAX_SAFE_INTEGER)||a.name.localeCompare(b.name));
   return arr;
@@ -2802,6 +2851,8 @@ function reorderInstalled(from, to){
   renderExtensionView();
 }
 async function renderExtInstalled(body){
+  /* 管理员身份是「作用域互转」的唯一闸门：进宿主页就先取，别等开发者页。 */
+  void loadServerPlugins();
   body.innerHTML='<div class="ext-empty">'+t('extmgr.loading')+'</div>';
   let list=[];
   try {
@@ -2814,9 +2865,10 @@ async function renderExtInstalled(body){
   const installedGit=new Set((s.gitInstalls||[]).map((r)=>r.name));
   const rules=s.gitAutoUpdateRules||{};
   const policy=updatePolicyOf(s);
-  const sort=['custom','name','version','source'].includes(s.extSort)?s.extSort:'custom';
+  const sort=['custom','name','version','source','order'].includes(s.extSort)?s.extSort:'custom';
   const records=sortedInstalledRecords(installedRowRecords(), sort);
   const rows=records.map(({x,name,version})=>{
+    const isGlobal=String(x?.sourceType||'')==='global';
     const registered=installedGit.has(name);
     const rule=rules[name]||null;
     /* 自动更新只在宿主页每条扩展上设置（用户 2026-11-11 裁定）：模式 + 秒级轮询（最小 5 秒）。 */
@@ -2836,8 +2888,10 @@ async function renderExtInstalled(body){
       +'<span class="ext-url" title="'+escapeHtml(name)+'">'+escapeHtml(name)+'</span>'
       +'<span class="ext-state">'+escapeHtml(version)+'</span>'
       +extSourceTag(x?.sourceType)
+      +(x?.loadingOrder!=null?'<span class="ext-flag" title="'+t('extmgr.orderHint')+'">#'+escapeHtml(String(x.loadingOrder))+'</span>':'')
       +auto
       +'<span class="ext-row-actions">'
+        +(state.extHostAdmin?'<button type="button" class="btn" data-extmove="'+escapeHtml(name)+'" data-extscope="'+(isGlobal?'global':'local')+'" title="'+t('extmgr.moveHint')+'">'+(isGlobal?t('extmgr.moveToLocal'):t('extmgr.moveToGlobal'))+'</button>':'')
         +'<button type="button" class="btn" data-extupdate="'+escapeHtml(name)+'">'+t('extmgr.updateNow')+'</button>'
         +'<button type="button" class="btn danger" data-extremove="'+escapeHtml(name)+'">'+t('extmgr.uninstall')+'</button>'
       +'</span></div>';
@@ -2866,7 +2920,7 @@ async function renderExtInstalled(body){
     ? '<div class="ext-note">'+(upd.busy ? t('extmgr.updateChecking') : (upd.note||t('extmgr.updateHint')))+'</div>'
       +'<div class="ext-list">'+(updRows||'')+'</div>'
     : '';
-  const sortOptions=[['custom','extmgr.sortCustom'],['name','extmgr.sortName'],['version','extmgr.sortVersion'],['source','extmgr.sortSource']];
+  const sortOptions=[['custom','extmgr.sortCustom'],['order','extmgr.sortOrder'],['name','extmgr.sortName'],['version','extmgr.sortVersion'],['source','extmgr.sortSource']];
   const toolbar='<div class="ext-toolbar">'
     +'<button type="button" class="btn" id="extmgr-export-assetlist">'+t('extmgr.exportAssetList')+'</button>'
     +'<button type="button" class="btn" id="extmgr-check-updates"'+(upd&&upd.busy?' disabled':'')+'>'+t('extmgr.checkUpdates')+'</button>'
@@ -3001,6 +3055,7 @@ async function renderExtInstalled(body){
   body.querySelectorAll('[data-extupdate]').forEach((btn)=>btn.addEventListener('click',()=>{ void updateInstalledExtension(btn.dataset.extupdate,{ref:refValue()}); }));
   body.querySelectorAll('[data-extreinstall]').forEach((btn)=>btn.addEventListener('click',()=>reinstallWithConfirm(btn.dataset.extreinstall)));
   body.querySelectorAll('[data-extremove]').forEach((btn)=>btn.addEventListener('click',()=>uninstallWithConfirm(btn.dataset.extremove)));
+  body.querySelectorAll('[data-extmove]').forEach((btn)=>btn.addEventListener('click',()=>moveScopeWithConfirm(btn.dataset.extmove, btn.dataset.extscope)));
   void loadServerPlugins();
   scheduleAutoUpdates();
 }
@@ -4773,14 +4828,6 @@ function bind(){
       const fetchBtn=document.getElementById('btn-fetch');
       if(fetchBtn) fetchBtn.click();
       else actions.fetch?.();
-      return;
-    }
-    const hostAssetList=e.target.closest('#btn-assetlist-host');
-    if(hostAssetList){
-      // 宿主扩展清单导出已收束到「扩展管理 → 宿主」页，不再单独弹导出。
-      state.extTab='host'; state.mainView='extension';
-      if(state.view==='mobile') state.mobileView='extension';
-      syncMainView(); renderExtensionView();
       return;
     }
     const cardAssetList=e.target.closest('[data-assetlist]');

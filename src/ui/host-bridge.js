@@ -2215,11 +2215,12 @@ export async function discoverHostExtensions() {
  * @param {string} params.url 扩展 Git 仓库 URL
  * @param {string} [params.branch] 对应分支
  * @param {boolean} [params.replace=false] 是否强制覆盖已有目录
+ * @param {boolean} [params.global=false] 是否安装到全局（管理员；宿主对非管理员回 403）
  * @returns {Promise<any>}
  */
-export async function installExtensionViaHost({ url, branch, replace = false }) {
+export async function installExtensionViaHost({ url, branch, replace = false, global = false }) {
   const token = await getCsrfToken();
-  const body = { url, branch, replace };
+  const body = { url, branch, replace, global: !!global };
   const response = await fetch('/api/extensions/install', {
     method: 'POST',
     credentials: 'same-origin',
@@ -2265,6 +2266,7 @@ export async function installExtensionBatch(entries, { onEntry, onLog } = {}) {
     /* 空 ref 表示「用仓库默认分支」——不要强行填 main（很多仓库默认是 master）。
        ref 可以是分支、标签或 commit（commit 宿主多半不支持，失败信息会原样回传）。 */
     const branch = String(entry?.branch ?? entry?.ref ?? entry?.version ?? '').trim();
+    const isGlobal = entry?.global === true;
     /* 私有仓库只能靠宿主服务端克隆：凭据拼进交给宿主的 URL（内存里拼、日志里抹）。
        界面与返回值一律用**不含凭据**的 url，避免 token 进日志 / 报告文件。 */
     const credential = entry?.credential || null;
@@ -2272,15 +2274,15 @@ export async function installExtensionBatch(entries, { onEntry, onLog } = {}) {
     onEntry?.({ url, branch, status: 'installing' });
     onLog?.(`[${new Date().toISOString()}] installing ${url} (${branch || 'default branch'})${target.authed ? ' · 已注入凭据' : ''}`);
     try {
-      await installExtensionViaHost({ url: target.url, branch, replace: !!entry.replace });
+      await installExtensionViaHost({ url: target.url, branch, replace: !!entry.replace, global: isGlobal });
       onEntry?.({ url, branch, status: 'ok' });
       onLog?.(`[${new Date().toISOString()}] OK ${url}`);
-      results.push({ url, branch, status: 'ok' });
+      results.push({ url, branch, status: 'ok', global: isGlobal });
     } catch (err) {
       const message = scrubUrlCredentials(err?.message || String(err));
       onEntry?.({ url, branch, status: 'failed', error: message });
       onLog?.(`[${new Date().toISOString()}] FAIL ${url}: ${message}`);
-      results.push({ url, branch, status: 'failed', error: message });
+      results.push({ url, branch, status: 'failed', error: message, global: isGlobal });
     }
   }
   onLog?.(`[${new Date().toISOString()}] finished: ${results.filter((r) => r.status === 'ok').length} ok / ${results.filter((r) => r.status === 'failed').length} failed`);
@@ -2338,6 +2340,51 @@ export async function deleteExtensionViaHost(extensionName, isGlobal = false) {
     body: JSON.stringify({ extensionName, global: isGlobal }),
   });
   return response.ok;
+}
+
+/**
+ * 调用宿主 `/api/extensions/move`，在「全局（管理员 / 所有用户）」与「当前用户」之间移动扩展。
+ *
+ * 端点事实（SillyTavern 与 Luker 上游同源，2026-11-11 核对两端 `src/endpoints/extensions.js`）：
+ * - body：`{ extensionName, source, destination }`；
+ * - `source` / `destination` 取 `global` 或 `local`（宿主把**任何非 global** 当作用户目录）；
+ * - **双向移动都要求管理员**，非管理员回 403；
+ * - 宿主按目录整体复制后删源，成功返回 204；源不存在 404、目标已存在 409。
+ *
+ * `extensionName` 必须是 discover 返回的**目录名**（不含 `third-party/` 前缀）：宿主只做 sanitize。
+ *
+ * @param {string} extensionName 扩展目录名
+ * @param {'global'|'local'} source 源作用域
+ * @param {'global'|'local'} destination 目标作用域
+ * @returns {Promise<{ok:boolean,status:number,reason?:string,error?:string}>}
+ */
+export async function moveExtensionViaHost(extensionName, source, destination) {
+  const name = String(extensionName || '').trim();
+  if (!name) return { ok: false, status: 0, reason: 'missing-name' };
+  if (source === destination) return { ok: false, status: 0, reason: 'same-scope' };
+  let token = '';
+  try { token = await getCsrfToken(); } catch { token = ''; }
+  try {
+    const response = await fetchWithTimeout('/api/extensions/move', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { 'X-CSRF-Token': token } : {}),
+      },
+      body: JSON.stringify({ extensionName: name, source, destination }),
+    }, { timeoutMs: 120_000, label: '移动宿主扩展' });
+    if (response.ok) return { ok: true, status: response.status };
+    let detail = '';
+    try { detail = scrubUrlCredentials((await response.text()).slice(0, 300)); } catch { /* 忽略 */ }
+    const reason = response.status === 403 ? 'forbidden'
+      : response.status === 404 ? 'not-found'
+        : response.status === 409 ? 'conflict'
+          : `http-${response.status}`;
+    return { ok: false, status: response.status, reason, error: detail };
+  } catch (err) {
+    return { ok: false, status: 0, reason: 'network', error: String(err?.message || err) };
+  }
 }
 
 /**
