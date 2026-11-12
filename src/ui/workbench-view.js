@@ -455,7 +455,8 @@ function renderViewSwitch(){
   items.push({id:'extension',label:t('view.extension')});
   const active=state.transfer.open ? 'transfer' : (mobile?state.mobileView:state.mainView);
   const html=items.map(it=>'<button type="button" class="view-switch-btn'+(it.id===active?' active':'')+'" data-wbview="'+it.id
-    +'" aria-pressed="'+(it.id===active)+'">'+viewSwitchIcon(it.id)+'<span>'+it.label+'</span></button>').join('');
+    +'" aria-pressed="'+(it.id===active)+'" aria-label="'+escapeHtml(it.label)+'" title="'+escapeHtml(it.label)+'">'
+    +viewSwitchIcon(it.id)+'<span>'+it.label+'</span></button>').join('');
   document.querySelectorAll('[data-view-switch]').forEach((host)=>{
     /* 数据包面板只在手机形态参与切换；桌面数据包列常显，头部不出现切换按钮。 */
     if(host.hasAttribute('data-view-switch-zone') && !mobile){
@@ -464,6 +465,27 @@ function renderViewSwitch(){
     host.hidden=false;
     host.innerHTML=html;
   });
+  scheduleSwitchDensity();
+}
+
+/**
+ * 视图切换行**绝不换行**：量“带文字”的真实宽度，放不下就整行退化为纯图标。
+ * 必须先去掉 is-icon-only 再量，否则一旦退化就再也量不出溢出，永远回不到文字态。
+ */
+function applySwitchDensity(){
+  document.querySelectorAll('[data-view-switch]').forEach((host)=>{
+    if(host.hidden) return;
+    host.classList.remove('is-icon-only');
+    if(host.scrollWidth > host.clientWidth + 1) host.classList.add('is-icon-only');
+  });
+}
+let switchDensityRaf=0;
+function scheduleSwitchDensity(){
+  if(switchDensityRaf) return;
+  const run=()=>{ switchDensityRaf=0; applySwitchDensity(); };
+  switchDensityRaf = (typeof requestAnimationFrame==='function')
+    ? requestAnimationFrame(run)
+    : (setTimeout(run, 0), 1);
 }
 function syncMainView(){
   state.view = detectView();
@@ -4640,7 +4662,7 @@ function bind(){
     if(btn){ btn.setAttribute('aria-expanded',open?'true':'false'); btn.classList.toggle('is-open',open); }
   });
   if(typeof window!=='undefined'){
-    window.addEventListener('resize',()=>{ syncView(); syncMainView(); });
+    window.addEventListener('resize',()=>{ syncView(); syncMainView(); scheduleSwitchDensity(); });
   }
   /* 容器宽度变化同样要重判（插件模态拉宽/拉窄时 window 尺寸不变）。
      rAF 合帧：拖拽模态边缘会连续触发，逐次重排会卡。 */
@@ -5218,6 +5240,13 @@ function initChartTight(){
   schedule();
 }
 
+/* ── 视图切换行密度：容器变窄时立刻退化为纯图标（绝不换行） ── */
+function initSwitchDensity(){
+  if(typeof ResizeObserver==='undefined') return;
+  const ro=new ResizeObserver(scheduleSwitchDensity);
+  document.querySelectorAll('[data-view-switch]').forEach(host=>ro.observe(host));
+}
+
 /* ── 初始化（视图自有，不依赖外部数据） ── */
 renderAll();
 bind();
@@ -5225,6 +5254,7 @@ syncTopControls();
 initSplitters();
 initChartSplitters();
 initChartTight();
+initSwitchDensity();
 
   /* ── 对外 API ── */
   function renderAll() {

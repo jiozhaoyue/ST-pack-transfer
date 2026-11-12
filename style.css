@@ -632,11 +632,14 @@
   #app.app-container .zone-empty{padding:16px;text-align:center;color:var(--muted-2);font-size:11.5px}
 
   /* 面板头内的视图切换：桌面 2 个（图表 / 扩展管理），手机 3 个（图表 / 数据包 / 扩展管理）。
-     桌面与面板头同排；手机切到面板头第一行，原面板按钮落到下一行。 */
-  #app.app-container .view-switch{display:flex;align-items:center;gap:4px;min-width:0;flex:0 1 auto;overflow-x:auto}
+     桌面与面板头同排；手机切到面板头第一行，原面板按钮落到下一行。
+     **绝不换行**：宽度不够时整行退化为纯图标（见 .is-icon-only）。 */
+  #app.app-container .view-switch{display:flex;flex-wrap:nowrap;align-items:center;gap:4px;min-width:0;flex:0 1 auto;overflow:hidden}
   #app.app-container .view-switch-btn{display:inline-flex;align-items:center;gap:6px;border:1px solid transparent;
     background:transparent;color:var(--muted);padding:4px 10px;border-radius:7px;font-size:12px;white-space:nowrap;flex:0 0 auto}
   #app.app-container .view-switch-btn .ico{width:15px;height:15px;flex:0 0 auto;color:currentColor}
+  #app.app-container .view-switch.is-icon-only .view-switch-btn{padding:4px 7px}
+  #app.app-container .view-switch.is-icon-only .view-switch-btn span{display:none}
   #app.app-container .view-switch-btn.active{background:var(--accent-soft);border-color:var(--accent);color:var(--text)}
   /* 全局动作条已取消：从宿主拉取在数据包模式行，迁移与备份在面板头切换行 */
 
