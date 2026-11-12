@@ -1726,3 +1726,35 @@ Topics: [.trellis/spec/frontend/extension-git-manager.md](../../spec/frontend/ex
 ### Next Steps
 
 - 观察后续启动是否仍有 ENOENT；如需更新扩展用串行队列/逐扩展自动更新
+
+
+## Session 86: 2026-11-12 · Luker 四态存储互转 + 图表/教程/响应式 + Playwright 无头实测
+<!-- trellis-session: v=2 fp=1c28b122d3f4fa70 -->
+
+**Date**: 2026-11-12
+**Task**: 2026-11-12 · Luker 四态存储互转 + 图表/教程/响应式 + Playwright 无头实测
+**Branch**: `main`
+
+### Summary
+
+Session summary was not supplied.
+
+### Main Changes
+
+- engine-bridge + 跨宿主中转；图表十字拖动；空间不足隐藏可视化；教程每次启动+不再弹出；视图切换只留图标；铁律 23/24
+
+### Git Commits
+
+(No commits - planning session)
+
+### Testing
+
+- [OK] 冒烟 16/16 全绿；真实样本 PG→FS→PG 九表 doc 一致；SQLite 宿主导出器实读通过
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 重跑 newui 完整流程；宿主侧无 _xrestore_ 取证
