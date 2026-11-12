@@ -67,6 +67,19 @@
   自动更新策略块与 Git 清理块存在；Git 页签选择器与图容器存在；两条禁止文案不存在。
 - 未覆盖：真实宿主仓库的泳道图与「按版本重装」需在装有扩展的 Dev 实例上验证（独立 Web 无宿主）。
 
+## Dev Luker 8003 实测（2026-11-12，Playwright 无头）
+
+- 工作台经宿主扩展行「打开」进入（`openWorkbenchModal`，`tutorialExited:true`）。
+- Git 页签：选中 `Acsus-Paws-Puffs` → **50 条提交 / 50 节点 / 50 条边 / 1 条悬空线**，
+  分支引用 `main`、`origin/main`；点提交出 **4 个文件**的 diff，无错误。
+- 「装到该版本」：点 `main` chip → 按钮「装到 main」；确认框文案为
+  「将把「Acsus-Paws-Puffs」重装为 main…扩展目录会被替换…」。
+- 实际安装请求（用 `page.route` 截获后 **abort，不写扩展目录**）：
+  `POST /api/extensions/install`，body = `{url:'https://github.com/Hmkovo/Acsus-Paws-Puffs', branch:'main', replace:true, global:false}` —— 仓库根 URL、所选 ref、覆盖模式均正确。
+- 扩展管理页：**41 行**真实已装扩展，`.ext-toolbar` 不存在，41 个 `fa-rotate` 更新图标，
+  `#N` 在名字前（样本：`#10 Acsus-Paws-Puffs 2.0.0 …`）。
+- **未执行**真实替换：按 PARDON，覆盖扩展目录需用户点头；本次只验证到请求体正确。
+
 ## 依赖与风险
 
 - 泳道图只取**单一 ref 的最近 N 条提交**（默认 50），跨分支完整历史需多次请求，本轮不做；
