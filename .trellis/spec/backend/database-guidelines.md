@@ -174,8 +174,10 @@ deleteArtifact(name)                  → Promise<boolean>
 - 目标**不是** Luker 时，Luker 专属私有文件（`stats.json` / `macros.json` / `user_data.json` 等）被搬到 `_compat/luker/<原路径>` 而非丢弃；转回 Luker 时再解包回原位（`transform.js`；`test/private-configs.test.js` 把关）。
 
 ### 6. Extension Migration
-- **PT / TT 目标**：用户级 `extensions/<name>/` 迁移为 `data/extensions/third-party/<name>/`，并产出 `data/_tauritavern/extension-sources/<scope>/<name>.json` 来源记录（源里已有记录则原样保留；否则仅在 `remoteUrl` / `homePage` 为 https 时合成，非 https 只记警告——PT 导入时会跳过该扩展）。
-- 与已有 third-party 同名冲突时保留 third-party 版本，丢弃用户级副本并逐条记录。
+- **PT 目标**：用户级 `extensions/<name>/` 迁移为 `data/extensions/third-party/<name>/`，并产出 `data/_tauritavern/extension-sources/<scope>/<name>.json` 来源记录（源里已有记录则原样保留；否则仅在 `remoteUrl` / `homePage` 为 https 时合成，非 https 只记警告——PT 导入时会跳过该扩展）。
+- **TT 目标**：保留作用域 —— 用户级 → `data/default-user/extensions/<name>/`（来源记录进 `extension-sources/local/`），全局 → `data/extensions/third-party/<name>/`（来源记录进 `global/`）。
+- **同名冲突（四目标统一）**：保留**用户级**、跳过全局副本（与 ST/Luker/TT 宿主加载语义一致），计入 `globalShadowedByUser` 并汇总警告。
+- **宿主自带插件**（`public/scripts/extensions/<内置>/`，非 third-party）判 `builtin-ext`：整条剥离、计入 `builtinExts` 并汇总警告。
 - **ST / L 目标**：修正错误的 `third-party` 嵌套并摊平（`thirdPartyFlattenedCount`）。
 - 另有交付模式开关：`EXTENSION_MODES.MANIFEST`（只导出来源清单，不打包插件实体与 git packfile，防 408 超时）与 `EXTENSION_MODES.FULL`（完整离线包）。
 

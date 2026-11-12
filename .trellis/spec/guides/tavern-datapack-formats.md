@@ -52,8 +52,15 @@
 ## 转换工具的既有约定(本仓库)
 
 - hub 布局 = ST 摊平;`data/default-user/` 前缀进出;TT 私有/派生默认丢弃(`keepAll` 保留)。
-- PT/TT 目标:用户级 `extensions/<name>/` 自动迁移为 third-party 布局 + 合成来源记录
-  (homePage 兜底),与 third-party 同名时保留第三方副本;third-party 根下散文件丢弃。
+- **扩展作用域与同名去重**（2026-11-12 起，取代旧「PT/TT 一律迁 third-party、冲突保留第三方」）：
+  源里五种形态按作用域分类 —— `extensions/<名>/` = 用户级；
+  `public/scripts/extensions/third-party/<名>/`（ST/Luker 全局扩展的**真实包内路径**）、
+  `extensions/third-party/<名>/`、`data/extensions/third-party/<名>/` = 全局；
+  `public/scripts/extensions/<内置>/` = **宿主自带**（判 `builtin-ext`，整条剥离）。
+  **同名 → 保留用户级、跳过全局副本**（ST/Luker `discover` 源码注释与 TT 一致：conflict 时用 user 目录）。
+  落点：ST/L 平铺 `extensions/<名>/`；TT 用户级 → `data/default-user/extensions/`、全局 → `data/extensions/third-party/`；
+  PT 无用户级目录 ⇒ 一律 `data/extensions/third-party/` + 来源记录（scope 随落点：TT local → `extension-sources/local/`）。
+  third-party 根下散文件丢弃。
 - L 目标:`image-metadata.json` 丢弃(L 类目不含);`_engine_dump.bin` / `_engine_meta.json`
   仅 L→L 透传,其余目标丢弃并写入警告〔仓内 `transform.js` 的 `ENGINE_DUMP_ENTRIES` / `sawEngineDump`〕。
 - **IO 统一门面**:只有 `src/core/zip-io.js` 的 `zipIo` 一个适配器(封装 `src/vendor/zip.js` +

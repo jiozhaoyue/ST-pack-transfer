@@ -58,7 +58,8 @@ report.warn('源包含 _engine_dump.bin/_engine_meta.json(数据库引擎状态)
 - **报告输出**：`toJSON()` 供程序消费，`toHuman()` 输出模块计数表 + 丢弃清单 + 警告清单。
 - **已实现的降级示例**（均为 `transform.js` 实际行为）：
   - PT / TT 目标的扩展来源产出：源里已有记录则原样保留（`data/_tauritavern/extension-sources/<scope>/<name>.json`）；否则仅当 `remoteUrl` / `homePage` **为 https** 时合成（字段 `remote_url` / `reference` / `installed_commit`），非 https 只记警告：`扩展 "<name>" 无来源记录且 remoteUrl/homePage 非 https(…),按 PT 规则它将在导入时被跳过,请在 PT 扩展面板重装。`——**不再合成占位 URL**。
-  - 用户级扩展与 third-party 同名冲突 → `dropped(…, '与 third-party 扩展 "<name>" 同名,保留第三方副本')` + 汇总 `warn('以下用户级扩展与 third-party 同名,已保留第三方副本: …')`。
+  - 同名扩展（用户级 + 全局各一份）→ `dropped(…, '同名扩展 "<name>" 已有用户级副本，全局副本跳过（宿主同样优先用户级）')` + 汇总 `warn('检测到 N 组同名扩展…')`（2026-11-12 起方向为**保留用户级**，取代旧的「保留第三方副本」）。
+  - 宿主自带插件（`public/scripts/extensions/<内置>/`）→ `dropped(…, '宿主自带插件，目标宿主自有一套（不参与扩展打包）')` + 汇总 `warn('已剥离 N 个宿主自带插件…')`。
   - ST / L 目标消除错误的 `third-party` 嵌套 → `warn('已针对 ST 平台规范消除错误的 third-party 嵌套，自动将 N 个扩展条目拉平为标准平铺布局 (extensions/<name>/)。')`。
   - 非 Luker 目标下，Luker 私有配置（`stats.json` / `macros.json` 等）转入 `_compat/luker/` 而非丢弃（`transform.js`；`test/private-configs.test.js` 把关）。
 

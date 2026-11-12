@@ -277,6 +277,8 @@ async function main(root) {
       if (live) {
         live.nodes = tree;
         live.extensions = plan.extensions || [];
+        // 扩展作用域诊断（同名覆盖 / 自带插件）：UI 顶部汇总条与行内指引的唯一数据源。
+        live.extensionScopes = plan.extensionScopes || null;
         live.extManifest = pkg.extManifest || [];
         // 产物包保留转换时声明的目标布局：PT 产物与 TT 结构相同，重新识别只会得到 tt。
         if (!live.declaredLayout) live.host = HOST_CODE[plan.sourceLayout] || live.host;

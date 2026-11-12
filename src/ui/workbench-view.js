@@ -3151,17 +3151,39 @@ function renderExtReport(body){
 /* ── 打包页：按数据包分组选择要打包的扩展 ──
    口径（用户 2026-11-11）：只过滤扩展，其它类目仍按存储图表里的勾选；
    产物仍按目标宿主布局生成（选择只影响哪些扩展条目被写出）。 */
-function packRowHtml(pkg, unit, disabled){
+function packRowHtml(pkg, unit, disabled, note){
   const scope='pkg:'+pkg.id;
   const on=unit.leaves.length>0 && unit.leaves.every((n)=>isChecked(n,scope));
   return '<label class="ext-entry pack-row'+(on?' is-ok':'')+'">'
     +'<input type="checkbox" data-packext="'+escapeHtml(unit.name)+'" data-packpkg="'+escapeHtml(pkg.id)+'"'
       +(on?' checked':'')+(disabled?' disabled':'')+'>'
     +'<span class="ext-url" title="'+escapeHtml(unit.name)+'">'+escapeHtml(unit.name)+'</span>'
+    +(note?'<span class="ext-scope-tag">'+escapeHtml(note)+'</span>':'')
     +'<span class="ext-state">'+t('extmgr.packFiles',{files:unit.files,size:fmtMB(unit.mb)})+'</span>'
     +'</label>';
 }
-function packGroupHtml(pkg, units, manifestOnly){
+/** 扩展作用域诊断条：同名覆盖与自带插件剥离的可见入口（用户 2026-11-12 要求「直接提示 + 引导修复」）。 */
+function extScopeNotesHtml(pkgs){
+  const shadowed=new Set(), builtin=new Set();
+  for(const pkg of pkgs){
+    const s=pkg&&pkg.extensionScopes;
+    if(!s) continue;
+    (s.shadowed||[]).forEach((n)=>shadowed.add(n));
+    (s.builtin||[]).forEach((n)=>builtin.add(n));
+  }
+  if(!shadowed.size && !builtin.size) return '';
+  let html='<div class="ext-scope-notes">';
+  if(shadowed.size){
+    html+='<div class="ext-scope-note is-warn"><b>'+t('extmgr.scopeShadowedTitle',{n:shadowed.size})+'</b>'
+      +'<span>'+t('extmgr.scopeShadowedHint',{list:[...shadowed].sort().join(', ')})+'</span></div>';
+  }
+  if(builtin.size){
+    html+='<div class="ext-scope-note"><b>'+t('extmgr.scopeBuiltinTitle',{n:builtin.size})+'</b>'
+      +'<span>'+t('extmgr.scopeBuiltinHint',{list:[...builtin].sort().join(', ')})+'</span></div>';
+  }
+  return html+'</div>';
+}
+function packGroupHtml(pkg, units, manifestOnly, shadowed){
   const scope='pkg:'+pkg.id;
   const sel=units.filter((u)=>u.leaves.length>0 && u.leaves.every((n)=>isChecked(n,scope))).length;
   return '<div class="pack-group" data-packgroup="'+escapeHtml(pkg.id)+'">'
@@ -3178,29 +3200,50 @@ function packGroupHtml(pkg, units, manifestOnly){
       +'<button type="button" class="btn" data-packall="'+escapeHtml(pkg.id)+'"'+(manifestOnly?' disabled':'')+'>'+t('extmgr.packAll')+'</button>'
       +'<button type="button" class="btn" data-packnone="'+escapeHtml(pkg.id)+'"'+(manifestOnly?' disabled':'')+'>'+t('extmgr.packNone')+'</button>'
     +'</div>'
-    +'<div class="ext-list">'+units.map((u)=>packRowHtml(pkg,u,manifestOnly)).join('')+'</div>'
+    +'<div class="ext-list">'+units.map((u)=>packRowHtml(pkg,u,manifestOnly,(shadowed&&shadowed.has(u.name))?t('extmgr.scopeRowShadowed'):'')).join('')+'</div>'
   +'</div>';
+}
+/** 打包页的扩展单元：合并「扩展」与「全局扩展」两组，按名字去重并剔除被丢弃的副本。
+ *  全局扩展的 hub 归一为 extensions/<n>，但类目仍读作 globalExtensions —— 只看 extensions 组会漏掉它们。 */
+function mergedExtensionUnits(nodes){
+  const map=new Map();
+  for(const gid of ['group:extensions','group:globalExtensions']){
+    const group=findNode(nodes,gid);
+    if(!group) continue;
+    for(const u of extensionUnitsOf(group)){
+      const live=(u.leaves||[]).filter((l)=>l.action!=='DROP');
+      if(!live.length) continue;
+      const mb=live.reduce((s,l)=>s+(Number(l.mb)||0),0);
+      const cur=map.get(u.name);
+      if(cur){ cur.leaves.push(...live); cur.files+=live.length; cur.mb+=mb; }
+      else map.set(u.name,{name:u.name,leaves:[...live],files:live.length,mb});
+    }
+  }
+  return [...map.values()]
+    .map((u)=>({...u,mb:Math.round(u.mb*1000)/1000}))
+    .sort((a,b)=>a.name.localeCompare(b.name));
 }
 function renderExtPack(body){
   const pkgs=(state.packages||[]).filter((p)=>p&&p.id);
   const groups=[];
   for(const pkg of pkgs){
-    const group=findNode(packageNodes(pkg).nodes,'group:extensions');
-    if(!group) continue;
-    const units=extensionUnitsOf(group);
+    const nodes=packageNodes(pkg).nodes;
+    const units=mergedExtensionUnits(nodes);
     if(!units.length) continue;
     groups.push({pkg,units,manifestOnly:extensionManifestOnly(pkg,'pkg:'+pkg.id)});
   }
   if(!groups.length){ body.innerHTML='<div class="ext-empty">'+t('extmgr.packEmpty')+'</div>'; return; }
+  const shadowed=new Set();
+  for(const pkg of pkgs){ (pkg.extensionScopes?.shadowed||[]).forEach((n)=>shadowed.add(n)); }
   body.innerHTML='<div class="ext-install">'
+    +extScopeNotesHtml(pkgs)
     +'<div class="ext-note">'+t('extmgr.packHint')+'</div>'
-    +groups.map((g)=>packGroupHtml(g.pkg,g.units,g.manifestOnly)).join('')
+    +groups.map((g)=>packGroupHtml(g.pkg,g.units,g.manifestOnly,shadowed)).join('')
     +'</div>';
   body.querySelectorAll('[data-packext]').forEach((el)=>{
     const pkg=(state.packages||[]).find((p)=>p.id===el.dataset.packpkg);
     if(!pkg) return;
-    const group=findNode(packageNodes(pkg).nodes,'group:extensions');
-    const unit=group ? extensionUnitsOf(group).find((u)=>u.name===el.dataset.packext) : null;
+    const unit=mergedExtensionUnits(packageNodes(pkg).nodes).find((u)=>u.name===el.dataset.packext);
     if(!unit) return;
     const scope='pkg:'+pkg.id;
     const states=unit.leaves.map((n)=>isChecked(n,scope));
@@ -3217,10 +3260,10 @@ function renderExtPack(body){
       const val=!!btn.dataset.packall;
       const pkg=(state.packages||[]).find((p)=>p.id===id);
       if(!pkg) return;
-      const group=findNode(packageNodes(pkg).nodes,'group:extensions');
-      if(!group) return;
+      const units=mergedExtensionUnits(packageNodes(pkg).nodes);
+      if(!units.length) return;
       const scope='pkg:'+pkg.id;
-      extensionUnitsOf(group).forEach((u)=>u.leaves.forEach((n)=>setChecked(n,scope,val)));
+      units.forEach((u)=>u.leaves.forEach((n)=>setChecked(n,scope,val)));
       renderChart();
       renderExtensionView();
     });

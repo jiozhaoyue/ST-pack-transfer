@@ -6,7 +6,7 @@ import { zipIo } from './zip-io.js';
 import { planEngineConversion } from './engine-bridge.js';
 import { loadSqlJs } from './sqlite-init.js';
 import { logger } from './logger.js';
-import { categoryOfHubPath, isBackupChatOrSnapshot } from './inspect.js';
+import { CATEGORIES, categoryOfHubPath, isBackupChatOrSnapshot } from './inspect.js';
 import { isTavernBuiltinAsset } from './builtin-assets.js';
 import {
   buildExtensionManifest,
@@ -105,6 +105,14 @@ const TT_PRIVATE_FILES = ['data/content.log', 'data/content.log.1'];
 const DERIVED_DIRS = ['thumbnails/', 'vectors/'];
 const ENGINE_DUMP_ENTRIES = ['_engine_dump.bin', '_engine_meta.json'];
 const THIRD_PARTY_PREFIX = 'extensions/third-party/';
+/**
+ * ST / Luker 的**全局**第三方扩展在包内的真实路径。
+ * 宿主常量：`SillyTavern/src/constants.js` 与 `Luker/src/constants.js` 的
+ * `globalExtensions: 'public/scripts/extensions/third-party'`。
+ */
+const PUBLIC_THIRD_PARTY_PREFIX = 'public/scripts/extensions/third-party/';
+/** `public/scripts/extensions/` 下**非** `third-party` 的部分 = 宿主自带插件（regex / expressions / tts …）。 */
+const PUBLIC_EXTENSIONS_PREFIX = 'public/scripts/extensions/';
 const DATA_PREFIX = 'data/';
 const USER_EXTENSIONS_PREFIX = 'extensions/';
 /** TT 写进用户目录的私有/派生内容(hub 路径视角)。 */
@@ -258,7 +266,8 @@ async function verifyPartialSameSource({ io, sourcePath, partialEntries, target,
     const seen = new Map();
     for await (const entry of scanner.entries()) {
       if (entry.isDirectory || entry.crc32 == null) continue;
-      const outPath = targetEntryPath(routeSource(entry.fileName, layout).hubPath, target);
+      const routedForOut = routeSource(entry.fileName, layout);
+      const outPath = targetEntryPath(routedForOut.hubPath, target, routedForOut.extScope);
       if (want.has(outPath)) seen.set(outPath, entry.crc32);
       entry.skip();
     }
@@ -479,8 +488,11 @@ export async function convert(sourcePath, targetPath, {
     extensionGitMeta: new Map(), // folderName -> { remoteUrl, branch, commit }
     sawEngineDump: false,
     thirdPartyFlattenedCount: 0, // ST/L 目标: 消除错误的 third-party 嵌套并拉平的条目数
-    userExtensionsMigrated: 0, // PT/TT 目标: 迁移为 third-party 布局的用户级扩展条目数
-    userExtensionCollisions: new Set(), // 与 third-party 同名而被丢弃的扩展名
+    userExtensionsMigrated: 0, // PT 目标: 迁移为 third-party 布局的用户级扩展条目数
+    globalShadowedByUser: new Set(), // 因同名用户级存在而跳过的全局扩展名
+    builtinExts: new Set(), // 被剥离的宿主自带插件名
+    globalExtFolders: new Set(), // 源包里的全局扩展目录名（含被覆盖的）
+    userExtFolders: new Set(), // 源包里的用户级扩展目录名
     gitMinimalRoots: new Set(), // gitMode=minimal 下见过 .git/ 的扩展根(hub 路径),供尾部合成 .keep
   };
 
@@ -490,26 +502,16 @@ export async function convert(sourcePath, targetPath, {
     entryApi.openStream().then((stream) => cb(null, stream), (err) => cb(err));
   };
 
-  // 预扫中央目录(不开文件流,开销可忽略):PT 目标迁移用户级扩展前,
-  // 需要知道源里已有哪些 third-party 目录名,同名时保留第三方副本。
-  const thirdPartyFolders = new Set();
-  if (target === TARGETS.PT) {
-    if (isPtNative) {
-      // 重建条目的第三方扩展目录名由重建器在记录趟直接给出（源条目是 modules/… 无法路由）。
-      for (const name of reader.thirdPartyFolders) thirdPartyFolders.add(name);
-    } else {
-      const scanner = await io.openReader(sourcePath);
-      try {
-        for await (const entry of scanner.entries()) {
-          const name = thirdPartyFolderOf(entry.fileName, detection.layout);
-          if (name) thirdPartyFolders.add(name);
-          entry.skip();
-        }
-      } finally {
-        await scanner.close();
-      }
-    }
-  }
+  // 预扫中央目录(不开文件流,开销可忽略):按**作用域**收集扩展目录名。
+  //
+  // 为什么对**所有**目标都扫（不再只在 PT 分支）：
+  // 同名去重是四目标共同的前置条件 —— 旧实现只在 PT 目标预扫，
+  // 于是 TT 目标的冲突判定恒失效，同名时两处各写一条、目标路径相同 ⇒ 产物里同路径重复。
+  const { global: thirdPartyFolders, user: userExtFolders } = await scanExtensionScopes({
+    io, sourcePath, layout: detection.layout, reader, isPtNative,
+  });
+  context.globalExtFolders = thirdPartyFolders;
+  context.userExtFolders = userExtFolders;
 
   try {
     for await (const entry of reader.entries()) {
@@ -545,8 +547,9 @@ export async function convert(sourcePath, targetPath, {
       // 根子是台账记的是「已读到」而非「已写下」。现在以**半成品的字节事实**为准：
       // 半成品里没有这条就照常写出 ⇒ 台账在而字节不在时，行为退化为「完整重做」而不是「静默残缺」。
       if (entry.crc32 != null) {
-        const skipHub = routeSource(entry.fileName, routingLayout).hubPath;
-        const skipOut = targetEntryPath(skipHub, target);
+        const routedSkip = routeSource(entry.fileName, routingLayout);
+        const skipHub = routedSkip.hubPath;
+        const skipOut = targetEntryPath(skipHub, target, routedSkip.extScope);
         if (appendedNames.has(skipOut)) {
           const doneCrc = resumedCrc?.get(entry.fileName) ?? resumedCrc?.get(skipHub);
           // 给了台账且 crc 不等 ⇒ 保守不跳过（宁重做，不冒险留下陈旧条目）
@@ -592,7 +595,12 @@ export async function convert(sourcePath, targetPath, {
 
       // 按用户类目选择过滤（脱敏排除）
       if (selection && typeof selection === 'object') {
-        const cat = categoryOfHubPath(routed.hubPath);
+        // 全局扩展的 hub 路径已归一为 `extensions/<n>`（图表归并与产物平铺都依赖它），
+        // 因此类目不能只看路径 —— 必须按 `extScope` 还原，否则 `selection.globalExtensions`
+        // 会对全局扩展失效（用户关了「全局扩展」却仍被打包）。
+        const cat = (routed.kind === 'extension-pkg' && routed.extScope === 'global')
+          ? CATEGORIES.GLOBAL_EXTENSIONS
+          : categoryOfHubPath(routed.hubPath);
         if (cat && (selection[cat] === false || (cat === 'extensions' && selection.extensions === false))) {
           entry.skip();
           report.filtered(routed.hubPath, cat);
@@ -659,7 +667,7 @@ export async function convert(sourcePath, targetPath, {
       }
       if (routed.kind === 'derived') {
         if (keepAll || includeCache) {
-          if (!dryRun) writer.addLazy(targetEntryPath(routed.hubPath, target), lazyOpen(entry), entry.uncompressedSize);
+          if (!dryRun) writer.addLazy(targetEntryPath(routed.hubPath, target, routed.extScope), lazyOpen(entry), entry.uncompressedSize);
           report.copied(routed.hubPath, entry.uncompressedSize);
         } else {
           entry.skip();
@@ -670,6 +678,15 @@ export async function convert(sourcePath, targetPath, {
       if (routed.kind === 'drop') {
         entry.skip();
         report.dropped(routed.hubPath, routed.reason);
+        continue;
+      }
+
+      // 宿主自带插件：四宿主各有一套（regex / expressions / tts …），
+      // 跨宿主搬运只会写出目标平台不消费的垃圾路径 ⇒ 一律剥离并在报告里点名。
+      if (routed.kind === 'builtin-ext') {
+        entry.skip();
+        if (routed.extName) context.builtinExts.add(routed.extName);
+        report.dropped(routed.hubPath, '宿主自带插件，目标宿主自有一套（不参与扩展打包）');
         continue;
       }
 
@@ -702,25 +719,25 @@ export async function convert(sourcePath, targetPath, {
           continue;
         }
 
-        // ST/L 目标: 遇到错误的 third-party 嵌套布局，自动拉平为标准平铺布局
-        if (target === TARGETS.ST || target === TARGETS.L) {
-          if (entry.fileName.startsWith('extensions/third-party/')
-            || entry.fileName.startsWith('data/extensions/third-party/')) {
-            context.thirdPartyFlattenedCount += 1;
-          }
+        // 同名去重（四目标统一）：宿主加载语义是「用户级优先」——
+        // ST / Luker 源码注释原文 `In case of a conflict, the extension will be loaded from the user folder`，
+        // TT 亦为 local 优先。故用户级存在时，全局副本**不写**，避免同一扩展在产物里出现两份
+        // （旧实现方向相反：丢弃用户级、保留第三方，且只在 PT 目标判定）。
+        const extScope = routed.extScope || 'user';
+        if (extScope === 'global' && userExtFolders.has(extFolder)) {
+          context.globalShadowedByUser.add(extFolder);
+          entry.skip();
+          report.dropped(routed.hubPath, `同名扩展 "${extFolder}" 已有用户级副本，全局副本跳过（宿主同样优先用户级）`);
+          continue;
         }
 
-        // PT / TT 目标: 用户级扩展迁移为 third-party 布局，与 third-party 同名时保留第三方副本
-        const isUserExt = !entry.fileName.startsWith('extensions/third-party/')
-          && !entry.fileName.startsWith('data/extensions/third-party/');
+        // ST/L 目标: 遇到错误的 third-party 嵌套布局，自动拉平为标准平铺布局
+        if ((target === TARGETS.ST || target === TARGETS.L) && extScope === 'global') {
+          context.thirdPartyFlattenedCount += 1;
+        }
 
-        if ((target === TARGETS.PT || target === TARGETS.TT) && isUserExt) {
-          if (thirdPartyFolders.has(extFolder)) {
-            context.userExtensionCollisions.add(extFolder);
-            entry.skip();
-            report.dropped(routed.hubPath, `与 third-party 扩展 "${extFolder}" 同名,保留第三方副本`);
-            continue;
-          }
+        // PT 目标: 用户级扩展迁移为 third-party 布局（PT 没有用户级扩展目录）
+        if (target === TARGETS.PT && extScope === 'user') {
           context.userExtensionsMigrated += 1;
         }
 
@@ -729,7 +746,7 @@ export async function convert(sourcePath, targetPath, {
           const data = await entry.read();
           noteExtensionPackage(context, routed.hubPath, data);
           if (extensionMode !== EXTENSION_MODES.MANIFEST) {
-            const outPath = targetEntryPath(routed.hubPath, target);
+            const outPath = targetEntryPath(routed.hubPath, target, routed.extScope);
             await writer.add(outPath, data);
             report.copied(routed.hubPath, entry.uncompressedSize);
           } else {
@@ -757,7 +774,7 @@ export async function convert(sourcePath, targetPath, {
           } else {
             // 只有真正写出的扩展才登记合成目标——被同名冲突/散文件规则跳过的扩展不得产生孤儿 .keep。
             if (resolvedGitMode === GIT_MODES.MINIMAL) context.gitMinimalRoots.add(`extensions/${extFolder}`);
-            const outPath = targetEntryPath(routed.hubPath, target);
+            const outPath = targetEntryPath(routed.hubPath, target, routed.extScope);
             if (!dryRun) writer.addLazy(outPath, lazyOpen(entry), entry.uncompressedSize);
             report.copied(routed.hubPath, entry.uncompressedSize);
           }
@@ -781,7 +798,7 @@ export async function convert(sourcePath, targetPath, {
           } else {
             // 只有真正写出的扩展才登记合成目标——被同名冲突/散文件规则跳过的扩展不得产生孤儿 .keep。
             if (resolvedGitMode === GIT_MODES.MINIMAL) context.gitMinimalRoots.add(`extensions/${extFolder}`);
-            const outPath = targetEntryPath(routed.hubPath, target);
+            const outPath = targetEntryPath(routed.hubPath, target, routed.extScope);
             if (!dryRun) writer.addLazy(outPath, lazyOpen(entry), entry.uncompressedSize);
             report.copied(routed.hubPath, entry.uncompressedSize);
           }
@@ -804,7 +821,7 @@ export async function convert(sourcePath, targetPath, {
           } else {
             // 只有真正写出的扩展才登记合成目标——被同名冲突/散文件规则跳过的扩展不得产生孤儿 .keep。
             if (resolvedGitMode === GIT_MODES.MINIMAL) context.gitMinimalRoots.add(`extensions/${extFolder}`);
-            const outPath = targetEntryPath(routed.hubPath, target);
+            const outPath = targetEntryPath(routed.hubPath, target, routed.extScope);
             if (!dryRun) writer.addLazy(outPath, lazyOpen(entry), entry.uncompressedSize);
             report.copied(routed.hubPath, entry.uncompressedSize);
           }
@@ -828,13 +845,13 @@ export async function convert(sourcePath, targetPath, {
         }
 
         // 4. 完整模式下直通写出
-        const outPath = targetEntryPath(routed.hubPath, target);
+        const outPath = targetEntryPath(routed.hubPath, target, routed.extScope);
         if (!dryRun) writer.addLazy(outPath, lazyOpen(entry), entry.uncompressedSize);
         report.copied(routed.hubPath, entry.uncompressedSize);
         continue;
       }
 
-      const outPath = targetEntryPath(routed.hubPath, target);
+      const outPath = targetEntryPath(routed.hubPath, target, routed.extScope);
       if (!dryRun) writer.addLazy(outPath, lazyOpen(entry), entry.uncompressedSize);
       report.copied(routed.hubPath, entry.uncompressedSize);
       if (typeof onEntryDone === 'function' && entry.crc32 != null) {
@@ -884,6 +901,10 @@ export function routeSource(sourcePath, layout) {
   if (layout === LAYOUTS.TT) {
     if (sourcePath.startsWith(TT_USER_PREFIX)) {
       const hubPath = sourcePath.slice(TT_USER_PREFIX.length);
+      // TT 的用户级扩展（local）在 `data/default-user/extensions/<n>/`，与 ST/Luker 的用户级同义。
+      if (hubPath.startsWith(USER_EXTENSIONS_PREFIX)) {
+        return { kind: 'extension-pkg', hubPath, extScope: 'user' };
+      }
       if (sourcePath.startsWith('data/default-user/_compat/')) {
         return { kind: 'compat', hubPath: sourcePath.slice('data/default-user/'.length) };
       }
@@ -897,7 +918,7 @@ export function routeSource(sourcePath, layout) {
     }
     if (sourcePath.startsWith(TT_THIRD_PARTY_PREFIX)) {
       const rest = sourcePath.slice(TT_THIRD_PARTY_PREFIX.length);
-      return { kind: 'extension-pkg', hubPath: `extensions/${rest}` };
+      return { kind: 'extension-pkg', hubPath: `extensions/${rest}`, extScope: 'global' };
     }
     if (sourcePath.startsWith(TT_SOURCES_PREFIX)) {
       const rest = sourcePath.slice(TT_SOURCES_PREFIX.length);
@@ -936,18 +957,37 @@ export function routeSource(sourcePath, layout) {
   if (ENGINE_DUMP_ENTRIES.includes(sourcePath)) {
     return { kind: 'engine-dump', hubPath: sourcePath };
   }
+  // ST / Luker 的**全局**三方扩展（宿主常量 `globalExtensions`）
+  if (sourcePath.startsWith(PUBLIC_THIRD_PARTY_PREFIX)) {
+    const rest = sourcePath.slice(PUBLIC_THIRD_PARTY_PREFIX.length);
+    return { kind: 'extension-pkg', hubPath: `extensions/${rest}`, extScope: 'global' };
+  }
+  // 宿主**自带**插件（`public/scripts/extensions/<内置>/`）：不参与扩展打包 ——
+  // 四宿主各有一套自带插件，跨宿主搬运只会写出目标平台不消费的垃圾路径。
+  if (sourcePath.startsWith(PUBLIC_EXTENSIONS_PREFIX)) {
+    const rest = sourcePath.slice(PUBLIC_EXTENSIONS_PREFIX.length);
+    if (!rest.includes('/')) {
+      // `public/scripts/extensions/shared.js` 这类前端静态文件，不是扩展包
+      return { kind: 'drop', hubPath: sourcePath, reason: '宿主前端静态文件，非扩展包' };
+    }
+    return { kind: 'builtin-ext', hubPath: sourcePath, extScope: 'builtin', extName: rest.split('/')[0] };
+  }
   if (sourcePath.startsWith('extensions/third-party/')) {
     const rest = sourcePath.slice('extensions/third-party/'.length);
-    return { kind: 'extension-pkg', hubPath: `extensions/${rest}` };
+    return { kind: 'extension-pkg', hubPath: `extensions/${rest}`, extScope: 'global' };
   }
   if (sourcePath.startsWith('extensions/')) {
-    return { kind: 'extension-pkg', hubPath: sourcePath };
+    return { kind: 'extension-pkg', hubPath: sourcePath, extScope: 'user' };
   }
   return { kind: 'user', hubPath: sourcePath };
 }
 
-/** hub 路径 → 目标平台上的最终条目路径。包含私有配置沙箱解包与跨平台安全隔离。 */
-export function targetEntryPath(hubPath, target) {
+/** hub 路径 → 目标平台上的最终条目路径。包含私有配置沙箱解包与跨平台安全隔离。
+ * @param {string} hubPath
+ * @param {string} target 目标布局码
+ * @param {'user'|'global'} [extScope] 扩展作用域；缺省按 user（hub 的 `extensions/<n>` 历史语义即用户级平铺）
+ */
+export function targetEntryPath(hubPath, target, extScope) {
   // 1. 跨平台私有配置沙箱解包 (Unwrap compat)
   if (hubPath.startsWith('_compat/')) {
     const parts = hubPath.slice('_compat/'.length).split('/');
@@ -987,27 +1027,96 @@ export function targetEntryPath(hubPath, target) {
   }
 
   // 4. 标准平台布局映射
-  if (target === TARGETS.TT || target === TARGETS.PT) {
-    if (hubPath.startsWith('extensions/')) {
-      return `data/extensions/third-party/${hubPath.slice('extensions/'.length)}`;
+  if (hubPath.startsWith('extensions/')) {
+    const rest = hubPath.slice('extensions/'.length);
+    // PT 没有用户级扩展目录（目录表不含 `extensions/`），只认 third-party + 来源记录。
+    if (target === TARGETS.PT) return `data/extensions/third-party/${rest}`;
+    // TT 保留作用域：local → `data/default-user/extensions/`（同名时宿主优先它），
+    // global → `data/extensions/third-party/`。
+    if (target === TARGETS.TT) {
+      return extScope === 'global'
+        ? `data/extensions/third-party/${rest}`
+        : `data/default-user/extensions/${rest}`;
     }
+    // ST / Luker 的恢复端点只往用户目录写，且宿主加载语义是「用户级优先」
+    // ⇒ 两种来源都平铺成 `extensions/<n>`，同一扩展只保留一份。
+    return hubPath;
+  }
+  if (target === TARGETS.TT || target === TARGETS.PT) {
     return `data/default-user/${hubPath}`;
   }
   return hubPath;
 }
 
-/** 预扫用:路径若属于扩展包,返回目录名(st/l 与 TT 两种布局都认)。 */
-export function thirdPartyFolderOf(sourcePath, layout) {
-  const prefixes = layout === LAYOUTS.TT
-    ? [TT_THIRD_PARTY_PREFIX]
-    : ['extensions/third-party/'];
-  for (const prefix of prefixes) {
-    if (!sourcePath.startsWith(prefix)) continue;
-    const rest = sourcePath.slice(prefix.length);
+/**
+ * 预扫用：判定一条**源路径**属于哪种扩展作用域。
+ *
+ * 五种形态与四种宿主一一对应（2026-11-12 实机取证，见
+ * `docs/PLAN-2026-11-12-extension-scope-and-conflicts.md`）：
+ *   `extensions/<n>/`                            用户级（ST / Luker）
+ *   `public/scripts/extensions/third-party/<n>/`  全局（ST / Luker，宿主常量 `globalExtensions`）
+ *   `public/scripts/extensions/<内置>/`            宿主自带
+ *   `data/default-user/extensions/<n>/`           用户级（TT local）
+ *   `data/extensions/third-party/<n>/`            全局（TT / PT）
+ *
+ * @returns {{name:string, scope:'user'|'global'|'builtin'}|null}
+ */
+export function extensionScopeOf(sourcePath, layout) {
+  const p = String(sourcePath || '').replace(/\\/g, '/');
+  const hit = (prefix, scope) => {
+    if (!p.startsWith(prefix)) return null;
+    const rest = p.slice(prefix.length);
     const slash = rest.indexOf('/');
-    if (slash > 0) return rest.slice(0, slash);
+    // 目录根下的散文件（如 `extensions/.gitkeep`）不是扩展
+    if (slash <= 0) return null;
+    return { name: rest.slice(0, slash), scope };
+  };
+  if (layout === LAYOUTS.TT) {
+    return hit('data/default-user/extensions/', 'user')
+      || hit(TT_THIRD_PARTY_PREFIX, 'global');
   }
-  return null;
+  // 顺序不可颠倒：third-party 与内置两条前缀更长，必须先判
+  return hit(PUBLIC_THIRD_PARTY_PREFIX, 'global')
+    || hit(PUBLIC_EXTENSIONS_PREFIX, 'builtin')
+    || hit(THIRD_PARTY_PREFIX, 'global')
+    || hit(USER_EXTENSIONS_PREFIX, 'user');
+}
+
+/** 预扫用:路径若属于**全局**第三方扩展包,返回目录名。 */
+export function thirdPartyFolderOf(sourcePath, layout) {
+  const hit = extensionScopeOf(sourcePath, layout);
+  return hit && hit.scope === 'global' ? hit.name : null;
+}
+
+/**
+ * 预扫中央目录，按作用域收集扩展目录名（不打开任何数据流）。
+ *
+ * 四目标共用：同名去重的前提是**先知道全包有哪些名字**。
+ */
+export async function scanExtensionScopes({ io, sourcePath, layout, reader, isPtNative }) {
+  const global = new Set();
+  const user = new Set();
+  const builtin = new Set();
+  if (isPtNative) {
+    // PT 归档的条目是 `modules/…`，无法按路径路由；重建器在记录趟直接给出全局目录名。
+    for (const name of reader.thirdPartyFolders || []) global.add(name);
+    return { global, user, builtin };
+  }
+  const scanner = await io.openReader(sourcePath);
+  try {
+    for await (const entry of scanner.entries()) {
+      const hit = extensionScopeOf(entry.fileName, layout);
+      if (hit) {
+        if (hit.scope === 'global') global.add(hit.name);
+        else if (hit.scope === 'user') user.add(hit.name);
+        else builtin.add(hit.name);
+      }
+      entry.skip();
+    }
+  } finally {
+    await scanner.close();
+  }
+  return { global, user, builtin };
 }
 
 function noteExtensionPackage(context, hubPath, data) {
@@ -1072,7 +1181,11 @@ async function emitSynthesized(writer, report, context, target, selection, {
   // （zip-io.js:101/111），故只能靠一个普通文件把目录「撑」住；缺它则 minimal 与 strip 等价。
   if (gitMode === GIT_MODES.MINIMAL && context.gitMinimalRoots.size > 0) {
     for (const root of [...context.gitMinimalRoots].sort()) {
-      const keepPath = `${targetEntryPath(root, target)}/.git/objects/.keep`;
+      const rootName = root.slice('extensions/'.length);
+      // 全局扩展的占位文件必须落在全局目录（TT 目标下两处是不同路径）。
+      const rootScope = (context.globalExtFolders.has(rootName) && !context.userExtFolders.has(rootName))
+        ? 'global' : 'user';
+      const keepPath = `${targetEntryPath(root, target, rootScope)}/.git/objects/.keep`;
       if (!dryRun) await writer.add(keepPath, GIT_KEEP_PLACEHOLDER);
       report.synthesized(keepPath);
     }
@@ -1126,22 +1239,33 @@ async function emitSynthesized(writer, report, context, target, selection, {
     );
   }
 
-  if ((target === TARGETS.PT || target === TARGETS.TT) && context.userExtensionsMigrated > 0) {
+  if (target === TARGETS.PT && context.userExtensionsMigrated > 0) {
     report.warn(
       `已将 ${context.userExtensionsMigrated} 个用户级 extensions/** 条目迁移为 third-party 布局`
-      + `(${target.toUpperCase()} 规范需放置在 data/extensions/third-party/); `
+      + `(PT 规范需放置在 data/extensions/third-party/); `
       + '来源记录取自各扩展 manifest 的 homePage。',
     );
   }
-  if ((target === TARGETS.PT || target === TARGETS.TT) && context.userExtensionCollisions.size > 0) {
+  // 同名去重：四目标统一按「用户级优先」保留一份。被跳过的全局副本必须点名，
+  // 否则用户会以为扩展丢了；同时给出「想在宿主里清理哪一份」的指引。
+  if (context.globalShadowedByUser.size > 0) {
+    const names = [...context.globalShadowedByUser].sort();
     report.warn(
-      `以下用户级扩展与 third-party 同名,已保留第三方副本: `
-      + [...context.userExtensionCollisions].sort().join(', '),
+      `检测到 ${names.length} 组同名扩展（用户级与全局各一份）：已按宿主加载语义保留**用户级**，`
+      + `跳过全局副本 —— ${names.join(', ')}。`
+      + ' 如需消除宿主里的重复安装，请在该宿主删除全局那一份（数据包中也可不勾选对应扩展）。',
+    );
+  }
+  // 宿主自带插件不进包：明确列出，避免用户以为转换丢了文件。
+  if (context.builtinExts.size > 0) {
+    report.warn(
+      `已剥离 ${context.builtinExts.size} 个宿主自带插件（目标宿主自有一套，不含在数据包内）：`
+      + [...context.builtinExts].sort().join(', '),
     );
   }
 
   if ((target === TARGETS.PT || target === TARGETS.TT) && (!selection || selection.extensions !== false)) {
-    for (const [path, value] of buildExtensionSources(context, report)) {
+    for (const [path, value] of buildExtensionSources(context, report, target)) {
       await writer.add(path, encodeJson(value));
       report.synthesized(path);
     }
@@ -1164,7 +1288,7 @@ async function emitSynthesized(writer, report, context, target, selection, {
  * - 源里已有记录 → 原样保留(保 reference/installed_commit,更新链不断)
  * - 没有记录 → 从扩展 manifest 的 homePage 或 Git 提取信息合成
  */
-function buildExtensionSources(context, report) {
+function buildExtensionSources(context, report, target) {
   const output = new Map();
 
   for (const { scope, fileName, record } of context.extensionSources.values()) {
@@ -1182,9 +1306,12 @@ function buildExtensionSources(context, report) {
     const gitMeta = context.extensionGitMeta.get(folderName) || {};
     const homePage = gitMeta.remoteUrl
       || (typeof manifest.homePage === 'string' ? manifest.homePage.trim() : '');
+    // 来源记录的 scope 必须与扩展落点一致：TT 的 local 扩展对应 `extension-sources/local/`。
+    // PT 没有用户级扩展目录，一律 global。
+    const scope = (target === TARGETS.PT || context.globalExtFolders.has(folderName)) ? 'global' : 'local';
 
     if (/^https:\/\//iu.test(homePage)) {
-      output.set(`data/_tauritavern/extension-sources/global/${folderName}.json`, {
+      output.set(`data/_tauritavern/extension-sources/${scope}/${folderName}.json`, {
         remote_url: homePage,
         reference: gitMeta.branch || '',
         installed_commit: gitMeta.commit || '',
