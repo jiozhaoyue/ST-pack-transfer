@@ -1,0 +1,6 @@
+{
+  "name": "sqljs-vendored",
+  "private": true,
+  "type": "commonjs",
+  "description": "sql.js 1.16.0 官方 dist 副本（sql-wasm-inline.js + LICENSE）。勿升级改动：升级会改变 wasm 与接口行为，需同步重跑存储引擎互转用例。此 package.json 只用于让 Node 按 CommonJS 解析该目录（仓库根为 type: module）。"
+}

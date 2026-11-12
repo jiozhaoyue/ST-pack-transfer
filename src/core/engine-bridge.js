@@ -41,6 +41,7 @@ import {
 } from './engine-adapters/fs.js';
 import { readSqlite, createSqliteWriter } from './engine-adapters/sqlite.js';
 import { detectSourceEngine } from './engine-registry.js';
+import { loadSqlJs } from './sqlite-init.js';
 
 const encoder = new TextEncoder();
 
@@ -148,14 +149,10 @@ export async function planEngineConversion({
     }
   }
   if (want === ENGINE_KINDS.SQLITE && typeof sqliteInit !== 'function') {
-    const reason = 'SQLite 目标需要 sql.js 初始化器（尚未注入）';
-    onWarn?.(reason);
-    return { applicable: false, sourceEngine, targetEngine: want, reason };
+    sqliteInit = loadSqlJs;
   }
   if (sourceEngine === ENGINE_KINDS.SQLITE && typeof sqliteInit !== 'function') {
-    const reason = 'SQLite 源需要 sql.js 初始化器（尚未注入）';
-    onWarn?.(reason);
-    return { applicable: false, sourceEngine, targetEngine: want, reason };
+    sqliteInit = loadSqlJs;
   }
 
   const resolvedHandle = String(
