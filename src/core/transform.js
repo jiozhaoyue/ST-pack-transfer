@@ -3,6 +3,8 @@ import { Report } from './report.js';
 import { detectFromReader, LAYOUTS } from './detect.js';
 import { createPtNativeHubReader } from './pt-archive.js';
 import { zipIo } from './zip-io.js';
+import { planEngineConversion } from './engine-bridge.js';
+import { loadSqlJs } from './sqlite-init.js';
 import { logger } from './logger.js';
 import { categoryOfHubPath, isBackupChatOrSnapshot } from './inspect.js';
 import { isTavernBuiltinAsset } from './builtin-assets.js';
@@ -325,6 +327,9 @@ export async function convert(sourcePath, targetPath, {
   onDiscardPartial,
   finalizeOnAbort = false,
   onEntryDone,
+  engine = '',
+  engineHandle = '',
+  sqliteInit = null,
 } = {}) {
   if (!target || !Object.values(TARGETS).includes(target)) {
     throw new Error(`convert: target 必须是 ${Object.values(TARGETS).join('|')} 之一`);
@@ -380,6 +385,25 @@ export async function convert(sourcePath, targetPath, {
   let writer = dryRun ? new NullZipWriter() : await io.createWriter(targetPath, { level: compressionLevel });
   const totalEntries = reader.totalEntries ?? 0;
   let processedEntries = 0;
+
+  // 存储引擎互转（用户 2026-11-12）：目标为 L 且显式选了引擎时，包内引擎承载物改由
+  // engine-bridge 重建 —— 转换后的包走宿主原生恢复，**不再需要任何临时数据库**。
+  // 规划阶段只读条目名 + meta，不解析大转储；重活在主循环尾部 `emit()` 里做。
+  let enginePlan = null;
+  if (!dryRun && target === TARGETS.L && engine) {
+    enginePlan = await planEngineConversion({
+      io,
+      sourcePath,
+      targetEngine: engine,
+      handle: engineHandle,
+      selection,
+      sqliteInit: sqliteInit || loadSqlJs,
+      onWarn: (message) => report.warn(message),
+    });
+    if (enginePlan.applicable) {
+      logger.info(`[convert] 存储引擎互转：${enginePlan.sourceEngine} → ${enginePlan.targetEngine}（handle=${enginePlan.handle || '(未定)'}）`);
+    }
+  }
 
   // 降级可观测（`L0-11` / `L1-MR-1`）：有台账、没半成品 ⇒ 本次完整重做。
   // 必须留一行日志 —— 否则用户点了「继续」却整包重跑且毫无解释，就成了「静默降级」（同样是缺陷）。
@@ -496,6 +520,14 @@ export async function convert(sourcePath, targetPath, {
       checkAbort();
       if (entry.isDirectory) {
         entry.skip();
+        continue;
+      }
+
+      // 引擎互转：承载物由 bridge 重建；目标为 FS 时引擎管理的磁盘文件也一并改为「由行生成」，
+      // 否则源包里的陈旧磁盘副本会覆盖数据库里的真值。
+      if (enginePlan?.applicable && enginePlan.suppress(entry.fileName)) {
+        entry.skip();
+        report.dropped(entry.fileName, '存储引擎互转：由目标引擎形态重建');
         continue;
       }
 
@@ -802,6 +834,11 @@ export async function convert(sourcePath, targetPath, {
       if (typeof onEntryDone === 'function' && entry.crc32 != null) {
         onEntryDone(entry.fileName, entry.crc32);
       }
+    }
+
+    if (enginePlan?.applicable) {
+      const summary = await enginePlan.emit(writer, { onWarn: (message) => report.warn(message) });
+      report.setEngine(summary);
     }
 
     await emitSynthesized(writer, report, context, target, selection, { extensionMode, gitMode: resolvedGitMode, dryRun });

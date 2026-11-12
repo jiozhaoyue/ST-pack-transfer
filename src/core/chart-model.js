@@ -396,16 +396,42 @@ export function deriveExportOptions({ nodes = [], isChecked = () => false, ui = 
   };
   const target = String(ui.target || '').toLowerCase();
   const isTt = target === 'tt' || target === 'tauritavern';
+  const isLuker = target === 'l' || target === 'luker';
   const compression = Number(ui.compression);
   return {
     compressionLevel: Number.isFinite(compression) ? compression : 5,
     extensionMode: ui.extensionMode === EXTENSION_MODES.MANIFEST ? EXTENSION_MODES.MANIFEST : EXTENSION_MODES.FULL,
     gitMode: [GIT_MODES.KEEP, GIT_MODES.MINIMAL, GIT_MODES.STRIP].includes(ui.gitMode) ? ui.gitMode : GIT_MODES.KEEP,
     keepDevFiles: !!ui.keepDev,
+    // 存储引擎只对 Luker 目标有意义；其他目标一律不带，避免把无关选项传进转换管线。
+    engine: isLuker ? String(ui.engine || '') : '',
+    engineHandle: isLuker ? String(ui.engineHandle || '') : '',
     includeBackups: anyChecked('group:backups'),
     includeCache: anyChecked('group:cache'),
     includeAppPrivate: isTt && anyChecked('group:private'),
     pruneBuiltinAssets: !anyChecked('group:native'),
+  };
+}
+
+/**
+ * 由图表勾选派生**类目级**选择（供存储引擎互转使用）。
+ *
+ * 为什么需要：引擎侧数据（settings / presets / worlds / chats）在包内不是普通文件，
+ * 不受 `excludedPaths` 约束；若不带类目选择，用户取消勾选的聊天仍会被写进转储。
+ * 分组归属与 `CATEGORY_GROUP` 一致：settings 与 presets 同属「预设与设置」组。
+ */
+export function deriveCategorySelection({ nodes = [], isChecked = () => false } = {}) {
+  const anyChecked = (groupId) => {
+    const group = findNode(nodes, groupId);
+    if (!group) return false;
+    return leavesOf([group]).some((leaf) => isChecked(leaf));
+  };
+  const presets = anyChecked('group:presets');
+  return {
+    settings: presets,
+    presets,
+    lorebooks: anyChecked('group:lorebooks'),
+    chats: anyChecked('group:chats'),
   };
 }
 

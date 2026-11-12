@@ -51,6 +51,15 @@ export function getWorkbenchHtml() {
                 <div class="picker-pop" id="target-pop" role="listbox" hidden></div>
               </div>
             </div>
+            <label class="field" id="engine-field" hidden><span data-i18n="chart.engine"></span>
+              <select id="target-engine" class="text_pole">
+                <option value="" data-i18n="chart.engineAuto"></option>
+                <option value="fs" data-i18n="chart.engineFs"></option>
+                <option value="postgres" data-i18n="chart.enginePostgres"></option>
+                <option value="mysql" data-i18n="chart.engineMysql"></option>
+                <option value="sqlite" data-i18n="chart.engineSqlite"></option>
+              </select>
+            </label>
             <label class="field"><span data-i18n="chart.split"></span>
               <input type="number" id="split-input" min="32" max="2048" step="1" data-i18n-placeholder="chart.splitPlaceholder">
               <span class="unit">MB</span>

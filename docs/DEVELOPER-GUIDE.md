@@ -345,6 +345,39 @@
 
 ---
 
+### P. 存储引擎互转（2026-11-12）
+
+**目标**：转换后的包走宿主**原生恢复流程**时不再连接任何数据库 —— PG/MySQL/SQLite/文件系统
+四种存储形态之间可任意互转，全程零临时数据库。
+
+| 部件 | 源码落点 | 职责 |
+| --- | --- | --- |
+| canonical 行模型 | `src/core/engine-model.js` | 9 张 doc-store 表、列清单、目录名映射、旁车命名 |
+| PG/MySQL 转储 | `src/core/engine-adapters/jsonl-dump.js` | JSONL 解析/生成、方言占位符、`_engine_meta.json` |
+| 文件系统 | `src/core/engine-adapters/fs.js` | 行 ↔ 磁盘文件（含预设 hex 规范路径） |
+| SQLite | `src/core/engine-adapters/sqlite.js` + `src/core/sqlite-init.js` | `.sqlite` 读写（sql.js 内联 WASM，惰性加载） |
+| 注册表 / 探测 | `src/core/engine-registry.js` | `detectSourceEngine`、目标引擎清单（新增数据库只加这一项） |
+| 编排 | `src/core/engine-bridge.js` | 读源 → 行 → 目标；守卫、选择项过滤、行数对账 |
+| 接线 | `src/core/transform.js`（`engine` / `engineHandle` / `sqliteInit` 选项） | 主循环抑制引擎条目，尾部 `emit()` 重建 |
+
+**打包形态（决定「原生恢复不起临时库」）**
+
+- 目标 `fs`：产物**不含** `_engine_dump.bin` / `_engine_meta.json`；引擎管理的磁盘文件由行重建
+  （源包里的陈旧磁盘副本被替换，不静默保留）。
+- 目标 `postgres` / `mysql`：写 `_engine_meta.json`（`engineKind`、`schemaVersion:1`、`handle`）+ JSONL 转储，
+  并保留源包全部磁盘类目条目。
+- 目标 `sqlite`：写 `<handle>/luker-storage.sqlite`（结构与上游 DDL 逐字一致）。
+
+**纪律**
+
+- `single-template-source` / `control-consumer`：新控件 `#target-engine`（仅 Luker 目标可见）已登记。
+- 引擎承载物一律视为「由行重建」，转换后不存在旧 engineKind 的 dump 与新 meta 并存。
+- 读不到就报告：`schemaVersion ≠ 1` 拒绝；未知表/未知桶如实告警；坏 JSONL 中止；行数对账不符即失败。
+- `_engine_dump.bin` 是 **JSONL 明文**（不是 pg_dump 二进制），因此浏览器端可直接解析；
+  SQLite 才需要 WASM。
+
+---
+
 ## 三、分层与硬性边界
 
 ```
