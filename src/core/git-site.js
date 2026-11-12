@@ -193,8 +193,9 @@ export function normalizeLatestCommit(payload) {
 
 /**
  * 提交列表归一（Git 可视化：只取最近 N 条，不拉全量历史）。
+ * 同时带出 `parents`：泳道图靠它画分叉与合并；站点缺字段时为空数组，不猜。
  * @param {unknown} payload 站点 commits 接口响应
- * @returns {Array<{sha:string, shortSha:string, message:string, author:string, date:string}>}
+ * @returns {Array<{sha:string, shortSha:string, message:string, author:string, date:string, parents:string[]}>}
  */
 export function normalizeCommitList(payload) {
   const list = Array.isArray(payload) ? payload : [];
@@ -208,7 +209,14 @@ export function normalizeCommitList(payload) {
         row.commit?.committer?.date || row.commit?.author?.date
         || row.committed_date || row.created_at || row.authored_date || '',
       );
-      return { sha, shortSha: sha.slice(0, 8), message, author, date };
+      /* GitHub / Gitee / Gitea: parents[].sha；GitLab: parent_ids。 */
+      const parents = (Array.isArray(row.parents) ? row.parents : [])
+        .map((parent) => String((parent && (parent.sha || parent.id)) || parent || ''))
+        .filter(Boolean);
+      if (!parents.length && Array.isArray(row.parent_ids)) {
+        parents.push(...row.parent_ids.map((id) => String(id || '')).filter(Boolean));
+      }
+      return { sha, shortSha: sha.slice(0, 8), message, author, date, parents };
     })
     .filter((row) => row.sha);
 }

@@ -167,10 +167,10 @@
 | --- | --- |
 | 结构化实时日志（**按条目类型多选筛选**：INFO / WARN / ERROR / SUCCESS，默认四类全选；类型按钮自带条数；毫秒时间戳 / 条数上限 / 加载时清空） | `src/ui/workbench-view.js` 的 `renderLog()` / `nowTime()` / `logLimit()`；筛选状态 `state.logLevels`（Set）；`test` 外无独立模块 |
 | 存储配额两行（浏览器 / 宿主）：两行都打开**同一个存储审查面板**（占满内容区），面板内可切换数据源；初始来源 = 点击的那一行。只读 | `src/ui/workbench-view.js` 的 `renderQuota()` / `renderStorageInspector()` / `openStorageInspector()` / `siRequest()`；`src/core/storage-inspector-model.js`（纯逻辑）；`src/ui/storage-inspector-browser.js`（浏览器 provider）；`index.js` 的 `actions.storageInspector`；`src/ui/host-bridge.js` 的 `fetchHostStorageInspect()` / `hostStorageInspectCapability()`。契约见 [HANDOFF-2026-11-11-storage-inspector.md](./HANDOFF-2026-11-11-storage-inspector.md) |
-| 教程演示模式（占位数据可操作；退出整体还原；不写真实数据/宿主） | `#btn-guide` / 教程菜单 / `#tutorial-banner-exit` | `src/ui/workbench-view.js` 的 `enterTutorialMode()` / `exitTutorialMode()` / `demoTutorialActions()` / `buildDemoPackages()`；模板 `#tutorial-banner` |
+| 教程演示模式（占位数据可操作；退出整体还原；不写真实数据/宿主） | `#btn-guide` / 教程菜单 / `#tutorial-banner-exit` | `src/ui/workbench-view.js` 的 `enterTutorialMode()` / `exitTutorialMode()` / `demoTutorialActions()` / `buildDemoPackages()`；模板 `#tutorial-banner`。**首帧即时出现**：`index.js` 在 `main()` 第一个 `await` 之前 `openTutorial()`，真实读库/配额推迟到退出教程（`actions.onTutorialExit`） |
 | 目标任务式教程（选目标 → 逐步高亮；按平台与桌面/手机视图自适应；目标缺失时卡片居中保留；扩展 / 迁移目标会引导填凭据） | `#btn-guide` → 目标菜单 | `src/ui/workbench-view.js` 的 `TUTORIAL_GOALS` / `renderTutorial()` / `tutorialPrepareStep()` / `centerTutorialCard()` |
 | 宿主配额读数（Luker `RestProvider`，供配额行） | `src/ui/host-bridge.js` 的 `readHostStorageQuota()`；面板内的逐层读取走 `fetchHostStorageInspect()` |
-| 导出扩展资产列表（官方扁平 JSON，可导入「下载扩展和资源菜单」） | 每张图表卡 `[data-assetlist]`；扩展管理 → 宿主页工具条 `#extmgr-export-assetlist`（空态不再提供入口） | `src/core/asset-list.js`、`src/ui/host-bridge.js` 的 `listHostExtensions()`、`index.js` 的 `exportPackageAssetList()` / `exportHostAssetList()`；契约见 `.trellis/spec/frontend/asset-list-export.md` |
+| 导出扩展资产列表（官方扁平 JSON，可导入「下载扩展和资源菜单」） | 每张图表卡 `[data-assetlist]`；扩展管理 → 宿主页**列表下方** `#extmgr-export-selected`（先在列表勾选，未勾选时禁用；空态不再提供入口） | `src/core/asset-list.js`、`src/ui/host-bridge.js` 的 `listHostExtensions()`、`index.js` 的 `exportPackageAssetList()` / `exportHostAssetList({names})`；契约见 `.trellis/spec/frontend/asset-list-export.md` |
 | 设置分组可收起（提示 / 导出 / 日志） | `src/ui/settings-panel.js` 的 `buildSettingsHtml()`（三个 `<details>`） |
 | 图表单独最大化 + 逐层下钻（勾选逻辑不变） | `src/ui/workbench-view.js` 的 `chartCardHtml()` / `volScopedNodes()` / `volBreadcrumbHtml()`；**最大化只铺满 `#app.app-container`，不是浏览器视口全屏**（`style.css` 的 `.vol-card.is-max` 用 `position:absolute`） |
 | 扩展未勾选时的「保持不选 / 仅清单」 | `src/ui/workbench-view.js` 的 `extensionToolsHtml()` / `extensionManifestOnly()`；仅清单时保留扩展元数据扫描、实体由 manifest 模式丢弃 |
@@ -218,15 +218,15 @@
 | **恢复模式**（原「数据包模式」）与覆盖/增量 | 数据包 `导入 / 导出` 页签**右侧**同一行 | `workbench-template.js` 的 `#zone-tabs > #zone-mode-row`；`workbench-view.js` 的 `renderZoneModeRow()`；文案 `chart.deltaLabel` |
 | 从宿主拉取 | 同上，仅在导入分区显示 | `#btn-fetch` → `doFetch()` |
 | **待导出两列区块已删除** | — | 模板无 `#pending-exports`；队列条目由 `renderZones()` 用 `pendingCardHtml()` 渲染到导出区，动作仍走 `pendingDownload` / `pendingStash` / `pendingRemove` |
-| **自动更新（父项 + 逐扩展勾选）** | 扩展管理 → 开发者：父项「自动更新」+ 子项「检查间隔」「模式」；宿主页逐扩展复选框与全选/反选/取消 | `workbench-view.js` 的 `devAutoUpdateHtml()` / `runDevAutoUpdate()` / `persistDevSelection()`；设置项 `devMode` / `gitAutoUpdate` / `gitUpdateIntervalHours`（默认 6）/ `gitUpdateMode`（`notify` 默认）/ `gitUpdateSelected` / `gitAutoUpdateLastAt` |
+| **自动更新（逐扩展 + 策略）** | 宿主页每行：关闭 / 仅提醒 / 直接更新 + 间隔（秒）；策略在**扩展管理 → 宿主页「自动更新设置」折叠块**（不再在设置弹窗） | `saveUpdateRule()` / `resolveUpdateRepo()` / `scheduleAutoUpdates()` / `runAutoUpdateTick()`；策略来自 `updatePolicyOf()`，退避用 `updateBackoffDelay()`（`intervalSec × backoff^failures`，截断到上限）；`renderExtInstalled()` 的 `extAutoPolicyBlockHtml()` |
 | 迁移与备份教程 | 迁移面板头 `?` | `HELP.transfer`（局域网互传 / 云端仓库 / 恢复模式） |
 | 教程模式不自动退出 | 头部书本图标 `#btn-guide` / 横幅「退出教程」 | `tutorial-next` 最后一步只回目标菜单；`closeTutorial()` 才是退出 |
 | 设置三态（×保留草稿 / 取消丢弃 / 保存持久化） | 设置面板顶部 × 与底部按钮 | `workbench-view.js` 的 `captureSettingsDraft()` / `applySettingsDraft()` / `openSettingsView()`；`state.settingsDraft` 仅内存 |
 | 整窗口铺满（桌面与窄屏一致）/ 选择锁 | `#app` 两种视图都占 100vw×100vh、零圆角；除日志与输入框外不可选 | `style.css` 的 `#app.app-container:not([data-view="mobile"])` 与 `[data-view="mobile"]` 两条容器规则、`user-select` 例外块；窄屏图表列/卡片用 `flex:1 0 auto`（可增不可缩）拉伸填满，树不限高以免压住底部汇总条 |
 | 切换行顺序（迁移与备份在扩展管理前） | 各面板头 `[data-view-switch]` | `workbench-view.js` 的 `renderViewSwitch()` 项序 |
 | 教程跳过 / 重新打开 | 浮层「跳过」、横幅「重新打开教程」 | `hideTutorialOverlay()`（只关浮层）与 `#tutorial-banner-reopen` → `openTutorial()` |
-| 宿主页 / 宿主列表 / 安装页脚 | 扩展管理 | 宿主页顶部 `ext-toolbar`（按钮 + 排序）、列表头 `ext-list-head`（数量 + 自动更新勾选组）、可拖拽排序行；安装扩展是面板**固定页脚** `#extmgr-install-block`（`renderExtInstalled()` / `syncExtInstallBlock()`），紧贴安装报告条 |
-| **扩展作用域互转（全局 ⇄ 用户）** | 扩展管理 → 宿主页每行「移至全局 / 移至用户」（**仅管理员**渲染） | 宿主 `POST /api/extensions/move`；`src/ui/host-bridge.js` 的 `moveExtensionViaHost()`、`src/ui/workbench-view.js` 的 `moveScopeWithConfirm()` / `moveInstalledExtension()`；`index.js` 的 `actions.moveExtension` |
+| 宿主页 / 宿主列表 / 安装页脚 | 扩展管理 | 宿主页**不再有顶部工具条**：检查更新 / 刷新 / 全选 / 批量都在列表头 `ext-list-head` 按钮行（图标按钮），导出清单沉到列表下方且必须先勾选；行内动作（移至全局 / 更新 / 卸载）一律图标按钮；加载顺序 `#N` 在扩展名前，本地作用域不再打「本地」标签；安装扩展是面板**固定页脚** `#extmgr-install-block`（`renderExtInstalled()` / `syncExtInstallBlock()`），紧贴安装报告条 |
+| **扩展作用域互转（全局 ⇄ 用户）** | 扩展管理 → 宿主页每行图标按钮（`fa-right-left`，**仅管理员**渲染；悬停/aria 给「移至全局 / 移至用户」） | 宿主 `POST /api/extensions/move`；`src/ui/host-bridge.js` 的 `moveExtensionViaHost()`、`src/ui/workbench-view.js` 的 `moveScopeWithConfirm()` / `moveInstalledExtension()`；`index.js` 的 `actions.moveExtension` |
 | **扩展作用域与同名去重（四宿主）** | 转出的包对同一扩展只保留一份 | `src/core/transform.js` 的 `extensionScopeOf()`（五形态分类）/ `routeSource()`（返回 `extScope`）/ `targetEntryPath(hub, target, extScope)`；`public/scripts/extensions/third-party/` 是 ST/Luker **全局**扩展在包内的真实路径（宿主常量 `globalExtensions`）；`public/scripts/extensions/<内置>/` 判为 `builtin-ext` **剥离**；同名按宿主语义**保留用户级**（ST/Luker `discover` 源码注释：conflict 时从 user 目录加载；TT 同 local 优先）；PT 无用户级目录 ⇒ 迁 `data/extensions/third-party/` 并补 `extension-sources/<scope>/`。UI 汇总条与行内标注读 `plan.extensionScopes` |
 | **安装到全局** | 扩展管理 → 宿主页安装区「安装到全局」（**仅管理员**可见） | `src/ui/host-bridge.js` 的 `installExtensionBatch()` 透传 `global` 给 `installExtensionViaHost()`；`workbench-view.js` 的 `renderExtInstall()` / `runExtInstall()` |
 | **加载顺序只读展示** | 扩展列表 `#N` 徽标 + 排序「加载顺序」；**不提供编辑**（宿主无写回端点） | `src/core/asset-list.js` 的 `manifestToExtension().loadingOrder`；`workbench-view.js` 的 `installedRowRecords()` / `sortedInstalledRecords()` |
@@ -270,7 +270,7 @@
 
 | 功能 | UI 入口 | 源码落点 |
 | --- | --- | --- |
-| **逐扩展自动更新（模式 + 秒级轮询 + 失败退避）** | 宿主页每行：关闭 / 仅提醒 / 直接更新 + 间隔（秒）；策略在 设置 → 自动更新 | `saveUpdateRule()` / `resolveUpdateRepo()` / `scheduleAutoUpdates()` / `runAutoUpdateTick()`；策略来自 `updatePolicyOf()`，退避用 `updateBackoffDelay()`（`intervalSec × backoff^failures`，截断到上限） |
+| **逐扩展自动更新（模式 + 秒级轮询 + 失败退避）** | 宿主页每行：关闭 / 仅提醒 / 直接更新 + 间隔（秒）；策略在扩展管理 → 宿主页「自动更新设置」 | `saveUpdateRule()` / `resolveUpdateRepo()` / `scheduleAutoUpdates()` / `runAutoUpdateTick()`；策略来自 `updatePolicyOf()`，退避用 `updateBackoffDelay()`（`intervalSec × backoff^failures`，截断到上限） |
 | **列表内批量管理** | 列表头：全选 / 反选 / 取消 / 批量更新 / 批量卸载 / 指定版本分支 | `batchUpdateInstalled()` / `batchUninstallWithConfirm()`；逐条 `updateInstalledExtension()` / `uninstallWithConfirm()`；宿主 `POST /api/extensions/update`（`updateExtensionViaHost`）与 `/delete` |
 | **数据包扩展清单统一入口** | 恢复后自动进「宿主 → 安装扩展」 | `host-bridge.js` 的 `setExtensionManifestSink()`；`index.js` 注册 `view.openExtensionManager(entries)`；独立安装浮层不再使用 |
 | **更新失败预案** | 更新检查结果行「删除后重装」 | `reinstallWithConfirm()` → `reinstallExtension()`：二次确认后 `deleteExtensionViaHost()` 再按登记仓库重装 |
@@ -278,7 +278,8 @@
 | **服务端插件分区** | 宿主页（仅管理员） | `listServerPlugins()`（`POST /api/users/plugins/list`，`requireAdminMiddleware`）→ `serverPluginBlockHtml()`；可折叠、显示 `enabled` 与 `pluginsPath` |
 | **前后端误装拒绝** | 安装执行前 | `src/core/plugin-kind.js` 的 `classifyPluginKind()`（manifest.json ⇒ 前端扩展；仅 package.json ⇒ 服务端插件）；`preflightExtEntry()` 用 `rawFile('manifest.json' / 'package.json')` 识别；`runExtInstall()` 拦截并给替代措施 |
 | **`?` 帮助补全** | 扩展管理 `?` | `HELP.extmgr` 新增「开发者页」「前端扩展与服务端插件」「Git 可视化」三段 |
-| **Git 可视化（只读，常显）** | 数据包列头「数据包 / Git」分段按钮（不再需要开关） | `workbench-template.js` 的 `#zone-side-tabs` / `#zone-side-git`；`workbench-view.js` 的 `renderZoneSide()` / `renderGitViz()` / `loadGitTarget()` / `loadGitCommitDiff()` |
+| **Git 可视化（SVG 泳道图 + 版本切换）** | 数据包列头「数据包 / Git」分段按钮（常显） | `workbench-template.js` 的 `#zone-side-tabs` / `#zone-side-git`（`#git-viz-headbar` / `#git-viz-graph` / `#git-viz-detail`）；`workbench-view.js` 的 `renderZoneSide()` / `renderGitViz()` / `loadGitTarget()` / `loadGitCommitDiff()` / `installGitRefNow()`；布局纯逻辑在 `src/core/git-graph.js`（`layoutGitGraph` / `nodePoint`）。云端仓库优先取宿主 `/api/extensions/version` 的 `remoteUrl`（所有已装扩展都能读），安装登记只作兜底；分支/标签点选后出现「装到该版本」，走 `installExtensions replace:true` |
+| **Git 清理（插件侧）** | 扩展管理 → 宿主页「Git 清理」折叠块 | `gitCleanupBlockHtml()` / `clearPluginGitData()`：清安装登记、逐扩展自动更新规则、更新失败记录；宿主目录里的 `.git` 只读展示、不处理 |
 | 本地 `.git` 读取 | Git 视图 | `host-bridge.js` 的 `readHostExtensionGit()`：`POST /api/extensions/version`（分支 / HEAD / 是否最新 / remoteUrl）+ `/branches`；HEAD 为空 ⇒ 如实显示「历史已丢失」 |
 | 云端只读信息 | Git 视图 | `src/core/git-site.js` 的 `tagsEndpoint()` / `commitDetailEndpoint()` / `remoteFileUrl()` / `normalizeCommitList()` / `normalizeTags()` / `normalizeCommitFiles()`；`git-remote.js` 的 `listTags()` / `listCommits()` / `commitDetail()` / `rawFile()`；只取最近 20 条提交，不拉全量历史 |
 | 模型与判据 | — | `src/core/git-viz.js` 的 `normalizeLocalGit()` / `gitStateOf()` / `mergeBranches()` / `buildGitSummary()` / `selectGitTargets()` / `diffStat()`；工作区状态宿主无端点 ⇒ 显示「宿主未提供」 |

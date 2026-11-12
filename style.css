@@ -668,10 +668,7 @@
   #app.app-container .ext-install-toggle .ext-install-ico{flex:0 0 auto;color:var(--accent)}
   #app.app-container .ext-install-toggle .ext-chev{flex:0 0 auto;transition:transform .16s ease;transform:rotate(180deg)}
   #app.app-container .ext-install-toggle.is-open .ext-chev{transform:rotate(0deg)}
-  /* 宿主页顶部工具条：与存储图表的横线控件同一形态（一行按钮 + 右侧排序） */
-  #app.app-container .ext-toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:6px 10px;
-    border-bottom:1px solid var(--border)}
-  #app.app-container .ext-toolbar .field{flex:0 0 auto}
+  /* 宿主页：列表按钮行承载检查更新 / 刷新 / 批量（顶部工具条已删除） */
   #app.app-container .ext-spacer{flex:1 1 auto}
   /* 折叠头统一形态：标题 + 数量徽标 + 可点击箭头 + 展开提示 */
   #app.app-container .ext-summary{display:flex;align-items:center;gap:7px;cursor:pointer;list-style:none;font-size:11.5px;
@@ -704,6 +701,26 @@
   #app.app-container .ext-auto .ext-unit{font-size:10.5px;color:var(--muted-2)}
   #app.app-container .ext-row-actions{display:inline-flex;gap:4px;flex:0 0 auto;margin-left:auto}
   #app.app-container .ext-row-actions .btn{padding:2px 7px;font-size:10.5px}
+  /* 图标按钮（酒馆那套 FontAwesome）：方角、居中、不因文字宽度跳动 */
+  #app.app-container .btn.icon{display:inline-flex;align-items:center;justify-content:center;padding:3px 6px;min-width:26px;line-height:1}
+  #app.app-container .btn.icon i{font-size:11.5px}
+  #app.app-container .ext-row-actions .btn.icon{padding:3px 6px;min-width:26px}
+  #app.app-container .ext-order{flex:0 0 auto;font-family:Consolas,monospace;color:var(--muted-2)}
+  /* 导出清单沉到列表下面：未勾选时按钮禁用 */
+  #app.app-container .ext-bottom-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+    padding:8px 10px;border-top:1px solid var(--border)}
+  #app.app-container .ext-bottom-actions .btn{display:inline-flex;align-items:center;gap:6px}
+  /* 自动更新策略 / Git 清理：与已装列表同形的折叠块 */
+  #app.app-container .ext-auto-policy,
+  #app.app-container .ext-git-clean{flex:0 0 auto;border:1px solid var(--border);border-radius:8px;
+    background:color-mix(in srgb,var(--panel-3) 45%,transparent);padding-bottom:6px}
+  #app.app-container .ext-auto-policy .ext-row,
+  #app.app-container .ext-auto-policy .ext-note,
+  #app.app-container .ext-git-clean .ext-note,
+  #app.app-container .ext-git-clean .ext-row{margin:0 8px 6px}
+  #app.app-container .ext-git-clean .ext-list{padding:0 8px 6px}
+  #app.app-container .ext-sort{flex:0 0 auto;font-size:10.5px;color:var(--muted)}
+  #app.app-container .ext-sort select{padding:2px 5px;font-size:10.5px}
   #app.app-container .ext-sel-actions{display:inline-flex;align-items:center;gap:5px;flex-wrap:wrap}
   #app.app-container .ext-sel-actions .btn{padding:2px 7px;font-size:10.5px}
   #app.app-container .ext-batch-ref{width:132px;padding:2px 6px;font-size:10.5px}
@@ -729,28 +746,53 @@
   #app.app-container .zone-side-panel{flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
   #app.app-container .zone-side-panel[hidden]{display:none}
   #app.app-container .git-viz-body{flex:1 1 auto;min-height:0;overflow:auto;padding:8px;display:flex;flex-direction:column;gap:8px}
-  #app.app-container .git-viz-list{display:flex;flex-direction:column;gap:4px;flex:0 0 auto}
-  #app.app-container .git-viz-row{display:flex;align-items:center;gap:6px;width:100%;text-align:left;cursor:pointer;
-    padding:5px 7px;border:1px solid var(--border);border-radius:7px;background:transparent;color:var(--text);font-size:11.5px}
-  #app.app-container .git-viz-row.active{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,transparent)}
-  #app.app-container .git-viz-name{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  #app.app-container .git-viz-tag{flex:0 0 auto;color:var(--muted-2);font-size:10.5px}
+  #app.app-container .git-viz-headbar{display:flex;flex-direction:column;gap:6px;flex:0 0 auto}
+  #app.app-container .git-viz-headrow{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+  #app.app-container .git-viz-pick{display:inline-flex;align-items:center;gap:6px;flex:1 1 auto;min-width:0;font-size:11px;color:var(--muted)}
+  #app.app-container .git-viz-pick select{flex:1 1 auto;min-width:0;padding:3px 6px;font-size:11px}
+  #app.app-container .git-viz-repo{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;
+    border:1px solid var(--border);border-radius:6px;color:var(--muted);text-decoration:none}
+  #app.app-container .git-viz-repo:hover{color:var(--text);border-color:var(--border-strong)}
+  #app.app-container .git-viz-refs{display:flex;gap:5px;flex-wrap:wrap}
+  #app.app-container .git-viz-ref{display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border:1px solid var(--border);
+    border-radius:99px;background:transparent;color:var(--muted);font-size:10.5px;cursor:pointer;max-width:100%}
+  #app.app-container .git-viz-ref span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  #app.app-container .git-viz-ref.is-current{border-color:var(--accent);color:var(--text)}
+  #app.app-container .git-viz-ref.is-picked{background:color-mix(in srgb,var(--accent) 16%,transparent);border-color:var(--accent);color:var(--text)}
+  #app.app-container .git-viz-install{align-self:flex-start;display:inline-flex;align-items:center;gap:6px}
+  /* 泳道图：SVG 画线，HTML 行放文字（截断与键盘可用性交给 HTML） */
+  #app.app-container .git-graph{position:relative;flex:0 0 auto;min-width:0}
+  #app.app-container .git-graph-svg{position:absolute;left:0;top:0;pointer-events:none}
+  #app.app-container .git-graph-rows{display:flex;flex-direction:column}
+  #app.app-container .git-graph-row{display:flex;align-items:center;gap:6px;width:100%;text-align:left;cursor:pointer;
+    border:0;border-radius:6px;background:transparent;color:var(--text);font-size:11px;padding-right:4px;box-sizing:border-box}
+  #app.app-container .git-graph-row:hover{background:color-mix(in srgb,var(--accent) 8%,transparent)}
+  #app.app-container .git-graph-row.is-selected{background:color-mix(in srgb,var(--accent) 14%,transparent)}
+  #app.app-container .git-graph-sha{flex:0 0 auto;font-family:Consolas,monospace;color:var(--accent)}
+  #app.app-container .git-graph-msg{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  #app.app-container .git-graph-date{flex:0 0 auto;color:var(--muted-2);font-size:10.5px}
+  #app.app-container .gg-edge{fill:none;stroke-width:1.6;opacity:.85}
+  #app.app-container .gg-edge.is-merge{stroke-dasharray:3 2}
+  #app.app-container .gg-edge.is-dangling{opacity:.35}
+  #app.app-container .gg-dot{stroke:var(--panel);stroke-width:1.5}
+  #app.app-container .gg-edge.gg-c0{stroke:var(--accent)}
+  #app.app-container .gg-edge.gg-c1{stroke:var(--optional)}
+  #app.app-container .gg-edge.gg-c2{stroke:var(--drop)}
+  #app.app-container .gg-edge.gg-c3{stroke:color-mix(in srgb,var(--accent) 55%,var(--optional))}
+  #app.app-container .gg-edge.gg-c4{stroke:color-mix(in srgb,var(--accent) 55%,var(--drop))}
+  #app.app-container .gg-edge.gg-c5{stroke:color-mix(in srgb,var(--optional) 55%,var(--drop))}
+  #app.app-container .gg-dot.gg-c0{fill:var(--accent)}
+  #app.app-container .gg-dot.gg-c1{fill:var(--optional)}
+  #app.app-container .gg-dot.gg-c2{fill:var(--drop)}
+  #app.app-container .gg-dot.gg-c3{fill:color-mix(in srgb,var(--accent) 55%,var(--optional))}
+  #app.app-container .gg-dot.gg-c4{fill:color-mix(in srgb,var(--accent) 55%,var(--drop))}
+  #app.app-container .gg-dot.gg-c5{fill:color-mix(in srgb,var(--optional) 55%,var(--drop))}
   #app.app-container .git-viz-detail{display:flex;flex-direction:column;gap:6px;flex:0 0 auto}
   #app.app-container .git-viz-head{display:flex;align-items:center;gap:8px}
   #app.app-container .git-viz-title{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   #app.app-container .git-viz-meta{display:flex;flex-direction:column;gap:2px;font-size:11px;color:var(--muted)}
-  #app.app-container .git-viz-sec{display:flex;flex-direction:column;gap:4px}
-  #app.app-container .git-viz-sec > h5{margin:0;font-size:11px;color:var(--muted-2);font-weight:600}
-  #app.app-container .git-viz-branch{justify-content:flex-start}
-  #app.app-container .git-viz-branch.is-current{border-left:2px solid var(--accent)}
-  #app.app-container .git-viz-tags{display:flex;gap:5px;flex-wrap:wrap}
-  #app.app-container .git-viz-tagitem{font-size:10.5px;padding:2px 6px;border:1px solid var(--border);border-radius:99px;color:var(--muted)}
-  #app.app-container .git-viz-commit{display:flex;align-items:center;gap:6px;width:100%;text-align:left;cursor:pointer;
-    padding:4px 6px;border:1px solid transparent;border-radius:6px;background:transparent;color:var(--text);font-size:11px}
-  #app.app-container .git-viz-commit:hover{border-color:var(--border)}
+  #app.app-container .git-viz-commithead{display:flex;align-items:center;gap:6px;font-size:11px;min-width:0}
   #app.app-container .git-viz-sha{flex:0 0 auto;font-family:Consolas,monospace;color:var(--accent)}
-  #app.app-container .git-viz-msg{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  #app.app-container .git-viz-date{flex:0 0 auto;color:var(--muted-2);font-size:10.5px}
   #app.app-container .git-viz-file{border:1px solid var(--border);border-radius:7px;padding:4px 6px}
   #app.app-container .git-viz-file > summary{cursor:pointer;display:flex;gap:8px;font-size:11px;color:var(--text)}
   #app.app-container .git-viz-path{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -1226,8 +1268,6 @@
 #app.app-container .ext-note{font-size:12px}
 #app.app-container .ext-summary{font-size:12.5px}
 #app.app-container .ext-list-head{font-size:11.5px}
-#app.app-container .ext-toolbar .field,
-#app.app-container .ext-toolbar .btn{font-size:11.5px}
 #app.app-container .tutorial-card .td{font-size:12px}
 #app.app-container .tutorial-card .tut-goal .tg-name{font-size:12.5px}
 #app.app-container .tutorial-card .tut-goal .tg-note{font-size:11.5px}

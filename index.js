@@ -511,8 +511,10 @@ async function main(root) {
    *
    * 事实边界：宿主 discover 只给目录名/类型，URL 来自各扩展 `manifest.json` 的
    * `homePage`。因此可能出现「有扩展、但没有可导入地址」——此时如实提示，不生成空文件。
+   * `names` 给定时只导出勾中的扩展（扩展管理里的「导出扩展清单」）。
+   * @param {{names?:string[]}} [request]
    */
-  async function exportHostAssetList() {
+  async function exportHostAssetList(request = {}) {
     await ensureAssetListGuide();
     const result = await listHostExtensions(host.platform);
     if (!result.ok) {
@@ -520,7 +522,14 @@ async function main(root) {
       logger.warn(`${t('toast.assetListUnavailable')}: ${result.reason || result.status || ''}`);
       return;
     }
-    const hostItems = (result.items || []).filter((item) => item.sourceType !== 'system');
+    const picked = Array.isArray(request.names) ? new Set(request.names.filter(Boolean)) : null;
+    const hostItems = (result.items || [])
+      .filter((item) => item.sourceType !== 'system')
+      .filter((item) => !picked || picked.has(String(item.id || item.folder || item.name || '')));
+    if (!hostItems.length) {
+      view.toast(t('toast.assetListEmpty', { total: 0 }));
+      return;
+    }
     const list = buildAssetList(hostItems);
     const summary = summarizeExtensions(hostItems);
     if (!list.length) {
@@ -565,7 +574,7 @@ async function main(root) {
 
   /** 图表卡 / 空态拉取卡的统一导出入口。 */
   async function exportAssetList(request = {}) {
-    if (request.source === 'host') return exportHostAssetList();
+    if (request.source === 'host') return exportHostAssetList(request);
     return exportPackageAssetList(request.pkgIds);
   }
 
@@ -1694,6 +1703,7 @@ async function main(root) {
         const active = state.packages.find((p) => view.getState().source?.pkgId === p.id);
         if (active) ensurePlan(active.id, name).then(() => view.setActivePackage(active.id));
       },
+      onTutorialExit: () => { void loadRealData(); },
       close: () => {
         const overlay = document.getElementById('st-converter-modal-overlay');
         if (overlay) overlay.style.display = 'none';
@@ -1768,16 +1778,13 @@ async function main(root) {
     },
   });
 
-  // 设置项：每次加载清空浏览器里的暂存数据包（不含设置/偏好/日志）。
-  if (settings.clearPackagesOnLoad) {
+  // 教程模式首帧优先：先弹蒙层，真实读库与宿主配额推迟到退出教程再补（2026-11-12 用户裁定）。
+  if (settings.autoTutorial) {
     try {
-      await clearStoredFiles();
-      logger.info(t('log.storageCleared'));
-    } catch (err) {
-      logger.warn(t('log.workspaceReadFailed', { msg: err?.message || String(err) }));
-    }
+      if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => view.openTutorial());
+      else view.openTutorial();
+    } catch { /* 隐私模式 */ }
   }
-  await syncPackages();
   async function refreshStorageQuota() {    // 两条读数彼此独立：任一失败都不能拖垮另一条。
     const [browser, hostQuota] = await Promise.all([
       Promise.resolve().then(() => readBrowserQuota()).catch(() => null),
@@ -1787,7 +1794,24 @@ async function main(root) {
     ]);
     view.setStorage({ browser, host: hostQuota });
   }
-  await refreshStorageQuota();
+  /** 真实数据装载：教程演示期间整体推迟，退出教程后由 onTutorialExit 触发；只装一次。 */
+  let realDataLoaded = false;
+  async function loadRealData() {
+    if (realDataLoaded) return;
+    realDataLoaded = true;
+    // 设置项：每次加载清空浏览器里的暂存数据包（不含设置/偏好/日志）。
+    if (settings.clearPackagesOnLoad) {
+      try {
+        await clearStoredFiles();
+        logger.info(t('log.storageCleared'));
+      } catch (err) {
+        logger.warn(t('log.workspaceReadFailed', { msg: err?.message || String(err) }));
+      }
+    }
+    await syncPackages();
+    await refreshStorageQuota();
+  }
+  if (!settings.autoTutorial) await loadRealData();
   if (typeof document !== 'undefined') {
     // 读数必须随数据变化：操作后由 syncPackages 触发，另有低频兜底刷新。
     setInterval(() => { if (!document.hidden) refreshStorageQuota(); }, 15000);
@@ -1795,15 +1819,6 @@ async function main(root) {
   }
   view.setProgress(0, t('progress.ready'));
   logger.info(t('log.workbenchReady', { host: host.isPlugin ? t('header.plugin', { host: HOST_LABEL[host.platform] || t('host.fallback') }) : t('header.web') }));
-  try {
-    // 「每次打开进入教程模式」默认开：不再用 sessionStorage 拦，刷新/重开都会进入；
-    // 用户点教程浮层里的「不再弹出」或取消该设置即不再自动进入。
-    if (settings.autoTutorial) {
-      // 立即弹：延迟会让用户先操作再看到蒙层（2026-11-09 反馈）。
-      if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => view.openTutorial());
-      else view.openTutorial();
-    }
-  } catch { /* 隐私模式 */ }
 }
 
 /**
