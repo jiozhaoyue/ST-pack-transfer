@@ -207,19 +207,6 @@ export function buildSettingsHtml(settings = {}) {
     + '<label class="check check-sub"><input type="checkbox" id="set-include-oauth"> ' + t('settings.includeOauth') + '</label>'
     + '<div class="ext-note">' + t('settings.dataNote') + '</div>';
 
-  const numSetting = (key, label, min, max, step) => '<label class="et-git"><span>' + label + '</span>'
-    + '<input class="text_pole" type="number" min="' + min + '" max="' + max + '" step="' + step + '" data-setting="' + key + '" value="' + s[key] + '"></label>';
-  const autoGroup = '<div class="ext-note">' + t('settings.autoPolicyNote') + '</div>'
-    + '<div class="ext-row">'
-    + numSetting('autoUpdateMinIntervalSec', t('settings.autoMinInterval'), 1, 86400, 1)
-    + numSetting('autoUpdateMaxIntervalSec', t('settings.autoMaxInterval'), 1, 604800, 60)
-    + numSetting('autoUpdateDefaultIntervalSec', t('settings.autoDefaultInterval'), 1, 604800, 60)
-    + '</div><div class="ext-row">'
-    + numSetting('autoUpdateFailureBackoff', t('settings.autoBackoff'), 1, 10, 0.1)
-    + numSetting('autoUpdateFailureBackoffMaxSec', t('settings.autoBackoffMax'), 1, 604800, 60)
-    + numSetting('autoUpdateNotifyTimeoutSec', t('settings.autoNotifyTimeout'), 1, 86400, 1)
-    + '</div>';
-
   const netGroup = '<label class="et-git"><span>' + t('settings.netProxy') + '</span>'
     + '<input class="text_pole" type="url" data-setting="netProxyUrl" placeholder="' + t('settings.netProxyPlaceholder')
     + '" value="' + (s.netProxyUrl || '') + '"></label>'
@@ -227,7 +214,6 @@ export function buildSettingsHtml(settings = {}) {
 
   return '<div class="settings-grid">'
     + group('behavior', t('settings.groupBehavior'), tips, true)
-    + group('auto', t('settings.groupAuto'), autoGroup, false)
     + group('export', t('settings.groupExport'), exportGroup, true)
     + group('net', t('settings.groupNet'), netGroup, false)
     + group('log', t('settings.groupLog'), logging, false)
@@ -265,15 +251,6 @@ export function readSettings(root, base = SETTINGS_DEFAULTS) {
 
   const netProxyEl = root.querySelector?.('[data-setting="netProxyUrl"]');
   if (netProxyEl && typeof netProxyEl.value === 'string') out.netProxyUrl = netProxyEl.value.trim();
-  /* 自动更新策略：全部从对话框读，缺省保留 base（不再写死阈值）。 */
-  for (const key of [
-    'autoUpdateMinIntervalSec', 'autoUpdateMaxIntervalSec', 'autoUpdateDefaultIntervalSec',
-    'autoUpdateFailureBackoff', 'autoUpdateFailureBackoffMaxSec', 'autoUpdateNotifyTimeoutSec',
-  ]) {
-    const el = root.querySelector?.('[data-setting="' + key + '"]');
-    const value = el?.value === '' || el?.value === undefined ? NaN : Number(el.value);
-    if (Number.isFinite(value)) out[key] = value;
-  }
 
   const clearLogEl = root.querySelector?.('[data-setting="clearLogOnLoad"]');
   if (clearLogEl && typeof clearLogEl.checked === 'boolean') out.clearLogOnLoad = clearLogEl.checked;

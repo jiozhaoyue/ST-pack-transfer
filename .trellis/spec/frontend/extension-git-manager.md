@@ -118,12 +118,19 @@ GitLab `/<group>/<sub>/<repo>/-/tree/<ref>`、`.git` 后缀、query/hash、`http
 - **开发者页**（`data-exttab="cred"`，`renderExtCredentials()`）= 账号列表 + 凭据存储位置 +
   OAuth 区块 + 令牌指引（自动更新已回到宿主页每条扩展，不在此页）；**不得**出现链接输入、
   上传 / 粘贴 / 分支、解析、开始安装、安装列表、失败链接导出等安装控件，也不提供「去安装」跳转。
-- **宿主页版式**（2026-11-11 第二轮用户裁定，见 `workbench-single-view.md` §18）：
-  - 顶部是横线工具条 `.ext-toolbar`（导出清单 / 检查更新 / 刷新 + 右侧排序），与存储图表的横线控件同形；
-  - 列表头 `.ext-list-head` 才显示数量（`共 N 项`）、拖拽提示与自动更新勾选组；折叠头 summary **只写标题**
+- **宿主页版式**（2026-11-12 第三轮用户裁定，取代 11-11 的顶部工具条）：
+  - **没有** `.ext-toolbar` 横线工具条；检查更新 / 刷新 / 全选 / 反选 / 取消 / 批量更新 / 批量卸载
+    全部在列表头 `.ext-list-head` 的按钮行（图标按钮，`title`/`aria-label` 给文字）；
+  - 列表头仍显示数量（`共 N 项`）、拖拽提示与排序下拉；折叠头 summary **只写标题**
     （`已装扩展` + 数量徽标 + 箭头 + 展开提示），**禁止** `已装扩展（0 个，点击折叠）` 这类把数量写进标签的写法；
-  - 每条扩展是带 `role="listitem"` 的 `[data-extrow]` 行，含拖拽手柄；自定义顺序存 `settings.extOrder`，
-    排序方式存 `settings.extSort`（`custom` / `name` / `version` / `source`）。
+  - 每条扩展是带 `role="listitem"` 的 `[data-extrow]` 行，含拖拽手柄；**加载顺序 `#N` 位于扩展名前**；
+    本地作用域**不再渲染「本地」标签**（全局仍显示「全局」）；
+  - 行内管理动作一律**图标按钮**：移至全局/用户 `fa-right-left`、更新 `fa-rotate`、卸载 `fa-trash`；
+    不写长文字按钮；
+  - **导出扩展清单在列表下方**（`.ext-bottom-actions` 的 `#extmgr-export-selected`），
+    **未勾选任何扩展时 disabled**，导出内容只含勾中的扩展（`actions.exportAssetList({source:'host', names})`）；
+  - 「自动更新设置」折叠块（策略数字）与「Git 清理」折叠块都在宿主页列表下方；
+  - 自定义顺序存 `settings.extOrder`，排序方式存 `settings.extSort`（`custom` / `name` / `version` / `source` / `order`）。
 - **安装区是面板固定页脚**：`<div class="ext-footer" id="extmgr-install-block">` 位于 `#extension-body`
   **之外**、`#extmgr-report-bar` 正上方（模板已有，不得再写进宿主页正文）；只在 `宿主` 页且报告未展开时显示。
   展开状态 `state.extInstallOpen` 只在本次会话内记住；展开区 `#extmgr-install-area` 在按钮**上方**，
@@ -202,31 +209,36 @@ GitLab `/<group>/<sub>/<repo>/-/tree/<ref>`、`.git` 后缀、query/hash、`http
 - **更新失败预案**：更新检查结果行提供「删除后重装」，二次确认后
   `deleteExtensionViaHost(name, global)` → 按 `gitInstalls` 登记重装；删除失败即停止，不继续重装。
 
-## 12. Git 可视化（只读，2026-11-11 第二轮）
+## 12. Git 可视化：SVG 泳道图 + 版本切换（2026-11-12 重写）
 
 **入口（常显）**：数据包列面板头固定有 `.segmented`（`数据包 / Git`），同一列内互换；
 不再由开发者模式开关控制（用户裁定：看不到等于没有）。桌面与手机同一套逻辑。
 
-**数据源（只读）**：
+**数据源（宿主优先，登记兜底）**：
 
 | 侧 | 端点 / 来源 | 说明 |
 | --- | --- | --- |
 | 本地 | `POST /api/extensions/version` | `{currentBranchName, currentCommitHash, isUpToDate, remoteUrl, remoteCommitHash}` |
 | 本地 | `POST /api/extensions/branches` | `[{name, commit, current, label}]` |
-| 云端 | 站点 API（分支 / 标签 / 最近 20 条提交 / 单次提交 diff） | 仅限该扩展在 `gitInstalls` 登记的仓库 |
-| 工作区 | — | 宿主无只读端点 ⇒ 固定显示「宿主未提供」 |
+| 云端 | 站点 API（分支 / 标签 / 最近 50 条提交带 `parents` / 单次提交 diff） | **优先用 `version.remoteUrl`**；所有已装扩展只要宿主返回 origin 就读，`gitInstalls` 只作兜底 |
 
-**判据与降级**：`currentCommitHash` 为空 ⇒ 「历史已丢失 / 非 Git 仓库」，不伪造提交；
-站点不可达 ⇒ 「未提供（原因）」；未登记仓库 ⇒ 只显示本地信息，不猜云端。
+**渲染契约**：
 
-**只读**：不渲染检出 / 切换 / 提交 / 合并按钮；分支与提交行只能点开查看。
+- `#git-viz-headbar`：扩展选择 `<select>` + 刷新 + 仓库外链（有 `remoteUrl` 才显示）；
+  分支 / 标签 chips 点选后出现「装到 {ref}」按钮（不预先点选，避免误触）。
+- `#git-viz-graph`：`layoutGitGraph()`（`src/core/git-graph.js`）给出的节点 / 边 / 泳道，
+  SVG 画线 + HTML 行放文字；合并边虚线、窗口外父提交画悬空线（不伪造历史）；
+  点任意提交行 → `loadGitCommitDiff()` 出 diff。
+- `#git-viz-detail`：当前扩展的分支 / 提交 / 状态 + 选中提交的 author/date + 文件级 diff。
+- **删除的文案**：「工作区改动：宿主未提供只读端点」「该扩展没有登记仓库：只能看本地 Git，云端信息不猜。」
+  两条**不得**再出现（2026-11-12 用户明令）。
 
-**核心函数**：`src/core/git-viz.js`（`normalizeLocalGit` / `gitStateOf` / `mergeBranches` /
-`buildGitSummary` / `selectGitTargets` / `diffStat`）、`git-site.js`（`tagsEndpoint` / `commitDetailEndpoint` /
-`remoteFileUrl` / `normalizeCommitList` / `normalizeTags` / `normalizeCommitFiles`）、
-`host-bridge.js`（`readHostExtensionGit`）、`git-remote.js`（`listTags` / `listCommits` / `commitDetail` / `rawFile`）。
+**版本切换**：`installGitRefNow()` → `actions.installExtensions([{url:remoteUrl, branch:ref, ref, replace:true, global}])`，
+走 `queueExtMutation()` 串行；**commit SHA 不作为安装 ref**（宿主只接受分支/标签），失败按宿主原文回显。
 
-**验收**：`test/git-viz.test.js`（9）、`test/git-site-viz.test.js`（6）、`test/plugin-kind.test.js`（4）。
+**判据与降级**：`currentCommitHash` 为空 ⇒ 「历史已丢失 / 非 Git 仓库」；站点不可达 ⇒ 图区如实显示原因；
+没有 `remoteUrl` ⇒ 只显示本地信息，图区提示仓库不可达，不猜。
+
 
 ## 13. 作用域互转：全局 ⇄ 用户（2026-11-11 追加）
 
@@ -290,3 +302,15 @@ B 的 `lstat` 抛 `ENOENT` ⇒ 该扩展本次更新失败。失败项随机、�
 
 **上游修复建议**（不由本插件修改宿主源码）：`sweepStaleStaging` 的 `lstat` 加
 `try/catch`，`ENOENT` 直接 `continue`；或对同一 `parentDir` 的 sweep 加进程内互斥。
+
+## 16. 自动更新策略与 Git 清理的落点（2026-11-12）
+
+- **策略数字搬进扩展管理**：`autoUpdateMinIntervalSec` / `Max` / `Default`、失败退避、提醒等待
+  从设置弹窗移到宿主页「自动更新设置」折叠块（`extAutoPolicyBlockHtml()`）；
+  `settings-panel.js` 不再渲染或读取这些键，值经 `persistDev()` 写回，`updatePolicyOf()` 不变。
+- **Git 清理只清插件侧**（`gitCleanupBlockHtml()` / `clearPluginGitData()`）：
+  - 清 `gitInstalls`（安装登记）、`gitAutoUpdateRules`（逐扩展规则）、`state.extUpdateFail`（失败记录）；
+  - 宿主扩展目录里的 `.git` **只读展示**，插件没有删除端点，不扫描、不删除、不假装清理；
+  - 清空后 `scheduleAutoUpdates()` 重排定时器，界面立即刷新计数。
+- 泳道布局纯逻辑：`src/core/git-graph.js`（`layoutGitGraph` / `nodePoint` / `GRAPH_COLORS`），
+  验收 `test/git-graph.test.js`（6 项：线性 / 合并 / 悬空 / 重复 / 坐标）。

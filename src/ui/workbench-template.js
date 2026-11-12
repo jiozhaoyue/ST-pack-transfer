@@ -365,7 +365,8 @@ export function getWorkbenchHtml() {
           </div>
           <div class="zone-side-panel git-viz" id="zone-side-git" hidden>
             <div class="git-viz-body">
-              <div class="git-viz-list" id="git-viz-list"></div>
+              <div class="git-viz-headbar" id="git-viz-headbar"></div>
+              <div class="git-viz-graph" id="git-viz-graph"></div>
               <div class="git-viz-detail" id="git-viz-detail"></div>
             </div>
           </div>
