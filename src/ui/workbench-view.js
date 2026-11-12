@@ -2296,6 +2296,7 @@ function renderExtInstall(body){
   const rows=state.extEntries.map(entryRowHtml).join('');
   body.innerHTML='<div class="ext-install">'
     +'<label class="ext-label">'+t('extmgr.linksLabel')+'</label>'
+    +(state.mode==='web' ? '<div class="ext-note">'+t('extmgr.webInstallHint')+'</div>' : '')
     +'<div class="ext-note">'+t('extmgr.policyNote')+'</div>'
     +'<textarea id="extmgr-links" class="text_pole" rows="5" placeholder="'+t('extmgr.linksPlaceholder')+'">'+escapeHtml(state.extLinksText||'')+'</textarea>'
     +'<div class="ext-row">'
@@ -2499,7 +2500,7 @@ async function runExtInstallNow(){
       return hit?.privateHint && r.status==='failed' ? { ...r, privateHint:true } : r;
     });
     const ok=(state.extResults||[]).filter((r)=>r.status==='ok');
-    if(ok.length && !state.tutorialMode){
+    if(ok.length && !state.tutorialMode && state.mode!=='web'){
       const s=gitSettings();
       const reg=new Map((s.gitInstalls||[]).map((x)=>[x.name,x]));
       for(const r of ok){
@@ -2508,7 +2509,11 @@ async function runExtInstallNow(){
       }
       saveSettings({ ...s, gitInstalls:[...reg.values()] });
     }
-    if(ok.length && !state.tutorialMode){
+    if(ok.length && !state.tutorialMode && state.mode==='web'){
+      openModal(t('extmgr.installDoneTitle'), t('extmgr.webDoneDesc',{n:ok.length}), [], [
+        {label:t('modal.close'),primary:true,onClick:closeModal},
+      ]);
+    } else if(ok.length && !state.tutorialMode){
       openModal(t('extmgr.installDoneTitle'), t('extmgr.installDoneDesc',{n:ok.length}), [], [
         {label:t('modal.close'),onClick:closeModal},
         {label:t('action.refreshPage'),primary:true,onClick:()=>{

@@ -237,6 +237,7 @@
 | **Git 账号（多站点多账号）** | 扩展管理 → 开发者 →「Git 账号」 | `src/core/git-accounts.js`（归一/增删/默认/匹配/脱敏）；`src/ui/git-remote.js`（测试账号）；持久化在 `settings-store.js` 与 `extension_settings` |
 | **OAuth 登录（授权码 + PKCE）** | 开发者页「OAuth 登录」 | `src/core/git-oauth.js`（端点事实 / PKCE / 换 token）；`workbench-view.js` 的 `startOAuth()` / `completeOAuthFromUrl()`；待完成态存 `sessionStorage['stpt.oauth.pending']` |
 | **令牌获取指引（一页教程）** | 开发者页「令牌获取指引」→ 帮助视图 `gitToken` | `workbench-view.js` 的 `HELP.gitToken`（含站点链接与最小权限）；帮助渲染支持 `intro` / `links` |
+| **Web 形态安装扩展（写进数据包）** | 扩展管理 → 宿主页安装区（需先在数据列表勾一个导入包） | `index.js` 的 `installExtensionsIntoPackage()`：`src/core/repo-files.js` 列树 + 并发逐文件取（6 并发、20s 单请求超时、1200 文件 / 80 MB 上限）；`src/core/ext-install-web.js` 判类型与落点（ST/L `extensions/<名>/`、TT `data/default-user/extensions/<名>/`）；`augmentZip` 注入源包后另存为「(含扩展)」包 |
 | **凭据与令牌说明（四类凭据总表）** | 迁移与备份 → 公网页签 `?` → 帮助视图 `credentials` | `workbench-view.js` 的 `HELP.credentials`；覆盖 Git 令牌 / S3 / WebDAV / 存放位置；模板 `#cloud-provider-tabs` 右侧 `data-help="credentials"` |
 | **教程引导填凭据** | 扩展管理 / 迁移备份教程 | `workbench-view.js` 的 `TUTORIAL_GOALS` 中 `extTab / openAccounts / openOauth / view:'cloud' / transferTab / cloudProvider` 由 `tutorialPrepareStep()` 处理 |
 | **安装日志 = 全局日志** | 安装区 / 报告页「查看日志」 | `extLogAppend()` 写入 `state.log`；`renderExtReport()` 不再有独立日志块；报告与失败链接仍为本页独有 |

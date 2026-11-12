@@ -35,6 +35,14 @@ import {
   opfsTmpHandle, opfsHandleToFile, opfsTmpCleanup,
 } from './src/ui/host-bridge.js';
 import { packPrivateContainer } from './src/core/private-container.js';
+import { parseRepoUrl } from './src/core/git-url.js';
+import { downloadRepoFiles } from './src/core/repo-files.js';
+import {
+  classifyRepoFiles, buildInjectionEntries, extensionDirName, injectionRoot,
+} from './src/core/ext-install-web.js';
+import { detectLayout } from './src/core/detect.js';
+import { augmentZip } from './src/core/zip-augment.js';
+import { findAccountFor } from './src/core/git-accounts.js';
 import { sanitizeEngineDumpForRestore } from './src/core/engine-sanitize.js';
 import { loadPrivateFiles, addPrivateFile, removePrivateFile } from './src/ui/private-files-store.js';
 import { ORIGIN_ZONE, zoneOfOrigin, copyBackRecord } from './src/core/zone-model.js';
@@ -215,9 +223,123 @@ async function main(root) {
     void refreshStorageQuota();
   }
 
+  /**
+   * 独立 Web / 无宿主形态：把仓库文件写进当前勾选的数据包（源包），随包导出。
+   *
+   * 与宿主形态的分工：宿主形态由宿主服务端克隆进扩展目录；这里没有宿主端点可用，
+   * 因此注入源包 —— 下游 `detectFromReader` / `routeSource` / `targetEntryPath` 全部照常工作。
+   * 落点按**源包布局**决定（ST/L 摊平 `extensions/`，TT `data/default-user/extensions/`），
+   * 保证转换时能被认成扩展，而不是一堆散文件。
+   *
+   * @param {Array<{url:string,ref?:string,branch?:string,credential?:object}>} entries
+   * @param {{onEntry?:Function,onLog?:Function}} hooks
+   * @returns {Promise<Array<{url:string,branch:string,status:string,error?:string}>>}
+   */
+  async function installExtensionsIntoPackage(entries, { onEntry, onLog } = {}) {
+    const list = Array.isArray(entries) ? entries : [];
+    const results = [];
+    if (!list.length) return results;
+
+    const fail = (entry, error) => {
+      onEntry?.({ url: entry.url, branch: entry.branch || '', status: 'failed', error });
+      onLog?.(`[${new Date().toISOString()}] FAIL ${entry.url}: ${error}`);
+      results.push({ url: entry.url, branch: entry.branch || '', status: 'failed', error });
+    };
+
+    const selectedIds = [...(view.getState().selectedPkgs || [])];
+    const targetPkg = selectedIds
+      .map((id) => state.packages.find((pkg) => pkg.id === id))
+      .find((pkg) => pkg && pkg.zone === 'import');
+    if (!targetPkg) {
+      for (const entry of list) fail(entry, t('extmgr.webNoPackage'));
+      return results;
+    }
+
+    const sourceBlob = await blobOf(targetPkg);
+    if (!sourceBlob) {
+      for (const entry of list) fail(entry, t('extmgr.webNoPackage'));
+      return results;
+    }
+    let layout = 'unknown';
+    try {
+      const detected = await detectLayout(sourceBlob);
+      layout = ['st', 'l', 'tt', 'unknown'].includes(detected?.layout) ? detected.layout : 'unknown';
+      if (detected?.layout === 'pt-native') {
+        for (const entry of list) fail(entry, t('extmgr.webPtNative'));
+        return results;
+      }
+    } catch {
+      layout = 'unknown';
+    }
+
+    const injected = [];
+    for (const entry of list) {
+      const parsed = parseRepoUrl(entry.url);
+      if (!parsed?.ok) { fail(entry, 'parse'); continue; }
+      onEntry?.({ url: entry.url, branch: entry.branch || '', status: 'installing' });
+      onLog?.(`[${new Date().toISOString()}] fetch ${entry.url} (${entry.branch || 'default branch'})${entry.credential?.secret ? ' · 已注入凭据' : ''}`);
+      /* 凭据优先用调用方给的；缺失时按仓库回查账号表 —— 视图侧的匹配结果不能当作唯一来源。 */
+      let credential = entry.credential?.secret ? entry.credential : null;
+      if (!credential) {
+        const matched = findAccountFor(loadSettings().gitAccounts, parsed);
+        if (matched?.secret) {
+          credential = { kind: matched.username ? 'basic' : 'token', site: matched.site, username: matched.username, secret: matched.secret };
+        }
+      }
+      const account = credential?.secret
+        ? { site: credential.site, username: credential.username || '', secret: credential.secret }
+        : null;
+      // eslint-disable-next-line no-await-in-loop —— 逐仓库串行：单仓库可能几百个文件，且要能随时中止
+      const download = await downloadRepoFiles({
+        repo: parsed,
+        ref: entry.ref || entry.branch || '',
+        account,
+        fetchImpl: typeof fetch === 'function' ? fetch.bind(globalThis) : null,
+        onProgress: ({ done, total }) => {
+          if (done === total || done % 100 === 0) {
+            onLog?.(`[${new Date().toISOString()}] ` + t('log.webExtProgress', { repo: parsed.repo, done, total }));
+          }
+        },
+      });
+      if (!download.ok) { fail(entry, download.reason); continue; }
+      const kind = classifyRepoFiles(download.files);
+      if (!kind.ok) {
+        fail(entry, kind.reason === 'server-plugin' ? t('extmgr.webServerPlugin') : t('extmgr.webNoManifest'));
+        continue;
+      }
+      const name = extensionDirName(parsed);
+      const rows = buildInjectionEntries(download.files, name, layout);
+      if (!rows.length) { fail(entry, t('extmgr.webNoManifest')); continue; }
+      injected.push(...rows);
+      onEntry?.({ url: entry.url, branch: entry.branch || '', status: 'ok' });
+      onLog?.(`[${new Date().toISOString()}] OK ${entry.url} → ` + t('log.webExtOk', { root: injectionRoot(name, layout), n: rows.length }));
+      results.push({ url: entry.url, branch: entry.branch || '', status: 'ok' });
+    }
+
+    if (!injected.length) return results;
+    try {
+      const augmented = await augmentZip(sourceBlob, injected, {});
+      const id = `pkg-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+      const baseName = String(targetPkg.name || 'package').replace(/\.zip$/i, '');
+      const name = `${baseName} ${t('extmgr.webPackSuffix')}.zip`;
+      await saveFile({
+        id, name, size: augmented.size, blob: augmented, role: 'source', origin: ORIGINS.UPLOAD,
+        metadata: { importedAt: Date.now(), injectedExtensions: injected.length },
+      });
+      await syncPackages();
+      view.setActivePackage?.(id);
+      logger.success(t('extmgr.webInjected', { name, n: injected.length }));
+    } catch (err) {
+      logger.error(t('log.webExtInjectFail', { msg: err?.message || String(err) }));
+      for (const r of results) {
+        if (r.status === 'ok') { r.status = 'failed'; r.error = `inject: ${err?.message || err}`; }
+      }
+    }
+    return results;
+  }
+
   /** 读取包内 `_convert/extensions-manifest.json`；没有则返回空数组。只解压这一条。 */
   async function readPackageExtensionManifest(blob) {
-    if (!blob) return [];
     const reader = await zipIo.openReader(blob);
     try {
       for await (const entry of reader.entries()) {
@@ -1506,10 +1628,15 @@ async function main(root) {
         // 扩展相关入口统一收进内联「扩展管理」，不再弹浮层。
         view.openExtensionManager(pkg.extManifest);
       },
-      installExtensions: async (entries) => installExtensionBatch(entries, {
-        onEntry: (entry) => view.extEntryUpdate(entry),
-        onLog: (line) => view.extLogAppend(line),
-      }),
+      installExtensions: async (entries) => (host.platform === 'standalone'
+        ? installExtensionsIntoPackage(entries, {
+          onEntry: (entry) => view.extEntryUpdate(entry),
+          onLog: (line) => view.extLogAppend(line),
+        })
+        : installExtensionBatch(entries, {
+          onEntry: (entry) => view.extEntryUpdate(entry),
+          onLog: (line) => view.extLogAppend(line),
+        })),
       listHostExtensions: () => listHostExtensions(host.platform),
       hostIdentity: () => readHostIdentity(),
       listServerPlugins: () => listServerPlugins(),
