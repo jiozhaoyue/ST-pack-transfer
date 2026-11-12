@@ -66,6 +66,7 @@ export class Report {
   #synthesized = [];
   #resumed = [];
   #storeBypass = { count: 0, bytes: 0 };
+  #engine = null;
 
   constructor(sourceLayout, target) {
     this.#sourceLayout = sourceLayout;
@@ -143,6 +144,15 @@ export class Report {
     this.#warnings.push(message);
   }
 
+  /**
+   * 记录存储引擎互转摘要（源引擎 → 目标引擎、handle、逐表行数）。
+   * 与 warnings 分开：这是**已发生的事实**，不是问题。
+   * @param {{sourceEngine:string,targetEngine:string,handle:string,counts:object,total:number}} summary
+   */
+  setEngine(summary) {
+    this.#engine = summary;
+  }
+
   toJSON() {
     return {
       sourceLayout: this.#sourceLayout,
@@ -154,6 +164,7 @@ export class Report {
       warnings: this.#warnings,
       resumed: this.#resumed,
       storeBypass: { ...this.#storeBypass },
+      engine: this.#engine,
       totals: {
         copied: [...this.#modules.values()].reduce((sum, m) => sum + m.copied, 0),
         dropped: this.#dropped.length,

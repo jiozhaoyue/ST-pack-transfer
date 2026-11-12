@@ -9,7 +9,7 @@
  *   · 动作：`actions.*`（拉取 / 生成 / 恢复 / 复制 / 删除 / 下载 / 设置 / 关闭）
  */
 
-import { chartTreeFor, deriveExportOptions, annotateChatLinks, counterpartsOf, CHART_GROUPS } from '../core/chart-model.js';
+import { chartTreeFor, deriveExportOptions, deriveCategorySelection, annotateChatLinks, counterpartsOf, CHART_GROUPS } from '../core/chart-model.js';
 import {
   normalizeResponse, stackSegments, dotFill, maxEntrySize,
   formatSize, formatSizeOrUnknown, categoryColorClass, iconKey,
@@ -238,6 +238,8 @@ const state = {
   /* 数据包列页签：zone = 数据包，git = Git 可视化（仅开发者模式）。 */
   sideTab:'zone', gitListRequested:false, gitViz:{ name:'', loadedFor:'', loading:false, error:'', local:null, localMeta:null, branches:[], cloud:null, commits:[], tags:[], diff:null, diffLoading:false, diffError:'' },
   source:{ type:'host', pkgId:null }, target:'SillyTavern', targetManual:false,
+  /* Luker 存储引擎（'' = 跟随源包；fs/postgres/mysql/sqlite = 显式目标）。 */
+  engine:'',
   delta: 'overwrite', splitMb: chartPrefs.splitMb,
   compression: chartPrefs.compression,
   extensionMode: chartPrefs.extensionMode,
@@ -559,6 +561,11 @@ function renderTargetPicker(){
   if(hostTag){ hostTag.hidden=!isHostNow; hostTag.textContent=isHostNow?t('target.hostSuffix'):''; }
   const app=document.getElementById('app');
   if(app) app.setAttribute('data-target-host', cur.host);
+  /* 存储引擎只对 Luker 目标开放：其他宿主没有这三种后端，显示出来只会误导。 */
+  const engineField=document.getElementById('engine-field');
+  if(engineField) engineField.hidden = cur.host !== 'luker';
+  const engineSelect=document.getElementById('target-engine');
+  if(engineSelect) engineSelect.value = state.engine;
   document.getElementById('target-pop').innerHTML=TARGETS.map(opt=>{
     const isHost = state.mode!=='web' && opt.host===state.host;
     return '<button class="picker-item" role="option" data-target="'+opt.value+'" aria-selected="'+(opt.value===state.target)+'">'
@@ -4799,6 +4806,11 @@ function bind(){
     compressionSelect.value=state.compression;
     compressionSelect.addEventListener('change',e=>{ state.compression=e.target.value; });
   }
+  const engineSelect=document.getElementById('target-engine');
+  if(engineSelect){
+    engineSelect.value=state.engine;
+    engineSelect.addEventListener('change',e=>{ state.engine=e.target.value; });
+  }
   const filenameInput=document.getElementById('filename-template');
   if(filenameInput){
     filenameInput.value=state.filenameTemplate;
@@ -5262,17 +5274,25 @@ initChartSplitters();
 
   function getExportOptions(pkg) {
     const scope = 'pkg:' + pkg.id;
-    return deriveExportOptions({
-      nodes: packageNodes(pkg).nodes,
-      isChecked: (n) => isChecked(n, scope),
+    const nodes = packageNodes(pkg).nodes;
+    const checked = (n) => isChecked(n, scope);
+    const opts = deriveExportOptions({
+      nodes,
+      isChecked: checked,
       ui: {
         compression: state.compression,
         extensionMode: extensionManifestOnly(pkg, scope) ? EXTENSION_MODES.MANIFEST : state.extensionMode,
         gitMode: packageGitMode(pkg),
         keepDev: state.keepDev,
         target: state.target,
+        engine: state.engine,
       },
     });
+    // 引擎侧数据不受 excludedPaths 约束：只有选了引擎时，才把类目勾选一并带上，
+    // 否则取消勾选的聊天/预设仍会被写进转储（数据正确性优先）。
+    // 图表为空（未建树 / 扫描失败）时不带选择项——否则「一棵空的树」会把全部行过滤掉。
+    if (opts.engine && nodes.length) opts.selection = deriveCategorySelection({ nodes, isChecked: checked });
+    return opts;
   }
 
   /* ── 渲染：本次待导出（内存队列，不入库） ── */
