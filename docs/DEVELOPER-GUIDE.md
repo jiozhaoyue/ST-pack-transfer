@@ -386,6 +386,7 @@
 | 空间不足优先隐藏占用可视化 | `initChartTight()` + `.vol-card.is-tight` | 卡片可视区**高 < 190 或宽 < 300** 时隐藏 `.vol-chart`（体积环/条），标题、勾选列表保持可用；用 ResizeObserver + MutationObserver（rAF 合帧）跟随渲染与拖动 |
 | 每次打开进入教程模式 | `src/ui/settings-panel.js`（`autoTutorial`，默认 true）、`index.js`、`src/ui/workbench-view.js` | 默认开；启动即进入教程（不再用 sessionStorage 拦）。教程浮层新增「不再弹出」= 持久化 `autoTutorial=false` |
 | 视图切换行**绝不换行** | `renderViewSwitch()` / `applySwitchDensity()` / `initSwitchDensity()`；`style.css` 的 `.view-switch.is-icon-only` | 行内 `flex-wrap:nowrap`；量出「带文字」宽度溢出即整行退化为纯图标（保留 `aria-label`/`title` 可读），不横向滚动、不换行 |
+| 响应式**美观优先** | `.trellis/spec/frontend/responsive-and-aesthetics.md` | 宁可不塞也不压扁/裁切：换行/堆叠/滚动 → 整块隐藏 → 纯图标；禁止 shrink-to-clip、禁止裁掉功能性文案 |
 
 > 两个新控件 `#target-engine`、`#tutorial-never` 已同步 `REQUIRED_TEMPLATE_IDS` 与 `CONTROL_CONSUMERS`。
 

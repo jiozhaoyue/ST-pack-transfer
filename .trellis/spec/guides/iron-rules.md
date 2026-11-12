@@ -27,3 +27,5 @@
 20. **检索门禁**：本会话未完成 Web/GitHub 检索前，search-gate 拦截实现类写操作；规划目录 `.trellis/`、`docs/`、`tasks/` 与只读操作放行；紧急禁用 `TRELLIS_SEARCH_GATE=0`。
 21. **本地专属目录永不入库**（2026-11-05 用户明令）：`test/` `e2e/` `scripts/` `fixtures/` **绝对不纳入版本控制**、**绝不上传到任何云端仓库**（含 S3 包仓库）；禁止 `git add -f` 强制加入。判据：`git ls-files test e2e scripts fixtures` 恒为空。
 22. **文档与 README 同步**（2026-11-11 用户明令）：每次功能更新 / 行为变更，必须在**同一次提交内**同步更新 `docs/DEVELOPER-GUIDE.md` 与 `README.md`；判据：`git diff` 中改动的 `src/` 文件必须在两份文档里有对应条目或读法更新，只改代码不改文档视为未完成。
+23. **实例实测一律 Playwright 无头 · 后台**（2026-11-12 用户明令）：Dev 实例（尤其 Dev Luker）的界面实测必须用 **Playwright 无头浏览器**完成，走 `e2e/` 的库 API（`lib/resolve-playwright` 解析本机全局，**不新装包**），**后台运行**、不得弹出前台窗口、不占用前台浏览器面板；读数与截图落盘后再汇报。
+24. **响应式美学铁律**（2026-11-12 用户明令）：任何响应式都**不得**产生不美观的响应；美观优先，**不为塞下而硬做，也不能显示不全**。允许的退让只有「换行 / 堆叠 / 容器滚动 → 整块隐藏次要信息 → 纯图标（带 aria-label/title）」；**禁止**压扁控件、缩小字号硬塞、`line-clamp` 裁掉功能性文案、固定高度内裁切。判据见 `.trellis/spec/frontend/responsive-and-aesthetics.md`。
