@@ -13,6 +13,10 @@
 4. **handle 必须正确**：上游恢复不改写 dump 里的 handle（`users-private.js:820-830`），
    所以写 db/sqlite 目标时必须把 handle 落到 meta 与每一行；拿不到 handle 就拒绝，不猜。
 5. **FS 目标以数据库为真值**：源包里的引擎管理磁盘文件视为陈旧，一律由行重建。
+6. **跨宿主一律走「中转」**（用户 2026-11-12 裁定「减少独立方式」）：目标不是 Luker 时，
+   先由行生成**文件形态**，再复用主循环同一个 `targetEntryPath()` 落到目标布局
+   （TT/PT → `data/default-user/`，`stats.json` 等 Luker 私有件进 `_compat/luker/`）。
+   **不得**为某个宿主另写一套引擎映射分支。
 
 ## 2. 数据结构（与上游逐一对应）
 

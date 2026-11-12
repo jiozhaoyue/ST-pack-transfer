@@ -1216,6 +1216,8 @@ function chartCanvasHtml(defs){
     if(n > 2*(r+1)+1) {
       html += '<div class="chart-split-h" data-split="row" data-gap="'+r+'" role="separator" aria-orientation="horizontal" title="'+t('chart.dragRow')+'" style="grid-column:3;grid-row:'+(2*r+2)+'"></div>';
     }
+    // 十字交界：横竖分隔条交叉点，可一次同时拖动列宽与该行高度（所有交叉点都要有）。
+    html += '<div class="chart-split-x" data-split="both" data-gap="'+r+'" role="separator" title="'+t('chart.dragBoth')+'" style="grid-column:2;grid-row:'+(2*r+2)+'"></div>';
   }
   defs.forEach((d,i)=>{
     const r = Math.floor(i/2);
@@ -5072,6 +5074,11 @@ function bind(){
   });
 
   document.getElementById('tutorial-skip').addEventListener('click',hideTutorialOverlay);
+  /* 「不再弹出」= 同时取消设置项「每次打开进入教程模式」，下次启动不再自动进入。 */
+  document.getElementById('tutorial-never')?.addEventListener('click',()=>{
+    try { saveSettings({ ...loadSettings(), autoTutorial: false }); } catch { /* 非持久化环境 */ }
+    hideTutorialOverlay();
+  });
   document.getElementById('tutorial-goals')?.addEventListener('click',(e)=>{
     const b=e.target.closest('[data-tutgoal]'); if(!b) return;
     const g=TUTORIAL_GOALS.find((x)=>x.id===b.dataset.tutgoal);
@@ -5153,34 +5160,62 @@ function initChartSplitters(){
     drag={ kind:bar.dataset.split, gap:Number(bar.dataset.gap)||0, canvas, bar };
     bar.classList.add('is-dragging');
     try { bar.setPointerCapture(e.pointerId); } catch { /* 老浏览器 */ }
-    document.body.style.cursor = drag.kind==='col' ? 'col-resize' : 'row-resize';
+    document.body.style.cursor = drag.kind==='col' ? 'col-resize' : (drag.kind==='row' ? 'row-resize' : 'move');
     e.preventDefault();
   });
   stack.addEventListener('pointermove',e=>{
     if(!drag) return;
     const { kind, gap, canvas } = drag;
     const rect = canvas.getBoundingClientRect();
-    if(kind==='col'){
+    const applyCol=()=>{
       const col=Math.max(0.2, Math.min(0.8, (e.clientX-rect.left)/rect.width));
       state.chartLayout.col=col;
       canvas.style.gridTemplateColumns='minmax(0,'+col+'fr) 6px minmax(0,'+(1-col)+'fr)';
-      return;
-    }
-    const count=Math.max(2, Number(canvas.dataset.rows)||2);
-    const rows=layoutRowRatios(count);
-    const usable=Math.max(1, rect.height - 6*(count-1));
-    let start=0;
-    for(let i=0;i<gap;i++) start += rows[i]*usable + 6;
-    const pair=rows[gap]+rows[gap+1];
-    let first=(e.clientY-rect.top-start)/usable;
-    first=Math.max(0.15, Math.min(pair-0.15, first));
-    rows[gap]=first;
-    rows[gap+1]=pair-first;
-    state.chartLayout.rows=rows;
-    canvas.style.gridTemplateRows=rows.map(r=>'minmax(0,'+r+'fr)').join(' 6px ');
+    };
+    const applyRow=()=>{
+      const count=Math.max(2, Number(canvas.dataset.rows)||2);
+      const rows=layoutRowRatios(count);
+      const usable=Math.max(1, rect.height - 6*(count-1));
+      let start=0;
+      for(let i=0;i<gap;i++) start += rows[i]*usable + 6;
+      const pair=rows[gap]+rows[gap+1];
+      let first=(e.clientY-rect.top-start)/usable;
+      first=Math.max(0.15, Math.min(pair-0.15, first));
+      rows[gap]=first;
+      rows[gap+1]=pair-first;
+      state.chartLayout.rows=rows;
+      canvas.style.gridTemplateRows=rows.map(r=>'minmax(0,'+r+'fr)').join(' 6px ');
+    };
+    if(kind==='col'){ applyCol(); return; }
+    if(kind==='row'){ applyRow(); return; }
+    // 十字交界：一次同时改列宽与该行高度
+    applyCol();
+    applyRow();
   });
   stack.addEventListener('pointerup',stop);
   stack.addEventListener('pointercancel',stop);
+}
+
+/* ── 图表卡片「空间不够」判定：优先隐藏占用可视化，保留标题与勾选 ── */
+function initChartTight(){
+  const stack=document.getElementById('chart-stack');
+  if(!stack || typeof ResizeObserver==='undefined') return;
+  let raf=0;
+  const apply=()=>{
+    raf=0;
+    stack.querySelectorAll('.vol-card').forEach(card=>{
+      const tight = card.clientHeight < 190 || card.clientWidth < 300;
+      card.classList.toggle('is-tight', tight);
+    });
+  };
+  const schedule=()=>{ if(!raf) raf=requestAnimationFrame(apply); };
+  const ro=new ResizeObserver(schedule);
+  const observe=()=>stack.querySelectorAll('.vol-card').forEach(c=>ro.observe(c));
+  observe();
+  if(typeof MutationObserver!=='undefined'){
+    new MutationObserver(observe).observe(stack,{ childList:true, subtree:true });
+  }
+  schedule();
 }
 
 /* ── 初始化（视图自有，不依赖外部数据） ── */
@@ -5189,6 +5224,7 @@ bind();
 syncTopControls();
 initSplitters();
 initChartSplitters();
+initChartTight();
 
   /* ── 对外 API ── */
   function renderAll() {

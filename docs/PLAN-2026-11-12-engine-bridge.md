@@ -167,6 +167,17 @@
    没有则先用合成固件，真机取证延后。
 3. **db 模式验证实例**：允许临时启动一次 db 模式 Luker 做取证吗（仅读日志、不改数据）？
 
+## 十二、同日追加需求（用户 2026-11-12 中途指令）
+
+| # | 需求 | 实现 | 判据 |
+| --- | --- | --- | --- |
+| A1 | **跨宿主**：Luker 的数据库形态也要能转成其它宿主的文件形态 | `transform.js` 对非 L 目标自动以 `targetEngine='fs'` 规划；`engine-bridge` 新增 `mapPath`（走 `targetEntryPath`），TT/PT 落 `data/default-user/` | 单测「PG 源 → TT 目标」：产物含 `data/default-user/settings.json`（值为 dump 内容）、无 `_engine_dump.bin` |
+| A2 | 多图表十字交界中心点可拖动，所有十字线都可 | `chartCanvasHtml()` 新增 `.chart-split-x[data-split="both"]`；`initChartSplitters()` 一次同时改列宽与该行高度 | 指针在交叉点显示 `move`，拖动同时改变列宽与行高；`.chart-split-x` 每个行间隙一个 |
+| A3 | 空间不够优先隐藏图表的占用可视化 | `initChartTight()`（ResizeObserver + MutationObserver，rAF 合帧）+ `.vol-card.is-tight .vol-chart{display:none}` | 卡片高度 < 190 或宽度 < 300 时体积环/条消失，标题与勾选保持 |
+| A4 | 设置项「每次打开进入教程模式」默认勾选；浮层加「不再弹出」 | `settings.autoTutorial` 默认 true；`index.js` 去掉 sessionStorage 拦截；浮层新增 `#tutorial-never` → 持久化 false | 启动即进入教程；点「不再弹出」后重启不再自动进入 |
+
+> A2/A3/A4 的控件与守卫同步：`#target-engine`、`#tutorial-never` 已登记 `REQUIRED_TEMPLATE_IDS` 与 `CONTROL_CONSUMERS`。
+
 ## 十一、证据与引用
 
 - 上游：`funnycups/Luker`（`Instance/Dev/Luker`，`luker` remote），文件与行号见 §一。
