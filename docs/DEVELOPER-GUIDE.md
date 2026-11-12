@@ -80,7 +80,7 @@
 
 | 功能 | UI 入口 | 源码落点 |
 | --- | --- | --- |
-| 从当前宿主拉取整份用户数据 | 数据包模式行 `#btn-fetch`（**仅导入分区**）/ 宿主原生界面注入按钮 | `index.js` 的 `fetchFromHost()` / `pullFromNativeUi()`；`src/ui/host-bridge.js` 的 `openNativeBackupUi()` / `fetchHostBackup()` |
+| 从当前宿主拉取整份用户数据 | 恢复模式行 `#btn-fetch`（**仅导入分区**）/ 宿主原生界面注入按钮 | `index.js` 的 `fetchFromHost()` / `pullFromNativeUi()`；`src/ui/host-bridge.js` 的 `openNativeBackupUi()` / `fetchHostBackup()` |
 | 迁移与备份 / 导出扩展清单 | 面板头切换行 `[data-wbview="transfer"]`（☁️）/ 扩展管理 → 宿主页 | `src/ui/workbench-view.js` 的 `renderViewSwitch()`（transfer 项）/ `renderExtInstalled()` |
 | **Luker 2.9+ 账户窗口**（备份页注入 / 勾选读取；存储页跳转能力保留但**配额行已改走自建面板**） | 账户 → Backup / Storage | `openHostAccountWindow()` / `openHostStoragePage()` / `readNativeBackupSelection()`；契约见 `.trellis/spec/frontend/luker-2.9-account-window.md` |
 | **原生界面生命周期**（拉取后自动关闭、宿主原生导出优先） | 原生界面「从宿主拉取」 | `closeNativeBackupUi()` / `isNativeExportBusy()` / `watchNativeExportStart()`；契约见 `.trellis/spec/frontend/host-native-pull-lifecycle.md` |
@@ -168,7 +168,7 @@
 | 结构化实时日志（**按条目类型多选筛选**：INFO / WARN / ERROR / SUCCESS，默认四类全选；类型按钮自带条数；毫秒时间戳 / 条数上限 / 加载时清空） | `src/ui/workbench-view.js` 的 `renderLog()` / `nowTime()` / `logLimit()`；筛选状态 `state.logLevels`（Set）；`test` 外无独立模块 |
 | 存储配额两行（浏览器 / 宿主）：两行都打开**同一个存储审查面板**（占满内容区），面板内可切换数据源；初始来源 = 点击的那一行。只读 | `src/ui/workbench-view.js` 的 `renderQuota()` / `renderStorageInspector()` / `openStorageInspector()` / `siRequest()`；`src/core/storage-inspector-model.js`（纯逻辑）；`src/ui/storage-inspector-browser.js`（浏览器 provider）；`index.js` 的 `actions.storageInspector`；`src/ui/host-bridge.js` 的 `fetchHostStorageInspect()` / `hostStorageInspectCapability()`。契约见 [HANDOFF-2026-11-11-storage-inspector.md](./HANDOFF-2026-11-11-storage-inspector.md) |
 | 教程演示模式（占位数据可操作；退出整体还原；不写真实数据/宿主） | `#btn-guide` / 教程菜单 / `#tutorial-banner-exit` | `src/ui/workbench-view.js` 的 `enterTutorialMode()` / `exitTutorialMode()` / `demoTutorialActions()` / `buildDemoPackages()`；模板 `#tutorial-banner` |
-| 目标任务式教程（选目标 → 逐步高亮；按平台与桌面/手机视图自适应；目标缺失时卡片居中保留） | `#btn-guide` → 目标菜单 | `src/ui/workbench-view.js` 的 `TUTORIAL_GOALS` / `renderTutorial()` / `tutorialPrepareStep()` / `centerTutorialCard()` |
+| 目标任务式教程（选目标 → 逐步高亮；按平台与桌面/手机视图自适应；目标缺失时卡片居中保留；扩展 / 迁移目标会引导填凭据） | `#btn-guide` → 目标菜单 | `src/ui/workbench-view.js` 的 `TUTORIAL_GOALS` / `renderTutorial()` / `tutorialPrepareStep()` / `centerTutorialCard()` |
 | 宿主配额读数（Luker `RestProvider`，供配额行） | `src/ui/host-bridge.js` 的 `readHostStorageQuota()`；面板内的逐层读取走 `fetchHostStorageInspect()` |
 | 导出扩展资产列表（官方扁平 JSON，可导入「下载扩展和资源菜单」） | 每张图表卡 `[data-assetlist]`；扩展管理 → 宿主页工具条 `#extmgr-export-assetlist`（空态不再提供入口） | `src/core/asset-list.js`、`src/ui/host-bridge.js` 的 `listHostExtensions()`、`index.js` 的 `exportPackageAssetList()` / `exportHostAssetList()`；契约见 `.trellis/spec/frontend/asset-list-export.md` |
 | 设置分组可收起（提示 / 导出 / 日志） | `src/ui/settings-panel.js` 的 `buildSettingsHtml()`（三个 `<details>`） |
@@ -201,7 +201,7 @@
 | 功能 | UI 入口 | 源码落点 |
 | --- | --- | --- |
 | 视图切换（桌面 2 / 手机 3；桌面数据包列常显） | 各面板头内 `[data-view-switch]`（图表 / 扩展管理 / 数据包；手机上一行切换、下一行原面板按钮） | `src/ui/workbench-view.js` 的 `renderViewSwitch()` / `syncMainView()` |
-| 扩展管理整面板（宿主 / 凭据 / 打包） | `#extension-view` | 同文件的 `renderExtensionView()` / `renderExtInstalled()` / `renderExtCredentials()` / `renderExtPack()` |
+| 扩展管理整面板（宿主 / 开发者 / 打包） | `#extension-view` | 同文件的 `renderExtensionView()` / `renderExtInstalled()` / `renderExtCredentials()` / `renderExtPack()` |
 | **报告常驻底部（不随页签）** | `#extmgr-report-bar` / `#extmgr-report-panel` | `renderExtensionView()` 的展开逻辑 + `renderExtReport()`；展开时隐藏 `#extension-body` |
 | **插件数据导入导出 JSON** | 设置 → 数据 | `src/ui/plugin-data.js` 的 `buildPluginData()` / `applyPluginData()`；凭据需勾选，OAuth 需再勾一次；导入后重载 |
 | 批量安装（多行链接 / `.txt` / `.json`；`url \| 分支`、`url#分支`） | 宿主页底部「安装扩展」折叠区（`#extmgr-install-block`，默认收起） | 同文件的 `parseExtEntries()` / `renderExtInstall()` / `refreshInstallArea()`；执行端 `src/ui/host-bridge.js` 的 `installExtensionBatch()` |
@@ -225,19 +225,21 @@
 | 整窗口铺满（桌面与窄屏一致）/ 选择锁 | `#app` 两种视图都占 100vw×100vh、零圆角；除日志与输入框外不可选 | `style.css` 的 `#app.app-container:not([data-view="mobile"])` 与 `[data-view="mobile"]` 两条容器规则、`user-select` 例外块；窄屏图表列/卡片用 `flex:1 0 auto`（可增不可缩）拉伸填满，树不限高以免压住底部汇总条 |
 | 切换行顺序（迁移与备份在扩展管理前） | 各面板头 `[data-view-switch]` | `workbench-view.js` 的 `renderViewSwitch()` 项序 |
 | 教程跳过 / 重新打开 | 浮层「跳过」、横幅「重新打开教程」 | `hideTutorialOverlay()`（只关浮层）与 `#tutorial-banner-reopen` → `openTutorial()` |
-| 开发者页签 / 宿主列表 / 安装页脚 | 扩展管理 | 宿主页顶部 `ext-toolbar`（按钮 + 排序）、列表头 `ext-list-head`（数量 + 自动更新勾选组）、可拖拽排序行；安装扩展是面板**固定页脚** `#extmgr-install-block`（`renderExtInstalled()` / `syncExtInstallBlock()`），紧贴安装报告条 |
+| 宿主页 / 宿主列表 / 安装页脚 | 扩展管理 | 宿主页顶部 `ext-toolbar`（按钮 + 排序）、列表头 `ext-list-head`（数量 + 自动更新勾选组）、可拖拽排序行；安装扩展是面板**固定页脚** `#extmgr-install-block`（`renderExtInstalled()` / `syncExtInstallBlock()`），紧贴安装报告条 |
 | **扩展作用域互转（全局 ⇄ 用户）** | 扩展管理 → 宿主页每行「移至全局 / 移至用户」（**仅管理员**渲染） | 宿主 `POST /api/extensions/move`；`src/ui/host-bridge.js` 的 `moveExtensionViaHost()`、`src/ui/workbench-view.js` 的 `moveScopeWithConfirm()` / `moveInstalledExtension()`；`index.js` 的 `actions.moveExtension` |
 | **扩展作用域与同名去重（四宿主）** | 转出的包对同一扩展只保留一份 | `src/core/transform.js` 的 `extensionScopeOf()`（五形态分类）/ `routeSource()`（返回 `extScope`）/ `targetEntryPath(hub, target, extScope)`；`public/scripts/extensions/third-party/` 是 ST/Luker **全局**扩展在包内的真实路径（宿主常量 `globalExtensions`）；`public/scripts/extensions/<内置>/` 判为 `builtin-ext` **剥离**；同名按宿主语义**保留用户级**（ST/Luker `discover` 源码注释：conflict 时从 user 目录加载；TT 同 local 优先）；PT 无用户级目录 ⇒ 迁 `data/extensions/third-party/` 并补 `extension-sources/<scope>/`。UI 汇总条与行内标注读 `plan.extensionScopes` |
 | **安装到全局** | 扩展管理 → 宿主页安装区「安装到全局」（**仅管理员**可见） | `src/ui/host-bridge.js` 的 `installExtensionBatch()` 透传 `global` 给 `installExtensionViaHost()`；`workbench-view.js` 的 `renderExtInstall()` / `runExtInstall()` |
 | **加载顺序只读展示** | 扩展列表 `#N` 徽标 + 排序「加载顺序」；**不提供编辑**（宿主无写回端点） | `src/core/asset-list.js` 的 `manifestToExtension().loadingOrder`；`workbench-view.js` 的 `installedRowRecords()` / `sortedInstalledRecords()` |
 | **扩展写操作全串行（规避宿主 staging 竞态）** | 扩展管理任意写操作：安装 / 更新 / 卸载 / 重装 / 移动；手动、批量、自动更新共用一条队列 | `src/ui/workbench-view.js` 的 `queueExtMutation()`；宿主竞态取证与上游修复建议见 `.trellis/spec/frontend/extension-git-manager.md` §15、`docs/research/luker-staging-race-2026-11-11.md` |
 | 演示占位扩展读数据模块 | 教程模式宿主列表 | `src/data/demo-extensions.js`（GitHub `st` 前缀仓库生成；**必须是 ESM 而不是 JSON**，否则浏览器直装整图失败——见 K2 段落与 2026-11-11 事故记录） |
-| 凭据双写（导出不必回读 settings.json） | 设置 → 数据 / 扩展管理 → 凭据 | `src/ui/settings-store.js` 的 `saveSettings()`：localStorage 与宿主 `extension_settings` 始终同写 |
+| 凭据双写（导出不必回读 settings.json） | 设置 → 数据 / 扩展管理 → 开发者 | `src/ui/settings-store.js` 的 `saveSettings()`：localStorage 与宿主 `extension_settings` 始终同写 |
 | 导出默认值（登录凭据默认勾选、OAuth 子项默认不勾） | 设置 → 数据 | `src/ui/settings-panel.js` 的 `dataGroup`；`src/ui/plugin-data.js` 的 `buildPluginData()` |
-| **Git 账号（多站点多账号）** | 扩展管理 → 安装页「Git 账号」 | `src/core/git-accounts.js`（归一/增删/默认/匹配/脱敏）；`src/ui/git-remote.js`（测试账号）；持久化在 `settings-store.js` 与 `extension_settings` |
-| **OAuth 登录（授权码 + PKCE）** | 账号区「OAuth 登录」 | `src/core/git-oauth.js`（端点事实 / PKCE / 换 token）；`workbench-view.js` 的 `startOAuth()` / `completeOAuthFromUrl()`；待完成态存 `sessionStorage['stpt.oauth.pending']` |
-| **令牌获取指引（一页教程）** | 账号区「令牌获取指引」→ 帮助视图 `gitToken` | `workbench-view.js` 的 `HELP.gitToken`（含站点链接与最小权限）；帮助渲染支持 `intro` / `links` |
-| **安装日志 = 全局日志** | 安装页 / 报告页「查看日志」 | `extLogAppend()` 写入 `state.log`；`renderExtReport()` 不再有独立日志块；报告与失败链接仍为本页独有 |
+| **Git 账号（多站点多账号）** | 扩展管理 → 开发者 →「Git 账号」 | `src/core/git-accounts.js`（归一/增删/默认/匹配/脱敏）；`src/ui/git-remote.js`（测试账号）；持久化在 `settings-store.js` 与 `extension_settings` |
+| **OAuth 登录（授权码 + PKCE）** | 开发者页「OAuth 登录」 | `src/core/git-oauth.js`（端点事实 / PKCE / 换 token）；`workbench-view.js` 的 `startOAuth()` / `completeOAuthFromUrl()`；待完成态存 `sessionStorage['stpt.oauth.pending']` |
+| **令牌获取指引（一页教程）** | 开发者页「令牌获取指引」→ 帮助视图 `gitToken` | `workbench-view.js` 的 `HELP.gitToken`（含站点链接与最小权限）；帮助渲染支持 `intro` / `links` |
+| **凭据与令牌说明（四类凭据总表）** | 迁移与备份 → 公网页签 `?` → 帮助视图 `credentials` | `workbench-view.js` 的 `HELP.credentials`；覆盖 Git 令牌 / S3 / WebDAV / 存放位置；模板 `#cloud-provider-tabs` 右侧 `data-help="credentials"` |
+| **教程引导填凭据** | 扩展管理 / 迁移备份教程 | `workbench-view.js` 的 `TUTORIAL_GOALS` 中 `extTab / openAccounts / openOauth / view:'cloud' / transferTab / cloudProvider` 由 `tutorialPrepareStep()` 处理 |
+| **安装日志 = 全局日志** | 安装区 / 报告页「查看日志」 | `extLogAppend()` 写入 `state.log`；`renderExtReport()` 不再有独立日志块；报告与失败链接仍为本页独有 |
 | **凭据存储位置（服务端 / 仅浏览器）** | 账号区单选项 | `settings-panel.js` 的 `gitCredentialStorage`；`settings-store.js` 的 `saveSettings()` 在 browser 模式写回空的 `gitAccounts` 覆盖服务端副本 |
 | **URL 归一（含 `/tree/<ref>`）** | 安装条目行 | `src/core/git-url.js` 的 `parseRepoUrl()` / `refineRefWithBranches()`；仓库页地址必须解析成「根 + ref」——宿主用 URL 最后一段做目录名 |
 | **分支列举 / 仓库摘要 / 私有预检** | 条目行「列分支」与解析后自动预检 | `src/core/git-site.js`（端点/鉴权/归一）+ `src/ui/git-remote.js`（有界超时 fetch） |

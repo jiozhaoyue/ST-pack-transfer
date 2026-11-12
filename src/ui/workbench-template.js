@@ -192,6 +192,7 @@ export function getWorkbenchHtml() {
               <button type="button" class="seg-btn active" data-cloud-provider="s3">S3</button>
               <button type="button" class="seg-btn" data-cloud-provider="webdav">WebDAV</button>
             </div>
+            <button class="help-btn" data-help="credentials" data-i18n-title="cloud.credentialsHelp">?</button>
           </div>
           <div class="cloud-body" id="cloud-mode-row">
             <div class="cloud-grid">

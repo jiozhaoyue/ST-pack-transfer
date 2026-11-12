@@ -232,7 +232,7 @@ const state = {
   host:'luker', mode:'plugin', view:'desktop', mainView:'chart', mobileView:'chart', pane:'workbench', zone:'import',
   extTab:'host', extEntries:[], extResults:[], extRunning:false, extInstalled:null, extManifestPrefill:[],
   extReportOpen:false, extInstallOpen:false, extInstallGlobal:false, settingsDraft:null,
-  extAccountTests:[], extUpdate:null, extAccountsOpen:false,
+  extAccountTests:[], extUpdate:null, extAccountsOpen:false, extOauthOpen:false,
   /* 服务端插件清单（仅管理员）：null = 未读取；[] = 已读取但为空。 */
   extServerPlugins:null, extHostAdmin:false, extServerOpen:true,
   /* 数据包列页签：zone = 数据包，git = Git 可视化（仅开发者模式）。 */
@@ -2170,7 +2170,7 @@ function accountRowHtml(acc){
   +'</div>';
 }
 function oauthHtml(){
-  return '<details class="ext-oauth" data-extoauth>'
+  return '<details class="ext-oauth" data-extoauth'+(state.extOauthOpen?' open':'')+'>'
     +extSummaryHtml(t('extmgr.oauthTitle'))
     +'<div class="ext-note">'+t('extmgr.oauthNote')+'</div>'
     +'<div class="ext-row oauth-redirect-row">'
@@ -2400,6 +2400,8 @@ function renderExtInstall(body){
 function bindAccounts(body){
   const box=body.querySelector('[data-extaccounts]');
   box?.addEventListener('toggle',()=>{ state.extAccountsOpen=!!box.open; });
+  const oauthBox=body.querySelector('[data-extoauth]');
+  oauthBox?.addEventListener('toggle',()=>{ state.extOauthOpen=!!oauthBox.open; });
   body.querySelectorAll('[data-accstorage]').forEach((el)=>{
     el.addEventListener('change',()=>{
       if(!el.checked) return;
@@ -4166,7 +4168,14 @@ function openTrafficModal(onConfirm, { enabled = true, onNever, onCancel } = {})
     { title:'help.gitToken.giteaTitle', points:['help.gitToken.giteaP1','help.gitToken.giteaP2'] },
     { title:'help.gitToken.securityTitle', points:['help.gitToken.securityP1','help.gitToken.securityP2','help.gitToken.securityP3'] },
   ]},
-  log:{ title:'help.log.title', points:['help.log.p1','help.log.p2','help.log.p3'] }
+  log:{ title:'help.log.title', points:['help.log.p1','help.log.p2','help.log.p3'] },
+  credentials:{ title:'help.credentials.title', intro:'help.credentials.intro', sections:[
+    { title:'help.credentials.gitTitle', points:['help.credentials.gitP1','help.credentials.gitP2','help.credentials.gitP3','help.credentials.gitP4'],
+      links:[{href:'https://github.com/settings/personal-access-tokens/new',label:'help.gitToken.githubOpen'},{href:'https://gitlab.com/-/user_settings/personal_access_tokens',label:'help.gitToken.gitlabOpen'},{href:'https://gitee.com/profile/personal_access_tokens',label:'help.gitToken.giteeOpen'}] },
+    { title:'help.credentials.s3Title', points:['help.credentials.s3P1','help.credentials.s3P2','help.credentials.s3P3'] },
+    { title:'help.credentials.webdavTitle', points:['help.credentials.webdavP1','help.credentials.webdavP2','help.credentials.webdavP3'] },
+    { title:'help.credentials.storageTitle', points:['help.credentials.storageP1','help.credentials.storageP2','help.credentials.storageP3','help.credentials.storageP4'] },
+  ]},
 };
 function closeHelp(){
   const title=document.getElementById('help-title');
@@ -4489,15 +4498,23 @@ const TUTORIAL_GOALS=[
     steps:[
       { sel:'#chart-card [data-view-switch]', view:'chart', title:'tutorial.ext.entry', desc:'tutorial.ext.entryDesc' },
       { sel:'#extmgr-tabs', view:'extension', title:'tutorial.ext.tabs', desc:'tutorial.ext.tabsDesc' },
-      { sel:'#extension-body', view:'extension', title:'tutorial.ext.install', desc:'tutorial.ext.installDesc' }
+      { sel:'#extension-body', view:'extension', title:'tutorial.ext.install', desc:'tutorial.ext.installDesc' },
+      { sel:'#extmgr-tabs [data-exttab="cred"]', view:'extension', extTab:'cred', title:'tutorial.ext.cred', desc:'tutorial.ext.credDesc' },
+      { sel:'[data-extaccounts]', view:'extension', extTab:'cred', openAccounts:true, title:'tutorial.ext.account', desc:'tutorial.ext.accountDesc' },
+      { sel:'[data-tokenguide]', view:'extension', extTab:'cred', openAccounts:true, openOauth:true, title:'tutorial.ext.token', desc:'tutorial.ext.tokenDesc' },
+      { sel:'[data-extaccounts]', view:'extension', extTab:'cred', openAccounts:true, title:'tutorial.ext.storage', desc:'tutorial.ext.storageDesc' }
     ]
   },
   {
     id:'transfer', label:'tutorial.goal.transfer', note:'tutorial.goal.transferNote',
     steps:[
       { sel:'#chart-card .view-switch-btn[data-wbview="transfer"]', view:'chart', title:'tutorial.transfer.entry', desc:'tutorial.transfer.entryDesc' },
-      { sel:'#transfer-tabs', view:'chart', title:'tutorial.transfer.tabs', desc:'tutorial.transfer.tabsDesc' },
-      { sel:'#transfer-view .help-btn[data-help="transfer"]', view:'chart', title:'tutorial.transfer.help', desc:'tutorial.transfer.helpDesc' },
+      { sel:'#transfer-tabs', view:'cloud', transferTab:'cloud', title:'tutorial.transfer.tabs', desc:'tutorial.transfer.tabsDesc' },
+      { sel:'#cloud-provider-tabs', view:'cloud', transferTab:'cloud', title:'tutorial.transfer.cloud', desc:'tutorial.transfer.cloudDesc' },
+      { sel:'#cloud-s3-pane', view:'cloud', transferTab:'cloud', cloudProvider:'s3', title:'tutorial.transfer.cred', desc:'tutorial.transfer.credDesc' },
+      { sel:'#webdav-body', view:'cloud', transferTab:'cloud', cloudProvider:'webdav', title:'tutorial.transfer.cred', desc:'tutorial.transfer.credDesc' },
+      { sel:'#transfer-view .help-btn[data-help="transfer"]', view:'cloud', transferTab:'cloud', title:'tutorial.transfer.help', desc:'tutorial.transfer.helpDesc' },
+      { sel:'#cloud-view .help-btn[data-help="credentials"]', view:'cloud', transferTab:'cloud', title:'tutorial.transfer.credGuide', desc:'tutorial.transfer.credGuideDesc' }
     ]
   }
 ];
@@ -4513,11 +4530,24 @@ function tutorialPrepareStep(step){
   if(!step) return;
   const view = step.view || tutorialGuessView(step.sel);
   let changed = false;
-  if(state.transfer.open){ state.transfer.open=false; changed=true; }
-  if(view==='extension'){
+  /* 云端凭据步骤必须让迁移面板保持打开；其余步骤先关掉它，免得遮挡目标。 */
+  if(state.transfer.open && view!=='cloud'){ state.transfer.open=false; changed=true; }
+  if(view==='cloud'){
+    if(!state.transfer.open){ state.transfer.open=true; changed=true; }
+    if(state.transfer.tab!=='cloud'){ state.transfer.tab='cloud'; changed=true; }
+    if(step.cloudProvider && state.cloud.provider!==step.cloudProvider){
+      state.cloud.provider=step.cloudProvider; changed=true;
+    }
+  }else if(view==='extension'){
     if(state.mainView!=='extension' || state.mobileView!=='extension'){
       state.mainView='extension'; state.mobileView='extension'; changed=true;
     }
+    const tab=step.extTab||'host';
+    if(state.extTab!==tab){ state.extTab=tab; state.extReportOpen=false; changed=true; }
+    const acc=!!step.openAccounts;
+    if(state.extAccountsOpen!==acc){ state.extAccountsOpen=acc; changed=true; }
+    const oauth=!!step.openOauth;
+    if(state.extOauthOpen!==oauth){ state.extOauthOpen=oauth; changed=true; }
   }else if(view==='zone'){
     if(state.mobileView!=='zone'){ state.mobileView='zone'; changed=true; }
     if(state.mainView==='extension'){ state.mainView='chart'; changed=true; }
@@ -4532,6 +4562,7 @@ function tutorialPrepareStep(step){
   }
   if(!changed) return;
   syncMainView();
+  if(view==='cloud'){ renderTransfer(); renderLan(); renderCloud(); }
   if(view==='extension') renderExtensionView();
   if(step.zone || view==='zone'){ renderZones(); renderActions(); }
 }
