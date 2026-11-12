@@ -186,7 +186,8 @@ function safeDecode(seg) {
   try { return decodeURIComponent(seg); } catch { return seg; }
 }
 
-/** 凭据 → 可交给宿主的 URL。token 型把 token 当用户名（GitHub/Gitee/GitLab 通用）。 */
+/** 凭据 → 可交给宿主的 URL。token 型把 token 当用户名（GitHub/Gitee/Gitea 通用）；
+ *  GitLab 的 token-only 需要 `oauth2:<token>`，否则克隆会 401。 */
 export function buildAuthedUrl(url, credential) {
   const base = String(url || '').trim();
   const secret = credential && typeof credential.secret === 'string' ? credential.secret : '';
@@ -196,6 +197,9 @@ export function buildAuthedUrl(url, credential) {
     if (u.protocol !== 'https:' && u.protocol !== 'http:') return { url: base, authed: false };
     if (credential.kind === 'basic' && credential.username) {
       u.username = credential.username;
+      u.password = secret;
+    } else if (String(credential.site || '').toLowerCase() === SITES.GITLAB) {
+      u.username = 'oauth2';
       u.password = secret;
     } else {
       u.username = secret;

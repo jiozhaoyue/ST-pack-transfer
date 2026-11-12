@@ -15,6 +15,8 @@ export const SETTINGS_DEFAULTS = Object.freeze({
   autoTutorial: true,
   /** 下载导出区里的包后是否把它从导出区删除；默认不删。 */
   deleteAfterExport: false,
+  /** 可选 CORS 代理地址：只用于插件自己的 Git / WebDAV 外发请求；留空即直连。 */
+  netProxyUrl: '',
   /** 日志上限（条）；0/非法回落默认。 */
   logMaxEntries: 500,
   /** 每次加载插件是否清空上次日志。 */
@@ -124,6 +126,7 @@ export function normalizeSettings(input) {
     if (typeof input.nativePullNotice === 'boolean') out.nativePullNotice = input.nativePullNotice;
     if (typeof input.autoTutorial === 'boolean') out.autoTutorial = input.autoTutorial;
     if (typeof input.deleteAfterExport === 'boolean') out.deleteAfterExport = input.deleteAfterExport;
+    if (typeof input.netProxyUrl === 'string') out.netProxyUrl = input.netProxyUrl.trim();
     const logMax = Number(input.logMaxEntries);
     if (Number.isFinite(logMax)) out.logMaxEntries = Math.max(50, Math.min(5000, Math.round(logMax)));
     if (typeof input.clearLogOnLoad === 'boolean') out.clearLogOnLoad = input.clearLogOnLoad;
@@ -217,10 +220,16 @@ export function buildSettingsHtml(settings = {}) {
     + numSetting('autoUpdateNotifyTimeoutSec', t('settings.autoNotifyTimeout'), 1, 86400, 1)
     + '</div>';
 
+  const netGroup = '<label class="et-git"><span>' + t('settings.netProxy') + '</span>'
+    + '<input class="text_pole" type="url" data-setting="netProxyUrl" placeholder="' + t('settings.netProxyPlaceholder')
+    + '" value="' + (s.netProxyUrl || '') + '"></label>'
+    + '<div class="ext-note">' + t('settings.netProxyHint') + '</div>';
+
   return '<div class="settings-grid">'
     + group('behavior', t('settings.groupBehavior'), tips, true)
     + group('auto', t('settings.groupAuto'), autoGroup, false)
     + group('export', t('settings.groupExport'), exportGroup, true)
+    + group('net', t('settings.groupNet'), netGroup, false)
     + group('log', t('settings.groupLog'), logging, false)
     + group('data', t('settings.groupData'), dataGroup, false)
     + '</div>';
@@ -253,6 +262,9 @@ export function readSettings(root, base = SETTINGS_DEFAULTS) {
 
   const logMaxEl = root.querySelector?.('[data-setting="logMaxEntries"]');
   if (logMaxEl?.value) out.logMaxEntries = Number(logMaxEl.value);
+
+  const netProxyEl = root.querySelector?.('[data-setting="netProxyUrl"]');
+  if (netProxyEl && typeof netProxyEl.value === 'string') out.netProxyUrl = netProxyEl.value.trim();
   /* 自动更新策略：全部从对话框读，缺省保留 base（不再写死阈值）。 */
   for (const key of [
     'autoUpdateMinIntervalSec', 'autoUpdateMaxIntervalSec', 'autoUpdateDefaultIntervalSec',

@@ -877,6 +877,7 @@
   #app.app-container .log-line .lv{font-weight:600}
   #app.app-container .log-line.info .lv{color:var(--keep)} #app.app-container .log-line.warn .lv{color:var(--optional)}
   #app.app-container .log-line.error .lv{color:var(--drop)}
+  #app.app-container .log-line.success .lv{color:var(--keep);opacity:.85}
 
   /* 面板内视图 / toast */
   #app.app-container .app-body{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;overflow:hidden}

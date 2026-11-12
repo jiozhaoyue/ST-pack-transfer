@@ -12,9 +12,37 @@
 
 import { SITES } from './git-url.js';
 
+/**
+ * 用账号的站点类型修正「自建域名」的仓库。
+ *
+ * 背景：`siteOfHost` 只认官方域名，`git.example.com` 这类自建主机一律 `custom`；
+ * 但它可能是 GitHub Enterprise / 自建 GitLab / Gitea，三者的 API 端点完全不同。
+ * 账号里用户已经显式选过站点类型（site），带凭据请求时按账号类型解释仓库，
+ * 否则自建 GitHub Enterprise 会被当成 Gitea 打 `/api/v1`，永远 404。
+ */
+export function resolveSite(repo, account) {
+  if (!repo?.ok) return repo;
+  if (repo.site !== SITES.CUSTOM) return repo;
+  const site = String(account?.site || '').toLowerCase();
+  if (site === SITES.GITHUB || site === SITES.GITLAB || site === SITES.GITEE || site === SITES.GITEA) {
+    return { ...repo, site };
+  }
+  return repo;
+}
+
+/** GitHub.com 与 GitHub Enterprise 的 API 根不同：Enterprise 走 `<host>/api/v3`。 */
+export function githubApiBase(host = '') {
+  const h = String(host || '').toLowerCase();
+  return !h || h === 'github.com' ? 'https://api.github.com' : `https://${h}/api/v3`;
+}
+
+function githubApi(repo) {
+  return githubApiBase(repo?.host);
+}
+
 /** 账号验证端点（「测试」按钮）。 */
 export function userEndpoint(site, host) {
-  if (site === SITES.GITHUB) return 'https://api.github.com/user';
+  if (site === SITES.GITHUB) return `${githubApiBase(host)}/user`;
   if (site === SITES.GITEE) return 'https://gitee.com/api/v5/user';
   if (site === SITES.GITLAB) return `https://${host}/api/v4/user`;
   return `https://${host}/api/v1/user`;
@@ -29,7 +57,7 @@ export function normalizeUser(payload) {
 export function branchesEndpoint(repo, { perPage = 100 } = {}) {
   if (!repo?.ok) return null;
   if (repo.site === SITES.GITHUB) {
-    return `https://api.github.com/repos/${repo.owner}/${repo.repo}/branches?per_page=${perPage}`;
+    return `${githubApi(repo)}/repos/${repo.owner}/${repo.repo}/branches?per_page=${perPage}`;
   }
   if (repo.site === SITES.GITEE) {
     return `https://gitee.com/api/v5/repos/${repo.owner}/${repo.repo}/branches?per_page=${perPage}`;
@@ -43,7 +71,7 @@ export function branchesEndpoint(repo, { perPage = 100 } = {}) {
 
 export function repoInfoEndpoint(repo) {
   if (!repo?.ok) return null;
-  if (repo.site === SITES.GITHUB) return `https://api.github.com/repos/${repo.owner}/${repo.repo}`;
+  if (repo.site === SITES.GITHUB) return `${githubApi(repo)}/repos/${repo.owner}/${repo.repo}`;
   if (repo.site === SITES.GITEE) return `https://gitee.com/api/v5/repos/${repo.owner}/${repo.repo}`;
   if (repo.site === SITES.GITLAB) {
     const project = encodeURIComponent(`${repo.owner}/${repo.repo}`);
@@ -56,7 +84,7 @@ export function commitsEndpoint(repo, ref, { perPage = 1 } = {}) {
   if (!repo?.ok) return null;
   const sha = ref ? `sha=${encodeURIComponent(ref)}&` : '';
   if (repo.site === SITES.GITHUB) {
-    return `https://api.github.com/repos/${repo.owner}/${repo.repo}/commits?${sha}per_page=${perPage}`;
+    return `${githubApi(repo)}/repos/${repo.owner}/${repo.repo}/commits?${sha}per_page=${perPage}`;
   }
   if (repo.site === SITES.GITEE) {
     return `https://gitee.com/api/v5/repos/${repo.owner}/${repo.repo}/commits?${sha}per_page=${perPage}`;
@@ -78,7 +106,7 @@ export function commitsEndpoint(repo, ref, { perPage = 1 } = {}) {
 export function tagsEndpoint(repo, { perPage = 50 } = {}) {
   if (!repo?.ok) return null;
   if (repo.site === SITES.GITHUB) {
-    return `https://api.github.com/repos/${repo.owner}/${repo.repo}/tags?per_page=${perPage}`;
+    return `${githubApi(repo)}/repos/${repo.owner}/${repo.repo}/tags?per_page=${perPage}`;
   }
   if (repo.site === SITES.GITEE) {
     return `https://gitee.com/api/v5/repos/${repo.owner}/${repo.repo}/tags?per_page=${perPage}`;
@@ -100,7 +128,7 @@ export function commitDetailEndpoint(repo, sha) {
   if (!repo?.ok || !sha) return null;
   const id = encodeURIComponent(String(sha));
   if (repo.site === SITES.GITHUB) {
-    return `https://api.github.com/repos/${repo.owner}/${repo.repo}/commits/${id}`;
+    return `${githubApi(repo)}/repos/${repo.owner}/${repo.repo}/commits/${id}`;
   }
   if (repo.site === SITES.GITEE) {
     return `https://gitee.com/api/v5/repos/${repo.owner}/${repo.repo}/commits/${id}`;
@@ -219,6 +247,55 @@ export function normalizeCommitFiles(payload) {
     .filter((row) => row.path);
 }
 
+/** GitHub.com 的 raw 在独立域名；Enterprise 用自己的 `/<o>/<r>/raw/<ref>/<path>`。 */
+export function githubRawUrl(repo, ref, file) {
+  const r = String(ref || repo.ref || 'main');
+  const name = String(file || '').replace(/^\/+/, '');
+  if (!name) return '';
+  const path = `${repo.owner}/${repo.repo}`;
+  const host = String(repo.host || '').toLowerCase();
+  if (!host || host === 'github.com') {
+    return `https://raw.githubusercontent.com/${path}/${r}/${encodeURI(name)}`;
+  }
+  return `https://${host}/${path}/raw/${encodeURIComponent(r)}/${encodeURI(name)}`;
+}
+
+/**
+ * 鉴权可用的「取仓库内某个文件」的 API 端点。
+ *
+ * 为什么需要它：raw.githubusercontent.com 不接受 `Authorization` 头，
+ * 私有仓库经 raw 域名永远 401/404；Gitee 的 raw 需要 `access_token` 查询参数。
+ * 因此带凭据读取时统一走各站点的内容 API（GitHub 用 `Accept: raw`）。
+ *
+ * Gitee 返回 null：它的 raw + `access_token` 已能覆盖公开与私有，无需转 API。
+ * @param {object} repo parseRepoUrl 产物
+ * @param {string} ref 分支/标签
+ * @param {string} file 仓库内相对路径
+ * @returns {string|null} 不适用时返回 null
+ */
+export function contentEndpoint(repo, ref, file) {
+  if (!repo?.ok) return null;
+  const name = String(file || '').replace(/^\/+/, '');
+  if (!name) return null;
+  const r = String(ref || repo.ref || 'main');
+  const path = `${repo.owner}/${repo.repo}`;
+  if (repo.site === SITES.GITHUB) {
+    return `${githubApi(repo)}/repos/${path}/contents/${name}?ref=${encodeURIComponent(r)}`;
+  }
+  if (repo.site === SITES.GITLAB) {
+    const project = encodeURIComponent(path);
+    return `https://${repo.host}/api/v4/projects/${project}/repository/files/${encodeURIComponent(name)}/raw?ref=${encodeURIComponent(r)}`;
+  }
+  if (repo.site === SITES.GITEE) return null;
+  /* Gitea / 自建同形态 */
+  return `https://${repo.host}/api/v1/repos/${path}/raw/${name}?ref=${encodeURIComponent(r)}`;
+}
+
+/** 内容 API 需要的 Accept 头（GitHub 必须显式要 raw，否则返回 JSON 包装）。 */
+export function contentAcceptHeader(repo) {
+  return repo?.site === SITES.GITHUB ? 'application/vnd.github.raw' : 'text/plain';
+}
+
 /**
  * 远端 manifest.json 的原始地址（用于更新检查比对版本）。
  * @param {object} repo parseRepoUrl 产物
@@ -226,9 +303,9 @@ export function normalizeCommitFiles(payload) {
  */
 export function remoteManifestUrl(repo, ref) {
   if (!repo?.ok) return '';
+  if (repo.site === SITES.GITHUB) return githubRawUrl(repo, ref, 'manifest.json');
   const r = String(ref || repo.ref || 'main');
   const path = `${repo.owner}/${repo.repo}`;
-  if (repo.site === SITES.GITHUB) return `https://raw.githubusercontent.com/${path}/${r}/manifest.json`;
   if (repo.site === SITES.GITEE) return `https://gitee.com/${path}/raw/${r}/manifest.json`;
   if (repo.site === SITES.GITLAB) return `https://${repo.host}/${path}/-/raw/${r}/manifest.json`;
   return `https://${repo.host}/${path}/raw/branch/${r}/manifest.json`;
@@ -242,11 +319,11 @@ export function remoteManifestUrl(repo, ref) {
  */
 export function remoteFileUrl(repo, ref, file) {
   if (!repo?.ok) return '';
+  if (repo.site === SITES.GITHUB) return githubRawUrl(repo, ref, file);
   const r = String(ref || repo.ref || 'main');
   const name = String(file || '').replace(/^\/+/, '');
   if (!name) return '';
   const path = `${repo.owner}/${repo.repo}`;
-  if (repo.site === SITES.GITHUB) return `https://raw.githubusercontent.com/${path}/${r}/${name}`;
   if (repo.site === SITES.GITEE) return `https://gitee.com/${path}/raw/${r}/${name}`;
   if (repo.site === SITES.GITLAB) return `https://${repo.host}/${path}/-/raw/${r}/${name}`;
   return `https://${repo.host}/${path}/raw/branch/${r}/${name}`;

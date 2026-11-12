@@ -10,8 +10,10 @@ import {
   commitDetailEndpoint,
   tagsEndpoint,
   repoInfoEndpoint,
-  remoteManifestUrl,
   remoteFileUrl,
+  contentEndpoint,
+  contentAcceptHeader,
+  resolveSite,
   authHeaders,
   withTokenQuery,
   normalizeBranches,
@@ -23,6 +25,7 @@ import {
   userEndpoint,
   normalizeUser,
 } from '../core/git-site.js';
+import { applyProxy } from '../core/net-proxy.js';
 
 export const GIT_REMOTE_TIMEOUT_MS = 8000;
 
@@ -34,8 +37,13 @@ function reasonOf(status, network) {
   return 'http';
 }
 
-export function createGitRemote({ fetchImpl = null, timeoutMs = GIT_REMOTE_TIMEOUT_MS } = {}) {
+export function createGitRemote({
+  fetchImpl = null,
+  timeoutMs = GIT_REMOTE_TIMEOUT_MS,
+  getProxyUrl = null,
+} = {}) {
   const f = fetchImpl || (typeof fetch !== 'undefined' ? fetch.bind(globalThis) : null);
+  const proxyOf = () => (typeof getProxyUrl === 'function' ? getProxyUrl() : '');
 
   async function request(url, { headers = {}, as = 'json' } = {}) {
     if (!f) return { ok: false, reason: 'unsupported', status: 0, data: null };
@@ -43,7 +51,7 @@ export function createGitRemote({ fetchImpl = null, timeoutMs = GIT_REMOTE_TIMEO
     let timer = 0;
     try {
       timer = setTimeout(() => controller.abort(), timeoutMs);
-      const response = await f(url, {
+      const response = await f(applyProxy(url, proxyOf()), {
         headers: { Accept: as === 'json' ? 'application/json' : 'text/plain', ...headers },
         signal: controller.signal,
         credentials: 'omit',
@@ -64,6 +72,31 @@ export function createGitRemote({ fetchImpl = null, timeoutMs = GIT_REMOTE_TIMEO
     return { url: withTokenQuery(repo.site, url, account?.secret), headers };
   }
 
+  /**
+   * 读仓库内某个文件的文本。
+   * 带凭据时优先走各站点的**内容 API**（GitHub 私有 raw 域名不接受 Authorization）；
+   * 失败且不是鉴权/不存在类错误时，再退回 raw 地址一次。
+   */
+  async function readFile(repo, ref, file, account = null) {
+    if (!repo?.ok) return { ok: false, reason: 'unsupported', text: '' };
+    const target = resolveSite(repo, account);
+    const api = account?.secret ? contentEndpoint(target, ref, file) : null;
+    if (api) {
+      const headers = { ...authHeaders(target.site, account.secret), Accept: contentAcceptHeader(target) };
+      const r = await request(api, { headers, as: 'text' });
+      if (r.ok) return { ok: true, text: String(r.data || ''), status: r.status, via: 'api' };
+      if (![401, 403, 404].includes(r.status)) {
+        return { ok: false, reason: r.reason || reasonOf(r.status, false), status: r.status, text: '' };
+      }
+    }
+    const raw = remoteFileUrl(target, ref, file);
+    if (!raw) return { ok: false, reason: 'unsupported', text: '' };
+    const { url, headers } = authed(raw, target, account);
+    const r = await request(url, { headers, as: 'text' });
+    if (!r.ok) return { ok: false, reason: r.reason || reasonOf(r.status, false), status: r.status, text: '' };
+    return { ok: true, text: String(r.data || ''), status: r.status, via: 'raw' };
+  }
+
   return {
     /** 验证账号（PAT / 账密）。CORS 拦截与凭据错误要区分开。 */
     async testAccount(account) {
@@ -77,9 +110,10 @@ export function createGitRemote({ fetchImpl = null, timeoutMs = GIT_REMOTE_TIMEO
 
     /** 列举远端分支。 */
     async listBranches(repo, account = null) {
-      const base = branchesEndpoint(repo);
+      const target = resolveSite(repo, account);
+      const base = branchesEndpoint(target);
       if (!base) return { ok: false, reason: 'unsupported', branches: [] };
-      const { url, headers } = authed(base, repo, account);
+      const { url, headers } = authed(base, target, account);
       const r = await request(url, { headers });
       if (!r.ok) return { ok: false, reason: r.reason || reasonOf(r.status, false), status: r.status, branches: [] };
       return { ok: true, branches: normalizeBranches(r.data), status: r.status };
@@ -87,9 +121,10 @@ export function createGitRemote({ fetchImpl = null, timeoutMs = GIT_REMOTE_TIMEO
 
     /** 仓库摘要。 */
     async repoInfo(repo, account = null) {
-      const base = repoInfoEndpoint(repo);
+      const target = resolveSite(repo, account);
+      const base = repoInfoEndpoint(target);
       if (!base) return { ok: false, reason: 'unsupported', info: null };
-      const { url, headers } = authed(base, repo, account);
+      const { url, headers } = authed(base, target, account);
       const r = await request(url, { headers });
       if (!r.ok) return { ok: false, reason: r.reason || reasonOf(r.status, false), status: r.status, info: null };
       const info = normalizeRepoInfo(r.data);
@@ -98,30 +133,27 @@ export function createGitRemote({ fetchImpl = null, timeoutMs = GIT_REMOTE_TIMEO
 
     /** 远端最新提交（更新检查用）。 */
     async latestCommit(repo, ref = '', account = null) {
-      const base = commitsEndpoint(repo, ref);
+      const target = resolveSite(repo, account);
+      const base = commitsEndpoint(target, ref);
       if (!base) return { ok: false, reason: 'unsupported', commit: null };
-      const { url, headers } = authed(base, repo, account);
+      const { url, headers } = authed(base, target, account);
       const r = await request(url, { headers });
       if (!r.ok) return { ok: false, reason: r.reason || reasonOf(r.status, false), status: r.status, commit: null };
       return { ok: true, commit: normalizeLatestCommit(r.data), status: r.status };
     },
 
-    /** 取远端 manifest.json 文本（版本比对用；raw 域名的 CORS 视站点而定）。 */
+    /** 取远端 manifest.json 文本（版本比对用）。 */
     async remoteManifest(repo, ref = '', account = null) {
-      const url = remoteManifestUrl(repo, ref);
-      if (!url) return { ok: false, reason: 'unsupported', text: '' };
-      const { headers } = authed(url, repo, account);
-      const r = await request(url, { headers, as: 'text' });
-      if (!r.ok) return { ok: false, reason: r.reason || reasonOf(r.status, false), status: r.status, text: '' };
-      return { ok: true, text: String(r.data || ''), status: r.status };
+      return readFile(repo, ref, 'manifest.json', account);
     },
 
 
     /** 标签列表（只取最近 N 个，不拉全量历史）。 */
     async listTags(repo, account = null) {
-      const base = tagsEndpoint(repo);
+      const target = resolveSite(repo, account);
+      const base = tagsEndpoint(target);
       if (!base) return { ok: false, reason: 'unsupported', tags: [] };
-      const { url, headers } = authed(base, repo, account);
+      const { url, headers } = authed(base, target, account);
       const r = await request(url, { headers });
       if (!r.ok) return { ok: false, reason: r.reason || reasonOf(r.status, false), status: r.status, tags: [] };
       return { ok: true, tags: normalizeTags(r.data), status: r.status };
@@ -129,9 +161,10 @@ export function createGitRemote({ fetchImpl = null, timeoutMs = GIT_REMOTE_TIMEO
 
     /** 最近提交（分页上限由调用方给，默认 20 条）。 */
     async listCommits(repo, ref = '', account = null, { perPage = 20 } = {}) {
-      const base = commitsEndpoint(repo, ref, { perPage });
+      const target = resolveSite(repo, account);
+      const base = commitsEndpoint(target, ref, { perPage });
       if (!base) return { ok: false, reason: 'unsupported', commits: [] };
-      const { url, headers } = authed(base, repo, account);
+      const { url, headers } = authed(base, target, account);
       const r = await request(url, { headers });
       if (!r.ok) return { ok: false, reason: r.reason || reasonOf(r.status, false), status: r.status, commits: [] };
       return { ok: true, commits: normalizeCommitList(r.data), status: r.status };
@@ -139,9 +172,10 @@ export function createGitRemote({ fetchImpl = null, timeoutMs = GIT_REMOTE_TIMEO
 
     /** 单次提交的文件级 diff。 */
     async commitDetail(repo, sha, account = null) {
-      const base = commitDetailEndpoint(repo, sha);
+      const target = resolveSite(repo, account);
+      const base = commitDetailEndpoint(target, sha);
       if (!base) return { ok: false, reason: 'unsupported', files: [] };
-      const { url, headers } = authed(base, repo, account);
+      const { url, headers } = authed(base, target, account);
       const r = await request(url, { headers });
       if (!r.ok) return { ok: false, reason: r.reason || reasonOf(r.status, false), status: r.status, files: [] };
       return { ok: true, files: normalizeCommitFiles(r.data), status: r.status };
@@ -149,12 +183,7 @@ export function createGitRemote({ fetchImpl = null, timeoutMs = GIT_REMOTE_TIMEO
 
     /** 仓库内任意文件的原始文本（插件类型识别用）。 */
     async rawFile(repo, ref, file, account = null) {
-      const url = remoteFileUrl(repo, ref, file);
-      if (!url) return { ok: false, reason: 'unsupported', text: '' };
-      const { headers } = authed(url, repo, account);
-      const r = await request(url, { headers, as: 'text' });
-      if (!r.ok) return { ok: false, reason: r.reason || reasonOf(r.status, false), status: r.status, text: '' };
-      return { ok: true, text: String(r.data || ''), status: r.status };
+      return readFile(repo, ref, file, account);
     },
   };
 }

@@ -3,7 +3,7 @@
 > 面向**改这个仓的人**。用户向说明见 [README.md](../README.md)；跨会话的架构规范见 `.trellis/spec/`。
 > 本文登记**已经实现的功能**与它们的源码落点。**未实现的不写进来**——"文档有、代码无"是本仓明确禁止的形态。
 >
-> 最后核对：2026-11-11（本轮功能改动对照 `src/` 与目标测试；未跑全量）。
+> 最后核对：2026-11-12（本轮功能改动对照 `src/` 与目标测试；未跑全量）。
 
 ---
 
@@ -165,7 +165,7 @@
 
 | 功能 | 源码落点 |
 | --- | --- |
-| 结构化实时日志（等级按钮自带条数 / 毫秒时间戳 / 条数上限 / 加载时清空） | `src/ui/workbench-view.js` 的 `renderLog()` / `nowTime()` / `logLimit()`；`test` 外无独立模块 |
+| 结构化实时日志（**按条目类型多选筛选**：INFO / WARN / ERROR / SUCCESS，默认四类全选；类型按钮自带条数；毫秒时间戳 / 条数上限 / 加载时清空） | `src/ui/workbench-view.js` 的 `renderLog()` / `nowTime()` / `logLimit()`；筛选状态 `state.logLevels`（Set）；`test` 外无独立模块 |
 | 存储配额两行（浏览器 / 宿主）：两行都打开**同一个存储审查面板**（占满内容区），面板内可切换数据源；初始来源 = 点击的那一行。只读 | `src/ui/workbench-view.js` 的 `renderQuota()` / `renderStorageInspector()` / `openStorageInspector()` / `siRequest()`；`src/core/storage-inspector-model.js`（纯逻辑）；`src/ui/storage-inspector-browser.js`（浏览器 provider）；`index.js` 的 `actions.storageInspector`；`src/ui/host-bridge.js` 的 `fetchHostStorageInspect()` / `hostStorageInspectCapability()`。契约见 [HANDOFF-2026-11-11-storage-inspector.md](./HANDOFF-2026-11-11-storage-inspector.md) |
 | 教程演示模式（占位数据可操作；退出整体还原；不写真实数据/宿主） | `#btn-guide` / 教程菜单 / `#tutorial-banner-exit` | `src/ui/workbench-view.js` 的 `enterTutorialMode()` / `exitTutorialMode()` / `demoTutorialActions()` / `buildDemoPackages()`；模板 `#tutorial-banner` |
 | 目标任务式教程（选目标 → 逐步高亮；按平台与桌面/手机视图自适应；目标缺失时卡片居中保留） | `#btn-guide` → 目标菜单 | `src/ui/workbench-view.js` 的 `TUTORIAL_GOALS` / `renderTutorial()` / `tutorialPrepareStep()` / `centerTutorialCard()` |
@@ -253,6 +253,14 @@
 > `extension_settings` 写入服务端 `settings.json`（有服务器/管理员权限者可见），
 > 可在账号区改成「仅浏览器」；任何展示位置必须脱敏。私有仓库安装时凭据会被拼进
 > 交给宿主克隆的 URL，宿主可能写入该扩展的 `.git/config`。
+>
+> **账号对所有平台链接生效（2026-11-12）**：带凭据时，分支 / 仓库信息 / 标签 / 提交 /
+> manifest / 任意原始文件的读取都会带凭据，**不限于私有仓库**。自建主机按账号里选的
+> 站点类型解释仓库（GitHub Enterprise → `https://<host>/api/v3`、自建 GitLab → `/api/v4`、
+> Gitea → `/api/v1`），见 `git-site.js` 的 `resolveSite()`。关键通道事实：
+> GitHub 私有仓库的 raw 域名**不接受 `Authorization`** ⇒ 读文件改走 contents API
+> （`Accept: application/vnd.github.raw`）；Gitee 的 raw 必须带 `access_token` 查询参数。
+> 读不到一律如实显示「未提供」，不伪造。
 
 ### K4. P2 / P3：开发者层级 · 管理员分区 · 误装预案 · Git 可视化（2026-11-11 第二轮）
 
@@ -310,6 +318,8 @@
 | 选包来源 | **只读左侧数据包列表的选中项**，面板内无独立文件选择器 | `state.selectedPkgs`；`#cloud-upload`（原包名上传）/ `#cloud-backup-selected`（建备份版本） |
 | S3 HEAD / Range / multipart | 自动 | `src/core/s3-client.js` |
 | WebDAV 全方法降级（OPTIONS/PROPFIND/MKCOL） | 自动 | `src/core/webdav-client.js` |
+| **WebDAV 测试连接**（OPTIONS → PROPFIND → MKCOL → PUT → GET 校验 → DELETE，六步逐步报状态） | 迁移与备份 → 公网 → WebDAV →「测试连接」`#webdav-test` | `webdav-client.js` 的 `selfTest()`；`workbench-view.js` 的 `testWebdavConnection()` |
+| **可选 CORS 代理**（Git / WebDAV 外发请求经用户自填转发地址；留空直连） | 设置 → 网络 → CORS 代理地址 | `src/core/net-proxy.js` 的 `applyProxy()`；`git-remote.js` 的 `getProxyUrl`；`webdav-client.js` 的 `proxyUrl` 参数 |
 | 逐片加密（可选） | S3/WebDAV 表单的「加密短语」；**留空即不加密** | `src/core/s3-crypto.js`；`transfer-runner` 每片独立 IV，续传沿用清单里的原 salt |
 | 一键备份：全量时间戳快照 | `#cloud-backup-selected` + `#cloud-mode-select=full` | `index.js` 的 `backupSelectedToCloud()`；每次独立对象，保留最近 `#cloud-retention` 份 |
 | 一键备份：增量备份集 | `#cloud-mode-select=set` + `#cloud-set-name` | `src/app/backup-set-runner.js`、`src/core/backup-set.js`；对象按 sha256 去重，每版一张完整快照 |
@@ -317,6 +327,14 @@
 
 > 契约见 `.trellis/spec/frontend/transfer-s3-webdav.md`。
 > **无服务端直传、无 cron**：本插件禁止后台插件；`serverTransfer` 能力表全 false。
+>
+> 2026-11-12 真机实测（`https://webdav.zhaoyuecst.us.ci/`，Apache mod_dav + Caddy）：> `OPTIONS 200`（`Allow` **不含** PUT/MKCOL）、`PROPFIND 207`、`MKCOL 201`、`PUT 201`、
+> `GET 200`、`DELETE 204`；响应带 `Access-Control-Allow-Origin: *`，浏览器可直连。
+> ⇒ `probe()` 不再按 `Allow` 判死写入能力（`declared` 字段保留声明供参考）。
+>
+> 浏览器端无头实测（2026-11-12，Playwright + `npm run build && npm run preview` 的 4173）：
+> 「测试连接」六步全绿（OPTIONS 200 / PROPFIND 207 · 17 项 / MKCOL / PUT / GET 内容一致 / DELETE 204），
+> 控制台零报错。**S3 不走该代理**：SigV4 签名绑定 Host 与路径，经转发地址会直接失效。
 
 ### N. 恢复上传：Luker 8 MiB 分片（2026-11-10）
 
@@ -490,9 +508,9 @@ npm run preview      # 本地静态服务器托管 dist，默认 4173
 | PT 原生源断点续传 | 不支持（重建条目无源 crc32 ⇒ 暂停后作废半成品并完整重做，安全降级） |
 | 资产列表 URL 来源 | 宿主 `/api/extensions/discover` 只给目录名/类型；URL 只能取各扩展 `manifest.json` 的 `homePage`。没有 `homePage` 的扩展无法导出可导入地址（如实提示，不伪造） |
 | 自动备份 | 两条路：① **全量时间戳快照**（每次独立新包，保留最近 N 份）；② **内容寻址增量备份集**（只传新增/修改条目，每版一张完整清单，任一张可独立恢复）。**加密可选**：填口令即逐片加密，留空即不加密。**无 cron、无服务端直传**（用户禁止后台插件）。**不做差量链**（用户 2026-11-09 裁定 D-8） |
-| WebDAV 真机 | 协议与降级分支已单测覆盖；**尚未在真实 WebDAV 服务器上跑过**（含 405/401/CORS 实测） |
+| WebDAV 真机 | **2026-11-12 已实测一台**（Apache mod_dav + Caddy：OPTIONS/PROPFIND/MKCOL/PUT/GET/DELETE 全通，CORS 允许直连）。其它服务端形态（Nextcloud 子路径、nginx-dav、S3 网关）仍未取证；能力判定仍以真实请求结果为准 |
 | 静态 UI 验收 | `npm run build && npm run preview` 只覆盖独立 Web / 插件模板本身；宿主注入（账户面板、原生按钮）仍需 Dev 实例 |
-| Git 账号与安装 | 站点 API 只在用户主动操作时请求；GitHub/GitLab/Gitee 支持 CORS，**自建 Gitea 视实例配置**，失败一律显示「未提供」/原因码 |
+| Git 账号与安装 | 站点 API 只在用户主动操作时请求；GitHub / GitLab / Gitee 支持 CORS，自建主机（含 GitHub Enterprise）视实例配置，失败一律显示「未提供」/原因码。浏览器无法直接使用 SOCKS/HTTP 代理，插件只支持自填 **CORS 代理地址**（设置 → 网络）；Luker/ST 的 `requestProxy` 与 `enableCorsProxy` 是服务端 `config.yaml` 项，需能编辑服务端文件并重启，不是 OS 管理员权限，插件不改也不探测 |
 | commit 安装 | 宿主 `git clone --branch` **不接受 commit SHA**；插件仍可传，失败信息原样回显并建议改用分支/标签 |
 | 私有仓库凭据 | 只能拼进交给宿主克隆的 URL；宿主可能写入扩展 `.git/config`，插件无法回收（安装前弹窗告知） |
 | 更新检查 | 只比对本地/远端 `manifest.json` 版本；任一缺失即 `unknown`，不自动更新 |

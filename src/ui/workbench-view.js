@@ -248,7 +248,9 @@ const state = {
   gitModeByPkg: {},
   keepDev: chartPrefs.keepDev,
   packages: INITIAL_PACKAGES.map(p=>({...p})),
-  selectedPkgs:new Set(), mergeMode:false, privateFiles:[], expanded:{}, collapsedVol:{}, sel:{}, log:loadPersistedLog(), logLevel:'ALL',
+  selectedPkgs:new Set(), mergeMode:false, privateFiles:[], expanded:{}, collapsedVol:{}, sel:{}, log:loadPersistedLog(),
+  /* 日志按「条目类型」多选筛选：默认四类全选；取消某类即隐藏该类。 */
+  logLevels:new Set(['INFO','WARN','ERROR','SUCCESS']),
   noTrafficPrompt:false,
   /* 退出数据包偏好时若有未保存改动的提醒开关（设置项，默认开）。 */
   confirmDiscardChartPrefs:true,
@@ -1896,7 +1898,7 @@ function extStatusText(status){
 }
 /* ── Git 账号 / 预检 / 分支（扩展管理） ── */
 let gitRemoteInstance = null;
-function gitRemote(){ return gitRemoteInstance || (gitRemoteInstance = createGitRemote()); }
+function gitRemote(){ return gitRemoteInstance || (gitRemoteInstance = createGitRemote({ getProxyUrl: () => gitSettings().netProxyUrl || '' })); }
 function gitSettings(){ return loadSettings(); }
 function gitAccountList(){ return normalizeAccounts(gitSettings().gitAccounts); }
 function persistGit(patch){
@@ -2485,7 +2487,7 @@ async function runExtInstallNow(){
   try {
     const payload=state.extEntries.map((e)=>{
       const acc=accountForRepo(e.parsed);
-      const credential=acc ? { kind: acc.username?'basic':'token', username:acc.username, secret:acc.secret } : null;
+      const credential=acc ? { kind: acc.username?'basic':'token', site:acc.site, username:acc.username, secret:acc.secret } : null;
       return { url:e.url, branch:e.ref, ref:e.ref, credential, replace:false, global:state.extHostAdmin && state.extInstallGlobal===true };
     });
     state.extResults=await actions.installExtensions?.(payload)||[];
@@ -3468,6 +3470,7 @@ function cloudClient() {
     const dav = createWebdavClient({
       config: cfg,
       fetchImpl: (url, init) => fetch(url, init),
+      proxyUrl: gitSettings().netProxyUrl || '',
     });
     return {
       ready: dav.ready,
@@ -3613,12 +3616,54 @@ async function cloudSave() {
   renderCloud();
   await cloudRefresh();
 }
+/**
+ * WebDAV 真机自检：用表单里的当前值（不要求先保存）跑六步。
+ * 只写一个临时小文件并立即删除；每一步的真实状态码都显示出来，不伪造结论。
+ */
+async function testWebdavConnection(){
+  const cfg = cloudConfigFromForm();
+  const btn = document.getElementById('webdav-test');
+  const box = document.getElementById('webdav-test-result');
+  if (!cfg.baseUrl) {
+    if (box) { box.hidden = false; box.textContent = t('cloud.notConfigured'); }
+    return { ok: false };
+  }
+  if (btn) btn.disabled = true;
+  if (box) { box.hidden = false; box.textContent = t('webdav.testing'); }
+  let res = { ok: false, steps: [], failedStep: 'client', code: '' };
+  try {
+    const dav = createWebdavClient({
+      config: cfg,
+      fetchImpl: (url, init) => fetch(url, init),
+      proxyUrl: gitSettings().netProxyUrl || '',
+    });
+    res = await dav.selfTest();
+  } catch (err) {
+    res = { ok: false, steps: [], failedStep: 'client', code: String(err?.message || err) };
+  }
+  if (btn) btn.disabled = false;
+  if (box) {
+    const rows = (res.steps || []).map((s) => {
+      const mark = s.ok ? '✓' : '✗';
+      const code = s.status ? String(s.status) : (s.code || '');
+      return '<div>' + escapeHtml(`${s.step} ${mark}${code ? ' · ' + code : ''}${s.detail ? ' · ' + s.detail : ''}`) + '</div>';
+    }).join('');
+    const head = res.ok
+      ? '<div class="ext-note">' + escapeHtml(t('webdav.testOk')) + '</div>'
+      : '<div class="ext-note">' + escapeHtml(t('webdav.testFail', { step: res.failedStep || '?', reason: res.code || '' })) + '</div>';
+    box.innerHTML = head + rows;
+  }
+  if (res.ok) log('SUCCESS', t('webdav.testOk'));
+  else log('WARN', t('webdav.testFail', { step: res.failedStep || '?', reason: res.code || '' }));
+  return res;
+}
 async function cloudRefresh() {
   const C = state.cloud;
   const target = createTransferTarget({
     kind: C.provider === 'webdav' ? 'webdav' : 's3',
     config: activeCloudConfig(),
     fetchImpl: (url, init) => fetch(url, init),
+    proxyUrl: gitSettings().netProxyUrl || '',
   });
   if (!target.ready) {
     C.list = [];
@@ -3701,6 +3746,7 @@ async function cloudDownload(key) {
     kind: C.provider === 'webdav' ? 'webdav' : 's3',
     config: cfg,
     fetchImpl: (url, init) => fetch(url, init),
+    proxyUrl: gitSettings().netProxyUrl || '',
   });
   if (!target.ready) {
     C.status = t('cloud.notConfigured');
@@ -3763,6 +3809,7 @@ async function cloudRestoreSnapshot(key) {
     kind: C.provider === 'webdav' ? 'webdav' : 's3',
     config: cfg,
     fetchImpl: (url, init) => fetch(url, init),
+    proxyUrl: gitSettings().netProxyUrl || '',
   });
   if (!target.ready) {
     C.status = t('cloud.notConfigured');
@@ -3811,6 +3858,7 @@ async function cloudDeleteSnapshot(key) {
     kind: C.provider === 'webdav' ? 'webdav' : 's3',
     config: activeCloudConfig(),
     fetchImpl: (url, init) => fetch(url, init),
+    proxyUrl: gitSettings().netProxyUrl || '',
   });
   if (!target.ready) {
     C.status = t('cloud.notConfigured');
@@ -3850,6 +3898,7 @@ async function cloudDelete(key) {
     kind: C.provider === 'webdav' ? 'webdav' : 's3',
     config: activeCloudConfig(),
     fetchImpl: (url, init) => fetch(url, init),
+    proxyUrl: gitSettings().netProxyUrl || '',
   });
   if (!target.ready) {
     C.status = t('cloud.notConfigured');
@@ -3922,22 +3971,26 @@ async function startLanScan(kind){
 }
 
 /* ── 渲染：日志 ── */
+const LOG_LEVELS_UI=['INFO','WARN','ERROR','SUCCESS'];
 function renderLog(){
   const lines=document.getElementById('log-lines');
-  const filter=state.logLevel;
-  const list=state.log.filter(l=>filter==='ALL'||l.level===filter);
-  lines.innerHTML=list.map(l=>'<div class="log-line '+l.level.toLowerCase()+'"><span class="t">['+escapeHtml(l.time)+']</span> <span class="lv">['+l.level+']</span> '+escapeHtml(l.msg)+'</div>').join('') || '<div class="log-line">'+t('log.empty')+'</div>';
+  const levels=state.logLevels;
+  const list=state.log.filter(l=>levels.has(l.level));
+  const emptyText=levels.size?t('log.empty'):t('log.none');
+  lines.innerHTML=list.map(l=>'<div class="log-line '+String(l.level||'').toLowerCase()+'"><span class="t">['+escapeHtml(l.time)+']</span> <span class="lv">['+escapeHtml(l.level)+']</span> '+escapeHtml(l.msg)+'</div>').join('') || '<div class="log-line">'+emptyText+'</div>';
   const last=state.log[state.log.length-1];
   document.getElementById('log-latest').textContent=last?last.msg:t('log.empty');
-  /* 等级按钮直接带条数：取消独立徽标，避免同一数字出现两次。 */
-  const counts={ALL:state.log.length,INFO:0,WARN:0,ERROR:0};
+  /* 类型按钮直接带条数（该类型总条数，不随筛选变化），并标出当前是否显示该类。 */
+  const counts={INFO:0,WARN:0,ERROR:0,SUCCESS:0};
   state.log.forEach(l=>{ if(counts[l.level]!==undefined) counts[l.level]++; });
-  const labels={ALL:t('log.all'),INFO:t('log.info'),WARN:t('log.warn'),ERROR:t('log.error')};
-  Object.keys(labels).forEach(level=>{
+  const labels={INFO:t('log.info'),WARN:t('log.warn'),ERROR:t('log.error'),SUCCESS:t('log.success')};
+  LOG_LEVELS_UI.forEach(level=>{
     const btn=document.querySelector('.log-level-btn[data-level="'+level+'"]');
     if(!btn) return;
     btn.textContent=labels[level]+' ('+counts[level]+')';
-    btn.classList.toggle('active',state.logLevel===level);
+    const on=levels.has(level);
+    btn.classList.toggle('active',on);
+    btn.setAttribute('aria-pressed',on?'true':'false');
   });
   const dot=document.getElementById('log-dot');
   if(dot){ const n=counts.WARN+counts.ERROR; dot.hidden=n===0; dot.title=t('log.dotTitle',{n}); }
@@ -4751,6 +4804,7 @@ function bind(){
   });
   document.getElementById('webdav-save')?.addEventListener('click',()=>cloudSave());
   document.getElementById('webdav-refresh')?.addEventListener('click',()=>cloudRefresh());
+  document.getElementById('webdav-test')?.addEventListener('click',()=>{ void testWebdavConnection(); });
   document.getElementById('lan-btn-generate').addEventListener('click',()=>actions.lan?.generate?.());
   document.getElementById('lan-btn-copy-send').addEventListener('click',()=>{
     copyLanText(document.getElementById('lan-send-code')?.value||'');
@@ -5125,8 +5179,10 @@ function bind(){
   }
   document.getElementById('log-toolbar').addEventListener('click',e=>{
     const b=e.target.closest('[data-level]'); if(!b) return;
-    document.querySelectorAll('#log-toolbar [data-level]').forEach(x=>x.classList.toggle('active',x===b));
-    state.logLevel=b.dataset.level; renderLog();
+    const level=b.dataset.level;
+    if(state.logLevels.has(level)) state.logLevels.delete(level);
+    else state.logLevels.add(level);
+    renderLog();
   });
   document.getElementById('log-clear').addEventListener('click',()=>{
     state.log=[];

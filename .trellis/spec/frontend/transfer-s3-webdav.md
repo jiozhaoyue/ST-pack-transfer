@@ -91,3 +91,22 @@ sets/<set>/snapshots/<ts>.json   # 每版**完整**清单；加密时后缀 .spt
 6. 增量备份集：第二次备份只传变化对象；任选快照可恢复；删旧快照不影响新快照。
 7. 单测：`test/transfer-plan.test.js`、`test/transfer-runner.test.js`、
    `test/webdav-client.test.js`、`test/backup-set.test.js`（均为小规模，不跑大数据）。
+
+## 7. 能力判定与自检（2026-11-12 真机取证）
+
+- **`Allow` 只是参考，不能据此判死写入**：实测 Apache 2.4 mod_dav（Caddy 前置）的
+  `OPTIONS` 返回 `Allow: OPTIONS,GET,HEAD,POST,DELETE,TRACE,PROPFIND,PROPPATCH,COPY,MOVE,LOCK,UNLOCK`
+  —— **不含 PUT / MKCOL**，但 `MKCOL 201`、`PUT 201` 都成功。
+  ⇒ `probe()` 的 `canWrite` / `canMakeCollection` 恒为 true（真实请求说话），
+  声明值另放 `declared` 供展示；不得再用 `Allow` 直接禁用上传按钮。
+- **「测试连接」走真实六步**：`webdav-client.js` 的 `selfTest()` 依次
+  `OPTIONS → PROPFIND → MKCOL(.stpt-selftest) → PUT 小文件 → GET 字节比对 → DELETE`，
+  任何一步失败即停并返回 `failedStep` + 状态码；只写临时文件并立即删除。
+- **列表过滤自身条目**：`PROPFIND Depth:1` 会把请求的集合本身也返回，
+  `list()` 按 URL 路径比对剔除，避免列表多出一个同名目录。
+- **可选 CORS 代理**：浏览器无法直连 SOCKS/HTTP 代理；插件只接受用户自填的
+  **带 CORS 头的转发地址**（设置 → 网络 → `netProxyUrl`），留空即直连。
+  `applyProxy()` 约定：含 `{url}` 占位 → 替换；以 `=` 结尾 → 追加编码目标；
+  以 `/` 结尾 → 路径前缀追加原样目标；否则追加 `?url=`。
+  Luker/SillyTavern 的 `requestProxy` 与 `enableCorsProxy` 只能改服务端 `config.yaml`
+  （需能编辑服务端文件并重启，**不是 OS 管理员权限**），插件不修改也不探测。
