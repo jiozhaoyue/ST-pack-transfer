@@ -196,7 +196,9 @@ export function createSqliteWriter({ SQL, handle }) {
       statements.clear();
       const bytes = db.export();
       db.close();
-      return { bytes, counts, name: `${handle}/${SQLITE_DB_ENTRY}` };
+      // L 包是**用户根扁平**布局：宿主只认 `<userRoot>/luker-storage.sqlite`，
+      // 写成 `<handle>/luker-storage.sqlite` 会让宿主静默找不到库（2026-11-12 实测）。
+      return { bytes, counts, name: SQLITE_DB_ENTRY };
     },
   };
 }

@@ -41,6 +41,14 @@
 新增存储形态 = 在 `src/core/engine-adapters/` 加一个适配器 + 在 `src/core/engine-registry.js` 的
 `TARGET_ENGINES` 登记一项。UI 下拉从注册表生成，**不得**在界面里硬编码选项。
 
+## 4.1 SQLite 依赖细节（勿踩）
+
+- `src/vendor/sqljs/` 是 sql.js 1.16.0 官方 `dist/sql-wasm-inline.js`（内联 WASM）副本，**勿升级改动**。
+- 目录内 `package.json` 声明 `"type": "commonjs"`：仓库根是 `type: module`，缺这一行时
+  **Node 运行时**（脚本 / E2E）会把该文件当 ESM 解析而报错；Vite / Vitest 不受影响，所以
+  这个坑只在「非打包环境」暴露（2026-11-12 实测）。
+- 加载走 `src/core/sqlite-init.js` 的动态 import（惰性、单独 chunk），浏览器 / Worker / Node 同一路径。
+
 ## 5. 验证入口
 
 - 单测：`test/engine-bridge.test.js`（本地专属，不入库）。
