@@ -9,12 +9,12 @@ import { createS3Client } from './s3-client.js';
 import { createWebdavClient } from './webdav-client.js';
 
 /**
- * @param {{kind?:'s3'|'webdav', config?:object, fetchImpl?:Function}} options
+ * @param {{kind?:'s3'|'webdav', config?:object, fetchImpl?:Function, proxyUrl?:string}} options
  * @returns {object}
  */
-export function createTransferTarget({ kind = 's3', config = {}, fetchImpl = globalThis.fetch } = {}) {
+export function createTransferTarget({ kind = 's3', config = {}, fetchImpl = globalThis.fetch, proxyUrl = '' } = {}) {
   if (kind === 'webdav') {
-    const dav = createWebdavClient({ config, fetchImpl });
+    const dav = createWebdavClient({ config, fetchImpl, proxyUrl });
     return {
       kind,
       ready: dav.ready,

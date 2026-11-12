@@ -128,8 +128,8 @@ export function findAccountFor(list, repo) {
 export function credentialOf(account) {
   if (!account || !account.secret) return null;
   return account.username
-    ? { kind: 'basic', username: account.username, secret: account.secret }
-    : { kind: 'token', secret: account.secret };
+    ? { kind: 'basic', site: account.site, username: account.username, secret: account.secret }
+    : { kind: 'token', site: account.site, secret: account.secret };
 }
 
 /** 脱敏展示：任何 UI / 日志都只能拿到这个形态。 */

@@ -503,6 +503,7 @@ async function main(root) {
       kind: provider === 'webdav' ? 'webdav' : 's3',
       config,
       fetchImpl: (url, init) => fetch(url, init),
+      proxyUrl: loadSettings().netProxyUrl || '',
     });
     if (!target.ready) { view.toast(t('cloud.notConfigured')); return; }
 

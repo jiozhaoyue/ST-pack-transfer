@@ -6,7 +6,13 @@
  * 不使用 PATCH / LOCK / MOVE 作为主路径。
  *
  * 分层约束：`src/core/`，禁止 DOM；浏览器与 Node 共用。
+ *
+ * 2026-11-12 真机实测（Apache 2.4 mod_dav 前置 Caddy）：
+ *   `OPTIONS` 的 `Allow` **不含 PUT / MKCOL**，但 `PUT` 201、`MKCOL` 201 都正常。
+ *   ⇒ `Allow` 只能当**参考**，不能据此判定「不可写」；能力以真实请求结果为准。
  */
+
+import { applyProxy } from './net-proxy.js';
 
 const PROPFIND_BODY = '<?xml version="1.0" encoding="utf-8"?>'
   + '<d:propfind xmlns:d="DAV:"><d:prop>'
@@ -52,6 +58,18 @@ function safeDecode(value) {
     return decodeURIComponent(value);
   } catch {
     return value;
+  }
+}
+
+/** 取 URL 的路径（解码、去尾斜杠），用于比较「是不是同一个条目」。 */
+function pathOfUrl(url, base) {
+  const raw = String(url || '');
+  if (!raw) return '';
+  try {
+    const resolved = base ? new URL(raw, base.endsWith('/') ? base : `${base}/`) : new URL(raw);
+    return safeDecode(resolved.pathname).replace(/\/+$/, '');
+  } catch {
+    return '';
   }
 }
 
@@ -117,12 +135,14 @@ export function classifyDavError(status, error) {
  *   config: {baseUrl:string, username?:string, password?:string},
  *   fetchImpl?: Function,
  *   timeoutMs?: number,
+ *   proxyUrl?: string,
  * }} options
  */
 export function createWebdavClient({
   config = {},
   fetchImpl = globalThis.fetch,
   timeoutMs = DEFAULT_TIMEOUT_MS,
+  proxyUrl = '',
 } = {}) {
   const baseUrl = String(config.baseUrl || '').replace(/\/+$/, '');
   const ready = Boolean(baseUrl && fetchImpl);
@@ -132,7 +152,7 @@ export function createWebdavClient({
 
   async function request(method, name, { body, headers = {}, range } = {}) {
     if (!ready) return { ok: false, status: 0, code: 'not-configured', message: 'not-configured' };
-    const url = joinDavUrl(baseUrl, name);
+    const url = applyProxy(joinDavUrl(baseUrl, name), proxyUrl);
     const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
     const timer = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
     const sendHeaders = { ...headers };
@@ -171,7 +191,10 @@ export function createWebdavClient({
     ready,
     baseUrl,
 
-    /** OPTIONS 探测能力；405/501 也不算整体失败（degraded）。 */
+    /** OPTIONS 探测能力；405/501 也不算整体失败（degraded）。
+     *  `Allow` 只是参考：实测 Apache 的 Allow 不含 PUT/MKCOL 却支持写入，
+     *  因此能力一律按「可尝试」返回，真实结果由 PUT / MKCOL / PROPFIND 说话；
+     *  声明值另放 `declared` 供展示，**不得**用它禁用上传按钮。 */
     async probe() {
       const result = await request('OPTIONS', '');
       if (!result.ok && result.code !== 'method-not-allowed') return result;
@@ -182,11 +205,18 @@ export function createWebdavClient({
         status: result.status,
         allow,
         degraded: !result.ok || !known,
-        canRead: known ? (allow.has('GET') || allow.has('HEAD')) : true,
-        canWrite: known ? allow.has('PUT') : true,
-        canList: known ? allow.has('PROPFIND') : true,
-        canMakeCollection: known ? allow.has('MKCOL') : true,
-        canDelete: known ? allow.has('DELETE') : true,
+        canRead: true,
+        /* 写入能力不按 Allow 判死：留 true，由真实 PUT / MKCOL 结果说话。 */
+        canWrite: true,
+        canList: true,
+        canMakeCollection: true,
+        declared: {
+          read: !known || allow.has('GET') || allow.has('HEAD'),
+          write: !known || allow.has('PUT'),
+          list: !known || allow.has('PROPFIND'),
+          makeCollection: !known || allow.has('MKCOL'),
+          delete: !known || allow.has('DELETE'),
+        },
       };
     },
 
@@ -268,7 +298,75 @@ export function createWebdavClient({
         return result;
       }
       const xml = await result.response.text();
-      return { ok: true, status: result.status, items: parsePropfindXml(xml) };
+      const items = parsePropfindXml(xml);
+      /* 过滤「自身条目」：PROPFIND Depth:1 会把请求的集合本身也返回，
+         直接喂给列表会多出一个与前缀同名的目录（部分服务器不报 resourcetype）。 */
+      const selfUrl = joinDavUrl(baseUrl, name);
+      const selfPath = pathOfUrl(selfUrl);
+      return {
+        ok: true,
+        status: result.status,
+        items: selfPath
+          ? items.filter((item) => pathOfUrl(item.href, selfUrl) !== selfPath)
+          : items,
+      };
+    },
+
+    /**
+     * 真实自检：OPTIONS → PROPFIND → MKCOL → PUT → GET 校验 → DELETE。
+     * 只写一个临时小文件并删掉；任何一步失败即停，如实返回该步，不伪造成功。
+     */
+    async selfTest({ dir = '.stpt-selftest' } = {}) {
+      const steps = [];
+      if (!ready) return { ok: false, code: 'not-configured', steps, failedStep: 'config' };
+      const push = (step, result, detail = '') => {
+        const row = {
+          step,
+          ok: !!result?.ok,
+          status: Number(result?.status) || 0,
+          code: result?.code || '',
+          detail,
+        };
+        steps.push(row);
+        return row;
+      };
+      const stop = (row, code = '') => ({ ok: false, steps, failedStep: row.step, code: code || row.code });
+
+      const probe = push('OPTIONS', await this.probe(), 'Capability');
+      if (!probe.ok) return stop(probe);
+
+      const listed = await this.list('');
+      const rowList = push('PROPFIND', listed, listed.ok ? `${listed.items.length} 项` : (listed.code || ''));
+      if (!listed.ok) return stop(rowList);
+
+      const made = await this.ensureCollection(dir);
+      const rowMk = push('MKCOL', made, dir);
+      if (!made.ok) return stop(rowMk);
+
+      const name = `${dir}/.probe-${Date.now().toString(36)}.txt`;
+      const content = `webdav-probe-${Math.random().toString(36).slice(2)}`;
+      const bytes = new TextEncoder().encode(content);
+      const put = await this.putObject(name, bytes, { contentType: 'text/plain; charset=utf-8' });
+      const rowPut = push('PUT', put, `${bytes.length} B`);
+      if (!put.ok) return stop(rowPut);
+
+      const got = await this.getObject(name);
+      const gotText = got.ok ? new TextDecoder().decode(got.bytes) : '';
+      const same = got.ok && gotText === content;
+      const rowGet = push('GET', { ok: same, status: got.status, code: got.code }, same ? '内容一致' : `内容不一致（${got.bytes?.length || 0} B）`);
+      if (!rowGet.ok) {
+        await this.deleteObject(name);
+        return stop(rowGet, got.code || 'content-mismatch');
+      }
+
+      const removed = await this.deleteObject(name);
+      const rowDel = push('DELETE', removed, name);
+      if (!removed.ok) return stop(rowDel);
+
+      /* 临时目录尽力清理。**必须带尾斜杠**：实测不带斜杠会被服务器 301 到
+         `http://…/<dir>/`，跨协议重定向让浏览器预检直接失败并刷红控制台。 */
+      await request('DELETE', `${String(dir).replace(/\/+$/, '')}/`);
+      return { ok: true, steps };
     },
   };
 }

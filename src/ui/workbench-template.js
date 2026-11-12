@@ -252,7 +252,9 @@ export function getWorkbenchHtml() {
             <div class="cloud-row">
               <button type="button" class="menu_button" id="webdav-save" data-i18n="cloud.save"></button>
               <button type="button" class="menu_button" id="webdav-refresh" data-i18n="cloud.refresh"></button>
+              <button type="button" class="menu_button" id="webdav-test" data-i18n="webdav.test" data-i18n-title="webdav.testHint"></button>
             </div>
+            <div class="cloud-note" id="webdav-test-result" hidden></div>
           </div>
           </div>
 
@@ -391,10 +393,10 @@ export function getWorkbenchHtml() {
         <button class="icon-btn" id="log-close" data-i18n-title="header.close">×</button>
       </div>
       <div class="log-toolbar" id="log-toolbar">
-        <button class="log-level-btn active" data-level="ALL" data-i18n="log.all"></button>
-        <button class="log-level-btn" data-level="INFO" data-i18n="log.info"></button>
-        <button class="log-level-btn" data-level="WARN" data-i18n="log.warn"></button>
-        <button class="log-level-btn" data-level="ERROR" data-i18n="log.error"></button>
+        <button class="log-level-btn active" data-level="INFO" data-i18n="log.info" title=""></button>
+        <button class="log-level-btn active" data-level="WARN" data-i18n="log.warn" title=""></button>
+        <button class="log-level-btn active" data-level="ERROR" data-i18n="log.error" title=""></button>
+        <button class="log-level-btn active" data-level="SUCCESS" data-i18n="log.success" title=""></button>
         <span style="flex:1"></span>
         <button id="log-export" data-i18n="log.export"></button>
         <button id="log-copy" data-i18n="log.copy"></button>
