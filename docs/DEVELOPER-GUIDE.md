@@ -222,11 +222,12 @@
 | 迁移与备份教程 | 迁移面板头 `?` | `HELP.transfer`（局域网互传 / 云端仓库 / 恢复模式） |
 | 教程模式不自动退出 | 头部书本图标 `#btn-guide` / 横幅「退出教程」 | `tutorial-next` 最后一步只回目标菜单；`closeTutorial()` 才是退出 |
 | 设置三态（×保留草稿 / 取消丢弃 / 保存持久化） | 设置面板顶部 × 与底部按钮 | `workbench-view.js` 的 `captureSettingsDraft()` / `applySettingsDraft()` / `openSettingsView()`；`state.settingsDraft` 仅内存 |
-| 桌面整窗口铺满 / 选择锁 | `#app` 全屏、除日志与输入框外不可选 | `style.css` 的 `#app.app-container:not([data-view="mobile"])` 与 `user-select` 例外块 |
+| 整窗口铺满（桌面与窄屏一致）/ 选择锁 | `#app` 两种视图都占 100vw×100vh、零圆角；除日志与输入框外不可选 | `style.css` 的 `#app.app-container:not([data-view="mobile"])` 与 `[data-view="mobile"]` 两条容器规则、`user-select` 例外块；窄屏图表列/卡片用 `flex:1 0 auto`（可增不可缩）拉伸填满，树不限高以免压住底部汇总条 |
 | 切换行顺序（迁移与备份在扩展管理前） | 各面板头 `[data-view-switch]` | `workbench-view.js` 的 `renderViewSwitch()` 项序 |
 | 教程跳过 / 重新打开 | 浮层「跳过」、横幅「重新打开教程」 | `hideTutorialOverlay()`（只关浮层）与 `#tutorial-banner-reopen` → `openTutorial()` |
 | 开发者页签 / 宿主列表 / 安装页脚 | 扩展管理 | 宿主页顶部 `ext-toolbar`（按钮 + 排序）、列表头 `ext-list-head`（数量 + 自动更新勾选组）、可拖拽排序行；安装扩展是面板**固定页脚** `#extmgr-install-block`（`renderExtInstalled()` / `syncExtInstallBlock()`），紧贴安装报告条 |
 | **扩展作用域互转（全局 ⇄ 用户）** | 扩展管理 → 宿主页每行「移至全局 / 移至用户」（**仅管理员**渲染） | 宿主 `POST /api/extensions/move`；`src/ui/host-bridge.js` 的 `moveExtensionViaHost()`、`src/ui/workbench-view.js` 的 `moveScopeWithConfirm()` / `moveInstalledExtension()`；`index.js` 的 `actions.moveExtension` |
+| **扩展作用域与同名去重（四宿主）** | 转出的包对同一扩展只保留一份 | `src/core/transform.js` 的 `extensionScopeOf()`（五形态分类）/ `routeSource()`（返回 `extScope`）/ `targetEntryPath(hub, target, extScope)`；`public/scripts/extensions/third-party/` 是 ST/Luker **全局**扩展在包内的真实路径（宿主常量 `globalExtensions`）；`public/scripts/extensions/<内置>/` 判为 `builtin-ext` **剥离**；同名按宿主语义**保留用户级**（ST/Luker `discover` 源码注释：conflict 时从 user 目录加载；TT 同 local 优先）；PT 无用户级目录 ⇒ 迁 `data/extensions/third-party/` 并补 `extension-sources/<scope>/`。UI 汇总条与行内标注读 `plan.extensionScopes` |
 | **安装到全局** | 扩展管理 → 宿主页安装区「安装到全局」（**仅管理员**可见） | `src/ui/host-bridge.js` 的 `installExtensionBatch()` 透传 `global` 给 `installExtensionViaHost()`；`workbench-view.js` 的 `renderExtInstall()` / `runExtInstall()` |
 | **加载顺序只读展示** | 扩展列表 `#N` 徽标 + 排序「加载顺序」；**不提供编辑**（宿主无写回端点） | `src/core/asset-list.js` 的 `manifestToExtension().loadingOrder`；`workbench-view.js` 的 `installedRowRecords()` / `sortedInstalledRecords()` |
 | **扩展写操作全串行（规避宿主 staging 竞态）** | 扩展管理任意写操作：安装 / 更新 / 卸载 / 重装 / 移动；手动、批量、自动更新共用一条队列 | `src/ui/workbench-view.js` 的 `queueExtMutation()`；宿主竞态取证与上游修复建议见 `.trellis/spec/frontend/extension-git-manager.md` §15、`docs/research/luker-staging-race-2026-11-11.md` |

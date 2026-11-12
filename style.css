@@ -760,6 +760,15 @@
   #app.app-container .ext-label{font-size:11px;color:var(--muted)}
   #app.app-container .ext-note{font-size:11px;line-height:1.45;color:var(--muted);padding:6px 8px;border:1px solid var(--border);
     border-radius:8px;background:color-mix(in srgb,var(--panel-3) 55%,transparent)}
+  /* 扩展作用域诊断：同名覆盖（warn）/ 自带插件剥离（info）。整块可换行，不裁切文案。 */
+  #app.app-container .ext-scope-notes{display:flex;flex-direction:column;gap:6px}
+  #app.app-container .ext-scope-note{display:flex;flex-direction:column;gap:3px;padding:7px 9px;border:1px solid var(--border);
+    border-radius:8px;background:color-mix(in srgb,var(--panel-3) 55%,transparent);font-size:11px;line-height:1.5;color:var(--muted)}
+  #app.app-container .ext-scope-note b{color:var(--text);font-weight:600}
+  #app.app-container .ext-scope-note.is-warn{border-color:color-mix(in srgb,var(--optional) 45%,var(--border));
+    background:color-mix(in srgb,var(--optional) 10%,transparent)}
+  #app.app-container .ext-scope-tag{flex:0 0 auto;font-size:10px;padding:1px 6px;border-radius:999px;
+    border:1px solid color-mix(in srgb,var(--optional) 55%,var(--border));color:var(--optional);white-space:nowrap}
   #app.app-container .ext-row{display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:11px;color:var(--muted)}
   #app.app-container .ext-row .btn{flex:0 0 auto;white-space:nowrap}
   #app.app-container .ext-branch-def{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
@@ -950,8 +959,10 @@
 
   /* 移动端：窄屏布局（唯一判据是 data-view，由 JS 按容器宽度设置；
      不再另设 @media 断点，否则会与 JS 阈值打架，出现「已堆叠却没有数据包切页按钮」） */
-  #app.app-container[data-view="mobile"]{width:100%;max-width:100%;height:min(820px,calc(100vh - 110px));
-    min-height:0;margin:0 auto}
+  /* 窄屏同样整窗口铺满（用户 2026-11-12 裁定）：不留 820px 上限、不留外边距与圆角。
+     唯一滚动容器仍是 .app-main。 */
+  #app.app-container[data-view="mobile"]{width:100vw;max-width:none;height:100vh;max-height:none;
+    min-height:0;margin:0;border-radius:0}
   #app.app-container[data-view="mobile"] .splitter-v{display:none}
   /* 手机端左右切换：切换哪一列可见；唯一滚动容器仍是 .app-main —— 不做第二个滚动条 */
   #app.app-container .mobile-switch{display:none;flex-wrap:wrap;gap:4px;row-gap:4px;padding:3px;margin:0 2px;
@@ -967,9 +978,11 @@
      注意 `.col-side{display:contents}` 只改变布局树、不改变 DOM 树，
      选择器仍要按 DOM 写 `.col-side > *`，不能用 `.app-main > *` 一并覆盖。 */
   #app.app-container[data-view="mobile"] .app-main > *, #app.app-container[data-view="mobile"] .col-side > *{flex:0 0 auto}
-  #app.app-container[data-view="mobile"] .col-chart{flex:0 0 auto}
+  /* 图表列与卡片「可增不可缩」：内容不足一屏时拉伸填满（不留空白），
+     内容超出时不压缩（否则下方面板会被压成 2px）。用户 2026-11-12 裁定。 */
+  #app.app-container[data-view="mobile"] .col-chart{flex:1 0 auto}
   #app.app-container[data-view="mobile"] .col-side{display:contents}
-  #app.app-container[data-view="mobile"] .chart-card{flex:0 0 auto}
+  #app.app-container[data-view="mobile"] .chart-card{flex:1 0 auto}
   #app.app-container[data-view="mobile"] .cloud-view{flex:0 0 auto}
   #app.app-container[data-view="mobile"] .cloud-grid{grid-template-columns:minmax(0,1fr)}
   #app.app-container[data-view="mobile"] .cloud-body{overflow:visible}
@@ -992,9 +1005,11 @@
   #app.app-container[data-view="mobile"] .empty-guide-card .guide-desc{font-size:10.5px;line-height:1.35;
     min-height:0}
   #app.app-container[data-view="mobile"] .empty-guide-card .btn{min-height:26px;padding:4px 8px;font-size:11px}
-  #app.app-container[data-view="mobile"] .vol-card .chart-tree{height:auto;max-height:260px}
-  /* 手机页头：只留徽标 + 全部功能按钮；标题文字隐藏，徽标文字必须保留（U1/U2） */
-  #app.app-container[data-view="mobile"] .app-title{display:none}
+  /* 树不限高：限高但 overflow:visible 会让内容溢出到底部汇总条之上
+     （2026-11-12 实测重叠，汇总条压在扩展行上）。整块由 .app-main 一个滚动容器承载。 */
+  /* 手机页头：**宽度够就显示标题**（用户 2026-11-12 裁定），放不下时由 h1 的省略号收尾；
+     徽标文字必须保留（U1/U2）。不再无条件 display:none。 */
+  #app.app-container[data-view="mobile"] .app-title{display:flex;flex:0 1 auto;min-width:0}
   #app.app-container[data-view="mobile"] #host-badge{flex:0 0 auto}
   #app.app-container[data-view="mobile"] #host-badge-text{display:inline;white-space:nowrap}
   #app.app-container[data-view="mobile"] .header-actions{gap:4px;margin-left:auto}

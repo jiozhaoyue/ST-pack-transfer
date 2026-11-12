@@ -8,7 +8,7 @@ import { detectFromReader, LAYOUTS } from './detect.js';
 import { createPtNativeHubReader } from './pt-archive.js';
 import { CATEGORIES, CATEGORY_LABELS, categoryOfHubPath, isBackupChatOrSnapshot } from './inspect.js';
 import {
-  routeSource, targetEntryPath, TARGETS, isJunkOrDevFile, parseJsonSafe,
+  routeSource, targetEntryPath, scanExtensionScopes, TARGETS, isJunkOrDevFile, parseJsonSafe,
   normalizeGitMode, isGitEntry, isGitMinimalKept, gitDropReason, GIT_KEEP_PLACEHOLDER,
 } from './transform.js';
 import { EXTENSION_MODES, GIT_MODES } from './export-modes.js';
@@ -82,7 +82,7 @@ export const SPECIAL_LABELS = Object.freeze({
  * @param {string} kind
  * @returns {string}
  */
-export function classifyItemCategory(hubPath, kind) {
+export function classifyItemCategory(hubPath, kind, extScope) {
   if (hubPath.startsWith('thumbnails/') || hubPath.startsWith('_cache/') || hubPath.startsWith('_css/') || hubPath.startsWith('_errors/')) {
     return SPECIAL_CATEGORIES.CACHE;
   }
@@ -92,6 +92,9 @@ export function classifyItemCategory(hubPath, kind) {
   if (kind === 'tt-app-private' || kind === 'engine-dump' || hubPath.startsWith('_tauritavern/')) {
     return SPECIAL_CATEGORIES.APP_PRIVATE;
   }
+  // 全局扩展的 hub 已归一为 `extensions/<n>`：类目必须按作用域还原，
+  // 否则 `selection.globalExtensions` 失效（与 transform 主循环同源）。
+  if (kind === 'extension-pkg' && extScope === 'global') return CATEGORIES.GLOBAL_EXTENSIONS;
 
   const standardCat = categoryOfHubPath(hubPath);
   return standardCat || 'other';
@@ -139,6 +142,16 @@ export async function generatePlan(source, target, {
     ? await createPtNativeHubReader({ io, sourcePath: source, readBlobs: false })
     : await io.openReader(source);
   const routingLayout = detection.layout === LAYOUTS.PT_NATIVE ? LAYOUTS.ST : detection.layout;
+
+  // 预扫中央目录（不开数据流）：同名去重与自带插件剥离都需要先知道全包有哪些扩展名。
+  // 与 `transform.js` 的 `convert` 同源，保证「预测」与「产物」不会各说各话。
+  const { global: globalExtNames, user: userExtFolders, builtin: builtinExtNames } = await scanExtensionScopes({
+    io,
+    sourcePath: source,
+    layout: routingLayout,
+    reader: scanner,
+    isPtNative: detection.layout === LAYOUTS.PT_NATIVE,
+  });
 
   const categories = {};
   const allCategoryKeys = [
@@ -203,7 +216,7 @@ export async function generatePlan(source, target, {
       totalSourceBytes += size;
 
       const routed = routeSource(entry.fileName, routingLayout);
-      const category = classifyItemCategory(routed.hubPath, routed.kind);
+      const category = classifyItemCategory(routed.hubPath, routed.kind, routed.extScope);
 
       // 0. 扩展元数据解析（与 transform.js 主循环同源的解析规则）。
       // 注意：不 continue——元数据条目仍要参与下方的类目计数与动作预测，
@@ -238,7 +251,18 @@ export async function generatePlan(source, target, {
       let reason = '';
 
       // 1. 判断原生处置动作与目标路径
-      if (pruneBuiltinAssets && isTavernBuiltinAsset(routed.hubPath)) {
+      if (routed.kind === 'drop' || routed.kind === 'builtin-ext') {
+        // 宿主自带插件按 DROP 预测：它不进产物（四宿主各有一套自带插件）。
+        action = ACTIONS.DROP;
+        reason = routed.kind === 'builtin-ext'
+          ? '宿主自带插件，目标宿主自有一套（不参与扩展打包）'
+          : routed.reason;
+      } else if (routed.kind === 'extension-pkg' && routed.extScope === 'global'
+        && userExtFolders.has(extensionFolderName(routed.hubPath))) {
+        // 同名去重：宿主加载语义是「用户级优先」，全局副本不写（与 transform 主循环同源）。
+        action = ACTIONS.DROP;
+        reason = `同名扩展已有用户级副本，全局副本跳过（宿主同样优先用户级）`;
+      } else if (pruneBuiltinAssets && isTavernBuiltinAsset(routed.hubPath)) {
         action = ACTIONS.DROP;
         reason = '酒馆原生固定资产(默认背景/主题/预设)，已智能剔除';
       } else if (isJunkOrDevFile(routed.hubPath, { keepDevFiles, keepAll })) {
@@ -297,16 +321,20 @@ export async function generatePlan(source, target, {
           reason = '应用级私有配置，目标平台不消费';
         }
       } else if (routed.kind === 'extension-pkg' && (target === TARGETS.TT || target === TARGETS.PT)) {
-        targetPath = targetEntryPath(routed.hubPath, target);
+        targetPath = targetEntryPath(routed.hubPath, target, routed.extScope);
         action = ACTIONS.MIGRATE;
-        reason = `适配 ${target.toUpperCase()} 平台 third-party 扩展目录布局`;
+        reason = target === TARGETS.PT
+          ? '适配 PT 平台 third-party 扩展目录布局'
+          : (routed.extScope === 'global'
+            ? '适配 TT 全局扩展目录 (data/extensions/third-party/)'
+            : '适配 TT 用户级扩展目录 (data/default-user/extensions/)');
       } else if (routed.kind === 'extension-pkg' && (target === TARGETS.ST || target === TARGETS.L)
-        && (entry.fileName.startsWith('extensions/third-party/') || entry.fileName.startsWith('data/extensions/third-party/'))) {
-        targetPath = targetEntryPath(routed.hubPath, target);
+        && routed.extScope === 'global') {
+        targetPath = targetEntryPath(routed.hubPath, target, routed.extScope);
         action = ACTIONS.MIGRATE;
         reason = '消除错误的 third-party 嵌套，自动平铺为目标平台规范布局';
       } else {
-        targetPath = targetEntryPath(routed.hubPath, target);
+        targetPath = targetEntryPath(routed.hubPath, target, routed.extScope);
         action = targetPath === entry.fileName ? ACTIONS.COPY : ACTIONS.ROUTE;
       }
 
@@ -348,6 +376,10 @@ export async function generatePlan(source, target, {
         rawAction: action,
         reason,
         selected: isSelected,
+        // 扩展作用域：'user' | 'global' | 'builtin'；非扩展条目为 undefined。
+        // UI 侧据此标注「宿主自带」与「被用户级覆盖的全局副本」。
+        extScope: routed.extScope,
+        extName: routed.extName,
       };
 
       if (!categories[category]) {
@@ -405,8 +437,10 @@ export async function generatePlan(source, target, {
     && extensionMode !== EXTENSION_MODES.MANIFEST
     && (!selection || selection.extensions !== false)) {
     for (const root of [...gitRoots].sort()) {
+      const rootName = root.slice('extensions/'.length);
+      const rootScope = (globalExtNames.has(rootName) && !userExtFolders.has(rootName)) ? 'global' : 'user';
       synthesizedItems.push({
-        targetPath: `${targetEntryPath(root, target)}/.git/objects/.keep`,
+        targetPath: `${targetEntryPath(root, target, rootScope)}/.git/objects/.keep`,
         action: ACTIONS.SYNTHESIZE,
         reason: 'gitMode=minimal：合成占位文件，保证 .git/objects 目录在解压后存在',
         estimatedSizeBytes: GIT_KEEP_PLACEHOLDER.length,
@@ -427,6 +461,14 @@ export async function generatePlan(source, target, {
     categories,
     synthesizedItems,
     actionStats,
+    // 扩展作用域诊断：UI 顶部汇总条与行内修复指引的唯一数据源
+    // （同名列表 = 全局与用户级都存在；builtin = 被剥离的宿主自带插件）
+    extensionScopes: {
+      user: [...userExtFolders].sort(),
+      global: [...globalExtNames].sort(),
+      builtin: [...builtinExtNames].sort(),
+      shadowed: [...globalExtNames].filter((name) => userExtFolders.has(name)).sort(),
+    },
     // 扩展元数据（供「仅导出扩展清单」只读选项复用，避免二次解析）
     extensions: [...new Set([
       ...extensionManifests.keys(),
