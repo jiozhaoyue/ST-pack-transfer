@@ -1666,8 +1666,9 @@ async function main(root) {
   view.setProgress(0, t('progress.ready'));
   logger.info(t('log.workbenchReady', { host: host.isPlugin ? t('header.plugin', { host: HOST_LABEL[host.platform] || t('host.fallback') }) : t('header.web') }));
   try {
-    if (settings.autoTutorial && !sessionStorage.getItem('st-pack-transfer:tutorial-seen')) {
-      sessionStorage.setItem('st-pack-transfer:tutorial-seen', '1');
+    // 「每次打开进入教程模式」默认开：不再用 sessionStorage 拦，刷新/重开都会进入；
+    // 用户点教程浮层里的「不再弹出」或取消该设置即不再自动进入。
+    if (settings.autoTutorial) {
       // 立即弹：延迟会让用户先操作再看到蒙层（2026-11-09 反馈）。
       if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => view.openTutorial());
       else view.openTutorial();

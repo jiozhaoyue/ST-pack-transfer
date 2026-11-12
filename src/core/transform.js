@@ -386,18 +386,24 @@ export async function convert(sourcePath, targetPath, {
   const totalEntries = reader.totalEntries ?? 0;
   let processedEntries = 0;
 
-  // 存储引擎互转（用户 2026-11-12）：目标为 L 且显式选了引擎时，包内引擎承载物改由
-  // engine-bridge 重建 —— 转换后的包走宿主原生恢复，**不再需要任何临时数据库**。
+  // 存储引擎互转（用户 2026-11-12）：包内引擎承载物改由 engine-bridge 重建。
+  // - 目标 L：按用户选择的目标引擎产出（省略 = 跟随源包）。
+  // - 目标其它宿主：宿主自身没有数据库后端，一律先还原成文件形态再走目标布局路由
+  //   （用户要求：Luker 的数据库形态也必须能和别宿主的文件形态互传）。
   // 规划阶段只读条目名 + meta，不解析大转储；重活在主循环尾部 `emit()` 里做。
   let enginePlan = null;
-  if (!dryRun && target === TARGETS.L && engine) {
+  const enginePlanTarget = target === TARGETS.L
+    ? engine
+    : (isPtNative ? '' : 'fs');
+  if (!dryRun && enginePlanTarget) {
     enginePlan = await planEngineConversion({
       io,
       sourcePath,
-      targetEngine: engine,
+      targetEngine: enginePlanTarget,
       handle: engineHandle,
       selection,
       sqliteInit: sqliteInit || loadSqlJs,
+      mapPath: (path) => targetEntryPath(path, target),
       onWarn: (message) => report.warn(message),
     });
     if (enginePlan.applicable) {

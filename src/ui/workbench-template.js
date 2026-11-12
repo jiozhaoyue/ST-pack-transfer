@@ -442,6 +442,7 @@ export function getWorkbenchHtml() {
     <div class="dots" id="tutorial-dots"></div>
     <div class="acts">
       <button id="tutorial-adv" class="link" data-i18n="tutorial.changeGoal"></button>
+      <button id="tutorial-never" class="link" data-i18n="tutorial.never"></button>
       <button id="tutorial-skip" data-i18n="tutorial.skip"></button>
       <button id="tutorial-prev" data-i18n="tutorial.prev"></button>
       <button id="tutorial-next" class="primary" data-i18n="tutorial.next"></button>

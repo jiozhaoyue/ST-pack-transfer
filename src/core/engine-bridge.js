@@ -123,6 +123,7 @@ export async function planEngineConversion({
   handle = '',
   selection = null,
   sqliteInit = null,
+  mapPath = null,
   onWarn,
 } = {}) {
   const want = normalizeEngineKind(targetEngine);
@@ -189,6 +190,7 @@ export async function planEngineConversion({
         selection,
         sqliteInit,
         writer,
+        mapPath,
         onWarn: emitWarn || onWarn,
       });
     },
@@ -196,9 +198,9 @@ export async function planEngineConversion({
 }
 
 async function emitConversion({
-  io, sourcePath, sourceEngine, targetEngine, handle, selection, sqliteInit, writer, onWarn,
+  io, sourcePath, sourceEngine, targetEngine, handle, selection, sqliteInit, writer, mapPath, onWarn,
 }) {
-  const sink = await createTargetSink({ targetEngine, handle, sqliteInit, writer, onWarn });
+  const sink = await createTargetSink({ targetEngine, handle, sqliteInit, writer, mapPath, onWarn });
   const readCounts = Object.fromEntries(DUMP_TABLES.map((t) => [t.name, 0]));
   const pushRow = (table, row) => {
     if (!selectionAllowsRow(table, selection)) return;
@@ -275,8 +277,9 @@ async function emitConversion({
   return { sourceEngine, targetEngine, handle, counts: written.counts, total: Object.values(written.counts).reduce((a, b) => a + b, 0) };
 }
 
-async function createTargetSink({ targetEngine, handle, sqliteInit, writer, onWarn }) {
+async function createTargetSink({ targetEngine, handle, sqliteInit, writer, mapPath = null, onWarn }) {
   if (targetEngine === ENGINE_KINDS.FS) {
+    const toPath = typeof mapPath === 'function' ? mapPath : ((p) => p);
     const counts = Object.fromEntries(DUMP_TABLES.map((t) => [t.name, 0]));
     const emitted = new Set();
     let pending = 0;
@@ -287,14 +290,16 @@ async function createTargetSink({ targetEngine, handle, sqliteInit, writer, onWa
           onWarn?.(`行无法写成文件（表 ${table}），已跳过`);
           return;
         }
-        if (emitted.has(entry.name)) {
-          onWarn?.(`目标路径重复：${entry.name}（后写入者覆盖相同行，已按 zip 去重）`);
+        // 目标宿主布局由调用方给（TT/PT 需要 `data/<handle>/` 前缀，ST/L 为摊平）。
+        const outName = toPath(entry.name);
+        if (emitted.has(outName)) {
+          onWarn?.(`目标路径重复：${outName}（后写入者覆盖相同行，已按 zip 去重）`);
           return;
         }
-        emitted.add(entry.name);
+        emitted.add(outName);
         counts[table] += 1;
         pending += 1;
-        void writer.add(entry.name, encoder.encode(entry.text));
+        void writer.add(outName, encoder.encode(entry.text));
         if (pending >= 64) {
           pending = 0;
           void writer.waitForRoom?.();

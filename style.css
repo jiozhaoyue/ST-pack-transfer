@@ -390,6 +390,15 @@
     transition:background .15s ease}
   #app.app-container .chart-split-h:hover::before,
   #app.app-container .chart-split-h.is-dragging::before{background:var(--outline)}
+  /* 十字交界手柄：横竖分隔线的交点，一次同时改列宽与该行高度；所有交叉点都可拖。 */
+  #app.app-container .chart-split-x{position:relative;cursor:move;touch-action:none;z-index:3;background:transparent;margin:-8px}
+  #app.app-container .chart-split-x::before{content:'';position:absolute;left:50%;top:50%;width:10px;height:10px;
+    transform:translate(-50%,-50%);border-radius:50%;border:1px solid var(--border);background:var(--panel-3);opacity:0;
+    transition:opacity .12s,background .12s}
+  #app.app-container .chart-split-x:hover::before,
+  #app.app-container .chart-split-x.is-dragging::before{opacity:1;background:var(--outline)}
+  /* 空间不够时**优先**隐藏占用可视化（体积环/条），标题与勾选列表保持可见。 */
+  #app.app-container .vol-card.is-tight .vol-chart{display:none}
 
   /* 数据包偏好：整列列表，像图表下的类目行，不挤在一侧 */
   #app.app-container .chart-prefs{display:flex;flex-direction:column;height:100%;min-height:0;padding:8px 10px;gap:8px}
