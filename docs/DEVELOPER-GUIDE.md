@@ -260,7 +260,8 @@
 > Gitea → `/api/v1`），见 `git-site.js` 的 `resolveSite()`。关键通道事实：
 > GitHub 私有仓库的 raw 域名**不接受 `Authorization`** ⇒ 读文件改走 contents API
 > （`Accept: application/vnd.github.raw`）；Gitee 的 raw 必须带 `access_token` 查询参数。
-> 读不到一律如实显示「未提供」，不伪造。
+> 另外实测本机 `raw.githubusercontent.com` **会被连接重置**（`api.github.com` 200）⇒
+> 无凭据时先 raw、失败即回落内容 API；有凭据时 API 优先、失败再回落 raw。两条都读不到才如实报「未提供」。
 
 ### K4. P2 / P3：开发者层级 · 管理员分区 · 误装预案 · Git 可视化（2026-11-11 第二轮）
 
@@ -318,7 +319,7 @@
 | 选包来源 | **只读左侧数据包列表的选中项**，面板内无独立文件选择器 | `state.selectedPkgs`；`#cloud-upload`（原包名上传）/ `#cloud-backup-selected`（建备份版本） |
 | S3 HEAD / Range / multipart | 自动 | `src/core/s3-client.js` |
 | WebDAV 全方法降级（OPTIONS/PROPFIND/MKCOL） | 自动 | `src/core/webdav-client.js` |
-| **WebDAV 测试连接**（OPTIONS → PROPFIND → MKCOL → PUT → GET 校验 → DELETE，六步逐步报状态） | 迁移与备份 → 公网 → WebDAV →「测试连接」`#webdav-test` | `webdav-client.js` 的 `selfTest()`；`workbench-view.js` 的 `testWebdavConnection()` |
+| **WebDAV 测试连接**（OPTIONS → PROPFIND → MKCOL → PUT → GET 校验 → DELETE；落在**目录前缀**下，前缀可列则一起验） | 迁移与备份 → 公网 → WebDAV →「测试连接」`#webdav-test` | `webdav-client.js` 的 `selfTest()`；`workbench-view.js` 的 `testWebdavConnection()` |
 | **可选 CORS 代理**（Git / WebDAV 外发请求经用户自填转发地址；留空直连） | 设置 → 网络 → CORS 代理地址 | `src/core/net-proxy.js` 的 `applyProxy()`；`git-remote.js` 的 `getProxyUrl`；`webdav-client.js` 的 `proxyUrl` 参数 |
 | 逐片加密（可选） | S3/WebDAV 表单的「加密短语」；**留空即不加密** | `src/core/s3-crypto.js`；`transfer-runner` 每片独立 IV，续传沿用清单里的原 salt |
 | 一键备份：全量时间戳快照 | `#cloud-backup-selected` + `#cloud-mode-select=full` | `index.js` 的 `backupSelectedToCloud()`；每次独立对象，保留最近 `#cloud-retention` 份 |
@@ -331,6 +332,14 @@
 > 2026-11-12 真机实测（`https://webdav.zhaoyuecst.us.ci/`，Apache mod_dav + Caddy）：> `OPTIONS 200`（`Allow` **不含** PUT/MKCOL）、`PROPFIND 207`、`MKCOL 201`、`PUT 201`、
 > `GET 200`、`DELETE 204`；响应带 `Access-Control-Allow-Origin: *`，浏览器可直连。
 > ⇒ `probe()` 不再按 `Allow` 判死写入能力（`declared` 字段保留声明供参考）。
+>
+> **控制面与数据面两套超时**：`OPTIONS/HEAD/PROPFIND/MKCOL/DELETE` 用 20 秒；
+> `PUT/GET` 用 `transferTimeoutMs`（默认 120 秒）。原因：分片默认 8 MiB，20 秒要求 ≈410 KB/s，
+> 远端酒馆或家宽上行经常达不到 ⇒ 每片都超时、上传永远失败；120 秒对应 ≈70 KB/s 下限。
+> 更慢的链路仍会如实超时。
+>
+> **自检分级**：`OPTIONS` / `PROPFIND` 是参考项（服务器可禁 PROPFIND，上传下载仍可用），
+> `MKCOL/PUT/GET/DELETE` 是必需项；参考项失败只标记 `advisoryFailed`，界面显示「连接可用」并列出 ⚠ 项。
 >
 > 浏览器端无头实测（2026-11-12，Playwright + `npm run build && npm run preview` 的 4173）：
 > 「测试连接」六步全绿（OPTIONS 200 / PROPFIND 207 · 17 项 / MKCOL / PUT / GET 内容一致 / DELETE 204），

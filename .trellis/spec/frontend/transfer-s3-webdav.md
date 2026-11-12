@@ -100,8 +100,12 @@ sets/<set>/snapshots/<ts>.json   # 每版**完整**清单；加密时后缀 .spt
   ⇒ `probe()` 的 `canWrite` / `canMakeCollection` 恒为 true（真实请求说话），
   声明值另放 `declared` 供展示；不得再用 `Allow` 直接禁用上传按钮。
 - **「测试连接」走真实六步**：`webdav-client.js` 的 `selfTest()` 依次
-  `OPTIONS → PROPFIND → MKCOL(.stpt-selftest) → PUT 小文件 → GET 字节比对 → DELETE`，
-  任何一步失败即停并返回 `failedStep` + 状态码；只写临时文件并立即删除。
+  `OPTIONS → PROPFIND → MKCOL(<前缀>/.stpt-selftest) → PUT 小文件 → GET 字节比对 → DELETE`，
+  必需项（MKCOL/PUT/GET/DELETE）失败即停并返回 `failedStep` + 状态码；`OPTIONS/PROPFIND`
+  是参考项，失败只计 `advisoryFailed`（服务器可禁 PROPFIND 而上传仍可用）。
+  测试目录跟随用户填的目录前缀，写入位置与正式上传一致；只写临时文件并立即删除。
+- **控制面 / 数据面两套超时**：控制类请求 20 秒；`PUT/GET` 默认 120 秒
+  （8 MiB 分片要求 ≈70 KB/s 才不超时；沿用 20 秒会让慢上行**每片都超时**、上传永远失败）。
 - **列表过滤自身条目**：`PROPFIND Depth:1` 会把请求的集合本身也返回，
   `list()` 按 URL 路径比对剔除，避免列表多出一个同名目录。
 - **可选 CORS 代理**：浏览器无法直连 SOCKS/HTTP 代理；插件只接受用户自填的

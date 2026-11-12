@@ -191,6 +191,7 @@ export default {
   'webdav.test': 'Test connection',
   'webdav.testing': 'Testing…',
   'webdav.testOk': 'Connection OK: all steps passed',
+  'webdav.testOkPartial': 'Connection usable: upload / download / delete passed; {n} advisory step(s) unavailable (not blocking)',
   'webdav.testFail': 'Test failed at {step}: {reason}',
   'webdav.testHint': 'Writes one tiny temp file under .stpt-selftest/ and deletes it right away.',
   'action.lanHint': 'Send or receive packs',

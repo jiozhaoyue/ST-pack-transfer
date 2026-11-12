@@ -17,6 +17,22 @@
   S3 不代理（SigV4 绑定域名）。宿主原生 `requestProxy` / `enableCorsProxy` 事实已写入文档。
 - 门槛：目标小测 99 项全绿；六个 UI 守卫全过。
 
+## 第二轮（同日「继续」）：健壮性补强
+
+1. **数据面超时与 8 MiB 分片**：原先 PUT/GET 与 OPTIONS 共用 20 秒 ⇒ 8 MiB 分片要求
+   ≈410 KB/s，远端酒馆/家宽上行必然每片超时、上传永远失败。改为 `transferTimeoutMs`
+   默认 120 秒（≈70 KB/s 下限），控制面仍 20 秒。单测用「尊重 AbortSignal 的慢响应」验证两套超时各自生效。
+2. **自检分级 + 跟随前缀**：`OPTIONS/PROPFIND` 改为参考项（服务器禁列目录时上传仍可用），
+   只计 `advisoryFailed`；测试目录落在用户填的目录前缀下，写入位置与正式上传一致。
+3. **GitHub raw 域名不可达**：本机实测 `raw.githubusercontent.com` 连接重置、`api.github.com` 200。
+   `readFile` 改为双通道：有凭据 API 优先→raw 回落；无凭据 raw 优先→失败回落内容 API。
+   真机抽查：GitHub 公共仓 rawFile 由「network 失败」变为 `via:api` 5941 B；GitLab 仍 `via:raw`；
+   Gitee 对不存在的文件如实 404。
+4. 三平台公共仓真机读数（2026-11-12）：
+   - GitHub `SillyTavern/SillyTavern`：分支 12，默认 `release`，rawFile via api 5941 B
+   - GitLab `gitlab-org/gitlab-foss`：分支 100，默认 `master`，rawFile via raw 14596 B
+   - Gitee `mirrors/nginx`：分支 24，默认 `master`（该镜像无 package.json/README，404 为真实结果）
+
 ## 目标与验收判据
 
 1. **日志筛选改为类型多选，默认全选**

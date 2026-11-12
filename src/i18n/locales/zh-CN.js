@@ -194,6 +194,7 @@ export default {
   'webdav.test': '测试连接',
   'webdav.testing': '正在测试…',
   'webdav.testOk': '连接正常：各步骤全部通过',
+  'webdav.testOkPartial': '连接可用：上传 / 下载 / 删除均通过；{n} 个参考项不可用（不影响使用）',
   'webdav.testFail': '测试在 {step} 步失败：{reason}',
   'webdav.testHint': '会在 .stpt-selftest/ 下写一个临时小文件，随后立即删除。',
   'action.lanHint': '发送或接收数据包',
