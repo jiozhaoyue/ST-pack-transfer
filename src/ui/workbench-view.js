@@ -3637,24 +3637,27 @@ async function testWebdavConnection(){
       fetchImpl: (url, init) => fetch(url, init),
       proxyUrl: gitSettings().netProxyUrl || '',
     });
-    res = await dav.selfTest();
+    res = await dav.selfTest({ prefix: cfg.prefix || '' });
   } catch (err) {
     res = { ok: false, steps: [], failedStep: 'client', code: String(err?.message || err) };
   }
   if (btn) btn.disabled = false;
   if (box) {
     const rows = (res.steps || []).map((s) => {
-      const mark = s.ok ? '✓' : '✗';
+      const mark = s.ok ? '✓' : (s.advisory ? '⚠' : '✗');
       const code = s.status ? String(s.status) : (s.code || '');
       return '<div>' + escapeHtml(`${s.step} ${mark}${code ? ' · ' + code : ''}${s.detail ? ' · ' + s.detail : ''}`) + '</div>';
     }).join('');
-    const head = res.ok
-      ? '<div class="ext-note">' + escapeHtml(t('webdav.testOk')) + '</div>'
-      : '<div class="ext-note">' + escapeHtml(t('webdav.testFail', { step: res.failedStep || '?', reason: res.code || '' })) + '</div>';
+    const head = !res.ok
+      ? '<div class="ext-note">' + escapeHtml(t('webdav.testFail', { step: res.failedStep || '?', reason: res.code || '' })) + '</div>'
+      : (res.advisoryFailed
+        ? '<div class="ext-note">' + escapeHtml(t('webdav.testOkPartial', { n: res.advisoryFailed })) + '</div>'
+        : '<div class="ext-note">' + escapeHtml(t('webdav.testOk')) + '</div>');
     box.innerHTML = head + rows;
   }
-  if (res.ok) log('SUCCESS', t('webdav.testOk'));
-  else log('WARN', t('webdav.testFail', { step: res.failedStep || '?', reason: res.code || '' }));
+  if (!res.ok) log('WARN', t('webdav.testFail', { step: res.failedStep || '?', reason: res.code || '' }));
+  else if (res.advisoryFailed) log('WARN', t('webdav.testOkPartial', { n: res.advisoryFailed }));
+  else log('SUCCESS', t('webdav.testOk'));
   return res;
 }
 async function cloudRefresh() {

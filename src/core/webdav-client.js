@@ -20,6 +20,14 @@ const PROPFIND_BODY = '<?xml version="1.0" encoding="utf-8"?>'
   + '</d:prop></d:propfind>';
 
 const DEFAULT_TIMEOUT_MS = 20_000;
+/**
+ * 数据面（PUT / GET）超时单独放宽。
+ *
+ * 依据：分片默认 8 MiB，20 秒内传完要求 ≈410 KB/s。远端酒馆、家宽上行经常达不到，
+ * 于是**每一片都超时**、上传永远失败（20 秒对控制类请求够，对数据面不够）。
+ * 120 秒对应 ≈70 KB/s 下限；更慢的链路仍会如实超时，不伪造成功。
+ */
+const DEFAULT_TRANSFER_TIMEOUT_MS = 120_000;
 
 /** 路径段编码，保留 `/`。 */
 export function encodeDavPath(path) {
@@ -135,6 +143,7 @@ export function classifyDavError(status, error) {
  *   config: {baseUrl:string, username?:string, password?:string},
  *   fetchImpl?: Function,
  *   timeoutMs?: number,
+ *   transferTimeoutMs?: number,
  *   proxyUrl?: string,
  * }} options
  */
@@ -142,6 +151,7 @@ export function createWebdavClient({
   config = {},
   fetchImpl = globalThis.fetch,
   timeoutMs = DEFAULT_TIMEOUT_MS,
+  transferTimeoutMs = DEFAULT_TRANSFER_TIMEOUT_MS,
   proxyUrl = '',
 } = {}) {
   const baseUrl = String(config.baseUrl || '').replace(/\/+$/, '');
@@ -150,11 +160,12 @@ export function createWebdavClient({
     ? `Basic ${base64(`${config.username}:${config.password || ''}`)}`
     : '';
 
-  async function request(method, name, { body, headers = {}, range } = {}) {
+  async function request(method, name, { body, headers = {}, range, timeout } = {}) {
     if (!ready) return { ok: false, status: 0, code: 'not-configured', message: 'not-configured' };
     const url = applyProxy(joinDavUrl(baseUrl, name), proxyUrl);
     const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
-    const timer = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
+    const limit = Number.isFinite(timeout) && timeout > 0 ? timeout : timeoutMs;
+    const timer = controller ? setTimeout(() => controller.abort(), limit) : null;
     const sendHeaders = { ...headers };
     if (auth) sendHeaders.Authorization = auth;
     if (range) sendHeaders.Range = range;
@@ -233,7 +244,7 @@ export function createWebdavClient({
     },
 
     async getObject(name, { range } = {}) {
-      const result = await request('GET', name, { range });
+      const result = await request('GET', name, { range, timeout: transferTimeoutMs });
       if (!result.ok) return result;
       return {
         ok: true,
@@ -246,6 +257,7 @@ export function createWebdavClient({
       return request('PUT', name, {
         body: bytes,
         headers: { 'Content-Type': contentType },
+        timeout: transferTimeoutMs,
       });
     },
 
@@ -314,15 +326,23 @@ export function createWebdavClient({
 
     /**
      * 真实自检：OPTIONS → PROPFIND → MKCOL → PUT → GET 校验 → DELETE。
-     * 只写一个临时小文件并删掉；任何一步失败即停，如实返回该步，不伪造成功。
+     *
+     * 分级：`OPTIONS` / `PROPFIND` 是**参考项**（服务器可禁用 PROPFIND，上传下载仍可用，
+     * 与「任一方法被禁不能让整体失败」的设计前提一致）；`MKCOL/PUT/GET/DELETE` 是必需项。
+     * 只写一个临时小文件并删掉；必需项失败即停，如实返回该步，不伪造成功。
+     * @param {{prefix?: string, dir?: string}} [options] 目录前缀（写入位置）与测试目录
      */
-    async selfTest({ dir = '.stpt-selftest' } = {}) {
+    async selfTest({ prefix = '', dir = '' } = {}) {
       const steps = [];
       if (!ready) return { ok: false, code: 'not-configured', steps, failedStep: 'config' };
-      const push = (step, result, detail = '') => {
+      const cleanPrefix = String(prefix || '').replace(/^\/+|\/+$/g, '');
+      const testDir = String(dir || '').replace(/^\/+|\/+$/g, '')
+        || (cleanPrefix ? `${cleanPrefix}/.stpt-selftest` : '.stpt-selftest');
+      const push = (step, result, detail = '', advisory = false) => {
         const row = {
           step,
           ok: !!result?.ok,
+          advisory,
           status: Number(result?.status) || 0,
           code: result?.code || '',
           detail,
@@ -330,20 +350,23 @@ export function createWebdavClient({
         steps.push(row);
         return row;
       };
-      const stop = (row, code = '') => ({ ok: false, steps, failedStep: row.step, code: code || row.code });
+      const stop = (row, code = '') => ({
+        ok: false,
+        steps,
+        failedStep: row.step,
+        code: code || row.code,
+        advisoryFailed: steps.filter((s) => s.advisory && !s.ok).length,
+      });
 
-      const probe = push('OPTIONS', await this.probe(), 'Capability');
-      if (!probe.ok) return stop(probe);
+      push('OPTIONS', await this.probe(), 'Capability', true);
+      const listed = await this.list(cleanPrefix);
+      push('PROPFIND', listed, listed.ok ? `${listed.items.length} 项` : (listed.code || '目录不可列'), true);
 
-      const listed = await this.list('');
-      const rowList = push('PROPFIND', listed, listed.ok ? `${listed.items.length} 项` : (listed.code || ''));
-      if (!listed.ok) return stop(rowList);
-
-      const made = await this.ensureCollection(dir);
-      const rowMk = push('MKCOL', made, dir);
+      const made = await this.ensureCollection(testDir);
+      const rowMk = push('MKCOL', made, testDir);
       if (!made.ok) return stop(rowMk);
 
-      const name = `${dir}/.probe-${Date.now().toString(36)}.txt`;
+      const name = `${testDir}/.probe-${Date.now().toString(36)}.txt`;
       const content = `webdav-probe-${Math.random().toString(36).slice(2)}`;
       const bytes = new TextEncoder().encode(content);
       const put = await this.putObject(name, bytes, { contentType: 'text/plain; charset=utf-8' });
@@ -365,8 +388,8 @@ export function createWebdavClient({
 
       /* 临时目录尽力清理。**必须带尾斜杠**：实测不带斜杠会被服务器 301 到
          `http://…/<dir>/`，跨协议重定向让浏览器预检直接失败并刷红控制台。 */
-      await request('DELETE', `${String(dir).replace(/\/+$/, '')}/`);
-      return { ok: true, steps };
+      await request('DELETE', `${testDir}/`);
+      return { ok: true, steps, advisoryFailed: steps.filter((s) => s.advisory && !s.ok).length };
     },
   };
 }

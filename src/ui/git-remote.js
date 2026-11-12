@@ -74,27 +74,42 @@ export function createGitRemote({
 
   /**
    * 读仓库内某个文件的文本。
-   * 带凭据时优先走各站点的**内容 API**（GitHub 私有 raw 域名不接受 Authorization）；
-   * 失败且不是鉴权/不存在类错误时，再退回 raw 地址一次。
+   *
+   * 通道顺序按凭据决定，任一路径失败都**回落另一条**：
+   * - 有凭据：内容 API 优先（GitHub 的 raw 域名不接受 Authorization；
+   *   且实测本机 `raw.githubusercontent.com` 会被连接重置，而 `api.github.com` 正常）；
+   * - 无凭据：raw 优先（省 API 配额），raw 网络失败/401/403/404 时改走内容 API。
    */
   async function readFile(repo, ref, file, account = null) {
     if (!repo?.ok) return { ok: false, reason: 'unsupported', text: '' };
     const target = resolveSite(repo, account);
-    const api = account?.secret ? contentEndpoint(target, ref, file) : null;
-    if (api) {
-      const headers = { ...authHeaders(target.site, account.secret), Accept: contentAcceptHeader(target) };
-      const r = await request(api, { headers, as: 'text' });
-      if (r.ok) return { ok: true, text: String(r.data || ''), status: r.status, via: 'api' };
-      if (![401, 403, 404].includes(r.status)) {
-        return { ok: false, reason: r.reason || reasonOf(r.status, false), status: r.status, text: '' };
-      }
+    const secret = account?.secret || '';
+    const apiUrl = contentEndpoint(target, ref, file);
+    const rawUrl = remoteFileUrl(target, ref, file);
+
+    const tryApi = async () => {
+      if (!apiUrl) return null;
+      const headers = {
+        ...(secret ? authHeaders(target.site, secret) : {}),
+        Accept: contentAcceptHeader(target),
+      };
+      return request(apiUrl, { headers, as: 'text' });
+    };
+    const tryRaw = async () => {
+      if (!rawUrl) return null;
+      const { url, headers } = authed(rawUrl, target, account);
+      return request(url, { headers, as: 'text' });
+    };
+
+    const order = secret ? [['api', tryApi], ['raw', tryRaw]] : [['raw', tryRaw], ['api', tryApi]];
+    let lastFail = { ok: false, reason: 'unsupported', text: '' };
+    for (const [via, attempt] of order) {
+      const r = await attempt();
+      if (!r) continue;
+      if (r.ok) return { ok: true, text: String(r.data || ''), status: r.status, via };
+      lastFail = { ok: false, reason: r.reason || reasonOf(r.status, false), status: r.status, text: '' };
     }
-    const raw = remoteFileUrl(target, ref, file);
-    if (!raw) return { ok: false, reason: 'unsupported', text: '' };
-    const { url, headers } = authed(raw, target, account);
-    const r = await request(url, { headers, as: 'text' });
-    if (!r.ok) return { ok: false, reason: r.reason || reasonOf(r.status, false), status: r.status, text: '' };
-    return { ok: true, text: String(r.data || ''), status: r.status, via: 'raw' };
+    return lastFail;
   }
 
   return {
