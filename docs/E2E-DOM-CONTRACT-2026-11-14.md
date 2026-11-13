@@ -51,13 +51,38 @@
 - `npm run build:offline` 自包含门禁把内联 JS 的运行期拼接串（`href="'+…+'"`）误判为外部引用
   ⇒ 自 2026-11-12 起一直失败；扫描器剥离 `<script>` 块后重建通过。
 
-## 3. 已知残余（run6 时点，283 项 / 260 过 / 23 败；从首轮 63 败收敛）
+## 3. 已知残余（定点复跑后，从首轮 63 败收敛到 ~15 败；全绿 spec：cloud-webdav 25/25、
+## cross-host 94/94（16 路径矩阵全通）、s1-remedies 18/18、exclude 11/11、concurrency 15/15、
+## LAN 24/24、下钻 9/9、suggest pill 8/8、图表卡 13/13、stash 14/14、源码树聊天库 17/17）
 
-- `waitForQueue` v2（run6 起生效）：投递面双路计数——旧 `.eq-name` 队列行 ∪ 现行
-  `deliverCreated` 直存的导出区包卡（`#zone-card .pkg-card.is-export .pkg-name-txt`），
-  按去重产物名集合判定；`deliverCreated` 还会 `setZone('export')` 自动切页签。
-- `{target}` 文件名模板变量现渲染**展示名**（SillyTavern/Luker/TauriTavern/PureTavern）。
-- flows「存工作区」中间态已不存在（转换即落库，F9-F14 改为直存 + 跨重载断言）。
-- 残余 23 项的分布：批量/并发/排除/库导出/离线 O14-O15/日志容器（N11）等**次级断言**，
-  多与「转换产物呈现细节」与「纯库桩供给」相关——下一轮入口：单跑对应 spec +
-  在转换后倾倒 `#zone-card` 与 `#log-lines` 读数。
+### 本轮追加的关键 helper（common.cjs）
+
+- **`generate(page)`**：切回导入区 → 保证有勾选包（真实 click，合成 change 不进勾选集合）→
+  点 `#btn-generate`。**为什么必须**：转换后 `deliverCreated` 会 `setZone('export')` 自动切页签 +
+  弹报告模态（复用 `#confirm-dialog`）⇒ 同 spec 的后续转换全部被拦。
+- **`closeModalIfOpen(page)`**：报告模态拦截的统一处置；已内嵌进 `waitForQueue` /
+  `downloadNthRow` / `selectTarget` / `ensureImportZone`。
+- **`downloadByName(page, prefix, dir, file)`**：共享工作区场景（concurrency 的同 context 双页签）
+  按产物名前缀下载——按下标取会拿错（两页产物同列一区是**正确行为**）。
+- **`downloadNthRow` v2**：双路（旧队列行 / 导出区包卡）；导出卡 DOM 序 = **时间倒序**，
+  调用方的创建序 n ⇒ DOM 下标 = count-1-n。
+- **`readCategory` v2.1**：组行展开后**递归展开全部子级折叠行**再数后代
+  （chats/Fixture/bulk-*.jsonl 的目录嵌套默认折叠——只展开组行数到 1 个目录节点）。
+
+### 本轮实证的产品语义变化（spec 已按现行契约改写）
+
+- **分卷阈值下限 32 MB**：UI 守卫拒绝低于 32 的阈值（toast「单卷容量限定 32–2048 MB」）
+  ——旧「阈值 1 MB 切 8 份」语义已不可用；split 夹具改 40 MB + 阈值 32。
+- **`{target}` 模板变量渲染展示名**；flows「存工作区」中间态已不存在（转换即落库）。
+
+### 仍未收敛的残余（~15 项，带首因）
+
+- **split G6/G8**：40 MB 源 + 阈值 32 的转换**不启动**（无任何转换日志、进度停在扫描完成；
+  doGenerate → generate() 链上 32 与 1 的分叉在 `splitLimitOf` 之后）——需 devtools 级排查。
+- **pause-resume R5/R5b**：转换完成太快导致 running 窗口采样不到（时序竞态）。
+- **controls K13/K15**：负数/超大阈值被 UI 拒绝（toast）后无产物——旧「归一为不分卷产出一份」
+  语义已变为「拒绝」，断言需按新语义重写（K12/K14 已按现行通过）。
+- **workbench C8**：setGroupChecks 后 lorebooks 的 readCategory 读数待复核。
+- **workbench-shell / misc / offline / library(E7) / perf / targets / batch 的「未抛异常」**：
+  各 1-3 项次级断言，多与投递面细节相关。
+- **library-export E7**（纯库导出）：纯库上游未实现的既有边界（§六·已知限制），桩供给下仍不出包。

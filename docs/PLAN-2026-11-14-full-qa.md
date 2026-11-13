@@ -237,6 +237,17 @@
 
 ### 验证
 
-- run6（05:10 后台）：验证 waitForQueue v2 / flows / presets / batch-bar / assetlist 引导 /
-  s1 help-close / shell probes / cross-host 勾选 / offline O8-O11b / selectTarget 展示名映射。
+- run6（05:10）：283 项 / 260 过 / 23 败——waitForQueue v2 / flows / presets / batch-bar /
+  assetlist 引导 / s1 help-close / shell probes / cross-host 勾选 / offline O8-O11b 生效。
+- **定点复跑（05:45–06:45，逐 spec）**：修复「转换后报告模态拦截 + 自动切导出区 + 勾选集合
+  click 语义 + 导出卡时间倒序 + readCategory 递归展开」后——
+  **cross-host 94/94（16 路径矩阵全通）**、s1-remedies **18/18**、exclude **11/11**、
+  concurrency **15/15**（共享工作区语义重写 + downloadByName）、split G2/G4/G5/G7 过、
+  controls K12/K14 过；全绿 spec 合计：cloud-webdav 25/25、LAN 24/24、下钻 9/9、
+  suggest pill 8/8、图表卡 13/13、stash 14/14、源码树聊天库 17/17、file:// 6/6。
+- **残余 ~15 项**（分布与首因见 E2E-DOM-CONTRACT §3）：split G6/G8（40MB+阈值 32 转换不启动，
+  需 devtools 级排查）、pause-resume R5（running 窗口时序竞态）、controls K13/K15（拒绝语义重写待做）、
+  library E7（纯库上游未实现的既有边界）及其余次级断言。
+- **产品语义变更登记**：分卷阈值下限 32 MB（UI 拒绝 + toast「单卷容量限定 32–2048 MB」）——
+  旧「1 MB 切 8 份」的验收语义已不可用。
 
