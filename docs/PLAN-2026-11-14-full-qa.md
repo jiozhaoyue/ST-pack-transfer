@@ -181,4 +181,39 @@
 
 - run2（02:58）：**206 项 / 160 过 / 46 败**（63→46）；
 - run3（03:12）：**212 项 / 173 过 / 39 败**（46→39，含跑中混合态的旧 spec）；
-- run4（04:00，后台）：预期显著收敛（selectTarget/教程关闭/树读数全部就位）。
+- run4（04:00）：**245 项 / 225 过 / 20 败**（selectTarget/教程关闭/树读数就位后的第一轮）；
+- run5（04:24）：**300 项 / 261 过 / 39 败**（更多 spec 跑到深层断言，总盘扩大；核心重写区全绿：
+  LAN 24/24、下钻 9/9、suggest pill 8/8、图表卡 13/13、stash 14/14、云存储 25/25、源码树聊天库 17/17）。
+- 残余 39 项的分布与首因见 `docs/E2E-DOM-CONTRACT-2026-11-14.md` §3——最大簇是 cross-host 16
+  路径矩阵的转换段（selectTarget 已通、转换未出产物，需带日志倾当面查），其余为次级断言与级联。
+
+## 阶段性读数 IV（04:40–05:40 · 4 宿主实例链 + 截图）
+
+### 4 宿主错峰实例链（`npm run e2e:instances`，一次只保被测宿主在线）
+
+| 宿主 | 结果 | 读数 |
+| --- | --- | --- |
+| guard | ✅ | 21/21（端口守卫负例 + 命名域名强制） |
+| **Dev ST (8001)** | ✅ | smoke **16/16**（插件挂载/注入点/零本插件报错/零失败请求）+ newui **12/12**；报告 `test-results/instances/dev-st-2026-11-13.md` |
+| **Dev Luker (8003)** | ✅ | smoke **16/16** + newui **12/12**；报告 `test-results/instances/dev-luker-2026-11-13.md` |
+| Dev PT (8899) | ❌ 环境阻塞 | 宿主仓 `apps/web` 的 `predev`（prepare-legacy-runtime.mjs）锚点漂移：「Legacy file-save patch expected exactly one anchor, found 0」——**宿主源码问题，按 L0-1 禁改**，如实登记 |
+| TT (9223 CDP) | ❌→修复中 | 前端 dev-server 缺 `@parcel/watcher`（pnpm workspace，npm 不支持 `workspace:*`）；改 `pnpm install` 后待复跑 |
+
+**关键结论**：两个真实宿主（Dev ST / Dev Luker）的加载冒烟与新 UI 矩阵**全绿**，且全程错峰
+（同一时刻只保被测宿主在线，收尾全停）——「同时只能运行一个 dev 实例」约束由编排器原生满足。
+
+### 截图存档（用户令：全部落盘、不读内容）
+
+- `test-results/screenshots/web/`：**13 张**（首帧教程 / 空工作台 / 计划图表 / 最大化 / Git 视图 /
+  扩展管理×3 / 设置 / file:// 离线 / 窄屏×3）；
+- `test-results/screenshots/instances/`：**9 张**（dev-st 5 张：加载 / 工作台模态 / Git 视图 /
+  迁移面板 / 扩展管理；dev-luker 4 张）；
+- TT：`test-results/instances/tt-cdp-2026-11-13.png`（smoke 现场截图，随报告存档）；
+- 采集器：`e2e/standalone/capture-ui-shots.cjs`（`npm run shots:web`）与
+  `scripts/capture-instance-shots.cjs`（`npm run shots:instances`，错峰起停实例）。
+
+### 终局验证（05:55）
+
+- vitest 全量：**127 文件 / 1243 passed / 2 skipped / 0 failed**；
+- `qa:static` 8/8；
+- 交接文档：`docs/HANDOFF-2026-11-14-full-qa.md`（唯一交接入口）。
