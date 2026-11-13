@@ -40,6 +40,8 @@ export const ORIGIN_ZONE = Object.freeze({
   'lan': ZONES.IMPORT,
   'export-copy': ZONES.IMPORT,
   'source-backup': ZONES.IMPORT,
+  /** 云端（备份集/快照）恢复回来的包 = 源包的字节级副本 ⇒ 回导入区可继续当源转换（2026-11-14）。 */
+  'cloud-restore': ZONES.IMPORT,
   'converted': ZONES.EXPORT,
   'delta': ZONES.EXPORT,
   'split-part': ZONES.EXPORT,

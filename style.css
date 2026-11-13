@@ -769,6 +769,14 @@
   #app.app-container .git-graph-row:hover{background:color-mix(in srgb,var(--accent) 8%,transparent)}
   #app.app-container .git-graph-row.is-selected{background:color-mix(in srgb,var(--accent) 14%,transparent)}
   #app.app-container .git-graph-sha{flex:0 0 auto;font-family:Consolas,monospace;color:var(--accent)}
+  #app.app-container .git-graph-row.is-head .git-graph-sha{font-weight:700}
+  /* 落点徽标（2026-11-14 加深 Git 可视化）：本地分支与 HEAD 钉在提交行上 */
+  #app.app-container .gg-refs{display:flex;flex:0 0 auto;gap:4px;flex-wrap:nowrap;overflow:hidden;max-width:40%}
+  #app.app-container .gg-ref{flex:0 0 auto;font-size:10px;line-height:1.4;padding:0 5px;border-radius:8px;
+    background:color-mix(in srgb,var(--accent) 14%,transparent);color:var(--accent);white-space:nowrap;
+    overflow:hidden;text-overflow:ellipsis;max-width:120px}
+  #app.app-container .gg-ref-head{background:color-mix(in srgb,var(--optional) 22%,transparent);color:var(--optional);
+    font-family:Consolas,monospace;font-weight:700}
   #app.app-container .git-graph-msg{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   #app.app-container .git-graph-date{flex:0 0 auto;color:var(--muted-2);font-size:10.5px}
   #app.app-container .gg-edge{fill:none;stroke-width:1.6;opacity:.85}

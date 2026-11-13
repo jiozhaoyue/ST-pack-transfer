@@ -85,6 +85,7 @@ const ORIGIN_LABELS = {
   [ORIGINS.SPLIT_PART]: { key: 'queue.origin.split', cls: 'origin-split' },
   [ORIGINS.SOURCE_BACKUP]: { key: 'queue.origin.sourceBackup', cls: 'origin-source-backup' },
   [ORIGINS.TARGET_BACKUP]: { key: 'queue.origin.targetBackup', cls: 'origin-target-backup' },
+  [ORIGINS.CLOUD_RESTORE]: { key: 'queue.origin.cloudRestore', cls: 'origin-upload' },
   [ORIGINS.REPORT]: { key: 'queue.origin.report', cls: 'origin-report' },
 };
 
