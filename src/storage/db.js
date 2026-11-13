@@ -41,6 +41,7 @@ export const ORIGINS = Object.freeze({
   SOURCE_BACKUP: 'source-backup',
   REPORT: 'report',
   TARGET_BACKUP: 'target-backup',
+  CLOUD_RESTORE: 'cloud-restore',
   VAULT: 'vault',
 });
 

@@ -38,6 +38,7 @@ import { compareVersions } from '../core/git-site.js';
 import { classifyPluginKind, PLUGIN_KINDS } from '../core/plugin-kind.js';
 import {
   GIT_STATES, normalizeLocalGit, mergeBranches, buildGitSummary, selectGitTargets, diffStat,
+  refPositions, cloudAlignment,
 } from '../core/git-viz.js';
 import { layoutGitGraph, nodePoint, GRAPH_COLORS } from '../core/git-graph.js';
 import {
@@ -1639,7 +1640,9 @@ function fitPackageNames(){
 /* ── 渲染：数据包模式行（导入 = 从宿主拉取；导出 = 覆盖/增量） ── */
 function renderZoneModeRow(){
   const fetchBtn=document.getElementById('btn-fetch');
-  if(fetchBtn) fetchBtn.hidden = state.zone!=='import';
+  // 2026-11-14：独立 Web（无宿主）态隐藏「从宿主拉取」——没有宿主端点可拉，
+  // 露出来只会让用户点了得到报错；宿主插件态（含 PT 的 ST 兼容宿主）照常显示。
+  if(fetchBtn) fetchBtn.hidden = state.zone!=='import' || state.mode!=='plugin';
   const extra=document.getElementById('zone-mode-extra');
   if(extra){
     extra.innerHTML = (state.zone==='import' && state.libraryExport)
@@ -1716,11 +1719,22 @@ function gitGraphHtml(g){
     const p=nodePoint(n,graph);
     return '<circle class="gg-dot gg-c'+n.color+'" cx="'+p.x+'" cy="'+p.y+'" r="4"/>';
   }).join('');
+  /* 落点标记：本地分支（带 commit）与 HEAD 钉到对应提交行；云端分支无 sha，不伪造。 */
+  const refs=refPositions(g.commits,g.branches||[],{localCommit:g.local?.commit||''});
   const rows=g.commits.map((c,i)=>{
     const on=g.selectedSha===c.sha;
-    return '<button type="button" class="git-graph-row'+(on?' is-selected':'')+'" data-gitcommit="'+escapeHtml(c.sha)+'"'
-      +' style="height:'+graph.rowHeight+'px;padding-left:'+(svgW+6)+'px">'
+    const ref=refs.get(c.sha);
+    const refChips=(ref&&(ref.isHead||ref.branches.length))
+      ?'<span class="gg-refs">'
+        +(ref.isHead?'<span class="gg-ref gg-ref-head">'+t('gitv.head')+'</span>':'')
+        +ref.branches.map((b)=>'<span class="gg-ref" title="'+escapeHtml(b)+'">'+escapeHtml(b)+'</span>').join('')
+      +'</span>'
+      :'';
+    return '<button type="button" class="git-graph-row'+(on?' is-selected':'')+(ref?.isHead?' is-head':'')+'" data-gitcommit="'+escapeHtml(c.sha)+'"'
+      +' style="height:'+graph.rowHeight+'px;padding-left:'+(svgW+6)+'px"'
+      +' title="'+escapeHtml(c.sha||'')+'">'
       +'<span class="git-graph-sha">'+escapeHtml(c.shortSha||'')+'</span>'
+      +refChips
       +'<span class="git-graph-msg" title="'+escapeHtml(c.message||'')+'">'+escapeHtml(c.message||'')+'</span>'
       +'<span class="git-graph-date">'+escapeHtml(String(c.date||'').slice(0,10))+'</span>'
     +'</button>';
@@ -1745,6 +1759,10 @@ function gitDetailHtml(row){
       +'<span>'+escapeHtml(String(commit.date||'').slice(0,10))+'</span></div>'
     : '<div class="ext-note">'+t('gitv.pickCommitHint')+'</div>';
   const diff=g.diff;
+  const stat=diff?diffStat(diff.files):null;
+  const statLine=(stat&&stat.known)
+    ?'<div class="git-viz-meta"><span>'+t('gitv.diffStat',{files:stat.files,add:stat.additions,del:Math.abs(stat.deletions)})+'</span></div>'
+    :'';
   const diffHtml=diff
     ? '<div class="git-viz-diff">'+(diff.files.length
         ? diff.files.map((f)=>'<details class="git-viz-file" open>'
@@ -1755,6 +1773,13 @@ function gitDetailHtml(row){
         : '<div class="ext-empty">'+t('gitv.noDiff')+'</div>')+'</div>'
     : (g.diffLoading ? '<div class="ext-note">'+t('gitv.diffLoading')+'</div>'
       : (g.diffError ? '<div class="ext-note is-warn">'+t('gitv.diffFailed',{reason:g.diffError})+'</div>' : ''));
+  /* 本地 HEAD 与云端历史的对齐读数：有本地 HEAD 且云端窗口非空才给行，两头缺失不伪造。 */
+  const align=cloudAlignment(g.local?.commit||'',g.commits||[]);
+  const alignLine=(g.local?.commit&&g.commits.length)
+    ?'<div class="git-viz-meta"><span>'+(align.found
+      ?(align.behind===0?t('gitv.inSync'):t('gitv.behind',{n:align.behind}))
+      :t('gitv.notInWindow',{n:g.commits.length}))+'</span></div>'
+    :'';
   return '<div class="git-viz-head"><b class="git-viz-title">'+escapeHtml(row.name)+'</b>'
       +'<span class="ext-state">'+escapeHtml(row.version||'-')+'</span></div>'
     +'<div class="git-viz-meta">'
@@ -1762,8 +1787,10 @@ function gitDetailHtml(row){
       +'<span>'+t('gitv.commit')+'：'+escapeHtml(summary.shortCommit||t('gitv.unknown'))+'</span>'
       +'<span>'+t('gitv.state')+'：'+gitStateText(summary.state)+'</span>'
     +'</div>'
+    +alignLine
     +historyNote
     +commitBox
+    +statLine
     +diffHtml;
 }
 async function loadGitTarget(name, { force = false } = {}){

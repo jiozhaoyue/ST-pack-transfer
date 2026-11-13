@@ -173,3 +173,55 @@ export function diffStat(files = []) {
   }
   return { files: Array.isArray(files) ? files.length : 0, additions, deletions, known };
 }
+
+/**
+ * 泳道图上的落点标记（2026-11-14 加深 Git 可视化）。
+ *
+ * 只认**带 commit sha 的分支**（`mergeBranches` 的本地行；云端分支只有名字，**不伪造落点**）
+ * 与本地 HEAD。落点不在提交窗口内的分支如实忽略——窗口只有最近 N 条，不构造悬空标记。
+ *
+ * @param {Array<{sha:string}>} commits 最新在前
+ * @param {Array<{name?:string,commit?:string,current?:boolean}>} branches
+ * @param {{localCommit?:string}} [options]
+ * @returns {Map<string,{branches:string[],isHead:boolean}>} sha → 落点标记
+ */
+export function refPositions(commits, branches = [], { localCommit = '' } = {}) {
+  const rows = Array.isArray(commits) ? commits : [];
+  const known = new Set(rows.map((c) => String(c?.sha || '')));
+  const map = new Map();
+  for (const branch of Array.isArray(branches) ? branches : []) {
+    const sha = String(branch?.commit || '').trim();
+    const name = String(branch?.name || '').trim();
+    if (!sha || !name || !known.has(sha)) continue;
+    const row = map.get(sha) || { branches: [], isHead: false };
+    row.branches.push(name);
+    map.set(sha, row);
+  }
+  const head = String(localCommit || '').trim();
+  if (head && known.has(head)) {
+    const row = map.get(head) || { branches: [], isHead: false };
+    row.isHead = true;
+    map.set(head, row);
+  }
+  return map;
+}
+
+/**
+ * 本地 HEAD 与云端历史的对齐读数（只读，不伪造；2026-11-14 加深 Git 可视化）。
+ *
+ * - `found=true` ⇒ `behind` = 本地提交在云端「最新→最旧」序列里的下标（0 = 已同步到云端最新）；
+ * - `found=false` ⇒ 本地提交不在云端窗口内（窗口只有最近 N 条，**不代表已分叉**）；
+ * - `known=false` ⇒ 本地没有 HEAD，无从对齐。
+ *
+ * @param {string} localCommit 本地 HEAD 完整 SHA
+ * @param {Array<{sha:string}>} commits 云端提交（最新在前）
+ * @returns {{known:boolean, found:boolean, behind:number|null}}
+ */
+export function cloudAlignment(localCommit, commits = []) {
+  const head = String(localCommit || '').trim();
+  if (!head) return { known: false, found: false, behind: null };
+  const rows = Array.isArray(commits) ? commits : [];
+  const idx = rows.findIndex((c) => String(c?.sha || '') === head);
+  if (idx < 0) return { known: true, found: false, behind: null };
+  return { known: true, found: true, behind: idx };
+}

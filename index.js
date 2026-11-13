@@ -66,7 +66,7 @@ import { createTransferTarget } from './src/core/transfer-target.js';
 import { createTransferRunner } from './src/app/transfer-runner.js';
 import { uploadBackupSet, updateSetRegistry } from './src/app/backup-set-runner.js';
 import { openEntrySession, safeSegment, timestampName } from './src/core/backup-set.js';
-import { parseManifest, chunkKey, manifestKey } from './src/core/transfer-plan.js';
+import { pruneFullSnapshots } from './src/core/transfer-prune.js';
 import { ExportQueue } from './src/ui/export-queue.js';
 import { reportToHuman } from './src/core/report.js';
 import { TaskManager, memoryAdapter } from './src/core/task-manager.js';
@@ -578,42 +578,6 @@ async function main(root) {
     return exportPackageAssetList(request.pkgIds);
   }
 
-  const FULL_KEEP_DEFAULT = 10;
-
-  /** 删除超出保留数的全量快照。列表不可用（如 WebDAV 禁 PROPFIND）时跳过，不阻断备份。 */
-  async function pruneFullSnapshots({ target, prefix = '', keep = FULL_KEEP_DEFAULT } = {}) {
-    const limit = Math.max(1, Math.trunc(Number(keep) || FULL_KEEP_DEFAULT));
-    if (typeof target?.list !== 'function') return { ok: false, code: 'list-unavailable' };
-    const listPrefix = prefix ? `${prefix}/snapshots/` : 'snapshots/';
-    const listed = await target.list(listPrefix);
-    if (!listed?.ok) return { ok: false, code: listed?.code || listed?.message || 'list-unavailable' };
-
-    const map = new Map();
-    for (const item of listed.items || []) {
-      if (!/\.manifest\.json$/i.test(item.key)) continue;
-      const base = item.key.slice(0, -'.manifest.json'.length);
-      const man = await target.get(item.key);
-      const parsed = man?.ok && man.bytes ? parseManifest(new TextDecoder().decode(man.bytes)) : null;
-      map.set(base, { key: base, createdAt: parsed?.createdAt || item.lastModified || '' });
-    }
-
-    const sorted = [...map.values()].sort(
-      (a, b) => String(b.createdAt).localeCompare(String(a.createdAt)),
-    );
-    const removed = [];
-    for (const item of sorted.slice(limit)) {
-      const man = await target.get(manifestKey(item.key));
-      const parsed = man?.ok && man.bytes ? parseManifest(new TextDecoder().decode(man.bytes)) : null;
-      if (parsed) {
-        for (const chunk of parsed.chunks) await target.remove(chunkKey(item.key, chunk.index));
-      }
-      await target.remove(manifestKey(item.key));
-      await target.remove(item.key);
-      removed.push(item.key);
-    }
-    return { ok: true, removed };
-  }
-
   /**
    * 把当前选中的导入包备份到云端（S3 / WebDAV）。
    *
@@ -626,7 +590,10 @@ async function main(root) {
   async function backupSelectedToCloud({
     provider = 's3', config = {}, mode = 'full', setName = 'default', retention = 10,
   } = {}) {
-    const ids = [...state.selectedPkgs];
+    // 2026-11-14 修 bug：选中包的真源在**视图状态**（`view.getState().selectedPkgs`），
+    // 本作用域的 `state` 没有该字段 ⇒ 旧写法 `[...undefined]` 抛 TypeError，
+    // 云端备份按钮自状态重构后对真实用户一直是坏的（单测只覆盖 runner 纯逻辑，没覆盖这段接线）。
+    const ids = [...(view.getState().selectedPkgs || [])];
     if (!ids.length) { view.toast(t('toast.selectPackFirst')); return; }
     if (mode === 'set' && ids.length !== 1) { view.toast(t('cloud.setSinglePack')); return; }
     if (state.busy) return;
@@ -856,7 +823,10 @@ async function main(root) {
       blob,
       size: blob.size,
       layout: 'unknown',
-      origin: ORIGINS.CONVERTED,
+      // 2026-11-14 改进：云端恢复的包是源包的字节级副本 ⇒ 落导入区（cloud-restore），
+      // 用户可直接当源继续转换；旧 origin=converted 会把它放进导出区，与
+      // 「备份集恢复 → 再走既有迁移流程」的既定流程相悖。
+      origin: ORIGINS.CLOUD_RESTORE,
       metadata: { fromCloud: true },
     });
     if (!fileId) {
