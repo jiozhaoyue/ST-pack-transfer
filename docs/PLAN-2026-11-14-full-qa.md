@@ -217,3 +217,26 @@
 - vitest 全量：**127 文件 / 1243 passed / 2 skipped / 0 failed**；
 - `qa:static` 8/8；
 - 交接文档：`docs/HANDOFF-2026-11-14-full-qa.md`（唯一交接入口）。
+
+## 阶段性读数 V（05:05–05:50 · 残余攻坚：投递面考古）
+
+### 探针实证（probe-convert / probe-assetlist）
+
+1. **转换投递面变更**：`deliverCreated` 现行**直接 `saveFile`**（origin=converted ⇒ 导出区
+   `.pkg-card.is-export` 包卡 + `setZone('export')` 自动切页签）——旧「待导出队列 `.eq-name`」
+   判据漏掉这条路径 ⇒ cross-host 矩阵 16 条「转换完成」假红的首因。
+   **修法**：`waitForQueue` v2 双路计数（`.eq-name` ∪ 导出区包卡，按去重产物名集合）。
+2. **`{target}` 模板变量现渲染展示名**（SillyTavern 而非布局码 st）——flows F6/F8 期望修正。
+3. **flows「存工作区」中间态已不存在**（saveFile 一步落库）——F9-F12 改为「转换即落库 +
+   跨重载持久」断言（F15 保留、F14 删除）。
+4. **资产清单首用引导模态**（`ensureAssetListGuide`，localStorage 门）——misc spec 补引导确认。
+5. **batch-bar 显隐条件**：`chartTargets()` 只数**勾选集/当前源**（无勾选 ⇒ 1 个 target）⇒
+   三键出现的前提是 **≥2 个包被勾选**（不是暂存 2 个）——controls 补勾选步骤。
+6. **workbench C 段预设删除**：`[data-preset]` 已删 ⇒ 树勾选直摆组合（含 C12 全选改为树全选）；
+   组键更名（settings→presets、secrets→private）同步。
+
+### 验证
+
+- run6（05:10 后台）：验证 waitForQueue v2 / flows / presets / batch-bar / assetlist 引导 /
+  s1 help-close / shell probes / cross-host 勾选 / offline O8-O11b / selectTarget 展示名映射。
+

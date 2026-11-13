@@ -51,11 +51,13 @@
 - `npm run build:offline` 自包含门禁把内联 JS 的运行期拼接串（`href="'+…+'"`）误判为外部引用
   ⇒ 自 2026-11-12 起一直失败；扫描器剥离 `<script>` 块后重建通过。
 
-## 3. 已知残余（run5 时点，300 项 / 261 过 / 39 败）
+## 3. 已知残余（run6 时点，283 项 / 260 过 / 23 败；从首轮 63 败收敛）
 
-- **cross-host 16 路径矩阵的转换段**（13 败）：selectTarget 已通，转换未出产物——
-  需要带日志倾当面查（下一轮入口：跑单 spec `node e2e/standalone/run.cjs --only cross-host --no-build`
-  并在 per-target 循环里倾倒 `#log-lines`）；
-- library-export E7（纯库导出出包）、split G4（放大包 chats 计数——readCategory v2 后待复核）、
-  offline O14/O15（计划面板读数）、s1 H3（转换入队）等次级断言；
-- 其余为「未抛异常」连锁——多半由上述首断言失败级联。
+- `waitForQueue` v2（run6 起生效）：投递面双路计数——旧 `.eq-name` 队列行 ∪ 现行
+  `deliverCreated` 直存的导出区包卡（`#zone-card .pkg-card.is-export .pkg-name-txt`），
+  按去重产物名集合判定；`deliverCreated` 还会 `setZone('export')` 自动切页签。
+- `{target}` 文件名模板变量现渲染**展示名**（SillyTavern/Luker/TauriTavern/PureTavern）。
+- flows「存工作区」中间态已不存在（转换即落库，F9-F14 改为直存 + 跨重载断言）。
+- 残余 23 项的分布：批量/并发/排除/库导出/离线 O14-O15/日志容器（N11）等**次级断言**，
+  多与「转换产物呈现细节」与「纯库桩供给」相关——下一轮入口：单跑对应 spec +
+  在转换后倾倒 `#zone-card` 与 `#log-lines` 读数。
