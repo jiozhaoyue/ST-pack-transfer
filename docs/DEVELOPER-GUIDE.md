@@ -278,7 +278,7 @@
 | **服务端插件分区** | 宿主页（仅管理员） | `listServerPlugins()`（`POST /api/users/plugins/list`，`requireAdminMiddleware`）→ `serverPluginBlockHtml()`；可折叠、显示 `enabled` 与 `pluginsPath` |
 | **前后端误装拒绝** | 安装执行前 | `src/core/plugin-kind.js` 的 `classifyPluginKind()`（manifest.json ⇒ 前端扩展；仅 package.json ⇒ 服务端插件）；`preflightExtEntry()` 用 `rawFile('manifest.json' / 'package.json')` 识别；`runExtInstall()` 拦截并给替代措施 |
 | **`?` 帮助补全** | 扩展管理 `?` | `HELP.extmgr` 新增「开发者页」「前端扩展与服务端插件」「Git 可视化」三段 |
-| **Git 可视化（SVG 泳道图 + 版本切换）** | 数据包列头「数据包 / Git」分段按钮（常显） | `workbench-template.js` 的 `#zone-side-tabs` / `#zone-side-git`（`#git-viz-headbar` / `#git-viz-graph` / `#git-viz-detail`）；`workbench-view.js` 的 `renderZoneSide()` / `renderGitViz()` / `loadGitTarget()` / `loadGitCommitDiff()` / `installGitRefNow()`；布局纯逻辑在 `src/core/git-graph.js`（`layoutGitGraph` / `nodePoint`）。云端仓库优先取宿主 `/api/extensions/version` 的 `remoteUrl`（所有已装扩展都能读），安装登记只作兜底；分支/标签点选后出现「装到该版本」，走 `installExtensions replace:true` |
+| **Git 可视化（SVG 泳道图 + 版本切换）** | 数据包列头「数据包 / Git」分段按钮（常显） | `workbench-template.js` 的 `#zone-side-tabs` / `#zone-side-git`（`#git-viz-headbar` / `#git-viz-graph` / `#git-viz-detail`）；`workbench-view.js` 的 `renderZoneSide()` / `renderGitViz()` / `loadGitTarget()` / `loadGitCommitDiff()` / `installGitRefNow()`；布局纯逻辑在 `src/core/git-graph.js`（`layoutGitGraph` / `nodePoint`）。**落点标记与对齐读数（2026-11-14 加深）**：`src/core/git-viz.js` 的 `refPositions()`（本地分支 + HEAD 钉到提交行；云端分支无 sha 不伪造）与 `cloudAlignment()`（已同步 / 落后 N / 窗口外如实报告），diff 汇总复用既有 `diffStat()`。云端仓库优先取宿主 `/api/extensions/version` 的 `remoteUrl`（所有已装扩展都能读），安装登记只作兜底；分支/标签点选后出现「装到该版本」，走 `installExtensions replace:true` |
 | **Git 清理（插件侧）** | 扩展管理 → 宿主页「Git 清理」折叠块 | `gitCleanupBlockHtml()` / `clearPluginGitData()`：清安装登记、逐扩展自动更新规则、更新失败记录；宿主目录里的 `.git` 只读展示、不处理 |
 | 本地 `.git` 读取 | Git 视图 | `host-bridge.js` 的 `readHostExtensionGit()`：`POST /api/extensions/version`（分支 / HEAD / 是否最新 / remoteUrl）+ `/branches`；HEAD 为空 ⇒ 如实显示「历史已丢失」 |
 | 云端只读信息 | Git 视图 | `src/core/git-site.js` 的 `tagsEndpoint()` / `commitDetailEndpoint()` / `remoteFileUrl()` / `normalizeCommitList()` / `normalizeTags()` / `normalizeCommitFiles()`；`git-remote.js` 的 `listTags()` / `listCommits()` / `commitDetail()` / `rawFile()`；只取最近 20 条提交，不拉全量历史 |
@@ -326,7 +326,8 @@
 | **WebDAV 测试连接**（OPTIONS → PROPFIND → MKCOL → PUT → GET 校验 → DELETE；落在**目录前缀**下，前缀可列则一起验） | 迁移与备份 → 公网 → WebDAV →「测试连接」`#webdav-test` | `webdav-client.js` 的 `selfTest()`；`workbench-view.js` 的 `testWebdavConnection()` |
 | **可选 CORS 代理**（Git / WebDAV 外发请求经用户自填转发地址；留空直连） | 设置 → 网络 → CORS 代理地址 | `src/core/net-proxy.js` 的 `applyProxy()`；`git-remote.js` 的 `getProxyUrl`；`webdav-client.js` 的 `proxyUrl` 参数 |
 | 逐片加密（可选） | S3/WebDAV 表单的「加密短语」；**留空即不加密** | `src/core/s3-crypto.js`；`transfer-runner` 每片独立 IV，续传沿用清单里的原 salt |
-| 一键备份：全量时间戳快照 | `#cloud-backup-selected` + `#cloud-mode-select=full` | `index.js` 的 `backupSelectedToCloud()`；每次独立对象，保留最近 `#cloud-retention` 份 |
+| 一键备份：全量时间戳快照 | `#cloud-backup-selected` + `#cloud-mode-select=full` | `index.js` 的 `backupSelectedToCloud()`；每次独立对象，保留最近 `#cloud-retention` 份；**修剪逻辑在 `src/core/transfer-prune.js` 的 `pruneFullSnapshots()`（2026-11-14 从 index.js 抽出补测，单测 `test/transfer-prune.test.js` 7 项）**：清单不可列（如 WebDAV 禁 PROPFIND）时跳过修剪不阻断备份；keep 非法输入 0/NaN→默认 10、负数→收敛 1。**注意**：备份读的是**已保存**的 `activeCloudConfig()`（mode/setName/retention 全部取保存值）——表单改完必须点「保存」才生效；**2026-11-14 修 bug**：该函数曾读不存在的 `state.selectedPkgs`（真源在 `view.getState().selectedPkgs`）⇒ 按钮对真实用户恒抛 TypeError |
+| 备份集恢复落点 | 云列表「恢复」 | 重建 zip 后 `importCloudPack()` 落工作区；**2026-11-14 改进**：origin 新增 `cloud-restore` → **导入区**（恢复的包可继续当源转换），旧 origin=converted 会落导出区、与「恢复 → 再走迁移流程」相悖；映射登记在 `zone-model.js` ORIGIN_ZONE，标签 `queue.origin.cloudRestore`（zh「云端恢复」） |
 | 一键备份：增量备份集 | `#cloud-mode-select=set` + `#cloud-set-name` | `src/app/backup-set-runner.js`、`src/core/backup-set.js`；对象按 sha256 去重，每版一张完整快照 |
 | 备份集恢复 | 列表里的「恢复」按钮 | `restoreBackupSet()` → `actions.importCloudPack()` 落入工作区，再走既有迁移流程 |
 
@@ -458,9 +459,13 @@ index.js      根控制器：detectHost → applyPluginUi → ExportQueue + Task
 
 ## 四、质量门槛与命令
 
+> **执行顺序、每层判据、失败归因速查见 [TESTING-PROCESS.md](./TESTING-PROCESS.md)**（2026-11-14 建立的
+> 唯一权威流程）。下面是命令速查；静态守卫层可用 `npm run qa:static` 一键串跑全部 8 条。
+
 ```bash
-npm test                      # Vitest 全量（2026-11-11 基线：1152 passed / 2 skipped / 120 文件）
+npm test                      # Vitest 全量（2026-11-14 基线：1228 passed / 2 skipped / 127 文件）
 npx vitest run test/xxx.test.js
+npm run qa:static             # L1：8 条静态守卫一键串跑（css-scope/dom-injection/template-source/dom-scope/control-consumer/no-bundler-only/i18n/copy）
 npm run check:css-scope       # CSS 双前缀
 npm run check:dom-injection   # innerHTML 未转义插值
 npm run check:template-source # 单一模板源 + 必需节点 id

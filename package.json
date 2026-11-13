@@ -34,6 +34,9 @@
     "check:i18n": "node scripts/i18n-guard.js",
     "check:copy": "node scripts/copy-audit.js",
     "check:no-bundler-only": "node tooling/no-bundler-only.js",
+    "qa:static": "node tooling/qa-static.mjs",
+    "shots:web": "node e2e/standalone/capture-ui-shots.cjs",
+    "shots:instances": "node scripts/capture-instance-shots.cjs",
     "gen-fixtures": "node fixtures/gen.js"
   }
 }
