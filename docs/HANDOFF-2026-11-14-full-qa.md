@@ -20,7 +20,7 @@
 | vitest 全量 | **127 文件 / 1243 passed / 2 skipped / 0 failed**（新增 transfer-prune 7 + git-viz 7 + zone-model 1 + git-mode 1） | ✅ |
 | `qa:static`（8 守卫） | 8/8（copy-audit 91 处咨询性） | ✅ |
 | `npm run build` / `build:offline` | ✓ / ✓（自包含门禁 0 外部引用——修复了 11-12 以来的误报失败） | ✅ |
-| `e2e:web` 独立 Web 全量 | **run11 终读数：514 项 / 482 过 / 32 败**（套件总盘 195→473——翻倍以上，spec 跑到全深度；首轮 63 败→20）。全绿 spec 群：cross-host 94/94（16 路径矩阵全通）、cloud-webdav 25/25、s1 18/18、exclude 11/11、concurrency 15/15、LAN 24/24、stash 14/14、下钻 9/9、图表卡 13/13、suggest pill 8/8、源码树聊天库 17/17、file:// 6/6、**split 11/11（分卷真出多份）**、targets 45/48、workbench 33/35、云子路径 27/28。**残余 20 项**逐项首因见 §5 与 E2E-DOM-CONTRACT §3 | ⚠ 残余 20 |
+| `e2e:web` 独立 Web 全量 | **run12 终锁定：514 项 / 483 过 / 31 败**（总盘 195→514 翻倍以上；首轮 63 败→31，收敛率 50.8%）。全绿 spec：cross-host **94/94**（16 路径矩阵全通）、cloud-webdav **25/25**、s1 **18/18**、exclude **11/11**、concurrency **15/15**、LAN **24/24**、stash **14/14**、下钻 **9/9**、图表卡 **13/13**、suggest pill **8/8**、源码树聊天库 **17/17**、file:// **6/6**、**split 11/11**、**controls 17/17**、targets 59/69、workbench 46/55、云子路径 37/43。**残余 31 项**逐项首因见 §5 与 E2E-DOM-CONTRACT §3 | ⚠ 残余 31 |
 | `e2e:instances` 4 宿主错峰 | guard 21/21；**Dev ST smoke 16/16 + newui 12/12**；**Dev Luker smoke 16/16 + newui 12/12**；PT/TT 环境阻塞（§4） | ✅(2/4)+⚠(2/4 环境) |
 | 云存储端到端（新 spec） | **25/25**：WebDAV 六步自检 / full 连备 3 留 2（修剪）/ 备份集条目级去重（11 对象复用 11）/ 恢复落导入区 | ✅ |
 
