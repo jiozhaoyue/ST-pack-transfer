@@ -1758,3 +1758,30 @@ Session summary was not supplied.
 ### Next Steps
 
 - 重跑 newui 完整流程；宿主侧无 _xrestore_ 取证
+
+
+## Session 87: e2e:web 残余 31 项全收敛（run14 550/550）+ 库导出统一出口产品修复
+<!-- trellis-session: v=2 fp=1c16f4ddc4f81084 -->
+
+**Date**: 2026-11-14
+**Task**: e2e:web 残余 31 项全收敛（run14 550/550）+ 库导出统一出口产品修复
+**Branch**: `main`
+
+### Summary
+
+继续 2026-11-14 夜间档：run12 的 31 项 e2e:web 残余逐簇收敛到全绿（run14：550 项/550 过/0 败，24 spec 全绿）。产品修复 1 个：exportLibrary 产物按统一出口进导出区（origin=converted）并尊重当前 UI 目标平台（此前硬编码 st、落导入区当源包）——顺带修正旧诊断「library E7 上游未实现」为不准确（功能一直在，缺的是落点与目标），落点契约已补进本 spec §4.5。其余为 spec 侧死探针按现行契约重写：任务控制按钮组（#task-controls 已删）、分卷阈值模态在 blur 才弹出并吞掉点击（capture 监听实证）、上传重置顶层控件偏好（selectOption 须在上传后）、切区清源须点包卡重新载入（ensureSourceLoaded helper）、按名取产物（下标取卡踩导出卡时间倒序）。新 DOM 契约 9 条入 docs/E2E-DOM-CONTRACT §3；杀进程清理与模态惰性化两行进 TESTING-PROCESS 归因速查。环境项：TT 注入静态排查到运行时激活层（安装路径/文件在位已证）；PT predev 属宿主源码禁改域维持登记；check:copy 91 处判定为中文排版惯例误报，维持咨询性。
+Topics: [.trellis/spec/frontend/chat-store-seam.md](../../spec/frontend/chat-store-seam.md)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `b8b812e` | fix(ui): 库导出走导出区统一出口并尊重 UI 目标——e2e:web 残余 31 项全收敛（run14 550/550 全绿） |
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- TT 注入真机轮次（运行时激活层）；PT predev 待 PT 仓侧修复后补 e2e:instances --only dev-pt
