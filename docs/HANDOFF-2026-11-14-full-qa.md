@@ -20,7 +20,7 @@
 | vitest 全量 | **127 文件 / 1243 passed / 2 skipped / 0 failed**（新增 transfer-prune 7 + git-viz 7 + zone-model 1 + git-mode 1） | ✅ |
 | `qa:static`（8 守卫） | 8/8（copy-audit 91 处咨询性） | ✅ |
 | `npm run build` / `build:offline` | ✓ / ✓（自包含门禁 0 外部引用——修复了 11-12 以来的误报失败） | ✅ |
-| `e2e:web` 独立 Web 全量 | **run12 终锁定：514 项 / 483 过 / 31 败**（总盘 195→514 翻倍以上；首轮 63 败→31，收敛率 50.8%）。全绿 spec：cross-host **94/94**（16 路径矩阵全通）、cloud-webdav **25/25**、s1 **18/18**、exclude **11/11**、concurrency **15/15**、LAN **24/24**、stash **14/14**、下钻 **9/9**、图表卡 **13/13**、suggest pill **8/8**、源码树聊天库 **17/17**、file:// **6/6**、**split 11/11**、**controls 17/17**、targets 59/69、workbench 46/55、云子路径 37/43。**残余 31 项**逐项首因见 §5 与 E2E-DOM-CONTRACT §3 | ⚠ 残余 31 |
+| `e2e:web` 独立 Web 全量 | **run14 终锁定（2026-11-14 续档）：550 项 / 550 过 / 0 败，退出码 0——24 个 spec 全绿**（含 specs-src 源码树 17 项）。总盘 195→514→550；31 项残余已全部收敛，逐簇首因链见 `docs/PLAN-2026-11-14-residual-convergence.md`，新 DOM 契约见 E2E-DOM-CONTRACT §3「2026-11-14 下午轮」 | ✅ |
 | `e2e:instances` 4 宿主错峰 | guard 21/21；**Dev ST smoke 16/16 + newui 12/12**；**Dev Luker smoke 16/16 + newui 12/12**；PT/TT 环境阻塞（§4） | ✅(2/4)+⚠(2/4 环境) |
 | 云存储端到端（新 spec） | **25/25**：WebDAV 六步自检 / full 连备 3 留 2（修剪）/ 备份集条目级去重（11 对象复用 11）/ 恢复落导入区 | ✅ |
 
@@ -44,32 +44,36 @@
 4 宿主互转的**格式面**证据：单测 roundtrip + 独立 Web 的 targets/cross-host spec（st/l/tt/pt 四目标连转，
 UI 级 + 产物级）；实例面 ST/Luker 已实测。TT 的注入问题不影响「转出 TT 包」的能力面。
 
-## 5. 残余（如实登记，run11 终读数 32 项 / 514 断言总盘）
+## 5. 残余（2026-11-14 续档已全部收敛 —— 本节转为登记历史与最终处置）
 
-1. **controls K13/K14/K15（3）**：分卷阈值的确认模态（change→确定→commitSplit）已修通 K12；
-   K13/K15 的转换在 commit 后仍不出产物（与 split 挂起同族——转换链在阈值提交后的静默 no-op）；
-   K14 回读 '32'（第二次 fill 未生效——change 后模态拦截时序）。
-2. **split 已修**：根因 = splitter.js 只读 `entry.data` 而调用方传 `{path, blob}`（键名不匹配
-   ⇒ 浏览器分卷必崩）＋ Blob 体积走 `.size`——已双键兼容 + `.size` 回退 + 回归单测；
-   E2E 11/11（40MB 夹具真切 2 份）。**G6/G8 已绿**。
-3. **pause-resume R5/R5b（3）**：转换完成太快导致 running 窗口采样不到（时序竞态，非功能损坏）。
-4. **library E7（2）**：纯库上游未实现的既有边界（桩供给下不出包）。
-5. **其余未抛异常（batch/misc/offline/perf/targets/workbench-shell/flows F10/云子路径 各 1）**：
-   次级断言，多为「转换后投递面细节」——口径与证据链见 E2E-DOM-CONTRACT §3。
-6. **PT 宿主 predev 锚点漂移**（实例仓源码，禁改域）；**TT 插件注入**（运行时侧，环境已修到 CDP 层）。
-7. `check:copy` 91 处文案待收口（咨询性）。
+run12 的 31 项残余已**全部收敛**（run14：550/550，退出码 0）。逐项首因与修法见
+`docs/PLAN-2026-11-14-residual-convergence.md`；新 DOM 契约见 E2E-DOM-CONTRACT §3。
+要点（修正旧诊断）：
+
+1. **library E7「上游未实现」诊断不准确**：功能一直已实现（`exportLibraryToPack` 完整），
+   真因是落点（导入区 vs 导出区）+ 目标平台硬编码 st ⇒ **产品已修**：产物进导出区
+   （origin=converted 统一出口）+ 尊重当前 UI 目标（i18n 同步）。
+2. **pause-resume R5「时序竞态」诊断不准确**：真因 = 死探针（`#task-controls` 等已删）+
+   **分卷阈值模态陷阱**（fill 不 blur ⇒ change 延迟到下一次点击，模态瞬时弹出吞掉点击，
+   capture 监听实证）⇒ spec 按现行契约重写（按钮组 + blur→确认模态→回读 32），22/22。
+3. **perf P19/P21**：上传触发 `applyTopControlsFromPrefs()` 重置压缩等级 ⇒ selectOption
+   挪到上传后（22/22）。产品语义（偏好是初始值）按现状登记。
+4. **targets 10 项**：内联合成 change 失效（须原生 click）+ 切区清源（须 ensureSourceLoaded
+   重新载入）+ 基线计数/取卡分区错误（按名 diff 取产物）⇒ 69/69。
+5. **workbench-shell / offline / misc / workbench F2**：死探针按现行契约重写（quota 行 /
+   zone 页签 / 日志 pane 往返 / 嗅探 404 豁免）⇒ 全绿。
+6. **PT predev 锚点漂移**：宿主仓源码（L0-1 禁改域），维持登记。
+7. **check:copy 91 处**：逐条核对为中文排版惯例（全角括号/分号），审计规则误报 ⇒
+   维持咨询性、登记不收口。
 
 ## 6. 下一会话入口（按优先级）
 
-1. **controls K13/K15 + split 同族**：阈值 commit 后转换静默 no-op——探针
-   `test-results/probe-split2.cjs` 已复现 commit 后「转换失败：byteLength undefined」→
-   **splitter.js 键名 bug 已修**（双键 + .size）；controls 的残余疑似另一环（阈值确认模态时序），
-   用 `node e2e/standalone/run.cjs --only controls --no-build` + 页面日志倾当排查。
-2. **TT 注入**：CDP 已通；插件文件已确认在位（APPDATA 目录 ls 证据在 PLAN §IV）；
-   下一步对照 TT debug exe 实际加载目录与 `e2e/lib/tt-cdp.cjs` 的 ensureInstalled 路径；
-   截图 `test-results/instances/tt-cdp-2026-11-13.png`。
-3. **PT 宿主**：predev 锚点漂移需 PT 仓侧修复；修复后 `npm run e2e:instances --only dev-pt` 补齐。
-4. e2e:web 残余 18 项按 E2E-DOM-CONTRACT §3 逐条收敛（每个都是独立小题）。
+1. **TT 注入**（环境项唯一活跃线）：CDP 已通、安装路径与文件在位已证
+   （`%APPDATA%/com.tauritavern.client/data/default-user/extensions/ST-pack-transfer`）；
+   残余在 TT 运行时激活层（延迟激活），需真机轮次对照 TT debug exe 实际加载目录。
+2. **PT 宿主**：predev 锚点漂移需 PT 仓侧修复（禁改域）；修复后
+   `npm run e2e:instances --only dev-pt` 补齐。
+3. e2e:web 已全绿——后续回归按 `docs/TESTING-PROCESS.md` 六层阶梯执行。
 
 ## 7. 纪律与违规自纠（本轮如实记录）
 

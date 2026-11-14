@@ -52,6 +52,8 @@ npm run e2e -- --only matrix --instance dev-luker    # 只跑一个 spec 的一�
 | `page.fill` 后读数为空 | 静默不写入 | 一律回读 + 程序化赋值兜底（`fillNumber`） |
 | 断言期望的路径/文案不存在 | 断言过时 | 对照 `DEVELOPER-GUIDE.md` 现行契约（例：TT 扩展作用域 2026-11-12 改造） |
 | 同一用例跨轮次结果不同 | 陈旧初态 | 清 `workspace` store 的 `active_session` + 重载；断言改增量口径 |
+| spec 卡死在**有界等待**上（超时机制没兜住） | 上轮杀进程残留 | `chrome-headless-shell` 孤儿进程 / 4173 监听没清 ⇒ 下一轮 openSite 挂死（2026-11-14 实测）。杀 run 后：`Get-Process chrome-headless-shell` 清干净 + `netstat :4173` 确认无 LISTENING 再重跑 |
+| 「功能没跑」但无任何报错/toast | 模态惰性化 | `<dialog open>`（top-layer）会吞掉页面所有点击（capture 监听实证 clicks=[]）。分卷阈值的确认模态在 **blur 才弹出**（Playwright fill 不 blur ⇒ 读回的值是「还没提交」的假象）——先 `blur()` + 等模态 + `confirmActiveModal` |
 
 ## 3. 真机专项判据
 

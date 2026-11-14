@@ -62,27 +62,52 @@
   弹报告模态（复用 `#confirm-dialog`）⇒ 同 spec 的后续转换全部被拦。
 - **`closeModalIfOpen(page)`**：报告模态拦截的统一处置；已内嵌进 `waitForQueue` /
   `downloadNthRow` / `selectTarget` / `ensureImportZone`。
+- **`confirmActiveModal(page)`**：点掉确认模态的**主确认按钮**（副作用生效，例如分卷的
+  commitSplit——只 close 会把要提交的值丢掉）。
 - **`downloadByName(page, prefix, dir, file)`**：共享工作区场景（concurrency 的同 context 双页签）
   按产物名前缀下载——按下标取会拿错（两页产物同列一区是**正确行为**）。
 - **`downloadNthRow` v2**：双路（旧队列行 / 导出区包卡）；导出卡 DOM 序 = **时间倒序**，
-  调用方的创建序 n ⇒ DOM 下标 = count-1-n。
+  调用方的创建序 n ⇒ DOM 下标 = count-1-n。⚠️ 基线计数必须在**卡片实际渲染的分区**做
+  （导出卡只在导出区渲染；导入区数恒 0 ⇒ 下发最老的卡——targets T-safe 假红的首因）。
+- **`ensureSourceLoaded(page)`（2026-11-14 新增）**：确保导入区有**当前源**（树可见）。
+  **为什么必须**：切区页签让「选中集合」与「当前来源」**一起失效**（2026-11-11 裁定，
+  workbench-view zone-tabs 处理器注释）⇒ 转换后切回导入区，树是**空的**——摆预设前必须
+  点包卡本体重新载入为源（探针实证：导出区 9 行树，切回导入 0 行）。
 - **`readCategory` v2.1**：组行展开后**递归展开全部子级折叠行**再数后代
   （chats/Fixture/bulk-*.jsonl 的目录嵌套默认折叠——只展开组行数到 1 个目录节点）。
+- **`readLogText` v2（2026-11-14）**：现行日志 = 常驻底栏 `#log-lines`（**无条件写入**），
+  无需「先展开」；旧 `#log-stream-container`/`#log-console-body`/`#btn-toggle-log` 已删。
 
-### 本轮实证的产品语义变化（spec 已按现行契约改写）
+### 2026-11-14 下午轮实证的新契约（run13b→run14 期间）
 
-- **分卷阈值下限 32 MB**：UI 守卫拒绝低于 32 的阈值（toast「单卷容量限定 32–2048 MB」）
-  ——旧「阈值 1 MB 切 8 份」语义已不可用；split 夹具改 40 MB + 阈值 32。
-- **`{target}` 模板变量渲染展示名**；flows「存工作区」中间态已不存在（转换即落库）。
+1. **任务控制是按钮组，不是容器**：`#task-controls`/`#tc-resume`/`#tc-discard` 已删。
+   现行 `renderActions()` 按任务状态增删按钮：running ⇒ `#btn-task-pause`+`#btn-task-abort`、
+   paused ⇒ `#btn-task-resume`+`#btn-task-abort`、结束 ⇒ 按钮整个消失。
+2. **进度读数现行 id**：`#progress-pct`（文本 "42%"）/ `#progress-fill`（width %）/
+   `#progress-label`。旧 `#progress-percent`/`#status-label`/`#progress-bar-fill` 已删。
+3. **分卷阈值不可为 0**：非法值（<32 / >2048）被守卫 **clamp 到边界 + toast + 「确认分卷容量」
+   模态**，确定后才提交（commitSplit）。⚠️ **change 事件在 blur 才触发**——Playwright `fill`
+   不 blur ⇒ `fillNumber` 读回的值是「还没提交」的假象；随后的下一次点击（blur）才触发守卫，
+   **模态在点击瞬间弹出并惰性化整页 ⇒ 该点击被吞**（capture 监听实证 clicks=[]）。
+   spec 侧处置：fill 后显式 `blur()` → 等模态 → `confirmActiveModal` → 回读 clamp 后的值。
+4. **上传会重置顶层控件**：`setPackages`（上传触发）→ `applyTopControlsFromPrefs()` 把
+   compression/splitMb/filenameTemplate 重置回**持久化偏好** ⇒ 想自定义压缩等级必须在
+   **上传+计划就绪之后**再 `selectOption('#compression-select', …)`（perf P19/P21 假红首因）。
+5. **「点进度条」= 切到日志视图 pane**：`#workbench-progress` 点击 → `showPane('log')`
+   （`#view-workbench` 被隐藏）⇒ 之后所有工作台控件「元素不可见」。回工作台点 `#log-close`。
+6. **配额看板**：`#quota-head` + `.quota-row[data-quota-kind]`；独立态恰 1 行（`browser`），
+   **宿主行不渲染**（旧「宿主区置灰」语义已删）。
+7. **纯库导出落导出区（2026-11-14 产品修正）**：`#btn-library-export` → 产物
+   `library-export-<target>.zip` 进**导出区**（origin=converted 统一出口），且**尊重当前 UI
+   目标平台**（旧实现硬编码 st 且落导入区当源包）。i18n toast 同步改为「已导出到导出区」。
+8. **库内计数基线必须在 generate 前取**：现行 `deliverCreated` 在 waitForQueue 返回前已落库
+   ⇒ 转换后取的 before 已含新记录（flows F10 恒差 1 的首因）。
+9. **运行器杀进程后的清理**：杀掉 e2e run 后必须清干净 `chrome-headless-shell` 残留与
+   4173 监听再重跑——残留会让下一轮在首次 openSite 处挂死（run13 实测，probe2 复刻不挂）。
 
-### 仍未收敛的残余（~15 项，带首因）
+### 仍未收敛的残余（2026-11-14 下午轮已全部收敛 ⇒ 本节留档作废）
 
-- **split G6/G8**：40 MB 源 + 阈值 32 的转换**不启动**（无任何转换日志、进度停在扫描完成；
-  doGenerate → generate() 链上 32 与 1 的分叉在 `splitLimitOf` 之后）——需 devtools 级排查。
-- **pause-resume R5/R5b**：转换完成太快导致 running 窗口采样不到（时序竞态）。
-- **controls K13/K15**：负数/超大阈值被 UI 拒绝（toast）后无产物——旧「归一为不分卷产出一份」
-  语义已变为「拒绝」，断言需按新语义重写（K12/K14 已按现行通过）。
-- **workbench C8**：setGroupChecks 后 lorebooks 的 readCategory 读数待复核。
-- **workbench-shell / misc / offline / library(E7) / perf / targets / batch 的「未抛异常」**：
-  各 1-3 项次级断言，多与投递面细节相关。
-- **library-export E7**（纯库导出）：纯库上游未实现的既有边界（§六·已知限制），桩供给下仍不出包。
+- split G6/G8、pause-resume R5/R5b、controls K13/K15、workbench C8、library E7 及各散项：
+  全部收敛（见 `docs/PLAN-2026-11-14-residual-convergence.md` 的逐簇首因链）。
+  「library E7 = 上游未实现」的旧诊断**不准确**：功能一直已实现（`exportLibraryToPack` 完整），
+  真因是落点（导入区 vs 导出区）与目标平台硬编码——已按统一出口修产品。

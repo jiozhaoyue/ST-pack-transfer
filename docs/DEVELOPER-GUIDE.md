@@ -155,7 +155,7 @@
 | 方向 | 源码落点 |
 | --- | --- |
 | 打包时补齐库里磁盘没有的聊天 | `src/core/pack-inject.js`（纯决策）、`src/ui/chat-store-inject.js` |
-| 从聊天库导出成标准数据包 | `#btn-library-export`、`src/ui/chat-store-bridge.js` |
+| 从聊天库导出成标准数据包（产物进**导出区**统一出口、尊重当前 UI 目标平台——2026-11-14 起） | `#btn-library-export`、`src/ui/chat-store-bridge.js` |
 | 还原后把包里聊天录入库 | `src/ui/chat-store-inject.js` |
 
 > 前置：需聊天库插件暴露带版本号的接入接口（契约见 `.trellis/spec/frontend/chat-store-seam.md`）。

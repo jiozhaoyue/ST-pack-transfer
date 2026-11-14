@@ -1033,7 +1033,7 @@ export default {
   'toast.hostExportBusy': 'Host-native export in progress; plugin pull cancelled',
   'toast.selectExportFirst': 'Select packs to export first',
   'toast.noChats': 'No chats to export',
-  'toast.libraryExported': 'Chat library exported to the import area',
+  'toast.libraryExported': 'Chat library exported to the export zone',
   'toast.privateUploaded': 'Uploaded to user/files',
   'toast.privateUploadFailed': 'Upload failed; see the log',
   'toast.privateUploadMissing': 'Private file not found',

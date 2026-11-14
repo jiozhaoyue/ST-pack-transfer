@@ -1431,19 +1431,27 @@ async function main(root) {
     }
   }
 
+  /**
+   * 「从聊天库导出」：纯库模式把库里的聊天产出一个**目标平台数据包**。
+   * 产物按「统一出口」走导出区（origin=converted，与普通转换产物同通道；
+   * 下载是用户在导出区里的显式动作）。不落导入区当源包——转换产物再当源是双重转换；
+   * 目标平台取当前 UI 选择（此前硬编码 st，用户选了 pt 也只会出 ST 布局）。
+   */
   async function exportLibrary() {
     try {
-      const pack = await exportLibraryToPack({});
+      const target = targetCodeOf(view.getState().target);
+      const pack = await exportLibraryToPack({ target });
       if (!pack?.ok || !pack.blob) { view.toast(pack?.reason || t('toast.noChats')); return; }
-      const id = `lib-${Date.now()}`;
+      const name = `library-export-${target}.zip`;
       await saveFile({
-        id, name: pack.name || 'library-export.zip', size: pack.blob.size,
-        blob: pack.blob, role: 'source', origin: ORIGINS.UPLOAD,
-        metadata: { libraryExport: true },
+        id: `out-lib-${Date.now()}`,
+        name, size: pack.blob.size, blob: namedBlob(pack.blob, name),
+        layout: target, role: 'output', origin: ORIGINS.CONVERTED,
+        metadata: { libraryExport: true, convertedAt: Date.now() },
       });
       await syncPackages();
-      await ensurePlan(id);
       view.toast(t('toast.libraryExported'));
+      view.setZone('export');
     } catch (err) {
       logger.error(t('log.libraryExportFailed', { msg: err.message }));
     }
