@@ -173,8 +173,15 @@ export async function splitArchiveEntries(entries, {
 
   for (let i = 0; i < sortedEntries.length; i++) {
     const entry = sortedEntries[i];
-    const data = typeof entry.read === 'function' ? await entry.read() : entry.data;
-    const entrySize = data.byteLength || data.length || entry.size || 0;
+    // 2026-11-14 修 bug：条目键名兼容——index.js 两个调用方（单包 / 合并分卷）都传
+    // `{path, blob}`（zipIo entry.read() 产物是 Blob），而本函数此前只读 `entry.data`
+    // ⇒ 浏览器里单包 / 合并分卷**一进 splitArchiveEntries 就崩**
+    // （「Cannot read properties of undefined (reading 'byteLength')」，E2E 实测复现）；
+    // 单测用 `{path, data}` 所以一直是绿的——键名双读 + Blob 体积走 `.size`。
+    const data = typeof entry.read === 'function'
+      ? await entry.read()
+      : (entry.data ?? entry.blob);
+    const entrySize = data?.byteLength || data?.length || data?.size || entry.size || 0;
 
     if (onProgress) {
       onProgress(currentPartIndex, Math.max(currentPartIndex, 1), entry.path);
