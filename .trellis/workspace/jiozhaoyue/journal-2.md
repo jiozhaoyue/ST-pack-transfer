@@ -1785,3 +1785,30 @@ Topics: [.trellis/spec/frontend/chat-store-seam.md](../../spec/frontend/chat-sto
 ### Next Steps
 
 - TT 注入真机轮次（运行时激活层）；PT predev 待 PT 仓侧修复后补 e2e:instances --only dev-pt
+
+
+## Session 88: 四 dev 宿主更新到最新 + PT/TT 环境阻塞双修复——L5 实例链 4/4+guard 全绿
+<!-- trellis-session: v=2 fp=c717f3feedba1332 -->
+
+**Date**: 2026-11-14
+**Task**: 四 dev 宿主更新到最新 + PT/TT 环境阻塞双修复——L5 实例链 4/4+guard 全绿
+**Branch**: `main`
+
+### Summary
+
+执行用户令（宿主更新到最新+禁止改宿主源码+环境项全部完成）：四仓 git pull --ff-only（Luker +18 提交 58198a4e6，ST/PT/TT 已最新）；插件克隆（ST 公共侧+Luker data 侧）同步到 974f8a7。PT predev「锚点漂移」真因=实例仓全局 autocrlf=true 把 vendored 上游物化成 CRLF（补丁锚点是 LF，found 0）；仓级 autocrlf=false + git rm --cached -r . && git reset --hard 重物化（磁盘字节=仓库 blob，逻辑零改动，status clean）→ predev exit 0。TT 注入真因=exe 是 2026-09-28 旧构建而前端 313 文件已演进（握手协议错位，__TAURI_INTERNALS__ 缺 invoke）；cargo build 7m33s 重建后 exe 改走内嵌资产协议 tauri.localhost（frontendDist=src），引导秒级完成、插件 +3s 注入；e2e helper 页面过滤放宽两处。pt-load spec 3 条旧断言按现行契约修正（模态惰性创建/常驻控件 5 项/.vol-card）。终读数：e2e:instances guard 21/21 + dev-st smoke 16/16+newui 12/12 + dev-luker smoke 16/16+newui 12/12 + dev-pt pt-load 21/21 + tt-cdp PASS，退出码 0——零宿主源码改动。
+Topics: [.trellis/spec/frontend/chat-store-seam.md](../../spec/frontend/chat-store-seam.md)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `e3c45e6` | docs(handoff): L5 实例链 4/4+guard 全绿——四 dev 宿主更新到最新（零源码改动），PT/TT 环境阻塞双修复 |
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 回归一律按 TESTING-PROCESS 六层阶梯；宿主更新纪律：git pull ff-only + 编译型宿主（TT）重建产物 + autocrlf 物化检查

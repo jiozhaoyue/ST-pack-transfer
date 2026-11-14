@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-2.md`
-- **Total Sessions**: 87
+- **Total Sessions**: 88
 - **Last Active**: 2026-11-14
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-2.md` | ~1787 | Active |
+| `journal-2.md` | ~1814 | Active |
 | `journal-1.md` | ~2491 | Archived |
 <!-- @@@/auto:active-documents -->
 
@@ -30,6 +30,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 88 | 2026-11-14 | 四 dev 宿主更新到最新 + PT/TT 环境阻塞双修复——L5 实例链 4/4+guard 全绿 | `e3c45e6` | `main` |
 | 87 | 2026-11-14 | e2e:web 残余 31 项全收敛（run14 550/550）+ 库导出统一出口产品修复 | `b8b812e` | `main` |
 | 86 | 2026-11-12 | 2026-11-12 · Luker 四态存储互转 + 图表/教程/响应式 + Playwright 无头实测 | - | `main` |
 | 85 | 2026-11-11 | Luker staging 竞态根治 + 扩展写操作串行（Session 85） | `32fe768` | `main` |
