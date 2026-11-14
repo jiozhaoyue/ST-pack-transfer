@@ -1036,7 +1036,7 @@ export default {
   'toast.hostExportBusy': '宿主原生导出进行中，插件拉取已取消',
   'toast.selectExportFirst': '先选择要导出的包',
   'toast.noChats': '没有可导出的聊天',
-  'toast.libraryExported': '聊天库已导出到导入区',
+  'toast.libraryExported': '聊天库已导出到导出区',
   'toast.privateUploaded': '已上传到 user/files',
   'toast.privateUploadFailed': '上传失败，详见日志',
   'toast.privateUploadMissing': '找不到该私有文件',
