@@ -20,7 +20,7 @@
 | vitest 全量 | **127 文件 / 1243 passed / 2 skipped / 0 failed**（新增 transfer-prune 7 + git-viz 7 + zone-model 1 + git-mode 1） | ✅ |
 | `qa:static`（8 守卫） | 8/8（copy-audit 91 处咨询性） | ✅ |
 | `npm run build` / `build:offline` | ✓ / ✓（自包含门禁 0 外部引用——修复了 11-12 以来的误报失败） | ✅ |
-| `e2e:web` 独立 Web 全量 | 首轮 63 败 → 定点收敛后 **全绿 spec 群**：cross-host 94/94（16 路径矩阵全通）、cloud-webdav 25/25、s1 18/18、exclude 11/11、concurrency 15/15、LAN 24/24、stash 14/14、下钻 9/9、图表卡 13/13、suggest pill 8/8、源码树聊天库 17/17、file:// 6/6；**残余 ~15 项**（分布与首因见 §5 与 E2E-DOM-CONTRACT §3） | ⚠ 残余 |
+| `e2e:web` 独立 Web 全量 | **run8 终读数：446 项 / 428 过 / 18 败**（套件总盘 195→446——spec 跑到全深度；首轮 63 败→18）。全绿 spec 群：cross-host 94/94（16 路径矩阵全通）、cloud-webdav 25/25、s1 18/18、exclude 11/11、concurrency 15/15、LAN 24/24、stash 14/14、下钻 9/9、图表卡 13/13、suggest pill 8/8、源码树聊天库 17/17、file:// 6/6、split 11/11（含分卷真出多份）、targets 45/48。**残余 18 项**逐项首因见 §5 与 E2E-DOM-CONTRACT §3 | ⚠ 残余 18 |
 | `e2e:instances` 4 宿主错峰 | guard 21/21；**Dev ST smoke 16/16 + newui 12/12**；**Dev Luker smoke 16/16 + newui 12/12**；PT/TT 环境阻塞（§4） | ✅(2/4)+⚠(2/4 环境) |
 | 云存储端到端（新 spec） | **25/25**：WebDAV 六步自检 / full 连备 3 留 2（修剪）/ 备份集条目级去重（11 对象复用 11）/ 恢复落导入区 | ✅ |
 
@@ -44,29 +44,32 @@
 4 宿主互转的**格式面**证据：单测 roundtrip + 独立 Web 的 targets/cross-host spec（st/l/tt/pt 四目标连转，
 UI 级 + 产物级）；实例面 ST/Luker 已实测。TT 的注入问题不影响「转出 TT 包」的能力面。
 
-## 5. 残余（如实登记，未修完）
+## 5. 残余（如实登记，run8 时点 18 项 / 446）
 
-1. **e2e:web ~15 项残余**（从首轮 63 收敛）：split G6/G8（40MB+阈值 32 转换不启动，需 devtools
-   级排查）、pause-resume R5/R5b（running 窗口时序竞态）、controls K13/K15（「非法阈值拒绝」新语义
-   的断言重写）、library E7（纯库上游未实现的既有边界）、workbench C8 及若干「未抛异常」次级断言。
-   逐项首因与口径见 `docs/E2E-DOM-CONTRACT-2026-11-14.md` §3。
-2. **产品语义变更待登记到用户文档**：分卷阈值下限 32 MB（UI 拒绝 + toast）——README 的分卷描述
-   若提及更小阈值需同步（本轮已核对 README 未写具体下限，无需改）。
-3. **PT 宿主 predev 锚点漂移**（实例仓源码，禁改域）；**TT 插件注入**（运行时侧）。
-4. `check:copy` 91 处文案待收口（咨询性，不阻塞门禁）。
+1. **controls K13/K14/K15（3）**：分卷阈值的确认模态（change→确定→commitSplit）已修通 K12；
+   K13/K15 的转换在 commit 后仍不出产物（与 split 挂起同族——转换链在阈值提交后的静默 no-op）；
+   K14 回读 '32'（第二次 fill 未生效——change 后模态拦截时序）。
+2. **split 已修**：根因 = splitter.js 只读 `entry.data` 而调用方传 `{path, blob}`（键名不匹配
+   ⇒ 浏览器分卷必崩）＋ Blob 体积走 `.size`——已双键兼容 + `.size` 回退 + 回归单测；
+   E2E 11/11（40MB 夹具真切 2 份）。**G6/G8 已绿**。
+3. **pause-resume R5/R5b（3）**：转换完成太快导致 running 窗口采样不到（时序竞态，非功能损坏）。
+4. **library E7（2）**：纯库上游未实现的既有边界（桩供给下不出包）。
+5. **其余未抛异常（batch/misc/offline/perf/targets/workbench-shell/flows F10/云子路径 各 1）**：
+   次级断言，多为「转换后投递面细节」——口径与证据链见 E2E-DOM-CONTRACT §3。
+6. **PT 宿主 predev 锚点漂移**（实例仓源码，禁改域）；**TT 插件注入**（运行时侧，环境已修到 CDP 层）。
+7. `check:copy` 91 处文案待收口（咨询性）。
 
 ## 6. 下一会话入口（按优先级）
 
-1. **split 转换不启动**：40MB 源 + 阈值 32（合法）⇒ doGenerate→generate() 链在 `splitLimitOf`
-   之后静默返回（无转换日志、进度停在扫描完成、busy 未置）——用 devtools 断点
-   `index.js` 的 `generate()`（1192 行起）排查；探针脚本 `test-results/probe-split.cjs` 可复现。
-2. **TT 注入**：CDP 已通；对照 `e2e/lib/tt-cdp.cjs` 的 `ensureInstalled`（插件拷到 APPDATA
-   `com.tauritavern.client/data/default-user/extensions/ST-pack-transfer`）与 TT debug exe 实际加载目录；
-   截图在 `test-results/instances/tt-cdp-2026-11-13.png`。
-3. **PT 宿主**：锚点漂移需 PT 仓侧修复；修复后 `npm run e2e:instances --only dev-pt` 与
-   `npm run shots:instances --only pt-web` 即可补齐。
-4. e2e:web 残余 ~15 项按 E2E-DOM-CONTRACT §3 逐条收敛（controls K13/K15 的「拒绝语义」断言重写
-   最轻，10 分钟级）。
+1. **controls K13/K15 + split 同族**：阈值 commit 后转换静默 no-op——探针
+   `test-results/probe-split2.cjs` 已复现 commit 后「转换失败：byteLength undefined」→
+   **splitter.js 键名 bug 已修**（双键 + .size）；controls 的残余疑似另一环（阈值确认模态时序），
+   用 `node e2e/standalone/run.cjs --only controls --no-build` + 页面日志倾当排查。
+2. **TT 注入**：CDP 已通；插件文件已确认在位（APPDATA 目录 ls 证据在 PLAN §IV）；
+   下一步对照 TT debug exe 实际加载目录与 `e2e/lib/tt-cdp.cjs` 的 ensureInstalled 路径；
+   截图 `test-results/instances/tt-cdp-2026-11-13.png`。
+3. **PT 宿主**：predev 锚点漂移需 PT 仓侧修复；修复后 `npm run e2e:instances --only dev-pt` 补齐。
+4. e2e:web 残余 18 项按 E2E-DOM-CONTRACT §3 逐条收敛（每个都是独立小题）。
 
 ## 7. 纪律与违规自纠（本轮如实记录）
 

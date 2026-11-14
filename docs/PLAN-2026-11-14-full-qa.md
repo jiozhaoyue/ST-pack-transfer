@@ -242,9 +242,16 @@
 - **定点复跑（05:45–06:45，逐 spec）**：修复「转换后报告模态拦截 + 自动切导出区 + 勾选集合
   click 语义 + 导出卡时间倒序 + readCategory 递归展开」后——
   **cross-host 94/94（16 路径矩阵全通）**、s1-remedies **18/18**、exclude **11/11**、
-  concurrency **15/15**（共享工作区语义重写 + downloadByName）、split G2/G4/G5/G7 过、
-  controls K12/K14 过；全绿 spec 合计：cloud-webdav 25/25、LAN 24/24、下钻 9/9、
-  suggest pill 8/8、图表卡 13/13、stash 14/14、源码树聊天库 17/17、file:// 6/6。
+  concurrency **15/15**（共享工作区语义重写 + downloadByName）。
+- **run7（07:15）：409 项 / 392 过 / 17 败**——generate() 报告模态关闭 / 目标区切换 /
+  setGroupChecks 新鲜查询生效；targets 扩到 48 项（T10b 重载重置 extensionMode）。
+- **run8（07:50）：446 项 / 428 过 / 18 败（终读数）**——splitter 键名 bug 修复生效：
+  **split 11/11（40MB 夹具真切 2 份）**、全绿 spec 合计：cross-host 94/94、cloud 25/25、
+  云子路径 27/28、s1 18/18、exclude 11/11、concurrency 15/15、LAN 24/24、下钻 9/9、
+  suggest pill 8/8、图表卡 13/13、stash 14/14、源码树聊天库 17/17、file:// 6/6、targets 45/48。
+- **产品 bug 第 5 个（本阶段）**：splitter.js 键名不匹配（调用方 `{path,blob}` vs 契约
+  `{path,data}`）⇒ 浏览器内单包/合并分卷必崩（「byteLength of undefined」实测复现）；
+  Blob 体积走 `.size` 而非 `.byteLength`。修法：双键兼容 + `.size` 回退 + 回归单测。
 - **残余 ~15 项**（分布与首因见 E2E-DOM-CONTRACT §3）：split G6/G8（40MB+阈值 32 转换不启动，
   需 devtools 级排查）、pause-resume R5（running 窗口时序竞态）、controls K13/K15（拒绝语义重写待做）、
   library E7（纯库上游未实现的既有边界）及其余次级断言。
