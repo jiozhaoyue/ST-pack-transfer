@@ -35,6 +35,7 @@ import {
   opfsTmpHandle, opfsHandleToFile, opfsTmpCleanup,
 } from './src/ui/host-bridge.js';
 import { packPrivateContainer } from './src/core/private-container.js';
+import { prunePackageExtensions } from './src/core/ext-prune.js';
 import { parseRepoUrl } from './src/core/git-url.js';
 import { downloadRepoFiles } from './src/core/repo-files.js';
 import {
@@ -1648,6 +1649,43 @@ async function main(root) {
         if (!pkg?.extManifest?.length) { view.toast(t('toast.noExtensionManifest')); return; }
         // 扩展相关入口统一收进内联「扩展管理」，不再弹浮层。
         view.openExtensionManager(pkg.extManifest);
+      },
+      /* 包内清理（2026-11-15 用户裁定：**只做减法**）——从数据包移除选中的扩展
+         （实体条目 + 私有清单条目），重建 zip 并原位替换存储记录。 */
+      prunePackageExtensions: async (pkgId, names) => {
+        const pkg = pkgById(pkgId);
+        if (!pkg) throw new Error('package not found');
+        const blob = await blobOf(pkg);
+        if (!blob) throw new Error('package blob not found');
+        const res = await prunePackageExtensions(blob, names);
+        if (res.blob === blob || (!res.removedFiles && !res.removedManifest)) {
+          return { removedFiles: 0, removedManifest: 0 };
+        }
+        const record = await getFile(pkgId);
+        await deleteFile(pkgId);
+        await saveFile({
+          id: pkgId,
+          name: record?.name || pkg.name,
+          size: res.blob.size,
+          blob: res.blob,
+          layout: record?.layout || pkg.declaredLayout || pkg.host,
+          role: record?.role || 'source',
+          origin: record?.origin,
+          group: record?.group ?? null,
+          metadata: { ...(record?.metadata || {}), prunedExtensions: Date.now() },
+        });
+        pkg.blob = res.blob;
+        pkg.mb = res.blob.size / (1024 * 1024);
+        pkg.size = fmtMB(pkg.mb);
+        if (res.manifest) pkg.extManifest = res.manifest.extensions || [];
+        else pkg.extManifest = [];
+        state.nodesById.delete(pkgId);
+        for (const key of [...state.planCache.keys()]) {
+          if (key.startsWith(pkgId + '::')) state.planCache.delete(key);
+        }
+        await syncPackages();
+        logger.info(t('extmgr.pkgPrunedLog', { files: res.removedFiles, manifest: res.removedManifest }));
+        return { removedFiles: res.removedFiles, removedManifest: res.removedManifest };
       },
       installExtensions: async (entries) => (host.platform === 'standalone'
         ? installExtensionsIntoPackage(entries, {

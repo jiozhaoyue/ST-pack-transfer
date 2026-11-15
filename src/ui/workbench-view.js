@@ -589,9 +589,16 @@ function renderTargetPicker(){
   const bi=document.getElementById('target-btn-icon');
   bi.src=hostIcon(cur.host); bi.dataset.host=cur.host;
   document.getElementById('target-btn-text').textContent=cur.value;
+  /* 2026-11-15 用户裁定：「宿主」状态**禁止**用「（宿主）」文字标签占宽——
+     一律用特殊颜色（accent）表示：按钮文字与弹层条目均加 .is-host，由 CSS 染色。 */
   const hostTag=document.getElementById('target-btn-host');
-  const isHostNow = state.mode!=='web' && cur.host===state.host;
-  if(hostTag){ hostTag.hidden=!isHostNow; hostTag.textContent=isHostNow?t('target.hostSuffix'):''; }
+  if(hostTag){ hostTag.hidden=true; hostTag.textContent=''; }
+  const targetBtn=document.getElementById('target-btn');
+  if(targetBtn){
+    const isHostNow = state.mode!=='web' && cur.host===state.host;
+    targetBtn.classList.toggle('is-host',isHostNow);
+    targetBtn.title=isHostNow?t('target.hostSuffix'):'';
+  }
   const app=document.getElementById('app');
   if(app) app.setAttribute('data-target-host', cur.host);
   /* 存储引擎只对 Luker 目标开放：其他宿主没有这三种后端，显示出来只会误导。 */
@@ -601,10 +608,11 @@ function renderTargetPicker(){
   if(engineSelect) engineSelect.value = state.engine;
   document.getElementById('target-pop').innerHTML=TARGETS.map(opt=>{
     const isHost = state.mode!=='web' && opt.host===state.host;
-    return '<button class="picker-item" role="option" data-target="'+opt.value+'" aria-selected="'+(opt.value===state.target)+'">'
+    return '<button class="picker-item'+(isHost?' is-host':'')+'" role="option" data-target="'+opt.value+'" aria-selected="'+(opt.value===state.target)+'"'
+      +(isHost?' title="'+t('target.hostSuffix')+'"':'')
+      +'>'
       +'<img class="picker-ico" data-host="'+opt.host+'" src="'+hostIcon(opt.host)+'" alt="">'
       +'<span>'+opt.value+'</span>'
-      +(isHost?'<span class="host-tag">'+t('target.hostSuffix')+'</span>':'')
       +'</button>';
   }).join('');
 }
@@ -3212,6 +3220,14 @@ function installedRowRecords(){
     loadingOrder:Number.isFinite(Number(x?.loadingOrder))&&String(x?.loadingOrder??'')!==''?Number(x.loadingOrder):null,
   })).filter((row)=>row.name);
 }
+/** 宿主行的远程仓库 URL（同步可得）：优先安装登记，其次自动更新规则；未登记返回 ''。
+ *  2026-11-15 用户裁定：URL 直接显示在行内、点击即复制，禁止单独的复制按钮。 */
+function installedRemoteUrlOf(name){
+  const s=loadSettings();
+  const reg=(s.gitInstalls||[]).find((r)=>r.name===name);
+  const rule=(s.gitAutoUpdateRules||{})[name];
+  return String(reg?.url||rule?.url||'').trim();
+}
 /** 排序：自定义（拖拽顺序）优先，其余按名称 / 版本 / 来源稳定排序。 */
 function sortedInstalledRecords(records, sort){
   const order=new Map(((loadSettings().extOrder)||[]).map((name,index)=>[name,index]));
@@ -3324,6 +3340,19 @@ async function installPackageExtensionsToHost(pkgId, selectedNames){
   state.extInstalled=null;
   renderExtensionView();
 }
+/** 包内清理（**只做减法**）：把所选扩展从数据包移除（实体 + 清单条目），然后刷新视图。 */
+async function pruneSelectedFromPackage(pkgId, names){
+  if(!pkgId || !names?.length) return;
+  try {
+    toast(t('extmgr.pkgPruning'));
+    const res=await actions.prunePackageExtensions?.(pkgId, names);
+    if(!res) throw new Error('prune unavailable');
+    toast(t('extmgr.pkgPruned',{files:res.removedFiles||0,manifest:res.removedManifest||0}));
+  } catch(err) {
+    toast(t('extmgr.pkgPruneFailed',{msg:err?.message||String(err)}));
+  }
+  renderExtensionView();
+}
 function clearPluginGitData(){
   persistDev({ gitInstalls:[], gitAutoUpdateRules:{} });
   state.extUpdateFail={};
@@ -3352,7 +3381,9 @@ async function renderExtInstalled(body){
   const isHost = state.extSource === 'host';
   const importPkgs = (state.packages||[]).filter(p=>p && p.id);
   if(!state.extSelectedPackageId && importPkgs.length){
-    state.extSelectedPackageId = importPkgs[0].id;
+    /* 无持久选择时默认取**最新**导入包（与导入区包列表的时序一致）。 */
+    const newest=[...importPkgs].sort((a,b)=>(b.ts||0)-(a.ts||0))[0];
+    state.extSelectedPackageId = newest.id;
   }
   const selectedPkg = importPkgs.find(p=>p.id===state.extSelectedPackageId) || null;
 
@@ -3364,10 +3395,10 @@ async function renderExtInstalled(body){
     +'</div>'
     +(!isHost
       ? (importPkgs.length
-        ? '<label class="field ext-pkg-picker"><span>'+t('extmgr.selectPackage')+'</span>'
-          +'<select class="text_pole" id="extmgr-pkg-select">'
-          +importPkgs.map(p=>'<option value="'+escapeHtml(p.id)+'"'+(p.id===state.extSelectedPackageId?' selected':'')+'>'+escapeHtml(p.name)+' ('+fmtMB(p.mb)+')</option>').join('')
-          +'</select></label>'
+        ? /* 2026-11-15 用户裁定：包内视图**禁止**出现「选择数据包」选择器——
+             当前包名只读展示（包的切换/管理在旁边的导入区包列表进行）。 */
+          '<span class="ext-pkg-current" title="'+escapeHtml(selectedPkg?.name||'')+'">'
+          +escapeHtml(selectedPkg?.name||'')+'（'+fmtMB(selectedPkg?.mb||0)+'）</span>'
         : '<span class="ext-note-inline">'+t('extmgr.noPackageAvailable')+'</span>')
       /* 「自动更新」按钮（2026-11-15 裁定：禁止长名字；打开即替换列表区域，此键是唯一开关） */
       : '<button type="button" class="btn ext-policy-btn'+(state.extPolicyOpen?' active':'')
@@ -3384,6 +3415,10 @@ async function renderExtInstalled(body){
     rowsHtml=records.map(({x,name,version})=>{
       const rule=rules[name]||null;
       const isCurrentGit = state.gitViz.name === name;
+      const remoteUrl=installedRemoteUrlOf(name);
+      const remoteEl=remoteUrl
+        ? '<span class="ext-remote-url" data-copyurl="'+escapeHtml(remoteUrl)+'" title="'+escapeHtml(remoteUrl)+' · 点击复制">'+escapeHtml(remoteUrl)+'</span>'
+        : '<span class="ext-remote-url is-none" title="'+t('extmgr.autoNeedsRepoShort')+'">—</span>';
       const auto='<span class="ext-auto">'
         +'<select class="text_pole ext-up-mode" data-upmode="'+escapeHtml(name)+'" title="'+t('extmgr.autoUpdate')+'">'
           +'<option value="off"'+(rule?'':' selected')+'>'+t('extmgr.devOff')+'</option>'
@@ -3399,6 +3434,7 @@ async function renderExtInstalled(body){
         +'<label class="check ext-dev-check"><input type="checkbox" data-extsel="'+escapeHtml(name)+'"></label>'
         +(x?.loadingOrder!=null?'<span class="ext-flag ext-order" title="'+t('extmgr.orderHint')+'">#'+escapeHtml(String(x.loadingOrder))+'</span>':'')
         +'<span class="ext-url" title="'+escapeHtml(name)+'">'+escapeHtml(name)+'</span>'
+        +remoteEl
         +'<span class="ext-state">'+escapeHtml(version)+'</span>'
         +extSourceTag(x?.sourceType)
         +auto
@@ -3415,8 +3451,10 @@ async function renderExtInstalled(body){
           ? '<span class="ext-flag ext-kind-tag is-orig">'+t('extmgr.kindOriginal')+'</span>'
           : '<span class="ext-flag ext-kind-tag is-man">'+t('extmgr.kindManifest')+'</span>';
         const repoLink = item.url
-          ? '<a class="ext-link-icon" href="'+escapeHtml(item.url)+'" target="_blank" rel="noopener" title="'+escapeHtml(item.url)+'"><i class="fa-solid fa-up-right-from-square"></i></a>'
-          : '';
+        /* 2026-11-15 用户裁定：远程 URL **直接显示**在行内，点击 URL 文本即复制；
+           绝对禁止单独的复制按钮（也不再用外链图标占宽）。 */
+        ? '<span class="ext-remote-url" data-copyurl="'+escapeHtml(item.url)+'" title="'+escapeHtml(item.url)+' · 点击复制">'+escapeHtml(item.url)+'</span>'
+        : '';
         return '<div class="ext-entry is-ok ext-ext-row'+(isCurrentGit?' is-active':'')+'" role="listitem" data-extrow="'+escapeHtml(item.name)+'">'
           +'<label class="check ext-dev-check"><input type="checkbox" data-extsel="'+escapeHtml(item.name)+'"></label>'
           +'<span class="ext-url" title="'+escapeHtml(item.name)+'">'+escapeHtml(item.name)+'</span>'
@@ -3425,7 +3463,7 @@ async function renderExtInstalled(body){
           +repoLink
           +'</div>';
       }).join('')
-      : ('<div class="ext-empty">'+(selectedPkg ? t('extmgr.noneInstalled') : t('extmgr.noPackageSelected'))+'</div>');
+      : ('<div class="ext-empty">'+t('extmgr.noneInstalled')+'</div>');
   }
 
   const upd=state.extUpdate;
@@ -3475,9 +3513,13 @@ async function renderExtInstalled(body){
     +'<input class="text_pole ext-batch-ref" data-extref placeholder="'+t('extmgr.refOptional')+'">';
 
   /* 2026-11-15 裁定：安装操作一律在底部「安装扩展」面板内进行——
-     数据包工具行只留「打包」，「安装到宿主」迁入页脚安装面板（renderExtInstall 的 package 分支）。 */
+     数据包工具行只留「打包」与「移除所选」（包内清理**只做减法**），
+     「安装到宿主」迁入页脚安装面板（renderExtInstall 的 package 分支）。 */
   const packageActionButtons='<button type="button" class="btn ext-act-btn" id="extmgr-batch-pack" disabled title="'+t('extmgr.batchPack')+'">'
       +'<i class="fa-solid fa-box-archive"></i><span>'+t('extmgr.batchPack')+'</span>'
+    +'</button>'
+    +'<button type="button" class="btn danger ext-act-btn" id="extmgr-batch-prune" disabled title="'+t('extmgr.batchPrune')+'">'
+      +'<i class="fa-solid fa-eraser"></i><span>'+t('extmgr.batchPrune')+'</span>'
     +'</button>';
 
   /* 2026-11-15 裁定：列表不再是独立 details DOM——去掉「扩展列表」头与 .ext-host-list 包裹层，
@@ -3527,14 +3569,22 @@ async function renderExtInstalled(body){
     state.extSource=b.dataset.extsource;
     renderExtensionView();
   });
-  body.querySelector('#extmgr-pkg-select')?.addEventListener('change',(e)=>{
-    state.extSelectedPackageId=e.target.value;
-    renderExtensionView();
-  });
   body.querySelector('#extmgr-policy-toggle')?.addEventListener('click',()=>{
     state.extPolicyOpen=!state.extPolicyOpen;
     renderExtensionView();
   });
+  /* 行内远程 URL：点击文本即复制（2026-11-15 裁定：禁止单独的复制按钮）。
+     body 节点常驻、每次重渲染都跑到这里，故用标记防重复绑定。 */
+  if(!body.dataset.copyurlBound){
+    body.dataset.copyurlBound='1';
+    body.addEventListener('click',async(e)=>{
+      const el=e.target.closest('[data-copyurl]');
+      if(!el) return;
+      e.stopPropagation();
+      try { await navigator.clipboard.writeText(el.dataset.copyurl||''); toast(t('lan.copied')); }
+      catch { toast(t('toast.copyFailed')); }
+    });
+  }
   body.querySelector('#extmgr-check-updates')?.addEventListener('click',()=>{ void checkExtUpdates(); });
   body.querySelector('#extmgr-refresh-installed')?.addEventListener('click',()=>{ state.extInstalled=null; state.extUpdate=null; state.extUpdateFail={}; renderExtensionView(); });
   body.querySelectorAll('[data-extpolicy]').forEach((input)=>input.addEventListener('change',()=>{
@@ -3598,12 +3648,14 @@ async function renderExtInstalled(body){
     const bMove=body.querySelector('#extmgr-batch-move');
     const bRemove=body.querySelector('#extmgr-batch-remove');
     const bPack=body.querySelector('#extmgr-batch-pack');
+    const bPrune=body.querySelector('#extmgr-batch-prune');
     /* 安装按钮在页脚安装面板里（不在 body 内），全局查找 */
     const bInstall=document.getElementById('extmgr-pkg-install');
     if(bUpdate) bUpdate.disabled=n===0;
     if(bMove) bMove.disabled=n===0;
     if(bRemove) bRemove.disabled=n===0;
     if(bPack) bPack.disabled=n===0;
+    if(bPrune) bPrune.disabled=n===0;
     if(bInstall) bInstall.disabled=n===0;
     if(n===1){
       const singleName=checked[0].dataset.extsel;
@@ -3645,6 +3697,19 @@ async function renderExtInstalled(body){
     const names=selectedNames();
     if(!names.length){ toast(t('extmgr.selectNoneHint')); return; }
     batchPackWithConfirm(names);
+  });
+
+  /* 包内清理（2026-11-15 用户裁定：**只做减法**）——移除所选扩展的实体与清单条目 */
+  body.querySelector('#extmgr-batch-prune')?.addEventListener('click',()=>{
+    const names=selectedNames();
+    if(!names.length){ toast(t('extmgr.selectNoneHint')); return; }
+    openModal(t('extmgr.batchPrune'), t('extmgr.batchPruneDesc',{n:names.length}), [], [
+      {label:t('modal.cancel'),onClick:closeModal},
+      {label:t('extmgr.batchPruneConfirm'),danger:true,onClick:()=>{
+        closeModal();
+        void pruneSelectedFromPackage(state.extSelectedPackageId, names);
+      }},
+    ]);
   });
 
   /* 「安装到宿主」绑定已迁入页脚安装面板（renderExtInstall 的 package 分支）：
