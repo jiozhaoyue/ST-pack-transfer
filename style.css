@@ -1201,9 +1201,11 @@
   #app.app-container[data-view="mobile"][data-zone-open="1"] .zone-body{
     flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;
   }
-  /* 收起动画（2026-11-16 用户裁定：所有动作必须有流畅动画）：1fr→0fr 收拢完再 display:none */
+  /* 收起动画（2026-11-16 用户裁定：所有动作必须有流畅动画）：1fr→0fr 收拢完再 display:none。
+     ⚠️ 此处**禁用 !important**——!important 会压过动画关键帧导致瞬间跳变；
+     本规则在源码顺序上位于展开规则之后，同特异性自然取胜。 */
   #app.app-container[data-view="mobile"] .col-side.is-closing{
-    display:grid;grid-template-rows:0fr !important;
+    display:grid;grid-template-rows:0fr;
     animation:zoneClose .2s ease forwards;
   }
   @keyframes zoneDrop{
