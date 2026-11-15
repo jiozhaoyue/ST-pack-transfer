@@ -762,7 +762,9 @@
   /* 「自动更新」子视图（2026-11-15 裁定）：打开即**替换**列表滚动区，独占正文剩余高度 */
   #app.app-container .ext-auto-policy{flex:1 1 auto;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:8px}
   #app.app-container .ext-policy-title{font-size:12.5px;font-weight:650;color:var(--text)}
-  #app.app-container .ext-source-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding-bottom:4px;border-bottom:1px dashed color-mix(in srgb,var(--border) 60%,transparent)}
+  /* 2026-11-15 用户裁定：扩展列表里**禁止常驻分隔细线**——来源行的 dashed 下边线及其
+     padding 上下恒占高度，全部去掉（来源行与工具行之间用面板既有间距，凭空无缝）。 */
+  #app.app-container .ext-source-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
   /* 包选择（2026-11-15 用户裁定：「选择数据包」文案彻底删除，连 label 都不许有）：
      **手机版必须可选**（无文字标签的 select，宽随最长选项自适应）；
      **桌面隐藏 select、只读展示 .ext-pkg-current 包名**（互斥显示） */
