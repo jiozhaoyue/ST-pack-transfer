@@ -734,10 +734,18 @@
   #app.app-container .ext-auto-policy{flex:1 1 auto;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:8px}
   #app.app-container .ext-policy-title{font-size:12.5px;font-weight:650;color:var(--text)}
   #app.app-container .ext-source-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding-bottom:4px;border-bottom:1px dashed color-mix(in srgb,var(--border) 60%,transparent)}
+  /* 包选择（2026-11-15 用户裁定：「选择数据包」文案彻底删除，连 label 都不许有）：
+     **手机版必须可选**（无文字标签的 select，宽随最长选项自适应）；
+     **桌面隐藏 select、只读展示 .ext-pkg-current 包名**（互斥显示） */
+  #app.app-container:not([data-view="mobile"]) .ext-pkg-picker{display:none}
+  #app.app-container[data-view="mobile"] .ext-pkg-current{display:none}
   #app.app-container .ext-pkg-picker{display:inline-flex;align-items:center;gap:6px;font-size:11px;max-width:100%}
   /* 包名不截断（2026-11-15 裁定）：宽度按最长选项自适应；容器放不下时整行换行，不用省略号。
      覆盖 .field select 的 max-width:190px——那是包名被截断的根因。 */
   #app.app-container .ext-pkg-picker select{width:auto;min-width:180px;max-width:100%;padding:2px 6px;font-size:11px}
+  /* 只读包名（桌面态显示；手机态由上方互斥规则隐藏） */
+  #app.app-container .ext-pkg-current{font-size:11px;font-weight:600;color:var(--text);
+    padding:2px 8px;border-radius:6px;background:var(--panel-3);border:1px solid var(--border)}
   #app.app-container .ext-policy-btn{margin-left:auto;padding:2px 8px;font-size:10.5px}
   #app.app-container .ext-policy-btn.active{background:color-mix(in srgb,var(--accent) 18%,transparent);border-color:var(--accent)}
   #app.app-container .ext-head-action-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
@@ -772,9 +780,6 @@
   #app.app-container .ext-remote-url:hover{color:var(--accent)}
   #app.app-container .ext-remote-url.is-none{cursor:default;color:var(--muted-2)}
   #app.app-container .ext-remote-url.is-none:hover{color:var(--muted-2)}
-  /* 包内视图的当前包名（2026-11-15 用户裁定：只读展示，禁止「选择数据包」选择器） */
-  #app.app-container .ext-pkg-current{font-size:11px;font-weight:600;color:var(--text);
-    padding:2px 8px;border-radius:6px;background:var(--panel-3);border:1px solid var(--border)}
   #app.app-container .ext-link-icon{color:var(--muted);font-size:11px}
   #app.app-container .ext-link-icon:hover{color:var(--accent)}
   #app.app-container .ext-auto{display:inline-flex;align-items:center;gap:4px;flex:0 0 auto}

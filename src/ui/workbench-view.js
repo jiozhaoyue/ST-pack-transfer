@@ -3395,10 +3395,15 @@ async function renderExtInstalled(body){
     +'</div>'
     +(!isHost
       ? (importPkgs.length
-        ? /* 2026-11-15 用户裁定：包内视图**禁止**出现「选择数据包」选择器——
-             当前包名只读展示（包的切换/管理在旁边的导入区包列表进行）。 */
+        ? /* 2026-11-15 用户裁定：**「选择数据包」这组文案彻底删除**（连 label 都不许有）；
+             桌面只读展示当前包名（默认最新导入包），**手机版必须保留可选**——
+             同一位置渲染 select（无文字标签），桌面 CSS 隐藏、手机显示。 */
           '<span class="ext-pkg-current" title="'+escapeHtml(selectedPkg?.name||'')+'">'
           +escapeHtml(selectedPkg?.name||'')+'（'+fmtMB(selectedPkg?.mb||0)+'）</span>'
+          +'<label class="field ext-pkg-picker" aria-label="'+t('extmgr.sourcePackage')+'">'
+          +'<select class="text_pole" id="extmgr-pkg-select">'
+          +importPkgs.map(p=>'<option value="'+escapeHtml(p.id)+'"'+(p.id===state.extSelectedPackageId?' selected':'')+'>'+escapeHtml(p.name)+' ('+fmtMB(p.mb)+')</option>').join('')
+          +'</select></label>'
         : '<span class="ext-note-inline">'+t('extmgr.noPackageAvailable')+'</span>')
       /* 「自动更新」按钮（2026-11-15 裁定：禁止长名字；打开即替换列表区域，此键是唯一开关） */
       : '<button type="button" class="btn ext-policy-btn'+(state.extPolicyOpen?' active':'')
@@ -3567,6 +3572,10 @@ async function renderExtInstalled(body){
   body.querySelector('#extmgr-source-tabs')?.addEventListener('click',(e)=>{
     const b=e.target.closest('[data-extsource]'); if(!b) return;
     state.extSource=b.dataset.extsource;
+    renderExtensionView();
+  });
+  body.querySelector('#extmgr-pkg-select')?.addEventListener('change',(e)=>{
+    state.extSelectedPackageId=e.target.value;
     renderExtensionView();
   });
   body.querySelector('#extmgr-policy-toggle')?.addEventListener('click',()=>{
