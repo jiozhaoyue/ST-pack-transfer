@@ -855,6 +855,47 @@ export async function listServerPlugins() {
 }
 
 /**
+ * 服务端插件管理（管理员专属）。端点事实（Luker 上游 `src/endpoints/users-admin.js`，挂载于 /api/users）：
+ * - `POST /api/users/plugins/update`  body `{ directory }` → `{ ok, restartRecommended, plugin }`
+ * - `POST /api/users/plugins/delete`  body `{ directory }` → `{ ok, restartRecommended, plugin }`
+ * - `POST /api/users/plugins/install-dependencies` body `{ directory }` → `{ ok, manager, installed, plugin }`
+ * - `POST /api/users/plugins/install` body `{ repoUrl }` → `{ ok, restartRecommended, plugin }`
+ * 全部 `requireAdminMiddleware`；失败返回 `{ error }` + 4xx/5xx。
+ * @returns {Promise<{ok:boolean, restartRecommended?:boolean, plugin?:object, error?:string, status?:number, reason?:string}>}
+ */
+export async function serverPluginUpdate(directory) {
+  return serverPluginMutation('/api/users/plugins/update', { directory: String(directory || '').trim() });
+}
+export async function serverPluginDelete(directory) {
+  return serverPluginMutation('/api/users/plugins/delete', { directory: String(directory || '').trim() });
+}
+export async function serverPluginInstallDeps(directory) {
+  return serverPluginMutation('/api/users/plugins/install-dependencies', { directory: String(directory || '').trim() });
+}
+export async function serverPluginInstall(repoUrl) {
+  return serverPluginMutation('/api/users/plugins/install', { repoUrl: String(repoUrl || '').trim() });
+}
+async function serverPluginMutation(endpoint, body) {
+  if (typeof fetch !== 'function') return { ok: false, reason: 'no-fetch' };
+  const firstValue = Object.values(body)[0];
+  if (!firstValue) return { ok: false, error: 'missing-parameter' };
+  const res = await postJsonBounded(endpoint, body, '管理服务端插件');
+  if (!res.ok) {
+    return {
+      ok: false,
+      status: res.status || 0,
+      reason: res.reason || `http-${res.status || 0}`,
+      error: String(res.data?.error || ''),
+    };
+  }
+  return {
+    ok: true,
+    restartRecommended: res.data?.restartRecommended === true,
+    plugin: res.data?.plugin || null,
+  };
+}
+
+/**
  * 读取宿主已装扩展的本地 Git 状态（只读）：分支 / HEAD / 是否最新 / origin，以及分支列表。
  *
  * - `POST /api/extensions/version` → `{ currentBranchName, currentCommitHash, isUpToDate, remoteUrl, remoteCommitHash }`；

@@ -56,9 +56,17 @@ export function createGitRemote({
         signal: controller.signal,
         credentials: 'omit',
       });
-      const data = as === 'json'
-        ? await response.json().catch(() => null)
-        : await response.text().catch(() => '');
+      /* 2026-11-15 用户实测「Git 可视化全乱码」：代理/宿主可能谎报 charset（如 latin1），
+         `response.json()/text()` 会按头解码导致中文全碎。这里一律取字节流**强制 UTF-8** 解码，
+         不信 Content-Type 的 charset。 */
+      const bytes = await response.arrayBuffer().catch(() => null);
+      const text = bytes === null ? '' : new TextDecoder('utf-8').decode(bytes);
+      let data;
+      if (as === 'json') {
+        try { data = text ? JSON.parse(text) : null; } catch { data = null; }
+      } else {
+        data = text;
+      }
       return { ok: response.ok, status: response.status, data };
     } catch {
       return { ok: false, reason: 'network', status: 0, data: null };

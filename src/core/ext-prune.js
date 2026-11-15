@@ -45,10 +45,14 @@ function isRemovedExtensionFile(entryName, lowered) {
  * @param {string[]} names 要移除的扩展名列表（清单条目 `name` 字段 / 目录名）
  * @param {object} [opts]
  * @param {number} [opts.compressionLevel=5] 重写清单条目时的压缩等级
+ * @param {boolean} [opts.keepManifest=false] **转成清单**（2026-11-15 用户裁定）：
+ *   只删实体文件、**保留**清单条目；包内没有清单文件时用 `manifestSeed` 补建。
+ * @param {Array<object>} [opts.manifestSeed=[]] keepManifest 且包内无清单文件时的种子条目
+ *   （`{name,url,...}`，来自视图层的包清单缓存）
  * @returns {Promise<{blob: Blob, removedFiles: number, removedManifest: number, manifest: object|null}>}
  *   `blob === source` 表示无命中、未做任何改写；`manifest` 为重写后的完整清单对象（无清单文件时为 null）
  */
-export async function prunePackageExtensions(source, names, { compressionLevel = 5 } = {}) {
+export async function prunePackageExtensions(source, names, { compressionLevel = 5, keepManifest = false, manifestSeed = [] } = {}) {
   const removed = (Array.isArray(names) ? names : [])
     .map((n) => String(n || '').trim()).filter(Boolean);
   const lowered = new Set(removed.map((n) => n.toLowerCase()));
@@ -88,12 +92,17 @@ export async function prunePackageExtensions(source, names, { compressionLevel =
         manifest = JSON.parse(manifestRaw);
         const before = Array.isArray(manifest.extensions) ? manifest.extensions.length : 0;
         if (Array.isArray(manifest.extensions)) {
-          manifest.extensions = manifest.extensions.filter((m) => {
-            const hit = lowered.has(String(m?.name || m?.id || '').trim().toLowerCase());
-            if (hit) removedManifest += 1;
-            return !hit;
-          });
-          manifest.total = manifest.extensions.length;
+          if (keepManifest) {
+            /* 转成清单：实体已删，清单条目原样保留（total 不变） */
+            removedManifest = 0;
+          } else {
+            manifest.extensions = manifest.extensions.filter((m) => {
+              const hit = lowered.has(String(m?.name || m?.id || '').trim().toLowerCase());
+              if (hit) removedManifest += 1;
+              return !hit;
+            });
+            manifest.total = manifest.extensions.length;
+          }
         }
         await writer.add(MANIFEST_ENTRY, JSON.stringify(manifest, null, 2));
       } catch (err) {
@@ -102,6 +111,20 @@ export async function prunePackageExtensions(source, names, { compressionLevel =
         manifest = null;
         await writer.add(MANIFEST_ENTRY, manifestRaw);
       }
+    } else if (keepManifest) {
+      /* 包内本无清单文件：用种子条目补建一份（转成清单的产物必须有清单可装） */
+      const seed = (Array.isArray(manifestSeed) ? manifestSeed : [])
+        .map((m) => ({ ...m, name: String(m?.name || '').trim() }))
+        .filter((m) => m.name && lowered.has(m.name.toLowerCase()));
+      manifest = {
+        converter: 'ST-pack-transfer',
+        schemaVersion: 2,
+        generatedAt: new Date().toISOString(),
+        mode: 'manifest',
+        total: seed.length,
+        extensions: seed,
+      };
+      await writer.add(MANIFEST_ENTRY, JSON.stringify(manifest, null, 2));
     }
 
     await writer.close();

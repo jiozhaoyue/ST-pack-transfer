@@ -325,6 +325,8 @@ export function getWorkbenchHtml() {
           </div>
           <div class="extension-body" id="extension-body"></div>
           <div class="ext-footer" id="extmgr-install-block" hidden>
+            <div class="ext-user-line" id="extmgr-user-line" hidden></div>
+            <div class="ext-server-area" id="extmgr-server-area" hidden></div>
             <div class="ext-install-area" id="extmgr-install-area" hidden></div>
             <button type="button" class="btn ext-install-toggle" id="extmgr-install-toggle" aria-expanded="false">
               <svg class="ext-install-ico" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M12 4v11"/><path d="M7 11l5 5 5-5"/><path d="M5 20h14"/></svg>

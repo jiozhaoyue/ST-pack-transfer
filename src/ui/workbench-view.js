@@ -28,7 +28,7 @@ import {
 import { decryptBytes, isEncrypted } from '../core/s3-crypto.js';
 import { mergeChartTrees } from '../core/merge-packages.js';
 import { EXTENSION_MODES, GIT_MODES } from '../core/export-modes.js';
-import { extensionUnitsOf } from '../core/ext-pack.js';
+import { extensionUnitsOf, suggestPackMode } from '../core/ext-pack.js';
 import { parseRepoUrl, refineRefWithBranches, isCommitRef } from '../core/git-url.js';
 import {
   normalizeAccounts, addAccount, removeAccount, setDefaultAccount,
@@ -232,11 +232,11 @@ let chartPrefs = typeof localStorage !== 'undefined' ? loadChartPrefs() : normal
 
 const state = {
   host:'luker', mode:'plugin', view:'desktop', mainView:'chart', mobileView:'chart', pane:'workbench', zone:'import',
-  extTab:'host', extSource:'host', extSelectedPackageId:'', extPolicyOpen:false, extEntries:[], extResults:[], extRunning:false, extInstalled:null, extManifestPrefill:[],
+  extTab:'host', extSource:'host', extSelectedPackageId:'', extPolicyOpen:false, extEntries:[], extResults:[], extRunning:false, extInstalled:null, extManifestPrefill:[], extRemoteUrls:{}, extServerOpen:false,
   extReportOpen:false, extInstallOpen:false, extInstallGlobal:false, settingsDraft:null,
   extAccountTests:[], extUpdate:null, extAccountsOpen:false, extOauthOpen:false,
   /* 服务端插件清单（仅管理员）：null = 未读取；[] = 已读取但为空。 */
-  extServerPlugins:null, extHostAdmin:false, extServerOpen:true,
+  extServerPlugins:null, extHostAdmin:false, extServerOpen:false,
   /* 数据包列页签：zone = 数据包，git = Git 可视化（仅开发者模式）。 */
   sideTab:'zone', gitListRequested:false, gitViz:{ name:'', loadedFor:'', loading:false, error:'', local:null, localMeta:null, branches:[], cloud:null, commits:[], tags:[], diff:null, diffLoading:false, diffError:'', remoteUrl:'', currentBranch:'', pickedRef:'', pickedKind:'', selectedSha:'' },
   source:{ type:'host', pkgId:null }, target:'SillyTavern', targetManual:false,
@@ -250,7 +250,7 @@ const state = {
   gitModeByPkg: {},
   keepDev: chartPrefs.keepDev,
   packages: INITIAL_PACKAGES.map(p=>({...p})),
-  selectedPkgs:new Set(), mergeMode:false, privateFiles:[], expanded:{}, collapsedVol:{}, sel:{}, log:loadPersistedLog(),
+  selectedPkgs:new Set(), activePkgs:new Set(), viewPkgMem:{}, mergeMode:false, privateFiles:[], expanded:{}, collapsedVol:{}, sel:{}, log:loadPersistedLog(),
   /* 日志按「条目类型」多选筛选：默认四类全选；取消某类即隐藏该类。 */
   logLevels:new Set(['INFO','WARN','ERROR','SUCCESS']),
   noTrafficPrompt:false,
@@ -453,16 +453,20 @@ function viewSwitchIcon(id){
 }
 function renderViewSwitch(){
   const mobile=state.view==='mobile';
-  const items=[{id:'chart',label:t('view.chart')}];
-  if(mobile) items.push({id:'zone',label:t('view.zone')});
-  items.push({id:'transfer',label:t('transfer.open')});
-  items.push({id:'extension',label:t('view.extension')});
+  /* 2026-11-15 用户裁定：手机 4 按钮，**数据包固定最右**——点它弹出下拉列表界面，不作为页切换 */
+  const items=mobile
+    ? [{id:'chart',label:t('view.chart')},{id:'transfer',label:t('transfer.open')},{id:'extension',label:t('view.extension')},{id:'zone',label:t('view.zone'),dropdown:true}]
+    : [{id:'chart',label:t('view.chart')},{id:'transfer',label:t('transfer.open')},{id:'extension',label:t('view.extension')}];
   const active=state.transfer.open ? 'transfer' : (mobile?state.mobileView:state.mainView);
-  const html=items.map(it=>'<button type="button" class="view-switch-btn'+(it.id===active?' active':'')+'" data-wbview="'+it.id
-    +'" aria-pressed="'+(it.id===active)+'" aria-label="'+escapeHtml(it.label)+'" title="'+escapeHtml(it.label)+'">'
-    +viewSwitchIcon(it.id)+'<span>'+it.label+'</span></button>').join('');
+  const zoneOpen=mobile && document.getElementById('app')?.dataset.zoneOpen==='1';
+  const html=items.map(it=>{
+    const on=it.dropdown ? zoneOpen : it.id===active;
+    return '<button type="button" class="view-switch-btn'+(on?' active':'')+'" data-wbview="'+it.id
+      +'" aria-pressed="'+on+'" aria-label="'+escapeHtml(it.label)+'" title="'+escapeHtml(it.label)+'">'
+      +viewSwitchIcon(it.id)+'<span>'+it.label+'</span></button>';
+  }).join('');
   document.querySelectorAll('[data-view-switch]').forEach((host)=>{
-    /* 数据包面板只在手机形态参与切换；桌面数据包列常显，头部不出现切换按钮。 */
+    /* 数据包面板只在手机形态参与切换（且是下拉，非页切换）；桌面数据包列常显，头部不出现切换按钮。 */
     if(host.hasAttribute('data-view-switch-zone') && !mobile){
       host.hidden=true; host.innerHTML=''; return;
     }
@@ -511,8 +515,10 @@ function syncMainView(){
   const chartCol=document.querySelector('.col-chart');
   const side=document.querySelector('.col-side');
   const splitter=document.querySelector('.splitter-v');
-  if(chartCol) chartCol.hidden = !siActive && mobile && primary === 'zone';
-  if(side) side.hidden = siActive || (mobile && primary !== 'zone');
+  /* 2026-11-15 用户裁定：手机数据包列不再是页切换目标——它固定作为下拉界面（data-zone-open），
+     图表列在任何手机主视图下都显示。下拉打开时清 hidden，交由 CSS 定位成浮层。 */
+  if(chartCol) chartCol.hidden = false;
+  if(side) side.hidden = siActive || (mobile && app?.dataset.zoneOpen!=='1');
   if(splitter) splitter.hidden = siActive;
   const chartCard=document.getElementById('chart-card');
   const extView=document.getElementById('extension-view');
@@ -641,17 +647,43 @@ function updateSplitSim(preview){
 /* 图表目标：勾了包 → 每个勾选的包一组图表；否则看当前来源。
    宿主数据不再作为图表卡出现——它只在配额折叠区里出现一次（禁止重复元素）。 */
 function chartTargets(){
-  const sel=[...state.selectedPkgs].map(id=>state.packages.find(p=>p.id===id)).filter(Boolean);
-  if(sel.length) return mergeActive(sel) ? [{merge:true,pkgs:sel}] : sel.map(p=>({pkg:p}));
-  if(state.source.type==='package'){
-    const p=state.packages.find(x=>x.id===state.source.pkgId);
-    if(p) return [{pkg:p}];
-  }
+  /* 2026-11-15 用户裁定：图表显示由**包卡外框点击**驱动（多选累加），
+     复选框只负责列表区批量操作，与图表彻底解耦。 */
+  const act=[...state.activePkgs].map(id=>state.packages.find(p=>p.id===id)).filter(Boolean);
+  if(act.length) return mergeActive(act) ? [{merge:true,pkgs:act}] : act.map(p=>({pkg:p}));
   return [];
 }
-/* 合并模式：≥2 个包勾选时才生效；只有一个包时没有可合并的对象。 */
+/* 合并模式：≥2 个包在图表显示集中才生效；只有一个包时没有可合并的对象。 */
 function mergeActive(sel){
   return !!state.mergeMode && sel.length>=2;
+}
+/* state.source 只作「主激活包」兼容位（部分老逻辑仍读它）：恰好一个激活包时指向它，否则置空。 */
+function syncSourceToActive(){
+  const act=[...state.activePkgs];
+  state.source = act.length===1 ? { type:'package', pkgId:act[0] } : { type:'host', pkgId:null };
+}
+/* ── 2026-11-15 用户裁定：**分区记住选择** ——
+   图表记住图表的外框显示集与勾选；扩展管理记住它当前选中的包；迁移与备份记住自己的勾选。
+   切换页 = 保存当前页 → 恢复目标页，各页回到各自上次的选择状态。桌面与手机同一套。 */
+const VIEW_PKG_MEM_DEFAULT=Object.freeze({ active:[], checked:[] });
+function currentViewKey(){
+  if(state.transfer.open) return 'transfer';
+  return (state.view==='mobile' ? state.mobileView : state.mainView) || 'chart';
+}
+function snapshotViewPkgs(){
+  const key=currentViewKey();
+  state.viewPkgMem[key]={
+    active:[...state.activePkgs],
+    checked:[...state.selectedPkgs],
+  };
+}
+function restoreViewPkgs(){
+  const key=currentViewKey();
+  const mem=state.viewPkgMem[key]||VIEW_PKG_MEM_DEFAULT;
+  const alive=new Set(state.packages.map((p)=>p.id));
+  state.activePkgs=new Set((mem.active||[]).filter((id)=>alive.has(id)));
+  state.selectedPkgs=new Set((mem.checked||[]).filter((id)=>alive.has(id)));
+  syncSourceToActive();
 }
 function mergeScope(pkgs){
   return 'merge:'+pkgs.map(p=>p.id).join(',');
@@ -1059,6 +1091,41 @@ function volBreadcrumbHtml(o){
     +'</div>';
 }
 
+/** 2026-11-15 用户裁定：图表上**每个扩展**都要标注「原件/清单」建议（与打包智能推荐同源启发式）。
+ *  覆盖两种形态：仅清单树的 `ext:<名>` 叶子、完整树 `dir:extensions:<名>`（含 third-party 一层）。 */
+function decorateExtSuggestions(nodes, urlMap){
+  const extGroup=(nodes||[]).find((n)=>n.id==='group:extensions');
+  if(!extGroup?.children) return;
+  const apply=(node,name)=>{
+    if(!name || name==='third-party') return;
+    const url=String(node.url||urlMap[name]||'');
+    const sug=suggestPackMode(name,url);
+    node.note=t(sug.mode==='manifest'?'extmgr.recManifest':'extmgr.recFull');
+  };
+  for(const child of extGroup.children){
+    if(child.id.startsWith('ext:')){ apply(child,child.id.slice(4)); continue; }
+    if(child.id==='dir:extensions:third-party'){
+      for(const sub of child.children||[]){
+        const name=String(sub.id||'').split('/').pop();
+        apply(sub,name);
+      }
+      continue;
+    }
+    apply(child, String(child.id||'').replace(/^dir:extensions:/,'').split('/').pop());
+  }
+}
+
+/** 包清单的 name→url 映射（图表扩展行建议徽标的数据源；原件无清单条目时无 url → 建议原件）。 */
+function extUrlMapOf(pkgs){
+  const map={};
+  for(const p of pkgs||[]){
+    for(const m of (p?.extManifest||[])){
+      if(m && m.name) map[String(m.name)]=String(m.url||'');
+    }
+  }
+  return map;
+}
+
 function chartCardHtml(o, place){
   const maxed = state.volMaxKey === o.key;
   const collapsed = !maxed && (state.collapsedVol[o.key]!==undefined ? !!state.collapsedVol[o.key] : !!o.defaultCollapsed);
@@ -1067,6 +1134,7 @@ function chartCardHtml(o, place){
   const dis = !!o.disabled;
   const fmt = chartFmtOf(o.key);
   const scopeNodes = maxed ? volScopedNodes(o) : o.nodes;
+  decorateExtSuggestions(scopeNodes, o.extUrlMap||{});
   const selectedMap = selectedMbMap(scopeNodes, o.scope);
   const colorMap = volColorMap(scopeNodes, selectedMap);
   const selectedTotal = volChartData(scopeNodes, selectedMap).total;
@@ -1108,17 +1176,15 @@ function chartCardHtml(o, place){
   +'</div>';
 }
 
-/** 扩展组内的模式/ Git / 构建配置控件（只有完整扩展时才显示 Git）；导出扩展清单也在这一条。 */
+/** 扩展组内的模式/ Git / 构建配置控件（只有完整扩展时才显示 Git）。
+ *  2026-11-15 用户裁定：「导出扩展清单」入口全部收进扩展管理按钮行（宿主/包内，纯图标），
+ *  图表卡上不再保留（`data-assetlist` 链路已随之拆除）。 */
 function extensionToolsHtml(pkg, assetPkgs, { scope, nodes } = {}){
   const hasExt = (pkg?.extensions && pkg.extensions.length) || !!findNode(pkg?.nodes || [], 'group:extensions');
   const treeNodes = nodes || (pkg ? packageNodes(pkg).nodes : []);
   const extNode = findNode(treeNodes, 'group:extensions');
   const extChecked = extNode ? isChecked(extNode, scope || ('pkg:' + (pkg?.id || ''))) : true;
-  const pkgs = Array.isArray(assetPkgs) ? assetPkgs.filter(Boolean) : [];
-  const listBtn = pkgs.length
-    ? '<button type="button" class="et-list-btn" data-assetlist="1" data-assetpkgs="'+escapeHtml(pkgs.join(','))+'" title="'+t('chart.exportAssetList')+'">'+t('chart.exportAssetList')+'</button>'
-    : '';
-  if(!hasExt && !listBtn) return '';
+  if(!hasExt) return '';
   /* 扩展组未勾选：不再直接丢弃，给用户「保持不选 / 仅清单」二选一。
      仅清单会在生成时保留扩展元数据、只产出 _convert/extensions-manifest.json。 */
   if(hasExt && !extChecked){
@@ -1128,8 +1194,7 @@ function extensionToolsHtml(pkg, assetPkgs, { scope, nodes } = {}){
         +'<button class="seg-btn'+(state.extUncheckedMode!=='manifest'?' active':'')+'" data-extunchecked="none">'+t('extension.uncheckedKeep')+'</button>'
         +'<button class="seg-btn'+(state.extUncheckedMode==='manifest'?' active':'')+'" data-extunchecked="manifest">'+t('extension.manifest')+'</button>'
       +'</div>'
-      +listBtn
-    +'</div>';
+      +'</div>';
   }
   const full = state.extensionMode !== EXTENSION_MODES.MANIFEST;
   const gitPkgId = pkg && pkg.id ? String(pkg.id) : '';
@@ -1149,7 +1214,6 @@ function extensionToolsHtml(pkg, assetPkgs, { scope, nodes } = {}){
             +'<label class="check et-keepdev"><input type="checkbox" data-keepdev'+(state.keepDev?' checked':'')+'> '+t('extension.keepDev')+'</label>'
           : '')
       : '')
-    + listBtn
     +'</div>';
 }
 
@@ -1319,6 +1383,7 @@ function renderChart(){
       const extOwner=target.pkgs.find(p=>p.extensions&&p.extensions.length)||target.pkgs[0];
       const assetPkgs=target.pkgs.map(p=>p.id);
       const extTools=extensionToolsHtml(extOwner, assetPkgs, { scope, nodes });
+      const extUrlMap=extUrlMapOf(target.pkgs);
       vols.forEach(v=>defs.push({
         key:'merge-'+v.i, scope, nodes:v.nodes,
         idxText:t('chart.mergedBadge',{n:target.pkgs.length}),
@@ -1327,7 +1392,7 @@ function renderChart(){
         capText: fmtMB(v.mb),
         totalText: multi ? t('chart.total',{size:fmtMB(totalMb)}) : '',
         noticeHtml: '', readonly: false, over: !!v.over, pkgId: '',
-        extToolsHtml: extTools,
+        extToolsHtml: extTools, extUrlMap,
         defaultCollapsed: state.view==='mobile' && multi && v.i>1
       }));
       return;
@@ -1338,6 +1403,7 @@ function renderChart(){
     const multi=vols.length>1;
     const notice=tree.unrecognized ? '<div class="chart-unavailable"><b>'+t('chart.unrecognizedTitle')+'</b></div>' : '';
     const extTools=extensionToolsHtml(pkg, [pkg.id], { scope:'pkg:'+pkg.id, nodes:tree.nodes });
+    const extUrlMap=extUrlMapOf([pkg]);
     vols.forEach(v=>defs.push({
       key:pkg.id+'-'+v.i, scope:'pkg:'+pkg.id, nodes:v.nodes,
       idxText: seqLabel(pkg),
@@ -1348,7 +1414,7 @@ function renderChart(){
       over: !!v.over,
       pkgId: pkg.id,
       manifestCount: (pkg.extManifest||[]).length,
-      extToolsHtml: extTools,
+      extToolsHtml: extTools, extUrlMap,
       defaultCollapsed: state.view==='mobile' && multi && v.i>1
     }));
   });
@@ -1565,7 +1631,8 @@ function renderFilenamePreview(){
 
 /* ── 渲染：包卡 ── */
 function pkgCard(p){
-  const isActive=state.source.type==='package' && state.source.pkgId===p.id;
+  /* 外框激活环 = 在图表显示集中（2026-11-15 用户裁定：外框点击驱动图表） */
+  const isActive=state.activePkgs.has(p.id);
   const isMobile=state.view==='mobile';
   const hostKey=p.unrecognized?'unknown':p.host;
   const hostCode=p.unrecognized?'?':({st:'ST',luker:'L',tt:'TT',pt:'PT'}[p.host]||'?');
@@ -2427,7 +2494,8 @@ function refreshInstallArea(){
   if(area) renderExtInstall(area);
 }
 /** 安装扩展是扩展管理面板的**固定页脚**：贴在面板底部、紧挨安装报告条，不随列表滚动。
- *  只在宿主页显示；报告展开或切到开发者/打包页时隐藏。 */
+ *  2026-11-15 用户裁定：服务端扩展块也住页脚（在「安装扩展」上方、默认收起、展开同样向上挤压）；
+ *  页脚同时显示当前用户徽标（管理员才亮管理能力）。只在宿主页显示；报告展开或切到开发者页时隐藏。 */
 function syncExtInstallBlock(){
   const block=document.getElementById('extmgr-install-block');
   if(!block) return;
@@ -2435,6 +2503,31 @@ function syncExtInstallBlock(){
   block.hidden=!show;
   const area=document.getElementById('extmgr-install-area');
   if(area) area.hidden=!state.extInstallOpen;
+  const serverArea=document.getElementById('extmgr-server-area');
+  if(serverArea){
+    if(show && state.extHostAdmin && state.extServerLoaded){
+      serverArea.hidden=false;
+      serverArea.innerHTML=serverPluginBlockHtml();
+      bindServerPluginArea(serverArea);
+    } else {
+      serverArea.hidden=true;
+      serverArea.innerHTML='';
+    }
+  }
+  const userLine=document.getElementById('extmgr-user-line');
+  if(userLine){
+    if(show && state.extHostUser){
+      userLine.hidden=false;
+      userLine.innerHTML='<span class="ext-user-badge" title="'+t('extmgr.userBadgeTitle')+'">'
+        +'<i class="fa-solid '+(state.extHostAdmin?'fa-user-shield':'fa-user')+'"></i>'
+        +'<span>'+escapeHtml(state.extHostUser)+'</span>'
+        +(state.extHostAdmin?'<b class="is-admin">'+t('extmgr.adminBadge')+'</b>':'')
+      +'</span>';
+    } else {
+      userLine.hidden=true;
+      userLine.innerHTML='';
+    }
+  }
   const btn=document.getElementById('extmgr-install-toggle');
   if(btn){
     btn.setAttribute('aria-expanded',state.extInstallOpen?'true':'false');
@@ -2842,26 +2935,116 @@ function extSourceTag(sourceType){
 }
 /** 管理员专属：「服务端插件」分区。非管理员不渲染、不伪造。 */
 function serverPluginBlockHtml(){
+  /* 2026-11-15 用户裁定：服务端插件必须像前端扩展一样**可管理**——
+     宿主端点（users-admin）：POST /api/users/plugins/{update,delete,install-dependencies,install}，全部 requireAdmin。
+     行内显示远端 URL（点击复制）+ 私有/公开徽标；默认收起，展开向上挤压列表。 */
   if(!state.extHostAdmin) return '';
+  const summary=extSummaryHtml(t('extmgr.serverTitle'), Array.isArray(state.extServerPlugins)?state.extServerPlugins.length:0)
+    +(state.extServerEnabled===false?'<span class="ext-flag-warn">'+t('extmgr.serverDisabled')+'</span>':'');
+  let inner;
   if(state.extServerError){
-    return '<div class="ext-note ext-server-note">'+t('extmgr.serverUnavailable',{reason:state.extServerError})+'</div>';
+    inner='<div class="ext-note ext-server-note">'+t('extmgr.serverUnavailable',{reason:state.extServerError})+'</div>';
+  } else if(state.extServerPlugins===null){
+    inner='<div class="ext-note ext-server-note">'+t('extmgr.serverLoading')+'</div>';
+  } else {
+    const list=state.extServerPlugins;
+    const rows=list.map((p)=>{
+      const url=String(p.remoteUrl||'').trim();
+      const priv=repoPrivacyOf(url);
+      const urlEl=url
+        ? '<span class="ext-remote-url" data-copyurl="'+escapeHtml(url)+'" title="'+escapeHtml(url)+' · 点击复制">'+escapeHtml(url)+'</span>'
+        : '<span class="ext-remote-url is-none">—</span>';
+      return '<div class="ext-entry is-ok ext-server-row">'
+        +'<span class="ext-url" title="'+escapeHtml(p.directory||p.packageName)+'">'+escapeHtml(p.directory||p.packageName)+'</span>'
+        +urlEl
+        +(priv?'<span class="ext-priv-tag is-'+priv+'">'+t(priv==='private'?'extmgr.privBadge':'extmgr.pubBadge')+'</span>':'')
+        +'<span class="ext-state">'+escapeHtml(p.version||'-')+'</span>'
+        +'<span class="ext-actions">'
+          +'<button type="button" class="btn icon" data-srvupd="'+escapeHtml(p.directory)+'" title="'+t('extmgr.srvUpdate')+'" aria-label="'+t('extmgr.srvUpdate')+'"><i class="fa-solid fa-rotate"></i></button>'
+          +'<button type="button" class="btn icon" data-srvdeps="'+escapeHtml(p.directory)+'" title="'+t('extmgr.srvDeps')+'" aria-label="'+t('extmgr.srvDeps')+'"><i class="fa-solid fa-box-open"></i></button>'
+          +'<button type="button" class="btn icon danger" data-srvdel="'+escapeHtml(p.directory)+'" title="'+t('extmgr.srvDelete')+'" aria-label="'+t('extmgr.srvDelete')+'"><i class="fa-solid fa-trash"></i></button>'
+        +'</span>'
+      +'</div>';
+    }).join('');
+    inner='<div class="ext-note">'+t('extmgr.serverNote')+'</div>'
+      +'<div class="ext-install">'
+        +'<div class="ext-row">'
+          +'<input class="text_pole" id="extmgr-srv-url" placeholder="'+t('extmgr.srvUrlPlaceholder')+'">'
+          +'<button type="button" class="btn accent" id="extmgr-srv-install">'+t('extmgr.srvInstall')+'</button>'
+        +'</div>'
+      +'</div>'
+      +'<div class="ext-list">'+(rows||'<div class="ext-empty">'+t('extmgr.serverEmpty')+'</div>')+'</div>'
+      +(state.extServerPath?'<div class="ext-note ext-path">'+escapeHtml(state.extServerPath)+'</div>':'');
   }
-  if(state.extServerPlugins===null){
-    return '<div class="ext-note ext-server-note">'+t('extmgr.serverLoading')+'</div>';
-  }
-  const list=state.extServerPlugins;
-  const enabledTag=state.extServerEnabled===false
-    ? '<span class="ext-flag-warn">'+t('extmgr.serverDisabled')+'</span>' : '';
-  const rows=list.map((p)=>'<div class="ext-entry is-ok ext-server-row">'
-    +'<span class="ext-url" title="'+escapeHtml(p.remoteUrl||p.directory)+'">'+escapeHtml(p.directory||p.packageName)+'</span>'
-    +'<span class="ext-state">'+escapeHtml(p.version||'-')+(p.packageName?' · '+escapeHtml(p.packageName):'')+'</span>'
-  +'</div>').join('');
   return '<details class="ext-server-block" data-extserver'+(state.extServerOpen?' open':'')+'>'
-    +extSummaryHtml(t('extmgr.serverTitle'), list.length)+enabledTag
-    +'<div class="ext-note">'+t('extmgr.serverNote')+'</div>'
-    +'<div class="ext-list">'+(rows||'<div class="ext-empty">'+t('extmgr.serverEmpty')+'</div>')+'</div>'
-    +(state.extServerPath?'<div class="ext-note ext-path">'+escapeHtml(state.extServerPath)+'</div>':'')
+    +summary
+    +'<div class="ext-server-body">'+inner+'</div>'
   +'</details>';
+}
+/** 页脚服务端扩展区的事件绑定（每次 syncExtInstallBlock 重渲染后重挂）。 */
+function bindServerPluginArea(root){
+  root.addEventListener('toggle',()=>{},true);
+  const details=root.querySelector('[data-extserver]');
+  details?.addEventListener('toggle',()=>{
+    state.extServerOpen=details.open;
+  });
+  root.addEventListener('click',async(e)=>{
+    const upd=e.target.closest('[data-srvupd]');
+    const del=e.target.closest('[data-srvdel]');
+    const deps=e.target.closest('[data-srvdeps]');
+    const inst=e.target.closest('#extmgr-srv-install');
+    if(upd){
+      await runServerPluginMutation(t('extmgr.srvUpdate'), ()=>actions.serverPluginUpdate?.(upd.dataset.srvupd));
+      return;
+    }
+    if(deps){
+      await runServerPluginMutation(t('extmgr.srvDeps'), ()=>actions.serverPluginInstallDeps?.(deps.dataset.srvdeps));
+      return;
+    }
+    if(del){
+      const dir=del.dataset.srvdel;
+      openModal(t('extmgr.srvDelete'), t('extmgr.srvDeleteDesc',{name:dir}), [], [
+        {label:t('modal.cancel'),onClick:closeModal},
+        {label:t('extmgr.srvDeleteConfirm'),danger:true,onClick:()=>{
+          closeModal();
+          void runServerPluginMutation(t('extmgr.srvDelete'), ()=>actions.serverPluginDelete?.(dir));
+        }},
+      ]);
+      return;
+    }
+    if(inst){
+      const input=root.querySelector('#extmgr-srv-url');
+      const url=String(input?.value||'').trim();
+      if(!url){ toast(t('extmgr.srvUrlEmpty')); return; }
+      await runServerPluginMutation(t('extmgr.srvInstall'), ()=>actions.serverPluginInstall?.(url));
+      if(input) input.value='';
+    }
+  });
+}
+/** 服务端插件管理动作的统一执行器：跑完刷新清单并提示（restartRecommended 如实转达）。 */
+async function runServerPluginMutation(label, fn){
+  try {
+    toast(label+'…');
+    const res=await fn?.();
+    if(res && res.ok===false) throw new Error(res.error||res.reason||('http-'+(res.status||'')));
+    await reloadServerPlugins();
+    toast(t('extmgr.srvDone',{action:label})+(res?.restartRecommended?' · '+t('extmgr.srvRestart'):''));
+  } catch(err) {
+    toast(t('extmgr.srvFailed',{action:label,msg:err?.message||String(err)}));
+  }
+}
+async function reloadServerPlugins(){
+  let res=null;
+  try { res=await actions.listServerPlugins?.(); } catch { res=null; }
+  if(res && res.ok){
+    state.extServerPlugins=Array.isArray(res.plugins)?res.plugins:[];
+    state.extServerEnabled=res.enabled===true;
+    state.extServerPath=res.pluginsPath||'';
+    state.extServerError='';
+  } else {
+    state.extServerError=res ? String(res.reason||('http-'+(res.status||0))) : 'unavailable';
+  }
+  syncExtInstallBlock();
 }
 /** 管理员身份 + 服务端插件清单只读一次；非管理员到此为止（不留空分区）。 */
 async function loadServerPlugins(){
@@ -2871,6 +3054,8 @@ async function loadServerPlugins(){
   try { identity=await actions.hostIdentity?.(); } catch { identity=null; }
   state.extHostAdmin=!!(identity && identity.ok && identity.admin);
   state.extHostUser=identity?.handle||'';
+  /* 用户徽标住页脚（非管理员也显示身份，只是不亮管理能力） */
+  syncExtInstallBlock();
   if(!state.extHostAdmin) return;
   let res=null;
   try { res=await actions.listServerPlugins?.(); } catch { res=null; }
@@ -3220,6 +3405,42 @@ function installedRowRecords(){
     loadingOrder:Number.isFinite(Number(x?.loadingOrder))&&String(x?.loadingOrder??'')!==''?Number(x.loadingOrder):null,
   })).filter((row)=>row.name);
 }
+/** 仓库私密性（与打包智能推荐同一启发式）：登记账号带凭据 → 私有；否则公开。 */
+function repoPrivacyOf(url){
+  const raw=String(url||'').trim();
+  if(!raw) return '';
+  const parsed=parseRepoUrl(raw);
+  if(parsed.ok){
+    const acc=accountForRepo(parsed);
+    if(acc && (acc.secret || acc.kind==='token' || acc.username)) return 'private';
+  }
+  if(/\/\/[^/@]+@/.test(raw)) return 'private';
+  return 'public';
+}
+/** 宿主行远端 URL 补全（2026-11-15 用户裁定：全部行都必须显示远端 URL）：
+ *  本地登记没有的，逐条读宿主 `.git` origin，结果进缓存；每条都记（含空），避免重复请求。 */
+let extRemoteEnrichBusy=false;
+async function enrichHostRemoteUrls(){
+  if(state.extTab!=='host' || extRemoteEnrichBusy) return;
+  const pending=installedRowRecords().map((r)=>r.name)
+    .filter((name)=>!installedRemoteUrlOf(name) && !(name in state.extRemoteUrls));
+  if(!pending.length) return;
+  extRemoteEnrichBusy=true;
+  try {
+    for(const name of pending){
+      if(state.extTab!=='host') break;
+      const item=(state.extInstalled||[]).find((x)=>String(x?.id||x?.folder||x?.name||'')===name);
+      const isGlobal=String(item?.sourceType||'')==='global';
+      let url='';
+      try {
+        const res=await actions.hostExtensionGit?.(name,{global:isGlobal});
+        url=String(res?.version?.remoteUrl||'').trim();
+      } catch { url=''; }
+      state.extRemoteUrls[name]={ url, priv:repoPrivacyOf(url) };
+    }
+  } finally { extRemoteEnrichBusy=false; }
+  if(state.extTab==='host') renderExtensionView();
+}
 /** 宿主行的远程仓库 URL（同步可得）：优先安装登记，其次自动更新规则；未登记返回 ''。
  *  2026-11-15 用户裁定：URL 直接显示在行内、点击即复制，禁止单独的复制按钮。 */
 function installedRemoteUrlOf(name){
@@ -3341,13 +3562,15 @@ async function installPackageExtensionsToHost(pkgId, selectedNames){
   renderExtensionView();
 }
 /** 包内清理（**只做减法**）：把所选扩展从数据包移除（实体 + 清单条目），然后刷新视图。 */
-async function pruneSelectedFromPackage(pkgId, names){
+async function pruneSelectedFromPackage(pkgId, names, { keepManifest = false } = {}){
   if(!pkgId || !names?.length) return;
   try {
     toast(t('extmgr.pkgPruning'));
-    const res=await actions.prunePackageExtensions?.(pkgId, names);
+    const res=await actions.prunePackageExtensions?.(pkgId, names, { keepManifest });
     if(!res) throw new Error('prune unavailable');
-    toast(t('extmgr.pkgPruned',{files:res.removedFiles||0,manifest:res.removedManifest||0}));
+    toast(keepManifest
+      ? t('extmgr.pkgToManifest',{files:res.removedFiles||0})
+      : t('extmgr.pkgPruned',{files:res.removedFiles||0,manifest:res.removedManifest||0}));
   } catch(err) {
     toast(t('extmgr.pkgPruneFailed',{msg:err?.message||String(err)}));
   }
@@ -3379,6 +3602,7 @@ async function renderExtInstalled(body){
   const sort=['custom','name','version','source','order'].includes(s.extSort)?s.extSort:'custom';
 
   const isHost = state.extSource === 'host';
+  const autoMasterOn=!!loadSettings().extAutoToolsOn;
   const importPkgs = (state.packages||[]).filter(p=>p && p.id);
   if(!state.extSelectedPackageId && importPkgs.length){
     /* 无持久选择时默认取**最新**导入包（与导入区包列表的时序一致）。 */
@@ -3405,10 +3629,19 @@ async function renderExtInstalled(body){
           +importPkgs.map(p=>'<option value="'+escapeHtml(p.id)+'"'+(p.id===state.extSelectedPackageId?' selected':'')+'>'+escapeHtml(p.name)+' ('+fmtMB(p.mb)+')</option>').join('')
           +'</select></label>'
         : '<span class="ext-note-inline">'+t('extmgr.noPackageAvailable')+'</span>')
-      /* 「自动更新」按钮（2026-11-15 裁定：禁止长名字；打开即替换列表区域，此键是唯一开关） */
-      : '<button type="button" class="btn ext-policy-btn'+(state.extPolicyOpen?' active':'')
-        +'" id="extmgr-policy-toggle" aria-pressed="'+(state.extPolicyOpen?'true':'false')
-        +'"><i class="fa-solid fa-clock"></i><span>'+t('extmgr.autoUpdate')+'</span></button>')
+      /* 2026-11-15 用户裁定：这是**自动更新总开关**（默认关）——
+         关：列表行不显示任何逐扩展自动更新设置；开：才显示逐行控件 + 策略入口。 */
+      : '<span class="ext-auto-master">'
+        +'<button type="button" class="btn ext-policy-btn'+(autoMasterOn?' active':'')
+        +'" id="extmgr-auto-master" aria-pressed="'+(autoMasterOn?'true':'false')
+        +'"><i class="fa-solid fa-clock"></i><span>'+t('extmgr.autoUpdate')+'</span></button>'
+        +(autoMasterOn
+          ? '<button type="button" class="btn icon ext-policy-btn'+(state.extPolicyOpen?' active':'')
+            +'" id="extmgr-policy-toggle" aria-pressed="'+(state.extPolicyOpen?'true':'false')
+            +'" title="'+t('extmgr.autoPolicy')+'" aria-label="'+t('extmgr.autoPolicy')
+            +'"><i class="fa-solid fa-sliders"></i></button>'
+          : '')
+      +'</span>')
   +'</div>';
 
   let rowsHtml = '';
@@ -3420,11 +3653,17 @@ async function renderExtInstalled(body){
     rowsHtml=records.map(({x,name,version})=>{
       const rule=rules[name]||null;
       const isCurrentGit = state.gitViz.name === name;
-      const remoteUrl=installedRemoteUrlOf(name);
+      /* 远端 URL：先吃本地登记（同步），缺的由 enrichHostRemoteUrls 读宿主 .git origin 补齐缓存 */
+      const cached=state.extRemoteUrls[name]||null;
+      const remoteUrl=installedRemoteUrlOf(name) || cached?.url || '';
+      const priv=remoteUrl ? repoPrivacyOf(remoteUrl) : '';
+      const privTag=priv
+        ? '<span class="ext-priv-tag is-'+priv+'">'+t(priv==='private'?'extmgr.privBadge':'extmgr.pubBadge')+'</span>'
+        : '';
       const remoteEl=remoteUrl
         ? '<span class="ext-remote-url" data-copyurl="'+escapeHtml(remoteUrl)+'" title="'+escapeHtml(remoteUrl)+' · 点击复制">'+escapeHtml(remoteUrl)+'</span>'
         : '<span class="ext-remote-url is-none" title="'+t('extmgr.autoNeedsRepoShort')+'">—</span>';
-      const auto='<span class="ext-auto">'
+      const auto=autoMasterOn?'<span class="ext-auto">'
         +'<select class="text_pole ext-up-mode" data-upmode="'+escapeHtml(name)+'" title="'+t('extmgr.autoUpdate')+'">'
           +'<option value="off"'+(rule?'':' selected')+'>'+t('extmgr.devOff')+'</option>'
           +'<option value="notify"'+(rule?.mode==='notify'?' selected':'')+'>'+t('extmgr.autoModeNotify')+'</option>'
@@ -3433,13 +3672,14 @@ async function renderExtInstalled(body){
         +'<input class="text_pole ext-up-sec" type="number" min="'+policy.min+'" max="'+policy.max+'" step="'+policy.min+'" data-upinterval="'+escapeHtml(name)+'"'
           +' value="'+(normalizeUpdateInterval(rule?.intervalSec, policy)) +'"'+(rule?'':' disabled')+' title="'+t('extmgr.autoIntervalSeconds')+'">'
         +'<span class="ext-unit">'+t('extmgr.seconds')+'</span>'
-      +'</span>';
+      +'</span>':'';
       return '<div class="ext-entry is-ok ext-ext-row'+(isCurrentGit?' is-active':'')+'" role="listitem" draggable="'+(sort==='custom'?'true':'false')+'" data-extrow="'+escapeHtml(name)+'">'
         +(sort==='custom'?'<span class="ext-drag" title="'+t('extmgr.dragHint')+'">'+gripSvg()+'</span>':'')
         +'<label class="check ext-dev-check"><input type="checkbox" data-extsel="'+escapeHtml(name)+'"></label>'
         +(x?.loadingOrder!=null?'<span class="ext-flag ext-order" title="'+t('extmgr.orderHint')+'">#'+escapeHtml(String(x.loadingOrder))+'</span>':'')
         +'<span class="ext-url" title="'+escapeHtml(name)+'">'+escapeHtml(name)+'</span>'
         +remoteEl
+        +privTag
         +'<span class="ext-state">'+escapeHtml(version)+'</span>'
         +extSourceTag(x?.sourceType)
         +auto
@@ -3460,12 +3700,18 @@ async function renderExtInstalled(body){
            绝对禁止单独的复制按钮（也不再用外链图标占宽）。 */
         ? '<span class="ext-remote-url" data-copyurl="'+escapeHtml(item.url)+'" title="'+escapeHtml(item.url)+' · 点击复制">'+escapeHtml(item.url)+'</span>'
         : '';
+        const toManifest=item.kind === 'original'
+          /* 2026-11-15 用户裁定：原件行内提供「转成清单」——删实体、留清单（只做减法） */
+          ? '<button type="button" class="btn icon ext-row-btn" data-pkg2manifest="'+escapeHtml(item.name)+'"'
+            +' title="'+t('extmgr.toManifest')+'" aria-label="'+t('extmgr.toManifest')+'"><i class="fa-solid fa-file-export"></i></button>'
+          : '';
         return '<div class="ext-entry is-ok ext-ext-row'+(isCurrentGit?' is-active':'')+'" role="listitem" data-extrow="'+escapeHtml(item.name)+'">'
           +'<label class="check ext-dev-check"><input type="checkbox" data-extsel="'+escapeHtml(item.name)+'"></label>'
           +'<span class="ext-url" title="'+escapeHtml(item.name)+'">'+escapeHtml(item.name)+'</span>'
           +'<span class="ext-state">'+escapeHtml(item.version)+'</span>'
           +kindBadge
           +repoLink
+          +toManifest
           +'</div>';
       }).join('')
       : ('<div class="ext-empty">'+t('extmgr.noneInstalled')+'</div>');
@@ -3515,6 +3761,9 @@ async function renderExtInstalled(body){
     +'<button type="button" class="btn accent ext-act-btn" id="extmgr-batch-pack" disabled title="'+t('extmgr.batchPack')+'">'
       +'<i class="fa-solid fa-box-archive"></i><span>'+t('extmgr.batchPack')+'</span>'
     +'</button>'
+    /* 2026-11-15 用户裁定：导出扩展清单＝纯图标钮（禁文字），只住扩展管理按钮行 */
+    +'<button type="button" class="btn icon ext-act-btn" id="extmgr-export-assetlist" disabled'
+      +' title="'+t('extmgr.exportAssetList')+'" aria-label="'+t('extmgr.exportAssetList')+'"><i class="fa-solid fa-file-code"></i></button>'
     +'<input class="text_pole ext-batch-ref" data-extref placeholder="'+t('extmgr.refOptional')+'">';
 
   /* 2026-11-15 裁定：安装操作一律在底部「安装扩展」面板内进行——
@@ -3525,12 +3774,15 @@ async function renderExtInstalled(body){
     +'</button>'
     +'<button type="button" class="btn danger ext-act-btn" id="extmgr-batch-prune" disabled title="'+t('extmgr.batchPrune')+'">'
       +'<i class="fa-solid fa-eraser"></i><span>'+t('extmgr.batchPrune')+'</span>'
-    +'</button>';
+    +'</button>'
+    /* 2026-11-15 用户裁定：导出扩展清单＝纯图标钮（禁文字），只住扩展管理按钮行 */
+    +'<button type="button" class="btn icon ext-act-btn" id="extmgr-export-assetlist-pkg" disabled'
+      +' title="'+t('extmgr.exportAssetList')+'" aria-label="'+t('extmgr.exportAssetList')+'"><i class="fa-solid fa-file-code"></i></button>';
 
   /* 2026-11-15 裁定：列表不再是独立 details DOM——去掉「扩展列表」头与 .ext-host-list 包裹层，
      直接嵌在 body 流内；按钮行固定在滚动区之上，永不与行内容穿插重叠（修复“穿透”）。
      「自动更新」打开时按钮行只剩来源行，滚动区整个被策略子视图替换。 */
-  const policyOpen=isHost && !!state.extPolicyOpen;
+  const policyOpen=isHost && autoMasterOn && !!state.extPolicyOpen;
   const actionRow=!policyOpen
     ? '<div class="ext-head-action-row">'
       +'<div class="ext-head-left">'
@@ -3565,7 +3817,7 @@ async function renderExtInstalled(body){
       : '<div class="ext-scroll">'
         +'<div class="ext-list" role="list">'+(rowsHtml||'<div class="ext-empty">'+t('extmgr.noneInstalled')+'</div>')+'</div>'
         +updBlock
-        +(isHost ? serverPluginBlockHtml() : '')
+        /* 服务端扩展块已迁入页脚（syncExtInstallBlock 渲染，2026-11-15 裁定） */
       +'</div>');
 
   /* 事件绑定 */
@@ -3576,6 +3828,11 @@ async function renderExtInstalled(body){
   });
   body.querySelector('#extmgr-pkg-select')?.addEventListener('change',(e)=>{
     state.extSelectedPackageId=e.target.value;
+    renderExtensionView();
+  });
+  body.querySelector('#extmgr-auto-master')?.addEventListener('click',()=>{
+    /* 总开关（默认关）：开=显示逐扩展自动更新设置；关=整列隐藏。 */
+    persistDev({ extAutoToolsOn:!autoMasterOn });
     renderExtensionView();
   });
   body.querySelector('#extmgr-policy-toggle')?.addEventListener('click',()=>{
@@ -3631,7 +3888,7 @@ async function renderExtInstalled(body){
     });
   }
 
-  /* 单击行联动右侧 Git 视图 */
+  /* 单击行联动右侧 Git 视图；手机（2026-11-15 用户裁定）点击扩展行即进入 Git 可视化视图 */
   body.querySelectorAll('.ext-ext-row').forEach((row)=>{
     row.addEventListener('click',(e)=>{
       if(e.target.closest('input, select, label, button, .ext-drag, a')) return;
@@ -3639,11 +3896,17 @@ async function renderExtInstalled(body){
       if(!name) return;
       state.gitViz.name=name;
       body.querySelectorAll('.ext-ext-row').forEach((r)=>r.classList.toggle('is-active', r.dataset.extrow===name));
+      if(state.view==='mobile'){
+        state.sideTab='git';
+        renderZoneSide();
+        document.getElementById('zone-side-git')?.scrollIntoView({ behavior:'smooth', block:'start' });
+      }
       renderGitViz();
     });
   });
 
   refreshInstallArea();
+  if(isHost) void enrichHostRemoteUrls();
   const selectedNames=()=>[...body.querySelectorAll('[data-extsel]:checked')].map((box)=>box.dataset.extsel);
   const refValue=()=>String(body.querySelector('[data-extref]')?.value||'').trim();
 
@@ -3658,6 +3921,8 @@ async function renderExtInstalled(body){
     const bRemove=body.querySelector('#extmgr-batch-remove');
     const bPack=body.querySelector('#extmgr-batch-pack');
     const bPrune=body.querySelector('#extmgr-batch-prune');
+    const bAssetList=body.querySelector('#extmgr-export-assetlist');
+    const bAssetListPkg=body.querySelector('#extmgr-export-assetlist-pkg');
     /* 安装按钮在页脚安装面板里（不在 body 内），全局查找 */
     const bInstall=document.getElementById('extmgr-pkg-install');
     if(bUpdate) bUpdate.disabled=n===0;
@@ -3665,6 +3930,8 @@ async function renderExtInstalled(body){
     if(bRemove) bRemove.disabled=n===0;
     if(bPack) bPack.disabled=n===0;
     if(bPrune) bPrune.disabled=n===0;
+    if(bAssetList) bAssetList.disabled=n===0;
+    if(bAssetListPkg) bAssetListPkg.disabled=!selectedPkg;
     if(bInstall) bInstall.disabled=n===0;
     if(n===1){
       const singleName=checked[0].dataset.extsel;
@@ -3719,6 +3986,32 @@ async function renderExtInstalled(body){
         void pruneSelectedFromPackage(state.extSelectedPackageId, names);
       }},
     ]);
+  });
+
+  /* 「转成清单」行内动作（2026-11-15 用户裁定：删实体、留清单，只做减法） */
+  body.querySelectorAll('[data-pkg2manifest]').forEach((btn)=>{
+    btn.addEventListener('click',()=>{
+      const name=btn.dataset.pkg2manifest;
+      if(!name) return;
+      openModal(t('extmgr.toManifest'), t('extmgr.toManifestDesc',{name}), [], [
+        {label:t('modal.cancel'),onClick:closeModal},
+        {label:t('extmgr.toManifestConfirm'),primary:true,onClick:()=>{
+          closeModal();
+          void pruneSelectedFromPackage(state.extSelectedPackageId, [name], { keepManifest:true });
+        }},
+      ]);
+    });
+  });
+
+  /* 导出扩展清单（2026-11-15 用户裁定：只住扩展管理按钮行，纯图标） */
+  body.querySelector('#extmgr-export-assetlist')?.addEventListener('click',()=>{
+    const names=selectedNames();
+    if(!names.length){ toast(t('extmgr.selectNoneHint')); return; }
+    batchPackWithConfirm(names);
+  });
+  body.querySelector('#extmgr-export-assetlist-pkg')?.addEventListener('click',()=>{
+    if(!selectedPkg){ toast(t('extmgr.noPackageAvailable')); return; }
+    actions.exportAssetList?.({ source:'package', pkgIds:[selectedPkg.id] });
   });
 
   /* 「安装到宿主」绑定已迁入页脚安装面板（renderExtInstall 的 package 分支）：
@@ -4942,7 +5235,8 @@ function demoTutorialActions(real){
     const set=new Set(ids||[]);
     state.packages=state.packages.filter((p)=>!set.has(p.id));
     state.selectedPkgs=new Set([...state.selectedPkgs].filter((id)=>!set.has(id)));
-    if(state.source && set.has(state.source.pkgId)){ state.source={type:'host',pkgId:null}; state.sourceKey='host:'+state.host; }
+    state.activePkgs=new Set([...state.activePkgs].filter((id)=>!set.has(id)));
+    syncSourceToActive();
     renderAll(); toast(t('toast.tutorialSimulated'));
   };
   wrap.copyBack=(ids)=>{
@@ -5060,6 +5354,7 @@ function enterTutorialMode(){
   state.packages=buildDemoPackages();
   const firstImport=(state.packages||[]).find((p)=>p.zone==='import')||null;
   state.selectedPkgs=new Set(firstImport?[firstImport.id]:[]);
+  state.activePkgs=new Set(firstImport?[firstImport.id]:[]);
   state.source=firstImport ? { type:'package', pkgId:firstImport.id } : { type:'host', pkgId:null };
   state.sourceKey=firstImport ? ('pkg:'+firstImport.id) : ('host:'+state.host);
   state.zone='import';
@@ -5376,21 +5671,31 @@ function bind(){
   ['modal-extra','settings-body'].forEach(id => document.getElementById(id)?.addEventListener('click', extModeClick));
   document.getElementById('btn-close')?.addEventListener('click',()=>actions.close?.());
 
-  // 视图切换：桌面 2 个（图表 / 扩展管理），手机 3 个（图表 / 数据包 / 扩展管理）。
+  // 视图切换：桌面 2 个（图表 / 扩展管理）+ 迁移；手机 4 个（图表 / 迁移 / 扩展管理 / 数据包下拉）。
   // 按钮分散在三个面板头里，事件委托挂在共同祖先上。
   document.getElementById('view-workbench')?.addEventListener('click',(e)=>{
     const b=e.target.closest('[data-wbview]'); if(!b) return;
     const v=b.dataset.wbview;
     closeStorageInspector();
     if(v==='transfer'){
+      snapshotViewPkgs();
       state.transfer.open=true;
       if(state.transfer.tab!=='lan' && state.transfer.tab!=='cloud') state.transfer.tab='lan';
       renderTransfer(); renderLan(); renderCloud();
       return;
     }
+    /* 手机「数据包」＝下拉界面开关（非页切换，2026-11-15 用户裁定） */
+    if(state.view==='mobile' && v==='zone'){
+      const app=document.getElementById('app');
+      if(app) app.dataset.zoneOpen = app.dataset.zoneOpen==='1' ? '' : '1';
+      renderViewSwitch();
+      return;
+    }
     if(state.transfer.open){ state.transfer.open=false; renderTransfer(); }
-    if(state.view==='mobile') state.mobileView = (v==='zone'||v==='extension') ? v : 'chart';
+    snapshotViewPkgs();
+    if(state.view==='mobile') state.mobileView = v==='extension' ? 'extension' : 'chart';
     else state.mainView = v==='extension' ? 'extension' : 'chart';
+    restoreViewPkgs();
     syncMainView();
     if(v==='extension') renderExtensionView();
   });
@@ -5550,6 +5855,7 @@ function bind(){
     /* 切区必须让「选中集合」与「当前来源」一起失效并整体重绘：
        否则包卡的选中环会留下，而图表已被清空（2026-11-11 实测）。 */
     state.zone=b.dataset.zone; state.selectedPkgs=new Set();
+    state.activePkgs=new Set();
     state.source={type:'host', pkgId:null}; state.sourceKey='host:'+state.host;
     renderAll();
   });
@@ -5648,7 +5954,8 @@ function bind(){
   };
   const closeGroup=(id)=>{
     state.selectedPkgs.delete(id);
-    if(state.source.type==='package' && state.source.pkgId===id) state.source={type:'host',pkgId:null};
+    state.activePkgs.delete(id);
+    syncSourceToActive();
     renderChart(); renderZones(); renderActions();
   };
 
@@ -5683,12 +5990,7 @@ function bind(){
       else actions.fetch?.();
       return;
     }
-    const cardAssetList=e.target.closest('[data-assetlist]');
-    if(cardAssetList){
-      const pkgIds=String(cardAssetList.dataset.assetpkgs||'').split(',').filter(Boolean);
-      actions.exportAssetList?.({source:'package', pkgIds});
-      return;
-    }
+    /* 「导出扩展清单」入口已收进扩展管理按钮行（2026-11-15 用户裁定），图表卡的 data-assetlist 链路拆除。 */
     const emptyImport=e.target.closest('#btn-empty-import');
     if(emptyImport){
       const fi=document.getElementById('file-input');
@@ -5809,11 +6111,21 @@ function bind(){
   });
 
   document.getElementById('zone-card').addEventListener('click',e=>{
+    /* 手机下拉态：点完包卡（勾选或外框）即收起下拉界面 */
+    const appEl=document.getElementById('app');
+    const closeZoneDropdown=()=>{
+      if(state.view==='mobile' && appEl?.dataset.zoneOpen==='1'){
+        appEl.dataset.zoneOpen='';
+        renderViewSwitch();
+        syncMainView();
+      }
+    };
     const check=e.target.closest('[data-pkgcheck]');
     if(check){
       const id=check.dataset.pkgcheck;
       if(check.checked) state.selectedPkgs.add(id); else state.selectedPkgs.delete(id);
-      renderZones(); renderChart(); renderActions(); renderCloud(); return;
+      /* 2026-11-15 用户裁定：复选框只管列表操作，**不再驱动图表**。 */
+      renderZones(); renderActions(); renderCloud(); closeZoneDropdown(); return;
     }
     const act=e.target.closest('[data-pkgact]');
     if(act){
@@ -5835,8 +6147,12 @@ function bind(){
     const card=e.target.closest('[data-pkg]');
     if(card && !e.target.closest('input')){
       const id=card.dataset.pkg;
-      // 只切换当前查看的包，不改勾选集合：取消选择只能靠复选框或「反选」。
-      state.source={type:'package',pkgId:id}; state.sourceKey='pkg:'+id;
+      /* 2026-11-15 用户裁定：外框点击＝把该包加入/移出**图表显示集**（多选累加）；
+         复选框只管列表操作，两者彻底解耦。 */
+      if(state.activePkgs.has(id)) state.activePkgs.delete(id);
+      else state.activePkgs.add(id);
+      syncSourceToActive();
+      closeZoneDropdown();
       if(actions.onActivePackage) actions.onActivePackage(id);
       else renderAll();
     }
@@ -6230,10 +6546,10 @@ initSwitchDensity();
       for (const id of [...state.selectedPkgs]) {
         if (!alive.has(id)) state.selectedPkgs.delete(id);
       }
-      if (state.source.type === 'package' && !alive.has(state.source.pkgId)) {
-        state.source = { type: 'host', pkgId: null };
-        state.sourceKey = 'host:' + state.host;
+      for (const id of [...state.activePkgs]) {
+        if (!alive.has(id)) state.activePkgs.delete(id);
       }
+      syncSourceToActive();
       if (fresh.length) {
         fresh.forEach((pkg) => { applyPrefsToPackage(pkg); state.prefAppliedPkgs.add(pkg.id); });
         applyTopControlsFromPrefs();
@@ -6244,6 +6560,7 @@ initSwitchDensity();
       state.host = hostKey;
       state.mode = mode;
       if (!state.targetManual) state.target = targetForHost(hostKey);
+      state.activePkgs = new Set();
       state.source = { type: 'host', pkgId: null };
       state.sourceKey = 'host:' + hostKey;
       const isWeb = mode === 'web';
@@ -6311,7 +6628,7 @@ initSwitchDensity();
       renderChart();
     },
     setPrivateFiles(list) { if(state.tutorialMode) return; state.privateFiles = Array.isArray(list) ? list : []; renderChart(); },
-    setZone(zone) { state.zone = zone; state.selectedPkgs = new Set(); renderAll(); },
+    setZone(zone) { state.zone = zone; state.selectedPkgs = new Set(); state.activePkgs = new Set(); syncSourceToActive(); renderAll(); },
     /** 任务条：running / paused / null。只影响动作行的暂停·继续·中止三键。 */
     setTask(task) { if(state.tutorialMode) return; state.task = task || null; renderActions(); },
     /** 本次待导出（内存队列）；空数组即隐藏整块。 */
@@ -6348,7 +6665,7 @@ initSwitchDensity();
     },
     extLogAppend(line){ if(line) log('INFO', String(line)); },
     setExtensionResults(results){ state.extResults=Array.isArray(results)?results:[]; renderExtensionView(); },
-    setActivePackage(id) { if(state.tutorialMode) return; state.source = { type: 'package', pkgId: id }; state.sourceKey = 'pkg:' + id; renderAll(); },
+    setActivePackage(id) { if(state.tutorialMode) return; state.activePkgs = new Set([id]); state.source = { type: 'package', pkgId: id }; state.sourceKey = 'pkg:' + id; renderAll(); },
     pushLog(level, msg) { log(String(level || 'INFO').toUpperCase(), msg); },
     openModal,
     closeModal,

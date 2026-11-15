@@ -31,6 +31,7 @@ import {
   fetchHostStorageInspect, hostStorageInspectCapability, listHostExtensions,
   installExtensionBatch, deleteExtensionViaHost, moveExtensionViaHost,
   readHostIdentity, listServerPlugins, readHostExtensionGit,
+  serverPluginUpdate, serverPluginDelete, serverPluginInstallDeps, serverPluginInstall,
   updateExtensionViaHost, setExtensionManifestSink,
   opfsTmpHandle, opfsHandleToFile, opfsTmpCleanup,
 } from './src/ui/host-bridge.js';
@@ -1651,13 +1652,17 @@ async function main(root) {
         view.openExtensionManager(pkg.extManifest);
       },
       /* 包内清理（2026-11-15 用户裁定：**只做减法**）——从数据包移除选中的扩展
-         （实体条目 + 私有清单条目），重建 zip 并原位替换存储记录。 */
-      prunePackageExtensions: async (pkgId, names) => {
+         （实体条目 + 私有清单条目），重建 zip 并原位替换存储记录。
+         keepManifest=true 时为「转成清单」：删实体、留清单（无清单文件时用包清单缓存补建）。 */
+      prunePackageExtensions: async (pkgId, names, opts = {}) => {
         const pkg = pkgById(pkgId);
         if (!pkg) throw new Error('package not found');
         const blob = await blobOf(pkg);
         if (!blob) throw new Error('package blob not found');
-        const res = await prunePackageExtensions(blob, names);
+        const res = await prunePackageExtensions(blob, names, {
+          keepManifest: !!opts.keepManifest,
+          manifestSeed: Array.isArray(pkg.extManifest) ? pkg.extManifest : [],
+        });
         if (res.blob === blob || (!res.removedFiles && !res.removedManifest)) {
           return { removedFiles: 0, removedManifest: 0 };
         }
@@ -1699,6 +1704,11 @@ async function main(root) {
       listHostExtensions: () => listHostExtensions(host.platform),
       hostIdentity: () => readHostIdentity(),
       listServerPlugins: () => listServerPlugins(),
+      /* 服务端插件管理（管理员；Luker users-admin 端点，2026-11-15 用户裁定接入） */
+      serverPluginUpdate: (dir) => serverPluginUpdate(dir),
+      serverPluginDelete: (dir) => serverPluginDelete(dir),
+      serverPluginInstallDeps: (dir) => serverPluginInstallDeps(dir),
+      serverPluginInstall: (url) => serverPluginInstall(url),
       hostExtensionGit: (name, opts) => readHostExtensionGit(name, opts),
       deleteExtension: (name, isGlobal) => deleteExtensionViaHost(name, isGlobal),
       updateExtension: (name, isGlobal) => updateExtensionViaHost(name, isGlobal),

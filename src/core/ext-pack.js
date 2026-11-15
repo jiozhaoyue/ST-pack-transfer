@@ -71,3 +71,31 @@ export function extensionUnitsOf(groupNode) {
     .map((u) => ({ ...u, mb: Math.round(u.mb * 1000) / 1000 }))
     .sort((a, b) => a.name.localeCompare(b.name));
 }
+
+/**
+ * 打包模式建议（纯函数，2026-11-15 用户裁定：图表上**每个扩展**都要标注原件/清单建议）。
+ *
+ * 与打包弹窗「智能推荐」同一启发式，收敛到这里供图表行内徽标与弹窗共用：
+ * - 插件自身（pack-transfer）→ **原件**（必须自举运行）；
+ * - 无远端地址 → **原件**（目标宿主拉不到）；
+ * - 需凭据的远端（登记账号带密钥/用户名，或 URL 内嵌 userinfo）→ **原件**；
+ * - 其余公开远端 → **清单**（省空间、可自动拉取）。
+ *
+ * @param {string} name 扩展名
+ * @param {string} url 远端仓库地址（可为空）
+ * @param {{hasPrivateCredential?:boolean}} [hints] 调用方注入的凭据线索
+ * @returns {{mode:'full'|'manifest', key:'self'|'no-remote'|'private'|'public'}}
+ */
+export function suggestPackMode(name, url, hints = {}) {
+  const lower = String(name || '').toLowerCase();
+  if (lower.includes('pack-transfer') || lower.includes('st-pack-transfer')) {
+    return { mode: 'full', key: 'self' };
+  }
+  const raw = String(url || '').trim();
+  if (!raw) return { mode: 'full', key: 'no-remote' };
+  if (hints.hasPrivateCredential || /\/\/[^/@]+@/.test(raw)) {
+    return { mode: 'full', key: 'private' };
+  }
+  return { mode: 'manifest', key: 'public' };
+}
+

@@ -309,6 +309,8 @@
   #app.app-container .vol-head .vol-bulk button:hover{color:var(--text);border-color:var(--accent)}
   #app.app-container .row-bulk{display:none;gap:2px;margin-left:4px}
   #app.app-container .tree-row:hover .row-bulk{display:inline-flex}
+  /* 手机（2026-11-15 用户裁定）：没有 hover，全选/全不选/反选必须**常显** */
+  #app.app-container[data-view="mobile"] .row-bulk{display:inline-flex}
   #app.app-container .row-bulk button{border:1px solid var(--border);background:var(--panel-3);border-radius:4px;
     padding:0 4px;font-size:9px;line-height:14px;color:var(--muted);cursor:pointer}
   #app.app-container .row-bulk button:hover{color:var(--text);border-color:var(--accent)}
@@ -699,6 +701,31 @@
     border-top:1px solid var(--border);background:color-mix(in srgb,var(--panel-3) 70%,transparent)}
   #app.app-container .ext-footer .ext-install-area{flex:0 1 auto;min-height:0;max-height:46vh;overflow:auto}
   #app.app-container .ext-footer .ext-install-area[hidden]{display:none}
+  /* 服务端扩展区（2026-11-15 裁定：住页脚、在「安装扩展」上方、默认收起、展开同样向上挤压） */
+  #app.app-container .ext-footer .ext-server-area{flex:0 1 auto;min-height:0;display:flex;flex-direction:column;gap:4px}
+  #app.app-container .ext-footer .ext-server-area[hidden]{display:none}
+  #app.app-container .ext-footer .ext-server-block{display:flex;flex-direction:column;gap:4px;min-height:0}
+  #app.app-container .ext-footer .ext-server-block > .ext-summary{flex:0 0 auto}
+  #app.app-container .ext-footer .ext-server-block > .ext-server-body{min-height:0;max-height:38vh;overflow:auto;
+    display:flex;flex-direction:column;gap:6px}
+  /* 页脚用户徽标（2026-11-15 裁定：识别当前用户；管理员才亮管理能力） */
+  #app.app-container .ext-user-line{display:flex;justify-content:flex-end}
+  #app.app-container .ext-user-line[hidden]{display:none}
+  #app.app-container .ext-user-badge{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;
+    color:var(--text);padding:2px 8px;border-radius:999px;background:var(--panel-3);border:1px solid var(--border)}
+  #app.app-container .ext-user-badge .fa-user-shield{color:var(--accent)}
+  #app.app-container .ext-user-badge b.is-admin{color:var(--accent);font-weight:650}
+  /* 私有/公开徽标（宿主行 + 服务端行共用；只标性质不占额外行） */
+  #app.app-container .ext-priv-tag{flex:0 0 auto;padding:1px 6px;border-radius:999px;font-size:9.5px;font-weight:600}
+  #app.app-container .ext-priv-tag.is-private{background:color-mix(in srgb,var(--brand-st) 22%,transparent);
+    color:var(--text);border:1px solid var(--brand-st-ring)}
+  #app.app-container .ext-priv-tag.is-public{background:color-mix(in srgb,var(--keep) 16%,transparent);
+    color:var(--keep);border:1px solid var(--keep)}
+  /* 行内图标小钮（转成清单等） */
+  #app.app-container .ext-row-btn{width:var(--ctl-h);height:var(--ctl-h);padding:0;display:inline-flex;
+    align-items:center;justify-content:center;flex:0 0 auto}
+  /* 自动更新总开关组 */
+  #app.app-container .ext-auto-master{display:inline-flex;align-items:center;gap:4px;margin-left:auto}
   #app.app-container .ext-footer > .btn{width:100%}
   #app.app-container .ext-install-toggle{display:flex;align-items:center;justify-content:center;gap:7px}
   #app.app-container .ext-install-toggle .ext-install-label{white-space:nowrap}
@@ -1118,7 +1145,18 @@
   /* 图表列与卡片「可增不可缩」：内容不足一屏时拉伸填满（不留空白），
      内容超出时不压缩（否则下方面板会被压成 2px）。用户 2026-11-12 裁定。 */
   #app.app-container[data-view="mobile"] .col-chart{flex:1 0 auto}
+  /* 手机端扩展管理：面板自身锁高（减去切换行/面板头/间距），正文内滚，
+     「安装扩展」页脚钉在面板底部向上挤压列表（2026-11-15 用户裁定：所有端一律钉底） */
+  #app.app-container[data-view="mobile"] .extension-view{height:calc(100dvh - 104px);min-height:0}
   #app.app-container[data-view="mobile"] .col-side{display:contents}
+  /* 手机数据包下拉界面（2026-11-15 用户裁定：第 4 钮弹出，非页切换）：
+     data-zone-open=1 时整列变成固定浮层；否则不占布局（hidden 由 JS 控制） */
+  #app.app-container[data-view="mobile"][data-zone-open="1"] .col-side{
+    display:block;position:fixed;left:8px;right:8px;bottom:8px;top:auto;
+    max-height:72vh;overflow:auto;z-index:60;
+    background:var(--panel);border:1px solid var(--outline);border-radius:12px;
+    box-shadow:var(--shadow);padding:4px;
+  }
   #app.app-container[data-view="mobile"] .chart-card{flex:1 0 auto}
   #app.app-container[data-view="mobile"] .cloud-view{flex:0 0 auto}
   #app.app-container[data-view="mobile"] .cloud-grid{grid-template-columns:minmax(0,1fr)}
