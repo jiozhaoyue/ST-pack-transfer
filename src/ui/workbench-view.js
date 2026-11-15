@@ -522,10 +522,10 @@ function syncMainView(){
   const chartCol=document.querySelector('.col-chart');
   const side=document.querySelector('.col-side');
   const splitter=document.querySelector('.splitter-v');
-  /* 2026-11-15 用户裁定（三次修订＝回退 81022e1 后重做）：手机数据包下拉**零布局高度**——
-     关＝display:none；开＝absolute 凭空浮出（hidden 清掉，定位由 --zone-drop-top 提供）。 */
+  /* 2026-11-15 用户裁定（四次修订＝最终定案）：手机数据包列表**同层挤压**——
+     文档流内 0fr→1fr 抽屉：hidden 不参与（否则动画失效），显隐全由 data-zone-open 驱动 CSS。 */
   if(chartCol) chartCol.hidden = false;
-  if(side) side.hidden = siActive || (mobile && app?.dataset.zoneOpen!=='1');
+  if(side) side.hidden = siActive;
   if(splitter) splitter.hidden = siActive;
   const chartCard=document.getElementById('chart-card');
   const extView=document.getElementById('extension-view');
@@ -5503,8 +5503,8 @@ const TUTORIAL_GOALS=[
       { sel:'#cloud-provider-tabs', view:'cloud', transferTab:'cloud', title:'tutorial.transfer.cloud', desc:'tutorial.transfer.cloudDesc' },
       { sel:'#cloud-s3-pane', view:'cloud', transferTab:'cloud', cloudProvider:'s3', title:'tutorial.transfer.cred', desc:'tutorial.transfer.credDesc' },
       { sel:'#webdav-body', view:'cloud', transferTab:'cloud', cloudProvider:'webdav', title:'tutorial.transfer.cred', desc:'tutorial.transfer.credDesc' },
-      { sel:'#transfer-view .help-btn[data-help="transfer"]', view:'cloud', transferTab:'cloud', title:'tutorial.transfer.help', desc:'tutorial.transfer.helpDesc' },
-      { sel:'#cloud-view .help-btn[data-help="credentials"]', view:'cloud', transferTab:'cloud', title:'tutorial.transfer.credGuide', desc:'tutorial.transfer.credGuideDesc' }
+      { sel:'#transfer-tabs [data-transfer-tab="cloud"]', view:'cloud', transferTab:'cloud', title:'tutorial.transfer.help', desc:'tutorial.transfer.helpDesc' },
+      { sel:'#cloud-provider-tabs', view:'cloud', transferTab:'cloud', title:'tutorial.transfer.credGuide', desc:'tutorial.transfer.credGuideDesc' }
     ]
   }
 ];
@@ -5738,22 +5738,11 @@ function bind(){
       renderTransfer(); renderLan(); renderCloud();
       return;
     }
-    /* 手机「数据包」＝锚定下拉开关（非页切换；2026-11-15 三次裁定：**零布局高度**，
-       打开时按切换行实时底边写入 --zone-drop-top，贴行正下方凭空浮出 + 滑入动画）。 */
+    /* 手机「数据包」＝同层挤压段开关（非页切换；2026-11-15 四次修订＝最终定案：
+       文档流内 0fr→1fr 抽屉，开关只翻 data-zone-open，显隐动画全在 CSS）。 */
     if(state.view==='mobile' && v==='zone'){
       const app=document.getElementById('app');
-      const opening=app?.dataset.zoneOpen!=='1';
-      if(app){
-        app.dataset.zoneOpen = opening ? '1' : '';
-        if(opening){
-          let bottom=0;
-          document.querySelectorAll('#view-workbench [data-view-switch]').forEach((host)=>{
-            if(bottom || host.closest('.panel')?.hidden || host.hidden) return;
-            bottom=host.getBoundingClientRect().bottom;
-          });
-          app.style.setProperty('--zone-drop-top', (Math.max(0, bottom) + 6) + 'px');
-        }
-      }
+      if(app) app.dataset.zoneOpen = app?.dataset.zoneOpen==='1' ? '' : '1';
       renderViewSwitch();
       syncMainView();
       return;

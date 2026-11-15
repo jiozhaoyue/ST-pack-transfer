@@ -45,7 +45,7 @@ export function getWorkbenchHtml() {
               <button class="icon-btn chart-pref-btn" id="chart-pref-btn" data-i18n-title="chart.prefsBtn" data-i18n-aria="chart.prefsBtn">
                 <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h8M16 7h4M4 12h4M12 12h8M4 17h10M18 17h2"/><circle cx="14" cy="7" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="16" cy="17" r="2"/></svg>
               </button>
-              <button class="help-btn" data-help="chart" data-i18n-title="chart.help">?</button>
+
             </div>
           </div>
 
@@ -118,7 +118,7 @@ export function getWorkbenchHtml() {
                 <button type="button" class="seg-btn active" data-transfer-tab="lan" data-i18n="action.lan"></button>
                 <button type="button" class="seg-btn" data-transfer-tab="cloud" data-i18n="cloud.open"></button>
               </div>
-              <button class="help-btn" data-help="transfer" data-i18n-title="transfer.help">?</button>
+
             </div>
           </div>
           <div class="transfer-body">
@@ -202,7 +202,6 @@ export function getWorkbenchHtml() {
               <button type="button" class="seg-btn active" data-cloud-provider="s3">S3</button>
               <button type="button" class="seg-btn" data-cloud-provider="webdav">WebDAV</button>
             </div>
-            <button class="help-btn" data-help="credentials" data-i18n-title="cloud.credentialsHelp">?</button>
           </div>
           <div class="cloud-body" id="cloud-mode-row">
             <div class="cloud-grid">
@@ -320,7 +319,7 @@ export function getWorkbenchHtml() {
                 <button class="seg-btn active" data-exttab="host" data-i18n="extmgr.tabHost"></button>
                 <button class="seg-btn" data-exttab="cred" data-i18n="extmgr.tabCred"></button>
               </div>
-              <button class="help-btn" data-help="extmgr" data-i18n-title="extmgr.help">?</button>
+
             </div>
           </div>
           <div class="extension-body" id="extension-body"></div>
@@ -354,7 +353,7 @@ export function getWorkbenchHtml() {
                 <button type="button" class="seg-btn active" data-sidetab="zone" data-i18n="view.zone"></button>
                 <button type="button" class="seg-btn" data-sidetab="git" data-i18n="gitv.title"></button>
               </div>
-              <button class="help-btn" data-help="zone" data-i18n-title="zones.help">?</button>
+
             </div>
           </div>
           <div class="zone-side-panel" id="zone-side-zone">
@@ -401,7 +400,7 @@ export function getWorkbenchHtml() {
     <section class="panel view-card" id="view-log" hidden>
       <div class="view-head">
         <h3 data-i18n="log.title"></h3>
-        <button class="help-btn" data-help="log" data-i18n-title="log.help">?</button>
+
         <span class="latest" id="log-latest" data-i18n="log.empty"></span>
         <button class="icon-btn" id="log-close" data-i18n-title="header.close">×</button>
       </div>
