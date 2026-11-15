@@ -131,6 +131,10 @@
     background:var(--accent-soft);border-bottom:1px solid var(--accent);font-size:11px;color:var(--text)}
   #app.app-container .tutorial-banner[hidden]{display:none !important}
   #app.app-container .tutorial-banner .tb-text{flex:1 1 auto;min-width:0;line-height:1.45}
+  /* 手机端单行铁律（2026-11-15 用户裁定）：短文案 + 禁换行，按钮与文字同一行 */
+  #app.app-container[data-view="mobile"] .tutorial-banner{gap:6px;padding:5px 8px;white-space:nowrap}
+  #app.app-container[data-view="mobile"] .tutorial-banner .tb-text{flex:1 1 auto;overflow:hidden;font-size:10.5px}
+  #app.app-container[data-view="mobile"] .tutorial-banner .btn{padding:3px 6px}
   #app.app-container .tutorial-banner .btn{flex:0 0 auto;min-height:var(--ctl-h);padding:3px 9px;font-size:11px}
   #app.app-container .icon-btn{position:relative;width:var(--ctl-h);height:var(--ctl-h);display:inline-flex;align-items:center;justify-content:center;
     border:1px solid var(--border);background:var(--panel-3);border-radius:8px;color:var(--muted);padding:0}
@@ -672,10 +676,8 @@
   #app.app-container .view-switch-btn .ico{width:15px;height:15px;flex:0 0 auto;color:currentColor}
   #app.app-container .view-switch.is-icon-only .view-switch-btn{width:var(--ctl-h);padding:0;gap:0}
   #app.app-container .view-switch.is-icon-only .view-switch-btn span{display:none}
-  /* 手机：视图切换**固定纯图标**（2026-11-15 裁定）——不量宽、不回退，任何情况都是四个图标；
-     可访问名经按钮 aria-label 保全 */
-  #app.app-container[data-view="mobile"] .view-switch-btn{width:var(--ctl-h);padding:0;gap:0}
-  #app.app-container[data-view="mobile"] .view-switch-btn span{display:none}
+  /* 手机 4 钮（2026-11-15 二次裁定）：**空间够必须显示文字**——废除原「手机固定纯图标」强制规则，
+     退化仍由 applySwitchDensity 按实测宽度唯一决定（is-icon-only） */
   #app.app-container .view-switch-btn.active{background:var(--accent-soft);border-color:var(--accent);color:var(--text)}
   /* 全局动作条已取消：从宿主拉取在数据包模式行，迁移与备份在面板头切换行 */
 
@@ -1129,9 +1131,11 @@
     min-height:0;margin:0;border-radius:0}
   #app.app-container[data-view="mobile"] .splitter-v{display:none}
   /* 手机端左右切换：切换哪一列可见；唯一滚动容器仍是 .app-main —— 不做第二个滚动条 */
-  #app.app-container .mobile-switch{display:none;flex-wrap:wrap;gap:4px;row-gap:4px;padding:3px;margin:0 2px;
+  #app.app-container .mobile-switch{display:none;flex-wrap:nowrap;gap:4px;padding:3px;margin:0 2px;
     background:var(--panel-2);border:1px solid var(--border);border-radius:9px}
+  /* 手机切换行（2026-11-15 用户裁定）：**绝对禁止换行**——空间不足由 is-icon-only 降级，不折行 */
   #app.app-container[data-view="mobile"] .mobile-switch{display:flex;position:sticky;top:0;z-index:6;
+    flex-wrap:nowrap;overflow:hidden;order:-2;
     backdrop-filter:blur(6px)}
   #app.app-container .mobile-switch .msw{flex:1 1 auto;min-width:max-content;min-height:28px;padding:3px 8px;
     border:1px solid transparent;border-radius:7px;background:transparent;color:var(--muted);
@@ -1146,17 +1150,28 @@
      内容超出时不压缩（否则下方面板会被压成 2px）。用户 2026-11-12 裁定。 */
   #app.app-container[data-view="mobile"] .col-chart{flex:1 0 auto}
   /* 手机端扩展管理：面板自身锁高（减去切换行/面板头/间距），正文内滚，
-     「安装扩展」页脚钉在面板底部向上挤压列表（2026-11-15 用户裁定：所有端一律钉底） */
+     「安装扩展」页脚钉在面板底部向上挤压列表（2026-11-15 用户裁定：所有端一律钉底）；
+     2026-11-15 加严：扩展管理激活时 **app-main 禁止外滚**（铁律：禁止双重滚动条，全部屏内） */
   #app.app-container[data-view="mobile"] .extension-view{height:calc(100dvh - 104px);min-height:0}
+  #app.app-container[data-view="mobile"]:has(#extension-view:not([hidden])) .app-main{overflow:hidden}
   #app.app-container[data-view="mobile"] .col-side{display:contents}
-  /* 手机数据包下拉界面（2026-11-15 用户裁定：第 4 钮弹出，非页切换）：
-     data-zone-open=1 时整列变成固定浮层；否则不占布局（hidden 由 JS 控制） */
-  #app.app-container[data-view="mobile"][data-zone-open="1"] .col-side{
-    display:block;position:fixed;left:8px;right:8px;bottom:8px;top:auto;
-    max-height:72vh;overflow:auto;z-index:60;
-    background:var(--panel);border:1px solid var(--outline);border-radius:12px;
-    box-shadow:var(--shadow);padding:4px;
+  /* 手机数据包抽屉（2026-11-15 用户裁定，二次修订）：
+     **完全内嵌**——不是浮层，不 fixed、无投影；排在 app-main 最上（order:-1），
+     用 grid-template-rows 0fr→1fr 做**从上至下抽屉滑动动画**；
+     关闭时 0fr 完全收起、不占布局。内容只装包列表（Git 页签在下拉内禁用，见下一条）。 */
+  #app.app-container[data-view="mobile"] .col-side{
+    display:grid;grid-template-rows:0fr;order:-1;
+    transition:grid-template-rows .24s ease;
   }
+  #app.app-container[data-view="mobile"][data-zone-open="1"] .col-side{
+    grid-template-rows:1fr;
+  }
+  #app.app-container[data-view="mobile"] .col-side > #zone-card{
+    min-height:0;overflow:hidden;
+  }
+  /* 下拉里只留包列表：zone/git 侧页签禁用（Git 可视化不在数据包抽屉里） */
+  #app.app-container[data-view="mobile"][data-zone-open="1"] .zone-side-tabs{display:none !important}
+  #app.app-container[data-view="mobile"][data-zone-open="1"] #zone-side-git{display:none !important}
   #app.app-container[data-view="mobile"] .chart-card{flex:1 0 auto}
   #app.app-container[data-view="mobile"] .cloud-view{flex:0 0 auto}
   #app.app-container[data-view="mobile"] .cloud-grid{grid-template-columns:minmax(0,1fr)}

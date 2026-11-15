@@ -234,7 +234,7 @@ const state = {
   host:'luker', mode:'plugin', view:'desktop', mainView:'chart', mobileView:'chart', pane:'workbench', zone:'import',
   extTab:'host', extSource:'host', extSelectedPackageId:'', extPolicyOpen:false, extEntries:[], extResults:[], extRunning:false, extInstalled:null, extManifestPrefill:[], extRemoteUrls:{}, extServerOpen:false,
   extReportOpen:false, extInstallOpen:false, extInstallGlobal:false, settingsDraft:null,
-  extAccountTests:[], extUpdate:null, extAccountsOpen:false, extOauthOpen:false,
+  extAccountTests:[], extUpdate:null, extAccountsOpen:true, extOauthOpen:false,
   /* 服务端插件清单（仅管理员）：null = 未读取；[] = 已读取但为空。 */
   extServerPlugins:null, extHostAdmin:false, extServerOpen:false,
   /* 数据包列页签：zone = 数据包，git = Git 可视化（仅开发者模式）。 */
@@ -466,8 +466,9 @@ function renderViewSwitch(){
       +viewSwitchIcon(it.id)+'<span>'+it.label+'</span></button>';
   }).join('');
   document.querySelectorAll('[data-view-switch]').forEach((host)=>{
-    /* 数据包面板只在手机形态参与切换（且是下拉，非页切换）；桌面数据包列常显，头部不出现切换按钮。 */
-    if(host.hasAttribute('data-view-switch-zone') && !mobile){
+    /* 区头那组 [data-view-switch-zone] 是旧「数据包页切换」残留：手机端数据包已是下拉界面，
+       这组**任何形态都不渲染**（2026-11-15 实测它在手机端制造重复的 4 钮）。 */
+    if(host.hasAttribute('data-view-switch-zone')){
       host.hidden=true; host.innerHTML=''; return;
     }
     host.hidden=false;
@@ -507,6 +508,12 @@ function syncMainView(){
   const app = document.getElementById('app');
   if(app) app.dataset.view = state.view;
   const mobile = state.view === 'mobile';
+  /* 横幅文案随形态切换（手机=短文案，保单行） */
+  if(state.tutorialMode){
+    const tb=document.getElementById('tutorial-banner');
+    const txt=tb?.querySelector('.tb-text');
+    if(txt && !tb.hidden) txt.textContent = mobile ? t('tutorial.modeBannerShort') : t('tutorial.modeBanner');
+  }
   const primary = mobile ? state.mobileView : state.mainView;
   const transferOpen = !!state.transfer.open;
   /* 存储审查面板占满内容区：同时隐藏数据包列与分隔条，网格改为单列（见 style.css [data-si]）。 */
@@ -515,10 +522,10 @@ function syncMainView(){
   const chartCol=document.querySelector('.col-chart');
   const side=document.querySelector('.col-side');
   const splitter=document.querySelector('.splitter-v');
-  /* 2026-11-15 用户裁定：手机数据包列不再是页切换目标——它固定作为下拉界面（data-zone-open），
-     图表列在任何手机主视图下都显示。下拉打开时清 hidden，交由 CSS 定位成浮层。 */
+  /* 2026-11-15 用户裁定：手机数据包列＝**内嵌抽屉**（非浮层）：显隐由 data-zone-open +
+     grid-template-rows 动画承担，hidden 不再参与（否则动画失效）；Git 可视化不在抽屉里。 */
   if(chartCol) chartCol.hidden = false;
-  if(side) side.hidden = siActive || (mobile && app?.dataset.zoneOpen!=='1');
+  if(side) side.hidden = siActive;
   if(splitter) splitter.hidden = siActive;
   const chartCard=document.getElementById('chart-card');
   const extView=document.getElementById('extension-view');
@@ -1966,12 +1973,15 @@ function renderGitVizHeadbar(row){
     ? '<a class="git-viz-repo" href="'+escapeHtml(g.remoteUrl)+'" target="_blank" rel="noopener" title="'+escapeHtml(g.remoteUrl)+'">'
       +'<i class="fa-solid fa-up-right-from-square"></i></a>'
     : '';
-  const install=(g.pickedRef && g.remoteUrl)
+  /* 2026-11-15 用户裁定：「切换分支」按钮（装到该版本）由开发者页设置控制，**默认关**——
+     关：Git 可视化里不显示分支/标签选择与装到按钮；开：才显示。 */
+  const refSwitchOn=!!loadSettings().gitRefInstallOn;
+  const install=(refSwitchOn && g.pickedRef && g.remoteUrl)
     ? '<button type="button" class="btn accent git-viz-install" id="git-viz-install">'
       +'<i class="fa-solid fa-download"></i><span>'+t('gitv.installRef',{ref:g.pickedRef})+'</span></button>'
     : '';
   return '<div class="git-viz-headrow">'+chip+reload+repo+'</div>'
-    +gitRefChipsHtml(g)
+    +(refSwitchOn?gitRefChipsHtml(g):'')
     +install;
 }
 function installGitRefWithConfirm(){
@@ -2540,8 +2550,34 @@ function syncExtInstallBlock(){
 /** 凭据（开发者）页：自动更新父子块 + 账号 / 存储位置 / OAuth / 令牌指引，不含任何安装控件。 */
 /** 开发者页：Git 账号 / 存储位置 / OAuth / 令牌指引（自动更新已搬到宿主页每条扩展）。 */
 function renderExtCredentials(body){
-  body.innerHTML='<div class="ext-install">'+accountsHtml()+'</div>';
+  const autoMasterOn=!!loadSettings().extAutoToolsOn;
+  body.innerHTML='<div class="ext-install">'
+    /* 2026-11-15 用户二次裁定：自动更新总开关住开发者页（默认关）；开了宿主页才显示逐扩展控件 */
+    +'<label class="check ext-ref-switch"><input type="checkbox" id="extmgr-auto-master"'+(autoMasterOn?' checked':'')+'> '
+      +'<span>'+t('extmgr.autoUpdate')+'</span><span class="ext-note-inline">'+t('extmgr.autoMasterHint')+'</span></label>'
+    +(autoMasterOn
+      ? '<div class="ext-row"><button type="button" class="btn" id="extmgr-policy-open"><i class="fa-solid fa-sliders"></i><span>'+t('extmgr.autoPolicy')+'</span></button></div>'
+      : '')
+    /* 2026-11-15 用户裁定：切换分支按钮的开关住开发者页（默认关） */
+    +'<label class="check ext-ref-switch"><input type="checkbox" id="extmgr-ref-switch"'+(loadSettings().gitRefInstallOn?' checked':'')+'> '
+      +'<span>'+t('extmgr.gitRefSwitch')+'</span><span class="ext-note-inline">'+t('extmgr.gitRefSwitchHint')+'</span></label>'
+    +accountsHtml()+'</div>';
   bindAccounts(body);
+  body.querySelector('#extmgr-auto-master')?.addEventListener('change',(e)=>{
+    persistDev({ extAutoToolsOn:!!e.target.checked });
+    if(!e.target.checked) state.extPolicyOpen=false;
+    renderExtensionView();
+  });
+  body.querySelector('#extmgr-policy-open')?.addEventListener('click',()=>{
+    /* 策略子视图在宿主页：切过去直接打开 */
+    state.extTab='host';
+    state.extPolicyOpen=true;
+    renderExtensionView();
+  });
+  body.querySelector('#extmgr-ref-switch')?.addEventListener('change',(e)=>{
+    persistDev({ gitRefInstallOn:!!e.target.checked });
+    toast(t('extmgr.devSaved'));
+  });
 }
 function renderExtInstall(body){
   /* 数据包来源模式：包内勾选的扩展在这里装进宿主。
@@ -3485,7 +3521,9 @@ function extAutoPolicyBlockHtml(){
     +'<input class="text_pole" type="number" data-extpolicy="'+key+'" min="'+min+'" max="'+max+'" step="'+step+'"'
     +' value="'+escapeHtml(String(s[key]??''))+'"></label>';
   return '<div class="ext-auto-policy" data-extpolicyblock>'
-    +'<div class="ext-policy-title">'+t('extmgr.autoUpdate')+'</div>'
+    +'<div class="ext-policy-title">'+t('extmgr.autoUpdate')
+      +'<button type="button" class="btn icon ext-policy-close" id="extmgr-policy-close" title="'+t('modal.close')+'" aria-label="'+t('modal.close')+'"><i class="fa-solid fa-xmark"></i></button>'
+    +'</div>'
     +'<div class="ext-note">'+t('extmgr.autoPolicyNote')+'</div>'
     +'<div class="ext-row">'
       +num('autoUpdateMinIntervalSec',t('settings.autoMinInterval'),1,86400,1)
@@ -3629,19 +3667,9 @@ async function renderExtInstalled(body){
           +importPkgs.map(p=>'<option value="'+escapeHtml(p.id)+'"'+(p.id===state.extSelectedPackageId?' selected':'')+'>'+escapeHtml(p.name)+' ('+fmtMB(p.mb)+')</option>').join('')
           +'</select></label>'
         : '<span class="ext-note-inline">'+t('extmgr.noPackageAvailable')+'</span>')
-      /* 2026-11-15 用户裁定：这是**自动更新总开关**（默认关）——
-         关：列表行不显示任何逐扩展自动更新设置；开：才显示逐行控件 + 策略入口。 */
-      : '<span class="ext-auto-master">'
-        +'<button type="button" class="btn ext-policy-btn'+(autoMasterOn?' active':'')
-        +'" id="extmgr-auto-master" aria-pressed="'+(autoMasterOn?'true':'false')
-        +'"><i class="fa-solid fa-clock"></i><span>'+t('extmgr.autoUpdate')+'</span></button>'
-        +(autoMasterOn
-          ? '<button type="button" class="btn icon ext-policy-btn'+(state.extPolicyOpen?' active':'')
-            +'" id="extmgr-policy-toggle" aria-pressed="'+(state.extPolicyOpen?'true':'false')
-            +'" title="'+t('extmgr.autoPolicy')+'" aria-label="'+t('extmgr.autoPolicy')
-            +'"><i class="fa-solid fa-sliders"></i></button>'
-          : '')
-      +'</span>')
+      /* 2026-11-15 用户二次裁定：自动更新**总开关住开发者页**——宿主来源行不放任何开关；
+         开了之后宿主页才显示逐扩展自动更新控件（渲染由 autoMasterOn 门控）。 */
+      : '')
   +'</div>';
 
   let rowsHtml = '';
@@ -3821,6 +3849,10 @@ async function renderExtInstalled(body){
       +'</div>');
 
   /* 事件绑定 */
+  body.querySelector('#extmgr-policy-close')?.addEventListener('click',()=>{
+    state.extPolicyOpen=false;
+    renderExtensionView();
+  });
   body.querySelector('#extmgr-source-tabs')?.addEventListener('click',(e)=>{
     const b=e.target.closest('[data-extsource]'); if(!b) return;
     state.extSource=b.dataset.extsource;
@@ -3830,15 +3862,7 @@ async function renderExtInstalled(body){
     state.extSelectedPackageId=e.target.value;
     renderExtensionView();
   });
-  body.querySelector('#extmgr-auto-master')?.addEventListener('click',()=>{
-    /* 总开关（默认关）：开=显示逐扩展自动更新设置；关=整列隐藏。 */
-    persistDev({ extAutoToolsOn:!autoMasterOn });
-    renderExtensionView();
-  });
-  body.querySelector('#extmgr-policy-toggle')?.addEventListener('click',()=>{
-    state.extPolicyOpen=!state.extPolicyOpen;
-    renderExtensionView();
-  });
+  /* 自动更新总开关已迁入开发者页（2026-11-15 用户二次裁定）；策略子视图自带关闭钮 */
   /* 行内远程 URL：点击文本即复制（2026-11-15 裁定：禁止单独的复制按钮）。
      body 节点常驻、每次重渲染都跑到这里，故用标记防重复绑定。 */
   if(!body.dataset.copyurlBound){
@@ -4984,16 +5008,26 @@ function openSettingsView(html,{onSave,onClose,onAction}={}){
   const body=document.getElementById('settings-body');
   if(!body) return;
   body.innerHTML=html||'';
-  /* 三态：× = 关闭但保留草稿（内存，刷新即丢）；取消 = 丢弃改动；保存 = 双写持久化。 */
+  /* 三态：× = 关闭但保留草稿（内存，刷新即丢）；取消 = 丢弃改动；保存 = 双写持久化。
+     2026-11-15 用户裁定：× / 取消时若有**未保存的更改**，必须先确认「是否离开」。 */
+  applySettingsDraft(body);
+  const baseline=captureSettingsDraft(body);
+  const isDirty=()=>JSON.stringify(captureSettingsDraft(body))!==JSON.stringify(baseline);
+  const confirmLeave=(then)=>{
+    if(!isDirty()){ then(); return; }
+    openModal(t('settings.unsavedTitle'), t('settings.unsavedDesc'), [], [
+      {label:t('settings.unsavedStay'),onClick:closeModal},
+      {label:t('settings.unsavedLeave'),danger:true,onClick:()=>{ closeModal(); then(); }},
+    ]);
+  };
   const closeKeep=()=>{ state.settingsDraft=captureSettingsDraft(body); onClose?.(); backToWorkbench(); };
   const closeDrop=()=>{ state.settingsDraft=null; onClose?.(); backToWorkbench(); };
-  applySettingsDraft(body);
   const save=document.getElementById('settings-save');
   if(save) save.onclick=()=>{ state.settingsDraft=null; onSave?.(body); };
   const closeX=document.getElementById('settings-close');
-  if(closeX) closeX.onclick=closeKeep;
+  if(closeX) closeX.onclick=()=>confirmLeave(closeKeep);
   const cancelBtn=document.getElementById('settings-cancel');
-  if(cancelBtn) cancelBtn.onclick=closeDrop;
+  if(cancelBtn) cancelBtn.onclick=()=>confirmLeave(closeDrop);
   body.querySelectorAll('[data-action]').forEach(el=>{
     el.addEventListener('click',()=>onAction?.(el.dataset.action, el));
   });
@@ -5339,7 +5373,11 @@ function demoStorageInspect(source, pathArr){
 }
 function setTutorialBanner(on){
   const el=document.getElementById('tutorial-banner');
-  if(el) el.hidden=!on;
+  if(!el) return;
+  el.hidden=!on;
+  /* 手机端单行（2026-11-15 用户裁定）：横幅文字换短文案，禁两行 */
+  const txt=el.querySelector('.tb-text');
+  if(txt) txt.textContent = state.view==='mobile' ? t('tutorial.modeBannerShort') : t('tutorial.modeBanner');
 }
 function enterTutorialMode(){
   if(state.tutorialMode) return;
@@ -5684,11 +5722,13 @@ function bind(){
       renderTransfer(); renderLan(); renderCloud();
       return;
     }
-    /* 手机「数据包」＝下拉界面开关（非页切换，2026-11-15 用户裁定） */
+    /* 手机「数据包」＝内嵌抽屉开关（非页切换、非浮层，2026-11-15 用户裁定）。
+       开关只翻 data-zone-open；显隐/动画全在 CSS（grid-template-rows 0fr→1fr）。 */
     if(state.view==='mobile' && v==='zone'){
       const app=document.getElementById('app');
-      if(app) app.dataset.zoneOpen = app.dataset.zoneOpen==='1' ? '' : '1';
+      if(app) app.dataset.zoneOpen = app?.dataset.zoneOpen==='1' ? '' : '1';
       renderViewSwitch();
+      syncMainView();
       return;
     }
     if(state.transfer.open){ state.transfer.open=false; renderTransfer(); }

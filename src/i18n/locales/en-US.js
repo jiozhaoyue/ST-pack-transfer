@@ -225,6 +225,7 @@ export default {
   'tutorial.next': 'Next',
   'tutorial.done': 'Done',
   'tutorial.modeBanner': 'Tutorial demo mode: placeholder data only; nothing is written to real data or the host',
+  'tutorial.modeBannerShort': 'Tutorial demo',
   'tutorial.exitMode': 'Exit tutorial',
 
   'log.title': 'Log',
@@ -256,6 +257,10 @@ export default {
   'log.assetListEmpty': 'Asset list empty · {total} extensions, none has a download URL',
 
   'settings.title': 'Settings',
+  'settings.unsavedTitle': 'Unsaved changes',
+  'settings.unsavedDesc': 'Settings have unsaved changes. Leave anyway? Unsaved values are not persisted (the × draft lives in memory only and is lost on refresh).',
+  'settings.unsavedStay': 'Stay',
+  'settings.unsavedLeave': 'Leave',
   'settings.deleteAfterExport': 'Delete the pack from the export area after export',
   'settings.autoRefreshAfterUpload': 'Reload the page automatically after a successful restore',
   'settings.autoInstallManifest': 'Auto-install extensions from manifest',
@@ -444,6 +449,9 @@ export default {
   'extmgr.toManifestConfirm': 'Convert',
   'extmgr.pkgToManifest': 'Converted to manifest: removed {files} file(s)',
   'extmgr.autoPolicy': 'Auto-update policy',
+  'extmgr.autoMasterHint': 'When on, per-extension auto-update controls appear on the Host page (default off)',
+  'extmgr.gitRefSwitch': 'Branch switch button',
+  'extmgr.gitRefSwitchHint': 'Show branch/tag picker and "Install this ref" in Git visualization (default off)',
   'extmgr.serverEmpty': 'The host has no server plugins installed',
   'extmgr.serverDisabled': 'Server plugins are disabled',
   'extmgr.serverLoading': 'Reading server plugins…',

@@ -228,6 +228,7 @@ export default {
   'tutorial.next': '下一步',
   'tutorial.done': '完成',
   'tutorial.modeBanner': '教程演示模式：当前是占位数据，所有操作都不会写入真实数据或宿主',
+  'tutorial.modeBannerShort': '教程演示模式',
   'tutorial.exitMode': '退出教程',
 
   'log.title': '日志',
@@ -259,6 +260,11 @@ export default {
   'log.assetListEmpty': '资产列表为空 · 共 {total} 个扩展，均无可用下载地址',
 
   'settings.title': '设置',
+  /* 2026-11-15 用户裁定：× / 取消时有未保存更改必须确认 */
+  'settings.unsavedTitle': '有未保存的更改',
+  'settings.unsavedDesc': '设置页有未保存的更改，是否离开？未保存内容不会被写入（× 保留的草稿仅存内存，刷新即失）。',
+  'settings.unsavedStay': '留下',
+  'settings.unsavedLeave': '离开',
   'settings.deleteAfterExport': '导出后删除导出区里的包',
   'settings.autoRefreshAfterUpload': '上传恢复成功后自动刷新页面',
   'settings.autoInstallManifest': '导入后按清单安装扩展',
@@ -449,6 +455,9 @@ export default {
   'extmgr.toManifestConfirm': '确认转换',
   'extmgr.pkgToManifest': '已转成清单：移除实体文件 {files} 个',
   'extmgr.autoPolicy': '自动更新策略',
+  'extmgr.autoMasterHint': '开启后宿主页的每条扩展才显示自动更新设置（默认关）',
+  'extmgr.gitRefSwitch': '切换分支按钮',
+  'extmgr.gitRefSwitchHint': '在 Git 可视化里显示分支/标签选择与「装到该版本」（默认关）',
   'extmgr.serverEmpty': '宿主没有已安装的服务端插件',
   'extmgr.serverDisabled': '服务端插件总开关已关闭',
   'extmgr.serverLoading': '正在读取服务端插件…',
