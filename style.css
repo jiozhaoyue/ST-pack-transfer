@@ -1135,7 +1135,7 @@
     background:var(--panel-2);border:1px solid var(--border);border-radius:9px}
   /* 手机切换行（2026-11-15 用户裁定）：**绝对禁止换行**——空间不足由 is-icon-only 降级，不折行 */
   #app.app-container[data-view="mobile"] .mobile-switch{display:flex;position:sticky;top:0;z-index:6;
-    flex-wrap:nowrap;overflow:hidden;order:-2;
+    flex-wrap:nowrap;overflow:hidden;
     backdrop-filter:blur(6px)}
   #app.app-container .mobile-switch .msw{flex:1 1 auto;min-width:max-content;min-height:28px;padding:3px 8px;
     border:1px solid transparent;border-radius:7px;background:transparent;color:var(--muted);
@@ -1155,21 +1155,24 @@
   #app.app-container[data-view="mobile"] .extension-view{height:calc(100dvh - 104px);min-height:0}
   #app.app-container[data-view="mobile"]:has(#extension-view:not([hidden])) .app-main{overflow:hidden}
   #app.app-container[data-view="mobile"] .col-side{display:contents}
-  /* 手机数据包抽屉（2026-11-15 用户裁定，二次修订）：
-     **完全内嵌**——不是浮层，不 fixed、无投影；排在 app-main 最上（order:-1），
-     用 grid-template-rows 0fr→1fr 做**从上至下抽屉滑动动画**；
-     关闭时 0fr 完全收起、不占布局。内容只装包列表（Git 页签在下拉内禁用，见下一条）。 */
-  #app.app-container[data-view="mobile"] .col-side{
-    display:grid;grid-template-rows:0fr;order:-1;
-    transition:grid-template-rows .24s ease;
-  }
+  /* 手机数据包下拉（2026-11-15 用户裁定，三次修订＝回退 81022e1 后重做）：
+     **绝对禁止占布局高度**——不参与文档流：关闭时 display:none（零高度），
+     打开时 absolute 贴着切换行正下方「凭空浮出」（top 由 JS 按切换行实时底边写入 --zone-drop-top），
+     从上至下滑入动画；锚定在 app-main 坐标系内，不是全屏遮罩。
+     下拉里只留包列表：zone/git 侧页签禁用（Git 可视化不在数据包下拉里）。 */
+  #app.app-container[data-view="mobile"] .app-main{position:relative}
   #app.app-container[data-view="mobile"][data-zone-open="1"] .col-side{
-    grid-template-rows:1fr;
+    display:block;position:absolute;left:8px;right:8px;
+    top:var(--zone-drop-top,90px);bottom:auto;
+    max-height:72vh;overflow:auto;z-index:30;
+    background:var(--panel);border:1px solid var(--outline);border-radius:12px;
+    box-shadow:var(--shadow);padding:4px;
+    animation:zoneDrop .2s ease;
   }
-  #app.app-container[data-view="mobile"] .col-side > #zone-card{
-    min-height:0;overflow:hidden;
+  @keyframes zoneDrop{
+    from{opacity:0;transform:translateY(-10px)}
+    to{opacity:1;transform:none}
   }
-  /* 下拉里只留包列表：zone/git 侧页签禁用（Git 可视化不在数据包抽屉里） */
   #app.app-container[data-view="mobile"][data-zone-open="1"] .zone-side-tabs{display:none !important}
   #app.app-container[data-view="mobile"][data-zone-open="1"] #zone-side-git{display:none !important}
   #app.app-container[data-view="mobile"] .chart-card{flex:1 0 auto}

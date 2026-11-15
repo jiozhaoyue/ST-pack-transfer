@@ -522,10 +522,10 @@ function syncMainView(){
   const chartCol=document.querySelector('.col-chart');
   const side=document.querySelector('.col-side');
   const splitter=document.querySelector('.splitter-v');
-  /* 2026-11-15 用户裁定：手机数据包列＝**内嵌抽屉**（非浮层）：显隐由 data-zone-open +
-     grid-template-rows 动画承担，hidden 不再参与（否则动画失效）；Git 可视化不在抽屉里。 */
+  /* 2026-11-15 用户裁定（三次修订＝回退 81022e1 后重做）：手机数据包下拉**零布局高度**——
+     关＝display:none；开＝absolute 凭空浮出（hidden 清掉，定位由 --zone-drop-top 提供）。 */
   if(chartCol) chartCol.hidden = false;
-  if(side) side.hidden = siActive;
+  if(side) side.hidden = siActive || (mobile && app?.dataset.zoneOpen!=='1');
   if(splitter) splitter.hidden = siActive;
   const chartCard=document.getElementById('chart-card');
   const extView=document.getElementById('extension-view');
@@ -1915,11 +1915,16 @@ async function loadGitTarget(name, { force = false } = {}){
   g.local=localRes && localRes.ok ? normalizeLocalGit(localRes.version,{name}) : null;
   const version=localRes && localRes.ok ? localRes.version : null;
   g.currentBranch=String(version?.currentBranchName||'');
-  /* 云端仓库优先用宿主 .git 的 origin（所有已装扩展都能读到），登记只作兜底。 */
+  /* 云端仓库优先用宿主 .git 的 origin（所有已装扩展都能读到），登记只作兜底。
+     2026-11-15 用户裁定：**读云端远仓默认关闭**，由开发者页开关（gitCloudReadOn）控制——
+     关：Git 可视化只读本地信息，**不发任何云端请求**（如实标注「云端读取已关闭」，不伪造数据）。 */
   const remoteUrl=String(version?.remoteUrl||install?.url||'').trim();
   g.remoteUrl=remoteUrl;
   let cloud=null;
-  if(remoteUrl){
+  const cloudReadOn=!!loadSettings().gitCloudReadOn;
+  if(!cloudReadOn){
+    cloud={branches:[],tags:[],commits:[],error:t('gitv.cloudReadOff')};
+  } else if(remoteUrl){
     const parsed=parseRepoUrl(remoteUrl);
     if(parsed.ok){
       const acc=accountForRepo(parsed);
@@ -1950,6 +1955,8 @@ async function loadGitTarget(name, { force = false } = {}){
 async function loadGitCommitDiff(sha){
   const g=state.gitViz;
   if(!g.remoteUrl || !sha) return;
+  /* 云端读取关闭时不发单次 diff 请求（与列表开关同一门控） */
+  if(!loadSettings().gitCloudReadOn) return;
   g.selectedSha=sha;
   const parsed=parseRepoUrl(g.remoteUrl);
   g.diffLoading=true; g.diff=null; g.diffError='';
@@ -2558,6 +2565,9 @@ function renderExtCredentials(body){
     +(autoMasterOn
       ? '<div class="ext-row"><button type="button" class="btn" id="extmgr-policy-open"><i class="fa-solid fa-sliders"></i><span>'+t('extmgr.autoPolicy')+'</span></button></div>'
       : '')
+    /* 2026-11-15 用户裁定：Git 可视化读取云端远仓的开关住开发者页（默认关，关=零云端请求） */
+    +'<label class="check ext-ref-switch"><input type="checkbox" id="extmgr-cloud-read"'+(loadSettings().gitCloudReadOn?' checked':'')+'> '
+      +'<span>'+t('extmgr.gitCloudRead')+'</span><span class="ext-note-inline">'+t('extmgr.gitCloudReadHint')+'</span></label>'
     /* 2026-11-15 用户裁定：切换分支按钮的开关住开发者页（默认关） */
     +'<label class="check ext-ref-switch"><input type="checkbox" id="extmgr-ref-switch"'+(loadSettings().gitRefInstallOn?' checked':'')+'> '
       +'<span>'+t('extmgr.gitRefSwitch')+'</span><span class="ext-note-inline">'+t('extmgr.gitRefSwitchHint')+'</span></label>'
@@ -2577,6 +2587,12 @@ function renderExtCredentials(body){
   body.querySelector('#extmgr-ref-switch')?.addEventListener('change',(e)=>{
     persistDev({ gitRefInstallOn:!!e.target.checked });
     toast(t('extmgr.devSaved'));
+  });
+  body.querySelector('#extmgr-cloud-read')?.addEventListener('change',(e)=>{
+    persistDev({ gitCloudReadOn:!!e.target.checked });
+    state.gitViz.loadedFor='';
+    toast(t('extmgr.devSaved'));
+    renderExtensionView();
   });
 }
 function renderExtInstall(body){
@@ -5722,11 +5738,22 @@ function bind(){
       renderTransfer(); renderLan(); renderCloud();
       return;
     }
-    /* 手机「数据包」＝内嵌抽屉开关（非页切换、非浮层，2026-11-15 用户裁定）。
-       开关只翻 data-zone-open；显隐/动画全在 CSS（grid-template-rows 0fr→1fr）。 */
+    /* 手机「数据包」＝锚定下拉开关（非页切换；2026-11-15 三次裁定：**零布局高度**，
+       打开时按切换行实时底边写入 --zone-drop-top，贴行正下方凭空浮出 + 滑入动画）。 */
     if(state.view==='mobile' && v==='zone'){
       const app=document.getElementById('app');
-      if(app) app.dataset.zoneOpen = app?.dataset.zoneOpen==='1' ? '' : '1';
+      const opening=app?.dataset.zoneOpen!=='1';
+      if(app){
+        app.dataset.zoneOpen = opening ? '1' : '';
+        if(opening){
+          let bottom=0;
+          document.querySelectorAll('#view-workbench [data-view-switch]').forEach((host)=>{
+            if(bottom || host.closest('.panel')?.hidden || host.hidden) return;
+            bottom=host.getBoundingClientRect().bottom;
+          });
+          app.style.setProperty('--zone-drop-top', (Math.max(0, bottom) + 6) + 'px');
+        }
+      }
       renderViewSwitch();
       syncMainView();
       return;
