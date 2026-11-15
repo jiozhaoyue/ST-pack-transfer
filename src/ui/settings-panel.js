@@ -25,6 +25,10 @@ export const SETTINGS_DEFAULTS = Object.freeze({
   clearPackagesOnLoad: false,
   /** 上传恢复成功后是否自动刷新页面；默认关闭（用户 2026-11-11 裁定）。 */
   autoRefreshAfterUpload: false,
+  /** 上传恢复后自动按清单安装扩展：'off' | 'prompt' | 'auto'；默认 prompt。 */
+  autoInstallManifestAfterUpload: 'prompt',
+  /** Web 独立模式下的酒馆预设主题。 */
+  webTheme: 'Dark Lite',
   /** 退出数据包偏好时若有未保存改动先提醒；默认开启。 */
   confirmDiscardChartPrefs: true,
   /** Git 凭据存储位置：server = 随宿主 extension_settings 落 settings.json；browser = 只存本机。 */
@@ -82,6 +86,91 @@ export function updatePolicyOf(settings = SETTINGS_DEFAULTS) {
   };
 }
 
+export const TAVERN_THEMES = Object.freeze({
+  'Dark Lite': {
+    name: 'Dark Lite',
+    vars: {
+      '--SmartThemeBodyColor': 'rgba(220, 220, 210, 1)',
+      '--SmartThemeEmColor': 'rgba(145, 145, 145, 1)',
+      '--SmartThemeUnderlineColor': 'rgba(188, 231, 207, 1)',
+      '--SmartThemeQuoteColor': 'rgba(225, 138, 36, 1)',
+      '--SmartThemeBlurTintColor': 'rgba(23, 23, 23, 1)',
+      '--SmartThemeChatTintColor': 'rgba(23, 23, 23, 1)',
+      '--SmartThemeShadowColor': 'rgba(0, 0, 0, 0.5)',
+      '--SmartThemeBorderColor': 'rgba(0, 0, 0, 0.5)',
+    },
+  },
+  'Dark V 1.0': {
+    name: 'Dark V 1.0',
+    vars: {
+      '--SmartThemeBodyColor': 'rgba(207, 207, 197, 1)',
+      '--SmartThemeEmColor': 'rgba(145, 145, 145, 1)',
+      '--SmartThemeUnderlineColor': 'rgba(145, 145, 145, 1)',
+      '--SmartThemeQuoteColor': 'rgba(198, 193, 151, 1)',
+      '--SmartThemeBlurTintColor': 'rgba(29, 33, 40, 0.95)',
+      '--SmartThemeChatTintColor': 'rgba(29, 33, 40, 0.95)',
+      '--SmartThemeShadowColor': 'rgba(0, 0, 0, 0.9)',
+      '--SmartThemeBorderColor': 'rgba(0, 0, 0, 1)',
+    },
+  },
+  'Azure': {
+    name: 'Azure',
+    vars: {
+      '--SmartThemeBodyColor': 'rgba(171, 198, 223, 1)',
+      '--SmartThemeEmColor': 'rgba(255, 255, 255, 1)',
+      '--SmartThemeUnderlineColor': 'rgba(188, 231, 207, 1)',
+      '--SmartThemeQuoteColor': 'rgba(111, 133, 253, 1)',
+      '--SmartThemeBlurTintColor': 'rgba(23, 30, 33, 0.92)',
+      '--SmartThemeChatTintColor': 'rgba(23, 30, 33, 0.92)',
+      '--SmartThemeShadowColor': 'rgba(0, 0, 0, 1)',
+      '--SmartThemeBorderColor': 'rgba(0, 0, 0, 0.5)',
+    },
+  },
+  'Cappuccino': {
+    name: 'Cappuccino',
+    vars: {
+      '--SmartThemeBodyColor': 'rgba(235, 235, 235, 1)',
+      '--SmartThemeEmColor': 'rgba(145, 145, 145, 1)',
+      '--SmartThemeUnderlineColor': 'rgba(188, 231, 207, 1)',
+      '--SmartThemeQuoteColor': 'rgba(165, 140, 115, 1)',
+      '--SmartThemeBlurTintColor': 'rgba(34, 30, 32, 0.95)',
+      '--SmartThemeChatTintColor': 'rgba(34, 30, 32, 0.95)',
+      '--SmartThemeShadowColor': 'rgba(0, 0, 0, 0.6)',
+      '--SmartThemeBorderColor': 'rgba(0, 0, 0, 0.5)',
+    },
+  },
+  'Celestial Macaron': {
+    name: 'Celestial Macaron',
+    vars: {
+      '--SmartThemeBodyColor': 'rgba(229, 175, 162, 1)',
+      '--SmartThemeEmColor': 'rgba(145, 145, 145, 1)',
+      '--SmartThemeUnderlineColor': 'rgba(188, 231, 207, 1)',
+      '--SmartThemeQuoteColor': 'rgba(197, 202, 206, 1)',
+      '--SmartThemeBlurTintColor': 'rgba(23, 36, 55, 0.92)',
+      '--SmartThemeChatTintColor': 'rgba(23, 36, 55, 0.92)',
+      '--SmartThemeShadowColor': 'rgba(0, 0, 0, 0.6)',
+      '--SmartThemeBorderColor': 'rgba(0, 0, 0, 0.5)',
+    },
+  },
+});
+
+export function applyWebTheme(themeKey) {
+  const theme = TAVERN_THEMES[themeKey] || TAVERN_THEMES['Dark Lite'];
+  if (typeof document === 'undefined') return;
+  const root = document.documentElement;
+  const app = document.getElementById('app') || document.querySelector('.app-container');
+  const targets = [root, app].filter(Boolean);
+  for (const target of targets) {
+    for (const [prop, val] of Object.entries(theme.vars)) {
+      target.style.setProperty(prop, val);
+    }
+    // 强制同步刷新关键派生层级，确保立即生效无死角
+    target.style.setProperty('--panel', theme.vars['--SmartThemeBlurTintColor']);
+    target.style.setProperty('--text', theme.vars['--SmartThemeBodyColor']);
+    target.style.setProperty('--accent', theme.vars['--SmartThemeQuoteColor']);
+  }
+}
+
 /** 间隔夹紧（秒），边界来自策略（不再有写死的 5 / 86400）。 */
 export function normalizeUpdateInterval(value, policy = updatePolicyOf()) {
   return Math.round(clampNumber(value, policy.min, policy.max, policy.fallback));
@@ -132,6 +221,12 @@ export function normalizeSettings(input) {
     if (typeof input.clearLogOnLoad === 'boolean') out.clearLogOnLoad = input.clearLogOnLoad;
     if (typeof input.clearPackagesOnLoad === 'boolean') out.clearPackagesOnLoad = input.clearPackagesOnLoad;
     if (typeof input.autoRefreshAfterUpload === 'boolean') out.autoRefreshAfterUpload = input.autoRefreshAfterUpload;
+    if (['off', 'prompt', 'auto'].includes(input.autoInstallManifestAfterUpload)) {
+      out.autoInstallManifestAfterUpload = input.autoInstallManifestAfterUpload;
+    }
+    if (typeof input.webTheme === 'string' && input.webTheme) {
+      out.webTheme = input.webTheme;
+    }
     if (typeof input.confirmDiscardChartPrefs === 'boolean') out.confirmDiscardChartPrefs = input.confirmDiscardChartPrefs;
     if (input.gitCredentialStorage === 'browser' || input.gitCredentialStorage === 'server') {
       out.gitCredentialStorage = input.gitCredentialStorage;
@@ -193,7 +288,13 @@ export function buildSettingsHtml(settings = {}) {
 
   const exportGroup = setting('set-delete-after-export', 'deleteAfterExport', t('settings.deleteAfterExport'), s.deleteAfterExport)
     + setting('set-clear-packages', 'clearPackagesOnLoad', t('settings.clearPackagesOnLoad'), s.clearPackagesOnLoad)
-    + setting('set-auto-refresh', 'autoRefreshAfterUpload', t('settings.autoRefreshAfterUpload'), s.autoRefreshAfterUpload);
+    + setting('set-auto-refresh', 'autoRefreshAfterUpload', t('settings.autoRefreshAfterUpload'), s.autoRefreshAfterUpload)
+    + '<label class="et-git" style="margin-top:6px"><span>' + t('settings.autoInstallManifest') + '</span>'
+    + '<select class="text_pole" data-setting="autoInstallManifestAfterUpload">'
+    + '<option value="prompt"' + (s.autoInstallManifestAfterUpload === 'prompt' ? ' selected' : '') + '>' + t('settings.autoInstallPrompt') + '</option>'
+    + '<option value="auto"' + (s.autoInstallManifestAfterUpload === 'auto' ? ' selected' : '') + '>' + t('settings.autoInstallAuto') + '</option>'
+    + '<option value="off"' + (s.autoInstallManifestAfterUpload === 'off' ? ' selected' : '') + '>' + t('settings.autoInstallOff') + '</option>'
+    + '</select></label>';
 
   const logging = '<label class="et-git"><span>' + t('settings.logMaxEntries') + '</span>'
     + '<input class="text_pole" type="number" min="50" max="5000" step="50" data-setting="logMaxEntries" value="' + s.logMaxEntries + '"></label>'
@@ -205,7 +306,11 @@ export function buildSettingsHtml(settings = {}) {
     + '</div>'
     + '<label class="check"><input type="checkbox" id="set-include-creds" checked> ' + t('settings.includeCreds') + '</label>'
     + '<label class="check check-sub"><input type="checkbox" id="set-include-oauth"> ' + t('settings.includeOauth') + '</label>'
-    + '<div class="ext-note">' + t('settings.dataNote') + '</div>';
+    + '<div class="ext-note">' + t('settings.dataNote') + '</div>'
+    + '<div class="ext-row" style="margin-top:8px">'
+      + '<button type="button" class="btn danger" data-action="plugin-git-clean">' + t('extmgr.gitCleanSettings') + '</button>'
+    + '</div>'
+    + '<div class="ext-note">' + t('extmgr.gitCleanSettingsDesc') + '</div>';
 
   const netGroup = '<label class="et-git"><span>' + t('settings.netProxy') + '</span>'
     + '<input class="text_pole" type="url" data-setting="netProxyUrl" placeholder="' + t('settings.netProxyPlaceholder')
@@ -260,6 +365,17 @@ export function readSettings(root, base = SETTINGS_DEFAULTS) {
 
   const autoRefreshEl = root.querySelector?.('[data-setting="autoRefreshAfterUpload"]');
   if (autoRefreshEl && typeof autoRefreshEl.checked === 'boolean') out.autoRefreshAfterUpload = autoRefreshEl.checked;
+
+  const autoInstallEl = root.querySelector?.('[data-setting="autoInstallManifestAfterUpload"]');
+  if (autoInstallEl && ['off', 'prompt', 'auto'].includes(autoInstallEl.value)) {
+    out.autoInstallManifestAfterUpload = autoInstallEl.value;
+  }
+
+  const webThemeEl = root.querySelector?.('[data-setting="webTheme"]');
+  if (webThemeEl && typeof webThemeEl.value === 'string' && webThemeEl.value) {
+    out.webTheme = webThemeEl.value;
+    applyWebTheme(out.webTheme);
+  }
 
   return normalizeSettings(out);
 }

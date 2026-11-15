@@ -50,7 +50,7 @@ import { exportLibraryToPack, importRestoredChatsIntoLibrary } from './src/ui/ch
 import { mountLanTransferPanel } from './src/ui/lan-transfer-panel.js';
 import { createBrowserStorageProvider } from './src/ui/storage-inspector-browser.js';
 import { qr } from './src/ui/qr.js';
-import { buildSettingsHtml, readSettings } from './src/ui/settings-panel.js';
+import { buildSettingsHtml, readSettings, applyWebTheme } from './src/ui/settings-panel.js';
 import { buildPluginData, applyPluginData, isPluginData, downloadPluginData } from './src/ui/plugin-data.js';
 import { loadSettings, saveSettings } from './src/ui/settings-store.js';
 import { applyI18n } from './src/i18n/dom.js';
@@ -909,6 +909,7 @@ async function main(root) {
     if (state.busy) return;
     state.busy = true;
     const results = [];
+    const restoredManifests = [];
     const record = { startedAt: Date.now(), total: targets.length, done: 0, results };
     persistRestoreProgress(record);
     try {
@@ -945,6 +946,12 @@ async function main(root) {
           try { await importRestoredChatsIntoLibrary(sane.blob); } catch { /* 纯库模式可选 */ }
           row.status = 'ok';
           logger.info(t('log.restored', { name: pkg.name }));
+          try {
+            const m = (pkg.extManifest && pkg.extManifest.length)
+              ? pkg.extManifest
+              : await readPackageExtensionManifest(sane.blob).catch(() => []);
+            if (Array.isArray(m) && m.length) restoredManifests.push(...m);
+          } catch { /* 清单读取容错 */ }
         } catch (err) {
           row.message = err?.message || String(err);
           logger.error(t('log.restoreFailed', { msg: row.message }));
@@ -969,6 +976,22 @@ async function main(root) {
       },
       onRefresh: () => { if (typeof window !== 'undefined') window.location.reload(); },
     });
+    // 自动按清单安装扩展：若存在清单且开关未关闭，支持全自动下载或提示安装
+    const autoInstallMode = settings.autoInstallManifestAfterUpload || 'prompt';
+    if (failed === 0 && restoredManifests.length > 0 && autoInstallMode !== 'off') {
+      if (settings.autoRefreshAfterUpload && typeof window !== 'undefined') {
+        try {
+          sessionStorage.setItem('stpt.pendingManifestInstall', JSON.stringify({
+            items: restoredManifests,
+            auto: autoInstallMode === 'auto',
+          }));
+        } catch { /* 忽略 */ }
+      } else {
+        setTimeout(() => {
+          view.openExtensionManager(restoredManifests, { autoInstall: autoInstallMode === 'auto' });
+        }, 500);
+      }
+    }
     // 自动刷新默认关闭；仅无失败且设置显式打开时执行，避免挡住失败报告。
     if (settings.autoRefreshAfterUpload && failed === 0 && typeof window !== 'undefined') {
       setTimeout(() => window.location.reload(), 800);
@@ -1577,6 +1600,17 @@ async function main(root) {
             } },
           ]);
         }
+        if (name === 'plugin-git-clean') {
+          const ok = await confirmDialog(t('extmgr.gitCleanTitle') + '？\n' + t('extmgr.gitCleanSettingsDesc'));
+          if (!ok) return;
+          const cur = loadSettings();
+          cur.gitInstalls = [];
+          cur.gitAutoUpdateRules = {};
+          saveSettings(cur);
+          Object.assign(settings, cur);
+          view.applySettings?.(cur);
+          view.toast(t('extmgr.gitCleanDone'));
+        }
       },
     });
   }
@@ -1719,9 +1753,15 @@ async function main(root) {
   });
 
   view.setHost(hostKey, host.isPlugin ? 'plugin' : 'web');
+  if (!host.isPlugin && settings.webTheme) {
+    try { applyWebTheme(settings.webTheme); } catch { /* 忽略 */ }
+  }
   view.applySettings?.(settings);
   modalRefreshHook = () => {
     Object.assign(settings, loadSettings());
+    if (!host.isPlugin && settings.webTheme) {
+      try { applyWebTheme(settings.webTheme); } catch { /* 忽略 */ }
+    }
     view.applySettings?.(settings);
   };
   view.setPrivateFiles(loadPrivateFiles());
@@ -1755,6 +1795,20 @@ async function main(root) {
       await importFiles([file], { remote: true });
     },
   });
+
+  // 检查是否有在刷新前暂存的待安装扩展清单（完全自动化）
+  const pendingManifestRaw = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('stpt.pendingManifestInstall') : null;
+  if (pendingManifestRaw) {
+    try {
+      sessionStorage.removeItem('stpt.pendingManifestInstall');
+      const pending = JSON.parse(pendingManifestRaw);
+      if (Array.isArray(pending?.items) && pending.items.length) {
+        setTimeout(() => {
+          view.openExtensionManager(pending.items, { autoInstall: !!pending.auto });
+        }, 500);
+      }
+    } catch { /* 忽略 */ }
+  }
 
   // 教程模式首帧优先：先弹蒙层，真实读库与宿主配额推迟到退出教程再补（2026-11-12 用户裁定）。
   if (settings.autoTutorial) {
