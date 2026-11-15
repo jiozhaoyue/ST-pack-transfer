@@ -681,7 +681,11 @@
   #app.app-container .view-switch-btn.active{background:var(--accent-soft);border-color:var(--accent);color:var(--text)}
   /* 全局动作条已取消：从宿主拉取在数据包模式行，迁移与备份在面板头切换行 */
 
-  /* 内联扩展管理（与存储图表同层，不是浮层） */
+  /* 内联扩展管理（与存储图表同层，不是浮层）。
+     2026-11-16 用户裁定（终版）：**全部留在文档流**——页脚不脱离 DOM；
+     面板**最小高度到屏幕底**（底贴底），页脚+安装报告条在面板底部依序堆叠（不相互遮挡、永远完整显示）；
+     列表区（.ext-scroll）内容定高——收起/空列表时不保留任何占高度的空白带；
+     列表长时由 .extension-body 唯一滚动（禁双滚动条），安装区展开向上挤压列表。 */
   #app.app-container .extension-view{flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
   #app.app-container .extension-body{flex:1 1 auto;min-height:0;overflow:auto;padding:9px;display:flex;flex-direction:column;gap:8px}
   /* 报告常驻底部：不随页签切换；点击展开后占满扩展管理正文区 */
@@ -694,11 +698,30 @@
   #app.app-container .ext-report-bar .erb-hint{margin-left:auto;color:var(--muted-2);white-space:nowrap}
   #app.app-container .ext-report-bar:hover{color:var(--text)}
   #app.app-container .ext-report-bar[aria-expanded="true"]{border-top-color:var(--accent)}
+  /* 开发者页设置卡（2026-11-16 用户裁定：**逐字照抄** .ext-accounts 卡片范式） */
+  #app.app-container .ext-settings-card{display:flex;flex-direction:column;gap:7px;padding:8px;border:1px solid var(--border);
+    border-radius:9px;background:color-mix(in srgb,var(--panel-3) 45%,transparent)}
+  #app.app-container .ext-settings-card > summary{cursor:pointer;font-size:11.5px;color:var(--muted);list-style:none}
+  #app.app-container .ext-settings-card > summary::-webkit-details-marker{display:none}
+  #app.app-container .ext-settings-card[open] > summary{color:var(--text)}
+  #app.app-container .ext-settings-body{display:flex;flex-direction:column;gap:2px}
+  #app.app-container .ext-ref-switch{display:flex;align-items:center;gap:9px;min-height:var(--ctl-h);cursor:pointer}
+  #app.app-container .ext-ref-switch input{flex:0 0 auto;margin:0;accent-color:var(--accent)}
+  #app.app-container .ext-ref-switch .esr-name{flex:0 0 auto;font-weight:600;color:var(--text);white-space:nowrap}
+  #app.app-container .ext-ref-switch .esr-hint{margin-left:auto;min-width:0;font-size:10.5px;
+    color:var(--muted-2);white-space:nowrap;text-align:right}
+  /* 2026-11-16 用户裁定：**所有动作必须有流畅动画**——全部 details 折叠卡开/合、
+     安装区展开、报告面板展开统一过渡（收合由全局 JS 托管：先播动画再摘 open）。 */
+  @keyframes discloseOpen{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+  @keyframes discloseClose{from{opacity:1;transform:none}to{opacity:0;transform:translateY(-4px)}}
+  #app.app-container details[open] > *:not(summary){animation:discloseOpen .18s ease}
+  #app.app-container details.is-closing > *:not(summary){animation:discloseClose .16s ease forwards}
+  #app.app-container .ext-install-area:not([hidden]){animation:discloseOpen .2s ease}
+  #app.app-container .ext-report-panel:not([hidden]){animation:discloseOpen .2s ease}
   #app.app-container .ext-data-row{flex-wrap:wrap}
   #app.app-container .ext-install{display:flex;flex-direction:column;gap:8px;min-height:0}
-  /* 安装扩展 = 面板固定页脚：紧贴安装报告条，展开区在按钮上方并自带上限滚动。
-     2026-11-15 用户裁定（绝对禁止）：页脚**永不**随动态列表滚动/移动；
-     展开时向上挤压列表（.extension-body flex:1 收缩），面板总高不变。 */
+  /* 安装扩展 = 面板内文档流页脚（不脱离 DOM）：面板底=屏幕底时它贴底；
+     展开区在按钮上方并自带上限滚动，展开时向上挤压列表（.extension-body flex:1 收缩）。 */
   #app.app-container .ext-footer{flex:0 0 auto;display:flex;flex-direction:column;gap:6px;padding:6px 9px;
     border-top:1px solid var(--border);background:color-mix(in srgb,var(--panel-3) 70%,transparent)}
   #app.app-container .ext-footer .ext-install-area{flex:0 1 auto;min-height:0;max-height:46vh;overflow:auto}
@@ -754,7 +777,9 @@
     padding:8px 10px;font-size:10.5px;color:var(--muted);background:var(--panel);
     border:1px solid var(--border);border-radius:8px}
   /* 列表滚动区：**始终占满剩余高度**；行少时列表撑满、动作块沉底，行多时整区滚动 */
-  #app.app-container .ext-scroll{flex:1 1 auto;min-height:96px;overflow:auto;display:flex;flex-direction:column;gap:8px}
+  /* 列表滚动区（2026-11-16 用户裁定）：**内容定高**——收起/空列表时不保留任何占高度的空白带；
+     列表长时它在面板内滚动（唯一滚动条），页脚仍钉在面板底。 */
+  #app.app-container .ext-scroll{flex:0 0 auto;min-height:0;overflow:visible;display:flex;flex-direction:column;gap:8px}
   #app.app-container .ext-scroll .ext-list{flex:1 0 auto;min-height:0;overflow:visible}
   /* 列表按钮行内控件统一高度（禁止特例尺寸） */
   #app.app-container .ext-list-head .btn{min-height:var(--ctl-h);display:inline-flex;align-items:center}
@@ -1154,19 +1179,40 @@
   /* 手机端扩展管理：面板自身锁高（减去切换行/面板头/间距），正文内滚，
      「安装扩展」页脚钉在面板底部向上挤压列表（2026-11-15 用户裁定：所有端一律钉底）；
      2026-11-15 加严：扩展管理激活时 **app-main 禁止外滚**（铁律：禁止双重滚动条，全部屏内） */
-  #app.app-container[data-view="mobile"] .extension-view{height:calc(100dvh - 104px);min-height:0}
+  /* 手机端扩展管理（2026-11-16 终版）：面板 flex 撑满列高——**面板底=屏幕底**（页脚贴底不被遮），
+     内容超出时由 .extension-body 唯一滚动（app-main 禁滚，禁双滚动条）。 */
+  #app.app-container[data-view="mobile"] .extension-view{flex:1 1 auto}
   #app.app-container[data-view="mobile"]:has(#extension-view:not([hidden])) .app-main{overflow:hidden}
-  #app.app-container[data-view="mobile"] .col-side{display:contents}
-  /* 手机数据包列表（2026-11-15 用户裁定，四次修订＝最终定案）：
-     **同层、挤压、绝对禁止浮层**——文档流内的内嵌段（`app-main` 内 `order:-1`，切换行 `order:-2` 保持最上），
-     `grid-template-rows 0fr→1fr` 从上至下滑开、**把下方内容挤下去**；
-     关闭时 0fr 完全收起。内容只装包列表（zone/git 侧页签禁用，Git 可视化不在数据包列表里）。 */
-  #app.app-container[data-view="mobile"] .col-side{
-    display:grid;grid-template-rows:0fr;order:-1;
-    transition:grid-template-rows .24s ease;
-  }
+  /* 手机数据包列表（2026-11-16 用户裁定，五次修订＝凭圈定实锤终版）：
+     **同层、挤压、绝对禁止浮层**——文档流内（`app-main` 内 `order:-1`，切换行 `order:-2` 最上）。
+     **收起＝display:none**：0fr 收拢会把 zone-card 边框压成一条悬在页头与切换行之间的细线
+     （上下空白、上不到顶）——绝不允许；收起时整段不渲染。
+     展开＝grid 1fr 从上滑开（zoneDrop 动画），把下方内容挤下去；段内只装包列表
+    （zone/git 侧页签禁用，Git 可视化不在数据包列表里）。 */
+  #app.app-container[data-view="mobile"] .col-side{display:none}
   #app.app-container[data-view="mobile"][data-zone-open="1"] .col-side{
-    grid-template-rows:1fr;
+    display:grid;grid-template-rows:1fr;order:-1;
+    max-height:72vh;
+    animation:zoneDrop .24s ease;
+  }
+  #app.app-container[data-view="mobile"][data-zone-open="1"] #zone-card{
+    display:flex;flex-direction:column;
+  }
+  #app.app-container[data-view="mobile"][data-zone-open="1"] .zone-body{
+    flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;
+  }
+  /* 收起动画（2026-11-16 用户裁定：所有动作必须有流畅动画）：1fr→0fr 收拢完再 display:none */
+  #app.app-container[data-view="mobile"] .col-side.is-closing{
+    display:grid;grid-template-rows:0fr !important;
+    animation:zoneClose .2s ease forwards;
+  }
+  @keyframes zoneDrop{
+    from{grid-template-rows:0fr}
+    to{grid-template-rows:1fr}
+  }
+  @keyframes zoneClose{
+    from{grid-template-rows:1fr}
+    to{grid-template-rows:0fr}
   }
   #app.app-container[data-view="mobile"] .col-side > #zone-card{
     min-height:0;overflow:hidden;
@@ -1181,9 +1227,13 @@
   #app.app-container[data-view="mobile"] .vol-collapse{display:inline-flex}
   #app.app-container[data-view="mobile"] .chart-stack > .chart-group:only-child .vol-card{height:auto}
   #app.app-container[data-view="mobile"] .vol-card{resize:none}
-  /* 竖屏：唯一滚动容器是 .app-main —— 内部一律不滚，保证能一次看完所有图表 */
-  #app.app-container[data-view="mobile"] .app-main{overflow-y:auto;overflow-x:hidden}
-  #app.app-container[data-view="mobile"] .chart-stack{overflow:visible;max-height:none;height:auto}
+  /* 竖屏（2026-11-16 铁律）：**最外层滚动条彻底禁止**——app-main 永不滚动，
+     每个视图自己内部滚动（图表栈 / 扩展正文 / 迁移面板 / 数据包抽屉）。 */
+  #app.app-container[data-view="mobile"] .app-main{overflow-y:hidden;overflow-x:hidden}
+  /* 图表栈内滚（2026-11-16 铁律：外层滚动条彻底禁止——图表列自己滚） */
+  /* 迁移与备份（2026-11-16 铁律：外层滚动条彻底禁止）：面板自己内滚 */
+  #app.app-container[data-view="mobile"] .transfer-body{overflow-y:auto;overflow-x:hidden}
+  #app.app-container[data-view="mobile"] .chart-stack{overflow-y:auto;overflow-x:hidden}
   #app.app-container[data-view="mobile"] .vol-card .chart-tree{max-height:none;overflow:visible}
   #app.app-container[data-view="mobile"] .zone-body{overflow:visible}
   #app.app-container[data-view="mobile"] .zone-body > .card-list{overflow:visible;max-height:none}

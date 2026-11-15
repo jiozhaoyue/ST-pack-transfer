@@ -553,6 +553,7 @@ export default {
   'extmgr.packManifestOnly': 'Manifest only (selection inactive)',
   'extmgr.packFull': 'Full extensions',
   'extmgr.accountsTitle': 'Git accounts',
+  'extmgr.settingsTitle': 'Developer settings',
   'extmgr.privacyNote': 'Privacy: this plugin has no remote server of its own and never sends credentials to third parties. By default they are saved with the host settings into the tavern server settings.json — anyone with server access or tavern admin rights can read them. You may switch to "Browser only", which keeps them in localStorage on this machine (lost on cache clear, re-enter on another browser).',
   'extmgr.storageLabel': 'Credential storage',
   'extmgr.storeServer': 'Server (settings.json)',

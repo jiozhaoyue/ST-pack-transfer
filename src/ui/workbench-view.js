@@ -234,7 +234,7 @@ const state = {
   host:'luker', mode:'plugin', view:'desktop', mainView:'chart', mobileView:'chart', pane:'workbench', zone:'import',
   extTab:'host', extSource:'host', extSelectedPackageId:'', extPolicyOpen:false, extEntries:[], extResults:[], extRunning:false, extInstalled:null, extManifestPrefill:[], extRemoteUrls:{}, extServerOpen:false,
   extReportOpen:false, extInstallOpen:false, extInstallGlobal:false, settingsDraft:null,
-  extAccountTests:[], extUpdate:null, extAccountsOpen:true, extOauthOpen:false,
+  extAccountTests:[], extUpdate:null, extAccountsOpen:true, extOauthOpen:false, extSettingsOpen:true,
   /* 服务端插件清单（仅管理员）：null = 未读取；[] = 已读取但为空。 */
   extServerPlugins:null, extHostAdmin:false, extServerOpen:false,
   /* 数据包列页签：zone = 数据包，git = Git 可视化（仅开发者模式）。 */
@@ -2558,21 +2558,27 @@ function syncExtInstallBlock(){
 /** 开发者页：Git 账号 / 存储位置 / OAuth / 令牌指引（自动更新已搬到宿主页每条扩展）。 */
 function renderExtCredentials(body){
   const autoMasterOn=!!loadSettings().extAutoToolsOn;
+  /* 2026-11-16 用户裁定：与「Git 账号」完全同范式——details 卡片 + ext-summary 标题头
+    （名称+计数+箭头，可折叠，默认展开），内容为标准设置行（名左·说明右·单行）。 */
   body.innerHTML='<div class="ext-install">'
-    /* 2026-11-15 用户二次裁定：自动更新总开关住开发者页（默认关）；开了宿主页才显示逐扩展控件 */
-    +'<label class="check ext-ref-switch"><input type="checkbox" id="extmgr-auto-master"'+(autoMasterOn?' checked':'')+'> '
-      +'<span>'+t('extmgr.autoUpdate')+'</span><span class="ext-note-inline">'+t('extmgr.autoMasterHint')+'</span></label>'
+    +'<details class="ext-settings-card" data-extsettings'+(state.extSettingsOpen?' open':'')+'>'
+      +extSummaryHtml(t('extmgr.settingsTitle'), 3)
+      +'<div class="ext-settings-body">'
+        +'<label class="check ext-ref-switch"><input type="checkbox" id="extmgr-auto-master"'+(autoMasterOn?' checked':'')+'> '
+          +'<span class="esr-name">'+t('extmgr.autoUpdate')+'</span><span class="esr-hint">'+t('extmgr.autoMasterHint')+'</span></label>'
+        +'<label class="check ext-ref-switch"><input type="checkbox" id="extmgr-cloud-read"'+(loadSettings().gitCloudReadOn?' checked':'')+'> '
+          +'<span class="esr-name">'+t('extmgr.gitCloudRead')+'</span><span class="esr-hint">'+t('extmgr.gitCloudReadHint')+'</span></label>'
+        +'<label class="check ext-ref-switch"><input type="checkbox" id="extmgr-ref-switch"'+(loadSettings().gitRefInstallOn?' checked':'')+'> '
+          +'<span class="esr-name">'+t('extmgr.gitRefSwitch')+'</span><span class="esr-hint">'+t('extmgr.gitRefSwitchHint')+'</span></label>'
+      +'</div>'
+    +'</details>'
     +(autoMasterOn
       ? '<div class="ext-row"><button type="button" class="btn" id="extmgr-policy-open"><i class="fa-solid fa-sliders"></i><span>'+t('extmgr.autoPolicy')+'</span></button></div>'
       : '')
-    /* 2026-11-15 用户裁定：Git 可视化读取云端远仓的开关住开发者页（默认关，关=零云端请求） */
-    +'<label class="check ext-ref-switch"><input type="checkbox" id="extmgr-cloud-read"'+(loadSettings().gitCloudReadOn?' checked':'')+'> '
-      +'<span>'+t('extmgr.gitCloudRead')+'</span><span class="ext-note-inline">'+t('extmgr.gitCloudReadHint')+'</span></label>'
-    /* 2026-11-15 用户裁定：切换分支按钮的开关住开发者页（默认关） */
-    +'<label class="check ext-ref-switch"><input type="checkbox" id="extmgr-ref-switch"'+(loadSettings().gitRefInstallOn?' checked':'')+'> '
-      +'<span>'+t('extmgr.gitRefSwitch')+'</span><span class="ext-note-inline">'+t('extmgr.gitRefSwitchHint')+'</span></label>'
     +accountsHtml()+'</div>';
   bindAccounts(body);
+  const card=body.querySelector('[data-extsettings]');
+  card?.addEventListener('toggle',()=>{ state.extSettingsOpen=card.open; });
   body.querySelector('#extmgr-auto-master')?.addEventListener('change',(e)=>{
     persistDev({ extAutoToolsOn:!!e.target.checked });
     if(!e.target.checked) state.extPolicyOpen=false;
@@ -5724,6 +5730,23 @@ function bind(){
   };
   ['modal-extra','settings-body'].forEach(id => document.getElementById(id)?.addEventListener('click', extModeClick));
   document.getElementById('btn-close')?.addEventListener('click',()=>actions.close?.());
+  /* 2026-11-16 用户裁定：所有 details 折叠卡**收合必须有动画**——
+     全局委托：点 summary 收起时先播 discloseClose，动画结束再摘 open（打开路径走 CSS discloseOpen）。 */
+  document.addEventListener('click',(e)=>{
+    const summary=e.target.closest('details > summary');
+    if(!summary) return;
+    const d=summary.parentElement;
+    if(!d || !d.open || d.classList.contains('is-closing')) return;
+    e.preventDefault();
+    d.classList.add('is-closing');
+    const finish=()=>{
+      d.classList.remove('is-closing');
+      [...d.querySelectorAll('.is-closing-anim')].forEach(el=>el.style.animation='');
+      d.open=false;
+    };
+    [...d.children].forEach(el=>{ if(el!==summary) el.classList.add('is-closing-anim'); });
+    setTimeout(finish,170);
+  });
 
   // 视图切换：桌面 2 个（图表 / 扩展管理）+ 迁移；手机 4 个（图表 / 迁移 / 扩展管理 / 数据包下拉）。
   // 按钮分散在三个面板头里，事件委托挂在共同祖先上。
@@ -5738,13 +5761,34 @@ function bind(){
       renderTransfer(); renderLan(); renderCloud();
       return;
     }
-    /* 手机「数据包」＝同层挤压段开关（非页切换；2026-11-15 四次修订＝最终定案：
-       文档流内 0fr→1fr 抽屉，开关只翻 data-zone-open，显隐动画全在 CSS）。 */
+    /* 手机「数据包」＝同层挤压段开关（非页切换；2026-11-16 终版：展开/收起都有流畅动画）。
+       展开：data-zone-open=1 → CSS zoneDrop 0fr→1fr；
+       收起：先播 is-closing（1fr→0fr），animationend 后才 display:none——全程不跳变。 */
     if(state.view==='mobile' && v==='zone'){
       const app=document.getElementById('app');
-      if(app) app.dataset.zoneOpen = app?.dataset.zoneOpen==='1' ? '' : '1';
-      renderViewSwitch();
-      syncMainView();
+      const opening=app?.dataset.zoneOpen!=='1';
+      if(opening){
+        app.dataset.zoneOpen='1';
+        renderViewSwitch();
+        syncMainView();
+        return;
+      }
+      const side=document.querySelector('.col-side');
+      const finishClose=()=>{
+        side?.classList.remove('is-closing');
+        if(app) app.dataset.zoneOpen='';
+        renderViewSwitch();
+        syncMainView();
+      };
+      if(side && !side.classList.contains('is-closing')){
+        side.classList.add('is-closing');
+        let done=false;
+        const onEnd=()=>{ if(done) return; done=true; side.removeEventListener('animationend',onEnd); finishClose(); };
+        side.addEventListener('animationend',onEnd);
+        setTimeout(onEnd,320);
+      } else {
+        finishClose();
+      }
       return;
     }
     if(state.transfer.open){ state.transfer.open=false; renderTransfer(); }
@@ -6171,9 +6215,8 @@ function bind(){
     const appEl=document.getElementById('app');
     const closeZoneDropdown=()=>{
       if(state.view==='mobile' && appEl?.dataset.zoneOpen==='1'){
-        appEl.dataset.zoneOpen='';
-        renderViewSwitch();
-        syncMainView();
+        /* 走切换按钮的同一条动画收起路径（is-closing → display:none） */
+        document.querySelector('#chart-card [data-view-switch] button[data-wbview="zone"]')?.click();
       }
     };
     const check=e.target.closest('[data-pkgcheck]');
