@@ -72,11 +72,18 @@
      曾放在文件尾部把 .header-theme-select / .chart-fmt / .ext-up-* 等全部压掉
      （2026-11-15 实测「Dark Lite」字号 14px、padding 6px、文字被原生 select 裁底）。 */
   #app.app-container .text_pole{background:var(--panel-3);border:1px solid var(--border);border-radius:7px;color:var(--text);padding:6px 8px;font:inherit}
-  #app.app-container .header-theme-picker{display:inline-flex;align-items:center;gap:4px}
-  /* 固定高度下拉铁律：padding-block 必须 0 + line-height 对齐内容高(26px)，
-     否则 Chromium 原生 select 会把选项文字底部裁掉（2026-11-15 实测「Dark Lite」被削） */
-  #app.app-container .header-theme-select{padding:0 6px;font-size:11px;background:var(--panel-3);border:1px solid var(--border);border-radius:6px;color:var(--text);
+  #app.app-container .header-theme-picker{display:inline-flex;align-items:center;gap:4px;position:relative}
+  /* 固定高度下拉铁律（2026-11-15）：Blink 原生 menulist 文字顶部对齐，且 computed line-height
+     恒回落 UA 值（实测钉不动）——唯一定制路径是 appearance:none + line-height 对齐内容高 26px，
+     箭头由 wrapper ::after 自绘（var 配色）。原生形态下文字既不居中也可能被裁
+     （实测「Dark Lite」字号 14px 时底部被削）。 */
+  #app.app-container .header-theme-select{appearance:none;-webkit-appearance:none;padding:0 20px 0 8px;font-size:11px;background:var(--panel-3);border:1px solid var(--border);border-radius:6px;color:var(--text);
     height:var(--ctl-h);box-sizing:border-box;line-height:26px}
+  /* 自绘下拉箭头：随主题色（var），禁硬编码 */
+  #app.app-container .header-theme-picker::after{
+    content:'';position:absolute;right:9px;top:50%;width:6px;height:6px;
+    transform:translateY(-60%) rotate(45deg);
+    border-right:1.5px solid var(--muted);border-bottom:1.5px solid var(--muted);pointer-events:none}
   #app.app-container *{box-sizing:border-box}
   #app.app-container button, #app.app-container input, #app.app-container select{font:inherit;color:inherit}
   #app.app-container button{cursor:pointer}
@@ -102,9 +109,10 @@
      is-symbol 由 applySwitchDensity 按溢出测量切换；可访问名经 h1[aria-label] 保全全名。 */
   #app.app-container .app-title h1{font-size:16px;margin:0;font-weight:650;letter-spacing:.2px;white-space:nowrap;
     overflow:hidden}
-  #app.app-container .app-title .app-title-sym{display:none;font-size:18px;line-height:1;color:var(--accent)}
+  /* 符号恒显示在名称前（⇄ 数据包转运）；放不下时整名退化为仅符号（is-symbol 隐藏文字） */
+  #app.app-container .app-title h1{display:inline-flex;align-items:center;gap:5px}
+  #app.app-container .app-title .app-title-sym{font-size:16px;line-height:1;color:var(--accent)}
   #app.app-container .app-title h1.is-symbol .app-title-txt{display:none}
-  #app.app-container .app-title h1.is-symbol .app-title-sym{display:inline}
   #app.app-container .header-actions{display:flex;align-items:center;gap:6px;margin-left:auto;flex-wrap:nowrap;
     justify-content:flex-end;flex:0 0 auto}
   #app.app-container .badge{display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border-radius:999px;
@@ -1382,10 +1390,4 @@
 #app.app-container .lan-link,
 #app.app-container .action-hint,
 #app.app-container .tutorial-card .acts button{min-height:var(--ctl-h);box-sizing:border-box}
-/* Blink 对原生 select 的 computed line-height 会回落 UA 值——用更高特异性在文件尾钉死
-   （仅固定高度下拉需要；min-height 型下拉盒会自增长、无裁剪风险，不在此列） */
-#app.app-container select.header-theme-select,
-#app.app-container .chart-fmt select.text_pole,
-#app.app-container #view-settings select.text_pole,
-#app.app-container .cloud-field select.text_pole{line-height:26px}
 
