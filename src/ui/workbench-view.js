@@ -2572,9 +2572,6 @@ function renderExtCredentials(body){
           +'<span class="esr-name">'+t('extmgr.gitRefSwitch')+'</span><span class="esr-hint">'+t('extmgr.gitRefSwitchHint')+'</span></label>'
       +'</div>'
     +'</details>'
-    +(autoMasterOn
-      ? '<div class="ext-row" data-ext-policy-row><button type="button" class="btn" id="extmgr-policy-open"><i class="fa-solid fa-sliders"></i><span>'+t('extmgr.autoPolicy')+'</span></button></div>'
-      : '')
     +accountsHtml()+'</div>';
   bindAccounts(body);
   const card=body.querySelector('[data-extsettings]');
@@ -2583,14 +2580,6 @@ function renderExtCredentials(body){
   body.querySelector('#extmgr-auto-master')?.addEventListener('change',(e)=>{
     persistDev({ extAutoToolsOn:!!e.target.checked });
     if(!e.target.checked) state.extPolicyOpen=false;
-    const row=body.querySelector('[data-ext-policy-row]');
-    if(row) row.hidden = !e.target.checked;
-  });
-  body.querySelector('#extmgr-policy-open')?.addEventListener('click',()=>{
-    /* 策略子视图在宿主页：切过去直接打开 */
-    state.extTab='host';
-    state.extPolicyOpen=true;
-    renderExtensionView();
   });
   body.querySelector('#extmgr-ref-switch')?.addEventListener('change',(e)=>{
     /* 就地切换：只写偏好，不重渲染（下次 Git 可视化渲染时生效） */
@@ -3690,9 +3679,14 @@ async function renderExtInstalled(body){
           +importPkgs.map(p=>'<option value="'+escapeHtml(p.id)+'"'+(p.id===state.extSelectedPackageId?' selected':'')+'>'+escapeHtml(p.name)+' ('+fmtMB(p.mb)+')</option>').join('')
           +'</select></label>'
         : '<span class="ext-note-inline">'+t('extmgr.noPackageAvailable')+'</span>')
-      /* 2026-11-15 用户二次裁定：自动更新**总开关住开发者页**——宿主来源行不放任何开关；
-         开了之后宿主页才显示逐扩展自动更新控件（渲染由 autoMasterOn 门控）。 */
-      : '')
+      /* 2026-11-16 用户裁定：总开关住开发者页；**策略入口住宿主页来源行**（总开关开着才显示），
+         点开即以策略子视图替换列表区。 */
+      : (autoMasterOn
+        ? '<button type="button" class="btn icon ext-policy-btn'+(state.extPolicyOpen?' active':'')
+          +'" id="extmgr-policy-toggle" aria-pressed="'+(state.extPolicyOpen?'true':'false')
+          +'" title="'+t('extmgr.autoPolicy')+'" aria-label="'+t('extmgr.autoPolicy')
+          +'"><i class="fa-solid fa-sliders"></i></button>'
+        : ''))
   +'</div>';
 
   let rowsHtml = '';
@@ -3888,6 +3882,11 @@ async function renderExtInstalled(body){
   /* 自动更新总开关已迁入开发者页（2026-11-15 用户二次裁定）；策略子视图自带关闭钮 */
   /* 行内远程 URL：点击文本即复制（2026-11-15 裁定：禁止单独的复制按钮）。
      body 节点常驻、每次重渲染都跑到这里，故用标记防重复绑定。 */
+  /* 策略入口（宿主来源行，总开关开着才显示）：点开=策略子视图替换列表区 */
+  body.querySelector('#extmgr-policy-toggle')?.addEventListener('click',()=>{
+    state.extPolicyOpen=!state.extPolicyOpen;
+    renderExtensionView();
+  });
   if(!body.dataset.copyurlBound){
     body.dataset.copyurlBound='1';
     body.addEventListener('click',async(e)=>{
