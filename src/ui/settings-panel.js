@@ -42,6 +42,12 @@ export const SETTINGS_DEFAULTS = Object.freeze({
   /** 逐扩展自动更新规则：{扩展名: {mode:'notify'|'auto', intervalSec}}；缺省即关闭。
    *  2026-11-11 第二轮用户裁定：自动更新只在宿主页每条扩展上设置，支持最短 5 秒轮询。 */
   gitAutoUpdateRules: {},
+  /** 自动更新总开关（开发者页，2026-11-16 用户裁定）：默认关，开了宿主页才显示逐条设置。 */
+  extAutoToolsOn: false,
+  /** Git 云端读取开关（开发者页）：默认关，关=Git 可视化零云端请求。 */
+  gitCloudReadOn: false,
+  /** 切换分支按钮开关（开发者页）：默认关，开了 Git 可视化才显示「装到该版本」。 */
+  gitRefInstallOn: false,
   /** 宿主页扩展列表的自定义顺序（拖拽排序；只存名字）。 */
   extOrder: [],
   /** 宿主页排序方式：custom（拖拽顺序）/ name / version / source。 */
@@ -260,6 +266,10 @@ export function normalizeSettings(input) {
     clampInto('autoUpdateFailureBackoffMaxSec', out.autoUpdateMinIntervalSec, 604800);
     clampInto('autoUpdateNotifyTimeoutSec', 1, 86400);
     out.gitAutoUpdateRules = normalizeUpdateRules(input, updatePolicyOf(out));
+    /* 2026-11-16 用户裁定：开发者页三个开关（布尔，缺省 false）。 */
+    if (typeof input.extAutoToolsOn === 'boolean') out.extAutoToolsOn = input.extAutoToolsOn;
+    if (typeof input.gitCloudReadOn === 'boolean') out.gitCloudReadOn = input.gitCloudReadOn;
+    if (typeof input.gitRefInstallOn === 'boolean') out.gitRefInstallOn = input.gitRefInstallOn;
     if (Array.isArray(input.extOrder)) {
       out.extOrder = [...new Set(input.extOrder.filter((name) => typeof name === 'string' && name))];
     }

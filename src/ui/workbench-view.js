@@ -2573,16 +2573,18 @@ function renderExtCredentials(body){
       +'</div>'
     +'</details>'
     +(autoMasterOn
-      ? '<div class="ext-row"><button type="button" class="btn" id="extmgr-policy-open"><i class="fa-solid fa-sliders"></i><span>'+t('extmgr.autoPolicy')+'</span></button></div>'
+      ? '<div class="ext-row" data-ext-policy-row><button type="button" class="btn" id="extmgr-policy-open"><i class="fa-solid fa-sliders"></i><span>'+t('extmgr.autoPolicy')+'</span></button></div>'
       : '')
     +accountsHtml()+'</div>';
   bindAccounts(body);
   const card=body.querySelector('[data-extsettings]');
   card?.addEventListener('toggle',()=>{ state.extSettingsOpen=card.open; });
+  /* 2026-11-16 用户裁定：开关**就地切换**——禁止整页重渲染（DOM 跳动）与多余 toast。 */
   body.querySelector('#extmgr-auto-master')?.addEventListener('change',(e)=>{
     persistDev({ extAutoToolsOn:!!e.target.checked });
     if(!e.target.checked) state.extPolicyOpen=false;
-    renderExtensionView();
+    const row=body.querySelector('[data-ext-policy-row]');
+    if(row) row.hidden = !e.target.checked;
   });
   body.querySelector('#extmgr-policy-open')?.addEventListener('click',()=>{
     /* 策略子视图在宿主页：切过去直接打开 */
@@ -2591,14 +2593,13 @@ function renderExtCredentials(body){
     renderExtensionView();
   });
   body.querySelector('#extmgr-ref-switch')?.addEventListener('change',(e)=>{
+    /* 就地切换：只写偏好，不重渲染（下次 Git 可视化渲染时生效） */
     persistDev({ gitRefInstallOn:!!e.target.checked });
-    toast(t('extmgr.devSaved'));
   });
   body.querySelector('#extmgr-cloud-read')?.addEventListener('change',(e)=>{
+    /* 就地切换：只写偏好 + 失效可视化缓存（下次打开 Git 可视化按新开关取数） */
     persistDev({ gitCloudReadOn:!!e.target.checked });
     state.gitViz.loadedFor='';
-    toast(t('extmgr.devSaved'));
-    renderExtensionView();
   });
 }
 function renderExtInstall(body){
