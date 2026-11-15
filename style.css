@@ -787,9 +787,16 @@
   /* 列表按钮行内控件统一高度（禁止特例尺寸） */
   #app.app-container .ext-list-head .btn{min-height:var(--ctl-h);display:inline-flex;align-items:center}
   #app.app-container .ext-list-head .text_pole{min-height:var(--ctl-h);box-sizing:border-box}
-  /* 「自动更新」子视图（2026-11-15 裁定）：打开即**替换**列表滚动区，独占正文剩余高度 */
-  #app.app-container .ext-auto-policy{flex:1 1 auto;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:8px}
-  #app.app-container .ext-policy-title{font-size:12.5px;font-weight:650;color:var(--text)}
+  /* 「自动更新」策略子视图（2026-11-16 用户裁定样式重做）：卡片外壳 + 两列网格 + 输入占满格；
+     打开即**替换**列表滚动区，独占正文剩余高度 */
+  #app.app-container .ext-auto-policy{flex:1 1 auto;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:10px;
+    padding:10px;border:1px solid var(--border);border-radius:9px;background:color-mix(in srgb,var(--panel-3) 45%,transparent)}
+  #app.app-container .ext-policy-title{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:650;color:var(--text)}
+  #app.app-container .ext-policy-title .ext-policy-close{margin-left:auto;width:var(--ctl-h);height:var(--ctl-h);padding:0;
+    display:inline-flex;align-items:center;justify-content:center}
+  #app.app-container .ext-auto-policy .ext-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}
+  #app.app-container .ext-auto-policy .field{display:flex;flex-direction:column;align-items:stretch;gap:4px;min-width:0;font-size:11px;color:var(--muted)}
+  #app.app-container .ext-auto-policy .field input{width:100%;min-width:0}
   /* 2026-11-15 用户裁定：扩展列表里**禁止常驻分隔细线**——来源行的 dashed 下边线及其
      padding 上下恒占高度，全部去掉（来源行与工具行之间用面板既有间距，凭空无缝）。 */
   #app.app-container .ext-source-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
