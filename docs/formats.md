@@ -2,52 +2,52 @@
 title: 四酒馆数据包格式
 ---
 
-# 四酒馆数据包格式
+# 四款酒馆数据包格式对照
 
-四款酒馆都把用户数据放在各自的目录结构里，导出的 zip 只有对应酒馆认得：
+SillyTavern、Luker、TauriTavern 与 PureTavern 四款酒馆在保存用户数据时，各自设计了不同的目录结构和规范。直接导出的压缩包通常只有对应酒馆才能直接认出：
 
-| 平台 | 包内布局 | 导出端点 | 怎么导入 |
+| 平台 | 包内目录结构 | 原生导出方式 | 原生导入方式 |
 | :-- | :-- | :-- | :-- |
-| **SillyTavern**（ST） | 用户目录摊平在根 | `POST /api/users/backup`（忽略 selection，全量） | 无恢复端点；解压覆盖到 `data/<用户>/`，或用本工具写回 |
-| **Luker**（L） | 目录摊平 + `manifest.json` | 同 ST，**支持 10 键 selection** | `POST /api/users/restore-backup`（8 MiB 分片） |
-| **TauriTavern**（TT） | `data/default-user/` 结构 | `POST /api/extensions/data-migration/export`（job_id 轮询） | `POST /api/extensions/data-migration/import`（ZIP/tar/gz，可直接吃 ST 包） |
-| **PureTavern**（PT） | 与 TT 相近 + 模块记录 + 扩展来源记录 | `POST /api/backups/archive/export` | `POST /api/backups/archive/import`（支持 TT 包与冲突预览） |
+| **SillyTavern**（ST） | 用户数据直接平铺在根目录 | 后端备份端点（全量导出） | 官方无导入端点；常规需手动解压覆盖，或使用本工具直接写回 |
+| **Luker**（L） | 目录平铺并附带 `manifest.json` | 导出端点，支持 10 项细粒度分类选择 | 具备还原端点，支持 8 MiB 切片上传 |
+| **TauriTavern**（TT） | 采用 `data/default-user/` 结构 | 数据迁移导出（支持任务轮询） | 支持 ZIP/tar 等格式，兼容直接读取 ST 数据包 |
+| **PureTavern**（PT） | 与 TT 结构相近，带有模块与来源记录 | 备份归档导出端点 | 具备归档导入端点，支持冲突预览与安全替换 |
 
-## 数据包能力
+## 数据包能力对比
 
-| 能力 | SillyTavern | Luker | TauriTavern | PureTavern |
+| 能力项 | SillyTavern | Luker | TauriTavern | PureTavern |
 | --- | --- | --- | --- | --- |
-| 导出端点 | `/api/users/backup`（全量） | 同左 + selection | data-migration export | archive/export |
-| 导入 / 恢复端点 | ❌ 无 | ✅ + 8 MiB 分片 | ✅（兼容 ST 包） | ✅（兼容 TT 包） |
-| 包内布局 | `data/<handle>/` 树 | 同 ST | `data/default-user/` 树 | manifest + 模块记录 |
-| 导入策略 | — | 合并 / 覆盖 | 迁移作业 | merge / skip / replace / 受保护替换 |
-| 恢复点 | ❌ | ❌ | ❌ | ✅ 导入前自动建 |
-| 跨宿主互操作 | ❌ | ❌ | ✅ 吃 ST 包 | ✅ 吃 TT 包 |
+| 导出功能 | 支持（全量） | 支持（可选类目） | 支持迁移任务导出 | 支持归档导出 |
+| 导入与恢复 | 暂无原生接口 | 支持（带分片） | 支持（兼容 ST 包） | 支持（兼容 TT 包） |
+| 包内文件布局 | `data/<用户>/` 树状结构 | 同 ST 结构 | `data/default-user/` 结构 | 清单 + 模块化记录 |
+| 导入策略 | — | 支持合并或完全覆盖 | 迁移作业处理 | 支持合并/跳过/模块替换等 |
+| 自动恢复点 | 暂无 | 暂无 | 暂无 | 导入前自动创建备份恢复点 |
+| 跨酒馆兼容读取 | 暂无 | 暂无 | 可直接读取 ST 布局 | 可直接读取 TT 布局 |
 
-## 传输能力
+## 传输能力对比
 
-| 能力 | ST | Luker | TT | PT |
+| 能力项 | SillyTavern | Luker | TauriTavern | PureTavern |
 | --- | --- | --- | --- | --- |
-| 局域网互传 | ❌ | ✅ `/api/sync/v1/*`（服务端↔服务端） | ✅ 但为 Rust 命令，扩展不可 invoke | ❌ |
-| 云端对象存储 | ❌ | ✅ S3 Sync | ✅ TT-Sync v2 | ❌ |
-| WebDAV | ❌ | ❌ | ❌ | ❌ |
-| 存储面板 / 配额（原生） | ❌ | ✅ `storage-inspector.js` | ❌ | ❌ |
+| 局域网同步 | 暂无 | 支持服务端间通信 | 内部命令处理 | 暂无 |
+| 云端对象存储 | 暂无 | 支持 S3 同步 | 支持云端同步 | 暂无 |
+| WebDAV 备份 | 暂无 | 暂无 | 暂无 | 暂无 |
+| 原生存储面板 | 暂无 | 内置存储审查面板 | 暂无 | 暂无 |
 
-> 本插件在四宿主都提供**自建存储审查面板**（浏览器源全平台可用）；Luker 额外复用其原生数据源。
+> 提示：本插件在四款酒馆中均提供**自建存储审查面板**，在纯浏览器端也能清晰查看空间占用；在 Luker 中还能进一步调取原生服务端存储明细。
 
-## 扩展在包里的位置
+## 扩展在数据包中的保存路径
 
-| 宿主 | 用户级扩展 | 全局扩展 |
+| 酒馆平台 | 用户私有扩展路径 | 全局共享扩展路径 |
 | :-- | :-- | :-- |
-| ST / Luker / PT | `extensions/<name>/`（平铺，**严禁**再套 `third-party`） | `public/scripts/extensions/third-party/<name>/` |
+| ST / Luker / PT | `extensions/<name>/`（直接平铺放置，无需多层嵌套） | `public/scripts/extensions/third-party/<name>/` |
 | TauriTavern | `data/default-user/extensions/<name>/` | `data/extensions/third-party/<name>/` |
 
-转换器按目标布局自动迁移，并消除错误的 `third-party/third-party` 嵌套。
+转换器会自动根据你选择的目标平台规范化扩展路径，并自动修正多余的嵌套层级。
 
-## 插件功能的来源
+## 插件功能的实现方式
 
-| 插件功能 | 来源 |
-| --- | --- |
-| 从宿主拉取数据包 / 写回恢复 / 扩展清单与安装 | **优先用宿主原生**，缺失时自建兜底或如实提示 |
-| 存储审查（浏览器 / 宿主两处配额） | **同一自建面板**；宿主数据源只在 Luker 可用，其余宿主如实显示「未提供」 |
-| 四酒馆格式互转 / 局域网互传 / S3 与 WebDAV 仓库 / 条目级差量 / 暂停续传 | **自建**（四家都没有） |
+| 功能模块 | 实现策略 | 说明 |
+| --- | --- | --- |
+| 从酒馆拉取 / 恢复写回 / 扩展安装 | **优先调用酒馆原生接口** | 尽量利用酒馆原生的稳定接口，保持与官方行为一致 |
+| 存储审查面板 | **自建统一面板 + 原生增强** | 浏览器端通用只读审查，在 Luker 下自动连接原生数据源展示服务端占用 |
+| 四酒馆格式互转 / 局域网互传 / S3 与 WebDAV 备份 / 差量合并 / 断点续传 | **插件自建实现** | 弥补各酒馆原生未覆盖的功能盲区，提供全方位的转运与备份能力 |

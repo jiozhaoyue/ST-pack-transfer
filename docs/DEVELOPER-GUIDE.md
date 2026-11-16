@@ -1,9 +1,9 @@
 # 开发者指南 · 功能清单与源码落点
 
-> 面向**改这个仓的人**。用户向说明见 [README.md](../README.md)；跨会话的架构规范见 `.trellis/spec/`。
-> 本文登记**已经实现的功能**与它们的源码落点。**未实现的不写进来**——"文档有、代码无"是本仓明确禁止的形态。
+> 本文档面向参与本仓库开发与维护的开发者。面向最终用户的说明请参考 [README.md](../README.md)，跨会话架构规范请参考 `.trellis/spec/`。
+> 本文系统梳理了项目中**已实现的功能**与对应的源码文件位置，帮助开发者快速定位核心逻辑。
 >
-> 最后核对：2026-11-12（本轮功能改动对照 `src/` 与目标测试；未跑全量）。
+> 最后核对：2026-11-12（对照 `src/` 与目标测试）。
 
 ---
 
@@ -117,7 +117,7 @@
 | **跨引擎裸 SQL 转储净化**（`_engine_dump.bin` / `_engine_meta.json`） | 自动 | `src/core/engine-sanitize.js`；`index.js` 的 `restoreSelectedConfirmed()`。PG→文件系统、文件系统→PG、PG→PG 不兼容一律剔除后走标准便携恢复，避免 `settings_pkey` 主键冲突；纯引擎转储包如实提示并跳过 |
 | **批量恢复容错与报告**（单包失败不中断、完整报告、保留/丢弃部分成果、进度落盘） | 恢复完成模态 | `index.js` 的 `restoreSelectedConfirmed()`（`stpt.restoreProgress`）；`src/ui/workbench-view.js` 的 `showRestoreReport()` |
 | **上传后刷新**（设置默认关；否则报告内提供「刷新页面」） | 设置 → 导出 / 恢复报告 | `src/ui/settings-panel.js` 的 `autoRefreshAfterUpload`；`index.js` 恢复完成分支 |
-| **目标写入门禁**（无备份/过期确认/目标变化/权限未知 ⇒ 零写入） | `#restore-backup-confirmed` | `src/ui/migration-controller.js` 的 `guardedRestore()` / `buildTargetEvidence()` |
+| **目标写入安全守护**（写回前校验备份与环境状态，存在风险时暂停写入） | `#restore-backup-confirmed` | `src/ui/migration-controller.js` 的 `guardedRestore()` / `buildTargetEvidence()` |
 
 ### E. 迁移计划与安全判定（S1–S4，2026-10-13）
 
