@@ -3000,14 +3000,14 @@ function serverPluginBlockHtml(){
       const url=String(p.remoteUrl||'').trim();
       const priv=repoPrivacyOf(url);
       const urlEl=url
-        ? '<span class="ext-remote-url" data-copyurl="'+escapeHtml(url)+'" title="'+escapeHtml(url)+' · 点击复制">'+escapeHtml(url)+'</span>'
+        ? '<span class="ext-remote-url" data-copyurl="'+escapeHtml(url)+'" title="'+escapeHtml(url)+' · '+t('extmgr.clickToCopy')+'">'+escapeHtml(url)+'</span>'
         : '<span class="ext-remote-url is-none">—</span>';
       return '<div class="ext-entry is-ok ext-server-row">'
         +'<span class="ext-url" title="'+escapeHtml(p.directory||p.packageName)+'">'+escapeHtml(p.directory||p.packageName)+'</span>'
         +urlEl
         +(priv?'<span class="ext-priv-tag is-'+priv+'">'+t(priv==='private'?'extmgr.privBadge':'extmgr.pubBadge')+'</span>':'')
         +'<span class="ext-state">'+escapeHtml(p.version||'-')+'</span>'
-        +'<span class="ext-actions">'
+        +'<span class="ext-server-actions">'
           +'<button type="button" class="btn icon" data-srvupd="'+escapeHtml(p.directory)+'" title="'+t('extmgr.srvUpdate')+'" aria-label="'+t('extmgr.srvUpdate')+'"><i class="fa-solid fa-rotate"></i></button>'
           +'<button type="button" class="btn icon" data-srvdeps="'+escapeHtml(p.directory)+'" title="'+t('extmgr.srvDeps')+'" aria-label="'+t('extmgr.srvDeps')+'"><i class="fa-solid fa-box-open"></i></button>'
           +'<button type="button" class="btn icon danger" data-srvdel="'+escapeHtml(p.directory)+'" title="'+t('extmgr.srvDelete')+'" aria-label="'+t('extmgr.srvDelete')+'"><i class="fa-solid fa-trash"></i></button>'
@@ -3015,11 +3015,9 @@ function serverPluginBlockHtml(){
       +'</div>';
     }).join('');
     inner='<div class="ext-note">'+t('extmgr.serverNote')+'</div>'
-      +'<div class="ext-install">'
-        +'<div class="ext-row">'
-          +'<input class="text_pole" id="extmgr-srv-url" placeholder="'+t('extmgr.srvUrlPlaceholder')+'">'
-          +'<button type="button" class="btn accent" id="extmgr-srv-install">'+t('extmgr.srvInstall')+'</button>'
-        +'</div>'
+      +'<div class="ext-server-install-row">'
+        +'<input class="text_pole" id="extmgr-srv-url" placeholder="'+t('extmgr.srvUrlPlaceholder')+'">'
+        +'<button type="button" class="btn accent" id="extmgr-srv-install">'+t('extmgr.srvInstall')+'</button>'
       +'</div>'
       +'<div class="ext-list">'+(rows||'<div class="ext-empty">'+t('extmgr.serverEmpty')+'</div>')+'</div>'
       +(state.extServerPath?'<div class="ext-note ext-path">'+escapeHtml(state.extServerPath)+'</div>':'');
@@ -3706,7 +3704,7 @@ async function renderExtInstalled(body){
         ? '<span class="ext-priv-tag is-'+priv+'">'+t(priv==='private'?'extmgr.privBadge':'extmgr.pubBadge')+'</span>'
         : '';
       const remoteEl=remoteUrl
-        ? '<span class="ext-remote-url" data-copyurl="'+escapeHtml(remoteUrl)+'" title="'+escapeHtml(remoteUrl)+' · 点击复制">'+escapeHtml(remoteUrl)+'</span>'
+        ? '<span class="ext-remote-url" data-copyurl="'+escapeHtml(remoteUrl)+'" title="'+escapeHtml(remoteUrl)+' · '+t('extmgr.clickToCopy')+'">'+escapeHtml(remoteUrl)+'</span>'
         : '<span class="ext-remote-url is-none" title="'+t('extmgr.autoNeedsRepoShort')+'">—</span>';
       const auto=autoMasterOn?'<span class="ext-auto">'
         +'<select class="text_pole ext-up-mode" data-upmode="'+escapeHtml(name)+'" title="'+t('extmgr.autoUpdate')+'">'
@@ -3743,7 +3741,7 @@ async function renderExtInstalled(body){
         const repoLink = item.url
         /* 2026-11-15 用户裁定：远程 URL **直接显示**在行内，点击 URL 文本即复制；
            绝对禁止单独的复制按钮（也不再用外链图标占宽）。 */
-        ? '<span class="ext-remote-url" data-copyurl="'+escapeHtml(item.url)+'" title="'+escapeHtml(item.url)+' · 点击复制">'+escapeHtml(item.url)+'</span>'
+        ? '<span class="ext-remote-url" data-copyurl="'+escapeHtml(item.url)+'" title="'+escapeHtml(item.url)+' · '+t('extmgr.clickToCopy')+'">'+escapeHtml(item.url)+'</span>'
         : '';
         const toManifest=item.kind === 'original'
           /* 2026-11-15 用户裁定：原件行内提供「转成清单」——删实体、留清单（只做减法） */

@@ -9,6 +9,7 @@ export default {
   'app.subtitle': 'ST-pack-transfer',
 
   'header.guide': '教程',
+  'header.theme': '酒馆主题',
   'header.log': '日志',
   'header.settings': '设置',
   'header.close': '关闭',
@@ -446,6 +447,7 @@ export default {
   'extmgr.srvFailed': '{action}失败：{msg}',
   'extmgr.privBadge': '私有',
   'extmgr.pubBadge': '公开',
+  'extmgr.clickToCopy': '点击复制',
   'extmgr.userBadgeTitle': '当前登录的宿主用户；管理员可管理服务端插件',
   'extmgr.adminBadge': '管理员',
   'extmgr.recFull': '建议原件',

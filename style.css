@@ -734,8 +734,8 @@
   #app.app-container .ext-footer .ext-server-area[hidden]{display:none}
   #app.app-container .ext-footer .ext-server-block{display:flex;flex-direction:column;gap:4px;min-height:0}
   #app.app-container .ext-footer .ext-server-block > .ext-summary{flex:0 0 auto}
-  #app.app-container .ext-footer .ext-server-block > .ext-server-body{min-height:0;max-height:38vh;overflow:auto;
-    display:flex;flex-direction:column;gap:6px}
+  #app.app-container .ext-footer .ext-server-block > .ext-server-body{min-height:0;max-height:38vh;overflow-y:auto;overflow-x:hidden;
+    display:flex;flex-direction:column;gap:8px;padding:0 8px 8px}
   /* 页脚用户徽标（2026-11-15 裁定：识别当前用户；管理员才亮管理能力） */
   #app.app-container .ext-user-line{display:flex;justify-content:flex-end}
   #app.app-container .ext-user-line[hidden]{display:none}
@@ -875,9 +875,23 @@
   #app.app-container .ext-server-block{flex:0 0 auto;border:1px solid var(--border);border-radius:8px;
     background:color-mix(in srgb,var(--panel-3) 45%,transparent)}
   #app.app-container .ext-server-block > summary{cursor:pointer;padding:6px 8px;font-size:11.5px;color:var(--text);font-weight:600}
-  #app.app-container .ext-server-block .ext-note{margin:0 8px 6px}
-  #app.app-container .ext-server-block .ext-list{padding:0 8px 8px}
-  #app.app-container .ext-server-row{border-left:2px solid var(--accent)}
+  #app.app-container .ext-server-block .ext-note{margin:0}
+  #app.app-container .ext-server-block .ext-server-install-row{display:flex;align-items:center;gap:8px;margin:0}
+  #app.app-container .ext-server-block .ext-server-install-row .text_pole{flex:1 1 auto;min-width:0;width:auto !important;margin:0 !important;height:var(--ctl-h);box-sizing:border-box}
+  #app.app-container .ext-server-block .ext-server-install-row .btn{flex:0 0 auto;white-space:nowrap;height:var(--ctl-h)}
+  #app.app-container .ext-server-block .ext-list{padding:0;overflow:visible;min-height:0;flex:0 0 auto;display:flex;flex-direction:column;gap:6px}
+  #app.app-container .ext-server-row{display:flex;align-items:center;gap:8px;padding:6px 10px;min-height:38px;border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:6px;background:var(--panel-3);min-width:0;margin:0}
+  #app.app-container .ext-server-row .ext-url{flex:0 0 160px;max-width:180px;font-weight:600;color:var(--text);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap !important}
+  #app.app-container .ext-server-row .ext-remote-url{flex:1 1 auto;min-width:60px;font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap !important;cursor:copy;user-select:none}
+  #app.app-container .ext-server-row .ext-remote-url:hover{color:var(--accent)}
+  #app.app-container .ext-server-row .ext-priv-tag{flex:0 0 auto;white-space:nowrap}
+  #app.app-container .ext-server-row .ext-state{flex:0 0 auto;font-family:Consolas,monospace;font-size:11px;color:var(--muted);white-space:nowrap !important;min-width:48px;text-align:right}
+  #app.app-container .ext-server-row .ext-server-actions,
+  #app.app-container .ext-server-row .ext-actions{flex:0 0 auto;display:inline-flex;align-items:center;gap:4px;border:none;padding:0;margin:0 0 0 auto;white-space:nowrap !important;flex-wrap:nowrap !important}
+  #app.app-container .ext-server-row .ext-server-actions .btn,
+  #app.app-container .ext-server-row .ext-actions .btn{flex:0 0 auto;padding:0;width:26px;height:26px;min-height:26px;max-height:26px;border-radius:6px;display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box}
+  #app.app-container .ext-server-row .ext-server-actions .btn i,
+  #app.app-container .ext-server-row .ext-actions .btn i{font-size:11px}
   #app.app-container .ext-server-note{margin:0}
   /* 数据包列：数据包 / Git 页签互换（仅开发者模式） */
   #app.app-container .zone-side-tabs{flex:0 0 auto}

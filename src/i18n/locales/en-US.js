@@ -6,6 +6,7 @@ export default {
   'app.subtitle': 'ST-pack-transfer',
 
   'header.guide': 'Tutorial',
+  'header.theme': 'Host theme',
   'header.log': 'Log',
   'header.settings': 'Settings',
   'header.close': 'Close',
@@ -440,6 +441,7 @@ export default {
   'extmgr.srvFailed': '{action} failed: {msg}',
   'extmgr.privBadge': 'Private',
   'extmgr.pubBadge': 'Public',
+  'extmgr.clickToCopy': 'Click to copy',
   'extmgr.userBadgeTitle': 'Current host user; admins can manage server plugins',
   'extmgr.adminBadge': 'Admin',
   'extmgr.recFull': 'Full suggested',
