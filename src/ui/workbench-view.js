@@ -586,15 +586,22 @@ function renderHeader(){
   document.getElementById('app').dataset.host=state.host;
   const icon=document.getElementById('host-badge-icon');
   const gh=document.getElementById('host-badge-gh');
-  icon.hidden=isWeb; gh.hidden=!isWeb;
-  if(!isWeb){ icon.src=h.icon; icon.dataset.host=state.host; }
+  const webIco=document.getElementById('host-badge-web');
+  if(gh) gh.hidden=true;
+  if(webIco) webIco.hidden=!isWeb;
+  if(icon){
+    icon.hidden=isWeb;
+    if(!isWeb){ icon.src=h.icon; icon.dataset.host=state.host; }
+  }
   const badge=document.getElementById('host-badge');
-  badge.title = isWeb ? t('header.webTitle') : t('header.hostTitle', { host: h.full });
-  /* 窄态（手机视图）去掉「插件」二字，避免徽标被压缩成图标；任何形态都必须有可读文字。 */
-  const compact = state.view === 'mobile';
-  document.getElementById('host-badge-text').textContent = isWeb
-    ? t('header.web')
-    : (compact ? t('header.hostOnly', { host: h.full }) : t('header.plugin', { host: h.full }));
+  const userText = state.extHostUser
+    ? (escapeHtml(state.extHostUser) + (state.extHostAdmin ? ' <b class="is-admin">'+t('extmgr.adminBadge')+'</b>' : ''))
+    : (isWeb ? t('header.web') : t('header.hostOnly', { host: h.full }));
+  badge.title = state.extHostUser
+    ? `${state.extHostUser} (${state.extHostAdmin ? t('extmgr.adminBadge') : t('extmgr.userBadgeTitle')})`
+    : (isWeb ? t('header.webTitle') : t('header.hostTitle', { host: h.full }));
+  const badgeTxt = document.getElementById('host-badge-text');
+  if(badgeTxt) badgeTxt.innerHTML = userText;
   renderTargetPicker();
 }
 function renderTargetPicker(){
@@ -2127,9 +2134,15 @@ function setLanBar(fillId, pctId, pct){
 }
 function setLanQr(id, text, show){
   const box=document.getElementById(id); if(!box) return;
-  if(!show || !text || typeof qr?.encodeSvg!=='function'){ box.hidden=true; box.innerHTML=''; return; }
-  try { box.innerHTML=qr.encodeSvg(text); box.hidden=false; }
-  catch { box.hidden=true; box.innerHTML=''; }
+  box.hidden=false;
+  if(typeof qr?.encodeSvg!=='function'){ box.innerHTML=''; return; }
+  const payload = (show && text) ? text : 'STPT:LAN:READY';
+  try {
+    box.innerHTML=qr.encodeSvg(payload);
+    box.title=(show && text) ? t('action.pickup') : t('action.ready');
+  } catch {
+    box.innerHTML='';
+  }
 }
 /* ── 扩展管理（内联视图，不是浮层） ── */
 function extStatusText(status){
@@ -2529,20 +2542,6 @@ function syncExtInstallBlock(){
     } else {
       serverArea.hidden=true;
       serverArea.innerHTML='';
-    }
-  }
-  const userLine=document.getElementById('extmgr-user-line');
-  if(userLine){
-    if(show && state.extHostUser){
-      userLine.hidden=false;
-      userLine.innerHTML='<span class="ext-user-badge" title="'+t('extmgr.userBadgeTitle')+'">'
-        +'<i class="fa-solid '+(state.extHostAdmin?'fa-user-shield':'fa-user')+'"></i>'
-        +'<span>'+escapeHtml(state.extHostUser)+'</span>'
-        +(state.extHostAdmin?'<b class="is-admin">'+t('extmgr.adminBadge')+'</b>':'')
-      +'</span>';
-    } else {
-      userLine.hidden=true;
-      userLine.innerHTML='';
     }
   }
   const btn=document.getElementById('extmgr-install-toggle');
@@ -2976,6 +2975,50 @@ async function runAutoUpdateTick(){
   }
   scheduleAutoUpdates();
 }
+/** 格式化远端仓库 URL 展示：截断、优先显示后面的作者/仓库，带 Git 平台小徽标，绝不换行。 */
+function formatExtRemoteUrlHtml(rawUrl){
+  const url=String(rawUrl||'').trim();
+  if(!url) return '<span class="ext-remote-url is-none" title="'+t('extmgr.autoNeedsRepoShort')+'">—</span>';
+
+  let siteIcon='<i class="fa-brands fa-git-alt"></i>';
+  let siteName='Git';
+  let slug='';
+
+  const parsed=parseRepoUrl(url);
+  if(parsed && parsed.ok){
+    slug=(parsed.owner && parsed.repo) ? (parsed.owner+'/'+parsed.repo) : (parsed.repo || parsed.cloneUrl);
+    if(parsed.site===SITES.GITHUB){
+      siteIcon='<i class="fa-brands fa-github"></i>';
+      siteName='GitHub';
+    } else if(parsed.site===SITES.GITLAB){
+      siteIcon='<i class="fa-brands fa-gitlab"></i>';
+      siteName='GitLab';
+    } else if(parsed.site===SITES.GITEE){
+      siteIcon='<i class="fa-solid fa-code-branch"></i>';
+      siteName='Gitee';
+    } else if(/bitbucket/i.test(parsed.host)){
+      siteIcon='<i class="fa-brands fa-bitbucket"></i>';
+      siteName='Bitbucket';
+    } else if(/codeberg/i.test(parsed.host)){
+      siteIcon='<i class="fa-solid fa-cube"></i>';
+      siteName='Codeberg';
+    } else {
+      siteName=parsed.host||'Git';
+    }
+  } else {
+    const clean=url.replace(/\.git$/i,'').replace(/\/+$/,'');
+    const m=clean.match(/([^/:]+\/[^/:]+)$/);
+    slug=m ? m[1] : clean.replace(/^https?:\/\//i,'');
+    if(/github\.com/i.test(url)){ siteIcon='<i class="fa-brands fa-github"></i>'; siteName='GitHub'; }
+    else if(/gitlab\.com/i.test(url)){ siteIcon='<i class="fa-brands fa-gitlab"></i>'; siteName='GitLab'; }
+    else if(/gitee\.com/i.test(url)){ siteIcon='<i class="fa-solid fa-code-branch"></i>'; siteName='Gitee'; }
+  }
+
+  return '<span class="ext-remote-url" data-copyurl="'+escapeHtml(url)+'" title="'+escapeHtml(url)+' · '+t('extmgr.clickToCopy')+'">'
+    +'<span class="ext-site-badge" title="'+escapeHtml(siteName)+'">'+siteIcon+'</span>'
+    +'<span class="ext-repo-slug" title="'+escapeHtml(slug)+'">'+escapeHtml(slug)+'</span>'
+  +'</span>';
+}
 /** 扩展来源标记：只标「全局」（本地是常态，不再重复打断阅读）。 */
 function extSourceTag(sourceType){
   if(sourceType==='global') return '<span class="ext-flag">'+t('extmgr.sourceGlobal')+'</span>';
@@ -2999,9 +3042,7 @@ function serverPluginBlockHtml(){
     const rows=list.map((p)=>{
       const url=String(p.remoteUrl||'').trim();
       const priv=repoPrivacyOf(url);
-      const urlEl=url
-        ? '<span class="ext-remote-url" data-copyurl="'+escapeHtml(url)+'" title="'+escapeHtml(url)+' · '+t('extmgr.clickToCopy')+'">'+escapeHtml(url)+'</span>'
-        : '<span class="ext-remote-url is-none">—</span>';
+      const urlEl=formatExtRemoteUrlHtml(url);
       return '<div class="ext-entry is-ok ext-server-row">'
         +'<span class="ext-url" title="'+escapeHtml(p.directory||p.packageName)+'">'+escapeHtml(p.directory||p.packageName)+'</span>'
         +urlEl
@@ -3703,9 +3744,7 @@ async function renderExtInstalled(body){
       const privTag=priv
         ? '<span class="ext-priv-tag is-'+priv+'">'+t(priv==='private'?'extmgr.privBadge':'extmgr.pubBadge')+'</span>'
         : '';
-      const remoteEl=remoteUrl
-        ? '<span class="ext-remote-url" data-copyurl="'+escapeHtml(remoteUrl)+'" title="'+escapeHtml(remoteUrl)+' · '+t('extmgr.clickToCopy')+'">'+escapeHtml(remoteUrl)+'</span>'
-        : '<span class="ext-remote-url is-none" title="'+t('extmgr.autoNeedsRepoShort')+'">—</span>';
+      const remoteEl=formatExtRemoteUrlHtml(remoteUrl);
       const auto=autoMasterOn?'<span class="ext-auto">'
         +'<select class="text_pole ext-up-mode" data-upmode="'+escapeHtml(name)+'" title="'+t('extmgr.autoUpdate')+'">'
           +'<option value="off"'+(rule?'':' selected')+'>'+t('extmgr.devOff')+'</option>'
@@ -3738,11 +3777,7 @@ async function renderExtInstalled(body){
         const kindBadge = item.kind === 'original'
           ? '<span class="ext-flag ext-kind-tag is-orig">'+t('extmgr.kindOriginal')+'</span>'
           : '<span class="ext-flag ext-kind-tag is-man">'+t('extmgr.kindManifest')+'</span>';
-        const repoLink = item.url
-        /* 2026-11-15 用户裁定：远程 URL **直接显示**在行内，点击 URL 文本即复制；
-           绝对禁止单独的复制按钮（也不再用外链图标占宽）。 */
-        ? '<span class="ext-remote-url" data-copyurl="'+escapeHtml(item.url)+'" title="'+escapeHtml(item.url)+' · '+t('extmgr.clickToCopy')+'">'+escapeHtml(item.url)+'</span>'
-        : '';
+        const repoLink = item.url ? formatExtRemoteUrlHtml(item.url) : '';
         const toManifest=item.kind === 'original'
           /* 2026-11-15 用户裁定：原件行内提供「转成清单」——删实体、留清单（只做减法） */
           ? '<button type="button" class="btn icon ext-row-btn" data-pkg2manifest="'+escapeHtml(item.name)+'"'
@@ -3790,6 +3825,7 @@ async function renderExtInstalled(body){
     +' title="'+label+'" aria-label="'+label+'"><i class="fa-solid '+icon+'"></i></button>';
 
   /* 统一顶部吸顶操作工具栏：宿主与数据包各自适配动作 */
+  const showBatchRef = !!loadSettings().gitRefInstallOn;
   const hostActionButtons='<button type="button" class="btn ext-act-btn" id="extmgr-batch-update" disabled title="'+t('extmgr.batchUpdate')+'">'
       +'<i class="fa-solid fa-rotate"></i><span>'+t('extmgr.batchUpdate')+'</span>'
     +'</button>'
@@ -3807,7 +3843,7 @@ async function renderExtInstalled(body){
     /* 2026-11-15 用户裁定：导出扩展清单＝纯图标钮（禁文字），只住扩展管理按钮行 */
     +'<button type="button" class="btn icon ext-act-btn" id="extmgr-export-assetlist" disabled'
       +' title="'+t('extmgr.exportAssetList')+'" aria-label="'+t('extmgr.exportAssetList')+'"><i class="fa-solid fa-file-code"></i></button>'
-    +'<input class="text_pole ext-batch-ref" data-extref placeholder="'+t('extmgr.refOptional')+'">';
+    +(showBatchRef ? '<input class="text_pole ext-batch-ref" data-extref placeholder="'+t('extmgr.refOptional')+'">' : '');
 
   /* 2026-11-15 裁定：安装操作一律在底部「安装扩展」面板内进行——
      数据包工具行只留「打包」与「移除所选」（包内清理**只做减法**），
@@ -3827,25 +3863,29 @@ async function renderExtInstalled(body){
      「自动更新」打开时按钮行只剩来源行，滚动区整个被策略子视图替换。 */
   const policyOpen=isHost && autoMasterOn && !!state.extPolicyOpen;
   const actionRow=!policyOpen
-    ? '<div class="ext-head-action-row">'
-      +'<div class="ext-head-left">'
-        +'<span class="ext-list-count">'+t('extmgr.listCount',{n:countTotal})+'</span>'
-        +'<span class="ext-state" id="extmgr-sel-count">'+t('extmgr.selectedN',{n:0,total:countTotal})+'</span>'
-        +'<div class="ext-sel-group">'
-          +iconBtn('data-extall','fa-check-double',t('extmgr.selectAll'))
-          +iconBtn('data-extinvert','fa-shuffle',t('extmgr.invert'))
-          +iconBtn('data-extnone','fa-xmark',t('extmgr.selectNone'))
+    ? '<div class="ext-head-action-rows">'
+      +'<div class="ext-head-action-row ext-head-view-row">'
+        +'<div class="ext-head-left">'
+          +'<span class="ext-list-count">'+t('extmgr.listCount',{n:countTotal})+'</span>'
+          +'<span class="ext-state" id="extmgr-sel-count">'+t('extmgr.selectedN',{n:0,total:countTotal})+'</span>'
+          +'<div class="ext-sel-group">'
+            +iconBtn('data-extall','fa-check-double',t('extmgr.selectAll'))
+            +iconBtn('data-extinvert','fa-shuffle',t('extmgr.invert'))
+            +iconBtn('data-extnone','fa-xmark',t('extmgr.selectNone'))
+          +'</div>'
+        +'</div>'
+        +'<div class="ext-head-right">'
+          +(isHost ? iconBtn('id="extmgr-check-updates"'+(upd&&upd.busy?' disabled':''),'fa-magnifying-glass-arrow-right',t('extmgr.checkUpdates')) : '')
+          +iconBtn('id="extmgr-refresh-installed"','fa-arrows-rotate',t('extmgr.refresh'))
+          +(isHost ? ('<label class="field ext-sort"><span>'+t('extmgr.sortLabel')+'</span><select class="text_pole" data-extsort>'
+            +sortOptions.map(([value,key])=>'<option value="'+value+'"'+(sort===value?' selected':'')+'>'+t(key)+'</option>').join('')
+            +'</select></label>') : '')
         +'</div>'
       +'</div>'
-      +'<div class="ext-unified-actions">'
-        +(isHost ? hostActionButtons : packageActionButtons)
-      +'</div>'
-      +'<div class="ext-head-right">'
-        +(isHost ? iconBtn('id="extmgr-check-updates"'+(upd&&upd.busy?' disabled':''),'fa-magnifying-glass-arrow-right',t('extmgr.checkUpdates')) : '')
-        +iconBtn('id="extmgr-refresh-installed"','fa-arrows-rotate',t('extmgr.refresh'))
-        +(isHost ? ('<label class="field ext-sort"><span>'+t('extmgr.sortLabel')+'</span><select class="text_pole" data-extsort>'
-          +sortOptions.map(([value,key])=>'<option value="'+value+'"'+(sort===value?' selected':'')+'>'+t(key)+'</option>').join('')
-          +'</select></label>') : '')
+      +'<div class="ext-head-action-row ext-head-bulk-row">'
+        +'<div class="ext-unified-actions">'
+          +(isHost ? hostActionButtons : packageActionButtons)
+        +'</div>'
       +'</div>'
     +'</div>'
     : '';
@@ -4529,36 +4569,6 @@ function renderCloud() {
   if (upload) upload.disabled = !!C.busy || state.selectedPkgs.size === 0 || !cloudReady();
   const backupSelected = document.getElementById('cloud-backup-selected');
   if (backupSelected) backupSelected.disabled = !!C.busy || state.selectedPkgs.size === 0;
-  const list = document.getElementById('cloud-list');
-  if (!list) return;
-  if (!C.list.length) {
-    list.innerHTML = '<div class="cloud-empty">' + t('cloud.empty') + '</div>';
-    return;
-  }
-  list.innerHTML = C.list
-    .map((item) => {
-      const snapshot = item.kind === 'set-snapshot';
-      const key = escapeHtml(item.key);
-      const label = snapshot ? `${item.setName} · ${item.ts}` : item.key;
-      const sizeText = snapshot
-        ? t('cloud.snapshotMeta', { n: Number(item.entries) || 0 })
-        : (item.size == null
-          ? t('cloud.sizeUnknown')
-          : fmtMB((Number(item.size) || 0) / 1048576)
-            + (item.entryCount ? ` · ${t('cloud.entries', { n: item.entryCount })}` : ''));
-      const primary = snapshot
-        ? '<button type="button" class="ci-btn" data-cloud-restore="' + key + '">' + t('cloud.restore') + '</button>'
-        : '<button type="button" class="ci-btn" data-cloud-get="' + key + '">' + t('cloud.download') + '</button>';
-      const removeAttr = snapshot ? 'data-cloud-del-snapshot' : 'data-cloud-del';
-      return '<div class="cloud-item' + (snapshot ? ' is-snapshot' : '') + '" data-cloud-key="' + key + '">' +
-        '<span class="ci-name" title="' + escapeHtml(label) + '">' + escapeHtml(label) + '</span>' +
-        '<span class="ci-size">' + escapeHtml(sizeText) + '</span>' +
-        '<span class="ci-time">' + escapeHtml(String(item.lastModified || '').replace('T', ' ').slice(0, 16)) + '</span>' +
-        primary +
-        '<button type="button" class="ci-btn danger" ' + removeAttr + '="' + key + '">' + t('cloud.remove') + '</button>' +
-        '</div>';
-    })
-    .join('');
 }
 async function cloudSave() {
   const C = state.cloud;
@@ -4707,7 +4717,7 @@ async function cloudRefresh() {
   );
   C.status = (!res.ok && !C.list.length)
     ? t('cloud.error', { msg: res.message || res.code })
-    : (C.list.length ? t('cloud.loaded', { n: C.list.length }) : t('cloud.empty'));
+    : (C.list.length ? t('cloud.loaded', { n: C.list.length }) : '');
   renderCloud();
 }
 function cloudErrorText(code) {

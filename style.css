@@ -123,8 +123,10 @@
     min-height:var(--ctl-h);box-sizing:border-box}
   #app.app-container .badge .host-icon{width:14px;height:14px;object-fit:contain}
   #app.app-container .badge .gh-icon{flex:0 0 auto}
-  #app.app-container .badge .gh-icon[hidden], #app.app-container .badge .host-icon[hidden]{display:none}
+  #app.app-container .badge .web-icon{flex:0 0 auto;color:var(--accent)}
+  #app.app-container .badge .gh-icon[hidden], #app.app-container .badge .host-icon[hidden], #app.app-container .badge .web-icon[hidden]{display:none}
   #app.app-container .badge.accent{border-color:var(--accent);color:var(--text);background:var(--accent-soft)}
+  #app.app-container .badge b.is-admin{color:var(--accent);margin-left:4px;font-weight:700}
   /* 教程演示模式横幅：始终在页头下方，明示占位数据与退出入口。
      教程蒙层 z-index:95 覆盖全屏，横幅必须在其之上，否则「退出教程」点不到。 */
   #app.app-container .tutorial-banner{position:relative;z-index:96;flex:0 0 auto;display:flex;align-items:center;gap:10px;padding:6px 12px;
@@ -717,8 +719,23 @@
      安装区展开、报告面板展开统一过渡（收合由全局 JS 托管：先播动画再摘 open）。 */
   @keyframes discloseOpen{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
   @keyframes discloseClose{from{opacity:1;transform:none}to{opacity:0;transform:translateY(-4px)}}
+  @keyframes viewFadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+  @keyframes serverDiscloseOpen{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  @keyframes serverDiscloseClose{from{opacity:1;transform:none}to{opacity:0;transform:translateY(6px)}}
+  #app.app-container .view-card:not([hidden]),
+  #app.app-container .panel:not([hidden]),
+  #app.app-container .ext-scroll,
+  #app.app-container .ext-auto-policy,
+  #app.app-container .ext-server-area:not([hidden]),
+  #app.app-container .lan-body:not([hidden]),
+  #app.app-container .storage-inspector-view:not([hidden]),
+  #app.app-container .zone-side-panel:not([hidden]){
+    animation:viewFadeIn .18s cubic-bezier(0.16,1,0.3,1);
+  }
   #app.app-container details[open] > *:not(summary){animation:discloseOpen .18s ease}
   #app.app-container details.is-closing > *:not(summary){animation:discloseClose .16s ease forwards}
+  #app.app-container .ext-server-block[open] > .ext-server-body{animation:serverDiscloseOpen .18s cubic-bezier(0.16,1,0.3,1)}
+  #app.app-container .ext-server-block.is-closing > .ext-server-body{animation:serverDiscloseClose .16s cubic-bezier(0.16,1,0.3,1) forwards}
   #app.app-container .ext-install-area:not([hidden]){animation:discloseOpen .2s ease}
   #app.app-container .ext-report-panel:not([hidden]){animation:discloseOpen .2s ease}
   #app.app-container .ext-data-row{flex-wrap:wrap}
@@ -778,7 +795,7 @@
      按钮行永不与行内容穿插重叠（修复“穿透”）。 */
   #app.app-container .ext-list-head{flex:0 0 auto;display:flex;flex-direction:column;gap:6px;
     padding:8px 10px;font-size:10.5px;color:var(--muted);background:var(--panel);
-    border:1px solid var(--border);border-radius:8px}
+    border:1px solid var(--border);border-radius:8px;position:sticky;top:0;z-index:10}
   /* 列表滚动区：**始终占满剩余高度**；行少时列表撑满、动作块沉底，行多时整区滚动 */
   /* 列表滚动区（2026-11-16 用户裁定）：**内容定高**——收起/空列表时不保留任何占高度的空白带；
      列表长时它在面板内滚动（唯一滚动条），页脚仍钉在面板底。 */
@@ -814,36 +831,41 @@
     padding:2px 8px;border-radius:6px;background:var(--panel-3);border:1px solid var(--border)}
   #app.app-container .ext-policy-btn{margin-left:auto;padding:2px 8px;font-size:10.5px}
   #app.app-container .ext-policy-btn.active{background:color-mix(in srgb,var(--accent) 18%,transparent);border-color:var(--accent)}
-  #app.app-container .ext-head-action-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  #app.app-container .ext-head-action-rows{display:flex;flex-direction:column;gap:6px;width:100%}
+  #app.app-container .ext-head-action-row{display:flex;align-items:center;gap:8px;width:100%;flex-wrap:nowrap}
+  #app.app-container .ext-head-view-row{justify-content:space-between}
+  #app.app-container .ext-head-bulk-row{justify-content:flex-start}
   #app.app-container .ext-head-left{display:inline-flex;align-items:center;gap:7px;flex:0 0 auto}
   #app.app-container .ext-list-count{display:inline-block;padding:2px 7px;border-radius:99px;font-size:11px;font-weight:600;background:var(--panel-3);border:1px solid var(--border);color:var(--text)}
   #app.app-container .ext-sel-group{display:inline-flex;align-items:center;gap:3px}
-  #app.app-container .ext-unified-actions{display:inline-flex;align-items:center;gap:6px;flex:1 1 auto;flex-wrap:wrap;margin:0 4px}
-  #app.app-container .ext-act-btn{padding:3px 9px;font-size:11px;font-weight:500;display:inline-flex;align-items:center;gap:5px;border-radius:6px;line-height:1.4}
+  #app.app-container .ext-unified-actions{display:inline-flex;align-items:center;gap:6px;flex:1 1 auto;flex-wrap:nowrap;margin:0}
+  #app.app-container .ext-act-btn{padding:3px 9px;font-size:11px;font-weight:500;display:inline-flex;align-items:center;gap:5px;border-radius:6px;line-height:1.4;white-space:nowrap}
   #app.app-container .ext-act-btn:disabled{opacity:.4;cursor:not-allowed}
-  #app.app-container .ext-head-right{display:inline-flex;align-items:center;gap:6px;margin-left:auto;flex:0 0 auto}
+  #app.app-container .ext-head-right{display:inline-flex;align-items:center;gap:6px;flex:0 0 auto}
   #app.app-container .ext-drag{flex:0 0 auto;display:inline-flex;align-items:center;color:var(--muted-2);cursor:grab}
   #app.app-container .ext-drag:active{cursor:grabbing}
   #app.app-container .ext-entry.is-dragging{opacity:.55;border-style:dashed}
   #app.app-container .ext-entry[data-extrow]:hover{border-color:var(--border-strong)}
-  /* 列表行：舒适高度、主次分明，点击联动右侧 Git。名称完整显示（禁止省略号，2026-11-15 裁定）：
-     长名整名换行、行随内容生长；窄屏控件换行不裁切 */
-  #app.app-container .ext-ext-row{display:flex;align-items:center;gap:10px;min-height:44px;padding:8px 12px;
+  /* 列表行：单行绝对铁律（任何情况禁止换行），截断URL，优先显示作者/仓库 */
+  #app.app-container .ext-ext-row{display:flex;align-items:center;gap:8px;min-height:38px;padding:6px 10px;
     border:1px solid var(--border);border-radius:6px;margin-bottom:4px;background:color-mix(in srgb,var(--panel) 75%,transparent);
-    transition:background .15s ease,border-color .15s ease;cursor:pointer;flex-wrap:wrap}
+    transition:background .15s ease,border-color .15s ease;cursor:pointer;flex-wrap:nowrap !important;white-space:nowrap !important;overflow:hidden}
   #app.app-container .ext-ext-row:hover{background:color-mix(in srgb,var(--panel-3) 90%,transparent);border-color:var(--border-strong)}
   #app.app-container .ext-ext-row.is-active{background:color-mix(in srgb,var(--accent) 14%,transparent);border-color:var(--accent)}
-  #app.app-container .ext-ext-row .ext-url{flex:1 1 auto;min-width:0;font-weight:600;color:var(--text);font-size:12px;
-    overflow-wrap:anywhere;white-space:normal}
-  #app.app-container .ext-ext-row .ext-state{flex:0 0 auto;font-size:11px;color:var(--muted)}
-  #app.app-container .ext-kind-tag{padding:2px 6px;border-radius:4px;font-size:10px;font-weight:600}
+  #app.app-container .ext-ext-row .ext-url{flex:0 1 180px;min-width:100px;max-width:220px;font-weight:600;color:var(--text);font-size:12px;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap !important}
+  #app.app-container .ext-ext-row .ext-state{flex:0 0 auto;font-family:Consolas,monospace;font-size:11px;color:var(--muted);white-space:nowrap !important}
+  #app.app-container .ext-kind-tag{flex:0 0 auto;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:600;white-space:nowrap !important}
   #app.app-container .ext-kind-tag.is-orig{background:color-mix(in srgb,var(--keep) 20%,transparent);color:var(--keep);border:1px solid var(--keep)}
   #app.app-container .ext-kind-tag.is-man{background:color-mix(in srgb,var(--accent) 20%,transparent);color:var(--accent);border:1px solid var(--accent)}
-  /* 远程 URL 直显（2026-11-15 用户裁定）：URL 直接占行内文本位，点击即复制；
-     禁止单独的复制按钮、禁止单独的图标占宽。未登记的宿主行以「—」占位（不额外配色） */
-  #app.app-container .ext-remote-url{flex:1 1 auto;min-width:0;font-size:11px;color:var(--muted);
-    overflow-wrap:anywhere;white-space:normal;cursor:copy;user-select:none}
+  /* 远程 URL 直显：优先作者/仓库 + Git平台徽标 + 单行截断，点击复制完整URL */
+  #app.app-container .ext-remote-url{flex:1 1 auto;min-width:80px;display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--muted);
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap !important;cursor:copy;user-select:none}
   #app.app-container .ext-remote-url:hover{color:var(--accent)}
+  #app.app-container .ext-remote-url .ext-site-badge{flex:0 0 auto;display:inline-flex;align-items:center;color:var(--muted);font-size:11.5px}
+  #app.app-container .ext-remote-url .ext-repo-slug{overflow:hidden;text-overflow:ellipsis;white-space:nowrap !important;font-family:Consolas,monospace;font-size:11px;color:var(--muted)}
+  #app.app-container .ext-remote-url:hover .ext-site-badge,
+  #app.app-container .ext-remote-url:hover .ext-repo-slug{color:var(--accent)}
   #app.app-container .ext-remote-url.is-none{cursor:default;color:var(--muted-2)}
   #app.app-container .ext-remote-url.is-none:hover{color:var(--muted-2)}
   #app.app-container .ext-link-icon{color:var(--muted);font-size:11px}

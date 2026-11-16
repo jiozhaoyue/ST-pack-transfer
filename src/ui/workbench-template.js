@@ -12,7 +12,7 @@ export function getWorkbenchHtml() {
         <h1 data-i18n-aria="app.title"><span class="app-title-sym" aria-hidden="true">⇄</span><span class="app-title-txt" data-i18n="app.title"></span></h1>
       </div>
       <div class="header-actions">
-        <span class="badge accent" id="host-badge"><img class="host-icon" id="host-badge-icon" alt=""><svg class="gh-icon" id="host-badge-gh" viewBox="0 0 24 24" width="14" height="14" fill="currentColor" hidden><path d="M12 2A10 10 0 0 0 2 12c0 4.42 2.87 8.17 6.84 9.5.5.09.68-.22.68-.48v-1.7c-2.78.6-3.37-1.34-3.37-1.34-.45-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.89 1.53 2.34 1.09 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.56-1.11-4.56-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02a9.5 9.5 0 0 1 5 0c1.9-1.29 2.74-1.02 2.74-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.69-4.57 4.94.36.31.68.92.68 1.85v2.74c0 .27.18.58.69.48A10 10 0 0 0 22 12A10 10 0 0 0 12 2z"/></svg><span id="host-badge-text"></span></span>
+        <span class="badge accent" id="host-badge"><img class="host-icon" id="host-badge-icon" alt=""><svg class="gh-icon" id="host-badge-gh" viewBox="0 0 24 24" width="14" height="14" fill="currentColor" hidden><path d="M12 2A10 10 0 0 0 2 12c0 4.42 2.87 8.17 6.84 9.5.5.09.68-.22.68-.48v-1.7c-2.78.6-3.37-1.34-3.37-1.34-.45-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.89 1.53 2.34 1.09 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.56-1.11-4.56-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02a9.5 9.5 0 0 1 5 0c1.9-1.29 2.74-1.02 2.74-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.69-4.57 4.94.36.31.68.92.68 1.85v2.74c0 .27.18.58.69.48A10 10 0 0 0 22 12A10 10 0 0 0 12 2z"/></svg><svg class="web-icon" id="host-badge-web" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" hidden><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.7 3.8 5.7 3.8 9s-1.3 6.3-3.8 9c-2.5-2.7-3.8-5.7-3.8-9S9.5 5.7 12 3z"/></svg><span id="host-badge-text"></span><span id="host-badge-user"></span></span>
         <div class="header-theme-picker" id="header-theme-picker" hidden>
           <select class="text_pole header-theme-select" id="header-theme-select" data-i18n-title="header.theme">
             <option value="Dark Lite">Dark Lite</option>
@@ -147,7 +147,7 @@ export function getWorkbenchHtml() {
               <div class="lan-field">
                 <div class="lan-label"><span data-i18n="action.pickup"></span><button type="button" class="lan-link" id="lan-btn-copy-send" hidden data-i18n="action.copy"></button></div>
                 <textarea class="text_pole lan-code" id="lan-send-code" rows="2" readonly data-i18n-placeholder="action.pickupPlaceholder"></textarea>
-                <div class="lan-qr" id="lan-send-qr" hidden></div>
+                <div class="lan-qr" id="lan-send-qr"></div>
               </div>
               <div class="lan-row">
                 <button type="button" class="menu_button" id="lan-btn-generate" data-i18n="action.generate"></button>
@@ -181,7 +181,7 @@ export function getWorkbenchHtml() {
               <div class="lan-field">
                 <div class="lan-label"><span data-i18n="action.answer"></span><button type="button" class="lan-link" id="lan-btn-copy-recv" hidden data-i18n="action.copy"></button></div>
                 <textarea class="text_pole lan-code" id="lan-recv-code" rows="2" readonly data-i18n-placeholder="action.recvPlaceholder"></textarea>
-                <div class="lan-qr" id="lan-recv-qr" hidden></div>
+                <div class="lan-qr" id="lan-recv-qr"></div>
               </div>
               <div class="lan-progress">
                 <span class="lan-phase" id="lan-recv-phase" data-i18n="action.waiting"></span>
@@ -274,7 +274,9 @@ export function getWorkbenchHtml() {
             <span class="cloud-picked" id="cloud-picked"></span>
           </div>
           <div class="cloud-status" id="cloud-status"></div>
-          <div class="cloud-list" id="cloud-list"></div>
+          <div class="cloud-note" id="cloud-unified-guide" data-i18n="cloud.unifiedPackHint"></div>
+          <div class="cloud-note" id="webdav-guide-card" data-i18n="webdav.tutorialGuide"></div>
+          <div class="cloud-list" id="cloud-list" hidden></div>
           </div>
           </div>
         </section>
@@ -324,7 +326,6 @@ export function getWorkbenchHtml() {
           </div>
           <div class="extension-body" id="extension-body"></div>
           <div class="ext-footer" id="extmgr-install-block" hidden>
-            <div class="ext-user-line" id="extmgr-user-line" hidden></div>
             <div class="ext-server-area" id="extmgr-server-area" hidden></div>
             <div class="ext-install-area" id="extmgr-install-area" hidden></div>
             <button type="button" class="btn ext-install-toggle" id="extmgr-install-toggle" aria-expanded="false">
