@@ -9,7 +9,7 @@
  *   · 动作：`actions.*`（拉取 / 生成 / 恢复 / 复制 / 删除 / 下载 / 设置 / 关闭）
  */
 
-import { chartTreeFor, deriveExportOptions, deriveCategorySelection, annotateChatLinks, counterpartsOf, CHART_GROUPS } from '../core/chart-model.js';
+import { chartTreeFor, deriveExportOptions, deriveCategorySelection, annotateChatLinks, counterpartsOf, CHART_GROUPS, SPLIT_MIN, SPLIT_MAX } from '../core/chart-model.js';
 import {
   normalizeResponse, stackSegments, dotFill, maxEntrySize,
   formatSize, formatSizeOrUnknown, categoryColorClass, iconKey,
@@ -45,6 +45,7 @@ import {
   oauthProvider, buildAuthorizeUrl, randomToken, makePkce, parseOAuthCallback, exchangeOAuthCode,
 } from '../core/git-oauth.js';
 import { createGitRemote } from './git-remote.js';
+import { gitSiteIcon } from './git-icons.js';
 import { t } from '../i18n/index.js';
 import { loadSettings, saveSettings } from './settings-store.js';
 import { normalizeUpdateInterval, updatePolicyOf, updateBackoffDelay, applyWebTheme } from './settings-panel.js';
@@ -3021,6 +3022,7 @@ function formatExtRemoteUrlHtml(rawUrl){
   const url=String(rawUrl||'').trim();
   if(!url) return '<span class="ext-remote-url is-none" title="'+t('extmgr.autoNeedsRepoShort')+'">—</span>';
 
+  /* 平台标一律用该平台的原版品牌图标（不接受通用分支/立方体近似） */
   let siteIcon='<i class="fa-brands fa-git-alt"></i>';
   let siteName='Git';
   let slug='';
@@ -3029,19 +3031,19 @@ function formatExtRemoteUrlHtml(rawUrl){
   if(parsed && parsed.ok){
     slug=(parsed.owner && parsed.repo) ? (parsed.owner+'/'+parsed.repo) : (parsed.repo || parsed.cloneUrl);
     if(parsed.site===SITES.GITHUB){
-      siteIcon='<i class="fa-brands fa-github"></i>';
+      siteIcon=gitSiteIcon('github');
       siteName='GitHub';
     } else if(parsed.site===SITES.GITLAB){
-      siteIcon='<i class="fa-brands fa-gitlab"></i>';
+      siteIcon=gitSiteIcon('gitlab');
       siteName='GitLab';
     } else if(parsed.site===SITES.GITEE){
-      siteIcon='<i class="fa-solid fa-code-branch"></i>';
+      siteIcon=gitSiteIcon('gitee');
       siteName='Gitee';
     } else if(/bitbucket/i.test(parsed.host)){
-      siteIcon='<i class="fa-brands fa-bitbucket"></i>';
+      siteIcon=gitSiteIcon('bitbucket');
       siteName='Bitbucket';
     } else if(/codeberg/i.test(parsed.host)){
-      siteIcon='<i class="fa-solid fa-cube"></i>';
+      siteIcon=gitSiteIcon('codeberg');
       siteName='Codeberg';
     } else {
       siteName=parsed.host||'Git';
@@ -3050,9 +3052,9 @@ function formatExtRemoteUrlHtml(rawUrl){
     const clean=url.replace(/\.git$/i,'').replace(/\/+$/,'');
     const m=clean.match(/([^/:]+\/[^/:]+)$/);
     slug=m ? m[1] : clean.replace(/^https?:\/\//i,'');
-    if(/github\.com/i.test(url)){ siteIcon='<i class="fa-brands fa-github"></i>'; siteName='GitHub'; }
-    else if(/gitlab\.com/i.test(url)){ siteIcon='<i class="fa-brands fa-gitlab"></i>'; siteName='GitLab'; }
-    else if(/gitee\.com/i.test(url)){ siteIcon='<i class="fa-solid fa-code-branch"></i>'; siteName='Gitee'; }
+    if(/github\.com/i.test(url)){ siteIcon=gitSiteIcon('github'); siteName='GitHub'; }
+    else if(/gitlab\.com/i.test(url)){ siteIcon=gitSiteIcon('gitlab'); siteName='GitLab'; }
+    else if(/gitee\.com/i.test(url)){ siteIcon=gitSiteIcon('gitee'); siteName='Gitee'; }
   }
 
   return '<span class="ext-remote-url" data-copyurl="'+escapeHtml(url)+'" title="'+escapeHtml(url)+' · '+t('extmgr.clickToCopy')+'">'
@@ -5313,6 +5315,20 @@ function buildDemoPackages(){
     mk('demo-exp-pt-32','demo_pt_export_32m.zip','pt',32,'09:16','export'),
   ];
 }
+/**
+ * 演示数据的读数（包数 / 最小体积 / 最大体积）。
+ * 教程文案里的数字全部由这里插值——改 `buildDemoPackages()` 就自动同步，
+ * 不在 i18n 里写死「6–10 个，16 MB–4 GB」这种会与真源脱节的固定值。
+ */
+function demoPackageStats(){
+  const imported=buildDemoPackages().filter((p)=>p.zone==='import');
+  const sizes=imported.map((p)=>Number(p.mb)||0).filter((n)=>n>0);
+  return {
+    count: imported.length,
+    min: sizes.length ? fmtMB(Math.min(...sizes)) : '—',
+    max: sizes.length ? fmtMB(Math.max(...sizes)) : '—',
+  };
+}
 function buildDemoHostTree(){
   const L=(k)=>t('demo.'+k);
   return [
@@ -5373,7 +5389,8 @@ function demoTutorialActions(real){
 function demoStorageInspect(source, pathArr){
   const path=Array.isArray(pathArr)?pathArr.map(String):[];
   const gb=DEMO_GB;
-  const quota={ usedBytes:9.4*gb, quotaBytes:32*gb, over:false };
+  /* 配额读数由分类求和得出，「分类合计 = 已用」永远自洽（2026-11-16） */
+  const quotaFor=(cats)=>({ usedBytes:cats.reduce((a,c)=>a+c[2],0), quotaBytes:32*gb, over:false });
   if(source==='host'){
     const cats=[
       ['chats','Chats',4.1*gb,'comment',true],
@@ -5387,6 +5404,7 @@ function demoStorageInspect(source, pathArr){
       ['backups','Backups',0.2*gb,'clock-rotate-left',false],
       ['other','Other',0.08*gb,'box',false],
     ];
+    const quota=quotaFor(cats);
     if(path.length===0){
       return {
         path:[], breadcrumbs:[{ label:'Storage', path:[] }], quota,
@@ -5414,8 +5432,10 @@ function demoStorageInspect(source, pathArr){
     ['sessionStorage','sessionStorage',6*1024,'clock',{ count:4, unit:'keys', drill:true }],
     ['indexeddb','IndexedDB',5.2*gb,'database',{ count:2, unit:'dbs', drill:true }],
     ['cachestorage','Cache Storage',3.1*gb,'layer-group',{ count:1, unit:'caches', drill:true }],
-    ['quota','Storage Quota',9.4*gb,'chart-pie',{}],
   ];
+  const quota=quotaFor(cats);
+  /* 「Storage Quota」行展示的已用读数取分类合计，避免两个数字互相矛盾 */
+  cats.push(['quota','Storage Quota',quota.usedBytes,'chart-pie',{}]);
   if(path.length===0){
     return {
       path:[], breadcrumbs:[{ labelKey:'si.root', path:[] }], quota,
@@ -5512,9 +5532,9 @@ const TUTORIAL_GOALS=[
     steps:[
       { sel:'#target-select', view:'chart', title:'tutorial.convert.target', desc:'tutorial.convert.targetDesc' },
       { sel:'#chart-stack', view:'chart', title:'tutorial.convert.chart', desc:'tutorial.convert.chartDesc' },
-      { sel:'#zone-body', view:'zone', zone:'import', title:'tutorial.convert.import', desc:'tutorial.convert.importDesc' },
+      { sel:'#zone-body', view:'zone', zone:'import', title:'tutorial.convert.import', desc:'tutorial.convert.importDesc', params:demoPackageStats },
       { sel:'#delta-toggle', view:'zone', zone:'export', title:'tutorial.convert.delta', desc:'tutorial.convert.deltaDesc' },
-      { sel:'#split-input', view:'chart', title:'tutorial.convert.split', desc:'tutorial.convert.splitDesc' },
+      { sel:'#split-input', view:'chart', title:'tutorial.convert.split', desc:'tutorial.convert.splitDesc', params:()=>({min:SPLIT_MIN,max:SPLIT_MAX}) },
       { sel:'#zone-actions-bottom', view:'zone', zone:'import', title:'tutorial.convert.generate', desc:'tutorial.convert.generateDesc' },
       { sel:'#zone-body', view:'zone', zone:'export', title:'tutorial.convert.export', desc:'tutorial.convert.exportDesc' }
     ]
@@ -5691,7 +5711,7 @@ function renderTutorial(){
   if(next){ next.hidden=false; next.textContent=state.tutorialStep>=steps.length-1?t('tutorial.done'):t('tutorial.next'); }
   if(adv){ adv.hidden=false; adv.textContent=t('tutorial.changeGoal'); }
   title.textContent=t(step.title);
-  desc.textContent=t(step.desc);
+  desc.textContent=t(step.desc, step.params ? step.params() : undefined);
   if(dots) dots.innerHTML=steps.map((_,i)=>'<i class="'+(i===state.tutorialStep?'on':'')+'"></i>').join('');
 
   tutorialPrepareStep(step);

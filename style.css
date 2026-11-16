@@ -870,6 +870,7 @@
     overflow:hidden;text-overflow:ellipsis;white-space:nowrap !important;cursor:copy;user-select:none}
   #app.app-container .ext-remote-url:hover{color:var(--accent)}
   #app.app-container .ext-remote-url .ext-site-badge{flex:0 0 auto;display:inline-flex;align-items:center;color:var(--muted);font-size:11.5px}
+  #app.app-container .ext-remote-url .ext-site-badge svg{width:1em;height:1em;fill:currentColor;display:block}
   #app.app-container .ext-remote-url .ext-repo-slug{overflow:hidden;text-overflow:ellipsis;white-space:nowrap !important;font-family:Consolas,monospace;font-size:11px;color:var(--muted)}
   #app.app-container .ext-remote-url:hover .ext-site-badge,
   #app.app-container .ext-remote-url:hover .ext-repo-slug{color:var(--accent)}

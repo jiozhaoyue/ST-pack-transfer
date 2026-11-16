@@ -218,6 +218,8 @@
 | **包内视图整改（2026-11-15 用户裁定，第三轮）** | ① **「选择数据包」文案彻底删除**（双语 i18n 键已删，label 不复存在）；**桌面**只读展示当前包名 `.ext-pkg-current`（默认最新导入包）；**手机版必须可选**——无文字标签的 `#extmgr-pkg-select` 保留，`[data-view]` 互斥显示（`style.css`：`:not([data-view="mobile"])` 隐藏 picker、`[data-view="mobile"]` 隐藏只读包名）；② 扩展行（宿主 + 包内）**直接显示远程 URL** `.ext-remote-url`，点击文本即复制（`data-copyurl` 委托，防重复绑定），**禁止单独的复制按钮**与外链图标；未登记以「—」占位；③ 工具行新增「移除所选」= **包内清理（只做减法）**：从当前包删除勾选扩展的实体条目与清单条目并重建 zip 原位替换；④ 「安装扩展」页脚钉底（独立态根容器补 `height:calc(100vh-36px)`，否则整页随内容生长、页脚滚出视口）；⑤ 目标下拉「宿主」状态只用颜色（`.picker-item.is-host` accent 染字 + 内嵌左色条），「（宿主）」文字标签废除；⑥ 原生 select 弹出项显式归一 `option{padding:4px 10px}` 禁止左侧空白 | `workbench-view.js` 的 `renderExtInstalled()` / `installedRemoteUrlOf()` / `pruneSelectedFromPackage()`；`src/core/ext-prune.js`（`prunePackageExtensions`，零命中原样返回）；`index.js` 的 `actions.prunePackageExtensions`；测试 `test/ext-prune.test.js` |
 | **UI 一致性整改（2026-11-15 用户裁定，两轮）** | ① 页头标题两态：宽度够显示全名，放不下整名降级为项目符号 `⇄`（`h1.is-symbol`，可访问名经 `aria-label` 保全）；② 扩展管理内**禁止省略号**（列表行/安装/报告行名称完整换行；包名下拉按最长选项自适应）；③ **面板头任何宽度单行**（推翻 2026-11-11 手机两行布局），**手机视图切换固定纯图标**（不量宽不回退）；④ **全插件控件等高 `--ctl-h:28px`**：按钮/输入/下拉/分段/徽标/图标钮/方形小钮全部归一，`style.css` 尾部有兜底范式规则（豁免：多行 textarea、复选框、拖拽手柄、状态 pill、`git-graph-row` 泳道行——与 SVG 坐标对齐禁改、`#workbench-progress`）。**固定高度下拉铁律**：`appearance:none` + `line-height` 对齐内容高(26px) + wrapper `::after` 自绘箭头——Blink 原生 menulist 文字顶部对齐、computed line-height 恒回落 UA 值（实测钉不动），上下 padding 还会裁掉选项文字（2026-11-15 实测「Dark Lite」）。**级联顺序铁律**：`.text_pole` 基座规则必须排在该文件所有复合规则**之前**（同特异性按源码顺序取胜——基座曾在文件尾部把 `.header-theme-select` / `.chart-fmt` / `.ext-up-*` 的字号与 padding 全部静默压掉）。**标题符号**：`⇄` 恒显示在名称前（⇄ 数据包转运），放不下时整名退化为仅符号；⑤ 面板动作行子项与 `.segmented` **禁止 flex 收缩**（收缩+overflow 会剪字；放不下由切换行退化图标承担）；⑥「安装至宿主」收束到页脚安装面板 | `workbench-template.js` 的 h1 两 span 结构；`workbench-view.js` 的 `applySwitchDensity()`（标题测量）/ `renderExtInstalled()` / `renderExtInstall()`；`style.css` 的 `--ctl-h` / `.ext-scroll` / `.ext-list-head` / `.app-title-sym` / 尾部等高兜底块。**范围边界**：`source-chip` / 存储审查 `si-*` 文字行 / 树 `tree-label` / Git 可视化 `git-viz-ref span` / 数据包卡 `pkg-name` / LAN / restore 行的省略号**未动**，属下一轮裁定范围 |
 
+| **扩展列表禁常驻分隔细线（2026-11-15 用户裁定）** | 扩展管理 → 宿主页来源行与工具行之间 | 移除来源行下的 dashed 分隔线**及其恒占高度的 padding**——两者叠加过会在两行之间凭空多出一条线并占掉高度。两行之间只用面板既有间距 | `style.css` 的扩展来源行样式；`workbench-view.js` 的 `renderExtInstalled()` 行结构 |
+
 ### K3. 数据包页签行 / 恢复模式 / 待导出合并 / 开发模式（2026-11-11）
 
 | 功能 | UI 入口 | 源码落点 |
@@ -432,6 +434,22 @@
 
 ---
 
+### R. 预估读数（写入宿主 / 压缩包）· 教程数值 · 平台原版图标（2026-11-16）
+
+| 功能 | 源码落点 | 行为与铁律 |
+| --- | --- | --- |
+| **数据包卡「写入宿主预估」** | `workbench-view.js` 的 `pkgCard(p)`；i18n `pkg.estHost` / `pkg.estHostTitle` | **只显示「图标 + ≈数值」**（如 🖴 ≈1.3 GB）。**禁止**出现「预计写入宿主:」等描述文字（2026-11-16 用户明令）；中英双语同形。说明文字只存在于 `title`。 |
+| **操作栏汇总预估** | `workbench-view.js` 的 `renderActions()`；i18n `zones.estHostTotal` | 与卡片**同一公式**（`p.rawMb \|\| p.uncompressedMb \|\| mb×2`），勾选变化即重算；同样只显示「图标 + ≈数值」。 |
+| **图表卡「预估压缩包」** | `chartCardHtml()` 的 `.chart-est-zip`；i18n `chart.estZip` / `chart.estZipTitle` | 按当前压缩模式系数估算（store 1.0 / fast 0.65 / standard 0.5 / maximum 0.42），系数读设置不写死；读数变化随勾选实时更新。 |
+| **教程数值必须与真源同源** | `workbench-view.js` 的 `buildDemoPackages()` → `demoPackageStats()`；`TUTORIAL_GOALS` 步骤的 `params` | 演示包数 / 体积区间由 `demoPackageStats()` 现算，分卷区间 `{min}/{max}` 取自 `SPLIT_MIN` / `SPLIT_MAX`（`core/chart-model.js`）。**禁止**在 i18n 文案里写死「6–10 个，16 MB–4 GB」这类会与真源脱节的固定值——插件更新后自动跟随。 |
+| **演示存储审查配额自洽** | `workbench-view.js` 的 `demoStorageInspect()` / `quotaFor()` | 已用配额由**分类求和**得出，「Storage Quota」行展示同一读数。**禁止**写死 `usedBytes` 与分类合计不一致（曾出现 9.4 GB 对 8.3 GB，用户一眼看出读数假）。 |
+| **Git 平台原版品牌图标** | `src/ui/git-icons.js`（`GIT_ICONS` / `gitSiteIcon()`）；调用点 `formatExtRemoteUrlHtml()`；CSS `#app.app-container .ext-remote-url .ext-site-badge svg` | GitHub / GitLab / Gitee / Gitea / Bitbucket / Codeberg 一律使用**官方品牌矢量路径**（内联 SVG，`fill:currentColor`）。**禁止**用 `fa-code-branch` / `fa-cube` 之类的通用图形近似平台标识；未登记站点才退回通用 `fa-git-alt`。 |
+
+> 教程文案的插值实现：`renderTutorial()` 用 `t(step.desc, step.params ? step.params() : undefined)`；
+> 新增带数值的教程步骤必须提供 `params`，不得把数字写进 locale 字符串。
+
+---
+
 ## 三、分层与硬性边界
 
 ```
@@ -442,7 +460,8 @@ src/core/     纯逻辑，**禁止 DOM / window / fetch**（可在 Node/Vitest �
               git-accounts.js（账号库）、git-site.js（站点 API 端点/归一）、
               storage-inspector-model.js（存储审查的纯逻辑：尺寸/配色/点阵/归一）
 src/app/      转换/传输编排（task-runtime / conversion-runner / transfer-runner / pull-entry）
-src/ui/       可 DOM；host-bridge.js 是宿主差异的唯一落点；git-remote.js 是 Git 站点网络的唯一落点
+src/ui/       可 DOM；host-bridge.js 是宿主差异的唯一落点；git-remote.js 是 Git 站点网络的唯一落点；
+              host-icons.js / git-icons.js 是四酒馆与 Git 平台「原版品牌图标」的唯一来源
 src/storage/  IndexedDB + 可选 Authority 适配器
 src/vendor/   zip.js / fzstd / fontawesome 本地副本 —— **勿升级改动**
 public/       仅 file-protocol-notice.js
