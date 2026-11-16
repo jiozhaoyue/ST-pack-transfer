@@ -197,13 +197,92 @@ export function getWorkbenchHtml() {
           </div>
 
           <div class="transfer-pane" id="cloud-view" hidden>
-          <div class="transfer-subtabs">
-            <div class="segmented" id="cloud-provider-tabs">
-              <button type="button" class="seg-btn active" data-cloud-provider="s3">S3</button>
-              <button type="button" class="seg-btn" data-cloud-provider="webdav">WebDAV</button>
+          <!-- 1. Storage credentials card (pinned to top with integrated tabs) -->
+          <div class="cloud-card cloud-storage-config-card">
+            <div class="cloud-card-header cloud-provider-header">
+              <div class="segmented cloud-provider-tabs" id="cloud-provider-tabs">
+                <button type="button" class="seg-btn active" data-cloud-provider="s3"><i class="fa-solid fa-cloud"></i> <span data-i18n="cloud.providerS3"></span></button>
+                <button type="button" class="seg-btn" data-cloud-provider="webdav"><i class="fa-solid fa-network-wired"></i> <span data-i18n="cloud.providerWebdav"></span></button>
+              </div>
+              <span class="cch-tag" id="cloud-provider-tag">S3 / WebDAV</span>
+            </div>
+
+            <div class="transfer-subpane" id="cloud-s3-pane">
+            <div class="cloud-body" id="cloud-body">
+              <div class="cloud-note-box"><i class="fa-solid fa-lock"></i> <p class="cloud-note" data-i18n="cloud.note"></p></div>
+              <div class="cloud-grid">
+                <label class="cloud-field span-2"><span data-i18n="cloud.endpoint"></span>
+                  <input class="text_pole" id="cloud-endpoint" placeholder="https://s3.example.com" autocomplete="off"></label>
+                <label class="cloud-field"><span data-i18n="cloud.region"></span>
+                  <input class="text_pole" id="cloud-region" placeholder="us-east-1" autocomplete="off"></label>
+                <label class="cloud-field"><span data-i18n="cloud.bucket"></span>
+                  <input class="text_pole" id="cloud-bucket" autocomplete="off"></label>
+                <label class="cloud-field"><span data-i18n="cloud.prefix"></span>
+                  <input class="text_pole" id="cloud-prefix" autocomplete="off"></label>
+                <label class="cloud-field"><span data-i18n="cloud.accessKey"></span>
+                  <input class="text_pole" id="cloud-access-key" autocomplete="off"></label>
+                <label class="cloud-field"><span data-i18n="cloud.secretKey"></span>
+                  <input class="text_pole" id="cloud-secret-key" type="password" autocomplete="off"></label>
+                <label class="cloud-field"><span data-i18n="cloud.passphrase"></span>
+                  <input class="text_pole" id="cloud-passphrase" type="password" autocomplete="off"></label>
+                <label class="cloud-check span-2"><input type="checkbox" id="cloud-path-style"><span data-i18n="cloud.pathStyle"></span></label>
+              </div>
+              <div class="cloud-row">
+                <button type="button" class="btn accent" id="cloud-save"><i class="fa-solid fa-floppy-disk"></i> <span data-i18n="cloud.save"></span></button>
+                <button type="button" class="btn" id="cloud-refresh"><i class="fa-solid fa-arrows-rotate"></i> <span data-i18n="cloud.refresh"></span></button>
+              </div>
+            </div>
+            </div>
+
+            <div class="transfer-subpane" id="cloud-webdav-pane" hidden>
+            <div class="cloud-body" id="webdav-body">
+              <div class="cloud-note-box"><i class="fa-solid fa-lock"></i> <p class="cloud-note" data-i18n="webdav.note"></p></div>
+              <div class="cloud-grid">
+                <label class="cloud-field span-2"><span data-i18n="webdav.baseUrl"></span>
+                  <input class="text_pole" id="webdav-base-url" placeholder="https://dav.example.com/remote.php/dav/files/user" autocomplete="off"></label>
+                <label class="cloud-field"><span data-i18n="webdav.username"></span>
+                  <input class="text_pole" id="webdav-username" autocomplete="off"></label>
+                <label class="cloud-field"><span data-i18n="webdav.password"></span>
+                  <input class="text_pole" id="webdav-password" type="password" autocomplete="off"></label>
+                <label class="cloud-field"><span data-i18n="webdav.prefix"></span>
+                  <input class="text_pole" id="webdav-prefix" autocomplete="off"></label>
+                <label class="cloud-field"><span data-i18n="webdav.passphrase"></span>
+                  <input class="text_pole" id="webdav-passphrase" type="password" autocomplete="off"></label>
+              </div>
+              <div class="cloud-row">
+                <button type="button" class="btn accent" id="webdav-save"><i class="fa-solid fa-floppy-disk"></i> <span data-i18n="cloud.save"></span></button>
+                <button type="button" class="btn" id="webdav-test" data-i18n-title="webdav.testHint"><i class="fa-solid fa-bolt"></i> <span data-i18n="webdav.test"></span></button>
+                <button type="button" class="btn" id="webdav-refresh"><i class="fa-solid fa-arrows-rotate"></i> <span data-i18n="cloud.refresh"></span></button>
+              </div>
+              <div class="cloud-note-box cloud-test-box" id="webdav-test-result" hidden></div>
+            </div>
             </div>
           </div>
-          <div class="cloud-body" id="cloud-mode-row">
+
+          <!-- 2. Cloud backup and sync actions card -->
+          <div class="cloud-card cloud-action-card">
+            <div class="cloud-card-header">
+              <div class="cch-title"><i class="fa-solid fa-cloud-arrow-up"></i> <span data-i18n="cloud.actionCardTitle"></span></div>
+              <div class="cloud-picked-badge" id="cloud-picked-wrap"><span class="cloud-picked" id="cloud-picked"></span></div>
+            </div>
+            <div class="cloud-row cloud-action-buttons">
+              <button type="button" class="btn accent cloud-btn-primary" id="cloud-backup-selected"><i class="fa-solid fa-cloud-arrow-up"></i> <span data-i18n="cloud.backupSelected"></span></button>
+              <button type="button" class="btn cloud-btn-secondary" id="cloud-upload" disabled><i class="fa-solid fa-upload"></i> <span data-i18n="cloud.upload"></span></button>
+            </div>
+            <div class="cloud-status" id="cloud-status"></div>
+            <div class="cloud-guide-group">
+              <div class="cloud-note-box"><i class="fa-solid fa-circle-info"></i> <div class="cloud-note" id="cloud-unified-guide" data-i18n="cloud.unifiedPackHint"></div></div>
+              <div class="cloud-note-box"><i class="fa-solid fa-lightbulb"></i> <div class="cloud-note" id="webdav-guide-card" data-i18n="webdav.tutorialGuide"></div></div>
+            </div>
+            <div class="cloud-list" id="cloud-list" hidden></div>
+          </div>
+
+          <!-- 3. Backup strategy and format card (bottom) -->
+          <div class="cloud-card cloud-strategy-card" id="cloud-mode-row">
+            <div class="cloud-card-header">
+              <div class="cch-title"><i class="fa-solid fa-sliders"></i> <span data-i18n="cloud.strategyCardTitle"></span></div>
+              <span class="cch-tag" data-i18n="cloud.strategyBadge"></span>
+            </div>
             <div class="cloud-grid">
               <label class="cloud-field"><span data-i18n="cloud.mode"></span>
                 <select class="text_pole" id="cloud-mode-select">
@@ -215,68 +294,8 @@ export function getWorkbenchHtml() {
               <label class="cloud-field"><span data-i18n="cloud.retention"></span>
                 <input class="text_pole" id="cloud-retention" type="number" min="1" max="99" value="10"></label>
             </div>
-            <p class="cloud-note" data-i18n="cloud.encryptNote"></p>
+            <div class="cloud-note-box"><i class="fa-solid fa-shield-halved"></i> <p class="cloud-note" data-i18n="cloud.encryptNote"></p></div>
           </div>
-          <div class="transfer-subpane" id="cloud-s3-pane">
-          <div class="cloud-body" id="cloud-body">
-            <p class="cloud-note" data-i18n="cloud.note"></p>
-            <div class="cloud-grid">
-              <label class="cloud-field"><span data-i18n="cloud.endpoint"></span>
-                <input class="text_pole" id="cloud-endpoint" placeholder="https://s3.example.com" autocomplete="off"></label>
-              <label class="cloud-field"><span data-i18n="cloud.region"></span>
-                <input class="text_pole" id="cloud-region" placeholder="us-east-1" autocomplete="off"></label>
-              <label class="cloud-field"><span data-i18n="cloud.bucket"></span>
-                <input class="text_pole" id="cloud-bucket" autocomplete="off"></label>
-              <label class="cloud-field"><span data-i18n="cloud.prefix"></span>
-                <input class="text_pole" id="cloud-prefix" autocomplete="off"></label>
-              <label class="cloud-field"><span data-i18n="cloud.accessKey"></span>
-                <input class="text_pole" id="cloud-access-key" autocomplete="off"></label>
-              <label class="cloud-field"><span data-i18n="cloud.secretKey"></span>
-                <input class="text_pole" id="cloud-secret-key" type="password" autocomplete="off"></label>
-              <label class="cloud-field"><span data-i18n="cloud.passphrase"></span>
-                <input class="text_pole" id="cloud-passphrase" type="password" autocomplete="off"></label>
-              <label class="cloud-check"><input type="checkbox" id="cloud-path-style"><span data-i18n="cloud.pathStyle"></span></label>
-            </div>
-            <div class="cloud-row">
-              <button type="button" class="menu_button" id="cloud-save" data-i18n="cloud.save"></button>
-              <button type="button" class="menu_button" id="cloud-refresh" data-i18n="cloud.refresh"></button>
-            </div>
-          </div>
-          </div>
-
-          <div class="transfer-subpane" id="cloud-webdav-pane" hidden>
-          <div class="cloud-body" id="webdav-body">
-            <p class="cloud-note" data-i18n="webdav.note"></p>
-            <div class="cloud-grid">
-              <label class="cloud-field"><span data-i18n="webdav.baseUrl"></span>
-                <input class="text_pole" id="webdav-base-url" placeholder="https://dav.example.com/remote.php/dav/files/user" autocomplete="off"></label>
-              <label class="cloud-field"><span data-i18n="webdav.username"></span>
-                <input class="text_pole" id="webdav-username" autocomplete="off"></label>
-              <label class="cloud-field"><span data-i18n="webdav.password"></span>
-                <input class="text_pole" id="webdav-password" type="password" autocomplete="off"></label>
-              <label class="cloud-field"><span data-i18n="webdav.prefix"></span>
-                <input class="text_pole" id="webdav-prefix" autocomplete="off"></label>
-              <label class="cloud-field"><span data-i18n="webdav.passphrase"></span>
-                <input class="text_pole" id="webdav-passphrase" type="password" autocomplete="off"></label>
-            </div>
-            <div class="cloud-row">
-              <button type="button" class="menu_button" id="webdav-save" data-i18n="cloud.save"></button>
-              <button type="button" class="menu_button" id="webdav-refresh" data-i18n="cloud.refresh"></button>
-              <button type="button" class="menu_button" id="webdav-test" data-i18n="webdav.test" data-i18n-title="webdav.testHint"></button>
-            </div>
-            <div class="cloud-note" id="webdav-test-result" hidden></div>
-          </div>
-          </div>
-
-          <div class="cloud-row">
-            <button type="button" class="menu_button" id="cloud-upload" data-i18n="cloud.upload" disabled></button>
-            <button type="button" class="menu_button" id="cloud-backup-selected" data-i18n="cloud.backupSelected"></button>
-            <span class="cloud-picked" id="cloud-picked"></span>
-          </div>
-          <div class="cloud-status" id="cloud-status"></div>
-          <div class="cloud-note" id="cloud-unified-guide" data-i18n="cloud.unifiedPackHint"></div>
-          <div class="cloud-note" id="webdav-guide-card" data-i18n="webdav.tutorialGuide"></div>
-          <div class="cloud-list" id="cloud-list" hidden></div>
           </div>
           </div>
         </section>
@@ -319,6 +338,7 @@ export function getWorkbenchHtml() {
             <div class="panel-actions">
               <div class="segmented" id="extmgr-tabs">
                 <button class="seg-btn active" data-exttab="host" data-i18n="extmgr.tabHost"></button>
+                <button class="seg-btn" data-exttab="package" data-i18n="extmgr.tabPackage"></button>
                 <button class="seg-btn" data-exttab="cred" data-i18n="extmgr.tabCred"></button>
               </div>
 

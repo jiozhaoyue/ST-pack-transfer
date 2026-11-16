@@ -1797,7 +1797,7 @@ async function main(root) {
   });
 
   logger.subscribe((entry) => {
-    view.pushLog(entry.level === 'SUCCESS' ? 'INFO' : entry.level, entry.message);
+    view.pushLog(entry.level, entry.message);
   });
 
   view.setHost(hostKey, host.isPlugin ? 'plugin' : 'web');
