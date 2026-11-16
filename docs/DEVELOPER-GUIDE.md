@@ -239,7 +239,7 @@
 | **扩展作用域与同名去重（四宿主）** | 转出的包对同一扩展只保留一份 | `src/core/transform.js` 的 `extensionScopeOf()`（五形态分类）/ `routeSource()`（返回 `extScope`）/ `targetEntryPath(hub, target, extScope)`；`public/scripts/extensions/third-party/` 是 ST/Luker **全局**扩展在包内的真实路径（宿主常量 `globalExtensions`）；`public/scripts/extensions/<内置>/` 判为 `builtin-ext` **剥离**；同名按宿主语义**保留用户级**（ST/Luker `discover` 源码注释：conflict 时从 user 目录加载；TT 同 local 优先）；PT 无用户级目录 ⇒ 迁 `data/extensions/third-party/` 并补 `extension-sources/<scope>/`。UI 汇总条与行内标注读 `plan.extensionScopes` |
 | **安装到全局** | 扩展管理 → 宿主页安装区「安装到全局」（**仅管理员**可见） | `src/ui/host-bridge.js` 的 `installExtensionBatch()` 透传 `global` 给 `installExtensionViaHost()`；`workbench-view.js` 的 `renderExtInstall()` / `runExtInstall()` |
 | **加载顺序只读展示** | 扩展列表 `#N` 徽标 + 排序「加载顺序」；**不提供编辑**（宿主无写回端点） | `src/core/asset-list.js` 的 `manifestToExtension().loadingOrder`；`workbench-view.js` 的 `installedRowRecords()` / `sortedInstalledRecords()` |
-| **扩展写操作全串行（规避宿主 staging 竞态）** | 扩展管理任意写操作：安装 / 更新 / 卸载 / 重装 / 移动；手动、批量、自动更新共用一条队列 | `src/ui/workbench-view.js` 的 `queueExtMutation()`；宿主竞态取证与上游修复建议见 `.trellis/spec/frontend/extension-git-manager.md` §15、`docs/research/luker-staging-race-2026-11-11.md` |
+| **扩展写操作全串行（规避宿主 staging 竞态）** | 扩展管理任意写操作：安装 / 更新 / 卸载 / 重装 / 移动；手动、批量、自动更新共用一条队列 | `src/ui/workbench-view.js` 的 `queueExtMutation()`；宿主竞态取证与上游修复建议见 `.trellis/spec/frontend/extension-git-manager.md` §15 |
 | 演示占位扩展读数据模块 | 教程模式宿主列表 | `src/data/demo-extensions.js`（GitHub `st` 前缀仓库生成；**必须是 ESM 而不是 JSON**，否则浏览器直装整图失败——见 K2 段落与 2026-11-11 事故记录） |
 | 凭据双写（导出不必回读 settings.json） | 设置 → 数据 / 扩展管理 → 开发者 | `src/ui/settings-store.js` 的 `saveSettings()`：localStorage 与宿主 `extension_settings` 始终同写 |
 | 导出默认值（登录凭据默认勾选、OAuth 子项默认不勾） | 设置 → 数据 | `src/ui/settings-panel.js` 的 `dataGroup`；`src/ui/plugin-data.js` 的 `buildPluginData()` |
@@ -250,7 +250,7 @@
 | **凭据与令牌说明（四类凭据总表）** | 迁移与备份 → 公网页签 `?` → 帮助视图 `credentials` | `workbench-view.js` 的 `HELP.credentials`；覆盖 Git 令牌 / S3 / WebDAV / 存放位置；模板 `#cloud-provider-tabs` 右侧 `data-help="credentials"` |
 | **教程引导填凭据** | 扩展管理 / 迁移备份教程 | `workbench-view.js` 的 `TUTORIAL_GOALS` 中 `extTab / openAccounts / openOauth / view:'cloud' / transferTab / cloudProvider` 由 `tutorialPrepareStep()` 处理 |
 | **安装日志 = 全局日志** | 安装区 / 报告页「查看日志」 | `extLogAppend()` 写入 `state.log`；`renderExtReport()` 不再有独立日志块；报告与失败链接仍为本页独有 |
-| **凭据存储位置（服务端 / 仅浏览器）** | 账号区单选项 | `settings-panel.js` 的 `gitCredentialStorage`；`settings-store.js` 的 `saveSettings()` 在 browser 模式写回空的 `gitAccounts` 覆盖服务端副本 |
+| **凭据存放位置（设置 → 隐私，2026-11-16 用户裁定）** | 设置弹窗「隐私」组三项独立开关（Git / S3 / WebDAV） | `settings-panel.js` 的 `gitCredentialStorage` / `s3CredentialStorage` / `webdavCredentialStorage`（**默认全 `browser`**）；`settings-store.js` 的 `saveSettings()` 按各档剥除服务端副本（`forHost`），`loadSettings()` 显式值优先 → 服务端已有凭据则按 `server` → 否则 `browser`；账号区不再放单选，只显示状态 + 「去隐私设置」 |
 | **URL 归一（含 `/tree/<ref>`）** | 安装条目行 | `src/core/git-url.js` 的 `parseRepoUrl()` / `refineRefWithBranches()`；仓库页地址必须解析成「根 + ref」——宿主用 URL 最后一段做目录名 |
 | **分支列举 / 仓库摘要 / 私有预检** | 条目行「列分支」与解析后自动预检 | `src/core/git-site.js`（端点/鉴权/归一）+ `src/ui/git-remote.js`（有界超时 fetch） |
 | **私有仓安装（凭据注入）** | 安装执行 | `host-bridge.js` 的 `installExtensionBatch()` 用 `buildAuthedUrl()` 拼进交给宿主的 URL；日志/报告用 `scrubUrlCredentials()` 脱敏 |
@@ -443,6 +443,8 @@
 | **图表卡「预估压缩包」** | `chartCardHtml()` 的 `.chart-est-zip`；i18n `chart.estZip` / `chart.estZipTitle` | 按当前压缩模式系数估算（store 1.0 / fast 0.65 / standard 0.5 / maximum 0.42），系数读设置不写死；读数变化随勾选实时更新。 |
 | **教程数值必须与真源同源** | `workbench-view.js` 的 `buildDemoPackages()` → `demoPackageStats()`；`TUTORIAL_GOALS` 步骤的 `params` | 演示包数 / 体积区间由 `demoPackageStats()` 现算，分卷区间 `{min}/{max}` 取自 `SPLIT_MIN` / `SPLIT_MAX`（`core/chart-model.js`）。**禁止**在 i18n 文案里写死「6–10 个，16 MB–4 GB」这类会与真源脱节的固定值——插件更新后自动跟随。 |
 | **演示存储审查配额自洽** | `workbench-view.js` 的 `demoStorageInspect()` / `quotaFor()` | 已用配额由**分类求和**得出，「Storage Quota」行展示同一读数。**禁止**写死 `usedBytes` 与分类合计不一致（曾出现 9.4 GB 对 8.3 GB，用户一眼看出读数假）。 |
+| **凭据默认不落服务端** | `settings-panel.js`（隐私组三开关）/ `settings-store.js`（`saveSettings` 的 `forHost` 剥除）/ `workbench-view.js`（`credStoreMode()` + S3/WebDAV 的 `load*`/`persist*` 双通道）/ `plugin-data.js`（导入导出按档取写） | 默认 `browser`：凭据只进 localStorage，**不写** `settings.json`；`server` 档才落，且改回 `browser` 保存时清空服务端副本。**禁止**恢复「无条件双写服务端」——那是 2026-11-16 前一直存在的真实缺陷。 |
+| **管理员专属 UI 总规则（2026-11-16 用户规则）** | `workbench-view.js` 的 `loadServerPlugins()` / `syncExtInstallBlock()` / `serverPluginBlockHtml()` | 凡管理员专属能力（服务端插件区、作用域互转、装到全局、安装到全局……），**非管理员完全不渲染**：不留空壳容器、不发相关请求、不显示标题或占位。只有 `identity.admin === true` 才出现；身份读取失败时 `extServerLoaded` **不置位**，避免一次失败永久降级。 |
 | **Git 平台原版品牌图标** | `src/ui/git-icons.js`（`GIT_ICONS` / `gitSiteIcon()`）；调用点 `formatExtRemoteUrlHtml()`；CSS `#app.app-container .ext-remote-url .ext-site-badge svg` | GitHub / GitLab / Gitee / Gitea / Bitbucket / Codeberg 一律使用**官方品牌矢量路径**（内联 SVG，`fill:currentColor`）。**禁止**用 `fa-code-branch` / `fa-cube` 之类的通用图形近似平台标识；未登记站点才退回通用 `fa-git-alt`。 |
 
 > 教程文案的插值实现：`renderTutorial()` 用 `t(step.desc, step.params ? step.params() : undefined)`；

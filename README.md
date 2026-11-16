@@ -5,7 +5,7 @@
 纯前端，装进酒馆就是一个面板；也能当独立网页用，不需要自己的服务端。
 装了 Authority 时产物可服务端托管，没装则静默降级，功能不缺。
 
-[在线使用](https://jiozhaoyue.github.io/ST-pack-transfer/) · [装进酒馆](#四安装与部署) · [功能总览](#一功能总览)
+[在线使用](https://jiozhaoyue.github.io/ST-pack-transfer/) · [完整文档](https://jiozhaoyue.github.io/ST-pack-transfer/docs/) · [装进酒馆](#四安装与部署) · [功能总览](#一功能总览)
 
 ---
 
@@ -167,11 +167,15 @@ npm run preview      # 本地预览 dist（4173）
 
 - **本仓库与插件都没有自己的远端服务，也不会把任何数据或凭据发送到第三方。**
   转换全程在浏览器内完成；唯一的外部请求是你在「扩展管理」里主动触发的站点 API 查询。
-- **凭据默认随宿主设置写入酒馆服务端 `settings.json`**，**任何有服务器或管理员权限的人都能看到**。
-  可改成「仅浏览器」，只写本机 `localStorage`，切换后服务端副本会被清空。
+- **凭据存放位置统一在「设置 → 隐私」**：Git 账号与令牌、S3 凭据、WebDAV 凭据三项独立开关，
+  **默认全部「仅浏览器」**——只写本机 `localStorage`，**不写入酒馆 `settings.json`**。
+- 只有你显式把某一项改成「服务端 settings.json」，那一项才会落服务端；此时任何能读
+  `settings.json` 的人都能看到凭据明文。改回「仅浏览器」并保存后，服务端副本会被清空。
 - 私有仓库只能由插件把凭据拼进交给宿主克隆的 URL；该 URL 可能被宿主写入扩展的 `.git/config`，
   安装私有仓库前请知悉此风险。界面、日志与导出报告一律对凭据脱敏。
-- **S3 / WebDAV 凭据只存本机浏览器**，不写进服务端 `settings.json`。
+- **S3 / WebDAV 凭据默认只存本机浏览器**；要放服务端需自己在「设置 → 隐私」里改。
+- **旧账号不会消失**：若服务端 `settings.json` 里已有 Git 账号、而本地从未选择过存放方式，
+  打开时仍按「服务端」显示，你可以在隐私区主动改成「仅浏览器」。
 - OAuth 是 Git 令牌的替代路径：GitLab / Gitee / 自建 Gitea 可浏览器直连；
   GitHub 的 token 端点无 CORS，需填自建代理或直接用令牌。
 - **可选网络代理**（设置 → 网络）只转发插件自己的 Git / WebDAV 请求到带 CORS 头的转发地址；
@@ -192,8 +196,8 @@ npm run preview      # 本地预览 dist（4173）
 ## 七、开发与质量
 
 - 功能清单与源码落点：[docs/DEVELOPER-GUIDE.md](docs/DEVELOPER-GUIDE.md)（**改代码先读它**）
+- 面向用户的完整文档站：[docs/](docs/)（纯 markdown，随 Pages 部署到 `/docs/`）
 - 分层规范与踩坑记录：[.trellis/spec/](.trellis/spec/)
-- 当前计划与状态：[docs/](docs/)
 
 ```bash
 npm test                      # 单元测试（纯逻辑层无 DOM 依赖）

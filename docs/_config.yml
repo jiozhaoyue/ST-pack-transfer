@@ -1,0 +1,15 @@
+title: ST-pack-transfer 文档
+description: 四酒馆（SillyTavern / Luker / TauriTavern / PureTavern）数据包互转、迁移与备份
+theme: minima
+markdown: kramdown
+plugins:
+  - jekyll-relative-links
+  - jekyll-seo-tag
+relative_links:
+  enabled: true
+header_pages:
+  - index.md
+  - install.md
+  - formats.md
+  - privacy.md
+  - faq.md

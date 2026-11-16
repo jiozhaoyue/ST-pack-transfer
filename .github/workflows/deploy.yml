@@ -37,6 +37,19 @@ jobs:
       - name: Build Web Application
         run: npm run build -- --base=./
 
+      # 文档站：纯 markdown + Jekyll（GitHub Pages 官方构建器），零手写前端。
+      # 产物合并到 dist/docs，与插件 Web 版同站共存：/ 是插件，/docs/ 是文档。
+      - name: Build docs (Jekyll)
+        uses: actions/jekyll-build-pages@v1
+        with:
+          source: ./docs
+          destination: ./_site_docs
+
+      - name: Merge docs into site
+        run: |
+          mkdir -p dist/docs
+          cp -r _site_docs/. dist/docs/
+
       - name: Setup Pages
         uses: actions/configure-pages@v5
         with:
