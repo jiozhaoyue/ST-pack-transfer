@@ -1185,7 +1185,9 @@ function chartCardHtml(o, place){
       +volChartHtml(scopeNodes, fmt, selectedMap)
       +(o.extToolsHtml||'')
       +'<div class="chart-tree">'+renderTreeRows(scopeNodes,0,o.scope,o.readonly||dis,groupToolsOf(o),selectedTotal,maxed,colorMap,undefined,selectedMap)+'</div>'
-      +(dis?'':'<div class="chart-foot"><span>'+t('chart.selected',{count:sum.count,size:fmtMB(sum.mb)})+'</span></div>')
+      +(dis?'':('<div class="chart-foot"><span>'+t('chart.selected',{count:sum.count,size:fmtMB(sum.mb)})+'</span>'
+        +(sum.mb>0?'<span class="chart-est-zip" title="'+t('chart.estZipTitle')+'"><i class="fa-solid fa-file-zipper"></i> '+t('chart.estZip',{size:fmtMB(Math.max(0.01, sum.mb * (state.compression==='fast'?0.65:state.compression==='maximum'?0.42:state.compression==='store'?1.0:0.5)))})+'</span>':'')
+      +'</div>'))
     +'</div>'
   +'</div>';
 }
@@ -1669,12 +1671,14 @@ function pkgCard(p){
   if(limit && (p.mb||0)>limit) badges.push('<span class="pkg-badge warn">'+t('pkg.split',{n:Math.ceil(p.mb/limit)})+'</span>');
   if(p.zone==='export') badges.push('<span class="pkg-badge lock">'+t('pkg.readonly')+'</span>');
   if(p.origin) badges.push('<span class="pkg-badge">'+p.origin+'</span>');
-  return '<div class="pkg-card'+(isActive?' is-active':'')+(p.unrecognized?' unrecognized':'')+(p.zone==='export'?' is-export':'')+'" data-pkg="'+p.id+'" data-mobile="'+(isMobile?'1':'0')+'">'
+    const estHostMb = p.rawMb || p.uncompressedMb || (p.mb ? Math.round(p.mb * 2.0 * 10) / 10 : 0);
+    const estHostHtml = estHostMb ? '<span class="pkg-est-host" title="'+t('pkg.estHostTitle')+'"><i class="fa-solid fa-hard-drive"></i> '+t('pkg.estHost',{size:fmtMB(estHostMb)})+'</span>' : '';
+    return '<div class="pkg-card'+(isActive?' is-active':'')+(p.unrecognized?' unrecognized':'')+(p.zone==='export'?' is-export':'')+'" data-pkg="'+p.id+'" data-mobile="'+(isMobile?'1':'0')+'">'
     +'<input class="pkg-check" type="checkbox" data-pkgcheck="'+p.id+'"'+(state.selectedPkgs.has(p.id)?' checked':'')+'>'
     +icon
     +'<div class="pkg-info">'
     +'<div class="pkg-name"><span class="pkg-name-txt" data-fullname="'+encodeURIComponent(p.name)+'" title="'+p.name+'">'+p.name+'</span></div>'
-    +'<div class="pkg-meta">'+badges.join('')+'<span>'+p.size+'</span><span>'+p.time+'</span></div>'
+    +'<div class="pkg-meta">'+badges.join('')+'<span>'+p.size+'</span>'+estHostHtml+'<span>'+p.time+'</span></div>'
     +'</div>'
     +(p.zone==='export'?'':'<div class="pkg-actions">'
       +'<button data-pkgact="delete" data-id="'+p.id+'" title="'+t('pkg.delete')+'">'+svg('archive','tree-ico')+'</button>'
@@ -1710,13 +1714,45 @@ function renderZones(){
   if(list.length===0){
     html+='<div class="zone-empty">'+(state.zone==='import'?t('zones.emptyImport'):t('zones.emptyExport'))+'</div>';
   }else{
-    html+='<div class="card-list">'+list.map(pkgCard).join('')+'</div>';
+    const PKG_PAGE_SIZE = 8;
+    state.zonePage = state.zonePage || { import: 1, export: 1 };
+    const totalCount = list.length;
+    const totalPages = Math.max(1, Math.ceil(totalCount / PKG_PAGE_SIZE));
+    let curPage = state.zonePage[state.zone] || 1;
+    if(curPage > totalPages) curPage = totalPages;
+    if(curPage < 1) curPage = 1;
+    state.zonePage[state.zone] = curPage;
+
+    const pagedList = list.slice((curPage - 1) * PKG_PAGE_SIZE, curPage * PKG_PAGE_SIZE);
+    html+='<div class="card-list">'+pagedList.map(pkgCard).join('')+'</div>';
+    if(totalPages > 1){
+      html+='<div class="zone-pagination">'
+        +'<span>'+t('zones.pageInfo',{current:curPage,total:totalPages})+'</span>'
+        +'<div class="zp-actions">'
+          +'<button type="button" class="btn" id="zone-page-prev"'+(curPage<=1?' disabled':'')+'>'+t('zones.pagePrev')+'</button>'
+          +'<button type="button" class="btn" id="zone-page-next"'+(curPage>=totalPages?' disabled':'')+'>'+t('zones.pageNext')+'</button>'
+        +'</div>'
+      +'</div>';
+    }
   }
   if(state.zone==='export'){
     const queue=state.pendingExports||[];
     if(queue.length) html+='<div class="card-list" id="pending-cards">'+queue.map(pendingCardHtml).join('')+'</div>';
   }
   body.innerHTML=html;
+  body.querySelector('#zone-page-prev')?.addEventListener('click',()=>{
+    if((state.zonePage[state.zone]||1) > 1){
+      state.zonePage[state.zone]--;
+      renderZones();
+    }
+  });
+  body.querySelector('#zone-page-next')?.addEventListener('click',()=>{
+    const totalPages = Math.max(1, Math.ceil(list.length / 8));
+    if((state.zonePage[state.zone]||1) < totalPages){
+      state.zonePage[state.zone]++;
+      renderZones();
+    }
+  });
   body.querySelectorAll('[data-pending-act]').forEach(btn=>btn.addEventListener('click',()=>{
     const id=btn.closest('[data-pending]')?.dataset.pending;
     if(!id) return;
@@ -2089,8 +2125,13 @@ function renderActions(){
       : '<button class="btn accent" id="btn-task-resume">'+t('action.resume')+'</button>'
         +'<button class="btn" id="btn-task-abort">'+t('action.abort')+'</button>')
     : '';
+  const selPkgs = [...state.selectedPkgs].map(id=>state.packages.find(p=>p.id===id)).filter(Boolean);
+  const totalHostRawMb = selPkgs.reduce((acc, p) => acc + (p.rawMb || p.uncompressedMb || (p.mb ? p.mb * 2.0 : 0)), 0);
+  const estHostBadge = hasSel && totalHostRawMb > 0
+    ? '<span class="pkg-est-host-badge" title="'+t('pkg.estHostTitle')+'"><i class="fa-solid fa-hard-drive"></i> '+t('zones.estHostTotal',{size:fmtMB(totalHostRawMb)})+'</span>'
+    : '';
   const selectedLabel=hasSel
-    ? '<span class="lbl">'+t('zones.selected',{n:state.selectedPkgs.size})+'</span>'
+    ? '<span class="lbl">'+t('zones.selected',{n:state.selectedPkgs.size})+'</span>'+estHostBadge
     : '<span class="zone-hint">'+t('zones.selectHint')+'</span>';
   if(state.zone==='import'){
     row.innerHTML=taskBtns+selectedLabel

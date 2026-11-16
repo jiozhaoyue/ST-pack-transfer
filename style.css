@@ -80,8 +80,9 @@
      恒回落 UA 值（实测钉不动）——唯一定制路径是 appearance:none + line-height 对齐内容高 26px，
      箭头由 wrapper ::after 自绘（var 配色）。原生形态下文字既不居中也可能被裁
      （实测「Dark Lite」字号 14px 时底部被削）。 */
-  #app.app-container .header-theme-select{appearance:none;-webkit-appearance:none;padding:0 20px 0 8px;font-size:11px;background:var(--panel-3);border:1px solid var(--border);border-radius:6px;color:var(--text);
-    height:var(--ctl-h);box-sizing:border-box;line-height:26px}
+  #app.app-container .header-theme-select{appearance:none !important;-webkit-appearance:none !important;-moz-appearance:none !important;padding:0 22px 0 8px;font-size:11px;background:var(--panel-3);border:1px solid var(--border);border-radius:6px;color:var(--text);
+    height:var(--ctl-h);box-sizing:border-box;line-height:26px;background-image:none !important}
+  #app.app-container .header-theme-select::-ms-expand{display:none !important}
   /* 自绘下拉箭头：随主题色（var），禁硬编码 */
   #app.app-container .header-theme-picker::after{
     content:'';position:absolute;right:9px;top:50%;width:6px;height:6px;
@@ -400,6 +401,7 @@
   #app.app-container .chart-foot{flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:7px 12px;border-top:1px solid var(--border);
     font-size:10.5px;color:var(--muted)}
   #app.app-container .chart-foot .spacer{flex:1}
+  #app.app-container .chart-foot .chart-est-zip{display:inline-flex;align-items:center;gap:4px;margin-left:auto;font-size:11px;font-weight:600;color:var(--accent);padding:1px 7px;border-radius:999px;background:var(--accent-soft);border:1px solid var(--accent)}
   #app.app-container .chart-foot .target-badge{color:var(--accent);border:1px solid var(--accent);border-radius:999px;padding:1px 7px}
 
   /* ── 图表栈：固定图表区，内部 canvas 由 JS 按数量摆 1 / 2 / 3 / 4 宫格 ── */
@@ -668,6 +670,11 @@
   #app.app-container .batch-bar button{border:1px solid var(--border);background:var(--panel);border-radius:6px;
     padding:3px 7px;font-size:10.5px;color:var(--text)}
   #app.app-container .batch-bar button:disabled{opacity:.45;cursor:not-allowed}
+  #app.app-container .batch-bar .pkg-est-host-badge{display:inline-flex;align-items:center;gap:4px;font-size:10.5px;font-weight:600;color:var(--accent);margin-left:auto}
+  #app.app-container .pkg-est-host{display:inline-flex;align-items:center;gap:3px;font-size:10px;color:var(--accent);font-weight:600}
+  #app.app-container .zone-pagination{display:flex;align-items:center;justify-content:space-between;padding:6px 10px;border-top:1px solid var(--border);background:color-mix(in srgb,var(--panel-3) 45%,transparent);font-size:11px;color:var(--muted);flex:0 0 auto}
+  #app.app-container .zone-pagination .zp-actions{display:inline-flex;align-items:center;gap:6px}
+  #app.app-container .zone-pagination .btn{padding:2px 8px;font-size:10.5px;min-height:24px}
   #app.app-container .zone-empty{padding:16px;text-align:center;color:var(--muted-2);font-size:11.5px}
 
   /* 面板头内的视图切换：桌面 2 个（图表 / 扩展管理），手机 3 个（图表 / 数据包 / 扩展管理）。
