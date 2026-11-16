@@ -165,9 +165,32 @@ export function createGitRemote({
       return { ok: true, commit: normalizeLatestCommit(r.data), status: r.status };
     },
 
-    /** 取远端 manifest.json 文本（版本比对用）。 */
-    async remoteManifest(repo, ref = '', account = null) {
-      return readFile(repo, ref, 'manifest.json', account);
+    /** 取远端 manifest.json / package.json 文本（支持 master / package.json 智能回退，版本比对用）。 */
+    async remoteManifest(repo, ref = '', account = null, onFallback = null) {
+      const primaryRef = ref || repo.ref || 'main';
+      let r = await readFile(repo, primaryRef, 'manifest.json', account);
+      if (r.ok) return { ...r, usedRef: primaryRef, usedFile: 'manifest.json' };
+
+      // 未显式指定分支且主分支 404 时，尝试回退 master 分支
+      if (!ref && r.status === 404) {
+        if (typeof onFallback === 'function') onFallback({ ref: 'master', file: 'manifest.json' });
+        const masterRes = await readFile(repo, 'master', 'manifest.json', account);
+        if (masterRes.ok) return { ...masterRes, usedRef: 'master', usedFile: 'manifest.json' };
+      }
+
+      // 尝试回退 package.json 读取版本号
+      if (r.status === 404) {
+        const fallbackRef = primaryRef;
+        if (typeof onFallback === 'function') onFallback({ ref: fallbackRef, file: 'package.json' });
+        const pkgRes = await readFile(repo, fallbackRef, 'package.json', account);
+        if (pkgRes.ok) return { ...pkgRes, usedRef: fallbackRef, usedFile: 'package.json' };
+        if (!ref) {
+          const pkgMaster = await readFile(repo, 'master', 'package.json', account);
+          if (pkgMaster.ok) return { ...pkgMaster, usedRef: 'master', usedFile: 'package.json' };
+        }
+      }
+
+      return r;
     },
 
 

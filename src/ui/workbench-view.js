@@ -47,6 +47,7 @@ import {
 import { createGitRemote } from './git-remote.js';
 import { gitSiteIcon } from './git-icons.js';
 import { t } from '../i18n/index.js';
+import { logger } from '../core/logger.js';
 import { loadSettings, saveSettings } from './settings-store.js';
 import { normalizeUpdateInterval, updatePolicyOf, updateBackoffDelay, applyWebTheme } from './settings-panel.js';
 import { loadChartPrefs, saveChartPrefs, normalizeChartPrefs } from './chart-prefs.js';
@@ -234,6 +235,7 @@ let chartPrefs = typeof localStorage !== 'undefined' ? loadChartPrefs() : normal
 const state = {
   host:'luker', mode:'plugin', view:'desktop', mainView:'chart', mobileView:'chart', pane:'workbench', zone:'import',
   extTab:'host', extSource:'host', extSelectedPackageId:'', extPolicyOpen:false, extEntries:[], extResults:[], extRunning:false, extInstalled:null, extManifestPrefill:[], extRemoteUrls:{}, extServerOpen:false,
+  extScanState:{}, extScanResults:{}, extScanningBusy:false,
   extReportOpen:false, extInstallOpen:false, extInstallGlobal:false, settingsDraft:null,
   extAccountTests:[], extUpdate:null, extAccountsOpen:true, extOauthOpen:false, extSettingsOpen:true,
   /* 服务端插件清单（仅管理员）：null = 未读取；[] = 已读取但为空。 */
@@ -2911,33 +2913,159 @@ function updateStatusText(row){
   if(row.status==='ahead') return t('extmgr.localAhead');
   return t('extmgr.updateUnknown');
 }
-/* 更新检查：只读。本地版本取宿主静态 manifest，远端版本取原始 manifest.json，
-   任一侧拿不到就如实显示「未知」，不伪造「已最新」。 */
-async function checkExtUpdates(){
-  const regs=(gitSettings().gitInstalls||[]).slice();
-  if(!regs.length){ state.extUpdate={busy:false,rows:[],note:t('extmgr.noRegistry')}; renderExtensionView(); return; }
-  state.extUpdate={busy:true,rows:[],note:''}; renderExtensionView();
-  const rows=[];
-  for(const reg of regs){
-    const parsed=parseRepoUrl(reg.url);
-    const acc=parsed.ok ? accountForRepo(parsed) : null;
-    const localVersion=await fetchLocalManifestVersion(reg.name);
-    let remoteVersion=''; let reason='';
-    if(parsed.ok){
-      const res=await gitRemote().remoteManifest(parsed, reg.ref, acc);
-      if(res.ok){
-        try { remoteVersion=String(JSON.parse(res.text).version||''); } catch { remoteVersion=''; }
-      } else reason=res.reason||'http';
-    } else reason='unsupported';
-    let status='unknown';
-    if(localVersion && remoteVersion){
-      const cmp=compareVersions(remoteVersion, localVersion);
-      status = cmp>0 ? 'update' : (cmp===0 ? 'latest' : 'ahead');
+let debouncedScanTimer = 0;
+function debouncedScanRender() {
+  if (debouncedScanTimer) return;
+  debouncedScanTimer = setTimeout(() => {
+    debouncedScanTimer = 0;
+    if (state.extTab === 'host') renderExtensionView();
+  }, 100);
+}
+
+/**
+ * 并发控制工具：以固定并发数运行任务
+ * @template T
+ * @param {T[]} items
+ * @param {number} concurrency
+ * @param {(item: T) => Promise<void>} fn
+ */
+async function runWithConcurrency(items, concurrency, fn) {
+  let index = 0;
+  const workers = Array.from({ length: Math.min(items.length, concurrency) }, async () => {
+    while (index < items.length) {
+      const current = items[index++];
+      try {
+        await fn(current);
+      } catch (err) {
+        console.error('[ST-pack-transfer] Scan task error:', err);
+      }
     }
-    rows.push({ name:reg.name, url:reg.url, ref:reg.ref||'', localVersion, remoteVersion, status, reason });
+  });
+  await Promise.all(workers);
+}
+
+/**
+ * 并行扫描扩展远端版本（非阻塞、快速懒加载、分级日志与智能回退）
+ */
+async function scanRemoteVersionsParallel(force = false) {
+  if (state.extScanningBusy) return;
+  const installed = installedRowRecords();
+  if (!installed.length) return;
+
+  const toScan = [];
+  for (const rec of installed) {
+    const name = rec.name;
+    if (!force && state.extScanState[name] && state.extScanState[name] !== 'scanning') {
+      continue;
+    }
+    const cached = state.extRemoteUrls[name] || null;
+    let url = installedRemoteUrlOf(name) || cached?.url || '';
+    if (!url) {
+      const item = (state.extInstalled || []).find((x) => String(x?.id || x?.folder || x?.name || '') === name);
+      const isGlobal = String(item?.sourceType || '') === 'global';
+      try {
+        const gitRes = await actions.hostExtensionGit?.(name, { global: isGlobal });
+        url = String(gitRes?.version?.remoteUrl || '').trim();
+        if (url) state.extRemoteUrls[name] = { url, priv: repoPrivacyOf(url) };
+      } catch { url = ''; }
+    }
+    if (url) {
+      toScan.push({ name, url, localVersion: rec.version });
+      state.extScanState[name] = 'scanning';
+    }
   }
-  state.extUpdate={busy:false,rows,note:''};
-  if(state.extTab==='host') renderExtensionView();
+
+  if (!toScan.length) return;
+  state.extScanningBusy = true;
+  debouncedScanRender();
+  logger.info(t('log.extScanStart', { count: toScan.length }));
+
+  try {
+    await runWithConcurrency(toScan, 5, async ({ name, url, localVersion }) => {
+      const parsed = parseRepoUrl(url);
+      if (!parsed.ok) {
+        state.extScanState[name] = 'failed';
+        state.extScanResults[name] = { localVersion, remoteVersion: '', status: 'failed', reason: 'invalid-url' };
+        logger.warn(t('log.extScanNotFound', { name, url, ref: '-' }));
+        debouncedScanRender();
+        return;
+      }
+
+      const acc = accountForRepo(parsed);
+      const locVer = localVersion || await fetchLocalManifestVersion(name);
+      let remoteVersion = '';
+      let status = 'unknown';
+      let reason = '';
+
+      const onFallback = ({ ref, file }) => {
+        logger.warn(t('log.extScanFallback', { name, ref, fallback: `${ref}/${file}` }));
+      };
+
+      const res = await gitRemote().remoteManifest(parsed, parsed.ref || '', acc, onFallback);
+      if (res.ok) {
+        try {
+          const parsedManifest = JSON.parse(res.text || '{}');
+          remoteVersion = String(parsedManifest.version || '');
+        } catch { remoteVersion = ''; }
+      } else {
+        reason = res.reason || 'http';
+        if (res.status === 403) {
+          logger.error(t('log.extScanRateLimit', { name }));
+        } else if (res.reason === 'timeout') {
+          logger.error(t('log.extScanTimeout', { name, timeout: GIT_REMOTE_TIMEOUT_MS, url }));
+        } else if (res.status === 404) {
+          logger.warn(t('log.extScanNotFound', { name, url, ref: parsed.ref || 'main/master' }));
+        } else {
+          logger.error(t('log.extScanError', { name, detail: res.reason || `HTTP ${res.status}` }));
+        }
+      }
+
+      if (locVer && remoteVersion) {
+        const cmp = compareVersions(remoteVersion, locVer);
+        status = cmp > 0 ? 'update' : (cmp === 0 ? 'latest' : 'ahead');
+      } else if (!res.ok) {
+        status = 'failed';
+      }
+
+      state.extScanState[name] = status;
+      state.extScanResults[name] = { localVersion: locVer, remoteVersion, status, reason };
+
+      if (res.ok && remoteVersion) {
+        const statusI18n = t('extmgr.status' + status.charAt(0).toUpperCase() + status.slice(1));
+        logger.success(t('log.extScanSuccess', { name, local: locVer || '-', remote: remoteVersion, status: statusI18n }));
+      }
+      debouncedScanRender();
+    });
+  } finally {
+    state.extScanningBusy = false;
+    debouncedScanRender();
+  }
+}
+
+/* 更新检查：并行快速扫描全部扩展，并在日志中输出详细分级信息 */
+async function checkExtUpdates(){
+  state.extUpdate = { busy: true, rows: [], note: '' };
+  renderExtensionView();
+  await scanRemoteVersionsParallel(true);
+  const installed = installedRowRecords();
+  const rows = [];
+  for (const rec of installed) {
+    const res = state.extScanResults[rec.name];
+    if (res) {
+      const url = installedRemoteUrlOf(rec.name) || state.extRemoteUrls[rec.name]?.url || '';
+      rows.push({
+        name: rec.name,
+        url,
+        ref: '',
+        localVersion: res.localVersion || rec.version || '',
+        remoteVersion: res.remoteVersion || '',
+        status: res.status || 'unknown',
+        reason: res.reason || '',
+      });
+    }
+  }
+  state.extUpdate = { busy: false, rows, note: '' };
+  if (state.extTab === 'host') renderExtensionView();
 }
 /** 宿主的原生浮层优先：有 toastr 就用它的可点击通知，没有才退回本插件 toast。 */
 function nativeToast(msg,opts){
@@ -3754,14 +3882,17 @@ function clearPluginGitData(){
 async function renderExtInstalled(body){
   /* 管理员身份是「作用域互转」的唯一闸门：进宿主页就先取，别等开发者页。 */
   void loadServerPlugins();
-  body.innerHTML='<div class="ext-empty">'+t('extmgr.loading')+'</div>';
-  let hostList=[];
-  try {
-    const res=await actions.listHostExtensions?.();
-    hostList=Array.isArray(res)?res:(Array.isArray(res?.items)?res.items:(Array.isArray(res?.list)?res.list:[]));
-  } catch { hostList=[]; }
-  if(state.extTab!=='host' || state.extReportOpen) return;
-  state.extInstalled=hostList;
+  const hasCached = Array.isArray(state.extInstalled) && state.extInstalled.length > 0;
+  if(!hasCached){
+    body.innerHTML='<div class="ext-empty">'+t('extmgr.loading')+'</div>';
+    let hostList=[];
+    try {
+      const res=await actions.listHostExtensions?.();
+      hostList=Array.isArray(res)?res:(Array.isArray(res?.items)?res.items:(Array.isArray(res?.list)?res.list:[]));
+    } catch { hostList=[]; }
+    if(state.extTab!=='host' || state.extReportOpen) return;
+    state.extInstalled=hostList;
+  }
 
   const s=loadSettings();
   const rules=s.gitAutoUpdateRules||{};
@@ -3833,6 +3964,22 @@ async function renderExtInstalled(body){
           +' value="'+(normalizeUpdateInterval(rule?.intervalSec, policy)) +'"'+(rule?'':' disabled')+' title="'+t('extmgr.autoIntervalSeconds')+'">'
         +'<span class="ext-unit">'+t('extmgr.seconds')+'</span>'
       +'</span>':'';
+      const scanSt = state.extScanState[name];
+      const scanRes = state.extScanResults[name];
+      let versionBadge = '';
+      if (scanSt === 'scanning') {
+        versionBadge = '<span class="ext-state ext-version-badge is-scanning" title="'+t('extmgr.scanScanning')+'"><i class="fa-solid fa-spinner fa-spin"></i> '+(escapeHtml(version)||'-')+' ('+t('extmgr.scanScanning')+')</span>';
+      } else if (scanRes?.status === 'update') {
+        versionBadge = '<span class="ext-state ext-version-badge is-update" title="'+t('extmgr.statusUpdate')+'"><i class="fa-solid fa-arrow-up"></i> '+(escapeHtml(version)||'-')+' → '+(escapeHtml(scanRes.remoteVersion)||'-')+' ('+t('extmgr.statusUpdate')+')</span>';
+      } else if (scanRes?.status === 'latest') {
+        versionBadge = '<span class="ext-state ext-version-badge is-latest" title="'+t('extmgr.statusLatest')+'"><i class="fa-solid fa-check"></i> '+(escapeHtml(version)||'-')+' ('+t('extmgr.statusLatest')+')</span>';
+      } else if (scanRes?.status === 'ahead') {
+        versionBadge = '<span class="ext-state ext-version-badge is-ahead" title="'+t('extmgr.statusAhead')+'"><i class="fa-solid fa-code-commit"></i> '+(escapeHtml(version)||'-')+' ('+t('extmgr.statusAhead')+')</span>';
+      } else if (scanRes?.status === 'failed') {
+        versionBadge = '<span class="ext-state ext-version-badge is-failed" title="'+escapeHtml(scanRes.reason||'error')+'"><i class="fa-solid fa-triangle-exclamation"></i> '+(escapeHtml(version)||'-')+' ('+t('extmgr.scanFailed')+')</span>';
+      } else {
+        versionBadge = '<span class="ext-state ext-version-badge is-local">'+escapeHtml(version || '-')+'</span>';
+      }
       return '<div class="ext-entry is-ok ext-ext-row'+(isCurrentGit?' is-active':'')+'" role="listitem" draggable="'+(sort==='custom'?'true':'false')+'" data-extrow="'+escapeHtml(name)+'">'
         +(sort==='custom'?'<span class="ext-drag" title="'+t('extmgr.dragHint')+'">'+gripSvg()+'</span>':'')
         +'<label class="check ext-dev-check"><input type="checkbox" data-extsel="'+escapeHtml(name)+'"></label>'
@@ -3840,7 +3987,7 @@ async function renderExtInstalled(body){
         +'<span class="ext-url" title="'+escapeHtml(name)+'">'+escapeHtml(name)+'</span>'
         +remoteEl
         +privTag
-        +'<span class="ext-state">'+escapeHtml(version)+'</span>'
+        +versionBadge
         +extSourceTag(x?.sourceType)
         +auto
         +'</div>';
@@ -4069,7 +4216,7 @@ async function renderExtInstalled(body){
   });
 
   refreshInstallArea();
-  if(isHost) void enrichHostRemoteUrls();
+  if(isHost) { void enrichHostRemoteUrls(); void scanRemoteVersionsParallel(); }
   const selectedNames=()=>[...body.querySelectorAll('[data-extsel]:checked')].map((box)=>box.dataset.extsel);
   const refValue=()=>String(body.querySelector('[data-extref]')?.value||'').trim();
 
