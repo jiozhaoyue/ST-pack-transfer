@@ -29,7 +29,7 @@ import { decryptBytes, isEncrypted } from '../core/s3-crypto.js';
 import { mergeChartTrees } from '../core/merge-packages.js';
 import { EXTENSION_MODES, GIT_MODES } from '../core/export-modes.js';
 import { extensionUnitsOf, suggestPackMode } from '../core/ext-pack.js';
-import { parseRepoUrl, refineRefWithBranches, isCommitRef } from '../core/git-url.js';
+import { parseRepoUrl, refineRefWithBranches, isCommitRef, SITES } from '../core/git-url.js';
 import {
   normalizeAccounts, addAccount, removeAccount, setDefaultAccount,
   findAccountFor, maskAccounts, ACCOUNT_SITES,
@@ -3027,6 +3027,17 @@ async function runAutoUpdateTick(){
 }
 /** 格式化远端仓库 URL 展示：截断、优先显示后面的作者/仓库，带 Git 平台小徽标，绝不换行。 */
 function formatExtRemoteUrlHtml(rawUrl){
+  /* 单行 URL 的任何意外都不得拖垮整块渲染（2026-11-16 实测：SITES 未定义让服务端插件区
+     整段中断，用户侧表现就是永远停在「正在读取」）。失败就退化为纯文本，不假成功。 */
+  try { return formatExtRemoteUrlHtmlInner(rawUrl); }
+  catch {
+    const u=String(rawUrl||'').trim();
+    if(!u) return '<span class="ext-remote-url is-none">—</span>';
+    return '<span class="ext-remote-url" title="'+escapeHtml(u)+'">'
+      +'<span class="ext-repo-slug">'+escapeHtml(u)+'</span></span>';
+  }
+}
+function formatExtRemoteUrlHtmlInner(rawUrl){
   const url=String(rawUrl||'').trim();
   if(!url) return '<span class="ext-remote-url is-none" title="'+t('extmgr.autoNeedsRepoShort')+'">—</span>';
 
@@ -3187,13 +3198,19 @@ async function reloadServerPlugins(){
 /** 管理员身份 + 服务端插件清单只读一次；非管理员到此为止（不留空分区）。 */
 async function loadServerPlugins(){
   if(state.extServerLoaded) return;
+  /* 身份必须真正读到：`/api/users/me` 可能瞬时失败（宿主刚重启、CSRF 未就绪），
+     一次失败就判成「非管理员」等于把管理员永久锁在外面。这里最多试 3 次，
+     只有 `ok === true` 才认；三次都失败则不置位，下次进宿主页继续重试。 */
   let identity=null;
-  try { identity=await actions.hostIdentity?.(); } catch { identity=null; }
-  /* 身份没读到时**不置位**：否则一次网络失败就会永久停在「非管理员」，
-     管理员也再也看不到服务端插件。 */
+  for(let attempt=0;attempt<3;attempt+=1){
+    try { identity=await actions.hostIdentity?.(); } catch { identity=null; }
+    if(identity && identity.ok) break;
+    identity=null;
+    if(attempt<2) await new Promise((r)=>{ setTimeout(r,250*(attempt+1)); });
+  }
   if(!identity) return;
   state.extServerLoaded=true;
-  state.extHostAdmin=!!(identity.ok && identity.admin);
+  state.extHostAdmin=identity.admin===true;
   state.extHostUser=identity.handle||'';
   /* 用户徽标住页脚（非管理员也显示身份，只是不亮管理能力） */
   syncExtInstallBlock();
