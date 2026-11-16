@@ -187,15 +187,21 @@ async function main(root) {
   let taskSeq = 0;
   let queueBusy = false;
   let queueCurrent = null;
+  /** 恢复 / 云端备份的协作式取消标记（在批次边界与上传循环内检查）。 */
+  let restoreCancelRequested = false;
+  let cloudCancelRequested = false;
   const queueSnapshot = () => [
     ...(queueCurrent ? [queueCurrent] : []),
     ...taskQueue,
     ...queueFinished,
   ].map((job) => ({
     id: job.id,
+    type: job.type || 'task',
     label: job.label,
     status: job.status,
     pct: job.pct || 0,
+    canPause: job.canPause !== false,
+    canAbort: job.canAbort !== false,
   }));
   const syncQueue = () => { try { view.setTaskQueue(queueSnapshot()); } catch { /* 视图尚未创建 */ } };
   const setQueueProgress = (pct) => {
@@ -684,7 +690,7 @@ async function main(root) {
    * 加密可选：`config.passphrase` 非空即启用；分片逐片加密，不整包入内存。
    */
   async function backupSelectedToCloud({
-    provider = 's3', config = {}, mode = 'full', setName = 'default', retention = 10,
+    provider = 's3', config = {}, mode = 'full', setName = 'default', retention = 10, signal = null,
   } = {}) {
     // 2026-11-14 修 bug：选中包的真源在**视图状态**（`view.getState().selectedPkgs`），
     // 本作用域的 `state` 没有该字段 ⇒ 旧写法 `[...undefined]` 抛 TypeError，
@@ -719,6 +725,7 @@ async function main(root) {
         let failed = 0;
         let encryptedPackages = 0;
         for (const id of ids) {
+          if (signal?.aborted) break;
           const pkg = state.packages.find((p) => p.id === id);
           if (!pkg) { failed += 1; continue; }
           const blob = await blobOf(pkg);
@@ -736,6 +743,7 @@ async function main(root) {
           const runner = createTransferRunner({
             target,
             passphrase,
+            signal,
             onProgress: (progress) => {
               if (progress.phase !== 'uploading') return;
               const pct = 15 + Math.round((progress.uploadedBytes / Math.max(1, progress.totalBytes)) * 80);
@@ -759,6 +767,10 @@ async function main(root) {
           if (result.encrypted) encryptedPackages += 1;
           if (result.skipped) skipped += 1;
           else uploaded += 1;
+        }
+        if (signal?.aborted) {
+          view.setProgress(0, t('progress.aborted'));
+          return { aborted: true };
         }
         const summary = { uploaded, skipped, failed, encrypted: encryptedPackages };
         view.setProgress(100, t('cloud.uploadDone', summary));
@@ -787,6 +799,7 @@ async function main(root) {
             sourceName: pkg.name,
             passphrase,
             retention,
+            signal,
             onProgress: (progress) => {
               const pct = 10 + Math.round((progress.done / Math.max(1, progress.total)) * 80);
               view.setProgress(pct, t('cloud.setUploading', {
@@ -841,6 +854,7 @@ async function main(root) {
       let encryptedPackages = 0;
       const stamp = timestampName();
       for (let i = 0; i < ids.length; i += 1) {
+        if (signal?.aborted) break;
         const pkg = state.packages.find((p) => p.id === ids[i]);
         if (!pkg) { failed += 1; continue; }
         const blob = await blobOf(pkg);
@@ -860,6 +874,7 @@ async function main(root) {
         const runner = createTransferRunner({
           target,
           passphrase,
+          signal,
           onProgress: (progress) => {
             if (progress.phase !== 'uploading') return;
             const pct = 15 + Math.round((progress.uploadedBytes / Math.max(1, progress.totalBytes)) * 80);
@@ -880,6 +895,10 @@ async function main(root) {
         else uploaded += 1;
       }
 
+      if (signal?.aborted) {
+        view.setProgress(0, t('progress.aborted'));
+        return { aborted: true };
+      }
       // 只有全部选中包都成功时才执行保留策略：失败时删旧快照会让用户两头落空。
       let prune = { ok: true, removed: [] };
       const succeeded = uploaded + skipped;
@@ -991,13 +1010,10 @@ async function main(root) {
     const targets = ids.map(pkgById).filter((p) => p && p.zone === 'export');
     if (!targets.length) { view.toast(t('toast.selectExportPack')); return; }
     if (settings.trafficPrompt) {
-      view.confirmTraffic(() => restoreSelectedConfirmed(targets), {
-        enabled: true,
-        onNever: () => { settings.trafficPrompt = false; saveSettings(settings); },
-      });
-      return;
+      const proceed = await askTraffic();
+      if (!proceed) return 'aborted';
     }
-    await restoreSelectedConfirmed(targets);
+    return restoreSelectedConfirmed(targets);
   }
 
   async function restoreSelectedConfirmed(targets) {
@@ -1013,6 +1029,10 @@ async function main(root) {
     persistRestoreProgress(record);
     try {
       for (let i = 0; i < targets.length; i += 1) {
+        if (restoreCancelRequested) {
+          logger.warn(t('queue.abortedToast'));
+          break;
+        }
         const pkg = targets[i];
         const row = { id: pkg.id, name: pkg.name, status: 'failed', message: '', note: '' };
         view.setProgress(Math.round((i / targets.length) * 90) + 5, t('progress.restoring'));
@@ -1320,6 +1340,52 @@ async function main(root) {
     enqueueTask({ type: 'generate', label, run: () => executeGenerate(args) });
   }
 
+  /** 宿主拉取：排入统一队列；不支持暂停，但可中断插件侧请求。 */
+  function enqueueHostPull() {
+    const job = enqueueTask({
+      type: 'pull',
+      label: t('queue.labelPull'),
+      canPause: false,
+      cancel: () => { try { activePullAbort?.abort(); } catch { /* 已结束 */ } },
+      run: async () => { await fetchFromHost(); return 'done'; },
+    });
+    return job?.promise;
+  }
+
+  /** 恢复写回：排入统一队列；批次边界可中断。 */
+  function enqueueRestore(ids) {
+    const targets = (Array.isArray(ids) ? ids : []).map(pkgById).filter((p) => p && p.zone === 'export');
+    if (!targets.length) { view.toast(t('toast.selectExportPack')); return Promise.resolve({ status: 'empty' }); }
+    const job = enqueueTask({
+      type: 'restore',
+      label: t('queue.labelRestore', { n: targets.length }),
+      canPause: false,
+      cancel: () => { restoreCancelRequested = true; },
+      run: async () => {
+        restoreCancelRequested = false;
+        const result = await restoreSelected(ids);
+        return (result === 'aborted' || restoreCancelRequested) ? 'aborted' : 'done';
+      },
+    });
+    return job?.promise;
+  }
+
+  /** 云端备份：排入统一队列；上传循环接收 AbortSignal。 */
+  function enqueueCloudBackup(options = {}) {
+    const job = enqueueTask({
+      type: 'cloud',
+      label: t('queue.labelCloud', { provider: String(options.provider || 's3').toUpperCase() }),
+      canPause: false,
+      cancel: () => { cloudCancelRequested = true; },
+      run: async ({ signal }) => {
+        cloudCancelRequested = false;
+        await backupSelectedToCloud({ ...options, signal });
+        return cloudCancelRequested || signal?.aborted ? 'aborted' : 'done';
+      },
+    });
+    return job?.promise;
+  }
+
   /** 真正执行一次生成；返回 `done|paused|aborted|empty`，失败抛错由队列记 failed。 */
   async function executeGenerate({ packages, merge = false, target, splitMb, filenameTemplate }) {
     if (!packages?.length) { view.toast(t('toast.selectExportFirst')); return 'empty'; }
@@ -1449,8 +1515,10 @@ async function main(root) {
   }
 
   /* ── 连续任务队列：串行执行，可暂停 / 继续 / 中断 / 排序 ── */
-  function enqueueTask({ type = 'task', label = '', run }) {
-    if (typeof run !== 'function') return '';
+  function enqueueTask({
+    type = 'task', label = '', run, cancel = null, canPause = true, canAbort = true,
+  }) {
+    if (typeof run !== 'function') return null;
     const job = {
       id: `q${++taskSeq}`,
       type,
@@ -1458,14 +1526,20 @@ async function main(root) {
       status: 'queued',
       pct: 0,
       run,
+      cancel: typeof cancel === 'function' ? cancel : null,
+      canPause: canPause !== false,
+      canAbort: canAbort !== false,
+      abortRequested: false,
+      resolve: null,
     };
+    job.promise = new Promise((resolve) => { job.resolve = resolve; });
     taskQueue.push(job);
     logger.debug(`[queue] enqueue ${job.id} type=${job.type} label=${job.label}`);
     syncQueue();
     view.toast(t('queue.added', { label: job.label }));
     logger.info(t('queue.added', { label: job.label }));
     void pumpQueue();
-    return job.id;
+    return job;
   }
 
   async function pumpQueue() {
@@ -1477,15 +1551,17 @@ async function main(root) {
         queueCurrent = job;
         job.status = 'running';
         job.pct = 0;
+        job.controller = new AbortController();
         syncQueue();
         logger.info(t('queue.started', { label: job.label }));
         let status = 'done';
         try {
-          status = await job.run();
+          status = await job.run({ signal: job.controller.signal });
         } catch (err) {
           status = 'failed';
           logger.error(t('queue.failedToast', { label: job.label }), err);
         }
+        if (job.abortRequested && status !== 'paused') status = 'aborted';
         queueCurrent = null;
         if (status === 'paused') {
           job.status = 'paused';
@@ -1498,6 +1574,7 @@ async function main(root) {
           job.status = 'aborted';
           job.pct = 0;
           rememberFinished(job);
+          job.resolve?.({ status: 'aborted' });
           syncQueue();
           view.toast(t('queue.abortedToast'));
           logger.info(t('queue.abortedToast'));
@@ -1506,12 +1583,14 @@ async function main(root) {
         if (status === 'failed' || status === 'empty') {
           job.status = 'failed';
           rememberFinished(job);
+          job.resolve?.({ status: 'failed' });
           syncQueue();
           continue;
         }
         job.status = 'done';
         job.pct = 100;
         rememberFinished(job);
+        job.resolve?.({ status: 'done' });
         syncQueue();
         view.toast(t('queue.doneToast', { label: job.label }));
         logger.info(t('queue.doneToast', { label: job.label }));
@@ -1532,7 +1611,7 @@ async function main(root) {
 
   async function queuePause(id) {
     const hit = findQueueJob(id);
-    if (!hit || !hit.current) return false;
+    if (!hit || !hit.current || hit.job.canPause === false) return false;
     const ok = await conversionRunner?.pause?.();
     if (ok) logger.info(t('queue.pausedToast'));
     return !!ok;
@@ -1540,16 +1619,22 @@ async function main(root) {
 
   async function queueAbort(id) {
     const hit = findQueueJob(id);
-    if (!hit) return false;
+    if (!hit || hit.job.canAbort === false) return false;
     if (!hit.current) {
       const wasPaused = hit.job.status === 'paused';
       hit.job.status = 'aborted';
       taskQueue.splice(hit.index, 1);
       if (wasPaused) await conversionRunner?.abort?.();
+      hit.job.resolve?.({ status: 'aborted' });
       syncQueue();
       return true;
     }
-    return !!(await conversionRunner?.abort?.());
+    // 生成任务走转换器的协作式中止；其它长任务走 AbortSignal + 各自的 cancel 钩子。
+    if (hit.job.type === 'generate') return !!(await conversionRunner?.abort?.());
+    try { hit.job.controller?.abort?.(); } catch { /* 已结束 */ }
+    try { hit.job.cancel?.(); } catch { /* 取消钩子失败不阻断标记 */ }
+    hit.job.abortRequested = true;
+    return true;
   }
 
   function queueResume(id) {
@@ -1913,9 +1998,9 @@ async function main(root) {
     qr,
     actions: {
       onProgress: setQueueProgress,
-      fetch: fetchFromHost,
+      fetch: enqueueHostPull,
       generate,
-      restore: restoreSelected,
+      restore: enqueueRestore,
       copyBack,
       deleteSelected,
       download: downloadSelected,
@@ -2003,7 +2088,7 @@ async function main(root) {
       deleteExtension: (name, isGlobal) => deleteExtensionViaHost(name, isGlobal),
       updateExtension: (name, isGlobal) => updateExtensionViaHost(name, isGlobal),
       moveExtension: (name, source, destination) => moveExtensionViaHost(name, source, destination),
-      backupSelectedToCloud,
+      backupSelectedToCloud: enqueueCloudBackup,
       importCloudPack,
       lan: lanActions,
       settings: openSettings,

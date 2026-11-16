@@ -38,6 +38,7 @@ import { decryptBytes, isEncrypted } from '../core/s3-crypto.js';
 import { mergeChartTrees } from '../core/merge-packages.js';
 import { EXTENSION_MODES, GIT_MODES } from '../core/export-modes.js';
 import { isGitEntryDropped } from '../core/git-policy.js';
+import { queueControls } from '../core/task-queue-controls.js';
 import { APP_VERSION, APP_COMMIT } from '../core/app-version.js';
 import { extensionUnitName, extensionUnitsOf, suggestPackMode } from '../core/ext-pack.js';
 import { parseRepoUrl, refineRefWithBranches, isCommitRef, SITES } from '../core/git-url.js';
@@ -5173,19 +5174,19 @@ function renderTaskQueue(items){
     const status=String(item.status||'queued');
     const running=status==='running';
     const paused=status==='paused';
-    const queued=status==='queued';
     const pct=Math.max(0,Math.min(100,Math.round(Number(item.pct)||0)));
+    const ctl=queueControls(item);
     return '<div class="tq-row is-'+escapeHtml(status)+'" data-tqid="'+escapeHtml(item.id)+'">'
       +'<span class="tq-status">'+escapeHtml(t('queue.status.'+status))+'</span>'
       +'<span class="tq-label" title="'+escapeHtml(item.label||'')+'">'+escapeHtml(item.label||'')+'</span>'
       +'<span class="tq-pct">'+(running||paused?pct+'%':'')+'</span>'
       +'<span class="tq-acts">'
-        +(running?'<button type="button" class="tree-mini" data-tqact="pause" data-tqid="'+escapeHtml(item.id)+'">'+t('queue.pause')+'</button>':'')
-        +(paused?'<button type="button" class="tree-mini" data-tqact="resume" data-tqid="'+escapeHtml(item.id)+'">'+t('queue.resume')+'</button>':'')
-        +((running||paused)?'<button type="button" class="tree-mini" data-tqact="abort" data-tqid="'+escapeHtml(item.id)+'">'+t('queue.abort')+'</button>':'')
-        +(queued?'<button type="button" class="tree-mini" data-tqact="up" data-tqid="'+escapeHtml(item.id)+'" title="'+t('queue.up')+'">↑</button>':'')
-        +(queued?'<button type="button" class="tree-mini" data-tqact="down" data-tqid="'+escapeHtml(item.id)+'" title="'+t('queue.down')+'">↓</button>':'')
-        +((queued||status==='done'||status==='failed'||status==='aborted')?'<button type="button" class="tree-mini" data-tqact="remove" data-tqid="'+escapeHtml(item.id)+'" title="'+t('queue.remove')+'">×</button>':'')
+        +(ctl.pause?'<button type="button" class="tree-mini" data-tqact="pause" data-tqid="'+escapeHtml(item.id)+'">'+t('queue.pause')+'</button>':'')
+        +(ctl.resume?'<button type="button" class="tree-mini" data-tqact="resume" data-tqid="'+escapeHtml(item.id)+'">'+t('queue.resume')+'</button>':'')
+        +(ctl.abort?'<button type="button" class="tree-mini" data-tqact="abort" data-tqid="'+escapeHtml(item.id)+'">'+t('queue.abort')+'</button>':'')
+        +(ctl.up?'<button type="button" class="tree-mini" data-tqact="up" data-tqid="'+escapeHtml(item.id)+'" title="'+t('queue.up')+'">↑</button>':'')
+        +(ctl.down?'<button type="button" class="tree-mini" data-tqact="down" data-tqid="'+escapeHtml(item.id)+'" title="'+t('queue.down')+'">↓</button>':'')
+        +(ctl.remove?'<button type="button" class="tree-mini" data-tqact="remove" data-tqid="'+escapeHtml(item.id)+'" title="'+t('queue.remove')+'">×</button>':'')
       +'</span>'
       +'<span class="tq-bar"><i style="width:'+pct+'%"></i></span>'
     +'</div>';

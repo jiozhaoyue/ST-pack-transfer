@@ -465,7 +465,7 @@ layout: default
 | **移动端教程** | `index.js` `portalTutorialOverlay()`、`style.css` `#st-pt-tutorial-overlay` | 浮层必须挂 `document.body`；`position:fixed; inset:0; height:100dvh`，卡片 `max-height` 内滚。宿主祖先的 transform 不得把浮层带出视口。 |
 | **局域网二维码** | `src/ui/qr.js`、`src/vendor/qrcode-generator.js` | 编码器静态 ESM 导入，vendor 只保留 `export default qrcode`，**不得**留 UMD `module.exports`（会与 ESM 只读 getter 冲突）。生成二维码失败时显示明确占位，取件码仍可复制。 |
 | **更新日志** | `src/core/changelog.js`、`vite.config.js`、`index.js` | 构建期注入完整 git 日志；宿主直装回退发布摘要。版本变化自动弹窗（默认开，可勾「不再自动显示」）；设置页可打开最早→最新完整日志。`vite.config.js` 的 git format **必须加引号**，否则 Windows cmd 把 `|` 当管道导致注入为空。 |
-| **连续任务队列** | `index.js`（`enqueueTask` / `pumpQueue` / `queuePause...`）、`workbench-view.js` `renderTaskQueue()` | 生成批次串行排队；运行中可暂停/继续/中断，排队可上移/下移/移出；最近 20 条结束任务保留展示。禁止 `state.busy` 直接拒绝新批次（旧行为会让用户以为按钮失效）。 |
+| **连续任务队列** | `index.js`（`enqueueTask` / `pumpQueue` / `enqueueHostPull` / `enqueueRestore` / `enqueueCloudBackup`）、`workbench-view.js` `renderTaskQueue()` | 生成 / 宿主拉取 / 恢复写回 / 云端备份共用串行队列；生成可暂停/继续，其它长任务至少可中断（AbortSignal + 协作标记）。排队可上移/下移/移出；最近 20 条结束任务保留。禁止 `state.busy` 直接拒绝新批次。 |
 | **日志全量** | `src/core/logger.js`、设置页、日志视图 | 新增 DEBUG；**所有级别始终入账**，默认控制台/显示阈值 WARN。设置可选 debug/info/warn/error；日志视图默认 WARN+ERROR，DEBUG 按钮可回看全部。 |
 | **导出体积预测** | `src/core/git-policy.js`、`workbench-view.js` `selectedProjected()` | 预估必须扣除 `gitMode=minimal/strip` 将剔除的 `.git` 条目，并在 title 里写明剔除量。转换器与预测共用 `git-policy.js`，禁止两套判断。 |
 | **Luker 引擎自动切换** | `plan-preview.js` `sourceEngine`、`workbench-view.js` `autoEngineForPackage()` | Luker 宿主选中包后，目标引擎自动切到该包声明的源引擎（fs/postgres/mysql/sqlite）；读不到就保持原选择，不猜。 |
