@@ -170,11 +170,10 @@ npm run build:offline # 产出可直接双击运行的离线单文件
 
 ## 六、鸣谢
 
-本插件由衷感谢 SillyTavern、Luker、TauriTavern、PureTavern 四款开源酒馆项目及其活跃的社区贡献者。正是因为有各项目的辛勤探索与开放生态，才有了丰富多样的数据格式与灵感来源。所有项目名称与标识归各自版权方所有，本项目为独立社区工具。
+本插件由衷感谢 Luker、TauriTavern、PureTavern 等开源酒馆项目及其活跃的社区贡献者。正是因为各项目的探索与开放生态，才有了丰富多样的数据格式与灵感来源。所有项目名称与标识归各自版权方所有，本项目为独立社区工具。
 
 | 项目 | 作者 / 维护者 | 参考与借鉴 |
 | :-- | :-- | :-- |
-| [SillyTavern](https://github.com/SillyTavern/SillyTavern) | SillyTavern 团队与社区贡献者 | 用户数据目录结构、备份端点约定、扩展加载规范与主题变量设计 |
 | [Luker](https://github.com/funnycups/Luker) | [@funnycups](https://github.com/funnycups) | 存储审查设计思路、分片恢复端点、局域网同步协议、云端对象存储对接、多数据库引擎格式规范与原生备份入口设计 |
 | [TauriTavern](https://github.com/Darkatse/TauriTavern) | [@Darkatse](https://github.com/Darkatse) | 数据迁移导出导入端点规范、扩展目录布局与扩展来源记录机制 |
 | [PureTavern](https://github.com/Lianues/PureTavern) | [@Lianues](https://github.com/Lianues) | 备份归档导出导入端点、模块化记录、导入前自动恢复点与冲突预览机制 |

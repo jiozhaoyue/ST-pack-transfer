@@ -85,3 +85,9 @@ CLAUDE.md.bak
 # SkillCompass 工具状态
 /.skill-compass/
 
+# 本地发布文案（不入库）
+/discord.md
+
+# Agent 工具私有目录
+/.unipi/
+
