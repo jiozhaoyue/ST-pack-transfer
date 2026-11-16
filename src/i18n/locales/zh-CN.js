@@ -9,6 +9,7 @@ export default {
   'app.subtitle': 'ST-pack-transfer',
 
   'header.guide': '教程',
+  'header.docs': '在线文档',
   'header.theme': '酒馆主题',
   'header.log': '日志',
   'header.settings': '设置',
@@ -232,6 +233,8 @@ export default {
   'action.abandon': '放弃半成品',
 
   'tutorial.changeGoal': '换个操作',
+  'tutorial.openDoc': '查看文档',
+  'tutorial.docHint': '打开对应功能的在线文档页面',
   'tutorial.skip': '跳过',
   'tutorial.never': '不再弹出',
   'tutorial.reopen': '重新打开教程',
@@ -330,6 +333,9 @@ export default {
   'settings.netProxy': 'CORS 代理地址（可选）',
   'settings.netProxyPlaceholder': 'https://proxy.example/?url=',
   'settings.netProxyHint': '只影响插件自己的 Git / WebDAV 外发请求，留空即直连。浏览器无法直接使用 SOCKS / HTTP 代理，必须填一个带 CORS 头的转发地址（含 {url} 占位符则替换，否则追加 ?url=）。Luker 原生的 requestProxy / enableCorsProxy 只能改服务端 config.yaml。',
+  'settings.docsBaseUrl': '文档站地址（可选）',
+  'settings.docsBaseUrlPlaceholder': './docs/',
+  'settings.docsBaseUrlNote': '留空默认使用内置的 ./docs/；支持自定义配置外部或私有部署的文档地址。',
   'settings.groupData': '数据',
   'settings.exportData': '导出插件数据',
   'settings.importData': '导入插件数据',

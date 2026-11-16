@@ -17,6 +17,8 @@ export const SETTINGS_DEFAULTS = Object.freeze({
   deleteAfterExport: false,
   /** 可选 CORS 代理地址：只用于插件自己的 Git / WebDAV 外发请求；留空即直连。 */
   netProxyUrl: '',
+  /** 自定义文档站基准地址：留空默认使用内置相对路径 ./docs/。 */
+  docsBaseUrl: '',
   /** 日志上限（条）；0/非法回落默认。 */
   logMaxEntries: 500,
   /** 每次加载插件是否清空上次日志。 */
@@ -236,6 +238,7 @@ export function normalizeSettings(input) {
     if (typeof input.autoTutorial === 'boolean') out.autoTutorial = input.autoTutorial;
     if (typeof input.deleteAfterExport === 'boolean') out.deleteAfterExport = input.deleteAfterExport;
     if (typeof input.netProxyUrl === 'string') out.netProxyUrl = input.netProxyUrl.trim();
+    if (typeof input.docsBaseUrl === 'string') out.docsBaseUrl = input.docsBaseUrl.trim();
     const logMax = Number(input.logMaxEntries);
     if (Number.isFinite(logMax)) out.logMaxEntries = Math.max(50, Math.min(5000, Math.round(logMax)));
     if (typeof input.clearLogOnLoad === 'boolean') out.clearLogOnLoad = input.clearLogOnLoad;
@@ -358,7 +361,10 @@ export function buildSettingsHtml(settings = {}) {
   const netGroup = '<label class="et-git"><span>' + t('settings.netProxy') + '</span>'
     + '<input class="text_pole" type="url" data-setting="netProxyUrl" placeholder="' + t('settings.netProxyPlaceholder')
     + '" value="' + (s.netProxyUrl || '') + '"></label>'
-    + '<div class="ext-note">' + t('settings.netProxyHint') + '</div>';
+    + '<label class="et-git" style="margin-top:6px"><span>' + t('settings.docsBaseUrl') + '</span>'
+    + '<input class="text_pole" type="text" data-setting="docsBaseUrl" placeholder="' + t('settings.docsBaseUrlPlaceholder')
+    + '" value="' + (s.docsBaseUrl || '') + '"></label>'
+    + '<div class="ext-note">' + t('settings.docsBaseUrlNote') + '</div>';
 
   return '<div class="settings-grid">'
     + group('behavior', t('settings.groupBehavior'), tips, true)
@@ -400,6 +406,9 @@ export function readSettings(root, base = SETTINGS_DEFAULTS) {
 
   const netProxyEl = root.querySelector?.('[data-setting="netProxyUrl"]');
   if (netProxyEl && typeof netProxyEl.value === 'string') out.netProxyUrl = netProxyEl.value.trim();
+
+  const docsBaseEl = root.querySelector?.('[data-setting="docsBaseUrl"]');
+  if (docsBaseEl && typeof docsBaseEl.value === 'string') out.docsBaseUrl = docsBaseEl.value.trim();
 
   const clearLogEl = root.querySelector?.('[data-setting="clearLogOnLoad"]');
   if (clearLogEl && typeof clearLogEl.checked === 'boolean') out.clearLogOnLoad = clearLogEl.checked;

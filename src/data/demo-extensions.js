@@ -14,7 +14,7 @@ export default {
   source: 'github.com/jiozhaoyue (repos matching /^(st|ST)/)',
   note: '演示/占位数据；kind 是占位判断：extension = 前端扩展，server = 服务端插件。',
   items: [
-    { name: 'ST-pack-transfer', version: '0.1.0', kind: 'extension', type: 'local', sourceType: 'local', loadingOrder: 10, url: 'https://github.com/jiozhaoyue/ST-pack-transfer', ref: 'main', description: '四类酒馆数据包互转与传输备份增强插件' },
+    { name: 'ST-pack-transfer', version: '0.5.0', kind: 'extension', type: 'local', sourceType: 'local', loadingOrder: 10, url: 'https://github.com/jiozhaoyue/ST-pack-transfer', ref: 'main', description: '四类酒馆数据包互转与传输备份增强插件' },
     { name: 'ST-msg-btn-mgr', version: '1.0.0', kind: 'extension', type: 'local', sourceType: 'local', loadingOrder: 12, url: 'https://github.com/jiozhaoyue/ST-msg-btn-mgr', ref: 'main', description: '控制消息上按钮显示的酒馆助手脚本' },
     { name: 'ST-chatfile-improve', version: '1.0.0', kind: 'extension', type: 'local', sourceType: 'local', loadingOrder: 14, url: 'https://github.com/jiozhaoyue/ST-chatfile-improve', ref: 'main', description: '增强酒馆聊天文件功能' },
     { name: 'ST-shujuku-rebuild', version: '1.0.0', kind: 'extension', type: 'local', sourceType: 'local', loadingOrder: 16, url: 'https://github.com/jiozhaoyue/ST-shujuku-rebuild', ref: 'master', description: 'Luker/TauriTavern 数据库扩展' },

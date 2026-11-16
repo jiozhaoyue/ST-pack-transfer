@@ -119,6 +119,12 @@
   #app.app-container .app-title h1.is-symbol .app-title-txt{display:none}
   #app.app-container .header-actions{display:flex;align-items:center;gap:6px;margin-left:auto;flex-wrap:nowrap;
     justify-content:flex-end;flex:0 0 auto}
+  #app.app-container .btn-docs{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:999px;
+    border:1px solid var(--accent);background:var(--accent-soft);color:var(--text);font-size:12px;font-weight:700;
+    text-decoration:none;white-space:nowrap;min-height:var(--ctl-h);box-sizing:border-box;transition:all .15s ease}
+  #app.app-container .btn-docs svg{color:var(--accent);flex:0 0 auto}
+  #app.app-container .btn-docs:hover{background:var(--accent);color:#fff;text-decoration:none}
+  #app.app-container .btn-docs:hover svg{color:#fff}
   #app.app-container .badge{display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border-radius:999px;
     border:1px solid var(--border);background:var(--panel-3);font-size:11px;color:var(--muted);white-space:nowrap;
     min-height:var(--ctl-h);box-sizing:border-box}
@@ -1251,6 +1257,14 @@
   #app.app-container .tutorial-card .acts button.link{border-color:transparent;background:transparent;color:var(--muted);
     text-decoration:underline;margin-right:auto;padding-left:0}
   #app.app-container .tutorial-card .acts button.link:hover{color:var(--text)}
+  #app.app-container .tutorial-card .acts .tutorial-doc-btn{display:inline-flex;align-items:center;gap:4px;
+    border:1px solid var(--accent);background:var(--accent-soft);border-radius:6px;padding:4px 8px;
+    font-size:10.5px;font-weight:600;color:var(--text);text-decoration:none;flex:0 0 auto;white-space:nowrap;
+    transition:all .15s ease}
+  #app.app-container .tutorial-card .acts .tutorial-doc-btn svg{color:var(--accent);flex:0 0 auto}
+  #app.app-container .tutorial-card .acts .tutorial-doc-btn:hover{background:var(--accent);color:#fff;text-decoration:none}
+  #app.app-container .tutorial-card .acts .tutorial-doc-btn:hover svg{color:#fff}
+  #app.app-container .tutorial-card .acts .tutorial-doc-btn[hidden]{display:none !important}
 
   /* 移动端：窄屏布局（唯一判据是 data-view，由 JS 按容器宽度设置；
      不再另设 @media 断点，否则会与 JS 阈值打架，出现「已堆叠却没有数据包切页按钮」） */

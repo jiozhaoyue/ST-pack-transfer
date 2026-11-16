@@ -9,7 +9,7 @@ describe('SillyTavern 标准插件工程结构 (ST-pack-transfer)', () => {
     const manifest = JSON.parse(await readFile('manifest.json', 'utf8'));
     expect(manifest.name).toBe('ST-pack-transfer');
     expect(manifest.display_name).toBe('数据包转运');
-    expect(manifest.version).toBe('1.0.0');
+    expect(manifest.version).toBe('0.5.0');
     expect(manifest.author).toBe('jiozhaoyue');
     expect(manifest.js).toBe('index.js');
     expect(manifest.css).toBe('style.css');

@@ -5984,7 +5984,7 @@ function exitTutorialMode(){
    · 目标在结构上不存在（例如还没载入数据包）时，卡片居中保留并如实说明，绝不整张消失。 */
 const TUTORIAL_GOALS=[
   {
-    id:'convert', label:'tutorial.goal.convert', note:'tutorial.goal.convertNote',
+    id:'convert', label:'tutorial.goal.convert', note:'tutorial.goal.convertNote', docPage:'convert',
     steps:[
       { sel:'#target-select', view:'chart', title:'tutorial.convert.target', desc:'tutorial.convert.targetDesc' },
       { sel:'#chart-stack', view:'chart', title:'tutorial.convert.chart', desc:'tutorial.convert.chartDesc' },
@@ -5996,7 +5996,7 @@ const TUTORIAL_GOALS=[
     ]
   },
   {
-    id:'restore', label:'tutorial.goal.restore', note:'tutorial.goal.restoreNote',
+    id:'restore', label:'tutorial.goal.restore', note:'tutorial.goal.restoreNote', docPage:'restore',
     when:()=>state.mode!=='web',
     steps:[
       { sel:'#dropzone', view:'zone', zone:'import', title:'tutorial.restore.pick', desc:'tutorial.restore.pickDesc' },
@@ -6007,7 +6007,7 @@ const TUTORIAL_GOALS=[
     ]
   },
   {
-    id:'pull', label:'tutorial.goal.pull', note:'tutorial.goal.pullNote',
+    id:'pull', label:'tutorial.goal.pull', note:'tutorial.goal.pullNote', docPage:'host-pull',
     when:()=>state.mode!=='web',
     steps:[
       { sel:'#btn-fetch', view:'chart', title:'tutorial.pull.entry', desc:'tutorial.pull.entryDesc' },
@@ -6016,7 +6016,7 @@ const TUTORIAL_GOALS=[
     ]
   },
   {
-    id:'extensions', label:'tutorial.goal.extensions', note:'tutorial.goal.extensionsNote',
+    id:'extensions', label:'tutorial.goal.extensions', note:'tutorial.goal.extensionsNote', docPage:'extensions',
     steps:[
       { sel:'#chart-card [data-view-switch]', view:'chart', title:'tutorial.ext.entry', desc:'tutorial.ext.entryDesc' },
       { sel:'#extmgr-tabs', view:'extension', title:'tutorial.ext.tabs', desc:'tutorial.ext.tabsDesc' },
@@ -6028,7 +6028,7 @@ const TUTORIAL_GOALS=[
     ]
   },
   {
-    id:'transfer', label:'tutorial.goal.transfer', note:'tutorial.goal.transferNote',
+    id:'transfer', label:'tutorial.goal.transfer', note:'tutorial.goal.transferNote', docPage:'transfer',
     steps:[
       { sel:'#chart-card .view-switch-btn[data-wbview="transfer"]', view:'chart', title:'tutorial.transfer.entry', desc:'tutorial.transfer.entryDesc' },
       { sel:'#transfer-tabs', view:'cloud', transferTab:'cloud', title:'tutorial.transfer.tabs', desc:'tutorial.transfer.tabsDesc' },
@@ -6133,9 +6133,18 @@ function renderTutorial(){
   const prev=document.getElementById('tutorial-prev');
   const next=document.getElementById('tutorial-next');
   const adv=document.getElementById('tutorial-adv');
+  const docBtn=document.getElementById('tutorial-doc-btn');
   const ring=document.getElementById('tutorial-ring');
   const card=document.getElementById('tutorial-card');
   const goal=currentTutorialGoal();
+
+  if(docBtn){
+    const s=loadSettings();
+    let base=(s.docsBaseUrl||'./docs/').trim();
+    if(!base.endsWith('/')) base+='/';
+    docBtn.href=base+(goal&&goal.docPage?goal.docPage:'tutorial');
+    docBtn.hidden=false;
+  }
 
   /* 首页：选目标（按平台过滤；Web 形态没有宿主，不显示宿主相关目标）。 */
   if(!goal){
@@ -6166,6 +6175,12 @@ function renderTutorial(){
   if(prev){ prev.hidden=false; prev.disabled=state.tutorialStep===0; }
   if(next){ next.hidden=false; next.textContent=state.tutorialStep>=steps.length-1?t('tutorial.done'):t('tutorial.next'); }
   if(adv){ adv.hidden=false; adv.textContent=t('tutorial.changeGoal'); }
+  if(docBtn){
+    const s=loadSettings();
+    let base=(s.docsBaseUrl||'./docs/').trim();
+    if(!base.endsWith('/')) base+='/';
+    docBtn.href=base+((step&&step.docPage)||(goal&&goal.docPage)||'tutorial');
+  }
   title.textContent=t(step.title);
   desc.textContent=t(step.desc, step.params ? step.params() : undefined);
   if(dots) dots.innerHTML=steps.map((_,i)=>'<i class="'+(i===state.tutorialStep?'on':'')+'"></i>').join('');

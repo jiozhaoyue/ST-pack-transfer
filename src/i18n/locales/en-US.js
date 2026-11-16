@@ -6,6 +6,7 @@ export default {
   'app.subtitle': 'ST-pack-transfer',
 
   'header.guide': 'Tutorial',
+  'header.docs': 'Documentation',
   'header.theme': 'Host theme',
   'header.log': 'Log',
   'header.settings': 'Settings',
@@ -229,6 +230,8 @@ export default {
   'action.abandon': 'Discard partial',
 
   'tutorial.changeGoal': 'Change goal',
+  'tutorial.openDoc': 'View docs',
+  'tutorial.docHint': 'Open corresponding documentation page',
   'tutorial.skip': 'Skip',
   'tutorial.never': "Don't show again",
   'tutorial.reopen': 'Reopen guide',
@@ -326,6 +329,9 @@ export default {
   'settings.netProxy': 'CORS proxy URL (optional)',
   'settings.netProxyPlaceholder': 'https://proxy.example/?url=',
   'settings.netProxyHint': 'Only applies to this plugin\'s own Git / WebDAV requests; leave empty for direct. Browsers cannot use SOCKS/HTTP proxies directly, so this must be an HTTP forwarder that sends CORS headers ({url} is replaced when present, otherwise ?url= is appended). Luker\'s native requestProxy / enableCorsProxy are server-side config.yaml options only.',
+  'settings.docsBaseUrl': 'Documentation URL (optional)',
+  'settings.docsBaseUrlPlaceholder': './docs/',
+  'settings.docsBaseUrlNote': 'Defaults to built-in ./docs/; supports custom remote or self-hosted documentation URLs.',
   'settings.groupData': 'Data',
   'settings.exportData': 'Export plugin data',
   'settings.importData': 'Import plugin data',
