@@ -4,7 +4,7 @@
 
 纯前端实现：装进酒馆就是一个便捷的功能面板；也可以直接作为独立网页使用，无需单独部署后端。如果你配合安装了 Authority，还能享受更强大的服务端托管支持；即使不装，浏览器本地运行同样功能齐全。
 
-[在线使用](https://jiozhaoyue.github.io/ST-pack-transfer/) · [完整文档](https://jiozhaoyue.github.io/ST-pack-transfer/docs/) · [装进酒馆](#四安装与部署) · [功能总览](#一功能总览)
+[在线使用](https://jiozhaoyue.github.io/ST-pack-transfer/) · [完整文档](https://jiozhaoyue.github.io/ST-pack-transfer/docs/) · [装进酒馆](#六安装与部署) · [功能总览](#一核心功能) · [浏览器模式对比](#三-浏览器独立模式-vs-酒馆插件模式支持什么云同步为什么不支持)
 
 ---
 
@@ -21,8 +21,7 @@
 - **全景存储空间审查**：交互和下钻思路直接移植自 Luker 的 Storage Inspector 界面，分层查看浏览器本地缓存与酒馆服务端的存储占用明细。
 - **手机电脑面对面扫码秒传**：手机和电脑连接在同一个 Wi-Fi 或局域网下，扫码即可通过 WebRTC 点对点直连传输数据包，直接走内网传输不经过任何外部服务器，速度快且免外网流量，协议思路参考了 Luker 的实现。
 - **S3 云端与 WebDAV 备份**：支持备份到兼容 S3 的对象存储（如 Cloudflare R2、OSS、COS、MinIO）以及 WebDAV 服务（群晖、坚果云、Alist 等），支持切片上传、断点续传与本地密码加密。
-- **Luker 数据库存储引擎互转**：直接把 Luker 里的数据库转储形态搬了出来，支持在普通文件系统、PostgreSQL、MySQL、SQLite 之间任意互转，无需自行搭建临时数据库，纯在浏览器本地完成转储解构与生成。
-- **纯本地运行与隐私隔离**：全套工具不设任何外部服务器，所有解压、清洗与重组完全在浏览器本地内存和沙盒中完成，你的私聊与卡片绝不出本机。配置的密钥和令牌默认仅保存在当前浏览器的 LocalStorage 中，界面与日志自动打码脱敏。
+- **Luker 数据库存储引擎互转**：直接把 Luker 里的数据库转储形态搬了出来，支持在普通文件系统、PostgreSQL、MySQL、SQLite 之间任意互转，无需自行搭建临时数据库，纯在浏览器本地完成转储解构与生成。几把的我从电脑pg的luker导出来数据包想要传手机luker结果发现需要连接临时pg，搞了termux5分钟才搞好传好，然后就软了......然后才做的。
 
 ### 2. 扩展管理
 
@@ -51,7 +50,62 @@
 - **S3 与 WebDAV 真实测试情况**：S3 云存储备份和部分复杂网络下的 WebDAV 属于重度外部链路，目前还没有在超大规模、高强度的长期实测中完全覆盖所有边缘情况，可能存在隐藏问题，欢迎大家来提 Issue。
 - **凭据存储安全**：配置的 GitHub 令牌、S3 密钥与 WebDAV 密码默认仅保存在你当前浏览器的 LocalStorage 中，不会随酒馆后端配置上传，更换浏览器或清空缓存后需重新输入。
 
-## 三、四酒馆原生功能矩阵与插件能力对比
+## 三、🌐 浏览器独立模式 vs 酒馆插件模式（支持什么？云同步为什么不支持？）
+
+数据包转运支持两种使用姿势：**直接作为独立网页在浏览器中打开**（GitHub Pages 或本地启动），或者**作为扩展插件装入酒馆宿主**（SillyTavern、Luker、TauriTavern、PureTavern）。
+
+### 1. 浏览器独立模式到底支持什么？（纯前端本地闭环）
+
+浏览器独立模式是一个完全脱离酒馆后端的**纯前端沙盒工作台**，只要你的设备能跑现代浏览器（Chrome / Edge / Firefox / Safari），以下核心能力 100% 在本地可用：
+
+- **四酒馆格式互转**：SillyTavern、Luker、TauriTavern、PureTavern 数据包双向互转，Zstd / Deflate 纯本地解包与压缩；
+- **文件细粒度拆选与分卷**：按文件/类目精准勾选，智能拆分成指定大小的分卷小包（32 MB ~ 2048 MB）；
+- **内存与 OPFS 真增量断点续传**：基于浏览器 OPFS（专用源文件系统）暂存半成品，暂停或断电重连后零重压缩直接接续，绝不丢失任何聊天或条目；
+- **扩展转清单与 Git 历史精简**：通过 GitHub/GitLab 公开 API 拉取远程仓库树，随包打包扩展，支持一键剥离为轻量清单（仅记录来源，数 GB 缩减至几十 KB），清除历史 commit；
+- **Git 账号登录与私有仓库拉取**：配置 Personal Access Token 或 OAuth，凭据纯保存在浏览器本地 `localStorage`，不会泄露；
+- **面对面扫码秒传 (WebRTC)**：电脑手机同局域网下，扫码直接通过 WebRTC 点对点传输数据包，免外网流量；
+- **Luker 4 种数据库引擎互转**：普通文件系统、PostgreSQL、MySQL、SQLite 数据库转储在本地纯前端解构互转，免起临时数据库；
+- **浏览器存储审查**：审查浏览器分配给当前站点的 LocalStorage / IndexedDB / OPFS 空间占用明细。
+
+### 2. 云同步（S3 / WebDAV）在纯浏览器下为什么不支持 / 经常报错？
+
+很多用户疑惑：“为什么在独立网页里配了 S3 或 WebDAV 总是报错或无法上传？”
+**这不是插件的代码 Bug，而是现代浏览器的核心底层安全机制（CORS 跨域同源策略与权限沙盒）决定的：**
+
+1. **浏览器的 CORS 跨域同源策略拦截（最核心原因，阻断率 95%）**：
+   - 网页运行在浏览器中，跨域向你的 S3 存储桶（Cloudflare R2 / AWS S3 / 阿里云 OSS / 腾讯云 COS / MinIO 等）或 WebDAV（群晖 NAS / 坚果云 / Alist / Nginx 等）发起 `fetch()` 请求时，**目标服务器必须显式返回 CORS 允许跨域头**：
+     - `Access-Control-Allow-Origin: *`（或当前网页域名，如 `https://jiozhaoyue.github.io`）
+     - `Access-Control-Allow-Methods: GET, PUT, POST, DELETE, HEAD, OPTIONS`
+     - `Access-Control-Allow-Headers: Authorization, Content-Type, Range, x-amz-*, x-amz-date, x-amz-content-sha256`
+   - **如果服务端没有配置上述跨域头，浏览器内核会在底层直接掐断请求**，并向控制台抛出 `TypeError: Failed to fetch` 或 `CORS blocked`，网页 JavaScript 连错误状态码都拿不到！
+2. **WebDAV 非标 HTTP 方法被公网 CDN / 反代拦截**：
+   - WebDAV 依赖 `PROPFIND`、`MKCOL` 等扩展 HTTP 方法。公网反向代理（如 Cloudflare CDN、宝塔 Nginx 默认配置、各类 WAF 防火墙）通常只放行 GET/POST，遇到 PROPFIND 会直接返回 `405 Method Not Allowed`，纯浏览器无底层 socket 权限无法伪造。
+3. **HTTPS 混合内容安全阻断（Mixed Content）**：
+   - 在线体验站点（GitHub Pages）是强制 HTTPS 的。如果你的自建 WebDAV 或 S3 是本地局域网 HTTP 明文地址（如 `http://192.168.1.x:5005`），**浏览器安全规范强制禁止 HTTPS 页面向 HTTP 发起网络请求**，直接当场拦截。
+4. **无系统 Socket 权限，无法直接调用本地 SOCKS5/HTTP 代理**：
+   - 浏览器网页无法像客户端那样走本地系统代理。如果云端无法直连，必须依赖用户自建并自填的“带 CORS 响应头的转发代理（`netProxyUrl`）”。
+5. **无常驻后台进程，不支持定时后台增量同步（Cron）**：
+   - 纯前端网页关闭或休眠后代码立即暂停，无法实现后台静默定时备份。
+
+> **💡 建议**：如果要在浏览器独立模式下使用云备份，请务必在你的对象存储控制台（如 R2 / OSS 等）配置允许该前端域名的 **CORS 跨域规则**；或者通过本地运行搭建并配置带有 CORS 的反代使用。
+
+### 3. 完整区别对比清单（浏览器独立模式 vs 酒馆插件模式）
+
+| 功能维度 | 浏览器独立模式（GitHub Pages / 本地网页） | 酒馆插件模式（装入 SillyTavern / Luker 等） |
+| :--- | :--- | :--- |
+| **四酒馆数据包互转** | ✅ 完全支持（纯本地前端解压、转换与重新打包） | ✅ 完全支持 |
+| **细粒度文件勾选 / 智能分卷** | ✅ 完全支持（按类目/文件挑选，支持分卷切片） | ✅ 完全支持 |
+| **数据包输入来源** | 📁 仅支持手动上传本地 ZIP 文件 | ⚡ 支持手动上传 + **一键「从当前宿主拉取」导出** |
+| **数据包恢复写回** | 💾 仅支持「下载」ZIP，需用户自行去酒馆导入 | 🚀 **一键「写回宿主（恢复）」**（Luker 原生支持 8 MiB 分片直接写回） |
+| **扩展管理与安装** | 📦 从 Git 拉取并写入选中的 ZIP 数据包 / 转清单 | 🛠️ 从 Git 拉取并**直接安装到宿主酒馆**或写入 ZIP |
+| **服务端插件（plugins）管理** | ❌ 无宿主后端，不支持 | ⚙️ 支持管理员安装/卸载宿主服务端插件 |
+| **存储空间审查** | 📊 仅审查浏览器端配额（LocalStorage / IndexedDB / OPFS） | 🔍 **全景审查**（同时审查浏览器配额 + 宿主服务端磁盘明细） |
+| **面对面扫码秒传 (WebRTC)** | ✅ 点对点局域网直连，完全支持 | ✅ 完全支持 |
+| **Luker 4 种数据库引擎互转** | ✅ 纯本地互转，完全支持（免起临时数据库） | ✅ 完全支持 |
+| **S3 / WebDAV 云同步** | ⚠️ **受限**：必须服务端配置 CORS 头或通过 CORS 代理，否则浏览器报 Failed to fetch；禁止 HTTP 混用 | 🟢 **相对宽松**：在同源或通过宿主代理时可减轻跨域限制（仍受网络连通性影响） |
+| **定时后台增量备份** | ❌ 页面关闭即停，无后台守护进程 | ❌ 本插件严守安全红线，不设常驻后台服务 |
+
+## 四、四酒馆原生功能矩阵与插件能力对比
 
 | 功能维度 | SillyTavern | Luker | TauriTavern | PureTavern | 插件支持情况 |
 | --- | --- | --- | --- | --- | --- |
@@ -63,13 +117,13 @@
 | **存储空间审查** | ❌ 无 | ✅ 内置 Storage Inspector | ❌ 无 | ❌ 无 | 插件提供全平台只读面板，Luker 额外对接原生数据源 |
 | **存储引擎互转** | 仅文件系统 | 文件 / PG / MySQL / SQLite | 仅文件系统 | 仅文件系统 | 插件支持 Luker 4 种引擎纯本地互转，免起临时数据库 |
 
-## 四、在线使用
+## 五、在线使用
 
 无需下载安装，直接在浏览器中打开：<https://jiozhaoyue.github.io/ST-pack-transfer/>
 
 如果你想搭建属于自己的转运站点：Fork 本仓库后，在仓库的 **Settings → Pages** 中将 Source 选为 **GitHub Actions**，后续每次推送都会自动构建发布最新版本。
 
-## 五、安装与部署
+## 六、安装与部署
 
 ### 1. 装进酒馆（推荐）
 
@@ -101,7 +155,7 @@ npm run build:offline # 产出可直接双击运行的离线单文件
 
 > 提示：在本地作为独立网页使用时，请通过本地 Web 服务器（如 `npm run preview`）打开。现代浏览器默认限制通过 `file://` 协议直接加载模块化脚本；如果需要双击直接运行，可使用 `npm run build:offline` 生成的离线单文件。
 
-## 六、隐私与凭据
+## 七、隐私与凭据
 
 插件仅在连接外部服务时需要必要的凭据，其余所有功能均无需登录，界面中每个输入项均配有详细的帮助说明。
 
@@ -122,17 +176,20 @@ npm run build:offline # 产出可直接双击运行的离线单文件
 - **凭据展示脱敏**：所有的界面显示、日志输出与报告下载均会对敏感令牌进行星号脱敏（如 `ghp_…3456`），防止意外泄露。
 - **网络代理配置**：如果所在网络访问外网 Git 或 WebDAV 较慢，可以在「设置 → 网络」中配置专用的 CORS 代理；留空则默认直连。（对象存储 S3 采用域名绑定签名，默认直接与云厂商通信）。
 
-## 七、鸣谢与参考
+## 八、参考与致谢项目
 
-本插件由衷感谢 Luker、TauriTavern、PureTavern 等开源酒馆项目及其活跃的社区贡献者。正是因为各项目的探索与开放生态，才有了丰富多样的数据格式与灵感来源。所有项目名称与标识归各自版权方所有，本项目为独立社区工具。
+很多功能端点与界面规范直接移植自以下优秀的类酒馆项目，向各位类酒馆作者深表感谢，希望你们能一直维护下去，引领各位卢克脱离原版sillytavern的屎山苦海
 
-| 项目 | 作者 / 维护者 | 参考与借鉴 |
-| :-- | :-- | :-- |
-| [Luker](https://github.com/funnycups/Luker) | [@funnycups](https://github.com/funnycups) | 存储审查设计思路、分片恢复端点、局域网同步协议、云端对象存储对接、多数据库引擎格式规范与原生备份入口设计 |
-| [TauriTavern](https://github.com/Darkatse/TauriTavern) | [@Darkatse](https://github.com/Darkatse) | 数据迁移导出导入端点规范、扩展目录布局与扩展来源记录机制 |
-| [PureTavern](https://github.com/Lianues/PureTavern) | [@Lianues](https://github.com/Lianues) | 备份归档导出导入端点、模块化记录、导入前自动恢复点与冲突预览机制 |
+[Luker](https://github.com/funnycups/Luker)  
+提供了存储审查设计思路、分片恢复端点、数据库引擎形态以及原生备份接口参考
 
-## 八、开发与质量
+[TauriTavern](https://github.com/Darkatse/TauriTavern)  
+提供了数据迁移导出导入规范与扩展来源记录参考
+
+[PureTavern](https://github.com/Lianues/PureTavern)  
+提供了归档导出导入、模块化记录与冲突预览机制参考
+
+## 九、开发与质量
 
 - 开发者功能清单与源码落点：[docs/DEVELOPER-GUIDE.md](docs/DEVELOPER-GUIDE.md)
 - 面向用户的完整说明文档：[docs/](docs/)（纯 Markdown 编写，随 Pages 自动发布）
@@ -148,7 +205,7 @@ npm run check:css-scope check:dom-injection check:template-source check:dom-scop
 
 代码库配有完善的静态检查与自动化测试，严格把关跨酒馆适配规范（如 CSS 隔离、DOM 范围、多语言完整度与免打包直装语法等），确保在各类酒馆中平稳加载。
 
-## 九、许可证
+## 十、许可证
 
 GNU Affero General Public License v3.0 or later（AGPL-3.0-or-later）。
 完整条款见 [LICENSE](LICENSE)。
