@@ -12,7 +12,7 @@ title: 实操测试指南
 
 - **测试目的**：验证纯前端 Web 环境下的解包、四端格式互转、文件细粒度拆选、智能分卷是否能完整闭环。
 - **实操步骤**：
-  1. 启动 Web 模式：在项目根目录运行 `npm run dev`，打开浏览器访问 `http://localhost:3040/`（或直接使用 [GitHub Pages 在线页面](https://jiozhaoyue.github.io/ST-pack-transfer/)）；
+  1. 启动 Web 模式：在项目根目录运行 `npm run dev`（系统固定且默认仅启动端口 **3040** 单一服务，开箱即用；端口 4173 仅用于静态打包预览），打开浏览器访问 `http://localhost:3040/`（或直接使用 [GitHub Pages 在线页面](https://jiozhaoyue.github.io/ST-pack-transfer/)）；
   2. 拖入或选择一个现成的酒馆数据包 ZIP（例如 SillyTavern 导出的备份包）；
   3. 查看左侧图表：检查角色卡、聊天记录、世界书等数量是否准确解析；
   4. 切换目标酒馆（例如选择 TauriTavern 或 Luker），并设置分卷阈值（如 100 MB）；

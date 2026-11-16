@@ -78,8 +78,8 @@ Web 模式是一个脱离酒馆后端的纯前端工作台，以下功能因缺�
 
 - **首选推荐：装入酒馆作为插件运行**  
   功能最为完整，拥有宿主原生数据拉取、一键切片恢复、服务端存储深度审查等全部功能，天然同源无跨域烦恼。
-- **次选推荐：本地或私有服务器静态部署**  
-  在本地终端执行 `npm run dev`（运行在 `http://localhost:3040`）或使用 Nginx / Caddy 托管，享有完整本地极速性能与纯本地隐私隔离。
+- **次选推荐：本地或私有服务器静态部署（默认仅启动 3040 单一服务）**  
+  在本地终端执行 `npm run dev`（固定运行在 `http://localhost:3040`，当前默认常驻启动这一个端口服务，开箱即用；系统绝不乱起多端口）；构建产物预览端口为 `4173`（执行 `npm run build && npm run preview` 运行，用于校验静态产物）。
 - **在线体验：GitHub Pages 网页端**  
   适合临时应急、离线解包、四端格式互转、分卷拆包与清单精简等纯本地沙盒操作。
 
@@ -124,28 +124,29 @@ Web 模式是一个脱离酒馆后端的纯前端工作台，以下功能因缺�
 https://github.com/jiozhaoyue/ST-pack-transfer.git
 ```
 
-或者手动将仓库克隆到酒馆的 `public/scripts/extensions/third-party/` 目录中。
-刷新酒馆页面后，在扩展列表中展开 **「数据包转运」** 并点击 **「打开面板」** 即可使用。
-
 > 💡 **插件极简瘦身建议（强烈推荐）**：  
 > 在酒馆日常使用中，插件目录内的测试与构建辅助文件夹（如 `test/`、`e2e/`、`scripts/` 等）仅供工程开发验证。日常使用完全可以直接删除这些测试目录，立刻为酒馆节省数十 MB 磁盘空间，核心转换与转运功能 100% 正常运行。
 
-### 2. 本地部署
+或者手动将仓库克隆到酒馆的 `public/scripts/extensions/third-party/` 目录中。
+刷新酒馆页面后，在扩展列表中展开 **「数据包转运」** 并点击 **「打开面板」** 即可使用。
 
-```bash
-git clone https://github.com/jiozhaoyue/ST-pack-transfer.git
-cd ST-pack-transfer
-npm install
-npm run dev
-```
+### 2. 本地部署（端口明确：3040 与 4173，默认仅启动 3040）
 
-构建静态站点：
-
-```bash
-npm run build        # 产出 dist/（用于 GitHub Pages 或 Web 服务器）
-npm run preview      # 本地预览构建产物（端口 4173）
-npm run build:offline # 产出可直接双击运行的离线单文件
-```
+- **本地 Web 模式服务（端口 3040，默认唯一启动）**：  
+  直接运行开发服务器，带实时热更新与完整本地沙盒能力，系统默认仅启动并常驻这一个服务（当前已启动）：
+  ```bash
+  git clone https://github.com/jiozhaoyue/ST-pack-transfer.git
+  cd ST-pack-transfer
+  npm install
+  npm run dev          # 启动本地 Web 模式（固定端口 3040，严格防冲突）
+  ```
+- **生产构建产物预览（端口 4173，构建后按需使用）**：  
+  对打包压缩后的静态 `dist/` 进行独立生产预览：
+  ```bash
+  npm run build        # 产出 dist/（用于 GitHub Pages 或 Web 服务器）
+  npm run preview      # 预览生产产物（固定端口 4173）
+  npm run build:offline # 产出可直接双击运行的离线单文件
+  ```
 
 > 提示：在本地作为独立网页使用时，请通过本地 Web 服务器（如 `npm run preview`）打开。现代浏览器默认限制通过 `file://` 协议直接加载模块化脚本；如果需要双击直接运行，可使用 `npm run build:offline` 生成的离线单文件。
 

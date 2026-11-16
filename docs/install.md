@@ -12,31 +12,32 @@ title: 安装与部署
 https://github.com/jiozhaoyue/ST-pack-transfer.git
 ```
 
+> 💡 **插件极简瘦身建议（强烈推荐）**：  
+> 在酒馆日常使用中，插件目录内的测试与构建辅助文件夹（如 `test/`、`e2e/`、`scripts/` 等）仅供工程开发验证。日常使用完全可以直接删除这些测试目录，立刻为酒馆节省数十 MB 磁盘空间，核心转换与转运功能 100% 正常运行。
+
 或者手动将仓库克隆到酒馆的 `public/scripts/extensions/third-party/` 目录中。
 
 刷新酒馆页面后，在扩展列表里展开 **「数据包转运」** 并点击 **「打开面板」** 即可。
 
-> 💡 **插件极简瘦身建议（强烈推荐）**：  
-> 在酒馆生产环境中使用本插件时，插件目录内的测试与构建辅助文件夹（如 `test/`、`e2e/`、`scripts/` 等）仅供工程开发验证。日常使用完全可以直接删除这些测试目录，立刻为酒馆节省数十 MB 磁盘空间，核心转换与转运功能 100% 正常运行。
-
 > 提示：在 Luker 中如果是用户私有扩展（`data/<user>/extensions/<name>/`），直接放置插件目录即可，无需额外嵌套 `third-party` 目录。
 
-## 二、本地部署
+## 二、本地部署（端口明确：3040 与 4173，默认仅启动 3040）
 
-```bash
-git clone https://github.com/jiozhaoyue/ST-pack-transfer.git
-cd ST-pack-transfer
-npm install
-npm run dev
-```
-
-构建静态站点：
-
-```bash
-npm run build        # 产出 dist/（用于部署到静态托管）
-npm run preview      # 本地启动预览服务器（端口 4173）
-npm run build:offline # 产出可直接双击运行的离线单文件
-```
+- **本地 Web 模式服务（端口 3040，默认唯一启动）**：  
+  直接运行开发服务器，带实时热更新与完整本地沙盒能力，系统默认仅启动并常驻这一个服务（当前已启动）：
+  ```bash
+  git clone https://github.com/jiozhaoyue/ST-pack-transfer.git
+  cd ST-pack-transfer
+  npm install
+  npm run dev          # 启动本地 Web 模式（固定端口 3040，严格防冲突）
+  ```
+- **生产构建产物预览（端口 4173，构建后按需使用）**：  
+  对打包压缩后的静态 `dist/` 进行独立生产预览：
+  ```bash
+  npm run build        # 产出 dist/（用于部署到静态托管）
+  npm run preview      # 本地启动预览服务器（端口 4173）
+  npm run build:offline # 产出可直接双击运行的离线单文件
+  ```
 
 > 提示：在本地作为独立网页运行时，请通过本地 Web 服务器（如 `npm run preview`）打开。现代浏览器默认限制通过 `file://` 协议直接加载模块化代码；如果需要脱离服务器直接双击打开运行，可使用 `npm run build:offline` 生成的离线单文件。
 
