@@ -1322,7 +1322,8 @@ function decorateExtSuggestions(nodes, urlMap){
     const url=String(node.url||urlMap[name]||'');
     const sug=suggestPackMode(name,url);
     node.extSuggest=sug;
-    node.note=t(sug.mode==='manifest'?'extmgr.recManifest':'extmgr.recFull');
+    /* 只保留专属彩色徽标；不要再往树标签里塞灰色「建议…」小字，避免同一建议出现两遍。 */
+    delete node.note;
   };
   const visit=(node)=>{
     if(!node) return;
