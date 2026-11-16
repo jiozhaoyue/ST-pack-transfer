@@ -3858,40 +3858,41 @@ async function renderExtInstalled(body){
     +'<button type="button" class="btn icon ext-act-btn" id="extmgr-export-assetlist-pkg" disabled'
       +' title="'+t('extmgr.exportAssetList')+'" aria-label="'+t('extmgr.exportAssetList')+'"><i class="fa-solid fa-file-code"></i></button>';
 
-  /* 2026-11-15 裁定：列表不再是独立 details DOM——去掉「扩展列表」头与 .ext-host-list 包裹层，
-     直接嵌在 body 流内；按钮行固定在滚动区之上，永不与行内容穿插重叠（修复“穿透”）。
-     「自动更新」打开时按钮行只剩来源行，滚动区整个被策略子视图替换。 */
+  /* 2026-11-16 用户铁律：列表头必须只有 2 行！
+     第 1 行：来源切换与策略在左，查看控制（检查更新/刷新/排序）在右，两端对称；
+     第 2 行：选择组在左，批量操作按钮在右，紧凑单行。 */
   const policyOpen=isHost && autoMasterOn && !!state.extPolicyOpen;
-  const actionRow=!policyOpen
-    ? '<div class="ext-head-action-rows">'
-      +'<div class="ext-head-action-row ext-head-view-row">'
-        +'<div class="ext-head-left">'
-          +'<span class="ext-list-count">'+t('extmgr.listCount',{n:countTotal})+'</span>'
-          +'<span class="ext-state" id="extmgr-sel-count">'+t('extmgr.selectedN',{n:0,total:countTotal})+'</span>'
-          +'<div class="ext-sel-group">'
-            +iconBtn('data-extall','fa-check-double',t('extmgr.selectAll'))
-            +iconBtn('data-extinvert','fa-shuffle',t('extmgr.invert'))
-            +iconBtn('data-extnone','fa-xmark',t('extmgr.selectNone'))
-          +'</div>'
-        +'</div>'
-        +'<div class="ext-head-right">'
-          +(isHost ? iconBtn('id="extmgr-check-updates"'+(upd&&upd.busy?' disabled':''),'fa-magnifying-glass-arrow-right',t('extmgr.checkUpdates')) : '')
-          +iconBtn('id="extmgr-refresh-installed"','fa-arrows-rotate',t('extmgr.refresh'))
-          +(isHost ? ('<label class="field ext-sort"><span>'+t('extmgr.sortLabel')+'</span><select class="text_pole" data-extsort>'
-            +sortOptions.map(([value,key])=>'<option value="'+value+'"'+(sort===value?' selected':'')+'>'+t(key)+'</option>').join('')
-            +'</select></label>') : '')
+  const headRow1='<div class="ext-head-row ext-head-top-row">'
+    +sourceBar
+    +'<div class="ext-head-right">'
+      +(isHost ? iconBtn('id="extmgr-check-updates"'+(upd&&upd.busy?' disabled':''),'fa-magnifying-glass-arrow-right',t('extmgr.checkUpdates')) : '')
+      +iconBtn('id="extmgr-refresh-installed"','fa-arrows-rotate',t('extmgr.refresh'))
+      +(isHost ? ('<label class="field ext-sort"><span>'+t('extmgr.sortLabel')+'</span><select class="text_pole" data-extsort>'
+        +sortOptions.map(([value,key])=>'<option value="'+value+'"'+(sort===value?' selected':'')+'>'+t(key)+'</option>').join('')
+        +'</select></label>') : '')
+    +'</div>'
+  +'</div>';
+
+  const headRow2=!policyOpen
+    ? '<div class="ext-head-row ext-head-action-row">'
+      +'<div class="ext-head-left">'
+        +'<span class="ext-list-count">'+t('extmgr.listCount',{n:countTotal})+'</span>'
+        +'<span class="ext-state" id="extmgr-sel-count">'+t('extmgr.selectedN',{n:0,total:countTotal})+'</span>'
+        +'<div class="ext-sel-group">'
+          +iconBtn('data-extall','fa-check-double',t('extmgr.selectAll'))
+          +iconBtn('data-extinvert','fa-shuffle',t('extmgr.invert'))
+          +iconBtn('data-extnone','fa-xmark',t('extmgr.selectNone'))
         +'</div>'
       +'</div>'
-      +'<div class="ext-head-action-row ext-head-bulk-row">'
-        +'<div class="ext-unified-actions">'
-          +(isHost ? hostActionButtons : packageActionButtons)
-        +'</div>'
+      +'<div class="ext-unified-actions">'
+        +(isHost ? hostActionButtons : packageActionButtons)
       +'</div>'
     +'</div>'
     : '';
+
   const listHead='<div class="ext-list-head" id="extmgr-list-head">'
-    +sourceBar
-    +actionRow
+    +headRow1
+    +headRow2
   +'</div>';
 
   body.innerHTML=listHead

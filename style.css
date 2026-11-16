@@ -816,7 +816,7 @@
   #app.app-container .ext-auto-policy .field input{width:100%;min-width:0}
   /* 2026-11-15 用户裁定：扩展列表里**禁止常驻分隔细线**——来源行的 dashed 下边线及其
      padding 上下恒占高度，全部去掉（来源行与工具行之间用面板既有间距，凭空无缝）。 */
-  #app.app-container .ext-source-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  #app.app-container .ext-source-bar{display:inline-flex;align-items:center;gap:8px;flex:0 0 auto;flex-wrap:nowrap}
   /* 包选择（2026-11-15 用户裁定：「选择数据包」文案彻底删除，连 label 都不许有）：
      **手机版必须可选**（无文字标签的 select，宽随最长选项自适应）；
      **桌面隐藏 select、只读展示 .ext-pkg-current 包名**（互斥显示） */
@@ -831,14 +831,14 @@
     padding:2px 8px;border-radius:6px;background:var(--panel-3);border:1px solid var(--border)}
   #app.app-container .ext-policy-btn{margin-left:auto;padding:2px 8px;font-size:10.5px}
   #app.app-container .ext-policy-btn.active{background:color-mix(in srgb,var(--accent) 18%,transparent);border-color:var(--accent)}
-  #app.app-container .ext-head-action-rows{display:flex;flex-direction:column;gap:6px;width:100%}
-  #app.app-container .ext-head-action-row{display:flex;align-items:center;gap:8px;width:100%;flex-wrap:nowrap}
-  #app.app-container .ext-head-view-row{justify-content:space-between}
-  #app.app-container .ext-head-bulk-row{justify-content:flex-start}
+  #app.app-container .ext-head-row{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;flex-wrap:nowrap}
+  #app.app-container .ext-head-top-row{justify-content:space-between}
+  #app.app-container .ext-head-action-row{justify-content:space-between}
   #app.app-container .ext-head-left{display:inline-flex;align-items:center;gap:7px;flex:0 0 auto}
   #app.app-container .ext-list-count{display:inline-block;padding:2px 7px;border-radius:99px;font-size:11px;font-weight:600;background:var(--panel-3);border:1px solid var(--border);color:var(--text)}
   #app.app-container .ext-sel-group{display:inline-flex;align-items:center;gap:3px}
-  #app.app-container .ext-unified-actions{display:inline-flex;align-items:center;gap:6px;flex:1 1 auto;flex-wrap:nowrap;margin:0}
+  #app.app-container .ext-unified-actions{display:inline-flex;align-items:center;gap:6px;flex:0 1 auto;flex-wrap:nowrap;margin:0;overflow-x:auto;scrollbar-width:none}
+  #app.app-container .ext-unified-actions::-webkit-scrollbar{display:none}
   #app.app-container .ext-act-btn{padding:3px 9px;font-size:11px;font-weight:500;display:inline-flex;align-items:center;gap:5px;border-radius:6px;line-height:1.4;white-space:nowrap}
   #app.app-container .ext-act-btn:disabled{opacity:.4;cursor:not-allowed}
   #app.app-container .ext-head-right{display:inline-flex;align-items:center;gap:6px;flex:0 0 auto}
