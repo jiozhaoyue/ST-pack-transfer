@@ -1711,6 +1711,25 @@ function renderFilenamePreview(){
 }
 
 /* ── 渲染：包卡 ── */
+function realUncompressedMbOf(p) {
+  if (!p) return 0;
+  if (p.rawMb) return p.rawMb;
+  if (p.uncompressedMb) return p.uncompressedMb;
+  if (p.rawBytes) return Math.round((p.rawBytes / (1024 * 1024)) * 10) / 10;
+  if (Array.isArray(p.nodes) && p.nodes.length > 0) {
+    let sum = 0;
+    for (const g of p.nodes) {
+      if (Array.isArray(g.children)) {
+        for (const c of g.children) sum += (c.sizeBytes || (c.mb ? c.mb * 1024 * 1024 : 0));
+      } else {
+        sum += (g.sizeBytes || (g.mb ? g.mb * 1024 * 1024 : 0));
+      }
+    }
+    if (sum > 0) return Math.round((sum / (1024 * 1024)) * 10) / 10;
+  }
+  return 0;
+}
+
 function pkgCard(p){
   /* 外框激活环 = 在图表显示集中（2026-11-15 用户裁定：外框点击驱动图表） */
   const isActive=state.activePkgs.has(p.id);
@@ -1736,8 +1755,8 @@ function pkgCard(p){
   if(limit && (p.mb||0)>limit) badges.push('<span class="pkg-badge warn">'+t('pkg.split',{n:Math.ceil(p.mb/limit)})+'</span>');
   if(p.zone==='export') badges.push('<span class="pkg-badge lock">'+t('pkg.readonly')+'</span>');
   if(p.origin) badges.push('<span class="pkg-badge">'+p.origin+'</span>');
-    const estHostMb = p.rawMb || p.uncompressedMb || (p.mb ? Math.round(p.mb * 2.0 * 10) / 10 : 0);
-    const estHostHtml = estHostMb ? '<span class="pkg-est-host" title="'+t('pkg.estHostTitle')+'"><i class="fa-solid fa-hard-drive"></i> '+t('pkg.estHost',{size:fmtMB(estHostMb)})+'</span>' : '';
+  const estHostMb = realUncompressedMbOf(p);
+  const estHostHtml = estHostMb ? '<span class="pkg-est-host" title="'+t('pkg.estHostTitle')+'"><i class="fa-solid fa-hard-drive"></i> '+t('pkg.estHost',{size:fmtMB(estHostMb)})+'</span>' : '';
     return '<div class="pkg-card'+(isActive?' is-active':'')+(p.unrecognized?' unrecognized':'')+(p.zone==='export'?' is-export':'')+'" data-pkg="'+p.id+'" data-mobile="'+(isMobile?'1':'0')+'" title="'+t('zones.cardDisplayTip')+'">'
     +'<input class="pkg-check" type="checkbox" data-pkgcheck="'+p.id+'"'+(state.selectedPkgs.has(p.id)?' checked':'')+' title="'+t('zones.checkboxActionTip')+'" aria-label="'+t('zones.checkboxActionTip')+'">'
     +icon
@@ -2224,7 +2243,7 @@ function renderActions(){
         +'<button class="btn" id="btn-task-abort">'+t('action.abort')+'</button>')
     : '';
   const selPkgs = [...state.selectedPkgs].map(id=>state.packages.find(p=>p.id===id)).filter(Boolean);
-  const totalHostRawMb = selPkgs.reduce((acc, p) => acc + (p.rawMb || p.uncompressedMb || (p.mb ? p.mb * 2.0 : 0)), 0);
+  const totalHostRawMb = selPkgs.reduce((acc, p) => acc + realUncompressedMbOf(p), 0);
   const estHostBadge = hasSel && totalHostRawMb > 0
     ? '<span class="pkg-est-host-badge" title="'+t('pkg.estHostTitle')+'"><i class="fa-solid fa-hard-drive"></i> '+t('zones.estHostTotal',{size:fmtMB(totalHostRawMb)})+'</span>'
     : '';
@@ -3517,7 +3536,7 @@ async function reloadServerPlugins(){
 }
 /** 管理员身份 + 服务端插件清单只读一次；非管理员到此为止（不留空分区）。 */
 async function loadServerPlugins(){
-  if(state.extServerLoaded) return;
+  if(state.mode==='web'||!state.host||state.host==='none'||state.host==='standalone'||state.extServerLoaded) return;
   /* 身份必须真正读到：`/api/users/me` 可能瞬时失败（宿主刚重启、CSRF 未就绪），
      一次失败就判成「非管理员」等于把管理员永久锁在外面。这里最多试 3 次，
      只有 `ok === true` 才认；三次都失败则不置位，下次进宿主页继续重试。 */
@@ -4119,27 +4138,18 @@ async function renderExtInstalled(body){
 
   const autoMasterOn=!!loadSettings().extAutoToolsOn;
   const importPkgs = (state.packages||[]).filter(p=>p && p.id);
-  const selectedPkg = importPkgs.find(p=>p.id===state.extSelectedPackageId) || null;
+  const activePkgId = (state.activePkgs && state.activePkgs.size === 1) ? Array.from(state.activePkgs)[0] : (state.source?.pkgId || null);
+  const selectedPkg = (activePkgId && importPkgs.find(p=>p.id===activePkgId))
+    || (state.extSelectedPackageId && importPkgs.find(p=>p.id===state.extSelectedPackageId))
+    || (importPkgs.length === 1 ? importPkgs[0] : null);
 
-  /* 列表头第 1 行左侧：包内展示当前包名与下拉选择（桌面和手机统一可用），宿主展示策略入口 */
-  const leftHeadControl=!isHost
-    ? (importPkgs.length
-      ? ('<div class="ext-pkg-bar">'
-          +'<span class="ext-pkg-current" title="'+escapeHtml(selectedPkg?.name||t('extmgr.noPackageSelected'))+'">'
-          +(selectedPkg ? (escapeHtml(selectedPkg.name)+'（'+fmtMB(selectedPkg.mb||0)+'）') : ('<span class="is-unselected">'+t('extmgr.noPackageSelected')+'</span>'))+'</span>'
-          +'<label class="field ext-pkg-picker" aria-label="'+t('extmgr.tabPackage')+'">'
-          +'<select class="text_pole" id="extmgr-pkg-select">'
-          +'<option value=""'+(!selectedPkg?' selected':'')+'>'+t('extmgr.selectPackagePlaceholder')+'</option>'
-          +importPkgs.map(p=>'<option value="'+escapeHtml(p.id)+'"'+(selectedPkg && p.id===selectedPkg.id?' selected':'')+'>'+escapeHtml(p.name)+' ('+fmtMB(p.mb)+')</option>').join('')
-          +'</select></label>'
-        +'</div>')
-      : ('<span class="ext-note-inline is-warn">'+t('extmgr.noPackageAvailable')+'</span>'))
-    : (autoMasterOn
-      ? '<button type="button" class="btn icon ext-policy-btn'+(state.extPolicyOpen?' active':'')
-        +'" id="extmgr-policy-toggle" aria-pressed="'+(state.extPolicyOpen?'true':'false')
-        +'" title="'+t('extmgr.autoPolicy')+'" aria-label="'+t('extmgr.autoPolicy')
-        +'"><i class="fa-solid fa-sliders"></i></button>'
-      : '');
+  /* 列表头左侧控制：包内视图统一由数据包列表选择，宿主展示策略入口 */
+  const leftHeadControl=isHost && autoMasterOn
+    ? '<button type="button" class="btn icon ext-policy-btn'+(state.extPolicyOpen?' active':'')
+      +'" id="extmgr-policy-toggle" aria-pressed="'+(state.extPolicyOpen?'true':'false')
+      +'" title="'+t('extmgr.autoPolicy')+'" aria-label="'+t('extmgr.autoPolicy')
+      +'"><i class="fa-solid fa-sliders"></i></button>'
+    : '';
 
   let rowsHtml = '';
   let countTotal = 0;
@@ -4220,18 +4230,12 @@ async function renderExtInstalled(body){
             ? '<span class="ext-flag ext-kind-tag is-orig">'+t('extmgr.kindOriginal')+'</span>'
             : '<span class="ext-flag ext-kind-tag is-man">'+t('extmgr.kindManifest')+'</span>';
           const repoLink = item.url ? formatExtRemoteUrlHtml(item.url) : '';
-          const toManifest=item.kind === 'original'
-            /* 2026-11-15 用户裁定：原件行内提供「转成清单」——删实体、留清单（只做减法） */
-            ? '<button type="button" class="btn icon ext-row-btn" data-pkg2manifest="'+escapeHtml(item.name)+'"'
-              +' title="'+t('extmgr.toManifest')+'" aria-label="'+t('extmgr.toManifest')+'"><i class="fa-solid fa-file-export"></i></button>'
-            : '';
           return '<div class="ext-entry is-ok ext-ext-row ext-pkg-row'+(isCurrentGit?' is-active':'')+'" role="listitem" data-extrow="'+escapeHtml(item.name)+'" style="animation-delay:'+Math.min(idx*35,350)+'ms">'
             +'<label class="check ext-dev-check"><input type="checkbox" data-extsel="'+escapeHtml(item.name)+'"></label>'
             +'<span class="ext-url" title="'+escapeHtml(item.name)+'">'+escapeHtml(item.name)+'</span>'
             +'<span class="ext-state">'+escapeHtml(item.version)+'</span>'
             +kindBadge
             +repoLink
-            +toManifest
             +'</div>';
         }).join('');
       } else {
@@ -4249,17 +4253,10 @@ async function renderExtInstalled(body){
   const updRows=upd && Array.isArray(upd.rows)
     ? upd.rows.map((r)=>{
       const failed=!!fails[r.name];
-      const actionsHtml=(r.status==='update'||failed)
-        ? '<span class="ext-actions">'
-          +(r.status==='update'?'<button type="button" class="btn" data-upd-update="'+escapeHtml(r.name)+'">'+t('extmgr.updateNow')+'</button>':'')
-          +'<button type="button" class="btn" data-upd-reinstall="'+escapeHtml(r.name)+'">'+t('extmgr.reinstall')+'</button>'
-          +'</span>'
-        : '';
       return '<div class="ext-entry upd-row is-'+(r.status==='update'?'update':failed?'failed':r.status==='latest'?'ok':'pending')+'">'
         +'<span class="ext-url" title="'+escapeHtml(r.url)+'">'+escapeHtml(r.name)+'</span>'
         +'<span class="ext-state">'+t('extmgr.updateVersions',{local:r.localVersion||'-',remote:r.remoteVersion||'-'})+'</span>'
         +'<span class="ext-state'+(r.status==='update'?' is-warn':'')+'">'+updateStatusText(r)+(r.reason?' · '+reasonText(r.reason):'')+'</span>'
-        +actionsHtml
       +'</div>'
         +(failed?'<div class="ext-sub"><span class="ext-note-inline is-warn">'+escapeHtml(fails[r.name])+'</span></div>':'');
     }).join('')
@@ -4295,22 +4292,20 @@ async function renderExtInstalled(body){
       +' title="'+t('extmgr.exportAssetList')+'" aria-label="'+t('extmgr.exportAssetList')+'"><i class="fa-solid fa-file-code"></i></button>'
     +(showBatchRef ? '<input class="text_pole ext-batch-ref" data-extref placeholder="'+t('extmgr.refOptional')+'">' : '');
 
-  /* 2026-11-15 裁定：安装操作一律在底部「安装扩展」面板内进行——
-     数据包工具行只留「打包」与「移除所选」（包内清理**只做减法**），
-     「安装到宿主」迁入页脚安装面板（renderExtInstall 的 package 分支）。 */
-  const packageActionButtons='<button type="button" class="btn ext-act-btn" id="extmgr-batch-pack" disabled title="'+t('extmgr.batchPack')+'">'
+  /* 数据包工具行：转成清单（删实体留清单）、打包、移除所选与导出清单，单行紧凑布局 */
+  const packageActionButtons='<button type="button" class="btn ext-act-btn" id="extmgr-batch-to-manifest" disabled title="'+t('extmgr.toManifest')+'">'
+      +'<i class="fa-solid fa-file-export"></i><span>'+t('extmgr.toManifest')+'</span>'
+    +'</button>'
+    +'<button type="button" class="btn ext-act-btn" id="extmgr-batch-pack" disabled title="'+t('extmgr.batchPack')+'">'
       +'<i class="fa-solid fa-box-archive"></i><span>'+t('extmgr.batchPack')+'</span>'
     +'</button>'
     +'<button type="button" class="btn danger ext-act-btn" id="extmgr-batch-prune" disabled title="'+t('extmgr.batchPrune')+'">'
       +'<i class="fa-solid fa-eraser"></i><span>'+t('extmgr.batchPrune')+'</span>'
     +'</button>'
-    /* 2026-11-15 用户裁定：导出扩展清单＝纯图标钮（禁文字），只住扩展管理按钮行 */
+    /* 导出扩展清单＝纯图标钮（禁文字），只住扩展管理按钮行 */
     +'<button type="button" class="btn icon ext-act-btn" id="extmgr-export-assetlist-pkg" disabled'
       +' title="'+t('extmgr.exportAssetList')+'" aria-label="'+t('extmgr.exportAssetList')+'"><i class="fa-solid fa-file-code"></i></button>';
 
-  /* 2026-11-16 用户铁律：列表头必须只有 2 行！
-     第 1 行：来源切换与策略在左，查看控制（检查更新/刷新/排序）在右，两端对称；
-     第 2 行：选择组在左，批量操作按钮在右，紧凑单行。 */
   const policyOpen=isHost && autoMasterOn && !!state.extPolicyOpen;
   const isBusy = !!(state.extScanningBusy || (upd && upd.busy));
   const lastScanTipText = isBusy
@@ -4345,15 +4340,33 @@ async function renderExtInstalled(body){
         +'</div>'
       +'</div>'
       +'<div class="ext-unified-actions">'
-        +(isHost ? hostActionButtons : packageActionButtons)
+        +hostActionButtons
       +'</div>'
     +'</div>'
     : '';
 
-  const listHead='<div class="ext-list-head" id="extmgr-list-head">'
-    +headRow1
-    +headRow2
-  +'</div>';
+  const listHead=isHost
+    ? ('<div class="ext-list-head" id="extmgr-list-head">'
+        +headRow1
+        +headRow2
+      +'</div>')
+    : ('<div class="ext-list-head ext-list-head--pkg" id="extmgr-list-head">'
+        +'<div class="ext-head-row ext-head-action-row">'
+          +'<div class="ext-head-left">'
+            +(selectedPkg ? ('<span class="ext-pkg-current" title="'+escapeHtml(selectedPkg.name)+'"><i class="fa-solid fa-box"></i> '+escapeHtml(selectedPkg.name)+'</span>') : '')
+            +'<span class="ext-list-count">'+t('extmgr.listCount',{n:countTotal})+'</span>'
+            +'<span class="ext-state" id="extmgr-sel-count">'+t('extmgr.selectedN',{n:0,total:countTotal})+'</span>'
+            +'<div class="ext-sel-group">'
+              +iconBtn('data-extall','fa-check-double',t('extmgr.selectAll'))
+              +iconBtn('data-extinvert','fa-shuffle',t('extmgr.invert'))
+              +iconBtn('data-extnone','fa-xmark',t('extmgr.selectNone'))
+            +'</div>'
+          +'</div>'
+          +'<div class="ext-unified-actions">'
+            +packageActionButtons
+          +'</div>'
+        +'</div>'
+      +'</div>');
 
   body.innerHTML=listHead
     +(policyOpen
@@ -4367,16 +4380,6 @@ async function renderExtInstalled(body){
   /* 事件绑定 */
   body.querySelector('#extmgr-policy-close')?.addEventListener('click',()=>{
     state.extPolicyOpen=false;
-    renderExtensionView();
-  });
-  body.querySelector('#extmgr-pkg-select')?.addEventListener('change',(e)=>{
-    state.extSelectedPackageId=e.target.value;
-    const newPkg = (state.packages||[]).find(p=>p.id===state.extSelectedPackageId);
-    if(newPkg){
-      logger.info(t('log.extPkgSwitch', { name: newPkg.name, size: fmtMB(newPkg.mb || 0) }));
-    } else {
-      logger.info(t('log.extPkgDeselect'));
-    }
     renderExtensionView();
   });
   /* 自动更新总开关已迁入开发者页（2026-11-15 用户二次裁定）；策略子视图自带关闭钮 */

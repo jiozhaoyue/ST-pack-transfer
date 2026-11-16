@@ -193,6 +193,13 @@ async function main(root) {
       name: record.name || record.id,
       size: fmtMB(sizeBytes / (1024 * 1024)),
       mb: sizeBytes / (1024 * 1024),
+      rawBytes: record.rawBytes || (record.metadata?.rawBytes || 0),
+      rawMb: (record.rawBytes || record.metadata?.rawBytes)
+        ? Math.round(((record.rawBytes || record.metadata.rawBytes) / (1024 * 1024)) * 10) / 10
+        : 0,
+      uncompressedMb: (record.rawBytes || record.metadata?.rawBytes)
+        ? Math.round(((record.rawBytes || record.metadata.rawBytes) / (1024 * 1024)) * 10) / 10
+        : 0,
       ts: record.createdAt || Date.now(),
       time: clockOf(record.createdAt),
       /** 产物声明的目标布局（转换时写入）；用于区分结构相同但平台不同的 TT / PT 包。 */
@@ -407,6 +414,9 @@ async function main(root) {
         // 产物包保留转换时声明的目标布局：PT 产物与 TT 结构相同，重新识别只会得到 tt。
         if (!live.declaredLayout) live.host = HOST_CODE[plan.sourceLayout] || live.host;
         live.unrecognized = plan.totalSourceFiles === 0;
+        live.rawBytes = plan.totalSourceBytes || 0;
+        live.rawMb = Math.round(((plan.totalSourceBytes || 0) / (1024 * 1024)) * 10) / 10;
+        live.uncompressedMb = live.rawMb;
       }
       view.setPackages(state.packages);
       view.setProgress(0, t('progress.scanDone'));
@@ -1702,8 +1712,8 @@ async function main(root) {
           onLog: (line) => view.extLogAppend(line),
         })),
       listHostExtensions: () => listHostExtensions(host.platform),
-      hostIdentity: () => readHostIdentity(),
-      listServerPlugins: () => listServerPlugins(),
+      hostIdentity: () => (!host.isPlugin ? Promise.resolve({ ok: false, reason: 'standalone' }) : readHostIdentity()),
+      listServerPlugins: () => (!host.isPlugin ? Promise.resolve({ ok: false, plugins: [], reason: 'standalone' }) : listServerPlugins()),
       /* 服务端插件管理（管理员；Luker users-admin 端点，2026-11-15 用户裁定接入） */
       serverPluginUpdate: (dir) => serverPluginUpdate(dir),
       serverPluginDelete: (dir) => serverPluginDelete(dir),

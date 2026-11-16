@@ -200,7 +200,7 @@ export function getWorkbenchHtml() {
           </div>
           </div>
 
-          <div class="transfer-pane" id="cloud-view" hidden>
+          <div class="transfer-pane cloud-view" id="cloud-view" hidden>
           <!-- 1. Storage credentials card (pinned to top with integrated tabs) -->
           <div class="cloud-card cloud-storage-config-card">
             <div class="cloud-card-header cloud-provider-header">

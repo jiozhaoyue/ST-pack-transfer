@@ -526,6 +526,7 @@ export default {
   'extmgr.recManifest': '建议清单',
   'extmgr.toManifest': '转成清单',
   'extmgr.toManifestDesc': '将「{name}」的实体文件从包内移除、清单条目保留（只做减法）。转出的包在宿主上按清单在线拉取。',
+  'extmgr.batchToManifestDesc': '将选中的 {n} 个扩展的实体文件从包内移除、清单条目保留（只做减法）。转出的包在宿主上按清单在线拉取。',
   'extmgr.toManifestConfirm': '确认转换',
   'extmgr.pkgToManifest': '已转成清单：移除实体文件 {files} 个',
   'extmgr.autoPolicy': '自动更新策略',

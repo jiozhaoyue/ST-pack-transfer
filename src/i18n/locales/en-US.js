@@ -520,6 +520,7 @@ export default {
   'extmgr.recManifest': 'Manifest suggested',
   'extmgr.toManifest': 'Convert to manifest',
   'extmgr.toManifestDesc': 'Remove the files of "{name}" from the package but keep its manifest entry (subtraction only). The host will pull it online via the manifest.',
+  'extmgr.batchToManifestDesc': 'Remove the files of {n} selected extension(s) from the package but keep their manifest entries (subtraction only). The host will pull them online via the manifest.',
   'extmgr.toManifestConfirm': 'Convert',
   'extmgr.pkgToManifest': 'Converted to manifest: removed {files} file(s)',
   'extmgr.autoPolicy': 'Auto-update policy',

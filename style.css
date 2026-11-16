@@ -817,8 +817,12 @@
      行直接嵌在 body 流内。列表按钮行固定（不吸顶）：行滚动发生在 .ext-scroll 内，
      按钮行永不与行内容穿插重叠（修复“穿透”）。 */
   #app.app-container .ext-list-head{flex:0 0 auto;display:flex;flex-direction:column;gap:6px;
-    padding:8px 10px;font-size:10.5px;color:var(--muted);background:var(--panel);
-    border:1px solid var(--border);border-radius:8px;position:sticky;top:0;z-index:10}
+    padding:8px 10px;font-size:10.5px;color:var(--muted);background:var(--panel-2, var(--panel));
+    border-bottom:1px solid var(--border);position:static}
+  #app.app-container .ext-list-head--pkg{padding:6px 10px}
+  #app.app-container .ext-list-head--pkg .ext-head-action-row{display:flex;align-items:center;justify-content:space-between;flex-wrap:nowrap;gap:8px}
+  #app.app-container .ext-list-head--pkg .ext-pkg-current{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;color:var(--text);margin-right:6px}
+  #app.app-container .ext-list-head--pkg .ext-pkg-current i{color:var(--accent)}
   /* 列表滚动区：**始终占满剩余高度**；行少时列表撑满、动作块沉底，行多时整区滚动 */
   /* 列表滚动区（2026-11-16 用户裁定）：**内容定高**——收起/空列表时不保留任何占高度的空白带；
      列表长时它在面板内滚动（唯一滚动条），页脚仍钉在面板底。 */
@@ -1339,7 +1343,7 @@
   #app.app-container[data-view="mobile"][data-zone-open="1"] .zone-side-tabs{display:none !important}
   #app.app-container[data-view="mobile"][data-zone-open="1"] #zone-side-git{display:none !important}
   #app.app-container[data-view="mobile"] .chart-card{flex:1 0 auto}
-  #app.app-container[data-view="mobile"] .cloud-view{flex:0 0 auto}
+  #app.app-container[data-view="mobile"] .cloud-view, #app.app-container[data-view="mobile"] #cloud-view{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden}
   #app.app-container[data-view="mobile"] .cloud-grid{grid-template-columns:minmax(0,1fr)}
   #app.app-container[data-view="mobile"] .cloud-body{overflow:visible}
   #app.app-container[data-view="mobile"] .vol-collapse{display:inline-flex}
@@ -1488,12 +1492,12 @@
 #app.app-container .lan-open-btn:hover{border-color:var(--border-strong)}
 #app.app-container .transfer-view{flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
 #app.app-container #transfer-view[hidden]{display:none}
-#app.app-container .transfer-body{flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
+#app.app-container .transfer-body{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;overflow-y:auto;overflow-x:hidden}
 #app.app-container .transfer-tabs{flex:0 0 auto}
 #app.app-container .transfer-subtabs{flex:0 0 auto;padding:6px 12px 0;display:flex;align-items:center;gap:8px}
 #app.app-container .transfer-subpane{flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
 #app.app-container .transfer-subpane[hidden]{display:none}
-#app.app-container .cloud-view{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;gap:10px;padding:10px 12px;overflow-y:auto}
+#app.app-container .cloud-view, #app.app-container #cloud-view{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;gap:10px;padding:10px 12px;overflow-y:auto;overflow-x:hidden}
 #app.app-container #cloud-view[hidden]{display:none}
 #app.app-container .cloud-card{display:flex;flex-direction:column;gap:10px;padding:12px 14px;border-radius:10px;
   border:1px solid var(--border);background:color-mix(in srgb,var(--panel-3) 55%,transparent);

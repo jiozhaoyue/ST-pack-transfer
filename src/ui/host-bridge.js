@@ -804,6 +804,7 @@ async function postJsonBounded(url, body, label) {
  */
 export async function readHostIdentity() {
   if (typeof fetch !== 'function') return { ok: false, reason: 'no-fetch' };
+  if (typeof window !== 'undefined' && !detectHost().isPlugin) return { ok: false, reason: 'standalone-web' };
   const res = await getJsonBounded('/api/users/me', '读取当前用户身份');
   if (!res.ok || !res.data || typeof res.data !== 'object') {
     return {
@@ -832,6 +833,7 @@ export async function readHostIdentity() {
  */
 export async function listServerPlugins() {
   if (typeof fetch !== 'function') return { ok: false, reason: 'no-fetch' };
+  if (typeof window !== 'undefined' && !detectHost().isPlugin) return { ok: false, plugins: [], reason: 'standalone-web' };
   const res = await postJsonBounded('/api/users/plugins/list', {}, '读取服务端插件');
   if (!res.ok) return { ok: false, status: res.status || 0, reason: res.reason || `http-${res.status || 0}` };
   const data = res.data;
@@ -1208,6 +1210,7 @@ function readContextCsrfToken() {
 export async function getCsrfToken({ signal } = {}) {
   const fromContext = readContextCsrfToken();
   if (fromContext) return fromContext;
+  if (typeof window !== 'undefined' && !detectHost().isPlugin) return null;
   const response = await fetchWithTimeout('/csrf-token', { credentials: 'same-origin' }, {
     timeoutMs: SHORT_FETCH_TIMEOUT_MS,
     signal,
