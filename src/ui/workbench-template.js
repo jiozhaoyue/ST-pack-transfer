@@ -426,7 +426,8 @@ export function getWorkbenchHtml() {
         <button class="icon-btn" id="log-close" data-i18n-title="header.close">×</button>
       </div>
       <div class="log-toolbar" id="log-toolbar">
-        <button class="log-level-btn active" data-level="INFO" data-i18n="log.info" title=""></button>
+        <button class="log-level-btn" data-level="DEBUG" data-i18n="log.debug" title=""></button>
+        <button class="log-level-btn" data-level="INFO" data-i18n="log.info" title=""></button>
         <button class="log-level-btn active" data-level="WARN" data-i18n="log.warn" title=""></button>
         <button class="log-level-btn active" data-level="ERROR" data-i18n="log.error" title=""></button>
         <button class="log-level-btn active" data-level="SUCCESS" data-i18n="log.success" title=""></button>
@@ -446,6 +447,11 @@ export function getWorkbenchHtml() {
       <div class="view-body help-view-body" id="help-body"></div>
     </section>
 
+    <section class="task-queue" id="task-queue" hidden aria-live="polite">
+      <div class="tq-head"><b data-i18n="queue.title"></b><span class="tq-count" id="tq-count"></span></div>
+      <div class="tq-list" id="tq-list"></div>
+    </section>
+
     <button type="button" class="workbench-progress" id="workbench-progress" data-i18n-title="progress.openLog">
       <span class="progress-bar"><span class="progress-fill" id="progress-fill"></span></span>
       <span class="progress-text">
@@ -453,6 +459,7 @@ export function getWorkbenchHtml() {
         <span class="progress-hint" id="progress-hint" data-i18n="progress.openLog"></span>
         <span class="log-dot" id="log-dot" hidden></span>
         <span id="progress-pct">0%</span>
+        <span class="app-version" id="app-version"></span>
       </span>
     </button>
 
@@ -468,7 +475,7 @@ export function getWorkbenchHtml() {
     </div>
 
 <!-- Tutorial -->
-<div class="tutorial-overlay" id="tutorial-overlay">
+<div class="tutorial-overlay" id="st-pt-tutorial-overlay">
   <div class="tutorial-ring" id="tutorial-ring"></div>
   <div class="tutorial-card" id="tutorial-card">
     <div class="tt" id="tutorial-title"></div>

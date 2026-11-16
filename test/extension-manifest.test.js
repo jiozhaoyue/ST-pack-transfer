@@ -99,6 +99,13 @@ describe('派生规则：availability', () => {
     expect(entry.availability).toBe(AVAILABILITY.UNAVAILABLE);
     expect(entry.sourceKind).toBe(SOURCE_KIND.HOMEPAGE);
   });
+
+  it('BOTH 模式：实体在包内（embedded）同时登记清单', () => {
+    const entry = deriveExtensionEntry({ name: 'a', gitMeta: GIT_META, mode: 'both' });
+    expect(entry.availability).toBe(AVAILABILITY.EMBEDDED);
+    expect(entry.packMode).toBe('both');
+    expect(entry.manifestListed).toBe(true);
+  });
 });
 
 describe('派生规则：notes', () => {
@@ -160,6 +167,23 @@ describe('buildExtensionManifest（私有清单）', () => {
     expect(m.total).toBe(0);
     expect(m.extensions).toEqual([]);
   });
+
+  it('同一包内完整 / 清单 / 双选并存，逐条 packMode 与顶层 mode', () => {
+    const m = buildExtensionManifest({
+      extensions: [
+        { name: 'full', gitMeta: GIT_META, mode: 'full' },
+        { name: 'only', gitMeta: GIT_META, mode: 'manifest' },
+        { name: 'both', gitMeta: GIT_META, mode: 'both' },
+      ],
+      mode: 'mixed',
+      generatedAt: 'x',
+    });
+    expect(m.mode).toBe('mixed');
+    expect(m.extensions.map((e) => e.packMode)).toEqual(['full', 'manifest', 'both']);
+    expect(m.extensions.map((e) => e.manifestListed)).toEqual([false, true, true]);
+    expect(m.extensions.map((e) => e.availability))
+      .toEqual([AVAILABILITY.EMBEDDED, AVAILABILITY.INSTALLABLE, AVAILABILITY.EMBEDDED]);
+  });
 });
 
 describe('buildOfficialIndex（官方索引，仅 MANIFEST 产出）', () => {
@@ -187,6 +211,14 @@ describe('buildOfficialIndex（官方索引，仅 MANIFEST 产出）', () => {
       { id: 'emb', name: 'emb', displayName: 'Emb', description: '', url: 'https://github.com/a/b', branch: 'main', commit: '', type: 'extension', availability: AVAILABILITY.EMBEDDED },
     ]);
     expect(index).toBeNull();
+  });
+
+  it('双选（both）条目：实体在包内，但仍登记官方索引', () => {
+    const index = buildOfficialIndex([
+      { id: 'both', name: 'both', displayName: 'Both', description: '', url: 'https://github.com/a/b', branch: 'main', commit: '', type: 'extension', availability: AVAILABILITY.EMBEDDED, packMode: 'both', manifestListed: true },
+    ]);
+    expect(index).toHaveLength(1);
+    expect(index[0].id).toBe('both');
   });
 
   it('只输出官方字段集，不泄漏 availability/manifest 等私有字段', () => {
@@ -259,6 +291,16 @@ describe('normalizeManifestEntries（恢复端归一）', () => {
     expect(entries[0].displayName).toBe('by-id');
     expect(entries[0].branch).toBe('main');
     expect(entries[0].type).toBe('extension');
+  });
+
+  it('both 条目归一：availability embedded、packMode both、manifestListed true', () => {
+    const entries = normalizeManifestEntries({
+      mode: 'both',
+      extensions: [{ name: 'a', url: 'https://github.com/a/b', packMode: 'both' }],
+    });
+    expect(entries[0].availability).toBe(AVAILABILITY.EMBEDDED);
+    expect(entries[0].packMode).toBe('both');
+    expect(entries[0].manifestListed).toBe(true);
   });
 
   it('notes 非字符串时归一为空串（渲染端据此跳过）', () => {

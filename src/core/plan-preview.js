@@ -19,6 +19,8 @@ import {
   extractGitRemoteUrl,
 } from './extension-manifest.js';
 import { isTavernBuiltinAsset } from './builtin-assets.js';
+import { detectSourceEngine, isCarrierEntryName } from './engine-registry.js';
+import { ENGINE_META_ENTRY } from './engine-model.js';
 
 const TEXT_DECODER = new TextDecoder();
 
@@ -204,6 +206,9 @@ export async function generatePlan(source, target, {
   const extensionSources = new Map();
   // gitMode=minimal 下见过 .git/config 的扩展根(hub 路径)——供预测尾部合成的 .git/objects/.keep。
   const gitRoots = new Set();
+  // 源存储引擎探测（Luker 选包后自动切换目标引擎的数据源）。
+  const engineNames = [];
+  let engineMeta = null;
 
   try {
     for await (const entry of scanner.entries()) {
@@ -221,7 +226,12 @@ export async function generatePlan(source, target, {
       // 0. 扩展元数据解析（与 transform.js 主循环同源的解析规则）。
       // 注意：不 continue——元数据条目仍要参与下方的类目计数与动作预测，
       // 否则会回归（这些条目本来就算在 extensions 类目里）。
-      if (routed.kind === 'extension-source') {
+      if (isCarrierEntryName(routed.hubPath)) {
+        engineNames.push(routed.hubPath);
+        if (String(routed.hubPath).split('/').pop() === ENGINE_META_ENTRY) {
+          engineMeta = parseJsonSafe(await entry.read()) || engineMeta;
+        }
+      } else if (routed.kind === 'extension-source') {
         const record = parseJsonSafe(await entry.read());
         if (record) extensionSources.set(routed.source.name, { record });
       } else if (routed.kind === 'extension-pkg') {
@@ -469,6 +479,8 @@ export async function generatePlan(source, target, {
       builtin: [...builtinExtNames].sort(),
       shadowed: [...globalExtNames].filter((name) => userExtFolders.has(name)).sort(),
     },
+    /** 源存储引擎探测（Luker 选包后自动切到宿主引擎；读不到时 kind 为空串）。 */
+    sourceEngine: detectSourceEngine({ names: engineNames, meta: engineMeta }),
     // 扩展元数据（供「仅导出扩展清单」只读选项复用，避免二次解析）
     extensions: [...new Set([
       ...extensionManifests.keys(),

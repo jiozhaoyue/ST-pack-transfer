@@ -2286,12 +2286,10 @@ var qrcode = function() {
 
 }();
 
-(function (factory) {
-  if (typeof define === 'function' && define.amd) {
-      define([], factory);
-  } else if (typeof exports === 'object') {
-      module.exports = factory();
-  }
-}(function () {
-    return qrcode;
-}));
+/* 本仓本地副本的唯一改动（2026-11-17）：移除 UMD 包装，改为纯 ESM 默认导出。
+   `src/ui/qr.js` 直接 import，**不再**依赖向宿主 document.head 注入 classic script。
+   原因：宿主里其它扩展可能占用 `window.qrcode`，或 CSP 拒绝动态脚本，
+   旧实现会静默返回空串 -> 局域网互传「什么码都不生成」。
+   注意：不得保留 `module.exports =` 分支，否则在 Vitest/CJS 互操作环境会与
+   `export default` 的只读 getter 冲突（Cannot set property default）。 */
+export default qrcode;

@@ -61,4 +61,35 @@ describe('逐扩展双模式 · 同一个数据包内完整与清单并存', () 
     const index = JSON.parse(files.get('extensions-index.json').toString('utf8'));
     expect(index.map((e) => e.id)).toEqual(['manifest-ext']);
   });
+
+  it('双选：实体与官方索引同时存在，packMode=both', async () => {
+    const files = await run(entries(), {
+      extensionMode: 'full',
+      extensionManifestNames: ['manifest-ext'],
+      extensionFullNames: ['manifest-ext'],
+    });
+    expect(files.has('extensions/manifest-ext/index.js')).toBe(true);
+    expect(files.has('extensions/manifest-ext/manifest.json')).toBe(true);
+    const manifest = JSON.parse(files.get('_convert/extensions-manifest.json').toString('utf8'));
+    const both = manifest.extensions.find((e) => e.name === 'manifest-ext');
+    expect(both.packMode).toBe('both');
+    expect(both.manifestListed).toBe(true);
+    expect(both.availability).toBe('embedded');
+    const index = JSON.parse(files.get('extensions-index.json').toString('utf8'));
+    expect(index.map((e) => e.id)).toEqual(['manifest-ext']);
+  });
+
+  it('全双选：顶层 mode=both，所有实体保留', async () => {
+    const files = await run(entries(), {
+      extensionMode: 'full',
+      extensionManifestNames: ['full-ext', 'manifest-ext'],
+      extensionFullNames: ['full-ext', 'manifest-ext'],
+    });
+    expect(files.has('extensions/full-ext/index.js')).toBe(true);
+    expect(files.has('extensions/manifest-ext/index.js')).toBe(true);
+    const manifest = JSON.parse(files.get('_convert/extensions-manifest.json').toString('utf8'));
+    expect(manifest.mode).toBe('both');
+    const index = JSON.parse(files.get('extensions-index.json').toString('utf8'));
+    expect(index.map((e) => e.id).sort()).toEqual(['full-ext', 'manifest-ext']);
+  });
 });

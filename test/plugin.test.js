@@ -9,7 +9,7 @@ describe('SillyTavern 标准插件工程结构 (ST-pack-transfer)', () => {
     const manifest = JSON.parse(await readFile('manifest.json', 'utf8'));
     expect(manifest.name).toBe('ST-pack-transfer');
     expect(manifest.display_name).toBe('数据包转运');
-    expect(manifest.version).toBe('0.5.2');
+    expect(manifest.version).toBe('0.5.3');
     expect(manifest.author).toBe('jiozhaoyue');
     expect(manifest.js).toBe('index.js');
     expect(manifest.css).toBe('style.css');
@@ -55,7 +55,7 @@ describe('SillyTavern 标准插件工程结构 (ST-pack-transfer)', () => {
     // clearLogOnLoad / clearPackagesOnLoad / autoRefreshAfterUpload / confirmDiscardChartPrefs）
     // + 设置→数据 的 2 个凭据勾选（includeCreds / includeOauth）。
     // 自动更新已搬到宿主页每条扩展，设置页不再有相关开关。
-    expect((settingsHtml.match(/type="checkbox"/g) || []).length).toBe(10);
+    expect((settingsHtml.match(/type="checkbox"/g) || []).length).toBe(11);
     expect(settingsHtml).not.toMatch(/扩展包|backups|派生缓存|清理/i);
 
     // 反向断言：index.html 不得出现这些业务节点（防回归成两份副本）

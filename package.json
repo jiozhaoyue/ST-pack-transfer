@@ -1,6 +1,6 @@
 {
   "name": "st-pack-transfer",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "description": "SillyTavern / Luker / PureTavern / TauriTavern 数据包转运工具",
   "type": "module",
   "license": "AGPL-3.0-or-later",

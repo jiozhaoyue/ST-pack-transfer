@@ -27,6 +27,19 @@ describe('Logger Core System', () => {
     expect(stats.success).toBe(1);
   });
 
+  it('DEBUG 也入账；默认阈值 WARN 只影响控制台镜像', () => {
+    const before = logger.getLevel();
+    logger.setLevel('warn');
+    logger.debug('Debug message');
+    logger.info('Info message');
+    const entries = logger.getEntries();
+    expect(entries.map((e) => e.level)).toContain(LOG_LEVELS.DEBUG);
+    expect(entries.map((e) => e.level)).toContain(LOG_LEVELS.INFO);
+    expect(logger.getStats().debug).toBeGreaterThanOrEqual(1);
+    expect(logger.getLevel()).toBe('WARN');
+    logger.setLevel(before);
+  });
+
   it('supports level filtering', () => {
     logger.info('Info 1');
     logger.warn('Warn 1');

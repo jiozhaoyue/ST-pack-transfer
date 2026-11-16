@@ -71,6 +71,10 @@ import { uploadBackupSet, updateSetRegistry } from './src/app/backup-set-runner.
 import { openEntrySession, safeSegment, timestampName } from './src/core/backup-set.js';
 import { pruneFullSnapshots } from './src/core/transfer-prune.js';
 import { ExportQueue } from './src/ui/export-queue.js';
+import { APP_VERSION } from './src/core/app-version.js';
+import {
+  fullChangelog, markSeenVersion, readSeenVersion, recentChangelog, shouldShowChangelog,
+} from './src/core/changelog.js';
 import { reportToHuman } from './src/core/report.js';
 import { TaskManager, memoryAdapter } from './src/core/task-manager.js';
 
@@ -101,6 +105,20 @@ let nativePullHook = null;
 /** 在途拉取的取消器；宿主原生导出开始时中止插件自己的请求（宿主优先）。 */
 let activePullAbort = null;
 
+/**
+ * 教程浮层必须直接挂到 `document.body`。
+ *
+ * 宿主（SillyTavern / Luker 抽屉与模态）祖先常带 `transform` / `filter` / 滚动容器，
+ * `position:fixed` 会被困进祖先坐标系——页面一滚，浮层就停在祖先顶部、落在屏幕外。
+ * 移到 body 后固定定位才真正相对视口；样式由 `#st-pt-tutorial-overlay` 自有作用域承载。
+ */
+function portalTutorialOverlay() {
+  const overlay = document.getElementById('st-pt-tutorial-overlay');
+  if (overlay && overlay.parentElement !== document.body) {
+    document.body.appendChild(overlay); // dom-scope:allow 教程浮层必须逃出宿主 transform 祖先
+  }
+}
+
 function ensureConverterModal() {
   let overlay = document.getElementById('st-converter-modal-overlay');
   if (overlay) return overlay;
@@ -129,11 +147,15 @@ export function openConverterModal() {
 }
 
 async function main(root) {
+  portalTutorialOverlay();
   const host = detectHost();
   const hostKey = host.isPlugin ? (HOST_CODE[host.platform] || 'st') : 'st';
   root.dataset.host = hostKey;
 
   const settings = loadSettings();
+  // 日志阈值默认 WARN；设置可切 debug / info / error。所有级别始终入账，不因阈值丢弃。
+  logger.setLevel(settings.logLevel || 'warn');
+  logger.debug(`[init] host=${host.platform} plugin=${host.isPlugin} logLevel=${logger.getLevel()} version=${APP_VERSION}`);
   /** 浏览器侧存储审查 provider（只读；与宿主无关，Node/Web/插件三形态同一份）。 */
   const browserStorageProvider = createBrowserStorageProvider();
 
@@ -154,6 +176,33 @@ async function main(root) {
   let pendingResume = readPausedMarker();
   /** @type {ReturnType<typeof createConversionRunner>|null} */
   let conversionRunner = null;
+  /** 连续任务队列：生成批次可排队，支持暂停 / 继续 / 中断 / 排序。 */
+  const taskQueue = [];
+  /** 已结束任务保留展示（最多 20 条）；不参与执行，可手动移除。 */
+  const queueFinished = [];
+  const rememberFinished = (job) => {
+    queueFinished.push(job);
+    while (queueFinished.length > 20) queueFinished.shift();
+  };
+  let taskSeq = 0;
+  let queueBusy = false;
+  let queueCurrent = null;
+  const queueSnapshot = () => [
+    ...(queueCurrent ? [queueCurrent] : []),
+    ...taskQueue,
+    ...queueFinished,
+  ].map((job) => ({
+    id: job.id,
+    label: job.label,
+    status: job.status,
+    pct: job.pct || 0,
+  }));
+  const syncQueue = () => { try { view.setTaskQueue(queueSnapshot()); } catch { /* 视图尚未创建 */ } };
+  const setQueueProgress = (pct) => {
+    if (!queueCurrent) return;
+    queueCurrent.pct = Math.max(0, Math.min(100, Number(pct) || 0));
+    syncQueue();
+  };
 
   async function getTaskManager() {
     if (!taskManagerPromise) {
@@ -399,6 +448,7 @@ async function main(root) {
   }
 
   async function ensurePlan(pkgId, targetName = null) {
+    logger.debug(`[plan] start pkg=${pkgId} target=${targetName || view.getState().target}`);
     const pkg = pkgById(pkgId);
     if (!pkg) return null;
     const code = targetCodeOf(targetName || view.getState().target);
@@ -439,6 +489,8 @@ async function main(root) {
       if (live) {
         live.nodes = tree;
         live.extensions = plan.extensions || [];
+        // 源存储引擎：Luker 下选中包后自动切到该引擎（不再停留在「跟随源包」）。
+        live.sourceEngine = plan.sourceEngine?.kind || '';
         // 扩展作用域诊断（同名覆盖 / 自带插件）：UI 顶部汇总条与行内指引的唯一数据源。
         live.extensionScopes = plan.extensionScopes || null;
         live.extManifest = pkg.extManifest || [];
@@ -474,6 +526,7 @@ async function main(root) {
   }
 
   async function importFiles(files, { remote = false } = {}) {
+    logger.debug(`[import] received ${files?.length || 0} file(s) remote=${!!remote}: ${(files || []).map((f) => f?.name).filter(Boolean).join(', ')}`);
     const list = [...(files || [])];
     if (!list.length) return;
     if (!isStorageSupported()) { view.toast(t('toast.storageUnsupported')); return; }
@@ -496,7 +549,7 @@ async function main(root) {
       await ensurePlan(newest.id);
       Object.assign(settings, loadSettings());
       view.applySettings?.(settings);
-      view.setActivePackage(newest.id);
+      view.setActivePackage(newest.id, { exclusive: true });
     }
     view.toast(t(remote ? 'toast.receivedCount' : 'toast.importedCount', { n: list.length }));
   }
@@ -1209,6 +1262,7 @@ async function main(root) {
    * @param {boolean} fromNativeUi 是否由原生界面按钮触发（完成时用宿主原生 toast）
    */
   async function pullFromHost(selection, fromNativeUi) {
+    logger.debug(`[pull] start host pull fromNativeUi=${!!fromNativeUi} selection=${JSON.stringify(selection || {})}`);
     if (state.busy) return;
     state.busy = true;
     const pullStart = performance.now();
@@ -1258,9 +1312,17 @@ async function main(root) {
     }
   }
 
-  async function generate({ packages, merge = false, target, splitMb, filenameTemplate }) {
-    if (state.busy) return;
-    if (!packages?.length) { view.toast(t('toast.selectExportFirst')); return; }
+  /** 对外的「生成」入口：**永不阻塞**，一律先入队；队列串行执行。 */
+  function generate(args = {}) {
+    const packages = Array.isArray(args.packages) ? args.packages : [];
+    if (!packages.length) { view.toast(t('toast.selectExportFirst')); return; }
+    const label = t('queue.labelGenerate', { n: packages.length, target: args.target || '' });
+    enqueueTask({ type: 'generate', label, run: () => executeGenerate(args) });
+  }
+
+  /** 真正执行一次生成；返回 `done|paused|aborted|empty`，失败抛错由队列记 failed。 */
+  async function executeGenerate({ packages, merge = false, target, splitMb, filenameTemplate }) {
+    if (!packages?.length) { view.toast(t('toast.selectExportFirst')); return 'empty'; }
     if (merge && packages.length >= 2) {
       return generateMerged({ packages, target, splitMb, filenameTemplate });
     }
@@ -1287,7 +1349,8 @@ async function main(root) {
           pctSpan: 92,
           resume: takeResumeFor(pkg.id),
         });
-        if (outcome.paused || outcome.aborted) return;
+        if (outcome.paused) return 'paused';
+        if (outcome.aborted) return 'aborted';
         if (outcome.report) reports.push(outcome.report);
         const resultBlob = outcome.resultBlob;
         if (!resultBlob) continue;
@@ -1319,10 +1382,12 @@ async function main(root) {
       }
       await deliverCreated(created, code);
       if (reports.length) view.showReport(reports[reports.length - 1]);
+      return 'done';
     } catch (err) {
       logger.error(t('log.convertFailed', { msg: err.message }));
       view.setProgress(0, t('progress.convertFailed'));
       view.toast(t('toast.convertFailed'));
+      throw err;
     } finally {
       state.busy = false;
     }
@@ -1366,6 +1431,8 @@ async function main(root) {
 
   /** 「继续」：按暂停标记回到同一源包、同一目标布局。 */
   async function resumePaused() {
+    const pausedJob = taskQueue.find((job) => job.status === 'paused');
+    if (pausedJob) { queueResume(pausedJob.id); return; }
     const marker = pendingResume || readPausedMarker();
     if (!marker) return;
     const pkg = state.packages.find((p) => p.id === marker.pkgId);
@@ -1379,6 +1446,139 @@ async function main(root) {
     pendingResume = marker;
     const targetName = TARGET_PLATFORMS.find((p) => p.code === marker.target)?.name || marker.target;
     await generate({ packages: [pkg], target: targetName, splitMb: view.getState().splitMb });
+  }
+
+  /* ── 连续任务队列：串行执行，可暂停 / 继续 / 中断 / 排序 ── */
+  function enqueueTask({ type = 'task', label = '', run }) {
+    if (typeof run !== 'function') return '';
+    const job = {
+      id: `q${++taskSeq}`,
+      type,
+      label: label || t('queue.title'),
+      status: 'queued',
+      pct: 0,
+      run,
+    };
+    taskQueue.push(job);
+    logger.debug(`[queue] enqueue ${job.id} type=${job.type} label=${job.label}`);
+    syncQueue();
+    view.toast(t('queue.added', { label: job.label }));
+    logger.info(t('queue.added', { label: job.label }));
+    void pumpQueue();
+    return job.id;
+  }
+
+  async function pumpQueue() {
+    if (queueBusy) return;
+    queueBusy = true;
+    try {
+      while (taskQueue.length) {
+        const job = taskQueue.shift();
+        queueCurrent = job;
+        job.status = 'running';
+        job.pct = 0;
+        syncQueue();
+        logger.info(t('queue.started', { label: job.label }));
+        let status = 'done';
+        try {
+          status = await job.run();
+        } catch (err) {
+          status = 'failed';
+          logger.error(t('queue.failedToast', { label: job.label }), err);
+        }
+        queueCurrent = null;
+        if (status === 'paused') {
+          job.status = 'paused';
+          taskQueue.unshift(job);
+          syncQueue();
+          view.toast(t('queue.pausedToast'));
+          break;
+        }
+        if (status === 'aborted') {
+          job.status = 'aborted';
+          job.pct = 0;
+          rememberFinished(job);
+          syncQueue();
+          view.toast(t('queue.abortedToast'));
+          logger.info(t('queue.abortedToast'));
+          continue;
+        }
+        if (status === 'failed' || status === 'empty') {
+          job.status = 'failed';
+          rememberFinished(job);
+          syncQueue();
+          continue;
+        }
+        job.status = 'done';
+        job.pct = 100;
+        rememberFinished(job);
+        syncQueue();
+        view.toast(t('queue.doneToast', { label: job.label }));
+        logger.info(t('queue.doneToast', { label: job.label }));
+      }
+    } finally {
+      queueBusy = false;
+      syncQueue();
+    }
+  }
+
+  function findQueueJob(id) {
+    if (queueCurrent?.id === id) return { job: queueCurrent, current: true };
+    const index = taskQueue.findIndex((job) => job.id === id);
+    if (index >= 0) return { job: taskQueue[index], index, current: false };
+    const doneIndex = queueFinished.findIndex((job) => job.id === id);
+    return doneIndex >= 0 ? { job: queueFinished[doneIndex], index: doneIndex, current: false, finished: true } : null;
+  }
+
+  async function queuePause(id) {
+    const hit = findQueueJob(id);
+    if (!hit || !hit.current) return false;
+    const ok = await conversionRunner?.pause?.();
+    if (ok) logger.info(t('queue.pausedToast'));
+    return !!ok;
+  }
+
+  async function queueAbort(id) {
+    const hit = findQueueJob(id);
+    if (!hit) return false;
+    if (!hit.current) {
+      const wasPaused = hit.job.status === 'paused';
+      hit.job.status = 'aborted';
+      taskQueue.splice(hit.index, 1);
+      if (wasPaused) await conversionRunner?.abort?.();
+      syncQueue();
+      return true;
+    }
+    return !!(await conversionRunner?.abort?.());
+  }
+
+  function queueResume(id) {
+    const index = taskQueue.findIndex((job) => job.id === id && job.status === 'paused');
+    if (index < 0) return false;
+    const [job] = taskQueue.splice(index, 1);
+    job.status = 'queued';
+    taskQueue.unshift(job);
+    syncQueue();
+    void pumpQueue();
+    return true;
+  }
+
+  function queueMove(id, delta) {
+    const index = taskQueue.findIndex((job) => job.id === id);
+    const next = index + Number(delta || 0);
+    if (index < 0 || next < 0 || next >= taskQueue.length) return false;
+    const [job] = taskQueue.splice(index, 1);
+    taskQueue.splice(next, 0, job);
+    syncQueue();
+    return true;
+  }
+
+  function queueRemove(id) {
+    const index = taskQueue.findIndex((job) => job.id === id);
+    if (index >= 0) { taskQueue.splice(index, 1); syncQueue(); return true; }
+    const doneIndex = queueFinished.findIndex((job) => job.id === id);
+    if (doneIndex >= 0) { queueFinished.splice(doneIndex, 1); syncQueue(); return true; }
+    return false;
   }
 
   async function downloadPending(id) {
@@ -1446,12 +1646,13 @@ async function main(root) {
           pctSpan: 50,
           resume: takeResumeFor(pkg.id),
         });
-        if (outcome.paused || outcome.aborted) return;
+        if (outcome.paused) return 'paused';
+        if (outcome.aborted) return 'aborted';
         if (outcome.report) reports.push(outcome.report);
         if (outcome.resultBlob) blobs.push(outcome.resultBlob);
         logger.info(t('log.converted', { name: pkg.name }));
       }
-      if (!blobs.length) { view.toast(t('toast.convertFailed')); return; }
+      if (!blobs.length) { view.toast(t('toast.convertFailed')); return 'failed'; }
 
       view.setProgress(55, t('progress.merging'));
       const merged = await mergeConvertedBlobs(blobs, {
@@ -1463,7 +1664,7 @@ async function main(root) {
       if (!merged.ok) {
         view.setProgress(0, t('progress.convertFailed'));
         showMergeConflicts(merged.conflicts);
-        return;
+        return 'failed';
       }
 
       const created = [];
@@ -1491,10 +1692,12 @@ async function main(root) {
       logger.info(t('log.mergeDone', { n: packages.length, files: merged.fileCount }));
       await deliverCreated(created, code);
       if (reports.length) view.showReport(reports[reports.length - 1]);
+      return 'done';
     } catch (err) {
       logger.error(t('log.convertFailed', { msg: err.message }));
       view.setProgress(0, t('progress.convertFailed'));
       view.toast(t('toast.convertFailed'));
+      throw err;
     } finally {
       state.busy = false;
     }
@@ -1603,17 +1806,52 @@ async function main(root) {
     });
   }
 
+  /** 更新日志弹窗：auto=true 显示本次更新摘要；否则显示最早→最新完整提交。 */
+  function openChangelog({ auto = false } = {}) {
+    const entries = auto ? recentChangelog(40) : fullChangelog();
+    const rows = entries.map((entry) => '<div class="changelog-row">'
+      + '<span class="changelog-date">' + escapeText(entry.date || '') + '</span>'
+      + (entry.sha ? '<code class="changelog-sha">' + escapeText(entry.sha) + '</code>' : '')
+      + '<span class="changelog-msg">' + escapeText(entry.subject || '') + '</span>'
+      + '</div>').join('');
+    const body = '<div class="changelog-list">' + (rows || '<div class="ext-note">' + escapeText(t('log.empty')) + '</div>') + '</div>'
+      + (auto ? '<label class="check" style="margin-top:8px"><input type="checkbox" id="changelog-never"> '
+        + escapeText(t('changelog.never')) + '</label>' : '');
+    markSeenVersion(APP_VERSION);
+    view.openModal(
+      auto ? t('changelog.updateTitle', { version: APP_VERSION }) : t('changelog.fullTitle'),
+      auto ? t('changelog.updateDesc') : t('changelog.fullDesc'),
+      [body],
+      [{ label: t('modal.close'), primary: true, onClick: () => {
+        const never = document.getElementById('changelog-never');
+        if (never?.checked) {
+          settings.showChangelogOnUpdate = false;
+          saveSettings(settings);
+          view.applySettings?.(settings);
+        }
+        view.closeModal();
+      } }],
+    );
+  }
+
+  function maybeShowChangelog() {
+    if (!shouldShowChangelog(readSeenVersion(), APP_VERSION, settings.showChangelogOnUpdate)) return;
+    setTimeout(() => openChangelog({ auto: true }), 450);
+  }
+
   function openSettings() {
     view.openSettingsView(buildSettingsHtml(settings), {
       onSave: (body) => {
         /* base 传入当前设置：只覆盖对话框里存在的控件，Git 账号 / 安装登记等原样保留。 */
         Object.assign(settings, readSettings(body, settings));
         saveSettings(settings);
+        logger.setLevel(settings.logLevel || 'warn');
         view.applySettings?.(settings);
         view.backToWorkbench();
         view.toast(t('settings.saved'));
       },
       onAction: async (name) => {
+        if (name === 'changelog') { openChangelog({ auto: false }); return; }
         if (name === 'plugin-export') {
           const includeCredentials = !!document.querySelector('#set-include-creds')?.checked;
           const includeOAuth = includeCredentials && !!document.querySelector('#set-include-oauth')?.checked;
@@ -1640,6 +1878,7 @@ async function main(root) {
               const res = applyPluginData(data);
               if (!res.ok) { view.toast(t('settings.dataBadFile')); return; }
               Object.assign(settings, loadSettings());
+              logger.setLevel(settings.logLevel || 'warn');
               view.applySettings?.(settings);
               view.toast(t('settings.dataImport'));
               setTimeout(() => location.reload(), 600);
@@ -1673,6 +1912,7 @@ async function main(root) {
   const view = createWorkbenchView({
     qr,
     actions: {
+      onProgress: setQueueProgress,
       fetch: fetchFromHost,
       generate,
       restore: restoreSelected,
@@ -1683,6 +1923,11 @@ async function main(root) {
       taskPause: () => conversionRunner?.pause(),
       taskResume: resumePaused,
       taskAbort: () => conversionRunner?.abort(),
+      queuePause: (id) => queuePause(id),
+      queueResume: (id) => queueResume(id),
+      queueAbort: (id) => queueAbort(id),
+      queueMove: (id, delta) => queueMove(id, delta),
+      queueRemove: (id) => queueRemove(id),
       pendingDownload: downloadPending,
       pendingStash: stashPending,
       pendingRemove: (id) => exportQueue.remove(id),
@@ -1808,7 +2053,7 @@ async function main(root) {
         const active = state.packages.find((p) => view.getState().source?.pkgId === p.id);
         if (active) ensurePlan(active.id, name).then(() => view.setActivePackage(active.id));
       },
-      onTutorialExit: () => { void loadRealData(); },
+      onTutorialExit: () => { void loadRealData(); maybeShowChangelog(); },
       close: () => {
         const overlay = document.getElementById('st-converter-modal-overlay');
         if (overlay) overlay.style.display = 'none';
@@ -1936,7 +2181,10 @@ async function main(root) {
     await syncPackages();
     await refreshStorageQuota();
   }
-  if (!settings.autoTutorial) await loadRealData();
+  if (!settings.autoTutorial) {
+    await loadRealData();
+    maybeShowChangelog();
+  }
   if (typeof document !== 'undefined') {
     // 读数必须随数据变化：操作后由 syncPackages 触发，另有低频兜底刷新。
     setInterval(() => { if (!document.hidden) refreshStorageQuota(); }, 15000);

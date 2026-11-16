@@ -4,6 +4,7 @@ import {
   extensionPackModeSummary,
   extensionPackNames,
   manifestExtensionNames,
+  fullExtensionNames,
 } from '../src/core/extension-pack-mode.js';
 
 function tree() {
@@ -49,11 +50,28 @@ function tree() {
 }
 
 describe('extension-pack-mode · 目录级双模式', () => {
-  it('只有完整 / 清单两种模式；组级读数为三态', () => {
-    const modes = { alpha: 'manifest', beta: 'full' };
-    expect(extensionPackModeSummary(['alpha'], (n) => modes[n])).toBe('manifest');
-    expect(extensionPackModeSummary(['beta'], (n) => modes[n])).toBe('full');
-    expect(extensionPackModeSummary(['alpha', 'beta'], (n) => modes[n])).toBe('mixed');
+  it('组级读数返回完整 / 清单两个独立开关（可同时为真）', () => {
+    const modes = { alpha: 'manifest', beta: 'full', gamma: 'both' };
+    const onlyManifest = extensionPackModeSummary(['alpha'], (n) => modes[n]);
+    expect(onlyManifest).toMatchObject({ full: false, manifest: true, allFull: false, allManifest: true });
+    const onlyFull = extensionPackModeSummary(['beta'], (n) => modes[n]);
+    expect(onlyFull).toMatchObject({ full: true, manifest: false, allFull: true, allManifest: false });
+    const mixed = extensionPackModeSummary(['alpha', 'beta'], (n) => modes[n]);
+    expect(mixed).toMatchObject({ full: true, manifest: true, allFull: false, allManifest: false });
+    const both = extensionPackModeSummary(['gamma'], (n) => modes[n]);
+    expect(both).toMatchObject({ full: true, manifest: true, allFull: true, allManifest: true, mode: 'both' });
+  });
+
+  it('双选扩展保留完整文件树（不折叠）', () => {
+    const source = tree();
+    const out = applyExtensionPackModes(source, {
+      modeOf: () => 'both',
+      manifestLabel: '清单',
+    });
+    const alpha = out[0].children.find((n) => n.extModeName === 'alpha');
+    expect(alpha.packMode).toBe('both');
+    expect(alpha.children).toHaveLength(2);
+    expect(alpha.children.some((n) => n.manifestOnly)).toBe(false);
   });
 
   it('清单扩展折叠为一条 0 体积叶子，完整扩展保持文件树，原树不被修改', () => {
@@ -78,9 +96,11 @@ describe('extension-pack-mode · 目录级双模式', () => {
     expect(source[0].children[0].mb).toBe(3);
   });
 
-  it('导出名单只含清单目录，且组内名字完整', () => {
+  it('导出名单：清单 / 完整各自独立，双选同时进两个名单', () => {
     const source = tree();
     expect(extensionPackNames(source)).toEqual(['alpha', 'beta']);
-    expect(manifestExtensionNames(source, (n) => (n === 'alpha' ? 'manifest' : 'full'))).toEqual(['alpha']);
+    const modeOf = (n) => ({ alpha: 'manifest', beta: 'both' })[n] || 'full';
+    expect(manifestExtensionNames(source, modeOf)).toEqual(['alpha', 'beta']);
+    expect(fullExtensionNames(source, modeOf)).toEqual(['beta']);
   });
 });

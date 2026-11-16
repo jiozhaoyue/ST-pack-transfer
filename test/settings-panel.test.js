@@ -18,7 +18,7 @@ describe('settings-panel 设置面板', () => {
   it('包含基础提示开关与导出清理项（打包选项不在设置页）', () => {
     const html = buildSettingsHtml(SETTINGS_DEFAULTS);
     // 8 个行为开关 + 设置→数据 的 2 个凭据勾选（includeCreds / includeOauth）
-    expect((html.match(/type="checkbox"/g) || []).length).toBe(10);
+    expect((html.match(/type="checkbox"/g) || []).length).toBe(11);
     expect(html).toContain('data-setting="deleteAfterExport"');
     expect(html).toContain('data-setting="logMaxEntries"');
     expect(html).toContain('data-setting="nativePullNotice"');
@@ -35,6 +35,7 @@ describe('settings-panel 设置面板', () => {
       trafficPrompt: true,
       nativePullNotice: false,
       autoTutorial: false,
+      showChangelogOnUpdate: true,
       clearLogOnLoad: true,
     }))).toEqual({
       ...SETTINGS_DEFAULTS,
@@ -42,6 +43,7 @@ describe('settings-panel 设置面板', () => {
       trafficPrompt: true,
       nativePullNotice: false,
       autoTutorial: false,
+      showChangelogOnUpdate: true,
       clearLogOnLoad: true,
       confirmDiscardChartPrefs: false,
     });

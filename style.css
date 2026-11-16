@@ -119,14 +119,20 @@
   #app.app-container .app-title h1.is-symbol .app-title-txt{display:none}
   #app.app-container .header-actions{display:flex;align-items:center;gap:6px;margin-left:auto;flex-wrap:nowrap;
     justify-content:flex-end;flex:0 0 auto}
-  #app.app-container .badge{display:inline-flex;align-items:center;justify-content:center;gap:5px;padding:0 8px;border-radius:999px;
+  /* 徽标：文字必须在**整个徽标**几何居中（用户 2026-11-17 裁定）。
+     图标绝对定位到左侧，不再参与主轴排布；否则图标占宽会把文字挤偏。
+     右侧用户名容器同样绝对定位（当前为空，保留兼容）。 */
+  #app.app-container .badge{position:relative;display:grid;place-items:center;padding:0 22px;border-radius:999px;
     border:1px solid var(--border);background:var(--panel-3);font-size:11px;color:var(--muted);white-space:nowrap;
     height:var(--ctl-h);line-height:1;box-sizing:border-box;text-align:center}
-  #app.app-container .badge #host-badge-text{display:inline-flex;align-items:center;justify-content:center;height:100%;line-height:1}
-  #app.app-container .badge #host-badge-user{display:inline-flex;align-items:center;height:100%;line-height:1}
+  #app.app-container .badge #host-badge-text{display:block;line-height:1;text-align:center;margin:0;padding:0}
+  #app.app-container .badge #host-badge-user{position:absolute;right:7px;top:50%;transform:translateY(-50%);
+    display:flex;align-items:center;line-height:1}
+  #app.app-container .badge .host-icon,
+  #app.app-container .badge .gh-icon,
+  #app.app-container .badge .web-icon{position:absolute;left:7px;top:50%;transform:translateY(-50%);flex:0 0 auto}
   #app.app-container .badge .host-icon{width:14px;height:14px;object-fit:contain}
-  #app.app-container .badge .gh-icon{flex:0 0 auto}
-  #app.app-container .badge .web-icon{flex:0 0 auto;color:var(--accent)}
+  #app.app-container .badge .web-icon{color:var(--accent)}
   #app.app-container .badge .gh-icon[hidden], #app.app-container .badge .host-icon[hidden], #app.app-container .badge .web-icon[hidden]{display:none}
   #app.app-container .badge.accent{border-color:var(--accent);color:var(--text);background:var(--accent-soft)}
   #app.app-container .badge b.is-admin{color:var(--accent);margin-left:4px;font-weight:700}
@@ -327,7 +333,9 @@
     padding:6px 12px;border-bottom:1px solid var(--border);
     background:color-mix(in srgb, var(--panel-3) 55%, transparent)}
   #app.app-container .extension-tools .et-label{font-size:10.5px;color:var(--muted)}
-  #app.app-container .extension-tools .et-git{display:inline-flex;align-items:center;gap:4px;font-size:10.5px;color:var(--muted)}
+  #app.app-container .extension-tools .et-git{display:inline-flex;align-items:center;gap:4px;font-size:10.5px;color:var(--muted);
+    white-space:nowrap}
+  #app.app-container .extension-tools .et-git > span{white-space:nowrap;flex:0 0 auto}
   #app.app-container .extension-tools .et-git select{font-size:11px;padding:2px 5px}
   #app.app-container .extension-tools .et-keepdev{font-size:10.5px;color:var(--muted);margin:0;
     display:inline-flex;align-items:center;gap:4px;white-space:nowrap;flex-shrink:0}
@@ -385,17 +393,19 @@
   #app.app-container .tree-pill.optional{color:var(--optional);border-color:var(--optional);background:var(--optional-bg)}
   #app.app-container .tree-pill.drop{color:var(--drop);border-color:var(--drop);background:var(--drop-bg)}
   #app.app-container .tree-pill.unknown{color:var(--unknown);border-color:var(--unknown);background:var(--unknown-bg)}
-  /* 扩展目录级双模式：只有两个按钮；组级混合时两个都不点亮，另加「混合」小字。 */
+  /* 扩展目录级双模式：完整 / 清单两个按钮可同时点亮；不再有「混合」文字。 */
   #app.app-container .tree-extmode{display:inline-flex;align-items:center;gap:2px;flex:0 0 auto;margin-left:4px}
   #app.app-container .extmode-btn{border:1px solid var(--border);background:var(--panel-3);color:var(--muted);
     border-radius:5px;padding:1px 6px;font-size:9.5px;line-height:16px;white-space:nowrap;cursor:pointer}
   #app.app-container .extmode-btn:hover{color:var(--text);border-color:var(--border-strong)}
   #app.app-container .extmode-btn.is-on{background:var(--accent-soft);border-color:var(--accent);color:var(--text);font-weight:600}
-  #app.app-container .tree-extmode.is-mixed .extmode-btn{border-style:dashed}
-  #app.app-container .extmode-mixed{font-size:9.5px;color:var(--optional);white-space:nowrap;margin-left:2px}
+  /* 智能建议徽标：必须明显可见（用户裁定），完整=绿系、清单=蓝系，均随主题令牌派生。 */
+  #app.app-container .ext-suggest{flex:0 0 auto;margin-left:5px;padding:0 5px;border-radius:999px;
+    font-size:9.5px;line-height:16px;font-weight:600;white-space:nowrap;border:1px solid}
+  #app.app-container .ext-suggest.is-full{color:var(--keep);border-color:var(--keep);background:var(--keep-bg)}
+  #app.app-container .ext-suggest.is-manifest{color:var(--accent);border-color:var(--accent);background:var(--accent-soft)}
   #app.app-container .batch-extmode{display:inline-flex;align-items:center;gap:3px;flex:0 0 auto}
   #app.app-container .batch-extmode-label{font-size:10.5px;color:var(--muted);margin-right:2px}
-  #app.app-container .batch-extmode.is-mixed .extmode-btn{border-style:dashed}
   #app.app-container .tree-mini{font-size:10px;padding:1px 6px;border-radius:5px;border:1px solid var(--border);
     background:var(--panel-3);color:var(--muted);white-space:nowrap}
   #app.app-container .tree-mini:hover{color:var(--text);border-color:var(--accent)}
@@ -1155,6 +1165,29 @@
   #app.app-container .btn.ghost{background:transparent}
   #app.app-container .btn .ico{width:14px;height:14px}
 
+  /* 连续任务队列：运行/暂停/排队可见，支持排序与中断。 */
+  #app.app-container .task-queue{flex:0 0 auto;max-height:168px;overflow:auto;border-top:1px solid var(--border);
+    background:var(--panel-2);padding:6px 10px 5px}
+  #app.app-container .task-queue[hidden]{display:none !important}
+  #app.app-container .tq-head{display:flex;align-items:center;gap:8px;font-size:10.5px;color:var(--text);margin-bottom:4px}
+  #app.app-container .tq-count{margin-left:auto;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+  #app.app-container .tq-list{display:flex;flex-direction:column;gap:3px}
+  #app.app-container .tq-row{position:relative;display:grid;grid-template-columns:52px minmax(0,1fr) 36px auto;
+    align-items:center;gap:6px;padding:4px 6px;border:1px solid var(--border);border-radius:6px;background:var(--panel-3)}
+  #app.app-container .tq-row.is-running{border-color:var(--accent)}
+  #app.app-container .tq-row.is-paused{border-color:var(--optional)}
+  #app.app-container .tq-row.is-failed{border-color:var(--drop)}
+  #app.app-container .tq-status{font-size:9.5px;font-weight:600;color:var(--muted);white-space:nowrap}
+  #app.app-container .tq-row.is-running .tq-status{color:var(--accent)}
+  #app.app-container .tq-row.is-paused .tq-status{color:var(--optional)}
+  #app.app-container .tq-row.is-failed .tq-status{color:var(--drop)}
+  #app.app-container .tq-label{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;color:var(--text)}
+  #app.app-container .tq-pct{font-size:10px;color:var(--muted);text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+  #app.app-container .tq-acts{display:inline-flex;align-items:center;gap:3px;flex:0 0 auto}
+  #app.app-container .tq-acts .tree-mini{font-size:9.5px;padding:0 5px}
+  #app.app-container .tq-bar{grid-column:1 / -1;display:block;height:3px;border-radius:999px;background:var(--panel-2);overflow:hidden}
+  #app.app-container .tq-bar i{display:block;height:100%;background:var(--accent);transition:width .2s ease}
+
   /* 常驻进度条：工作台与所有视图共用的底部日志入口 */
   #app.app-container .workbench-progress{flex:0 0 auto;display:flex;flex-direction:column;gap:4px;
     width:100%;text-align:left;font:inherit;color:inherit;
@@ -1173,6 +1206,9 @@
     text-decoration:underline dotted;text-underline-offset:2px}
   #app.app-container .workbench-progress #progress-pct{flex:0 0 auto;color:var(--text);
     font-variant-numeric:tabular-nums;white-space:nowrap}
+  #app.app-container .workbench-progress .app-version{flex:0 0 auto;font-size:9px;color:var(--muted-2);
+    opacity:.75;white-space:nowrap;font-variant-numeric:tabular-nums;letter-spacing:.2px}
+  #app.app-container[data-view="mobile"] .workbench-progress .app-version{display:none}
 
   /* 日志视图 */
   #app.app-container #view-log .log-toolbar{flex-wrap:wrap;padding:0}
@@ -1190,6 +1226,7 @@
     white-space:pre-wrap;word-break:break-all;color:var(--muted)}
   #app.app-container .log-line .t{color:var(--muted-2)}
   #app.app-container .log-line .lv{font-weight:600}
+  #app.app-container .log-line.debug .lv{color:var(--muted-2)}
   #app.app-container .log-line.info .lv{color:var(--keep)} #app.app-container .log-line.warn .lv{color:var(--optional)}
   #app.app-container .log-line.error .lv{color:var(--drop)}
   #app.app-container .log-line.success .lv{color:var(--keep);opacity:.85}
@@ -1223,6 +1260,16 @@
   #app.app-container .view-body .check{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);margin:8px 0}
   #app.app-container .view-body .check-sub{padding-left:18px}
   #app.app-container .settings-grid{display:flex;flex-direction:column;gap:2px}
+  #app.app-container .settings-version{margin-top:8px;padding-top:6px;border-top:1px solid var(--border);
+    font-size:10px;color:var(--muted-2);text-align:right;user-select:text;letter-spacing:.2px}
+  /* 更新日志：日期 / 短 sha / 提交说明三列；长说明可换行，短字段不拆字。 */
+  #app.app-container .changelog-list{display:flex;flex-direction:column;gap:2px;max-height:52vh;overflow:auto;padding-right:4px}
+  #app.app-container .changelog-row{display:grid;grid-template-columns:74px 58px minmax(0,1fr);gap:7px;align-items:start;
+    padding:3px 5px;border-radius:5px;font-size:11px;line-height:1.45}
+  #app.app-container .changelog-row:nth-child(odd){background:var(--panel-3)}
+  #app.app-container .changelog-date{color:var(--muted-2);white-space:nowrap;font-variant-numeric:tabular-nums}
+  #app.app-container .changelog-sha{color:var(--accent);white-space:nowrap;font-size:10px}
+  #app.app-container .changelog-msg{color:var(--text);min-width:0;overflow-wrap:anywhere}
   #app.app-container .set-group{border:1px solid var(--border);border-radius:8px;background:var(--panel-2);overflow:hidden}
   #app.app-container .set-group + .set-group{margin-top:6px}
   #app.app-container .set-group-head{cursor:pointer;padding:7px 10px;font-size:11.5px;font-weight:600;color:var(--text);
@@ -1238,7 +1285,19 @@
   #app.app-container #view-settings .set-group-head{font-size:11.5px;font-weight:600;padding:6px 10px}
   #app.app-container #view-settings .set-group-body{padding:8px 10px;font-size:11px;display:flex;flex-direction:column;gap:5px}
   #app.app-container #view-settings label.check{font-size:11px;margin:2px 0}
-  #app.app-container #view-settings label.et-git{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:11px;margin:2px 0}
+  /* 设置行：短标签绝不拆字（2026-11-17 用户强烈要求）。
+     标签 itself nowrap + flex:0 0 auto；控件 flex:1 1 auto + min-width:0 —— 宽度不足时控件收缩，
+     而不是把「仅浏览器」拆成「仅浏」+ 换行。行容器不换行，保证文字与自身控件同行。 */
+  #app.app-container #view-settings label.et-git{display:flex;flex-wrap:nowrap;align-items:center;
+    justify-content:space-between;gap:8px;font-size:11px;margin:2px 0}
+  #app.app-container #view-settings label.et-git > span{flex:0 0 auto;white-space:nowrap}
+  #app.app-container #view-settings label.et-git > :is(select,input){flex:1 1 auto;min-width:0}
+  /* 其它设置行 / 字段 / 短按钮同样禁止拆字；长说明文字（.ext-note / .check）不受影响。 */
+  #app.app-container #view-settings .field > span,
+  #app.app-container #view-settings .btn,
+  #app.app-container #view-settings button{white-space:nowrap}
+  #app.app-container #view-settings .field{flex-wrap:nowrap}
+  #app.app-container #view-settings .field > :is(select,input){min-width:0}
   #app.app-container #view-settings :is(input, select).text_pole{font-size:11px;padding:0 6px;height:var(--ctl-h);line-height:26px}
   #app.app-container #view-settings .ext-note{font-size:10px;color:var(--muted-2);margin:1px 0 3px}
   #app.app-container #view-settings .btn{font-size:11px;padding:3px 8px}
@@ -1248,48 +1307,66 @@
     transition:opacity .18s ease,transform .18s ease;max-width:calc(100% - 32px)}
   #app.app-container .toast.show{opacity:1;transform:translate(-50%,0)}
 
-  /* 教程 */
-  #app.app-container .tutorial-overlay{position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:95;display:none;
-    pointer-events:none}
-  #app.app-container .tutorial-overlay.open{display:block}
-  #app.app-container .tutorial-ring{position:fixed;border:2px solid var(--accent);border-radius:9px;pointer-events:none;
+  /* 教程浮层：**必须挂在 document.body**（index.js portalTutorialOverlay）。
+     宿主抽屉/模态祖先常带 transform / filter / 滚动容器，position:fixed 会被困进祖先坐标系，
+     页面一滚浮层就停在祖先顶部、跑到屏幕外（2026-11-17 手机端实测事故）。
+     因浮层在 #app 之外，令牌在此复制一份；配色仍继承宿主 --SmartTheme*，不自建独立主题。 */
+  #st-pt-tutorial-overlay{
+    --panel: var(--SmartThemeBlurTintColor, rgba(23, 23, 23, 1));
+    --panel-3: color-mix(in srgb, var(--SmartThemeChatTintColor, rgba(23, 23, 23, 1)) 84%, var(--SmartThemeBodyColor, rgb(220, 220, 210)) 16%);
+    --border: color-mix(in srgb, var(--SmartThemeBodyColor, rgb(220, 220, 210)) 14%, transparent);
+    --border-strong: color-mix(in srgb, var(--SmartThemeBodyColor, rgb(220, 220, 210)) 26%, transparent);
+    --text: var(--SmartThemeBodyColor, rgb(220, 220, 210));
+    --muted: color-mix(in srgb, var(--text) 62%, transparent);
+    --muted-2: color-mix(in srgb, var(--text) 42%, transparent);
+    --accent: var(--SmartThemeQuoteColor, rgb(225, 138, 36));
+    --accent-soft: color-mix(in srgb, var(--accent) 20%, transparent);
+    --shadow: 0 24px 70px var(--SmartThemeShadowColor, rgba(0, 0, 0, 0.5));
+    --ctl-h:28px;
+    position:fixed;inset:0;width:100vw;height:100vh;height:100dvh;z-index:2147483000;display:none;
+    pointer-events:none;box-sizing:border-box}
+  #st-pt-tutorial-overlay.open{display:block}
+  #st-pt-tutorial-overlay .tutorial-ring{position:absolute;border:2px solid var(--accent);border-radius:9px;pointer-events:none;
     box-shadow:0 0 0 9999px rgba(0,0,0,.42);
     transition:left .16s ease, top .16s ease, width .16s ease, height .16s ease}
-  #app.app-container .tutorial-card{position:fixed;width:min(330px,calc(100vw - 24px));background:var(--panel);
+  #st-pt-tutorial-overlay .tutorial-card{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+    width:min(330px,calc(100vw - 24px));max-width:calc(100vw - 24px);
+    max-height:calc(100vh - 24px);max-height:calc(100dvh - 24px);overflow:auto;overscroll-behavior:contain;
+    box-sizing:border-box;background:var(--panel);
     border:1px solid var(--accent);border-radius:11px;padding:12px;box-shadow:var(--shadow);pointer-events:auto;
     transition:left .16s ease, top .16s ease}
   /* 首次打开：蒙层立即覆盖，位置过渡从下一帧才启用。 */
-  #app.app-container .tutorial-overlay.instant .tutorial-ring,
-  #app.app-container .tutorial-overlay.instant .tutorial-card{transition:none}
-  #app.app-container .tutorial-card .tt{font-size:13px;font-weight:600;margin-bottom:6px}
-  #app.app-container .tutorial-card .td{font-size:11px;color:var(--muted);line-height:1.6;margin-bottom:9px}
+  #st-pt-tutorial-overlay.instant .tutorial-ring,
+  #st-pt-tutorial-overlay.instant .tutorial-card{transition:none}
+  #st-pt-tutorial-overlay .tutorial-card .tt{font-size:13px;font-weight:600;margin-bottom:6px}
+  #st-pt-tutorial-overlay .tutorial-card .td{font-size:11px;color:var(--muted);line-height:1.6;margin-bottom:9px}
   /* 目标任务选择（教程首页）：每行一个目标 + 一句说明 */
-  #app.app-container .tutorial-card .goals{display:flex;flex-direction:column;gap:6px;margin:2px 0 10px}
-  #app.app-container .tutorial-card .goals[hidden]{display:none}
-  #app.app-container .tutorial-card .tut-goal{display:flex;flex-direction:column;align-items:flex-start;gap:2px;width:100%;
+  #st-pt-tutorial-overlay .tutorial-card .goals{display:flex;flex-direction:column;gap:6px;margin:2px 0 10px}
+  #st-pt-tutorial-overlay .tutorial-card .goals[hidden]{display:none}
+  #st-pt-tutorial-overlay .tutorial-card .tut-goal{display:flex;flex-direction:column;align-items:flex-start;gap:2px;width:100%;
     text-align:left;border:1px solid var(--border);background:var(--panel-3);border-radius:8px;padding:7px 9px;color:var(--text)}
-  #app.app-container .tutorial-card .tut-goal:hover{border-color:var(--accent)}
-  #app.app-container .tutorial-card .tut-goal .tg-name{font-size:12px;font-weight:600}
-  #app.app-container .tutorial-card .tut-goal .tg-note{font-size:10.5px;color:var(--muted);line-height:1.4}
-  #app.app-container .tutorial-card .acts button[hidden]{display:none}
-  #app.app-container .tutorial-card .dots{display:flex;gap:4px;margin-bottom:9px}
-  #app.app-container .tutorial-card .dots i{width:6px;height:6px;border-radius:50%;background:var(--border-strong)}
-  #app.app-container .tutorial-card .dots i.on{background:var(--accent)}
-  #app.app-container .tutorial-card .acts{display:flex;flex-wrap:wrap;gap:5px;row-gap:5px;justify-content:flex-end}
-  #app.app-container .tutorial-card .acts button{border:1px solid var(--border);background:var(--panel-3);border-radius:6px;
+  #st-pt-tutorial-overlay .tutorial-card .tut-goal:hover{border-color:var(--accent)}
+  #st-pt-tutorial-overlay .tutorial-card .tut-goal .tg-name{font-size:12px;font-weight:600}
+  #st-pt-tutorial-overlay .tutorial-card .tut-goal .tg-note{font-size:10.5px;color:var(--muted);line-height:1.4}
+  #st-pt-tutorial-overlay .tutorial-card .acts button[hidden]{display:none}
+  #st-pt-tutorial-overlay .tutorial-card .dots{display:flex;gap:4px;margin-bottom:9px}
+  #st-pt-tutorial-overlay .tutorial-card .dots i{width:6px;height:6px;border-radius:50%;background:var(--border-strong)}
+  #st-pt-tutorial-overlay .tutorial-card .dots i.on{background:var(--accent)}
+  #st-pt-tutorial-overlay .tutorial-card .acts{display:flex;flex-wrap:wrap;gap:5px;row-gap:5px;justify-content:flex-end}
+  #st-pt-tutorial-overlay .tutorial-card .acts button{border:1px solid var(--border);background:var(--panel-3);border-radius:6px;
     padding:4px 9px;font-size:10.5px;color:var(--text);flex:0 0 auto;white-space:nowrap}
-  #app.app-container .tutorial-card .acts button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
-  #app.app-container .tutorial-card .acts button.link{border-color:transparent;background:transparent;color:var(--muted);
+  #st-pt-tutorial-overlay .tutorial-card .acts button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  #st-pt-tutorial-overlay .tutorial-card .acts button.link{border-color:transparent;background:transparent;color:var(--muted);
     text-decoration:underline;margin-right:auto;padding-left:0}
-  #app.app-container .tutorial-card .acts button.link:hover{color:var(--text)}
-  #app.app-container .tutorial-card .acts .tutorial-doc-btn{display:inline-flex;align-items:center;gap:4px;
+  #st-pt-tutorial-overlay .tutorial-card .acts button.link:hover{color:var(--text)}
+  #st-pt-tutorial-overlay .tutorial-card .acts .tutorial-doc-btn{display:inline-flex;align-items:center;gap:4px;
     border:1px solid var(--accent);background:var(--accent-soft);border-radius:6px;padding:4px 8px;
     font-size:10.5px;font-weight:600;color:var(--text);text-decoration:none;flex:0 0 auto;white-space:nowrap;
     transition:all .15s ease}
-  #app.app-container .tutorial-card .acts .tutorial-doc-btn svg{color:var(--accent);flex:0 0 auto}
-  #app.app-container .tutorial-card .acts .tutorial-doc-btn:hover{background:var(--accent);color:#fff;text-decoration:none}
-  #app.app-container .tutorial-card .acts .tutorial-doc-btn:hover svg{color:#fff}
-  #app.app-container .tutorial-card .acts .tutorial-doc-btn[hidden]{display:none !important}
+  #st-pt-tutorial-overlay .tutorial-card .acts .tutorial-doc-btn svg{color:var(--accent);flex:0 0 auto}
+  #st-pt-tutorial-overlay .tutorial-card .acts .tutorial-doc-btn:hover{background:var(--accent);color:#fff;text-decoration:none}
+  #st-pt-tutorial-overlay .tutorial-card .acts .tutorial-doc-btn:hover svg{color:#fff}
+  #st-pt-tutorial-overlay .tutorial-card .acts .tutorial-doc-btn[hidden]{display:none !important}
 
   /* 移动端：窄屏布局（唯一判据是 data-view，由 JS 按容器宽度设置；
      不再另设 @media 断点，否则会与 JS 阈值打架，出现「已堆叠却没有数据包切页按钮」） */
@@ -1396,7 +1473,6 @@
      徽标文字必须保留（U1/U2）。不再无条件 display:none。 */
   #app.app-container[data-view="mobile"] .app-title{display:flex;flex:0 1 auto;min-width:0}
   #app.app-container[data-view="mobile"] #host-badge{flex:0 0 auto}
-  #app.app-container[data-view="mobile"] #host-badge-text{display:inline;white-space:nowrap}
   #app.app-container[data-view="mobile"] .header-actions{gap:4px;margin-left:auto}
   #app.app-container[data-view="mobile"] .header-actions .icon-btn{flex:0 0 auto}
   /* 手机面板头**单行**（2026-11-15 裁定，推翻 2026-11-11 的两行布局）：
@@ -1643,9 +1719,9 @@
 #app.app-container .ext-note{font-size:12px}
 #app.app-container .ext-summary{font-size:12.5px}
 #app.app-container .ext-list-head{font-size:11.5px}
-#app.app-container .tutorial-card .td{font-size:12px}
-#app.app-container .tutorial-card .tut-goal .tg-name{font-size:12.5px}
-#app.app-container .tutorial-card .tut-goal .tg-note{font-size:11.5px}
+#st-pt-tutorial-overlay .tutorial-card .td{font-size:12px}
+#st-pt-tutorial-overlay .tutorial-card .tut-goal .tg-name{font-size:12.5px}
+#st-pt-tutorial-overlay .tutorial-card .tut-goal .tg-note{font-size:11.5px}
 #app.app-container .help-sec li{font-size:12.5px}
 #app.app-container .zone-tab{font-size:12.5px}
 
@@ -1699,7 +1775,7 @@
 #app.app-container .si-crumb,
 #app.app-container .lan-link,
 #app.app-container .action-hint,
-#app.app-container .tutorial-card .acts button{min-height:var(--ctl-h);box-sizing:border-box}
+#st-pt-tutorial-overlay .tutorial-card .acts button{min-height:var(--ctl-h);box-sizing:border-box}
 
 /* ── 全局交互过渡与动效（2026-11-16 体验增强） ── */
 #app.app-container .log-line{animation:logLineFadeIn .16s ease-out;transition:background .15s ease,color .15s ease}

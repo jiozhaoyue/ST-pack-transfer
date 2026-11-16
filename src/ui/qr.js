@@ -1,19 +1,27 @@
 /**
  * 二维码适配器（正式侧）
  *
- * `qrcode-generator` 是普通脚本：顶层 `var qrcode` 在 ES module 里不会挂到 window，
- * 所以这里以 classic `<script>` 注入本地 vendor（与 demo 的加载方式一致）。
- * jsQR 是 UMD，同样以 classic 注入；两者都是本地文件，无 CDN。
+ * 编码：**静态 ESM 导入**本地 `qrcode-generator`（vendor 末尾追加了 `export default qrcode`）。
+ * 不再向 `document.head` 注入 classic script——宿主里其它扩展可能占用 `window.qrcode`，
+ * 或 CSP 拒绝动态脚本，旧实现会静默返回空串，导致局域网互传不显示二维码（2026-11-17 事故）。
+ *
+ * 解码：jsQR 仍是 UMD，只在扫码时以 classic `<script>` 注入；失败由调用方如实提示，
+ * 不影响「生成二维码 / 复制取件码」主路径。
  */
 
+import qrcodeFactory from '../vendor/qrcode-generator.js';
 import { t } from '../i18n/index.js';
 
 const VENDOR = {
-  encode: new URL('../vendor/qrcode-generator.js', import.meta.url),
   decode: new URL('../vendor/jsqr.js', import.meta.url),
 };
 
 let loading = null;
+
+/** 编码器是否可用（纯 ESM，恒可用；保留函数供调用方显式判断）。 */
+export function encodeReady() {
+  return typeof qrcodeFactory === 'function';
+}
 
 function loadScript(url) {
   return new Promise((resolve, reject) => {
@@ -28,16 +36,12 @@ function loadScript(url) {
   });
 }
 
-/** 确保编码 / 解码库都已就绪；失败后允许下次重试。 */
+/** 确保扫码解码库就绪；失败后允许下次重试。生成二维码不依赖本函数。 */
 export function ready() {
   if (typeof window === 'undefined') return Promise.reject(new Error(t('qr.noWindow')));
-  if (typeof window.qrcode === 'function' && typeof window.jsQR === 'function') return Promise.resolve();
+  if (typeof window.jsQR === 'function') return Promise.resolve();
   if (loading) return loading;
-  loading = Promise.all([
-    typeof window.qrcode === 'function' ? null : loadScript(VENDOR.encode),
-    typeof window.jsQR === 'function' ? null : loadScript(VENDOR.decode),
-  ]).then(() => {
-    if (typeof window.qrcode !== 'function') throw new Error(t('qr.encodeUnavailable'));
+  loading = loadScript(VENDOR.decode).then(() => {
     if (typeof window.jsQR !== 'function') throw new Error(t('qr.decodeUnavailable'));
   }).catch((err) => {
     loading = null;
@@ -46,11 +50,12 @@ export function ready() {
   return loading;
 }
 
-/** 同步生成 SVG；库未就绪时返回空串，由调用方隐藏二维码（粘贴始终可用）。 */
+/** 同步生成 SVG；编码失败返回空串，调用方据此显示明确占位（粘贴始终可用）。 */
 export function encodeSvg(text) {
-  if (typeof window === 'undefined' || typeof window.qrcode !== 'function') return '';
+  if (typeof qrcodeFactory !== 'function') return '';
   try {
-    const q = window.qrcode(0, 'M');
+    // 纠错等级 L：容量最大，避免长取件码在 M 级直接溢出（版本 40-L 可容纳约 2.9 KB）。
+    const q = qrcodeFactory(0, 'L');
     q.addData(String(text || ''));
     q.make();
     return q.createSvgTag({ cellSize: 3, margin: 2, scalable: true });
@@ -125,4 +130,4 @@ export async function scan({ video, canvas, onResult, onError } = {}) {
   return stop;
 }
 
-export const qr = { ready, encodeSvg, scan };
+export const qr = { ready, encodeReady, encodeSvg, scan };

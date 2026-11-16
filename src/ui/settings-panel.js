@@ -7,6 +7,7 @@
 import { t } from '../i18n/index.js';
 import { normalizeAccounts } from '../core/git-accounts.js';
 import { escapeHtml } from './escape.js';
+import { APP_VERSION, APP_COMMIT } from '../core/app-version.js';
 
 /** 设置默认值。新增项必须同步 zh-CN / en-US 文案与测试。 */
 export const SETTINGS_DEFAULTS = Object.freeze({
@@ -14,6 +15,8 @@ export const SETTINGS_DEFAULTS = Object.freeze({
   /** 点「从宿主拉取」时是否先提示「去原生界面点拉取」；默认每次提醒。 */
   nativePullNotice: true,
   autoTutorial: true,
+  /** 版本变化后自动弹更新说明；默认开（用户 2026-11-17 裁定），可在弹窗里关闭。 */
+  showChangelogOnUpdate: true,
   /** 下载导出区里的包后是否把它从导出区删除；默认不删。 */
   deleteAfterExport: false,
   /** 可选 CORS 代理地址：只用于插件自己的 Git / WebDAV 外发请求；留空即直连。 */
@@ -22,6 +25,8 @@ export const SETTINGS_DEFAULTS = Object.freeze({
   docsBaseUrl: '',
   /** 日志上限（条）；0/非法回落默认。 */
   logMaxEntries: 500,
+  /** 日志显示/控制台镜像阈值：debug | info | warn | error；默认 warn（用户 2026-11-17 裁定）。 */
+  logLevel: 'warn',
   /** 每次加载插件是否清空上次日志。 */
   clearLogOnLoad: true,
   /** 每次加载插件是否清空浏览器里暂存的数据包（IndexedDB files + OPFS packages）。 */
@@ -242,6 +247,8 @@ export function normalizeSettings(input) {
     if (typeof input.docsBaseUrl === 'string') out.docsBaseUrl = input.docsBaseUrl.trim();
     const logMax = Number(input.logMaxEntries);
     if (Number.isFinite(logMax)) out.logMaxEntries = Math.max(50, Math.min(5000, Math.round(logMax)));
+    if (['debug', 'info', 'warn', 'error'].includes(input.logLevel)) out.logLevel = input.logLevel;
+    if (typeof input.showChangelogOnUpdate === 'boolean') out.showChangelogOnUpdate = input.showChangelogOnUpdate;
     if (typeof input.clearLogOnLoad === 'boolean') out.clearLogOnLoad = input.clearLogOnLoad;
     if (typeof input.clearPackagesOnLoad === 'boolean') out.clearPackagesOnLoad = input.clearPackagesOnLoad;
     if (typeof input.autoRefreshAfterUpload === 'boolean') out.autoRefreshAfterUpload = input.autoRefreshAfterUpload;
@@ -320,6 +327,9 @@ export function buildSettingsHtml(settings = {}) {
   const tips = setting('set-traffic', 'trafficPrompt', t('settings.trafficPrompt'), s.trafficPrompt)
     + setting('set-native-pull-notice', 'nativePullNotice', t('settings.nativePullNotice'), s.nativePullNotice)
     + setting('set-auto-tutorial', 'autoTutorial', t('settings.autoTutorial'), s.autoTutorial)
+    + setting('set-show-changelog', 'showChangelogOnUpdate', t('settings.showChangelog'), s.showChangelogOnUpdate)
+    + '<div class="ext-row" style="margin-top:4px"><button type="button" class="btn" data-action="changelog">'
+      + t('settings.openChangelog') + '</button></div>'
     + setting('set-confirm-discard-prefs', 'confirmDiscardChartPrefs', t('settings.confirmDiscardChartPrefs'), s.confirmDiscardChartPrefs);
 
   const exportGroup = setting('set-delete-after-export', 'deleteAfterExport', t('settings.deleteAfterExport'), s.deleteAfterExport)
@@ -332,7 +342,13 @@ export function buildSettingsHtml(settings = {}) {
     + '<option value="off"' + (s.autoInstallManifestAfterUpload === 'off' ? ' selected' : '') + '>' + t('settings.autoInstallOff') + '</option>'
     + '</select></label>';
 
-  const logging = '<label class="et-git"><span>' + t('settings.logMaxEntries') + '</span>'
+  const logging = '<label class="et-git"><span>' + t('settings.logLevel') + '</span>'
+    + '<select class="text_pole" data-setting="logLevel">'
+    + ['debug', 'info', 'warn', 'error'].map((lv) =>
+      '<option value="' + lv + '"' + (s.logLevel === lv ? ' selected' : '') + '>'
+      + t('settings.logLevel.' + lv) + '</option>').join('')
+    + '</select></label>'
+    + '<label class="et-git"><span>' + t('settings.logMaxEntries') + '</span>'
     + '<input class="text_pole" type="number" min="50" max="5000" step="50" data-setting="logMaxEntries" value="' + s.logMaxEntries + '"></label>'
     + setting('set-clear-log', 'clearLogOnLoad', t('settings.clearLogOnLoad'), s.clearLogOnLoad);
 
@@ -380,6 +396,9 @@ export function buildSettingsHtml(settings = {}) {
     + group('net', t('settings.groupNet'), netGroup, false)
     + group('log', t('settings.groupLog'), logging, false)
     + group('data', t('settings.groupData'), dataGroup, false)
+    + '<div class="settings-version" id="settings-version">'
+      + t('settings.versionLine', { version: APP_VERSION, commit: APP_COMMIT })
+    + '</div>'
     + '</div>';
 }
 
@@ -403,6 +422,8 @@ export function readSettings(root, base = SETTINGS_DEFAULTS) {
   if (nativePullEl && typeof nativePullEl.checked === 'boolean') out.nativePullNotice = nativePullEl.checked;
   const tutorialEl = root.querySelector?.('[data-setting="autoTutorial"]');
   if (tutorialEl && typeof tutorialEl.checked === 'boolean') out.autoTutorial = tutorialEl.checked;
+  const changelogEl = root.querySelector?.('[data-setting="showChangelogOnUpdate"]');
+  if (changelogEl && typeof changelogEl.checked === 'boolean') out.showChangelogOnUpdate = changelogEl.checked;
   const confirmDiscardEl = root.querySelector?.('[data-setting="confirmDiscardChartPrefs"]');
   if (confirmDiscardEl && typeof confirmDiscardEl.checked === 'boolean') out.confirmDiscardChartPrefs = confirmDiscardEl.checked;
   const deleteEl = root.querySelector?.('[data-setting="deleteAfterExport"]');
@@ -410,6 +431,11 @@ export function readSettings(root, base = SETTINGS_DEFAULTS) {
 
   const logMaxEl = root.querySelector?.('[data-setting="logMaxEntries"]');
   if (logMaxEl?.value) out.logMaxEntries = Number(logMaxEl.value);
+
+  const logLevelEl = root.querySelector?.('[data-setting="logLevel"]');
+  if (logLevelEl && ['debug', 'info', 'warn', 'error'].includes(logLevelEl.value)) {
+    out.logLevel = logLevelEl.value;
+  }
 
   const netProxyEl = root.querySelector?.('[data-setting="netProxyUrl"]');
   if (netProxyEl && typeof netProxyEl.value === 'string') out.netProxyUrl = netProxyEl.value.trim();

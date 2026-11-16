@@ -265,7 +265,12 @@ export function mountLanTransferPanel({ view, getSendTargets = null, onReceive =
   }
 
   async function ensureQrReady() {
-    try { await qr.ready(); } catch (err) { dbg('qr library unavailable', err?.message || String(err)); }
+    // 编码器是静态 ESM 导入，恒可用；这里只做能力探测，**不再**为生成二维码去加载扫码库。
+    try {
+      if (typeof qr.encodeReady === 'function' && !qr.encodeReady()) {
+        dbg('qr encoder unavailable');
+      }
+    } catch (err) { dbg('qr encoder check failed', err?.message || String(err)); }
   }
 
   // ── 发送端 ──

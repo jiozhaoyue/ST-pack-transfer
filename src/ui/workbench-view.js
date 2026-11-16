@@ -14,10 +14,10 @@ import {
   applyExtensionPackModes,
   extensionPackModeSummary,
   extensionPackNames,
-  manifestExtensionNames,
+  extPackFlags,
+  extPackModeOf,
   normalizeExtPackMode,
   EXT_PACK_MODES,
-  EXT_PACK_MIXED,
 } from '../core/extension-pack-mode.js';
 import {
   normalizeResponse, stackSegments, dotFill, maxEntrySize,
@@ -37,7 +37,9 @@ import {
 import { decryptBytes, isEncrypted } from '../core/s3-crypto.js';
 import { mergeChartTrees } from '../core/merge-packages.js';
 import { EXTENSION_MODES, GIT_MODES } from '../core/export-modes.js';
-import { extensionUnitsOf, suggestPackMode } from '../core/ext-pack.js';
+import { isGitEntryDropped } from '../core/git-policy.js';
+import { APP_VERSION, APP_COMMIT } from '../core/app-version.js';
+import { extensionUnitName, extensionUnitsOf, suggestPackMode } from '../core/ext-pack.js';
 import { parseRepoUrl, refineRefWithBranches, isCommitRef, SITES } from '../core/git-url.js';
 import {
   normalizeAccounts, addAccount, removeAccount, setDefaultAccount,
@@ -215,11 +217,18 @@ function extModeOf(name){
     ? EXT_PACK_MODES.MANIFEST
     : EXT_PACK_MODES.FULL;
 }
-function setExtPackModes(names, mode){
-  const next = normalizeExtPackMode(mode);
-  for(const name of names||[]){
-    const key=String(name||'').trim();
-    if(key) state.extPackMode[key]=next;
+/** 切换一个模式开关（完整 / 清单）；两个开关可同时为 true，至少保留一个。 */
+function toggleExtPackModes(names, mode){
+  const key = mode === EXT_PACK_MODES.MANIFEST ? 'manifest' : 'full';
+  const list = [...new Set((names||[]).map((n)=>String(n||'').trim()).filter(Boolean))];
+  if(!list.length) return;
+  const allOn = list.every((name)=>extPackFlags(extModeOf(name))[key]);
+  const nextValue = !allOn;
+  for(const name of list){
+    const flags = extPackFlags(extModeOf(name));
+    flags[key] = nextValue;
+    if(!flags.full && !flags.manifest) flags[key] = true;
+    state.extPackMode[name] = extPackModeOf(flags);
   }
   renderChart();
 }
@@ -353,7 +362,9 @@ const state = {
   packages: INITIAL_PACKAGES.map(p=>({...p})),
   selectedPkgs:new Set(), activePkgs:new Set(), viewPkgMem:{}, mergeMode:false, privateFiles:[], expanded:{}, collapsedVol:{}, sel:{}, log:loadPersistedLog(),
   /* 日志按「条目类型」多选筛选：默认四类全选；取消某类即隐藏该类。 */
-  logLevels:new Set(['INFO','WARN','ERROR','SUCCESS']),
+  /* 默认只显示 WARN + ERROR（用户 2026-11-17 裁定：默认只开到 warn）；
+     全部级别仍然入账，点 DEBUG/INFO 按钮即可回看。 */
+  logLevels:new Set(['WARN','ERROR']),
   noTrafficPrompt:false,
   /* 退出数据包偏好时若有未保存改动的提醒开关（设置项，默认开）。 */
   confirmDiscardChartPrefs:true,
@@ -467,6 +478,18 @@ function setChecked(n,scope,val){
   });
 }
 /** 每包独立 git 模式：未单独设置时沿用全局默认（偏好里保存的那份）。 */
+/** Luker 宿主：选中包后自动把目标存储引擎切到该包声明的源引擎。
+ *  用户 2026-11-17 裁定：不得停留在「跟随源包」或旧选择。 */
+function autoEngineForPackage(pkg){
+  if(state.host!=='luker' || !pkg) return;
+  const kind=String(pkg.sourceEngine||'');
+  if(!['fs','postgres','mysql','sqlite'].includes(kind)) return;
+  if(state.engine===kind) return;
+  state.engine=kind;
+  const sel=document.getElementById('target-engine');
+  if(sel) sel.value=kind;
+  logger.info(t('log.engineAuto',{name:pkg.name||pkg.id||'',engine:kind}));
+}
 function packageGitMode(pkg){
   const own = pkg && state.gitModeByPkg[pkg.id];
   if([GIT_MODES.KEEP,GIT_MODES.MINIMAL,GIT_MODES.STRIP].includes(own)) return own;
@@ -491,6 +514,39 @@ function sumSelected(nodes,scope){
     } else if(isChecked(n,scope)){ mb+=n.mb; count++; }
   }
   return { mb, count };
+}
+/** 选中体积 + Git 策略剔除量（导出包体积预估的数据源）。
+ *  `.git` 条目按所属扩展的 `packageGitMode()` 判定：minimal 只留 config/HEAD/index/refs/heads，
+ *  strip 全剔；keep 不剔。合并树按叶子的 `srcPkgId` 找各自包。 */
+function selectedProjected(nodes,scope,basePkg=null){
+  let mb=0,droppedMb=0,count=0;
+  const pkgCache=new Map();
+  const pkgOf=(n)=>{
+    if(basePkg) return basePkg;
+    const id=n?.srcPkgId;
+    if(!id) return null;
+    if(!pkgCache.has(id)) pkgCache.set(id,(state.packages||[]).find((p)=>p.id===id)||null);
+    return pkgCache.get(id);
+  };
+  const visit=(list)=>{
+    for(const n of list||[]){
+      if(n.children && n.children.length){ visit(n.children); continue; }
+      if(!isChecked(n,scope)) continue;
+      count++;
+      const path=String(n.path||'');
+      const name=extensionUnitName(path);
+      let drop=false;
+      if(name){
+        const idx=path.indexOf('/.git/');
+        const rel=idx>=0 ? path.slice(idx+1) : (path.endsWith('/.git')?'.git':'');
+        if(rel) drop=isGitEntryDropped(rel,packageGitMode(pkgOf(n)));
+      }
+      if(drop) droppedMb+=Number(n.mb)||0;
+      else mb+=Number(n.mb)||0;
+    }
+  };
+  visit(nodes);
+  return { mb,droppedMb,count };
 }
 /* 包序号：导入区、导出区**各自独立编号**，按导入时间升序 01..N，
    前缀区分来源，所以两边都叫「包·导入01 / 包·导出01」也不会撞。删除后不重排。 */
@@ -714,6 +770,11 @@ function renderHeader(){
     : (isWeb ? t('header.webTitle') : t('header.hostTitle', { host: h.full }));
   const badgeTxt = document.getElementById('host-badge-text');
   if(badgeTxt) badgeTxt.innerHTML = userText;
+  const versionEl = document.getElementById('app-version');
+  if(versionEl){
+    versionEl.textContent = 'v' + APP_VERSION;
+    versionEl.title = t('app.versionTitle') + ' · ' + APP_COMMIT;
+  }
   renderTargetPicker();
 }
 function renderTargetPicker(){
@@ -1085,17 +1146,15 @@ function extModeButtonsHtml(names, labelScope){
   const list=[...new Set((names||[]).filter(Boolean))];
   if(!list.length) return '';
   const current=extensionPackModeSummary(list, extModeOf);
-  const mixed=current===EXT_PACK_MIXED;
   const payload=escapeHtml(JSON.stringify(list));
-  const btn=(mode,label)=>'<button type="button" class="extmode-btn'
-    +(current===mode?' is-on':'')
+  const btn=(mode,on,label)=>'<button type="button" class="extmode-btn'
+    +(on?' is-on':'')
     +'" data-extpackmode="'+mode+'" data-extpacknames="'+payload+'"'
-    +' aria-pressed="'+(current===mode?'true':'false')+'"'
+    +' aria-pressed="'+(on?'true':'false')+'"'
     +' title="'+label+'">'+label+'</button>';
-  return '<span class="tree-extmode'+(mixed?' is-mixed':'')+'" data-extmodescope="'+escapeHtml(labelScope||'ext')+'">'
-    +btn(EXT_PACK_MODES.FULL,t('extension.full'))
-    +btn(EXT_PACK_MODES.MANIFEST,t('extension.manifest'))
-    +(mixed?'<span class="extmode-mixed">'+t('extension.mixed')+'</span>':'')
+  return '<span class="tree-extmode" data-extmodescope="'+escapeHtml(labelScope||'ext')+'">'
+    +btn(EXT_PACK_MODES.FULL,current.full,t('extension.full'))
+    +btn(EXT_PACK_MODES.MANIFEST,current.manifest,t('extension.manifest'))
   +'</span>';
 }
 function extModeControlOf(n){
@@ -1120,6 +1179,13 @@ function renderTreeRows(nodes,depth,scope,readonly,tools,totalMb,drill,colorMap,
     const pct = totalMb>0 ? Math.max(0,Math.min(100,Math.round(((mbMap?mbMap.get(n):Number(n.mb))||0)/totalMb*100))) : 0;
     const pillCls=n.suggest==='keep'?'keep':n.suggest==='optional'?'optional':n.suggest==='drop'?'drop':'unknown';
     const pillText=n.suggest==='keep'?t('tree.suggestKeep'):n.suggest==='optional'?t('tree.suggestOptional'):n.suggest==='drop'?t('tree.suggestDrop'):t('tree.suggestUnknown');
+    /* 扩展行用专属「建议完整 / 建议清单」徽标；不再显示通用的「建议保留」，避免两枚徽标打架。 */
+    const extSuggestHtml=n.extSuggest
+      ? '<span class="ext-suggest is-'+n.extSuggest.mode+'" title="'
+        + escapeHtml(t(n.extSuggest.mode==='manifest'?'extmgr.recManifestHint':'extmgr.recFullHint'))+'">'
+        + t(n.extSuggest.mode==='manifest'?'extmgr.recManifest':'extmgr.recFull')+'</span>'
+      : '';
+    const showGenericPill=!n.extSuggest && n.extModeScope!=='group' && n.id!=='group:extensions' && n.id!=='group:globalExtensions';
     const inMax=!!drill;
     const toggleHtml=hasKids
       ? (inMax
@@ -1134,8 +1200,9 @@ function renderTreeRows(nodes,depth,scope,readonly,tools,totalMb,drill,colorMap,
       +(depth===0 && colorCls ? '<span class="tree-dot '+colorCls+'" aria-hidden="true"></span>' : '')
       +svg(n.icon,'tree-ico')
       +'<span class="tree-label'+(inMax&&hasKids?' is-drill':'')+'"'+(inMax&&hasKids?' data-voldrill="'+n.id+'"':'')+' title="'+n.label+'">'+n.label+(n.badge?'<span class="sub">'+n.badge+'</span>':'')+(n.note?'<span class="sub">'+n.note+'</span>':'')+(nodePrivateIncompatible(n)?'<span class="sub is-incompat" title="'+t('private.incompatibleHint')+'">'+t('private.incompatible')+'</span>':'')+'</span>'
+      +extSuggestHtml
       +extModeControlOf(n)
-      +'<span class="tree-pill '+pillCls+'">'+pillText+'</span>'
+      +(showGenericPill?'<span class="tree-pill '+pillCls+'">'+pillText+'</span>':'')
       +(hasKids && !readonly ? '<span class="row-bulk">'
         +'<button data-suball="all" data-subnode="'+n.id+'" title="'+t('chart.selectAll')+'">✓</button>'
         +'<button data-suball="none" data-subnode="'+n.id+'" title="'+t('chart.selectNone')+'">✕</button>'
@@ -1244,36 +1311,55 @@ function volBreadcrumbHtml(o){
     +'</div>';
 }
 
-/** 2026-11-15 用户裁定：图表上**每个扩展**都要标注「原件/清单」建议（与打包智能推荐同源启发式）。
- *  覆盖两种形态：仅清单树的 `ext:<名>` 叶子、完整树 `dir:extensions:<名>`（含 third-party 一层）。 */
+/** 2026-11-17 用户裁定：图表上**每个扩展**都要有显眼建议（与打包智能推荐同源启发式）：
+ *  本插件 → 完整；公开远端 → 清单；无远端 / 私有凭据 → 完整。
+ *  覆盖用户级与全局扩展组、清单树 `ext:<名>`、完整树 `dir:.../<名>`（含 third-party 一层）。 */
 function decorateExtSuggestions(nodes, urlMap){
-  const extGroup=(nodes||[]).find((n)=>n.id==='group:extensions');
-  if(!extGroup?.children) return;
+  const seen=new Set();
   const apply=(node,name)=>{
-    if(!name || name==='third-party') return;
+    if(!node || !name || name==='third-party' || seen.has(node)) return;
+    seen.add(node);
     const url=String(node.url||urlMap[name]||'');
     const sug=suggestPackMode(name,url);
+    node.extSuggest=sug;
     node.note=t(sug.mode==='manifest'?'extmgr.recManifest':'extmgr.recFull');
   };
-  for(const child of extGroup.children){
-    if(child.id.startsWith('ext:')){ apply(child,child.id.slice(4)); continue; }
-    if(child.id==='dir:extensions:third-party'){
-      for(const sub of child.children||[]){
-        const name=String(sub.id||'').split('/').pop();
-        apply(sub,name);
+  const visit=(node)=>{
+    if(!node) return;
+    if(node.id==='group:extensions' || node.id==='group:globalExtensions'){
+      for(const child of node.children||[]){
+        if(child.extModeName){ apply(child,child.extModeName); continue; }
+        if(child.id?.startsWith('ext:')){ apply(child,child.id.slice(4)); continue; }
+        const name=String(child.id||'').replace(/^dir:(?:extensions|globalExtensions):/,'').split('/').pop();
+        if(name && name!=='third-party') apply(child,name);
+        else for(const sub of child.children||[]){
+          const subName=sub.extModeName || String(sub.id||'').split('/').pop();
+          if(subName) apply(sub,subName);
+        }
       }
-      continue;
+      return;
     }
-    apply(child, String(child.id||'').replace(/^dir:extensions:/,'').split('/').pop());
-  }
+    for(const child of node.children||[]) visit(child);
+  };
+  visit({ children: nodes||[] });
 }
 
-/** 包清单的 name→url 映射（图表扩展行建议徽标的数据源；原件无清单条目时无 url → 建议原件）。 */
+/** 包清单 / 包内扩展元数据的 name→url 映射（建议徽标的数据源）。
+ *  取值链与 `extension-manifest.js` 同源：.git remote → TT/PT sourceRecord → manifest.homePage。
+ *  仅有 `_convert/extensions-manifest.json` 的包以前只能靠清单；现在也读 plan.extensions，
+ *  避免「所有扩展都无 URL → 全部建议完整」的假推荐。 */
 function extUrlMapOf(pkgs){
   const map={};
   for(const p of pkgs||[]){
-    for(const m of (p?.extManifest||[])){
-      if(m && m.name) map[String(m.name)]=String(m.url||'');
+    const manifests=Array.isArray(p?.extManifest) ? p.extManifest
+      : (Array.isArray(p?.manifest?.extManifest) ? p.manifest.extManifest : []);
+    for(const m of manifests){
+      if(m && m.name && m.url) map[String(m.name)]=String(m.url);
+    }
+    for(const e of (p?.extensions||[])){
+      if(!e || !e.name) continue;
+      const url=String(e.gitMeta?.remoteUrl || e.sourceRecord?.remote_url || e.manifest?.homePage || '').trim();
+      if(url && !map[e.name]) map[e.name]=url;
     }
   }
   return map;
@@ -1284,6 +1370,14 @@ function chartCardHtml(o, place){
   const collapsed = !maxed && (state.collapsedVol[o.key]!==undefined ? !!state.collapsedVol[o.key] : !!o.defaultCollapsed);
   syncAncestors(o.nodes,o.scope);
   const sum=sumSelected(o.nodes,o.scope);
+  const chartPkg=o.pkgId ? (state.packages||[]).find((p)=>p.id===o.pkgId)||null : null;
+  /* 体积预估必须扣除 gitMode=minimal/strip 将剔除的 `.git` 条目；否则带 Git 历史的包会严重虚高。 */
+  const projected=selectedProjected(o.nodes,o.scope,chartPkg);
+  const estRatio=state.compression==='fast'?0.65:state.compression==='maximum'?0.42:state.compression==='store'?1.0:0.5;
+  const estZipMb=Math.max(0.01, projected.mb*estRatio);
+  const estTitle=t('chart.estZipTitle')+(projected.droppedMb>0
+    ? ' · '+t('chart.estZipGit',{size:fmtMB(projected.droppedMb)})
+    : '');
   const dis = !!o.disabled;
   const fmt = chartFmtOf(o.key);
   const scopeNodes = maxed ? volScopedNodes(o) : o.nodes;
@@ -1325,7 +1419,7 @@ function chartCardHtml(o, place){
       +(o.extToolsHtml||'')
       +'<div class="chart-tree">'+renderTreeRows(scopeNodes,0,o.scope,o.readonly||dis,groupToolsOf(o),selectedTotal,maxed,colorMap,undefined,selectedMap)+'</div>'
       +(dis?'':('<div class="chart-foot"><span>'+t('chart.selected',{count:sum.count,size:fmtMB(sum.mb)})+'</span>'
-        +(sum.mb>0?'<span class="chart-est-zip" title="'+t('chart.estZipTitle')+'"><i class="fa-solid fa-file-zipper"></i> '+t('chart.estZip',{size:fmtMB(Math.max(0.01, sum.mb * (state.compression==='fast'?0.65:state.compression==='maximum'?0.42:state.compression==='store'?1.0:0.5)))})+'</span>':'')
+        +(projected.mb>0?'<span class="chart-est-zip" title="'+escapeHtml(estTitle)+'"><i class="fa-solid fa-file-zipper"></i> '+t('chart.estZip',{size:fmtMB(estZipMb)})+'</span>':'')
       +'</div>'))
     +'</div>'
   +'</div>';
@@ -1356,7 +1450,6 @@ function extensionToolsHtml(pkg, assetPkgs, { scope, nodes } = {}){
   return '<div class="extension-tools" data-exttools="1">'
     +(hasExt
       ? '<span class="et-label">'+t('extension.label')+'</span>'
-        +'<span class="et-hint">'+t('extension.modeHint')+'</span>'
         +(full
           ? '<label class="et-git"><span>'+t('extension.git')+'</span><select class="text_pole" data-gitmode="'+escapeHtml(gitPkgId)+'">'
               +'<option value="keep"'+(packageGitMode(pkg)===GIT_MODES.KEEP?' selected':'')+'>'+t('extension.gitKeep')+'</option>'
@@ -1445,17 +1538,15 @@ function renderBatchBar(targets){
     : pkgs.reduce((a,p)=>a+volumesOf(p,chartNodesOf(p)).length,0);
   const extNames=[...new Set(pkgs.flatMap((p)=>extensionPackNames(packageNodes(p).nodes)))].sort();
   const extSummary=extensionPackModeSummary(extNames, extModeOf);
-  const extMixed=extSummary===EXT_PACK_MIXED;
   const extPayload=escapeHtml(JSON.stringify(extNames));
-  const extBtn=(mode,label)=>'<button type="button" class="extmode-btn'
-    +(extSummary===mode?' is-on':'')+'" data-batchextmode="'+mode+'" data-extpacknames="'+extPayload+'"'
-    +' aria-pressed="'+(extSummary===mode?'true':'false')+'">'+label+'</button>';
+  const extBtn=(mode,on,label)=>'<button type="button" class="extmode-btn'
+    +(on?' is-on':'')+'" data-batchextmode="'+mode+'" data-extpacknames="'+extPayload+'"'
+    +' aria-pressed="'+(on?'true':'false')+'">'+label+'</button>';
   const extModeHtml=extNames.length
-    ? '<span class="batch-extmode'+(extMixed?' is-mixed':'')+'">'
+    ? '<span class="batch-extmode">'
       +'<span class="batch-extmode-label">'+t('extension.label')+'</span>'
-      +extBtn(EXT_PACK_MODES.FULL,t('extension.full'))
-      +extBtn(EXT_PACK_MODES.MANIFEST,t('extension.manifest'))
-      +(extMixed?'<span class="extmode-mixed">'+t('extension.mixed')+'</span>':'')
+      +extBtn(EXT_PACK_MODES.FULL,extSummary.full,t('extension.full'))
+      +extBtn(EXT_PACK_MODES.MANIFEST,extSummary.manifest,t('extension.manifest'))
     +'</span>'
     : '';
   bar.hidden=false;
@@ -1673,7 +1764,6 @@ function chartPrefsHtml(){
           +'<button type="button" class="seg-btn'+(prefFull?'':' active')+'" data-prefextmode="manifest">'+t('extension.manifest')+'</button>'
         +'</div>'
       +'</div>'
-      +'<div class="ext-note">'+t('chart.prefsExtDefaultHint')+'</div>'
       +'<label class="et-git"><span>'+t('chart.prefsGit')+'</span><select class="text_pole" data-prefgitmode>'
         +'<option value="keep"'+(state.gitMode===GIT_MODES.KEEP?' selected':'')+'>'+t('extension.gitKeep')+'</option>'
         +'<option value="minimal"'+(state.gitMode===GIT_MODES.MINIMAL?' selected':'')+'>'+t('extension.gitMinimal')+'</option>'
@@ -5068,6 +5158,39 @@ function renderLan(){
   if(err){ err.hidden=!L.scanError; err.textContent=L.scanError||''; }
 }
 
+/* ── 连续任务队列（生成 / 拉取 / 恢复共用；可暂停、继续、中断、排序） ── */
+function renderTaskQueue(items){
+  const box=document.getElementById('task-queue');
+  if(!box) return;
+  const list=Array.isArray(items)?items:[];
+  box.hidden=list.length===0;
+  const count=document.getElementById('tq-count');
+  if(count) count.textContent=t('queue.count',{n:list.length});
+  const host=document.getElementById('tq-list');
+  if(!host) return;
+  host.innerHTML=list.map((item)=>{
+    const status=String(item.status||'queued');
+    const running=status==='running';
+    const paused=status==='paused';
+    const queued=status==='queued';
+    const pct=Math.max(0,Math.min(100,Math.round(Number(item.pct)||0)));
+    return '<div class="tq-row is-'+escapeHtml(status)+'" data-tqid="'+escapeHtml(item.id)+'">'
+      +'<span class="tq-status">'+escapeHtml(t('queue.status.'+status))+'</span>'
+      +'<span class="tq-label" title="'+escapeHtml(item.label||'')+'">'+escapeHtml(item.label||'')+'</span>'
+      +'<span class="tq-pct">'+(running||paused?pct+'%':'')+'</span>'
+      +'<span class="tq-acts">'
+        +(running?'<button type="button" class="tree-mini" data-tqact="pause" data-tqid="'+escapeHtml(item.id)+'">'+t('queue.pause')+'</button>':'')
+        +(paused?'<button type="button" class="tree-mini" data-tqact="resume" data-tqid="'+escapeHtml(item.id)+'">'+t('queue.resume')+'</button>':'')
+        +((running||paused)?'<button type="button" class="tree-mini" data-tqact="abort" data-tqid="'+escapeHtml(item.id)+'">'+t('queue.abort')+'</button>':'')
+        +(queued?'<button type="button" class="tree-mini" data-tqact="up" data-tqid="'+escapeHtml(item.id)+'" title="'+t('queue.up')+'">↑</button>':'')
+        +(queued?'<button type="button" class="tree-mini" data-tqact="down" data-tqid="'+escapeHtml(item.id)+'" title="'+t('queue.down')+'">↓</button>':'')
+        +((queued||status==='done'||status==='failed'||status==='aborted')?'<button type="button" class="tree-mini" data-tqact="remove" data-tqid="'+escapeHtml(item.id)+'" title="'+t('queue.remove')+'">×</button>':'')
+      +'</span>'
+      +'<span class="tq-bar"><i style="width:'+pct+'%"></i></span>'
+    +'</div>';
+  }).join('') || '<div class="ext-note">'+t('queue.empty')+'</div>';
+}
+
 /* ── 云端包仓库（S3 兼容；凭据默认只存本机浏览器，不可用时如实降级） ── */
 const CLOUD_KEY = 'st-pack-transfer:s3';
 
@@ -5679,7 +5802,7 @@ async function startLanScan(kind){
 }
 
 /* ── 渲染：日志 ── */
-const LOG_LEVELS_UI=['INFO','WARN','ERROR','SUCCESS'];
+const LOG_LEVELS_UI=['DEBUG','INFO','WARN','ERROR','SUCCESS'];
 function renderLog(){
   const lines=document.getElementById('log-lines');
   const levels=state.logLevels;
@@ -5689,9 +5812,9 @@ function renderLog(){
   const last=state.log[state.log.length-1];
   document.getElementById('log-latest').textContent=last?last.msg:t('log.empty');
   /* 类型按钮直接带条数（该类型总条数，不随筛选变化），并标出当前是否显示该类。 */
-  const counts={INFO:0,WARN:0,ERROR:0,SUCCESS:0};
+  const counts={DEBUG:0,INFO:0,WARN:0,ERROR:0,SUCCESS:0};
   state.log.forEach(l=>{ if(counts[l.level]!==undefined) counts[l.level]++; });
-  const labels={INFO:t('log.info'),WARN:t('log.warn'),ERROR:t('log.error'),SUCCESS:t('log.success')};
+  const labels={DEBUG:t('log.debug'),INFO:t('log.info'),WARN:t('log.warn'),ERROR:t('log.error'),SUCCESS:t('log.success')};
   LOG_LEVELS_UI.forEach(level=>{
     const btn=document.querySelector('.log-level-btn[data-level="'+level+'"]');
     if(!btn) return;
@@ -6237,6 +6360,7 @@ const TUTORIAL_GOALS=[
     id:'extensions', label:'tutorial.goal.extensions', note:'tutorial.goal.extensionsNote', docPage:'extensions',
     steps:[
       { sel:'#chart-card [data-view-switch]', view:'chart', title:'tutorial.ext.entry', desc:'tutorial.ext.entryDesc' },
+      { sel:'#chart-card .tree-extmode', view:'chart', title:'tutorial.ext.modes', desc:'tutorial.ext.modesDesc' },
       { sel:'#extmgr-tabs', view:'extension', title:'tutorial.ext.tabs', desc:'tutorial.ext.tabsDesc' },
       { sel:'#extension-body', view:'extension', title:'tutorial.ext.install', desc:'tutorial.ext.installDesc' },
       { sel:'#extmgr-tabs [data-exttab="cred"]', view:'extension', extTab:'cred', title:'tutorial.ext.cred', desc:'tutorial.ext.credDesc' },
@@ -6319,14 +6443,14 @@ function centerTutorialCard(card, overlay){
 }
 /** 只关浮层，不退出演示模式（2026-11-11 用户裁定：跳过 ≠ 回正常模式）。 */
 function hideTutorialOverlay(){
-  const overlay=document.getElementById('tutorial-overlay');
+  const overlay=document.getElementById('st-pt-tutorial-overlay');
   if(overlay) overlay.classList.remove('open');
   state.tutorialOpen=false;
 }
 function openTutorial(){
   if(!state.tutorialMode) enterTutorialMode();
   state.tutorialOpen=true; state.tutorialStep=0; state.tutorialGoal=null;
-  const overlay=document.getElementById('tutorial-overlay');
+  const overlay=document.getElementById('st-pt-tutorial-overlay');
   if(!overlay) return;
   /* 首帧禁用位置过渡：蒙层必须立即铺满，不能从上一坐标飞过来（2026-11-09 用户反馈）。 */
   overlay.classList.add('open','instant');
@@ -6336,13 +6460,13 @@ function openTutorial(){
   else settle();
 }
 function closeTutorial(){
-  const overlay=document.getElementById('tutorial-overlay');
+  const overlay=document.getElementById('st-pt-tutorial-overlay');
   if(overlay) overlay.classList.remove('open');
   /* 关闭教程 = 退出演示模式，恢复进入前的真实状态。 */
   exitTutorialMode();
 }
 function renderTutorial(){
-  const overlay=document.getElementById('tutorial-overlay');
+  const overlay=document.getElementById('st-pt-tutorial-overlay');
   if(!overlay) return;
   const title=document.getElementById('tutorial-title');
   const desc=document.getElementById('tutorial-desc');
@@ -6451,6 +6575,7 @@ function applyProgress(pct, label){
   document.getElementById('progress-fill').style.width=Math.max(0,Math.min(100,pct))+'%';
   document.getElementById('progress-pct').textContent=Math.round(pct)+'%';
   if(label) document.getElementById('progress-label').textContent=label;
+  try { actions.onProgress?.(Math.max(0,Math.min(100,Number(pct)||0))); } catch { /* 队列进度非关键 */ }
 }
 function setProgress(pct,label){
   pendingProgress = { pct, label };
@@ -6873,7 +6998,7 @@ function bind(){
       const mode=extPackMode.dataset.extpackmode||extPackMode.dataset.batchextmode;
       let names=[];
       try{ names=JSON.parse(extPackMode.dataset.extpacknames||'[]'); }catch{ names=[]; }
-      if(names.length) setExtPackModes(names,mode);
+      if(names.length) toggleExtPackModes(names,mode);
       return;
     }
     const extMode=e.target.closest('[data-extmode]');
@@ -6975,7 +7100,7 @@ function bind(){
     if(extMode){
       let names=[];
       try{ names=JSON.parse(extMode.dataset.extpacknames||'[]'); }catch{ names=[]; }
-      if(names.length) setExtPackModes(names,extMode.dataset.batchextmode);
+      if(names.length) toggleExtPackModes(names,extMode.dataset.batchextmode);
       return;
     }
     const toggle=e.target.closest('[data-mergetoggle]');
@@ -7060,6 +7185,7 @@ function bind(){
     const card=e.target.closest('[data-pkg]');
     if(card && !e.target.closest('input')){
       const id=card.dataset.pkg;
+      const wasActive=state.activePkgs.has(id);
       if(state.transfer.open){
         const pkg=(state.packages||[]).find(p=>p.id===id);
         if(state.selectedPkgs.has(id)){
@@ -7067,6 +7193,7 @@ function bind(){
           if(pkg) logger.info(t('log.pkgUnchecked', { name: pkg.name, total: state.selectedPkgs.size }));
         }else{
           state.selectedPkgs.add(id);
+          autoEngineForPackage(pkg);
           if(pkg) logger.info(t('log.pkgChecked', { name: pkg.name, size: fmtMB(pkg.mb||0), total: state.selectedPkgs.size }));
         }
         renderZones(); renderCloud(); closeZoneDropdown(); return;
@@ -7086,9 +7213,25 @@ function bind(){
       }
       syncSourceToActive();
       closeZoneDropdown();
-      if(actions.onActivePackage) actions.onActivePackage(id);
+      /* 取消选中不再回调 onActivePackage（否则会把刚删掉的包又加回去）；新增/切换才需要补扫描。 */
+      if(!wasActive && actions.onActivePackage) actions.onActivePackage(id);
       else renderAll();
     }
+  });
+
+  // 任务队列：暂停 / 继续 / 中断 / 上移 / 下移 / 移出
+  document.getElementById('task-queue')?.addEventListener('click',(e)=>{
+    const btn=e.target.closest('[data-tqact]');
+    if(!btn) return;
+    const id=btn.dataset.tqid||'';
+    const act=btn.dataset.tqact||'';
+    if(!id||!act) return;
+    if(act==='pause') actions.queuePause?.(id);
+    else if(act==='resume') actions.queueResume?.(id);
+    else if(act==='abort') actions.queueAbort?.(id);
+    else if(act==='up') actions.queueMove?.(id,-1);
+    else if(act==='down') actions.queueMove?.(id,1);
+    else if(act==='remove') actions.queueRemove?.(id);
   });
 
   // 进度条即日志入口：点击或键盘激活都进日志视图
@@ -7164,7 +7307,7 @@ function bind(){
   if(typeof ResizeObserver!=='undefined'){
     const ro=new ResizeObserver(scheduleTutorial);
     const stack=document.getElementById('chart-stack');
-    const overlay=document.getElementById('tutorial-overlay');
+    const overlay=document.getElementById('st-pt-tutorial-overlay');
     if(stack) ro.observe(stack);
     if(overlay) ro.observe(overlay);
   }
@@ -7338,7 +7481,8 @@ initSwitchDensity();
     const nodes = mergeChartTrees(pkgs.map((pkg) => ({ pkgId: pkg.id, nodes: packageNodes(pkg).nodes })));
     const scope = mergeScope(pkgs);
     const mergedExt = findNode(nodes, 'group:extensions');
-    const mergedManifestOnly = state.extUncheckedMode === 'manifest' && !!mergedExt && !isChecked(mergedExt, scope);
+    const mergedExtChecked = !mergedExt || isChecked(mergedExt, scope);
+    const mergedManifestOnly = state.extUncheckedMode === 'manifest' && !!mergedExt && !mergedExtChecked;
     const excludedByPkg = {};
     for (const pkg of pkgs) {
       const excluded = new Set();
@@ -7367,9 +7511,13 @@ initSwitchDensity();
       const names = extensionPackNames(packageNodes(pkg).nodes);
       const manifestNames = mergedManifestOnly
         ? names
-        : names.filter((name) => extModeOf(name) === EXT_PACK_MODES.MANIFEST);
+        : (mergedExtChecked ? names.filter((name) => extPackFlags(extModeOf(name)).manifest) : []);
+      const fullNames = mergedManifestOnly
+        ? []
+        : (mergedExtChecked ? names.filter((name) => extPackFlags(extModeOf(name)).full) : []);
       opts.extensionManifestNames = manifestNames;
-      opts.extensionMode = names.length > 0 && manifestNames.length === names.length
+      opts.extensionFullNames = fullNames;
+      opts.extensionMode = names.length > 0 && fullNames.length === 0 && manifestNames.length > 0
         ? EXTENSION_MODES.MANIFEST
         : EXTENSION_MODES.FULL;
       optionsByPkg[pkg.id] = opts;
@@ -7383,15 +7531,20 @@ initSwitchDensity();
     const checked = (n) => isChecked(n, scope);
     const names = extensionPackNames(nodes);
     const manifestOnly = extensionManifestOnly(pkg, scope);
+    const extGroup = findNode(nodes, 'group:extensions');
+    const extChecked = !extGroup || checked(extGroup);
     const manifestNames = manifestOnly
       ? names
-      : names.filter((name) => extModeOf(name) === EXT_PACK_MODES.MANIFEST);
+      : (extChecked ? names.filter((name) => extPackFlags(extModeOf(name)).manifest) : []);
+    const fullNames = manifestOnly
+      ? []
+      : (extChecked ? names.filter((name) => extPackFlags(extModeOf(name)).full) : []);
     const opts = deriveExportOptions({
       nodes,
       isChecked: checked,
       ui: {
         compression: state.compression,
-        extensionMode: names.length > 0 && manifestNames.length === names.length
+        extensionMode: names.length > 0 && fullNames.length === 0 && manifestNames.length > 0
           ? EXTENSION_MODES.MANIFEST
           : EXTENSION_MODES.FULL,
         gitMode: packageGitMode(pkg),
@@ -7401,6 +7554,7 @@ initSwitchDensity();
       },
     });
     opts.extensionManifestNames = manifestNames;
+    opts.extensionFullNames = fullNames;
     // 引擎侧数据不受 excludedPaths 约束：只有选了引擎时，才把类目勾选一并带上，
     // 否则取消勾选的聊天/预设仍会被写进转储（数据正确性优先）。
     // 图表为空（未建树 / 扫描失败）时不带选择项——否则「一棵空的树」会把全部行过滤掉。
@@ -7539,6 +7693,7 @@ initSwitchDensity();
       }
     },
     setProgress,
+    setTaskQueue(items) { renderTaskQueue(items); },
     setLan(next = {}) {
       if ('open' in next) {
         state.transfer.open = !!next.open;
@@ -7616,7 +7771,15 @@ initSwitchDensity();
     },
     extLogAppend(line){ if(line) log('INFO', String(line)); },
     setExtensionResults(results){ state.extResults=Array.isArray(results)?results:[]; renderExtensionView(); },
-    setActivePackage(id) { if(state.tutorialMode) return; state.activePkgs = new Set([id]); state.source = { type: 'package', pkgId: id }; state.sourceKey = 'pkg:' + id; renderAll(); },
+    setActivePackage(id, { exclusive = false } = {}) {
+      if(state.tutorialMode) return;
+      if(exclusive) state.activePkgs = new Set();
+      if(id) state.activePkgs.add(id);
+      autoEngineForPackage(state.packages.find((p)=>p.id===id));
+      state.source = id ? { type: 'package', pkgId: id } : { type: 'host', pkgId: null };
+      state.sourceKey = id ? ('pkg:' + id) : ('host:' + state.host);
+      renderAll();
+    },
     pushLog(level, msg) { log(String(level || 'INFO').toUpperCase(), msg); },
     openModal,
     closeModal,

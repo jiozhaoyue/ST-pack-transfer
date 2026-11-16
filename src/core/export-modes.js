@@ -8,6 +8,7 @@
 export const EXTENSION_MODES = Object.freeze({
   MANIFEST: 'manifest', // 轻量清单：不打包扩展实体与 Git 对象，改用官方索引在线安装
   FULL: 'full',         // 完整离线包：打包扩展代码
+  BOTH: 'both',         // 双选：实体 + 清单条目并存
 });
 
 export const GIT_MODES = Object.freeze({

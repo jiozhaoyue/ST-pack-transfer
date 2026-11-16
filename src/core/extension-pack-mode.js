@@ -1,13 +1,15 @@
 /**
  * 扩展目录级打包模式（完整 / 清单）—— 纯逻辑，无 DOM。
  *
- * 用户 2026-11-17 裁定：
- * - 每个扩展目录行只有两个按钮：完整 / 清单，只有一个点亮；
- * - 组级 / 批量级只有三种读数：全完整、全清单、混合（混合时两个按钮都不点亮）；
- * - 单图表与多图表共用同一套逻辑；同一个数据包里允许两种模式并存。
+ * 用户 2026-11-17 最终裁定：
+ * - 每个扩展目录行只有两个按钮：完整 / 清单；两个按钮**可以同时点亮**（双选）；
+ * - 双选 = 完整实体 + 官方清单条目并存，不引入第三个按钮；
+ * - 组级 / 批量级：组内存在完整就点亮完整，存在清单就点亮清单；两者可同时亮；
+ * - 单图表与多图表共用同一套逻辑；同一个数据包里允许三种状态并存。
+ * - 界面上**不再显示「混合」文字**；模式读数只用于内部判断。
  *
- * 本模块只负责「按扩展目录名查询模式」与「把清单扩展折叠成一条 0 体积叶子」，
- * 真正的丢弃动作在 transform.js 里按 `extensionManifestNames` 执行。
+ * 本模块只负责「按扩展目录名查询模式」与「把仅清单扩展折叠成一条 0 体积叶子」，
+ * 真正的丢弃动作在 transform.js 里按 `extensionManifestNames` / `extensionFullNames` 执行。
  */
 
 import { extensionUnitName } from './ext-pack.js';
@@ -15,28 +17,55 @@ import { extensionUnitName } from './ext-pack.js';
 export const EXT_PACK_MODES = Object.freeze({
   FULL: 'full',
   MANIFEST: 'manifest',
+  BOTH: 'both',
 });
 
 export const EXT_PACK_MIXED = 'mixed';
 
 /** 归一单个模式；未知值一律按完整处理（保持旧行为）。 */
 export function normalizeExtPackMode(value) {
-  return value === EXT_PACK_MODES.MANIFEST ? EXT_PACK_MODES.MANIFEST : EXT_PACK_MODES.FULL;
+  if (value === EXT_PACK_MODES.MANIFEST) return EXT_PACK_MODES.MANIFEST;
+  if (value === EXT_PACK_MODES.BOTH) return EXT_PACK_MODES.BOTH;
+  return EXT_PACK_MODES.FULL;
+}
+
+/** 模式 → 两个独立开关（完整 / 清单可以同时为 true）。 */
+export function extPackFlags(mode) {
+  const normalized = normalizeExtPackMode(mode);
+  return {
+    full: normalized === EXT_PACK_MODES.FULL || normalized === EXT_PACK_MODES.BOTH,
+    manifest: normalized === EXT_PACK_MODES.MANIFEST || normalized === EXT_PACK_MODES.BOTH,
+  };
+}
+
+/** 两个独立开关 → 模式；两个都关时回退到完整。 */
+export function extPackModeOf(flags = {}) {
+  const full = flags.full !== false;
+  const manifest = flags.manifest === true;
+  if (full && manifest) return EXT_PACK_MODES.BOTH;
+  if (manifest) return EXT_PACK_MODES.MANIFEST;
+  return EXT_PACK_MODES.FULL;
 }
 
 /**
- * 组级 / 批量级三态读数。
+ * 组级 / 批量级读数。
+ * `full` / `manifest` 表示「组内是否存在该模式」，所以两个都可以为 true（双选）。
  * @param {Iterable<string>} names
  * @param {(name:string)=>string} modeOf
- * @returns {'full'|'manifest'|'mixed'}
  */
 export function extensionPackModeSummary(names, modeOf = () => EXT_PACK_MODES.FULL) {
   const list = [...new Set([...(names || [])].map(String).filter(Boolean))];
-  if (list.length === 0) return EXT_PACK_MODES.FULL;
-  const first = normalizeExtPackMode(modeOf(list[0]));
-  return list.every((name) => normalizeExtPackMode(modeOf(name)) === first)
-    ? first
-    : EXT_PACK_MIXED;
+  const flags = list.map((name) => extPackFlags(modeOf(name)));
+  return {
+    names: list,
+    full: flags.some((f) => f.full),
+    manifest: flags.some((f) => f.manifest),
+    allFull: flags.length > 0 && flags.every((f) => f.full),
+    allManifest: flags.length > 0 && flags.every((f) => f.manifest),
+    mode: flags.some((f) => f.full) && flags.some((f) => f.manifest)
+      ? EXT_PACK_MODES.BOTH
+      : (flags.some((f) => f.manifest) ? EXT_PACK_MODES.MANIFEST : EXT_PACK_MODES.FULL),
+  };
 }
 
 /** 从叶子路径 / id 取扩展目录名。 */
@@ -102,9 +131,9 @@ function recompute(node) {
  * 把双模式应用到图表树（返回新树，绝不改 `pkg.nodes`）。
  *
  * - 扩展组节点获得 `extModeScope:'group'` 与 `extModeNames`；
- * - 每个扩展目录根获得 `extModeName` 与 `packMode`；
- * - 清单模式的扩展目录折叠为一条 `manifestOnly` 叶子（体积 0，勾选镜像目录节点）；
- * - 完整模式的扩展子树原样克隆，不再把 `.git` 等子目录误判成扩展根。
+ * - 每个扩展目录根获得 `extModeName` 与 `packMode`（full / manifest / both）；
+ * - 仅清单（manifest-only）的扩展目录折叠为一条 `manifestOnly` 叶子（体积 0，勾选镜像目录节点）；
+ * - 完整与双选（both）保留完整实体子树，不再把 `.git` 等子目录误判成扩展根。
  *
  * @param {Array<object>} nodes
  * @param {{modeOf?:Function, manifestLabel?:string}} [opts]
@@ -206,7 +235,10 @@ export function extensionPackNames(nodes) {
  * @returns {string[]}
  */
 export function manifestExtensionNames(nodes, modeOf) {
-  return extensionPackNames(nodes).filter(
-    (name) => normalizeExtPackMode(modeOf(name)) === EXT_PACK_MODES.MANIFEST,
-  );
+  return extensionPackNames(nodes).filter((name) => extPackFlags(modeOf(name)).manifest);
+}
+
+/** 需要保留完整实体的扩展名（完整 / 双选）。 */
+export function fullExtensionNames(nodes, modeOf) {
+  return extensionPackNames(nodes).filter((name) => extPackFlags(modeOf(name)).full);
 }

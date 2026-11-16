@@ -19,9 +19,13 @@
 /** 私有清单当前 schema 版本。缺省（v1）表示旧产物：仅 MANIFEST 模式、无状态字段。 */
 export const MANIFEST_SCHEMA_VERSION = 2;
 
-/** 条目的可安装性状态（由 `mode` + URL 派生，调用方不得传入）。 */
+/**
+ * 条目的可安装性状态（由 `mode` + URL 派生，调用方不得传入）。
+ * `both`（完整 + 清单双选）的实体在包内，故 availability 与 FULL 相同为 embedded；
+ * 是否写入官方索引由独立的 `manifestListed` 决定。
+ */
 export const AVAILABILITY = Object.freeze({
-  EMBEDDED: 'embedded',       // 包内已含扩展实体（FULL 模式）
+  EMBEDDED: 'embedded',       // 包内已含扩展实体（FULL / BOTH 模式）
   INSTALLABLE: 'installable', // 仅清单，但记录了可用的 Git URL，可在线安装
   UNAVAILABLE: 'unavailable', // 仅清单且无可用 URL，无法在线安装
 });
@@ -103,7 +107,7 @@ export function extensionRelativePath(hubPath) {
  * @param {object} [params.manifest] 解析后的 `manifest.json`（可为空对象）
  * @param {object} [params.gitMeta] `.git` 解析结果 `{ remoteUrl, branch, commit }`
  * @param {object} [params.sourceRecord] TT/PT 来源记录（`remote_url` / `reference` / `installed_commit`）
- * @param {string} params.mode `manifest` | `full`
+ * @param {string} params.mode `manifest` | `full` | `both`
  * @returns {object} 清单条目
  */
 export function deriveExtensionEntry({ name, manifest = {}, gitMeta = {}, sourceRecord = {}, mode }) {
@@ -127,8 +131,9 @@ export function deriveExtensionEntry({ name, manifest = {}, gitMeta = {}, source
 
   const installable = isInstallableUrl(url);
   let availability;
-  const resolvedMode = mode === 'manifest' ? 'manifest' : 'full';
-  if (resolvedMode === 'full') {
+  const resolvedMode = mode === 'manifest' || mode === 'both' ? mode : 'full';
+  const manifestListed = resolvedMode === 'manifest' || resolvedMode === 'both';
+  if (resolvedMode === 'full' || resolvedMode === 'both') {
     availability = AVAILABILITY.EMBEDDED;
   } else {
     availability = installable ? AVAILABILITY.INSTALLABLE : AVAILABILITY.UNAVAILABLE;
@@ -154,8 +159,10 @@ export function deriveExtensionEntry({ name, manifest = {}, gitMeta = {}, source
     type: 'extension',
     sourceKind,
     availability,
-    // 每个条目自己的打包模式：同一包里允许完整与清单并存。
+    // 每个条目自己的打包模式：同一包里允许完整、清单、双选并存。
     packMode: resolvedMode,
+    // 是否登记进官方 Content Downloader 索引（manifest / both 为 true）。
+    manifestListed,
     manifest,
   };
   if (notes.length > 0) entry.notes = notes.join(' ');
@@ -166,10 +173,11 @@ export function deriveExtensionEntry({ name, manifest = {}, gitMeta = {}, source
 /**
  * 构建转换器私有清单（`_convert/extensions-manifest.json`）。
  *
- * FULL 与 MANIFEST **两种模式都产出**；条目状态由 `deriveExtensionEntry` 派生。
+ * FULL / MANIFEST / BOTH **三种模式都产出**；条目状态由 `deriveExtensionEntry` 派生。
+ * 每项可按自身 `ext.mode` 覆盖顶层 `mode`，因此同一包里允许三种状态并存。
  * @param {object} params
- * @param {Array<object>} params.extensions 原始扩展输入数组（每项含 name/manifest/gitMeta/sourceRecord）
- * @param {string} params.mode `manifest` | `full`
+ * @param {Array<object>} params.extensions 原始扩展输入数组（每项含 name/manifest/gitMeta/sourceRecord/mode）
+ * @param {string} params.mode `manifest` | `full` | `both`
  * @param {string} params.generatedAt 固定时间戳（保证产物字节可复现）
  * @returns {object} 私有清单对象
  */
@@ -195,8 +203,9 @@ export function buildExtensionManifest({ extensions, mode, generatedAt }) {
 /**
  * 构建 SillyTavern 官方 Content Downloader 索引（`extensions-index.json`）。
  *
- * **仅 MANIFEST 模式产出**：该索引的语义是「按 URL 在线下载」，而 FULL 包内已有实体，
- * 宿主若按索引再装一遍会造成重复安装与潜在覆盖（决策 D-6，见 design.md §2.4）。
+ * **只有登记为清单的条目才产出**：`manifest`（仅清单）与 `both`（实体 + 清单双选）。
+ * `full` 条目不登记——包内已有实体，宿主再按索引装一遍会造成重复安装
+ * （决策 D-6，见 design.md §2.4）。
  *
  * 官方格式无「不可安装」语义，故 `unavailable` 条目**必须过滤掉**——写入空 URL 会让
  * 宿主的 Content Downloader 报错。
@@ -204,9 +213,15 @@ export function buildExtensionManifest({ extensions, mode, generatedAt }) {
  * @returns {object|null} 官方索引对象；无可安装项时返回 null
  */
 export function buildOfficialIndex(extensions) {
-  const usable = extensions.filter(
-    (ext) => ext.availability === AVAILABILITY.INSTALLABLE && isInstallableUrl(ext.url),
-  );
+  const usable = (extensions || []).filter((ext) => {
+    if (!ext || !isInstallableUrl(ext.url)) return false;
+    // v2 条目用 manifestListed 显式标记；旧条目按 packMode / availability 兼容推断。
+    const listed = ext.manifestListed === true
+      || ext.packMode === 'manifest'
+      || ext.packMode === 'both'
+      || ext.availability === AVAILABILITY.INSTALLABLE;
+    return listed;
+  });
   if (usable.length === 0) return null;
   // SillyTavern 官方 index.json 是**扁平数组**：downloadAssetsList 明确
   // `if (!Array.isArray(json)) throw`；扩展条目只含 id/type/name/description/url。
@@ -224,12 +239,13 @@ export function buildOfficialIndex(extensions) {
  * 归一包内清单条目（恢复端使用）。
  *
  * 兼容三种来源：
- * - v1 旧清单（无 `availability`）：按 `mode` 推断——MANIFEST 下有可用 URL 即可安装；
+ * - v1 旧清单（无 `availability`）：按条目 `packMode` / 顶层 `mode` 推断——
+ *   MANIFEST 下有可用 URL 即可安装，FULL / BOTH 视为包内已有实体；
  * - 非法 `availability` 取值：回退到同一推断规则；
- * - URL 非 http(s)：**强制** `unavailable`（无论声明为何）。
+ * - URL 非 http(s)：**强制** `unavailable`（无论声明为何；embedded / both 不受此限）。
  *
  * 同时兼容 FULL 模式的 v1 等价形态（无 mode 字段）：一律按「包内已有实体」处理，
- * 因为能读到实体的包才可能带有这些扩展。
+ * 因为能读到实体的包才可能带有这些扩展。`manifestListed` 缺失时按 packMode 兼容推断。
  * @param {unknown} raw `JSON.parse` 后的清单对象
  * @returns {Array<object>} 归一后的条目数组；无法解析时返回空数组
  */
@@ -249,12 +265,18 @@ export function normalizeManifestEntries(raw) {
 
       let availability = item.availability;
       const legal = Object.values(AVAILABILITY);
+      const packModeHint = item.packMode === 'manifest' || item.packMode === 'full' || item.packMode === 'both'
+        ? item.packMode
+        : '';
       if (!legal.includes(availability)) {
-        // 旧版 / 非法值：按 mode 推断
-        if (mode === 'full') availability = AVAILABILITY.EMBEDDED;
-        else availability = installable ? AVAILABILITY.INSTALLABLE : AVAILABILITY.UNAVAILABLE;
+        // 旧版 / 非法值：按条目 packMode 优先、其次顶层 mode 推断
+        if (packModeHint === 'both' || packModeHint === 'full' || mode === 'full' || mode === 'both') {
+          availability = AVAILABILITY.EMBEDDED;
+        } else {
+          availability = installable ? AVAILABILITY.INSTALLABLE : AVAILABILITY.UNAVAILABLE;
+        }
       }
-      // 强制规则：无可用 URL 就不可能在线安装
+      // 强制规则：无可用 URL 就不可能在线安装（embedded / both 实体在包内，不受此限）
       if (availability !== AVAILABILITY.EMBEDDED && !installable) {
         availability = AVAILABILITY.UNAVAILABLE;
       }
@@ -262,9 +284,12 @@ export function normalizeManifestEntries(raw) {
       const sourceKind = Object.values(SOURCE_KIND).includes(item.sourceKind)
         ? item.sourceKind
         : (installable ? SOURCE_KIND.GIT : SOURCE_KIND.UNKNOWN);
-      const packMode = item.packMode === 'manifest' || item.packMode === 'full'
-        ? item.packMode
-        : (availability === AVAILABILITY.EMBEDDED ? 'full' : 'manifest');
+      const packMode = packModeHint
+        || (availability === AVAILABILITY.EMBEDDED ? 'full' : 'manifest');
+      const manifestListed = typeof item.manifestListed === 'boolean'
+        ? item.manifestListed
+        : (packMode === 'manifest' || packMode === 'both'
+          || availability === AVAILABILITY.INSTALLABLE);
 
       return {
         ...item,
@@ -279,6 +304,7 @@ export function normalizeManifestEntries(raw) {
         sourceKind,
         availability,
         packMode,
+        manifestListed,
         notes: typeof item.notes === 'string' ? item.notes : '',
       };
     })

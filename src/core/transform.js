@@ -47,6 +47,9 @@ export const TARGETS = Object.freeze({
 });
 
 import { EXTENSION_MODES, GIT_MODES } from './export-modes.js';
+import {
+  normalizeGitMode, isGitEntry, isGitMinimalKept, gitDropReason,
+} from './git-policy.js';
 import { EXT_PACK_MIXED } from './extension-pack-mode.js';
 
 export { EXTENSION_MODES, GIT_MODES };
@@ -69,34 +72,9 @@ export const GIT_KEEP_PLACEHOLDER = new TextEncoder().encode(
   '# 由 ST-pack-transfer 合成：占位文件，仅用于保证 .git/objects 目录在解压后存在\n',
 );
 
-/** 归一化 gitMode：未知取值一律回落 KEEP（防御式，不抛错）。 */
-export function normalizeGitMode(value) {
-  return Object.values(GIT_MODES).includes(value) ? value : GIT_MODES.KEEP;
-}
-
-/** `relPath`（相对扩展根）是否属于 `.git` 目录。注意 `.gitkeep` 不算。 */
-export function isGitEntry(relPath) {
-  return relPath === '.git' || relPath.startsWith('.git/');
-}
-
-/**
- * `minimal` 策略下需要保留的 `.git` 条目：
- * `config`（remote URL）/ `HEAD`（分支）/ `index`（使更新后 status 干净）/ `refs/heads/**`（分支指针）。
- * 其余（含 `objects/pack/*.pack` 全部对象存储）一律剔除。
- */
-export function isGitMinimalKept(relPath) {
-  return relPath === '.git/config'
-    || relPath === '.git/HEAD'
-    || relPath === '.git/index'
-    || relPath.startsWith('.git/refs/heads/');
-}
-
-/** 因 gitMode 剔除条目时的上报文案（两档各自写明代价）。 */
-export function gitDropReason(gitMode) {
-  return gitMode === GIT_MODES.STRIP
-    ? 'gitMode=strip：剔除扩展 Git 历史（接收方需重新 git clone 才能在线更新）'
-    : 'gitMode=minimal：仅保留 Git 识别与更新所需最小集，剔除对象存储';
-}
+export {
+  normalizeGitMode, isGitEntry, isGitMinimalKept, isGitEntryDropped, gitDropReason,
+} from './git-policy.js';
 
 const TT_USER_PREFIX = 'data/default-user/';
 const TT_THIRD_PARTY_PREFIX = 'data/extensions/third-party/';
@@ -329,11 +307,11 @@ export async function convert(sourcePath, targetPath, {
   compressionLevel = 5,
   extensionMode = EXTENSION_MODES.FULL,
   /**
-   * 逐扩展目录的「仅清单」名单（2026-11-17 用户裁定）。
-   * 与 extensionMode 并存：extensionMode=manifest 仍表示整包清单；
-   * 本名单只影响列出的扩展目录，未列出的照常完整打包。
+   * 逐扩展目录的清单名单（清单 / 双选）与完整名单（完整 / 双选）。
+   * 两个名单可以同时包含同一个扩展 => 完整实体 + 清单条目并存。
    */
   extensionManifestNames = [],
+  extensionFullNames = [],
   gitMode = GIT_MODES.KEEP,
   keepDevFiles = false,
   pruneBuiltinAssets = false,
@@ -366,8 +344,16 @@ export async function convert(sourcePath, targetPath, {
       .map((name) => String(name || '').trim())
       .filter(Boolean),
   );
-  const isManifestExtension = (folderName) => extensionMode === EXTENSION_MODES.MANIFEST
+  const fullExtSet = new Set(
+    (Array.isArray(extensionFullNames) ? extensionFullNames : [])
+      .map((name) => String(name || '').trim())
+      .filter(Boolean),
+  );
+  const isManifestListed = (folderName) => extensionMode === EXTENSION_MODES.MANIFEST
     || manifestExtSet.has(String(folderName || ''));
+  /** 只丢实体、保留清单：清单开关开且完整开关关。 */
+  const isManifestOnly = (folderName) => isManifestListed(folderName)
+    && !fullExtSet.has(String(folderName || ''));
   const checkAbort = () => {
     if (signal?.aborted) {
       throw new DOMException('转换任务已被中止/暂停', 'AbortError');
@@ -760,7 +746,7 @@ export async function convert(sourcePath, targetPath, {
         if (relPath === 'manifest.json' || relPath.endsWith('/manifest.json')) {
           const data = await entry.read();
           noteExtensionPackage(context, routed.hubPath, data);
-          if (!isManifestExtension(extFolder)) {
+          if (!isManifestOnly(extFolder)) {
             const outPath = targetEntryPath(routed.hubPath, target, routed.extScope);
             await writer.add(outPath, data);
             report.copied(routed.hubPath, entry.uncompressedSize);
@@ -782,7 +768,7 @@ export async function convert(sourcePath, targetPath, {
             }
           } catch { /* 忽略读取错误 */ }
           // 解析在三档模式下都发生（extensionGitMeta 必须照常产出），只有写出与否受策略影响。
-          if (isManifestExtension(extFolder)) {
+          if (isManifestOnly(extFolder)) {
             report.dropped(routed.hubPath, '轻量清单模式：已解析 Git Remote URL，实体文件不打包');
           } else if (!gitKeep) {
             report.dropped(routed.hubPath, gitDropReason(resolvedGitMode), entry.uncompressedSize);
@@ -806,7 +792,7 @@ export async function convert(sourcePath, targetPath, {
               context.extensionGitMeta.set(extFolder, current);
             }
           } catch { /* 忽略读取错误 */ }
-          if (isManifestExtension(extFolder)) {
+          if (isManifestOnly(extFolder)) {
             report.dropped(routed.hubPath, '轻量清单模式：已解析 Git 分支，实体文件不打包');
           } else if (!gitKeep) {
             report.dropped(routed.hubPath, gitDropReason(resolvedGitMode), entry.uncompressedSize);
@@ -829,7 +815,7 @@ export async function convert(sourcePath, targetPath, {
               context.extensionGitMeta.set(extFolder, current);
             }
           } catch { /* 忽略读取错误 */ }
-          if (isManifestExtension(extFolder)) {
+          if (isManifestOnly(extFolder)) {
             report.dropped(routed.hubPath, '轻量清单模式：已解析 Git Commit，实体文件不打包');
           } else if (!gitKeep) {
             report.dropped(routed.hubPath, gitDropReason(resolvedGitMode), entry.uncompressedSize);
@@ -846,14 +832,14 @@ export async function convert(sourcePath, targetPath, {
         // 2.5 Git 目录策略兜底闸：未经上述元数据处理器接管的 .git 条目。
         // strip 下全部命中；minimal 下命中的是白名单之外者（objects/pack/*.pack 等对象存储）。
         // 轻量清单模式下本闸不生效——该模式由下方第 3 步统一按「清单模式」理由丢弃，文案不得被 gitMode 抢占。
-        if (gitEntry && !gitKeep && !isManifestExtension(extFolder)) {
+        if (gitEntry && !gitKeep && !isManifestOnly(extFolder)) {
           entry.skip();
           report.dropped(routed.hubPath, gitDropReason(resolvedGitMode), entry.uncompressedSize);
           continue;
         }
 
         // 3. 轻量清单模式下，跳过其他代码文件
-        if (isManifestExtension(extFolder)) {
+        if (isManifestOnly(extFolder)) {
           entry.skip();
           report.dropped(routed.hubPath, '轻量清单模式：扩展代码由目标酒馆按清单下载');
           continue;
@@ -882,6 +868,7 @@ export async function convert(sourcePath, targetPath, {
     await emitSynthesized(writer, report, context, target, selection, {
       extensionMode,
       extensionManifestNames: [...manifestExtSet],
+      extensionFullNames: [...fullExtSet],
       gitMode: resolvedGitMode,
       dryRun,
     });
@@ -1158,6 +1145,7 @@ function noteExtensionPackage(context, hubPath, data) {
 async function emitSynthesized(writer, report, context, target, selection, {
   extensionMode = EXTENSION_MODES.FULL,
   extensionManifestNames = [],
+  extensionFullNames = [],
   gitMode = GIT_MODES.KEEP,
   dryRun = false,
 } = {}) {
@@ -1166,7 +1154,12 @@ async function emitSynthesized(writer, report, context, target, selection, {
       .map((name) => String(name || '').trim())
       .filter(Boolean),
   );
-  const isManifestExtension = (name) => extensionMode === EXTENSION_MODES.MANIFEST
+  const fullExtSet = new Set(
+    (Array.isArray(extensionFullNames) ? extensionFullNames : [])
+      .map((name) => String(name || '').trim())
+      .filter(Boolean),
+  );
+  const isManifestListed = (name) => extensionMode === EXTENSION_MODES.MANIFEST
     || manifestExtSet.has(String(name || ''));
   if (target === TARGETS.L) {
     const baseSelection = { ...L_SELECTION };
@@ -1197,14 +1190,24 @@ async function emitSynthesized(writer, report, context, target, selection, {
     ...context.extensionGitMeta.keys(),
   ]);
 
-  const extInputs = [...allExtNames].sort().map((name) => ({
-    name,
-    manifest: context.extensionManifests.get(name) || {},
-    gitMeta: context.extensionGitMeta.get(name) || {},
-    sourceRecord: context.extensionSources.get(name)?.record || {},
-    // 逐扩展模式（2026-11-17）：同一包里允许完整与清单并存。
-    mode: isManifestExtension(name) ? EXTENSION_MODES.MANIFEST : EXTENSION_MODES.FULL,
-  }));
+  const extInputs = [...allExtNames].sort().map((name) => {
+    const listed = isManifestListed(name);
+    // 完整实体保留规则必须与上方 `isManifestOnly` 完全同源：
+    // 显式完整（full / both）优先；未登记清单且非整包清单时默认完整。
+    const full = fullExtSet.has(name)
+      || (!manifestExtSet.has(name) && extensionMode !== EXTENSION_MODES.MANIFEST);
+    const mode = full && listed
+      ? EXTENSION_MODES.BOTH
+      : (listed ? EXTENSION_MODES.MANIFEST : EXTENSION_MODES.FULL);
+    return {
+      name,
+      manifest: context.extensionManifests.get(name) || {},
+      gitMeta: context.extensionGitMeta.get(name) || {},
+      sourceRecord: context.extensionSources.get(name)?.record || {},
+      // 逐扩展模式（2026-11-17）：同一包里允许完整、清单、双选并存。
+      mode,
+    };
+  });
 
   // gitMode=minimal：为每个实际打包的 Git 扩展补一个占位文件，保证 `.git/objects` 目录解压后存在。
   // 必要性：git 的 is_git_directory() 要求 objects/refs 是真实目录，而本管线丢弃空目录条目
@@ -1232,13 +1235,16 @@ async function emitSynthesized(writer, report, context, target, selection, {
     && (extensionMode === EXTENSION_MODES.MANIFEST || extensionMode === EXTENSION_MODES.FULL);
 
   if (extInputs.length > 0 && (!selection || selection.extensions !== false) && shouldEmitManifest) {
-    const manifestInputs = extInputs.filter((input) => input.mode === EXTENSION_MODES.MANIFEST);
-    const fullInputs = extInputs.filter((input) => input.mode !== EXTENSION_MODES.MANIFEST);
+    const manifestInputs = extInputs.filter((input) => input.mode === EXTENSION_MODES.MANIFEST || input.mode === EXTENSION_MODES.BOTH);
+    const fullInputs = extInputs.filter((input) => input.mode === EXTENSION_MODES.FULL || input.mode === EXTENSION_MODES.BOTH);
+    const fullOnly = extInputs.filter((input) => input.mode === EXTENSION_MODES.FULL);
+    const manifestOnly = extInputs.filter((input) => input.mode === EXTENSION_MODES.MANIFEST);
+    const bothInputs = extInputs.filter((input) => input.mode === EXTENSION_MODES.BOTH);
 
-    // 1. 官方 Content Downloader 索引：**只列仅清单且可安装**的条目
+    // 1. 官方 Content Downloader 索引：清单 / 双选且可安装的条目
     if (manifestInputs.length > 0) {
       const officialIndex = buildOfficialIndex(
-        manifestInputs.map((input) => deriveExtensionEntry({ ...input, mode: EXTENSION_MODES.MANIFEST })),
+        manifestInputs.map((input) => deriveExtensionEntry({ ...input, mode: input.mode })),
       );
       if (officialIndex) {
         await writer.add('extensions-index.json', encodeJson(officialIndex));
@@ -1246,32 +1252,39 @@ async function emitSynthesized(writer, report, context, target, selection, {
       }
     }
 
-    // 2. 转换器私有清单：两种模式都产出，供宿主插件恢复时引导安装或更新
+    // 2. 转换器私有清单：所有模式都产出，供宿主插件恢复时引导安装或更新
+    const modeSet = new Set(extInputs.map((input) => input.mode));
+    const summaryMode = modeSet.size > 1 ? EXT_PACK_MIXED : [...modeSet][0];
     const convertManifest = buildExtensionManifest({
       extensions: extInputs,
-      mode: manifestInputs.length === 0
-        ? EXTENSION_MODES.FULL
-        : (fullInputs.length === 0 ? EXTENSION_MODES.MANIFEST : EXT_PACK_MIXED),
+      mode: summaryMode,
       generatedAt: FIXED_TIMESTAMP,
     });
     await writer.add('_convert/extensions-manifest.json', encodeJson(convertManifest));
     report.synthesized('_convert/extensions-manifest.json');
 
-    if (fullInputs.length === 0) {
+    if (manifestOnly.length === extInputs.length) {
       report.warn(
-        `已启用轻量清单模式：已记录 ${manifestInputs.length} 个扩展清单（未打包实体代码与 Git packfile），`
+        `已启用轻量清单模式：已记录 ${manifestOnly.length} 个扩展清单（未打包实体代码与 Git packfile），`
         + '已生成 extensions-index.json 与 _convert/extensions-manifest.json。',
       );
-    } else if (manifestInputs.length === 0) {
+    } else if (fullOnly.length === extInputs.length) {
       report.warn(
-        `完整离线包已含 ${fullInputs.length} 个扩展实体：包内同时写入 _convert/extensions-manifest.json，`
+        `完整离线包已含 ${fullOnly.length} 个扩展实体：包内同时写入 _convert/extensions-manifest.json，`
         + '仅用于恢复后的更新引导（不生成 extensions-index.json，以免宿主重复在线安装）。',
+      );
+    } else if (bothInputs.length === extInputs.length) {
+      report.warn(
+        `双选扩展模式：${bothInputs.length} 个扩展同时打包实体并登记官方清单；`
+        + '包内保留完整代码，同时生成 extensions-index.json 供宿主在线安装或更新。',
       );
     } else {
       report.warn(
-        `混合扩展模式：${fullInputs.length} 个扩展完整打包，${manifestInputs.length} 个仅清单`
-        + `（${manifestInputs.map((x) => x.name).join(', ')}）；`
-        + '两类扩展同在一个数据包内，另有 extensions-index.json 供清单条目在线安装。',
+        `混合扩展模式：${fullOnly.length} 个完整、${manifestOnly.length} 个仅清单、${bothInputs.length} 个完整+清单双选`
+        + `（完整：${fullOnly.map((x) => x.name).join(', ') || '无'}；`
+        + `清单：${manifestOnly.map((x) => x.name).join(', ') || '无'}；`
+        + `双选：${bothInputs.map((x) => x.name).join(', ') || '无'}）。`
+        + '同一个数据包内三种状态可以并存。',
       );
     }
   }
