@@ -105,15 +105,25 @@ export function loadSettings() {
     ...(localData && typeof localData === 'object' ? localData : {}),
     ...(hostData && typeof hostData === 'object' ? hostData : {}),
   };
-  /* 「仅浏览器」模式下，服务端那份是不该存在的空壳；账号只能取本地，
-     否则会被 host 的空数组覆盖，用户会以为自己的账号丢了。 */
-  const storageMode = (hostData && hostData.gitCredentialStorage)
-    || (localData && localData.gitCredentialStorage)
-    || merged.gitCredentialStorage;
-  if (storageMode === 'browser') {
-    merged.gitCredentialStorage = 'browser';
+  /* 凭据存放位置：显式选择优先；否则若服务端已有账号，按 server 显示
+     （否则旧用户在「默认仅浏览器」上线后会看到账号凭空消失）；都不是才用新默认 browser。
+     browser 档只取本机副本，服务端那份是空壳、不可信。 */
+  const explicitMode = (hostData && hostData.gitCredentialStorage)
+    || (localData && localData.gitCredentialStorage);
+  const hostAccounts = (hostData && Array.isArray(hostData.gitAccounts)) ? hostData.gitAccounts : [];
+  merged.gitCredentialStorage = explicitMode || (hostAccounts.length ? 'server' : 'browser');
+  if (merged.gitCredentialStorage === 'browser') {
     merged.gitAccounts = (localData && Array.isArray(localData.gitAccounts)) ? localData.gitAccounts : [];
   }
+
+  /* S3 / WebDAV：同一套识别规则（服务端已有配置但本地没选过 → 按 server 显示）。 */
+  const s3Explicit = (hostData && hostData.s3CredentialStorage) || (localData && localData.s3CredentialStorage);
+  merged.s3CredentialStorage = s3Explicit || ((hostData && hostData.s3Config) ? 'server' : 'browser');
+  if (merged.s3CredentialStorage === 'browser') merged.s3Config = null;
+
+  const wdExplicit = (hostData && hostData.webdavCredentialStorage) || (localData && localData.webdavCredentialStorage);
+  merged.webdavCredentialStorage = wdExplicit || ((hostData && hostData.webdavConfig) ? 'server' : 'browser');
+  if (merged.webdavCredentialStorage === 'browser') merged.webdavConfig = null;
 
   return normalizeSettings(merged);
 }
@@ -121,6 +131,7 @@ export function loadSettings() {
 export function saveSettings(settings) {
   const normalized = normalizeSettings(settings);
   const s = storage();
+  /* 本机始终保留完整副本：导出插件数据、离线下次启动都直接读它。 */
   if (s) {
     try {
       s.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(normalized));
@@ -128,8 +139,12 @@ export function saveSettings(settings) {
       /* 隐私模式 / 配额不足：静默降级，不阻塞 */
     }
   }
-  /* 凭据双写：服务端 settings.json 与浏览器 localStorage 都保留完整副本，
-     导出插件数据时直接读本地，不必回读 settings.json（2026-11-11 用户裁定）。 */
-  saveHostSettings(normalized);
+  /* 服务端按各凭据自己的存放位置剥除：选「仅浏览器」的凭据绝不落 settings.json
+     （2026-11-16 用户明令）。此前是无条件双写，服务端一直残留明文。 */
+  const forHost = { ...normalized };
+  if (normalized.gitCredentialStorage === 'browser') forHost.gitAccounts = [];
+  if (normalized.s3CredentialStorage === 'browser') forHost.s3Config = null;
+  if (normalized.webdavCredentialStorage === 'browser') forHost.webdavConfig = null;
+  saveHostSettings(forHost);
   return normalized;
 }

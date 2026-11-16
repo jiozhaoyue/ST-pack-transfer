@@ -743,6 +743,10 @@
   #app.app-container details.is-closing > *:not(summary){animation:discloseClose .16s ease forwards}
   #app.app-container .ext-server-block[open] > .ext-server-body{animation:serverDiscloseOpen .18s cubic-bezier(0.16,1,0.3,1)}
   #app.app-container .ext-server-block.is-closing > .ext-server-body{animation:serverDiscloseClose .16s cubic-bezier(0.16,1,0.3,1) forwards}
+  /* 收起时同时折叠高度：只做透明度会让 <details> 关闭瞬间整块跳掉（2026-11-16 实测）。 */
+  #app.app-container .ext-server-block > .ext-server-body{overflow:hidden;
+    transition:max-height .16s cubic-bezier(0.16,1,0.3,1),opacity .16s ease}
+  #app.app-container .ext-server-block.is-closing > .ext-server-body{max-height:0 !important;opacity:0}
   #app.app-container .ext-install-area:not([hidden]){animation:discloseOpen .2s ease}
   #app.app-container .ext-report-panel:not([hidden]){animation:discloseOpen .2s ease}
   #app.app-container .ext-data-row{flex-wrap:wrap}

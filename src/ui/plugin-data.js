@@ -55,8 +55,9 @@ export function buildPluginData({ includeCredentials = false, includeOAuth = fal
     settings: { ...settings, gitAccounts: exportedAccounts },
     chartPrefs: loadChartPrefs(),
     chartLayout: readJson(EXTRA_KEYS.layout),
-    cloud: readJson(EXTRA_KEYS.cloud),
-    webdav: readJson(EXTRA_KEYS.webdav),
+    /* 凭据在哪个位置就从哪里取：选「服务端」的读 settings，否则读本机。 */
+    cloud: settings.s3CredentialStorage === 'server' ? (settings.s3Config || null) : readJson(EXTRA_KEYS.cloud),
+    webdav: settings.webdavCredentialStorage === 'server' ? (settings.webdavConfig || null) : readJson(EXTRA_KEYS.webdav),
   };
 }
 
@@ -71,11 +72,18 @@ export function applyPluginData(data) {
   if (data.includeCredentials !== true || !Array.isArray(incoming.gitAccounts)) {
     delete incoming.gitAccounts;
   }
-  saveSettings({ ...loadSettings(), ...incoming });
+  const base = { ...loadSettings(), ...incoming };
+  const s3Server = base.s3CredentialStorage === 'server';
+  const wdServer = base.webdavCredentialStorage === 'server';
+  saveSettings({
+    ...base,
+    s3Config: s3Server ? (data.cloud ?? null) : null,
+    webdavConfig: wdServer ? (data.webdav ?? null) : null,
+  });
   if (data.chartPrefs && typeof data.chartPrefs === 'object') saveChartPrefs(data.chartPrefs);
   writeJson(EXTRA_KEYS.layout, data.chartLayout ?? null);
-  writeJson(EXTRA_KEYS.cloud, data.cloud ?? null);
-  writeJson(EXTRA_KEYS.webdav, data.webdav ?? null);
+  if (!s3Server) writeJson(EXTRA_KEYS.cloud, data.cloud ?? null);
+  if (!wdServer) writeJson(EXTRA_KEYS.webdav, data.webdav ?? null);
   return {
     ok: true,
     accounts: Array.isArray(incoming.gitAccounts) ? incoming.gitAccounts.length : 0,

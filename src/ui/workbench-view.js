@@ -2517,8 +2517,8 @@ function accountsHtml(){
     +'<div class="ext-note privacy">'+t('extmgr.privacyNote')+'</div>'
     +'<div class="ext-row">'
       +'<span class="et-label">'+t('extmgr.storageLabel')+'</span>'
-      +'<label class="check"><input type="radio" name="accstorage" data-accstorage="server"'+(mode==='server'?' checked':'')+'> '+t('extmgr.storeServer')+'</label>'
-      +'<label class="check"><input type="radio" name="accstorage" data-accstorage="browser"'+(mode==='browser'?' checked':'')+'> '+t('extmgr.storeBrowser')+'</label>'
+      +'<span class="acc-store-state">'+(mode==='server'?t('extmgr.storeServer'):t('extmgr.storeBrowser'))+'</span>'
+      +'<button type="button" class="btn" data-openprivacy>'+t('extmgr.storeGoPrivacy')+'</button>'
     +'</div>'
     +'<div class="ext-row acc-add">'
       +'<select class="text_pole" data-accsite>'+ACCOUNT_SITES.map((s)=>'<option value="'+s+'">'+s+'</option>').join('')+'</select>'
@@ -2568,6 +2568,8 @@ function refreshInstallArea(){
 /** 安装扩展是扩展管理面板的**固定页脚**：贴在面板底部、紧挨安装报告条，不随列表滚动。
  *  2026-11-15 用户裁定：服务端扩展块也住页脚（在「安装扩展」上方、默认收起、展开同样向上挤压）；
  *  页脚同时显示当前用户徽标（管理员才亮管理能力）。只在宿主页显示；报告展开或切到开发者页时隐藏。 */
+/** 服务端插件区上一次渲染的 HTML 指纹：内容不变就不重建，避免打断收起动画。 */
+let lastServerBlockHtml='';
 function syncExtInstallBlock(){
   const block=document.getElementById('extmgr-install-block');
   if(!block) return;
@@ -2577,13 +2579,20 @@ function syncExtInstallBlock(){
   if(area) area.hidden=!state.extInstallOpen;
   const serverArea=document.getElementById('extmgr-server-area');
   if(serverArea){
+    /* 非管理员：连容器都不留（不做空壳、不发请求、不显示标题）——2026-11-16 用户规则，
+       以后所有管理员专属 UI 一律如此。 */
     if(show && state.extHostAdmin && state.extServerLoaded){
+      const html=serverPluginBlockHtml();
+      /* 内容没变就不重建：整块重建会打断正在播放的收起动画（2026-11-16 实测）。 */
+      if(serverArea.hidden || html!==lastServerBlockHtml){
+        serverArea.innerHTML=html;
+        lastServerBlockHtml=html;
+        bindServerPluginArea(serverArea);
+      }
       serverArea.hidden=false;
-      serverArea.innerHTML=serverPluginBlockHtml();
-      bindServerPluginArea(serverArea);
     } else {
       serverArea.hidden=true;
-      serverArea.innerHTML='';
+      if(lastServerBlockHtml||serverArea.innerHTML){ serverArea.innerHTML=''; lastServerBlockHtml=''; }
     }
   }
   const btn=document.getElementById('extmgr-install-toggle');
@@ -2764,13 +2773,12 @@ function bindAccounts(body){
   box?.addEventListener('toggle',()=>{ state.extAccountsOpen=!!box.open; });
   const oauthBox=body.querySelector('[data-extoauth]');
   oauthBox?.addEventListener('toggle',()=>{ state.extOauthOpen=!!oauthBox.open; });
-  body.querySelectorAll('[data-accstorage]').forEach((el)=>{
-    el.addEventListener('change',()=>{
-      if(!el.checked) return;
-      const browser=el.dataset.accstorage==='browser';
-      persistGit({ gitCredentialStorage: browser?'browser':'server' });
-      toast(browser?t('extmgr.storeBrowserSet'):t('extmgr.storeServerSet'));
-      renderExtensionView();
+  /* 存放位置只在「设置 → 隐私」改，这里只显示状态与入口（单一真源，2026-11-16 用户裁定）。 */
+  body.querySelector('[data-openprivacy]')?.addEventListener('click',()=>{
+    actions.settings?.();
+    requestAnimationFrame(()=>{
+      const g=document.querySelector('#settings-body [data-group="privacy"]');
+      if(g){ g.setAttribute('open',''); g.scrollIntoView({block:'nearest'}); }
     });
   });
   body.querySelector('[data-accadd]')?.addEventListener('click',()=>{ void addAccountFromForm(body); });
@@ -3179,16 +3187,26 @@ async function reloadServerPlugins(){
 /** 管理员身份 + 服务端插件清单只读一次；非管理员到此为止（不留空分区）。 */
 async function loadServerPlugins(){
   if(state.extServerLoaded) return;
-  state.extServerLoaded=true;
   let identity=null;
   try { identity=await actions.hostIdentity?.(); } catch { identity=null; }
-  state.extHostAdmin=!!(identity && identity.ok && identity.admin);
-  state.extHostUser=identity?.handle||'';
+  /* 身份没读到时**不置位**：否则一次网络失败就会永久停在「非管理员」，
+     管理员也再也看不到服务端插件。 */
+  if(!identity) return;
+  state.extServerLoaded=true;
+  state.extHostAdmin=!!(identity.ok && identity.admin);
+  state.extHostUser=identity.handle||'';
   /* 用户徽标住页脚（非管理员也显示身份，只是不亮管理能力） */
   syncExtInstallBlock();
-  if(!state.extHostAdmin) return;
+  if(!state.extHostAdmin){ state.extServerPlugins=[]; return; }
+  /* 有界等待：宿主端点挂起时不能永久停在「正在读取」（2026-11-16 用户实测卡死）。
+     超时即落错误态，让 UI 如实显示不可用，而不是假装还在读。 */
   let res=null;
-  try { res=await actions.listServerPlugins?.(); } catch { res=null; }
+  try {
+    res=await Promise.race([
+      Promise.resolve(actions.listServerPlugins?.()),
+      new Promise((resolve)=>{ setTimeout(()=>resolve(null),8000); }),
+    ]);
+  } catch { res=null; }
   if(res && res.ok){
     state.extServerPlugins=Array.isArray(res.plugins)?res.plugins:[];
     state.extServerEnabled=res.enabled===true;
@@ -4421,33 +4439,49 @@ function renderLan(){
   if(err){ err.hidden=!L.scanError; err.textContent=L.scanError||''; }
 }
 
-/* ── 云端包仓库（S3 兼容；凭据只存本机浏览器，不可用时如实降级） ── */
+/* ── 云端包仓库（S3 兼容；凭据默认只存本机浏览器，不可用时如实降级） ── */
 const CLOUD_KEY = 'st-pack-transfer:s3';
 
+/**
+ * 凭据存放位置（设置 → 隐私）。默认 `browser`；用户显式选 `server` 才落 settings.json。
+ * @param {'git'|'s3'|'webdav'} kind
+ */
+function credStoreMode(kind){
+  const key=kind+'CredentialStorage';
+  return gitSettings()[key]==='server' ? 'server' : 'browser';
+}
+
+function normalizeCloudConfig(parsed) {
+  if (!parsed || typeof parsed !== 'object') return null;
+  return {
+    endpoint: String(parsed.endpoint || ''),
+    region: String(parsed.region || ''),
+    bucket: String(parsed.bucket || ''),
+    prefix: normalizePrefix(parsed.prefix || ''),
+    pathStyle: !!parsed.pathStyle,
+    accessKeyId: String(parsed.accessKeyId || ''),
+    secretAccessKey: String(parsed.secretAccessKey || ''),
+    passphrase: String(parsed.passphrase || ''),
+    mode: parsed.mode === 'set' ? 'set' : 'full',
+    setName: String(parsed.setName || 'default'),
+    retention: Math.max(1, Math.min(99, Number(parsed.retention) || 10)),
+  };
+}
 function loadCloudConfig() {
+  if (credStoreMode('s3') === 'server') return normalizeCloudConfig(gitSettings().s3Config);
   if (typeof localStorage === 'undefined') return null;
   try {
-    const parsed = JSON.parse(localStorage.getItem(CLOUD_KEY) || 'null');
-    if (!parsed || typeof parsed !== 'object') return null;
-    return {
-      endpoint: String(parsed.endpoint || ''),
-      region: String(parsed.region || ''),
-      bucket: String(parsed.bucket || ''),
-      prefix: normalizePrefix(parsed.prefix || ''),
-      pathStyle: !!parsed.pathStyle,
-      accessKeyId: String(parsed.accessKeyId || ''),
-      secretAccessKey: String(parsed.secretAccessKey || ''),
-      passphrase: String(parsed.passphrase || ''),
-      mode: parsed.mode === 'set' ? 'set' : 'full',
-      setName: String(parsed.setName || 'default'),
-      retention: Math.max(1, Math.min(99, Number(parsed.retention) || 10)),
-    };
+    return normalizeCloudConfig(JSON.parse(localStorage.getItem(CLOUD_KEY) || 'null'));
   } catch {
     return null;
   }
 }
 function persistCloudConfig(config) {
   if (state.tutorialMode) return true;
+  if (credStoreMode('s3') === 'server') {
+    persistGit({ s3Config: config });
+    return true;
+  }
   if (typeof localStorage === 'undefined') return false;
   try {
     localStorage.setItem(CLOUD_KEY, JSON.stringify(config));
@@ -4459,28 +4493,35 @@ function persistCloudConfig(config) {
 
 const WEBDAV_KEY = 'st-pack-transfer:webdav';
 
-/** WebDAV 配置：凭据只存本机浏览器；读不到时返回空配置而不是伪造。 */
+/** WebDAV 配置：默认只存本机浏览器；读不到时返回空配置而不是伪造。 */
+function normalizeWebdavConfig(parsed) {
+  if (!parsed || typeof parsed !== 'object') return null;
+  return {
+    baseUrl: String(parsed.baseUrl || '').replace(/\/+$/, ''),
+    username: String(parsed.username || ''),
+    password: String(parsed.password || ''),
+    prefix: normalizePrefix(parsed.prefix || ''),
+    passphrase: String(parsed.passphrase || ''),
+    mode: parsed.mode === 'set' ? 'set' : 'full',
+    setName: String(parsed.setName || 'default'),
+    retention: Math.max(1, Math.min(99, Number(parsed.retention) || 10)),
+  };
+}
 function loadWebdavConfig() {
+  if (credStoreMode('webdav') === 'server') return normalizeWebdavConfig(gitSettings().webdavConfig);
   if (typeof localStorage === 'undefined') return null;
   try {
-    const parsed = JSON.parse(localStorage.getItem(WEBDAV_KEY) || 'null');
-    if (!parsed || typeof parsed !== 'object') return null;
-    return {
-      baseUrl: String(parsed.baseUrl || '').replace(/\/+$/, ''),
-      username: String(parsed.username || ''),
-      password: String(parsed.password || ''),
-      prefix: normalizePrefix(parsed.prefix || ''),
-      passphrase: String(parsed.passphrase || ''),
-      mode: parsed.mode === 'set' ? 'set' : 'full',
-      setName: String(parsed.setName || 'default'),
-      retention: Math.max(1, Math.min(99, Number(parsed.retention) || 10)),
-    };
+    return normalizeWebdavConfig(JSON.parse(localStorage.getItem(WEBDAV_KEY) || 'null'));
   } catch {
     return null;
   }
 }
 function persistWebdavConfig(config) {
   if (state.tutorialMode) return true;
+  if (credStoreMode('webdav') === 'server') {
+    persistGit({ webdavConfig: config });
+    return true;
+  }
   if (typeof localStorage === 'undefined') return false;
   try {
     localStorage.setItem(WEBDAV_KEY, JSON.stringify(config));

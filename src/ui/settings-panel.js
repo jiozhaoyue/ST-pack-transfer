@@ -31,8 +31,22 @@ export const SETTINGS_DEFAULTS = Object.freeze({
   webTheme: 'Dark Lite',
   /** 退出数据包偏好时若有未保存改动先提醒；默认开启。 */
   confirmDiscardChartPrefs: true,
-  /** Git 凭据存储位置：server = 随宿主 extension_settings 落 settings.json；browser = 只存本机。 */
-  gitCredentialStorage: 'server',
+  /**
+   * 凭据存放位置（设置 → 隐私，2026-11-16 用户裁定）：
+   * 默认一律 `browser` —— 只写本机 localStorage，不落酒馆 settings.json。
+   * 旧用户若服务端已有账号且从未选过，`loadSettings()` 会按 `server` 显示以免账号消失。
+   */
+  gitCredentialStorage: 'browser',
+  /** S3 凭据存放位置：默认只存本机浏览器。 */
+  s3CredentialStorage: 'browser',
+  /** WebDAV 凭据存放位置：默认只存本机浏览器。 */
+  webdavCredentialStorage: 'browser',
+  /**
+   * 仅当 S3 / WebDAV 存放位置选「服务端」时才有值：随 extension_settings 落 settings.json。
+   * 默认 null（浏览器模式不往服务端写任何凭据）。
+   */
+  s3Config: null,
+  webdavConfig: null,
   /** Git 账号（结构见 src/core/git-accounts.js）。 */
   gitAccounts: [],
   /** 安装来源登记（更新检查用）：{name, url, ref, at}。 */
@@ -237,7 +251,15 @@ export function normalizeSettings(input) {
     if (input.gitCredentialStorage === 'browser' || input.gitCredentialStorage === 'server') {
       out.gitCredentialStorage = input.gitCredentialStorage;
     }
+    if (input.s3CredentialStorage === 'browser' || input.s3CredentialStorage === 'server') {
+      out.s3CredentialStorage = input.s3CredentialStorage;
+    }
+    if (input.webdavCredentialStorage === 'browser' || input.webdavCredentialStorage === 'server') {
+      out.webdavCredentialStorage = input.webdavCredentialStorage;
+    }
     if (Array.isArray(input.gitAccounts)) out.gitAccounts = normalizeAccounts(input.gitAccounts);
+    if (input.s3Config && typeof input.s3Config === 'object') out.s3Config = { ...input.s3Config };
+    if (input.webdavConfig && typeof input.webdavConfig === 'object') out.webdavConfig = { ...input.webdavConfig };
     if (Array.isArray(input.gitInstalls)) {
       out.gitInstalls = input.gitInstalls
         .filter((x) => x && typeof x === 'object' && typeof x.name === 'string' && x.name)
@@ -322,6 +344,17 @@ export function buildSettingsHtml(settings = {}) {
     + '</div>'
     + '<div class="ext-note">' + t('extmgr.gitCleanSettingsDesc') + '</div>';
 
+  /* 隐私：全部凭据的存放位置集中一处，默认「仅浏览器」（2026-11-16 用户裁定） */
+  const credSelect = (key, label) => '<label class="et-git"><span>' + label + '</span>'
+    + '<select class="text_pole" data-setting="' + key + '">'
+    + '<option value="browser"' + (s[key] === 'browser' ? ' selected' : '') + '>' + t('settings.credStoreBrowser') + '</option>'
+    + '<option value="server"' + (s[key] === 'server' ? ' selected' : '') + '>' + t('settings.credStoreServer') + '</option>'
+    + '</select></label>';
+  const privacyGroup = credSelect('gitCredentialStorage', t('settings.credGit'))
+    + credSelect('s3CredentialStorage', t('settings.credS3'))
+    + credSelect('webdavCredentialStorage', t('settings.credWebdav'))
+    + '<div class="ext-note">' + t('settings.credPrivacyHint') + '</div>';
+
   const netGroup = '<label class="et-git"><span>' + t('settings.netProxy') + '</span>'
     + '<input class="text_pole" type="url" data-setting="netProxyUrl" placeholder="' + t('settings.netProxyPlaceholder')
     + '" value="' + (s.netProxyUrl || '') + '"></label>'
@@ -329,6 +362,7 @@ export function buildSettingsHtml(settings = {}) {
 
   return '<div class="settings-grid">'
     + group('behavior', t('settings.groupBehavior'), tips, true)
+    + group('privacy', t('settings.groupPrivacy'), privacyGroup, true)
     + group('export', t('settings.groupExport'), exportGroup, true)
     + group('net', t('settings.groupNet'), netGroup, false)
     + group('log', t('settings.groupLog'), logging, false)
@@ -379,6 +413,11 @@ export function readSettings(root, base = SETTINGS_DEFAULTS) {
   const autoInstallEl = root.querySelector?.('[data-setting="autoInstallManifestAfterUpload"]');
   if (autoInstallEl && ['off', 'prompt', 'auto'].includes(autoInstallEl.value)) {
     out.autoInstallManifestAfterUpload = autoInstallEl.value;
+  }
+
+  for (const key of ['gitCredentialStorage', 's3CredentialStorage', 'webdavCredentialStorage']) {
+    const el = root.querySelector?.('[data-setting="' + key + '"]');
+    if (el && (el.value === 'browser' || el.value === 'server')) out[key] = el.value;
   }
 
   const webThemeEl = root.querySelector?.('[data-setting="webTheme"]');
