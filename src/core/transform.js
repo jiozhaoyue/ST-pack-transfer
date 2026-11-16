@@ -47,6 +47,7 @@ export const TARGETS = Object.freeze({
 });
 
 import { EXTENSION_MODES, GIT_MODES } from './export-modes.js';
+import { EXT_PACK_MIXED } from './extension-pack-mode.js';
 
 export { EXTENSION_MODES, GIT_MODES };
 
@@ -327,6 +328,12 @@ export async function convert(sourcePath, targetPath, {
   includeAppPrivate = false,
   compressionLevel = 5,
   extensionMode = EXTENSION_MODES.FULL,
+  /**
+   * 逐扩展目录的「仅清单」名单（2026-11-17 用户裁定）。
+   * 与 extensionMode 并存：extensionMode=manifest 仍表示整包清单；
+   * 本名单只影响列出的扩展目录，未列出的照常完整打包。
+   */
+  extensionManifestNames = [],
   gitMode = GIT_MODES.KEEP,
   keepDevFiles = false,
   pruneBuiltinAssets = false,
@@ -353,6 +360,14 @@ export async function convert(sourcePath, targetPath, {
     : (resumeCrcMap && typeof resumeCrcMap === 'object' ? new Map(Object.entries(resumeCrcMap)) : null);
   // gitMode 归一：未知取值回落 KEEP，保证「默认行为零变化」这一约束不被任意输入击穿。
   const resolvedGitMode = normalizeGitMode(gitMode);
+  // 逐扩展清单名单：只收扩展目录名；空数组 = 全部按 extensionMode 处理。
+  const manifestExtSet = new Set(
+    (Array.isArray(extensionManifestNames) ? extensionManifestNames : [])
+      .map((name) => String(name || '').trim())
+      .filter(Boolean),
+  );
+  const isManifestExtension = (folderName) => extensionMode === EXTENSION_MODES.MANIFEST
+    || manifestExtSet.has(String(folderName || ''));
   const checkAbort = () => {
     if (signal?.aborted) {
       throw new DOMException('转换任务已被中止/暂停', 'AbortError');
@@ -745,7 +760,7 @@ export async function convert(sourcePath, targetPath, {
         if (relPath === 'manifest.json' || relPath.endsWith('/manifest.json')) {
           const data = await entry.read();
           noteExtensionPackage(context, routed.hubPath, data);
-          if (extensionMode !== EXTENSION_MODES.MANIFEST) {
+          if (!isManifestExtension(extFolder)) {
             const outPath = targetEntryPath(routed.hubPath, target, routed.extScope);
             await writer.add(outPath, data);
             report.copied(routed.hubPath, entry.uncompressedSize);
@@ -767,7 +782,7 @@ export async function convert(sourcePath, targetPath, {
             }
           } catch { /* 忽略读取错误 */ }
           // 解析在三档模式下都发生（extensionGitMeta 必须照常产出），只有写出与否受策略影响。
-          if (extensionMode === EXTENSION_MODES.MANIFEST) {
+          if (isManifestExtension(extFolder)) {
             report.dropped(routed.hubPath, '轻量清单模式：已解析 Git Remote URL，实体文件不打包');
           } else if (!gitKeep) {
             report.dropped(routed.hubPath, gitDropReason(resolvedGitMode), entry.uncompressedSize);
@@ -791,7 +806,7 @@ export async function convert(sourcePath, targetPath, {
               context.extensionGitMeta.set(extFolder, current);
             }
           } catch { /* 忽略读取错误 */ }
-          if (extensionMode === EXTENSION_MODES.MANIFEST) {
+          if (isManifestExtension(extFolder)) {
             report.dropped(routed.hubPath, '轻量清单模式：已解析 Git 分支，实体文件不打包');
           } else if (!gitKeep) {
             report.dropped(routed.hubPath, gitDropReason(resolvedGitMode), entry.uncompressedSize);
@@ -814,7 +829,7 @@ export async function convert(sourcePath, targetPath, {
               context.extensionGitMeta.set(extFolder, current);
             }
           } catch { /* 忽略读取错误 */ }
-          if (extensionMode === EXTENSION_MODES.MANIFEST) {
+          if (isManifestExtension(extFolder)) {
             report.dropped(routed.hubPath, '轻量清单模式：已解析 Git Commit，实体文件不打包');
           } else if (!gitKeep) {
             report.dropped(routed.hubPath, gitDropReason(resolvedGitMode), entry.uncompressedSize);
@@ -831,14 +846,14 @@ export async function convert(sourcePath, targetPath, {
         // 2.5 Git 目录策略兜底闸：未经上述元数据处理器接管的 .git 条目。
         // strip 下全部命中；minimal 下命中的是白名单之外者（objects/pack/*.pack 等对象存储）。
         // 轻量清单模式下本闸不生效——该模式由下方第 3 步统一按「清单模式」理由丢弃，文案不得被 gitMode 抢占。
-        if (gitEntry && !gitKeep && extensionMode !== EXTENSION_MODES.MANIFEST) {
+        if (gitEntry && !gitKeep && !isManifestExtension(extFolder)) {
           entry.skip();
           report.dropped(routed.hubPath, gitDropReason(resolvedGitMode), entry.uncompressedSize);
           continue;
         }
 
         // 3. 轻量清单模式下，跳过其他代码文件
-        if (extensionMode === EXTENSION_MODES.MANIFEST) {
+        if (isManifestExtension(extFolder)) {
           entry.skip();
           report.dropped(routed.hubPath, '轻量清单模式：扩展代码由目标酒馆按清单下载');
           continue;
@@ -864,7 +879,12 @@ export async function convert(sourcePath, targetPath, {
       report.setEngine(summary);
     }
 
-    await emitSynthesized(writer, report, context, target, selection, { extensionMode, gitMode: resolvedGitMode, dryRun });
+    await emitSynthesized(writer, report, context, target, selection, {
+      extensionMode,
+      extensionManifestNames: [...manifestExtSet],
+      gitMode: resolvedGitMode,
+      dryRun,
+    });
     // Store 直存统计汇入报告（zip-io 按扩展名分流 level 0 的条目）
     if (!dryRun && typeof writer.getStoreStats === 'function') {
       const storeStats = writer.getStoreStats();
@@ -1137,9 +1157,17 @@ function noteExtensionPackage(context, hubPath, data) {
  */
 async function emitSynthesized(writer, report, context, target, selection, {
   extensionMode = EXTENSION_MODES.FULL,
+  extensionManifestNames = [],
   gitMode = GIT_MODES.KEEP,
   dryRun = false,
 } = {}) {
+  const manifestExtSet = new Set(
+    (Array.isArray(extensionManifestNames) ? extensionManifestNames : [])
+      .map((name) => String(name || '').trim())
+      .filter(Boolean),
+  );
+  const isManifestExtension = (name) => extensionMode === EXTENSION_MODES.MANIFEST
+    || manifestExtSet.has(String(name || ''));
   if (target === TARGETS.L) {
     const baseSelection = { ...L_SELECTION };
     if (selection && typeof selection === 'object') {
@@ -1174,6 +1202,8 @@ async function emitSynthesized(writer, report, context, target, selection, {
     manifest: context.extensionManifests.get(name) || {},
     gitMeta: context.extensionGitMeta.get(name) || {},
     sourceRecord: context.extensionSources.get(name)?.record || {},
+    // 逐扩展模式（2026-11-17）：同一包里允许完整与清单并存。
+    mode: isManifestExtension(name) ? EXTENSION_MODES.MANIFEST : EXTENSION_MODES.FULL,
   }));
 
   // gitMode=minimal：为每个实际打包的 Git 扩展补一个占位文件，保证 `.git/objects` 目录解压后存在。
@@ -1197,17 +1227,18 @@ async function emitSynthesized(writer, report, context, target, selection, {
   }
 
   // 清单在 FULL 与 MANIFEST **两种模式**下都产出（决策 D-1）；
-  // 官方索引仅 MANIFEST 产出（决策 D-6，避免宿主对已内嵌实体重复安装）。
+  // 官方索引只为「仅清单」条目产出（决策 D-6，避免宿主对已内嵌实体重复安装）。
   const shouldEmitManifest = (target === TARGETS.ST || target === TARGETS.L)
     && (extensionMode === EXTENSION_MODES.MANIFEST || extensionMode === EXTENSION_MODES.FULL);
 
   if (extInputs.length > 0 && (!selection || selection.extensions !== false) && shouldEmitManifest) {
-    const isManifestMode = extensionMode === EXTENSION_MODES.MANIFEST;
+    const manifestInputs = extInputs.filter((input) => input.mode === EXTENSION_MODES.MANIFEST);
+    const fullInputs = extInputs.filter((input) => input.mode !== EXTENSION_MODES.MANIFEST);
 
-    // 1. 官方 Content Downloader 索引：**仅轻量清单模式**产出
-    if (isManifestMode) {
+    // 1. 官方 Content Downloader 索引：**只列仅清单且可安装**的条目
+    if (manifestInputs.length > 0) {
       const officialIndex = buildOfficialIndex(
-        extInputs.map((input) => deriveExtensionEntry({ ...input, mode: extensionMode })),
+        manifestInputs.map((input) => deriveExtensionEntry({ ...input, mode: EXTENSION_MODES.MANIFEST })),
       );
       if (officialIndex) {
         await writer.add('extensions-index.json', encodeJson(officialIndex));
@@ -1218,19 +1249,31 @@ async function emitSynthesized(writer, report, context, target, selection, {
     // 2. 转换器私有清单：两种模式都产出，供宿主插件恢复时引导安装或更新
     const convertManifest = buildExtensionManifest({
       extensions: extInputs,
-      mode: extensionMode,
+      mode: manifestInputs.length === 0
+        ? EXTENSION_MODES.FULL
+        : (fullInputs.length === 0 ? EXTENSION_MODES.MANIFEST : EXT_PACK_MIXED),
       generatedAt: FIXED_TIMESTAMP,
     });
     await writer.add('_convert/extensions-manifest.json', encodeJson(convertManifest));
     report.synthesized('_convert/extensions-manifest.json');
 
-    report.warn(
-      isManifestMode
-        ? `已启用轻量清单模式：已记录 ${extInputs.length} 个扩展清单（未打包实体代码与 Git packfile），`
-          + '已生成 extensions-index.json 与 _convert/extensions-manifest.json。'
-        : `完整离线包已含 ${extInputs.length} 个扩展实体：包内同时写入 _convert/extensions-manifest.json，`
-          + '仅用于恢复后的更新引导（不生成 extensions-index.json，以免宿主重复在线安装）。',
-    );
+    if (fullInputs.length === 0) {
+      report.warn(
+        `已启用轻量清单模式：已记录 ${manifestInputs.length} 个扩展清单（未打包实体代码与 Git packfile），`
+        + '已生成 extensions-index.json 与 _convert/extensions-manifest.json。',
+      );
+    } else if (manifestInputs.length === 0) {
+      report.warn(
+        `完整离线包已含 ${fullInputs.length} 个扩展实体：包内同时写入 _convert/extensions-manifest.json，`
+        + '仅用于恢复后的更新引导（不生成 extensions-index.json，以免宿主重复在线安装）。',
+      );
+    } else {
+      report.warn(
+        `混合扩展模式：${fullInputs.length} 个扩展完整打包，${manifestInputs.length} 个仅清单`
+        + `（${manifestInputs.map((x) => x.name).join(', ')}）；`
+        + '两类扩展同在一个数据包内，另有 extensions-index.json 供清单条目在线安装。',
+      );
+    }
   }
 
   if ((target === TARGETS.ST || target === TARGETS.L) && context.thirdPartyFlattenedCount > 0) {

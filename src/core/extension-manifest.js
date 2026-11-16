@@ -127,7 +127,8 @@ export function deriveExtensionEntry({ name, manifest = {}, gitMeta = {}, source
 
   const installable = isInstallableUrl(url);
   let availability;
-  if (mode === 'full') {
+  const resolvedMode = mode === 'manifest' ? 'manifest' : 'full';
+  if (resolvedMode === 'full') {
     availability = AVAILABILITY.EMBEDDED;
   } else {
     availability = installable ? AVAILABILITY.INSTALLABLE : AVAILABILITY.UNAVAILABLE;
@@ -153,6 +154,8 @@ export function deriveExtensionEntry({ name, manifest = {}, gitMeta = {}, source
     type: 'extension',
     sourceKind,
     availability,
+    // 每个条目自己的打包模式：同一包里允许完整与清单并存。
+    packMode: resolvedMode,
     manifest,
   };
   if (notes.length > 0) entry.notes = notes.join(' ');
@@ -171,12 +174,19 @@ export function deriveExtensionEntry({ name, manifest = {}, gitMeta = {}, source
  * @returns {object} 私有清单对象
  */
 export function buildExtensionManifest({ extensions, mode, generatedAt }) {
-  const entries = extensions.map((ext) => deriveExtensionEntry({ ...ext, mode }));
+  const entries = extensions.map((ext) => deriveExtensionEntry({
+    ...ext,
+    mode: ext.mode || mode,
+  }));
+  const modes = new Set(entries.map((entry) => entry.packMode));
+  const summaryMode = modes.size > 1
+    ? 'mixed'
+    : (modes.size === 1 ? [...modes][0] : (mode === 'manifest' ? 'manifest' : 'full'));
   return {
     converter: 'ST-pack-transfer',
     schemaVersion: MANIFEST_SCHEMA_VERSION,
     generatedAt,
-    mode,
+    mode: summaryMode,
     total: entries.length,
     extensions: entries,
   };
@@ -252,6 +262,9 @@ export function normalizeManifestEntries(raw) {
       const sourceKind = Object.values(SOURCE_KIND).includes(item.sourceKind)
         ? item.sourceKind
         : (installable ? SOURCE_KIND.GIT : SOURCE_KIND.UNKNOWN);
+      const packMode = item.packMode === 'manifest' || item.packMode === 'full'
+        ? item.packMode
+        : (availability === AVAILABILITY.EMBEDDED ? 'full' : 'manifest');
 
       return {
         ...item,
@@ -265,6 +278,7 @@ export function normalizeManifestEntries(raw) {
         type: item.type || 'extension',
         sourceKind,
         availability,
+        packMode,
         notes: typeof item.notes === 'string' ? item.notes : '',
       };
     })

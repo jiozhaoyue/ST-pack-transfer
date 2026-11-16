@@ -75,11 +75,12 @@ function makeProvider(overrides = {}) {
   });
 }
 
-describe('storage-inspector-browser · L0 五类', () => {
-  it('根层固定五类，顺序与 Luker 一致', async () => {
+describe('storage-inspector-browser · L0 四类', () => {
+  it('根层固定四类，配额只在面板头', async () => {
     const resp = await makeProvider().fetch([]);
     expect(resp.entries.map((e) => e.key))
-      .toEqual(['localStorage', 'sessionStorage', 'indexeddb', 'cachestorage', 'quota']);
+      .toEqual(['localStorage', 'sessionStorage', 'indexeddb', 'cachestorage']);
+    expect(resp.entries.some((e) => e.key === 'quota')).toBe(false);
     expect(resp.isLeaf).toBe(false);
     expect(resp.breadcrumbs).toEqual([{ labelKey: 'si.root', path: [] }]);
   });
@@ -104,18 +105,16 @@ describe('storage-inspector-browser · L0 五类', () => {
     expect(resp.quota).toEqual({ usedBytes: 1000, quotaBytes: null, over: false });
   });
 
-  it('配额行是只读总量视图（不可下钻）', async () => {
+  it('配额读数只走响应头，不伪装成分类条目', async () => {
     const resp = await makeProvider().fetch([]);
-    const quota = resp.entries.find((e) => e.key === 'quota');
-    expect(quota.sizeBytes).toBe(1000);
-    expect(quota.canDrill).toBe(false);
+    expect(resp.quota).toEqual({ usedBytes: 1000, quotaBytes: null, over: false });
   });
 
   it('estimate 不可用时不伪造数字（size 为 null）', async () => {
     const resp = await makeProvider({ navigator: {} }).fetch([]);
     expect(resp.entries.find((e) => e.key === 'indexeddb').sizeBytes).toBeNull();
     expect(resp.entries.find((e) => e.key === 'cachestorage').sizeBytes).toBeNull();
-    expect(resp.entries.find((e) => e.key === 'quota').sizeBytes).toBeNull();
+    expect(resp.entries.some((e) => e.key === 'quota')).toBe(false);
     expect(resp.quota).toEqual({ usedBytes: null, quotaBytes: null, over: false });
   });
 });

@@ -1,5 +1,6 @@
 ---
 title: 常见问题解答
+layout: default
 ---
 
 # 常见问题解答

@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ page.title | default: site.title }} · {{ site.title }}</title>
+  <meta name="description" content="{{ page.description | default: site.description }}">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="wrap header-inner">
+      <a class="brand" href="index.html">
+        <span class="brand-mark">⇄</span>
+        <span>ST-pack-transfer</span>
+      </a>
+      <nav class="site-nav" aria-label="文档导航">
+        <a href="index.html">首页</a>
+        <a href="install.html">安装</a>
+        <a href="convert.html">转换</a>
+        <a href="extensions.html">扩展</a>
+        <a href="transfer.html">备份</a>
+        <a href="storage.html">存储</a>
+        <a href="testing.html">测试</a>
+        <a href="DEVELOPER-GUIDE.html">开发者</a>
+        <a class="nav-app" href="../">返回应用</a>
+      </nav>
+    </div>
+  </header>
+  <main class="wrap page">
+    {{ content }}
+  </main>
+  <footer class="site-footer">
+    <div class="wrap footer-inner">
+      <span>ST-pack-transfer · 四酒馆数据包互转</span>
+      <span><a href="../">打开应用</a> · <a href="index.html">文档首页</a></span>
+    </div>
+  </footer>
+</body>
+</html>

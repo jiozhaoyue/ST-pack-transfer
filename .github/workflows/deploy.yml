@@ -1,9 +1,11 @@
 name: Deploy to GitHub Pages
 
-# 仅在正式发版（Release）或手动触发时部署，杜绝日常开发 push 污染线上 Pages
+# 仅在正式版本 tag（v*）或手动触发时部署，杜绝日常开发 push 污染线上 Pages。
+# 2026-11-17 用户裁定：发布只打 tag，不创建 GitHub Release，因此改为 tag push 触发。
 on:
-  release:
-    types: [published]
+  push:
+    tags:
+      - 'v*'
   workflow_dispatch:
 
 permissions:

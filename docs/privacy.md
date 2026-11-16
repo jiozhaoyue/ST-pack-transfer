@@ -1,5 +1,6 @@
 ---
 title: 隐私与凭据说明
+layout: default
 ---
 
 # 隐私与凭据说明

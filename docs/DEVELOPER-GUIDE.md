@@ -1,3 +1,8 @@
+---
+title: 开发者指南
+layout: default
+---
+
 # 开发者指南 · 功能清单与源码落点
 
 > 本文档面向参与本仓库开发与维护的开发者。面向最终用户的说明请参考 [README.md](../README.md)，跨会话架构规范请参考 `.trellis/spec/`。
@@ -210,6 +215,7 @@
 | 包清单入口收束 | 图表卡 `[data-extmanifest]` → 扩展管理并预填 | `index.js` 的 `openExtensionManifest` → `view.openExtensionManager()` |
 | **打包页：按数据包选择扩展** | 扩展管理 → 打包 | `src/ui/workbench-view.js` 的 `renderExtPack()`；扩展折叠为单元的纯逻辑在 `src/core/ext-pack.js`（`extensionUnitsOf` / `extensionUnitName`） |
 | **每包独立 Git 模式** | 打包页组头 / 图表卡 `[data-gitmode]` | `state.gitModeByPkg` + `packageGitMode(pkg)`；`getExportOptions(pkg)` 与合并计划按包取值 |
+| **v0.5.2 整改（2026-11-17 用户裁定）** | ① **逐扩展双模式**：每个扩展目录行只有「完整 / 清单」两个按钮，点亮即选中；组级/批量级只有全完整、全清单、混合三种读数（混合时两个都不亮，显示「混合」），单图表与多图表共用同一 `state.extPackMode`。② **同一包内两种模式并存**：转换器新增 `extensionManifestNames`，只丢弃名单内扩展实体，其余照常完整写出；私有清单每条记录 `packMode`，顶层 `mode` 可为 `mixed`；官方索引只列清单模式的可安装项。③ **清单扩展在图表中折叠为一条 0 体积叶子**（勾选镜像扩展目录），切换模式立即恢复/折叠。④ **二级占用条递归**：`selectedMbMap()` 覆盖全部后代，不再只填一级。⑤ **存储审查四类**：移除 `quota` 分类条目，配额只在面板头；中文类目去英文括号。⑥ **包内 Git 真实提交**：新增 `src/core/git-local.js` 读 `.git` 的 HEAD/refs/packed-refs/loose objects/packfile（含 ofs/ref delta），本地/云端页签常显，云端关闭时明确提示；泳道列与提交行分别包裹。⑦ **二维码占位**：未就绪只显示矩形提示，不生成占位真二维码 | `src/core/extension-pack-mode.js`、`src/core/git-local.js`、`src/core/transform.js`、`src/core/extension-manifest.js`、`src/ui/workbench-view.js`、`src/ui/storage-inspector-browser.js`、`style.css`、`src/i18n/locales/*.js`、`index.js`、测试 `test/extension-pack-mode.test.js` / `test/git-local.test.js` / `test/mixed-ext-mode.test.js` |
 | **第八轮整改（2026-11-16 用户裁定，实机逐条）** | ① **扩展面板终版布局**：全部留在文档流（页脚/报告条不 fixed、不脱离 DOM）；面板 flex 撑满列高=**面板底即屏幕底**（页脚贴底、完整显示、永不遮挡）；`.ext-scroll` **内容定高**（去掉 flex 拉伸+min-height:96 的占高度空白带）；列表长时 `.extension-body` 唯一滚动。② **手机数据包抽屉**：收起＝`display:none`（0fr 收拢会把 zone-card 边框压成悬在页头与切换行之间的细线——用户圈选实锤后消灭）；展开＝`1fr + zoneDrop` 滑开挤压；**收起也有动画**（`.is-closing` zoneClose，animationend 后才摘除，选包自动收起走同一路径）。③ **全局动画纪律**：所有 details 折叠卡开（discloseOpen）/合（discloseClose+全局委托 JS 托管摘 open）、安装区/报告面板展开统一过渡。④ **开发者页设置卡**：三个开关（自动更新/Git 云端读取/切换分支按钮）**逐字照抄 .ext-accounts 卡片范式**（details+ext-summary 标题头「开发者设置 3」+ 名左说明右单行行）；提示文案全部缩短为单行。⑤ **最外层滚动条彻底禁止**（手机）：app-main overflow:hidden，图表栈/迁移面板/扩展正文/数据包抽屉各自内滚。⑥ 面板头 help-btn 全拆（第七轮）与守卫表同步 | `style.css`（扩展布局终版/抽屉动画/设置卡/内滚）、`workbench-view.js`（抽屉动画 JS/全局 details 收合委托/设置卡）、`workbench-template.js`（无改动） |
 | **第七轮整改（2026-11-15 用户裁定，最终定案）** | ① **手机数据包列表＝同层挤压**（推翻第六轮浮层版，终审裁定「绝对禁止浮层」）：恢复文档流内 `order:-1` 段 + `grid-template-rows 0fr→1fr` 滑开挤压下方内容；`syncMainView` 的 side.hidden 回到 `siActive`（hidden 不参与显隐，全由 `data-zone-open` 驱动 CSS）。② **面板头孤零零「?」全拆**（举一反三）：模板中 6 处 `help-btn`（chart/transfer/credentials/extmgr/zone/log）全部删除；`scripts/control-consumer-guard.js` 的 `group:.help-btn` 僵尸消费点声明删除；两条教程锚点改指现存控件（`#transfer-tabs [data-transfer-tab="cloud"]` / `#cloud-provider-tabs`）。**教训**：模板批量删改用了 `sed -i`（违反块级编辑铁律，已当场用 diff 核验只动了目标行并补用 Edit 删漏网 1 处——下不为例） | `workbench-template.js`（6 处 help-btn 删除）、`scripts/control-consumer-guard.js`、`workbench-view.js`（教程锚点）、`style.css`（挤压段） |
 | **第六轮整改（2026-11-15 用户裁定，回退 81022e1 后重做）** | ① **回退 81022e1 的内嵌抽屉**（占一行布局高度被否），重做为**零高度锚定下拉**：关闭 `display:none`、打开 `absolute` + `--zone-drop-top`（JS 按切换行实时底边写入）贴行正下方浮出，`zoneDrop` 滑入动画；`syncMainView` 的 side.hidden 恢复 `siActive || (mobile && zoneOpen!=='1')`。② **Git 云端读取开关**：开发者页 `gitCloudReadOn`（默认关）——`loadGitTarget` 云端段与 `loadGitCommitDiff` 双门控，关=零云端请求、如实显示「云端读取已关闭」（`gitv.cloudReadOff`） | `workbench-view.js`（`syncMainView`/wbview 点击处理/`loadGitTarget`/`loadGitCommitDiff`/`renderExtCredentials`）、`style.css`（`zoneDrop`/锚定规则/去 `order:-2`） |
@@ -377,7 +383,7 @@
 | 功能 | UI 入口 | 源码落点 |
 | --- | --- | --- |
 | 浏览器 / 宿主同一面板，初始来源跟随点击行，面板内可切换 | `#quota-head` 两行 → `#storage-inspector-view` | `src/ui/workbench-view.js` 的 `renderQuota()` / `renderStorageInspector()` / `openStorageInspector()` / `siSwitchSource()` / `siRequest()` |
-| 浏览器 L0 五类与下钻（localStorage / sessionStorage / IndexedDB / Cache Storage / 配额），只读 | 面板内列表与面包屑 | `src/ui/storage-inspector-browser.js`、`src/core/storage-inspector-model.js`（纯逻辑） |
+| 浏览器 L0 四类与下钻（本地键值存储 / 会话存储 / 本地对象库 / 网络缓存），只读；配额只在面板头显示「已用 / 总量」 | 面板内列表与面包屑 | `src/ui/storage-inspector-browser.js`、`src/core/storage-inspector-model.js`（纯逻辑） |
 | 宿主数据源（Luker `RestProvider`；失败回落 `POST /api/users/storage/inspect`） | 面板「宿主」页签 | `src/ui/host-bridge.js` 的 `fetchHostStorageInspect()` / `hostStorageInspectCapability()`；`index.js` 的 `actions.storageInspector` |
 | 占满内容区（隐藏数据包列与分隔条，网格改单列） | — | `syncMainView()` + `style.css` 的 `[data-si="1"]` / `.si-*` |
 

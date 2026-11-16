@@ -257,17 +257,6 @@ export function createBrowserStorageProvider(deps = {}) {
       category('sessionStorage', 'si.cat.sessionStorage', 'clock', ss.bytes, ss.count, 'keys'),
       category('indexeddb', 'si.cat.indexeddb', 'database', detailNumber('indexedDB'), dbs.length, 'dbs'),
       category('cachestorage', 'si.cat.cachestorage', 'layer-group', detailNumber('caches'), cacheNames.length, 'caches'),
-      {
-        key: 'quota',
-        labelKey: 'si.cat.quota',
-        icon: 'chart-pie',
-        kind: 'category',
-        categoryKey: 'quota',
-        sizeBytes: quota.usedBytes,
-        childCount: null,
-        countUnit: '',
-        canDrill: false,
-      },
     ];
     return response(quota, [], [{ ...ROOT }], entries, false);
   }

@@ -1,5 +1,6 @@
 ---
 title: 安装与部署
+layout: default
 ---
 
 # 安装与部署

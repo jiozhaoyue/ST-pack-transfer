@@ -1,5 +1,6 @@
 ---
 title: 从宿主拉取
+layout: default
 ---
 
 # 从当前酒馆直接拉取

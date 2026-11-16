@@ -34,9 +34,14 @@ jobs:
       - name: Docs layout guard
         run: |
           set -e
-          allowed="_config.yml index.md install.md formats.md convert.md host-pull.md restore.md extensions.md transfer.md storage.md engines.md privacy.md tutorial.md faq.md DEVELOPER-GUIDE.md testing.md"
+          allowed="_config.yml index.md install.md formats.md convert.md host-pull.md restore.md extensions.md transfer.md storage.md engines.md privacy.md tutorial.md faq.md DEVELOPER-GUIDE.md testing.md style.css PLAN-2026-11-17-ui-fixes.md"
           for f in docs/*; do
-            if [ -d "$f" ]; then echo "docs/ 下不允许目录：$f"; exit 1; fi
+            if [ -d "$f" ]; then
+              case "$(basename "$f")" in
+                _layouts) continue ;;
+                *) echo "docs/ 下不允许目录：$f"; exit 1 ;;
+              esac
+            fi
             base=$(basename "$f")
             case " $allowed " in
               *" $base "*) ;;

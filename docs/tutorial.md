@@ -1,5 +1,6 @@
 ---
 title: 教程演示模式
+layout: default
 ---
 
 # 教程演示模式

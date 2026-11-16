@@ -63,6 +63,7 @@ import { createConversionRunner, readPausedMarker, clearPausedMarker } from './s
 import { beginHostPull, beginNativePull } from './src/app/pull-entry.js';
 import { buildAssetList, summarizeExtensions } from './src/core/asset-list.js';
 import { deriveExtensionEntry, normalizeManifestEntries } from './src/core/extension-manifest.js';
+import { readGitHistoryFromEntries } from './src/core/git-local.js';
 import { objectKey } from './src/core/s3-client.js';
 import { createTransferTarget } from './src/core/transfer-target.js';
 import { createTransferRunner } from './src/app/transfer-runner.js';
@@ -180,6 +181,36 @@ async function main(root) {
     const record = await getFile(pkg.id);
     pkg.blob = record?.blob || null;
     return pkg.blob;
+  }
+
+  /** 包内 `.git` 历史缓存：同一个包/扩展只解一次 packfile。 */
+  const packageGitCache = new Map();
+  async function readPackageGit(pkgId, name) {
+    const key = `${pkgId}|${String(name || '')}`;
+    if (packageGitCache.has(key)) return packageGitCache.get(key);
+    const pkg = pkgById(pkgId);
+    if (!pkg) return { ok: false, reason: 'no-package' };
+    const blob = await blobOf(pkg);
+    if (!blob) return { ok: false, reason: 'no-blob' };
+    const reader = await zipIo.openReader(blob);
+    try {
+      const result = await readGitHistoryFromEntries(reader.entries(), {
+        extensionName: String(name || ''),
+        maxCommits: 50,
+      });
+      packageGitCache.set(key, result);
+      if (packageGitCache.size > 24) {
+        const first = packageGitCache.keys().next().value;
+        if (first) packageGitCache.delete(first);
+      }
+      return result;
+    } catch (err) {
+      const result = { ok: false, reason: err?.message || String(err) };
+      packageGitCache.set(key, result);
+      return result;
+    } finally {
+      await reader.close();
+    }
   }
 
   function toPackage(record) {
@@ -895,6 +926,9 @@ async function main(root) {
       try { await deleteFile(id); } catch { /* 已不存在 */ }
       state.nodesById.delete(id);
       state.layoutById.delete(id);
+      for (const key of [...packageGitCache.keys()]) {
+        if (key.startsWith(`${id}|`)) packageGitCache.delete(key);
+      }
     }
     await syncPackages();
   }
@@ -1720,6 +1754,7 @@ async function main(root) {
       serverPluginInstallDeps: (dir) => serverPluginInstallDeps(dir),
       serverPluginInstall: (url) => serverPluginInstall(url),
       hostExtensionGit: (name, opts) => readHostExtensionGit(name, opts),
+      packageGit: (pkgId, name) => readPackageGit(pkgId, name),
       deleteExtension: (name, isGlobal) => deleteExtensionViaHost(name, isGlobal),
       updateExtension: (name, isGlobal) => updateExtensionViaHost(name, isGlobal),
       moveExtension: (name, source, destination) => moveExtensionViaHost(name, source, destination),

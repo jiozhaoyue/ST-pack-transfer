@@ -6,6 +6,7 @@
  */
 import { t } from '../i18n/index.js';
 import { normalizeAccounts } from '../core/git-accounts.js';
+import { escapeHtml } from './escape.js';
 
 /** 设置默认值。新增项必须同步 zh-CN / en-US 文案与测试。 */
 export const SETTINGS_DEFAULTS = Object.freeze({
@@ -364,7 +365,13 @@ export function buildSettingsHtml(settings = {}) {
     + '<label class="et-git" style="margin-top:6px"><span>' + t('settings.docsBaseUrl') + '</span>'
     + '<input class="text_pole" type="text" data-setting="docsBaseUrl" placeholder="' + t('settings.docsBaseUrlPlaceholder')
     + '" value="' + (s.docsBaseUrl || '') + '"></label>'
-    + '<div class="ext-note">' + t('settings.docsBaseUrlNote') + '</div>';
+    + '<div class="ext-note">' + t('settings.docsBaseUrlNote') + '</div>'
+    + (() => {
+      const base = String(s.docsBaseUrl || './docs/').trim() || './docs/';
+      const href = base.endsWith('/') ? base : `${base}/`;
+      return '<div class="ext-row" style="margin-top:6px"><a class="btn" id="settings-open-docs" href="'
+        + escapeHtml(href) + '" target="_blank" rel="noopener noreferrer">' + t('settings.openDocs') + '</a></div>';
+    })();
 
   return '<div class="settings-grid">'
     + group('behavior', t('settings.groupBehavior'), tips, true)

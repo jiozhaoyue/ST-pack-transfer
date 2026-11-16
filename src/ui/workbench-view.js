@@ -11,6 +11,15 @@
 
 import { chartTreeFor, deriveExportOptions, deriveCategorySelection, annotateChatLinks, counterpartsOf, CHART_GROUPS, SPLIT_MIN, SPLIT_MAX } from '../core/chart-model.js';
 import {
+  applyExtensionPackModes,
+  extensionPackModeSummary,
+  extensionPackNames,
+  manifestExtensionNames,
+  normalizeExtPackMode,
+  EXT_PACK_MODES,
+  EXT_PACK_MIXED,
+} from '../core/extension-pack-mode.js';
+import {
   normalizeResponse, stackSegments, dotFill, maxEntrySize,
   formatSize, formatSizeOrUnknown, categoryColorClass, iconKey,
 } from '../core/storage-inspector-model.js';
@@ -187,7 +196,7 @@ function hostNodes(host){
   return { unavailable: !(HOSTS[host] || {}).readable, nodes: state.hostTree || [] };
 }
 function packageNodes(pkg){
-  const nodes = chartTreeFor(pkg, state.extensionMode);
+  const nodes = chartTreeFor(pkg, EXTENSION_MODES.FULL);
   /* 角色卡 / 聊天目录按名称配对；配不上的标「未匹配」，不猜。 */
   annotateChatLinks(nodes, t('link.unmatched'));
   /* 私有件「传云」只在 ST/Luker 有原生 files 接口时出现；宿主树没有源包字节，故不标。 */
@@ -196,6 +205,30 @@ function packageNodes(pkg){
     walk(nodes,(n)=>{ if(n.leaf && n.privateConfig) n.uploadable=true; });
   }
   return { unavailable: false, unrecognized: !!pkg.unrecognized, nodes };
+}
+
+/** 扩展目录级模式：显式选择优先；缺省沿用偏好里的默认值（兼容旧版全局设置）。 */
+function extModeOf(name){
+  const own = state.extPackMode[String(name||'')];
+  if(own) return normalizeExtPackMode(own);
+  return chartPrefs.extensionMode === EXTENSION_MODES.MANIFEST
+    ? EXT_PACK_MODES.MANIFEST
+    : EXT_PACK_MODES.FULL;
+}
+function setExtPackModes(names, mode){
+  const next = normalizeExtPackMode(mode);
+  for(const name of names||[]){
+    const key=String(name||'').trim();
+    if(key) state.extPackMode[key]=next;
+  }
+  renderChart();
+}
+/** 把双模式应用到图表树：清单扩展折叠为一条 0 体积叶子。 */
+function applyChartExtModes(nodes){
+  return applyExtensionPackModes(nodes, { modeOf: extModeOf, manifestLabel: t('extension.manifest') });
+}
+function chartNodesOf(pkg){
+  return applyChartExtModes(packageNodes(pkg).nodes);
 }
 
 const INITIAL_PACKAGES = [];
@@ -297,13 +330,22 @@ const state = {
   /* 服务端插件清单（仅管理员）：null = 未读取；[] = 已读取但为空。 */
   extServerPlugins:null, extHostAdmin:false, extServerOpen:false,
   /* 数据包列页签：zone = 数据包，git = Git 可视化（仅开发者模式）。 */
-  sideTab:'zone', gitListRequested:false, gitViz:{ name:'', loadedFor:'', loading:false, error:'', local:null, localMeta:null, branches:[], cloud:null, commits:[], tags:[], diff:null, diffLoading:false, diffError:'', remoteUrl:'', currentBranch:'', pickedRef:'', pickedKind:'', selectedSha:'' },
+  sideTab:'zone', gitListRequested:false, gitViz:{
+    name:'', loadedFor:'', loading:false, error:'', local:null, localMeta:null,
+    branches:[], cloud:null, commits:[], tags:[], diff:null, diffLoading:false, diffError:'',
+    remoteUrl:'', currentBranch:'', pickedRef:'', pickedKind:'', selectedSha:'',
+    /* 2026-11-17：本地 / 云端常显切换；包内 `.git` 的提交单独缓存。 */
+    source:'local', localCommits:[], localBranches:[], localError:'', localGit:null,
+    cloudCommits:[], cloudBranches:[], cloudReadOff:false, hostLocalOnly:false,
+  },
   source:{ type:'host', pkgId:null }, target:'SillyTavern', targetManual:false,
   /* Luker 存储引擎（'' = 跟随源包；fs/postgres/mysql/sqlite = 显式目标）。 */
   engine:'',
   delta: 'overwrite', splitMb: chartPrefs.splitMb,
   compression: chartPrefs.compression,
   extensionMode: chartPrefs.extensionMode,
+  /* 扩展目录级打包模式（2026-11-17）：name -> 'full' | 'manifest'；缺省按完整。 */
+  extPackMode: {},
   extUncheckedMode: 'none',
   gitMode: chartPrefs.gitMode,
   gitModeByPkg: {},
@@ -411,8 +453,19 @@ function walk(nodes,fn){ for(const n of nodes){ fn(n); walk(n.children||[],fn); 
 /* 勾选与展开状态按「来源作用域」记忆：宿主一个作用域，每个包一个作用域。
    多张图表（多包 / 多卷）各自带自己的 scope，互不串。 */
 function treeKey(scope,id){ return scope+'::'+id; }
-function isChecked(n,scope){ const k=treeKey(scope,n.id); return state.sel[k]!==undefined ? state.sel[k] : !!n.checked; }
-function setChecked(n,scope,val){ state.sel[treeKey(scope,n.id)]=val; walk(n.children||[],c=>{ state.sel[treeKey(scope,c.id)]=val; }); }
+function isChecked(n,scope){
+  const id = n.mirrorId || n.id;
+  const k = treeKey(scope,id);
+  return state.sel[k]!==undefined ? state.sel[k] : !!n.checked;
+}
+function setChecked(n,scope,val){
+  state.sel[treeKey(scope,n.id)]=val;
+  if(n.mirrorId) state.sel[treeKey(scope,n.mirrorId)]=val;
+  walk(n.children||[],c=>{
+    state.sel[treeKey(scope,c.id)]=val;
+    if(c.mirrorId) state.sel[treeKey(scope,c.mirrorId)]=val;
+  });
+}
 /** 每包独立 git 模式：未单独设置时沿用全局默认（偏好里保存的那份）。 */
 function packageGitMode(pkg){
   const own = pkg && state.gitModeByPkg[pkg.id];
@@ -710,7 +763,7 @@ function updateSplitSim(preview){
   if(!pkgs.length){ sim.textContent=t('splitSim.estimate'); return; }
   let n=0, over=false;
   pkgs.forEach(item=>{
-    const v=volumesOf(item.pkg,packageNodes(item.pkg).nodes);
+    const v=volumesOf(item.pkg,chartNodesOf(item.pkg));
     n+=v.length; if(v.some(x=>x.over)) over=true;
   });
   sim.textContent=t('splitSim.parts',{n})+(over?' '+t('splitSim.over'):'');
@@ -765,7 +818,8 @@ function mergedTotalMb(pkgs){
   return pkgs.reduce((sum,p)=>sum+(Number(p.mb)||0),0);
 }
 function mergedNodes(pkgs){
-  return mergeChartTrees(pkgs.map(p=>({pkgId:p.id,nodes:packageNodes(p).nodes})));
+  const merged = mergeChartTrees(pkgs.map(p=>({pkgId:p.id,nodes:packageNodes(p).nodes})));
+  return applyChartExtModes(merged);
 }
 function scopeOf(t){ return t.host ? ('host:'+state.host) : ('pkg:'+t.pkg.id); }
 
@@ -1026,6 +1080,30 @@ function siSwitchSource(source){
   si.source=next;
   siRequest([]);
 }
+/** 扩展目录级双模式控件：只有两个按钮；组级三态通过「两个都不亮 + 混合」表达。 */
+function extModeButtonsHtml(names, labelScope){
+  const list=[...new Set((names||[]).filter(Boolean))];
+  if(!list.length) return '';
+  const current=extensionPackModeSummary(list, extModeOf);
+  const mixed=current===EXT_PACK_MIXED;
+  const payload=escapeHtml(JSON.stringify(list));
+  const btn=(mode,label)=>'<button type="button" class="extmode-btn'
+    +(current===mode?' is-on':'')
+    +'" data-extpackmode="'+mode+'" data-extpacknames="'+payload+'"'
+    +' aria-pressed="'+(current===mode?'true':'false')+'"'
+    +' title="'+label+'">'+label+'</button>';
+  return '<span class="tree-extmode'+(mixed?' is-mixed':'')+'" data-extmodescope="'+escapeHtml(labelScope||'ext')+'">'
+    +btn(EXT_PACK_MODES.FULL,t('extension.full'))
+    +btn(EXT_PACK_MODES.MANIFEST,t('extension.manifest'))
+    +(mixed?'<span class="extmode-mixed">'+t('extension.mixed')+'</span>':'')
+  +'</span>';
+}
+function extModeControlOf(n){
+  if(n?.extModeScope==='group') return extModeButtonsHtml(n.extModeNames,'group');
+  if(n?.extModeName) return extModeButtonsHtml([n.extModeName],'ext');
+  return '';
+}
+
 function renderTreeRows(nodes,depth,scope,readonly,tools,totalMb,drill,colorMap,rootId,mbMap){
   let out='';
   for(const n of nodes){
@@ -1056,6 +1134,7 @@ function renderTreeRows(nodes,depth,scope,readonly,tools,totalMb,drill,colorMap,
       +(depth===0 && colorCls ? '<span class="tree-dot '+colorCls+'" aria-hidden="true"></span>' : '')
       +svg(n.icon,'tree-ico')
       +'<span class="tree-label'+(inMax&&hasKids?' is-drill':'')+'"'+(inMax&&hasKids?' data-voldrill="'+n.id+'"':'')+' title="'+n.label+'">'+n.label+(n.badge?'<span class="sub">'+n.badge+'</span>':'')+(n.note?'<span class="sub">'+n.note+'</span>':'')+(nodePrivateIncompatible(n)?'<span class="sub is-incompat" title="'+t('private.incompatibleHint')+'">'+t('private.incompatible')+'</span>':'')+'</span>'
+      +extModeControlOf(n)
       +'<span class="tree-pill '+pillCls+'">'+pillText+'</span>'
       +(hasKids && !readonly ? '<span class="row-bulk">'
         +'<button data-suball="all" data-subnode="'+n.id+'" title="'+t('chart.selectAll')+'">✓</button>'
@@ -1094,6 +1173,7 @@ function selectedMbMap(nodes, scope){
     if(n.children && n.children.length){
       const mb=sumSelected(n.children,scope).mb;
       map.set(n,mb);
+      (n.children||[]).forEach(visit);
       return mb;
     }
     const mb=isChecked(n,scope)?(Number(n.mb)||0):0;
@@ -1271,15 +1351,12 @@ function extensionToolsHtml(pkg, assetPkgs, { scope, nodes } = {}){
       +'</div>'
       +'</div>';
   }
-  const full = state.extensionMode !== EXTENSION_MODES.MANIFEST;
+  const full = true;
   const gitPkgId = pkg && pkg.id ? String(pkg.id) : '';
   return '<div class="extension-tools" data-exttools="1">'
     +(hasExt
       ? '<span class="et-label">'+t('extension.label')+'</span>'
-        +'<div class="segmented et-mode">'
-          +'<button class="seg-btn'+(full?' active':'')+'" data-extmode="full">'+t('extension.full')+'</button>'
-          +'<button class="seg-btn'+(full?'':' active')+'" data-extmode="manifest">'+t('extension.manifest')+'</button>'
-        +'</div>'
+        +'<span class="et-hint">'+t('extension.modeHint')+'</span>'
         +(full
           ? '<label class="et-git"><span>'+t('extension.git')+'</span><select class="text_pole" data-gitmode="'+escapeHtml(gitPkgId)+'">'
               +'<option value="keep"'+(packageGitMode(pkg)===GIT_MODES.KEEP?' selected':'')+'>'+t('extension.gitKeep')+'</option>'
@@ -1365,13 +1442,29 @@ function renderBatchBar(targets){
   const merged=!!mergeTarget;
   const vols=merged
     ? volumesFor(mergedTotalMb(pkgs),mergedNodes(pkgs)).length
-    : pkgs.reduce((a,p)=>a+volumesOf(p,packageNodes(p).nodes).length,0);
+    : pkgs.reduce((a,p)=>a+volumesOf(p,chartNodesOf(p)).length,0);
+  const extNames=[...new Set(pkgs.flatMap((p)=>extensionPackNames(packageNodes(p).nodes)))].sort();
+  const extSummary=extensionPackModeSummary(extNames, extModeOf);
+  const extMixed=extSummary===EXT_PACK_MIXED;
+  const extPayload=escapeHtml(JSON.stringify(extNames));
+  const extBtn=(mode,label)=>'<button type="button" class="extmode-btn'
+    +(extSummary===mode?' is-on':'')+'" data-batchextmode="'+mode+'" data-extpacknames="'+extPayload+'"'
+    +' aria-pressed="'+(extSummary===mode?'true':'false')+'">'+label+'</button>';
+  const extModeHtml=extNames.length
+    ? '<span class="batch-extmode'+(extMixed?' is-mixed':'')+'">'
+      +'<span class="batch-extmode-label">'+t('extension.label')+'</span>'
+      +extBtn(EXT_PACK_MODES.FULL,t('extension.full'))
+      +extBtn(EXT_PACK_MODES.MANIFEST,t('extension.manifest'))
+      +(extMixed?'<span class="extmode-mixed">'+t('extension.mixed')+'</span>':'')
+    +'</span>'
+    : '';
   bar.hidden=false;
   bar.innerHTML='<span class="lbl"><span class="scope">'+t(merged?'chart.mergeSelected':'chart.batchSelected',{n:pkgs.length,vols})+'</span></span>'
     +'<button class="merge-toggle'+(merged?' is-merged':'')+'" data-mergetoggle="'+(merged?'off':'on')+'">'
       +(merged?'<i class="fa-solid fa-layer-group"></i> ':'<i class="fa-solid fa-object-group"></i> ')
       +t(merged?'chart.mergeOff':'chart.mergeOn')+'</button>'
     +(merged?'<span class="merge-badge">'+t('chart.mergedBadge',{n:pkgs.length})+'</span>':'')
+    +extModeHtml
     +'<button data-batchall="1">'+t('chart.batchAll')+'</button>'
     +'<button data-batchnone="1">'+t('chart.selectNone')+'</button>'
     +'<button data-batchinvert="1">'+t('chart.batchInvert')+'</button>'
@@ -1474,7 +1567,8 @@ function renderChart(){
     }
     const pkg=target.pkg;
     const tree=packageNodes(pkg);
-    const vols=volumesOf(pkg, tree.nodes);
+    const chartNodes=chartNodesOf(pkg);
+    const vols=volumesOf(pkg, chartNodes);
     const multi=vols.length>1;
     const notice=tree.unrecognized ? '<div class="chart-unavailable"><b>'+t('chart.unrecognizedTitle')+'</b></div>' : '';
     const extTools=extensionToolsHtml(pkg, [pkg.id], { scope:'pkg:'+pkg.id, nodes:tree.nodes });
@@ -1568,15 +1662,18 @@ function chartPrefsHtml(){
       +'<span class="pref-dot '+volColorClass(i+1)+'" aria-hidden="true"></span>'
       +'<span class="pref-label">'+g.label+'</span>'
     +'</label>').join('');
-  const full = state.extensionMode !== EXTENSION_MODES.MANIFEST;
+  const prefFull = p.extensionMode !== EXTENSION_MODES.MANIFEST;
   return '<div class="chart-prefs">'
     +'<div class="pref-head"><b>'+t('chart.prefsTitle')+'</b><span>'+t('chart.prefsDesc')+'</span></div>'
     +'<div class="pref-list">'+rows+'</div>'
     +'<div class="pref-extra">'
-      +'<div class="segmented et-mode">'
-        +'<button type="button" class="seg-btn'+(full?' active':'')+'" data-prefextmode="full">'+t('extension.full')+'</button>'
-        +'<button type="button" class="seg-btn'+(full?'':' active')+'" data-prefextmode="manifest">'+t('extension.manifest')+'</button>'
+      +'<div class="pref-extmode"><span class="pref-label">'+t('chart.prefsExtDefault')+'</span>'
+        +'<div class="segmented et-mode">'
+          +'<button type="button" class="seg-btn'+(prefFull?' active':'')+'" data-prefextmode="full">'+t('extension.full')+'</button>'
+          +'<button type="button" class="seg-btn'+(prefFull?'':' active')+'" data-prefextmode="manifest">'+t('extension.manifest')+'</button>'
+        +'</div>'
       +'</div>'
+      +'<div class="ext-note">'+t('chart.prefsExtDefaultHint')+'</div>'
       +'<label class="et-git"><span>'+t('chart.prefsGit')+'</span><select class="text_pole" data-prefgitmode>'
         +'<option value="keep"'+(state.gitMode===GIT_MODES.KEEP?' selected':'')+'>'+t('extension.gitKeep')+'</option>'
         +'<option value="minimal"'+(state.gitMode===GIT_MODES.MINIMAL?' selected':'')+'>'+t('extension.gitMinimal')+'</option>'
@@ -1646,7 +1743,7 @@ function saveChartPrefsDraft(){
     compression: state.compression,
     splitMb: state.splitMb,
     filenameTemplate: state.filenameTemplate,
-    extensionMode: state.extensionMode,
+    extensionMode: state.prefDraft?.extensionMode || state.extensionMode,
     gitMode: state.gitMode,
     keepDev: state.keepDev,
   };
@@ -1922,6 +2019,13 @@ function gitStateText(stateCode){
   if(stateCode===GIT_STATES.outOfDate) return t('gitv.stateOutOfDate');
   return t('gitv.stateUnknown');
 }
+function localGitErrorText(reason){
+  const raw=String(reason||'');
+  if(raw==='no-git') return t('gitv.localNoGit');
+  if(raw==='pack-too-large'||raw.includes('pack-too-large')) return t('gitv.localPackLarge');
+  if(raw==='no-package'||raw==='no-blob') return t('gitv.localNoPack');
+  return t('gitv.localParseFailed',{reason:raw||t('gitv.unknown')});
+}
 /** 分支 / 标签：点选后出现「装到该版本」；不点不显示，避免误触。 */
 function gitRefChipsHtml(g){
   const branchChips=(g.branches||[]).map((b)=>'<button type="button" class="git-viz-ref is-branch'
@@ -1936,13 +2040,22 @@ function gitRefChipsHtml(g){
   if(!chips.length) return '';
   return '<div class="git-viz-refs">'+chips.join('')+'</div>';
 }
-/** 泳道图：SVG 画线 + HTML 行放文字（截断与键盘可用性交给 HTML）。 */
+/** 泳道图：左侧泳道列与右侧提交行**分别包裹**，边界清晰；SVG 不再绝对定位覆盖文字。 */
 function gitGraphHtml(g){
-  if(!g.commits.length){
-    return '<div class="ext-empty">'+(g.loading?t('gitv.loading'):t('gitv.noCommits'))+'</div>';
+  const commits=Array.isArray(g.commits)?g.commits:[];
+  if(!commits.length){
+    if(g.loading) return '<div class="git-graph-empty ext-empty">'+t('gitv.loading')+'</div>';
+    if(g.source==='cloud' && g.cloudReadOff){
+      return '<div class="git-graph-empty ext-note is-warn">'+t('gitv.cloudReadOffHint')+'</div>';
+    }
+    if(g.source==='local' && g.localError){
+      return '<div class="git-graph-empty ext-note is-warn">'+escapeHtml(g.localError)+'</div>';
+    }
+    return '<div class="git-graph-empty ext-empty">'+t('gitv.noCommits')+'</div>';
   }
-  const graph=layoutGitGraph(g.commits,{laneWidth:12,rowHeight:26});
+  const graph=layoutGitGraph(commits,{laneWidth:12,rowHeight:26});
   const svgW=graph.width+12;
+  const laneW=Math.max(44,svgW);
   const dangling=graph.edges.some((e)=>e.kind==='dangling');
   const svgH=graph.height+(dangling?Math.round(graph.rowHeight/2):0);
   const paths=graph.edges.map((e)=>{
@@ -1960,8 +2073,9 @@ function gitGraphHtml(g){
     return '<circle class="gg-dot gg-c'+n.color+'" cx="'+p.x+'" cy="'+p.y+'" r="4"/>';
   }).join('');
   /* 落点标记：本地分支（带 commit）与 HEAD 钉到对应提交行；云端分支无 sha，不伪造。 */
-  const refs=refPositions(g.commits,g.branches||[],{localCommit:g.local?.commit||''});
-  const rows=g.commits.map((c,i)=>{
+  const branchList=g.source==='local' ? (g.localBranches||[]) : (g.branches||[]);
+  const refs=refPositions(commits,branchList,{localCommit:g.local?.commit||''});
+  const rows=commits.map((c,i)=>{
     const on=g.selectedSha===c.sha;
     const ref=refs.get(c.sha);
     const refChips=(ref&&(ref.isHead||ref.branches.length))
@@ -1971,7 +2085,7 @@ function gitGraphHtml(g){
       +'</span>'
       :'';
     return '<button type="button" class="git-graph-row'+(on?' is-selected':'')+(ref?.isHead?' is-head':'')+'" data-gitcommit="'+escapeHtml(c.sha)+'"'
-      +' style="height:'+graph.rowHeight+'px;padding-left:'+(svgW+6)+'px"'
+      +' style="height:'+graph.rowHeight+'px"'
       +' title="'+escapeHtml(c.sha||'')+'">'
       +'<span class="git-graph-sha">'+escapeHtml(c.shortSha||'')+'</span>'
       +refChips
@@ -1979,10 +2093,15 @@ function gitGraphHtml(g){
       +'<span class="git-graph-date">'+escapeHtml(String(c.date||'').slice(0,10))+'</span>'
     +'</button>';
   }).join('');
-  return '<div class="git-graph">'
-    +'<svg class="git-graph-svg" width="'+svgW+'" height="'+svgH+'" viewBox="0 0 '+svgW+' '+svgH+'" aria-hidden="true">'+paths+dots+'</svg>'
-    +'<div class="git-graph-rows">'+rows+'</div>'
-  +'</div>';
+  return '<div class="git-graph-head" style="grid-template-columns:'+laneW+'px minmax(0,1fr)">'
+      +'<span>'+t('gitv.lane')+'</span><span>'+t('gitv.commitList')+'</span>'
+    +'</div>'
+    +'<div class="git-graph" style="grid-template-columns:'+laneW+'px minmax(0,1fr)">'
+      +'<div class="git-graph-lane" style="height:'+svgH+'px">'
+        +'<svg class="git-graph-svg" width="'+svgW+'" height="'+svgH+'" viewBox="0 0 '+svgW+' '+svgH+'" aria-hidden="true">'+paths+dots+'</svg>'
+      +'</div>'
+      +'<div class="git-graph-rows">'+rows+'</div>'
+    +'</div>';
 }
 function gitDetailHtml(row){
   const g=state.gitViz;
@@ -2013,13 +2132,23 @@ function gitDetailHtml(row){
         : '<div class="ext-empty">'+t('gitv.noDiff')+'</div>')+'</div>'
     : (g.diffLoading ? '<div class="ext-note">'+t('gitv.diffLoading')+'</div>'
       : (g.diffError ? '<div class="ext-note is-warn">'+t('gitv.diffFailed',{reason:g.diffError})+'</div>' : ''));
-  /* 本地 HEAD 与云端历史的对齐读数：有本地 HEAD 且云端窗口非空才给行，两头缺失不伪造。 */
+  /* 本地 HEAD 与云端历史的对齐读数：只有云端来源且有本地 HEAD、云端窗口非空才给行。 */
   const align=cloudAlignment(g.local?.commit||'',g.commits||[]);
-  const alignLine=(g.local?.commit&&g.commits.length)
+  const alignLine=(g.source==='cloud'&&g.local?.commit&&g.commits.length)
     ?'<div class="git-viz-meta"><span>'+(align.found
       ?(align.behind===0?t('gitv.inSync'):t('gitv.behind',{n:align.behind}))
       :t('gitv.notInWindow',{n:g.commits.length}))+'</span></div>'
     :'';
+  const localInfo=(g.source==='local'&&g.localGit?.ok)
+    ? '<div class="git-viz-meta"><span>'+t('gitv.localCommits',{n:g.localGit.totalCommits||0})+'</span>'
+      +(g.localGit.truncated?'<span class="is-warn">'+t('gitv.localTruncated')+'</span>':'')+'</div>'
+    : (g.source==='local'&&g.hostLocalOnly
+      ? '<div class="git-viz-meta"><span>'+t('gitv.localHeadOnly')+'</span></div>'
+      : (g.source==='local'&&g.localError
+        ? '<div class="ext-note is-warn">'+escapeHtml(g.localError)+'</div>' : ''));
+  const diffBlock=(g.source==='local')
+    ? '<div class="ext-note">'+t('gitv.localNoDiff')+'</div>'
+    : diffHtml;
   return '<div class="git-viz-head"><b class="git-viz-title">'+escapeHtml(row.name)+'</b>'
       +'<span class="ext-state">'+escapeHtml(row.version||'-')+'</span></div>'
     +'<div class="git-viz-meta">'
@@ -2027,11 +2156,12 @@ function gitDetailHtml(row){
       +'<span>'+t('gitv.commit')+'：'+escapeHtml(summary.shortCommit||t('gitv.unknown'))+'</span>'
       +'<span>'+t('gitv.state')+'：'+gitStateText(summary.state)+'</span>'
     +'</div>'
+    +localInfo
     +alignLine
     +historyNote
     +commitBox
     +statLine
-    +diffHtml;
+    +diffBlock;
 }
 async function loadGitTarget(name, { force = false } = {}){
   const g=state.gitViz;
@@ -2041,30 +2171,82 @@ async function loadGitTarget(name, { force = false } = {}){
   g.local=null; g.localMeta=null; g.branches=[]; g.cloud=null; g.commits=[]; g.tags=[];
   g.diff=null; g.diffError=''; g.diffLoading=false; g.selectedSha='';
   g.remoteUrl=''; g.currentBranch=''; g.pickedRef=''; g.pickedKind='';
+  g.localCommits=[]; g.localBranches=[]; g.localError=''; g.localGit=null;
+  g.cloudCommits=[]; g.cloudBranches=[]; g.cloudReadOff=false; g.hostLocalOnly=false;
   renderGitViz();
   const item=(state.extInstalled||[]).find((x)=>String(x?.id||x?.folder||x?.name||'')===name);
   const isGlobal=String(item?.sourceType||'')==='global';
   const install=(loadSettings().gitInstalls||[]).find((r)=>r.name===name)||null;
+  const importPkgs = (state.packages||[]).filter(p=>p && p.id);
+  const pkg = importPkgs.find((p)=>packageExtensionItems(p).some((i)=>i.name===name))
+    || importPkgs.find(p=>p.id===state.extSelectedPackageId)
+    || importPkgs[0] || null;
+  const pkgItems = pkg ? packageExtensionItems(pkg) : [];
+  const pkgItem = pkgItems.find((i)=>i.name===name) || null;
+  g.pkgId = pkgItem ? pkg.id : '';
   let localRes=null;
   try { localRes=await actions.hostExtensionGit?.(name,{global:isGlobal}); } catch { localRes=null; }
   g.localMeta=localRes;
   g.local=localRes && localRes.ok ? normalizeLocalGit(localRes.version,{name}) : null;
   const version=localRes && localRes.ok ? localRes.version : null;
   g.currentBranch=String(version?.currentBranchName||'');
-  /* 云端仓库优先用宿主 .git 的 origin（所有已装扩展都能读到），登记只作兜底。
-     2026-11-15 用户裁定：**读云端远仓默认关闭**，由开发者页开关（gitCloudReadOn）控制——
-     关：Git 可视化只读本地信息，**不发任何云端请求**（如实标注「云端读取已关闭」，不伪造数据）。 */
-  let remoteUrl=String(version?.remoteUrl||install?.url||'').trim();
+  /* 云端仓库优先用宿主 .git 的 origin（所有已装扩展都能读到），登记只作兜底。 */
+  let remoteUrl=String(version?.remoteUrl||install?.url||pkgItem?.url||'').trim();
   if(!remoteUrl){
-    const importPkgs = (state.packages||[]).filter(p=>p && p.id);
-    const pkg = importPkgs.find(p=>p.id===state.extSelectedPackageId) || importPkgs[0];
-    const pkgItems = pkg ? packageExtensionItems(pkg) : [];
     const pi = pkgItems.find(i=>i.name===name);
     remoteUrl = String(pi?.url || state.extRemoteUrls[name]?.url || '').trim();
   }
   g.remoteUrl=remoteUrl;
-  let cloud=null;
+
+  /* 本地来源（2026-11-17）：包内扩展直接读 zip 里的 `.git`；宿主扩展只有 HEAD。 */
+  if(pkgItem && typeof actions.packageGit==='function'){
+    const git=await actions.packageGit(pkg.id, name);
+    g.localGit=git||null;
+    if(git?.ok){
+      g.localCommits=Array.isArray(git.commits)?git.commits:[];
+      g.localBranches=Array.isArray(git.branches)?git.branches:[];
+      g.localError='';
+      if(!g.remoteUrl && git.remoteUrl) g.remoteUrl=git.remoteUrl;
+      if(!g.local?.commit && git.head){
+        g.local={
+          ...(g.local||{}),
+          commit:git.head,
+          shortCommit:String(git.head).slice(0,8),
+          branch:git.branch||g.currentBranch||'',
+          remoteUrl:g.local?.remoteUrl||git.remoteUrl||'',
+          hasHistory:true,
+          // 包内本地历史没有「是否落后云端」的权威读数；置 null 让状态显示未知，不伪造。
+          upToDate:null,
+        };
+      }
+      if(g.local && git.head){
+        g.local.hasHistory=true;
+        g.local.commit=g.local.commit||git.head;
+        g.local.shortCommit=g.local.shortCommit||String(g.local.commit).slice(0,8);
+        g.local.branch=g.local.branch||git.branch||g.currentBranch||'';
+      }
+    } else {
+      g.localError=localGitErrorText(git?.reason);
+    }
+  } else if(g.local?.commit){
+    g.hostLocalOnly=true;
+    g.localCommits=[{
+      sha:g.local.commit,
+      shortSha:String(g.local.commit).slice(0,7),
+      message:'',
+      author:'',
+      date:'',
+      timestamp:0,
+    }];
+    g.localBranches=(localRes?.branches||[]).map((b)=>({
+      name:b.name, commit:b.commit, current:!!b.current,
+    }));
+  }
+
+  /* 云端来源：默认关闭；关闭时零请求，并如实显示提示。 */
   const cloudReadOn=!!loadSettings().gitCloudReadOn;
+  g.cloudReadOff=!cloudReadOn;
+  let cloud=null;
   if(!cloudReadOn){
     cloud={branches:[],tags:[],commits:[],error:t('gitv.cloudReadOff')};
   } else if(remoteUrl){
@@ -2088,19 +2270,29 @@ async function loadGitTarget(name, { force = false } = {}){
       cloud={branches:[],tags:[],commits:[],error:reasonText('unsupported')};
     }
   }
-  g.branches=mergeBranches(localRes?.branches||[], cloud?.branches||[]);
   g.cloud=cloud;
-  g.commits=cloud?.commits||[];
+  g.cloudBranches=Array.isArray(cloud?.branches)?cloud.branches:[];
+  g.cloudCommits=Array.isArray(cloud?.commits)?cloud.commits:[];
+  g.branches=mergeBranches(localRes?.branches||[], cloud?.branches||[]);
   g.tags=cloud?.tags||[];
+  g.commits = g.source==='cloud' ? g.cloudCommits : g.localCommits;
+  if(g.selectedSha && !g.commits.some((c)=>c.sha===g.selectedSha)) g.selectedSha='';
   g.loading=false;
   renderGitViz();
 }
 async function loadGitCommitDiff(sha){
   const g=state.gitViz;
-  if(!g.remoteUrl || !sha) return;
+  if(!sha) return;
+  g.selectedSha=sha;
+  /* 本地提交只有元数据；diff 仍只在云端提供，不伪造。 */
+  if(g.source==='local'){
+    g.diff=null; g.diffError=''; g.diffLoading=false;
+    renderGitViz();
+    return;
+  }
+  if(!g.remoteUrl) return;
   /* 云端读取关闭时不发单次 diff 请求（与列表开关同一门控） */
   if(!loadSettings().gitCloudReadOn) return;
-  g.selectedSha=sha;
   const parsed=parseRepoUrl(g.remoteUrl);
   g.diffLoading=true; g.diff=null; g.diffError='';
   renderGitViz();
@@ -2113,6 +2305,14 @@ async function loadGitCommitDiff(sha){
 }
 function renderGitVizHeadbar(row){
   const g=state.gitViz;
+  const sourceTabs='<div class="segmented git-source-tabs" role="group" aria-label="'+t('gitv.source')+'">'
+    +'<button type="button" class="seg-btn'+(g.source==='local'?' active':'')+'" data-gitsource="local" aria-pressed="'+(g.source==='local'?'true':'false')+'">'
+      +'<i class="fa-solid fa-hard-drive"></i><span>'+t('gitv.sourceLocal')+'</span></button>'
+    +'<button type="button" class="seg-btn'+(g.source==='cloud'?' active':'')+'" data-gitsource="cloud" aria-pressed="'+(g.source==='cloud'?'true':'false')+'">'
+      +'<i class="fa-solid fa-cloud"></i><span>'+t('gitv.sourceCloud')+'</span></button>'
+  +'</div>';
+  const cloudOff=(g.source==='cloud'&&g.cloudReadOff)
+    ? '<span class="git-viz-source-warn">'+t('gitv.cloudReadOff')+'</span>' : '';
   const chip='<div class="git-viz-target-chip" title="'+t('gitv.currentExt')+'">'
     +'<i class="fa-solid fa-cube"></i>'
     +'<strong class="git-viz-target-title">'+escapeHtml(g.name||t('gitv.unknown'))+'</strong>'
@@ -2130,7 +2330,7 @@ function renderGitVizHeadbar(row){
     ? '<button type="button" class="btn accent git-viz-install" id="git-viz-install">'
       +'<i class="fa-solid fa-download"></i><span>'+t('gitv.installRef',{ref:g.pickedRef})+'</span></button>'
     : '';
-  return '<div class="git-viz-headrow">'+chip+reload+repo+'</div>'
+  return '<div class="git-viz-headrow">'+sourceTabs+chip+cloudOff+reload+repo+'</div>'
     +(refSwitchOn?gitRefChipsHtml(g):'')
     +install;
 }
@@ -2216,6 +2416,15 @@ function renderGitViz(){
   headEl.innerHTML=renderGitVizHeadbar(activeTarget);
   graphEl.innerHTML=gitGraphHtml(state.gitViz);
   detailEl.innerHTML=gitDetailHtml(activeTarget);
+  headEl.querySelectorAll('[data-gitsource]').forEach((btn)=>btn.addEventListener('click',()=>{
+    const g=state.gitViz;
+    const next=btn.dataset.gitsource==='cloud'?'cloud':'local';
+    if(g.source===next) return;
+    g.source=next;
+    g.selectedSha=''; g.diff=null; g.diffError='';
+    g.commits = next==='cloud' ? g.cloudCommits : g.localCommits;
+    renderGitViz();
+  }));
   headEl.querySelector('#git-viz-reload')?.addEventListener('click',()=>{ void loadGitTarget(state.gitViz.name,{force:true}); });
   headEl.querySelectorAll('[data-gitref]').forEach((btn)=>btn.addEventListener('click',()=>{
     const g=state.gitViz;
@@ -2293,14 +2502,22 @@ function setLanBar(fillId, pctId, pct){
 function setLanQr(id, text, show){
   const box=document.getElementById(id); if(!box) return;
   box.hidden=false;
-  if(typeof qr?.encodeSvg!=='function'){ box.innerHTML=''; return; }
-  const payload = (show && text) ? text : 'STPT:LAN:READY';
-  try {
-    box.innerHTML=qr.encodeSvg(payload);
-    box.title=(show && text) ? t('action.pickup') : t('action.ready');
-  } catch {
-    box.innerHTML='';
+  box.classList.remove('is-placeholder');
+  if(!show || !text){
+    box.classList.add('is-placeholder');
+    box.innerHTML='<span class="lan-qr-placeholder">'+escapeHtml(t('qr.notReady'))+'</span>';
+    box.title=t('qr.notReady');
+    return;
   }
+  const svg=typeof qr?.encodeSvg==='function' ? qr.encodeSvg(text) : '';
+  if(!svg){
+    box.classList.add('is-placeholder');
+    box.innerHTML='<span class="lan-qr-placeholder">'+escapeHtml(t('qr.unavailableShort'))+'</span>';
+    box.title=t('qr.unavailableShort');
+    return;
+  }
+  box.innerHTML=svg;
+  box.title=t('action.pickup');
 }
 /* ── 扩展管理（内联视图，不是浮层） ── */
 function extStatusText(status){
@@ -5893,8 +6110,6 @@ function demoStorageInspect(source, pathArr){
     ['cachestorage','Cache Storage',3.1*gb,'layer-group',{ count:1, unit:'caches', drill:true }],
   ];
   const quota=quotaFor(cats);
-  /* 「Storage Quota」行展示的已用读数取分类合计，避免两个数字互相矛盾 */
-  cats.push(['quota','Storage Quota',quota.usedBytes,'chart-pie',{}]);
   if(path.length===0){
     return {
       path:[], breadcrumbs:[{ labelKey:'si.root', path:[] }], quota,
@@ -6653,6 +6868,14 @@ function bind(){
       if(fi) fi.click();
       return;
     }
+    const extPackMode=e.target.closest('[data-extpackmode],[data-batchextmode]');
+    if(extPackMode){
+      const mode=extPackMode.dataset.extpackmode||extPackMode.dataset.batchextmode;
+      let names=[];
+      try{ names=JSON.parse(extPackMode.dataset.extpacknames||'[]'); }catch{ names=[]; }
+      if(names.length) setExtPackModes(names,mode);
+      return;
+    }
     const extMode=e.target.closest('[data-extmode]');
     if(extMode){
       state.extensionMode = extMode.dataset.extmode==='manifest' ? EXTENSION_MODES.MANIFEST : EXTENSION_MODES.FULL;
@@ -6667,7 +6890,9 @@ function bind(){
     }
     const prefExtMode=e.target.closest('[data-prefextmode]');
     if(prefExtMode){
-      state.extensionMode = prefExtMode.dataset.prefextmode==='manifest' ? EXTENSION_MODES.MANIFEST : EXTENSION_MODES.FULL;
+      const next=prefExtMode.dataset.prefextmode==='manifest' ? EXTENSION_MODES.MANIFEST : EXTENSION_MODES.FULL;
+      if(state.prefDraft) state.prefDraft.extensionMode=next;
+      else state.extensionMode=next;
       prefExtMode.parentElement.querySelectorAll('[data-prefextmode]').forEach((b)=>b.classList.toggle('active', b===prefExtMode));
       return;
     }
@@ -6746,6 +6971,13 @@ function bind(){
     renderChart();
   });
   document.getElementById('batch-bar').addEventListener('click',e=>{
+    const extMode=e.target.closest('[data-batchextmode]');
+    if(extMode){
+      let names=[];
+      try{ names=JSON.parse(extMode.dataset.extpacknames||'[]'); }catch{ names=[]; }
+      if(names.length) setExtPackModes(names,extMode.dataset.batchextmode);
+      return;
+    }
     const toggle=e.target.closest('[data-mergetoggle]');
     if(toggle){ state.mergeMode = toggle.dataset.mergetoggle==='on'; renderChart(); return; }
     const b=e.target.closest('[data-batchall],[data-batchnone],[data-batchinvert]'); if(!b) return;
@@ -7121,17 +7353,26 @@ initSwitchDensity();
     }
     const optionsByPkg = {};
     for (const pkg of pkgs) {
-      optionsByPkg[pkg.id] = deriveExportOptions({
+      const opts = deriveExportOptions({
         nodes,
         isChecked: (n) => (n.srcPkgId && n.srcPkgId !== pkg.id ? false : isChecked(n, scope)),
         ui: {
           compression: state.compression,
-          extensionMode: mergedManifestOnly ? EXTENSION_MODES.MANIFEST : state.extensionMode,
+          extensionMode: EXTENSION_MODES.FULL,
           gitMode: packageGitMode(pkg),
           keepDev: state.keepDev,
           target: state.target,
         },
       });
+      const names = extensionPackNames(packageNodes(pkg).nodes);
+      const manifestNames = mergedManifestOnly
+        ? names
+        : names.filter((name) => extModeOf(name) === EXT_PACK_MODES.MANIFEST);
+      opts.extensionManifestNames = manifestNames;
+      opts.extensionMode = names.length > 0 && manifestNames.length === names.length
+        ? EXTENSION_MODES.MANIFEST
+        : EXTENSION_MODES.FULL;
+      optionsByPkg[pkg.id] = opts;
     }
     return { nodes, scope, excludedByPkg, optionsByPkg };
   }
@@ -7140,18 +7381,26 @@ initSwitchDensity();
     const scope = 'pkg:' + pkg.id;
     const nodes = packageNodes(pkg).nodes;
     const checked = (n) => isChecked(n, scope);
+    const names = extensionPackNames(nodes);
+    const manifestOnly = extensionManifestOnly(pkg, scope);
+    const manifestNames = manifestOnly
+      ? names
+      : names.filter((name) => extModeOf(name) === EXT_PACK_MODES.MANIFEST);
     const opts = deriveExportOptions({
       nodes,
       isChecked: checked,
       ui: {
         compression: state.compression,
-        extensionMode: extensionManifestOnly(pkg, scope) ? EXTENSION_MODES.MANIFEST : state.extensionMode,
+        extensionMode: names.length > 0 && manifestNames.length === names.length
+          ? EXTENSION_MODES.MANIFEST
+          : EXTENSION_MODES.FULL,
         gitMode: packageGitMode(pkg),
         keepDev: state.keepDev,
         target: state.target,
         engine: state.engine,
       },
     });
+    opts.extensionManifestNames = manifestNames;
     // 引擎侧数据不受 excludedPaths 约束：只有选了引擎时，才把类目勾选一并带上，
     // 否则取消勾选的聊天/预设仍会被写进转储（数据正确性优先）。
     // 图表为空（未建树 / 扫描失败）时不带选择项——否则「一棵空的树」会把全部行过滤掉。
@@ -7380,7 +7629,7 @@ initSwitchDensity();
     getExcludedPaths,
     getExportOptions,
     getMergedPlan,
-    getVolumes(pkg) { return volumesOf(pkg, packageNodes(pkg).nodes); },
+    getVolumes(pkg) { return volumesOf(pkg, chartNodesOf(pkg)); },
     getState() { return state; },
     applySettings(s) {
       if(!s) return;

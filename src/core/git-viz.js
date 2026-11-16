@@ -54,6 +54,7 @@ export function normalizeLocalGit(payload, { name = '' } = {}) {
 export function gitStateOf(local) {
   if (!local) return GIT_STATES.unknown;
   if (!local.hasHistory) return GIT_STATES.historyLost;
+  if (local.upToDate === null) return GIT_STATES.unknown;
   return local.upToDate ? GIT_STATES.upToDate : GIT_STATES.outOfDate;
 }
 

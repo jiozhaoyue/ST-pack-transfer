@@ -119,15 +119,11 @@
   #app.app-container .app-title h1.is-symbol .app-title-txt{display:none}
   #app.app-container .header-actions{display:flex;align-items:center;gap:6px;margin-left:auto;flex-wrap:nowrap;
     justify-content:flex-end;flex:0 0 auto}
-  #app.app-container .btn-docs{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:999px;
-    border:1px solid var(--accent);background:var(--accent-soft);color:var(--text);font-size:12px;font-weight:700;
-    text-decoration:none;white-space:nowrap;min-height:var(--ctl-h);box-sizing:border-box;transition:all .15s ease}
-  #app.app-container .btn-docs svg{color:var(--accent);flex:0 0 auto}
-  #app.app-container .btn-docs:hover{background:var(--accent);color:#fff;text-decoration:none}
-  #app.app-container .btn-docs:hover svg{color:#fff}
-  #app.app-container .badge{display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border-radius:999px;
+  #app.app-container .badge{display:inline-flex;align-items:center;justify-content:center;gap:5px;padding:0 8px;border-radius:999px;
     border:1px solid var(--border);background:var(--panel-3);font-size:11px;color:var(--muted);white-space:nowrap;
-    min-height:var(--ctl-h);box-sizing:border-box}
+    height:var(--ctl-h);line-height:1;box-sizing:border-box;text-align:center}
+  #app.app-container .badge #host-badge-text{display:inline-flex;align-items:center;justify-content:center;height:100%;line-height:1}
+  #app.app-container .badge #host-badge-user{display:inline-flex;align-items:center;height:100%;line-height:1}
   #app.app-container .badge .host-icon{width:14px;height:14px;object-fit:contain}
   #app.app-container .badge .gh-icon{flex:0 0 auto}
   #app.app-container .badge .web-icon{flex:0 0 auto;color:var(--accent)}
@@ -389,6 +385,17 @@
   #app.app-container .tree-pill.optional{color:var(--optional);border-color:var(--optional);background:var(--optional-bg)}
   #app.app-container .tree-pill.drop{color:var(--drop);border-color:var(--drop);background:var(--drop-bg)}
   #app.app-container .tree-pill.unknown{color:var(--unknown);border-color:var(--unknown);background:var(--unknown-bg)}
+  /* 扩展目录级双模式：只有两个按钮；组级混合时两个都不点亮，另加「混合」小字。 */
+  #app.app-container .tree-extmode{display:inline-flex;align-items:center;gap:2px;flex:0 0 auto;margin-left:4px}
+  #app.app-container .extmode-btn{border:1px solid var(--border);background:var(--panel-3);color:var(--muted);
+    border-radius:5px;padding:1px 6px;font-size:9.5px;line-height:16px;white-space:nowrap;cursor:pointer}
+  #app.app-container .extmode-btn:hover{color:var(--text);border-color:var(--border-strong)}
+  #app.app-container .extmode-btn.is-on{background:var(--accent-soft);border-color:var(--accent);color:var(--text);font-weight:600}
+  #app.app-container .tree-extmode.is-mixed .extmode-btn{border-style:dashed}
+  #app.app-container .extmode-mixed{font-size:9.5px;color:var(--optional);white-space:nowrap;margin-left:2px}
+  #app.app-container .batch-extmode{display:inline-flex;align-items:center;gap:3px;flex:0 0 auto}
+  #app.app-container .batch-extmode-label{font-size:10.5px;color:var(--muted);margin-right:2px}
+  #app.app-container .batch-extmode.is-mixed .extmode-btn{border-style:dashed}
   #app.app-container .tree-mini{font-size:10px;padding:1px 6px;border-radius:5px;border:1px solid var(--border);
     background:var(--panel-3);color:var(--muted);white-space:nowrap}
   #app.app-container .tree-mini:hover{color:var(--text);border-color:var(--accent)}
@@ -452,6 +459,8 @@
   #app.app-container .pref-extra{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:6px 8px;
     border:1px solid var(--border);border-radius:8px;background:var(--panel-3);flex:0 0 auto}
   #app.app-container .pref-extra .et-git{display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--muted)}
+  #app.app-container .pref-extmode{display:inline-flex;align-items:center;gap:6px}
+  #app.app-container .pref-extmode .pref-label{color:var(--muted);font-size:11px;white-space:nowrap}
   #app.app-container .asset-guide{margin:0;padding-left:18px;line-height:1.9;font-size:12px}
   #app.app-container .chart-group-head{display:flex;align-items:center;gap:7px;flex-wrap:wrap;padding:0 2px;
     font-size:11px;color:var(--muted)}
@@ -986,12 +995,24 @@
   #app.app-container .git-viz-ref.is-current{border-color:var(--accent);color:var(--text)}
   #app.app-container .git-viz-ref.is-picked{background:color-mix(in srgb,var(--accent) 16%,transparent);border-color:var(--accent);color:var(--text)}
   #app.app-container .git-viz-install{align-self:flex-start;display:inline-flex;align-items:center;gap:6px}
-  /* 泳道图：SVG 画线，HTML 行放文字（截断与键盘可用性交给 HTML） */
-  #app.app-container .git-graph{position:relative;flex:0 0 auto;min-width:0}
-  #app.app-container .git-graph-svg{position:absolute;left:0;top:0;pointer-events:none}
-  #app.app-container .git-graph-rows{display:flex;flex-direction:column}
+  /* 泳道图：左侧泳道列与右侧提交行分别包裹，边界明确（2026-11-17 用户裁定）。 */
+  #app.app-container .git-viz-source-tabs{flex:0 0 auto}
+  #app.app-container .git-viz-source-warn{font-size:10.5px;color:var(--optional);white-space:nowrap}
+  #app.app-container .git-graph-head{display:grid;gap:0;padding:0 2px;font-size:10px;color:var(--muted-2);
+    letter-spacing:.4px;text-transform:uppercase}
+  #app.app-container .git-graph-head > span{padding:0 6px 2px}
+  #app.app-container .git-graph-head > span:first-child{text-align:center;padding:0 2px 2px}
+  #app.app-container .git-graph{display:grid;border:1px solid var(--border);border-radius:8px;overflow:hidden;
+    background:color-mix(in srgb,var(--panel-3) 65%,var(--panel));min-width:0}
+  #app.app-container .git-graph-lane{display:flex;justify-content:center;overflow:hidden;background:color-mix(in srgb,var(--accent) 6%,var(--panel-3));
+    border-right:1px solid var(--border)}
+  #app.app-container .git-graph-svg{display:block}
+  #app.app-container .git-graph-rows{display:flex;flex-direction:column;min-width:0;background:var(--panel)}
   #app.app-container .git-graph-row{display:flex;align-items:center;gap:6px;width:100%;text-align:left;cursor:pointer;
-    border:0;border-radius:6px;background:transparent;color:var(--text);font-size:11px;padding-right:4px;box-sizing:border-box}
+    border:0;border-bottom:1px solid color-mix(in srgb,var(--border) 55%,transparent);
+    background:transparent;color:var(--text);font-size:11px;padding:0 6px;box-sizing:border-box}
+  #app.app-container .git-graph-row:last-child{border-bottom:0}
+  #app.app-container .git-graph-empty{border:1px dashed var(--border);border-radius:8px;padding:14px 10px}
   #app.app-container .git-graph-row:hover{background:color-mix(in srgb,var(--accent) 8%,transparent)}
   #app.app-container .git-graph-row.is-selected{background:color-mix(in srgb,var(--accent) 14%,transparent)}
   #app.app-container .git-graph-sha{flex:0 0 auto;font-family:Consolas,monospace;color:var(--accent)}
@@ -1572,8 +1593,11 @@
   background:var(--panel-3);border:1px solid var(--border);border-radius:8px;color:var(--text)}
 #app.app-container .lan-row .menu_button:hover{border-color:var(--border-strong)}
 #app.app-container .lan-row .menu_button:disabled{opacity:.45;cursor:not-allowed}
-#app.app-container .lan-qr{display:flex;justify-content:center;padding:6px;background:#fff;border-radius:8px;align-self:center}
+#app.app-container .lan-qr{display:flex;justify-content:center;align-items:center;padding:6px;background:#fff;border-radius:8px;align-self:center}
 #app.app-container .lan-qr svg{width:150px;height:150px;display:block}
+#app.app-container .lan-qr.is-placeholder{width:min(100%,260px);min-height:96px;box-sizing:border-box;
+  background:color-mix(in srgb,var(--panel-3) 70%,transparent);border:1px dashed var(--border-strong);color:var(--muted)}
+#app.app-container .lan-qr-placeholder{font-size:12px;line-height:1.5;text-align:center;padding:0 12px;white-space:pre-wrap}
 #app.app-container .lan-progress{display:flex;align-items:center;gap:7px;flex-wrap:wrap;font-size:9.5px;color:var(--muted);margin-top:2px}
 #app.app-container .lan-phase{min-width:58px}
 #app.app-container .lan-bar{flex:1 1 100px;height:5px;border:1px solid var(--border);border-radius:999px;background:var(--panel-3);overflow:hidden}

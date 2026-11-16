@@ -1,5 +1,6 @@
 ---
 title: 恢复写回宿主
+layout: default
 ---
 
 # 恢复写回酒馆
