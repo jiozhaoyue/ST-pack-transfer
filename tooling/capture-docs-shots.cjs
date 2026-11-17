@@ -3,7 +3,7 @@
  * 文档站截图：**只从教程演示模式采集**，绝不加载真实数据包。
  *
  * 产物：docs/assets/shots/<viewport>-<nn>-<name>.png（入库，公开文档使用）
- * 用法：npm run build && npm run docs:shots [-- --port 4173] [-- --only desktop|mobile]
+ * 用法：npm run build && npm run docs:shots [-- --port 3040] [-- --only desktop|mobile]
  *
  * 依赖本地开发工具（e2e/ 不入库）：e2e/standalone/lib/static-server.cjs、
  * e2e/lib/resolve-playwright.cjs。CI 只跑 docs:verify，不跑本脚本。

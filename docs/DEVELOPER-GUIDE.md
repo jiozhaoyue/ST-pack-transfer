@@ -78,11 +78,13 @@ translation: pending
 npm install
 npm test                 # 单元测试
 npm run build            # 生产构建，输出 dist/
-npm run preview          # 预览 dist/，终端会打印实际地址
-npm run dev              # 本地开发服务器，终端会打印实际地址
+npm run preview          # 预览 dist/，固定使用本地唯一端口 3040
+npm run dev              # 本地开发服务器，同样使用 3040
 npm run build:offline    # 生成单文件 HTML
 npm run qa:static        # 静态守卫串跑
 ```
+
+**本地端口只有一个**：`vite.config.js` 的 `LOCAL_PORT`（默认 `3040`），`dev` / `preview` / 本地静态服务共用；也可用环境变量 `PORT` 覆盖。不要再为预览另开端口，也不要占用 `5173`（env-sync 桌面应用的 Tauri `devUrl`）。
 
 `npm run build:offline` 会生成：
 

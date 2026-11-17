@@ -68,8 +68,7 @@
     --border-strong: rgba(170, 170, 162, 0.62);
     --outline: rgba(180, 180, 172, 0.72);
   }
-  /* 2026-11-17 用户裁定：目标平台切换不再改全站 accent；
-     目标平台统一鲜艳色 + 永远白色文字见 src/data/target-ui.js。 */
+  /* 2026-11-17 用户改判：目标平台按各自品牌色变化；禁止写死紫色单色。 */
   #app.app-container input[type="checkbox"], #app.app-container .tree-check{
     accent-color: var(--accent);
   }
@@ -205,6 +204,19 @@
   #app.app-container .help-btn:hover{color:var(--text);border-color:var(--accent);color:var(--accent)}
 
   /* 图表控制 */
+  /* 手机端转换设置：默认只留一行摘要，点按钮展开完整控件（桌面不显示摘要）。 */
+  #app.app-container .chart-mobile-summary{display:none}
+  #app.app-container[data-view="mobile"] .chart-mobile-summary{display:flex;align-items:center;gap:6px;
+    flex:0 0 auto;padding:6px 8px;border-bottom:1px solid var(--border);font-size:10.5px;color:var(--muted)}
+  #app.app-container[data-view="mobile"] .chart-mobile-summary .cms-text{flex:1 1 auto;min-width:0;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  #app.app-container[data-view="mobile"] .chart-mobile-summary .cms-toggle{flex:0 0 auto;min-height:30px;
+    padding:4px 9px;font-size:11px}
+  #app.app-container[data-view="mobile"] #chart-card:not(.is-mobile-settings) .chart-controls,
+  #app.app-container[data-view="mobile"] #chart-card:not(.is-mobile-settings) .filename-row,
+  #app.app-container[data-view="mobile"] #chart-card:not(.is-mobile-settings) .quota-head,
+  #app.app-container[data-view="mobile"] #chart-card:not(.is-mobile-settings) .legend,
+  #app.app-container[data-view="mobile"] #chart-card:not(.is-mobile-settings) .extension-tools{display:none}
   #app.app-container .chart-controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:6px 10px;
     border-bottom:1px solid var(--border)}
   #app.app-container .field{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);white-space:nowrap}
@@ -513,9 +525,11 @@
   #app.app-container .pref-extra .et-git{display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--muted)}
   #app.app-container .pref-extmode{display:inline-flex;align-items:center;gap:6px}
   /* 「保留构建配置」与普通勾选同一字号/字重，避免字体突兀。 */
-  #app.app-container .pref-extra .et-keepdev.pref-keepdev{display:inline-flex;align-items:center;gap:5px;
+  #app.app-container .pref-extra .et-keepdev.pref-keepdev,
+  #app.app-container .pref-extra .et-keepdev.pref-keepincompat{display:inline-flex;align-items:center;gap:5px;
     font-size:11px;font-weight:400;color:var(--muted);margin:0;white-space:nowrap;line-height:1.4}
-  #app.app-container .pref-extra .et-keepdev.pref-keepdev input{width:13px;height:13px;margin:0;flex:0 0 auto}
+  #app.app-container .pref-extra .et-keepdev.pref-keepdev input,
+  #app.app-container .pref-extra .et-keepdev.pref-keepincompat input{width:13px;height:13px;margin:0;flex:0 0 auto}
   #app.app-container .pref-extmode .pref-label{color:var(--muted);font-size:11px;white-space:nowrap}
   #app.app-container .asset-guide{margin:0;padding-left:18px;line-height:1.9;font-size:12px}
   #app.app-container .chart-group-head{display:flex;align-items:center;gap:7px;flex-wrap:wrap;padding:0 2px;
@@ -590,8 +604,17 @@
   #app.app-container .vc-c11{--vc:var(--vc-c11)}
   #app.app-container .vc-c12{--vc:var(--vc-c12)}
   #app.app-container .vol-chart{flex:0 0 auto;min-height:84px;padding:12px 14px;border-bottom:1px solid var(--border);
-    display:flex;align-items:center;justify-content:center}
+    display:flex;align-items:center;justify-content:center;box-sizing:border-box}
   #app.app-container .vol-chart.is-empty{display:none}
+  /* 占用条 / 环形的高度可以上下拖动，不再写死（2026-11-17 用户裁定）。 */
+  #app.app-container .vol-chart-resize{flex:0 0 9px;height:9px;cursor:row-resize;touch-action:none;
+    position:relative;background:transparent}
+  #app.app-container .vol-chart-resize::before{content:'';position:absolute;left:12px;right:12px;top:50%;height:2px;
+    transform:translateY(-50%);border-radius:2px;background:color-mix(in srgb,var(--outline) 28%,transparent);
+    transition:background .15s ease}
+  #app.app-container .vol-chart-resize:hover::before,
+  #app.app-container .vol-chart-resize.is-dragging::before{background:var(--outline)}
+  #app.app-container .vol-card:has(.vol-chart.is-empty) .vol-chart-resize{display:none}
   #app.app-container .vc-stack{display:flex;width:100%;height:34px;border-radius:8px;overflow:hidden;
     background:var(--panel-3);gap:1px}
   #app.app-container .vc-seg{display:block;height:100%;flex-basis:0;flex-shrink:0;min-width:3px;
@@ -633,48 +656,48 @@
     border-radius:6px;background:transparent;color:var(--text);font-size:12px;text-align:left;white-space:nowrap}
   #app.app-container .picker-item:hover{background:var(--panel-3)}
   #app.app-container .picker-item[aria-selected="true"]{background:var(--accent-soft)}
-  /* 目标平台统一鲜艳色（唯一真源 src/data/target-ui.js）；文字永远白色，不随主题/平台切换。 */
-  #app.app-container .picker-btn[data-host]{
-    background:var(--target-accent);
-    border-color:var(--target-accent);
-    color:var(--target-ink);
-  }
-  #app.app-container .picker-btn[data-host]:hover{
-    background:var(--target-accent-strong);
-    border-color:var(--target-accent-strong);
-  }
-  #app.app-container .picker-btn[data-host][aria-expanded="true"]{
-    border-color:var(--target-ink);
-  }
-  #app.app-container .picker-btn[data-host] #target-btn-text{
-    color:var(--target-ink);
-    font-weight:650;
-  }
-  #app.app-container .picker-btn[data-host] .caret{color:var(--target-ink-soft)}
-  #app.app-container .picker-btn[data-host] .host-tag{
-    color:var(--target-ink);
-    border-color:var(--target-border);
-  }
-  #app.app-container .picker-btn[data-host] .picker-ico{
-    outline-color:var(--target-ink-soft);
-    background:transparent;
-    padding:0;
-  }
-  #app.app-container .picker-item.is-host{
-    background:var(--target-accent);
-    color:var(--target-ink);
-    font-weight:650;
-  }
-  #app.app-container .picker-item[aria-selected="true"]{
-    background:var(--target-accent);
-    color:var(--target-ink);
-  }
-  #app.app-container .picker-item[aria-selected="true"]:hover{
-    background:var(--target-accent-strong);
-  }
-  #app.app-container .picker-pop{
-    border-color:var(--target-accent);
-  }
+  /* 目标平台按钮必须随目标切换品牌色（2026-11-17 用户改判：禁止写死紫色单色）。 */
+  #app.app-container .picker-btn[data-host]{border-width:1px}
+  #app.app-container .picker-btn[data-host="st"]{
+    background:var(--brand-st);border-color:var(--brand-st);color:var(--brand-st-ink)}
+  #app.app-container .picker-btn[data-host="luker"]{
+    background:var(--brand-luker);border-color:var(--brand-luker);color:var(--brand-luker-ink)}
+  #app.app-container .picker-btn[data-host="tt"]{
+    background:var(--brand-tt);border-color:var(--brand-tt);color:var(--brand-tt-ink)}
+  #app.app-container .picker-btn[data-host="pt"]{
+    background:var(--brand-pt);border-color:var(--brand-pt);color:var(--brand-pt-ink)}
+  #app.app-container .picker-btn[data-host]:hover{filter:brightness(1.08)}
+  #app.app-container .picker-btn[data-host][aria-expanded="true"]{border-color:currentColor}
+  #app.app-container .picker-btn[data-host] #target-btn-text{color:currentColor;font-weight:650}
+  #app.app-container .picker-btn[data-host] .caret{color:currentColor;opacity:.85}
+  #app.app-container .picker-btn[data-host] .host-tag{color:currentColor;border-color:currentColor;opacity:.9}
+  #app.app-container .picker-btn[data-host] .picker-ico{outline-color:currentColor;background:transparent;padding:0}
+  /* Luker 图标是纯黑剪影：深色按钮/条目上必须垫浅色底板，否则“前面的符号”直接消失。 */
+  #app.app-container .picker-btn[data-host="luker"] .picker-ico,
+  #app.app-container .picker-item[data-host="luker"] .picker-ico{
+    background:var(--icon-plate);border-radius:4px;padding:1px}
+  /* 未选中的平台也保留各自品牌浅色底，切换目标一眼看出颜色变化。 */
+  #app.app-container .picker-item[data-host="st"]{background:var(--brand-st-soft)}
+  #app.app-container .picker-item[data-host="luker"]{background:var(--brand-luker-soft)}
+  #app.app-container .picker-item[data-host="tt"]{background:var(--brand-tt-soft)}
+  #app.app-container .picker-item[data-host="pt"]{background:var(--brand-pt-soft)}
+  #app.app-container .picker-item.is-host,
+  #app.app-container .picker-item[aria-selected="true"]{font-weight:650}
+  #app.app-container .picker-item[data-host="st"].is-host,
+  #app.app-container .picker-item[data-host="st"][aria-selected="true"]{
+    background:var(--brand-st);color:var(--brand-st-ink)}
+  #app.app-container .picker-item[data-host="luker"].is-host,
+  #app.app-container .picker-item[data-host="luker"][aria-selected="true"]{
+    background:var(--brand-luker);color:var(--brand-luker-ink)}
+  #app.app-container .picker-item[data-host="tt"].is-host,
+  #app.app-container .picker-item[data-host="tt"][aria-selected="true"]{
+    background:var(--brand-tt);color:var(--brand-tt-ink)}
+  #app.app-container .picker-item[data-host="pt"].is-host,
+  #app.app-container .picker-item[data-host="pt"][aria-selected="true"]{
+    background:var(--brand-pt);color:var(--brand-pt-ink)}
+  #app.app-container .picker-item.is-host:hover,
+  #app.app-container .picker-item[aria-selected="true"]:hover{filter:brightness(1.08)}
+  #app.app-container .picker-pop{border-color:var(--border-strong)}
 
   /* 图表组头：包序号是图表唯一身份；右侧 × 关掉该包图表 */
   #app.app-container .chart-group-head .g-name{font-weight:600}
@@ -746,8 +769,8 @@
   #app.app-container .pkg-icon[data-host="pt"]{border-color:var(--brand-pt-ring)}
   #app.app-container .pkg-icon[data-host="unknown"]{border-color:var(--unknown);opacity:.85}
   #app.app-container .pkg-check-spacer{width:14px;height:14px;flex:0 0 auto}
-  #app.app-container .pkg-icon[data-host="file"]{border-color:var(--target-accent);color:var(--target-accent)}
-  #app.app-container .pkg-icon[data-host="file"] .tree-ico{color:var(--target-accent)}
+  #app.app-container .pkg-icon[data-host="file"]{border-color:var(--accent);color:var(--accent)}
+  #app.app-container .pkg-icon[data-host="file"] .tree-ico{color:var(--accent)}
   /* Luker 的图标是纯黑剪影，深色底上必须垫浅底 */
   #app.app-container .pkg-icon[data-host="luker"], #app.app-container .host-icon[data-host="luker"]{
     background:var(--icon-plate); border-radius:8px; padding:2px}
@@ -768,7 +791,7 @@
   #app.app-container .mini{display:inline-flex;align-items:center;justify-content:center;min-height:var(--ctl-h);
     padding:2px 7px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--panel);
     color:var(--text);font:inherit;font-size:var(--font-xs);line-height:1.2;white-space:nowrap;cursor:pointer}
-  #app.app-container .mini:hover{border-color:var(--target-accent);background:var(--target-accent);color:var(--target-ink)}
+  #app.app-container .mini:hover{border-color:var(--accent);background:var(--accent);color:var(--ink-on-accent)}
   #app.app-container .mini[data-pending-act="remove"]:hover{border-color:var(--drop);background:var(--drop);color:var(--target-ink)}
   #app.app-container .pkg-badge.warn{color:var(--optional);border-color:var(--optional);background:var(--optional-bg)}
   #app.app-container .pkg-badge.unknown{color:var(--unknown);border-color:var(--unknown);background:var(--unknown-bg)}
@@ -1029,6 +1052,15 @@
   #app.app-container .ext-remote-url:hover .ext-repo-slug{color:var(--accent)}
   #app.app-container .ext-remote-url.is-none{cursor:default;color:var(--muted-2)}
   #app.app-container .ext-remote-url.is-none:hover{color:var(--muted-2)}
+  /* 复制仓库地址 = 独立图标按钮；点扩展行/仓库文字不再复制。 */
+  #app.app-container .ext-copy-btn{flex:0 0 auto;width:24px;height:24px;display:inline-flex;align-items:center;
+    justify-content:center;border:1px solid var(--border);border-radius:6px;background:var(--panel);
+    color:var(--muted);padding:0;font-size:11px;cursor:pointer}
+  #app.app-container .ext-copy-btn:hover{color:var(--accent);border-color:var(--accent)}
+  #app.app-container [data-gitopen]{cursor:pointer}
+  #app.app-container [data-gitopen]:hover{color:var(--accent)}
+  #app.app-container .ext-gitopen-target{border-bottom:1px dashed color-mix(in srgb,var(--border) 70%,transparent)}
+  #app.app-container .ext-gitopen-target:hover{border-bottom-color:var(--accent)}
   #app.app-container .ext-link-icon{color:var(--muted);font-size:11px}
   #app.app-container .ext-link-icon:hover{color:var(--accent)}
   #app.app-container .ext-auto{display:inline-flex;align-items:center;gap:4px;flex:0 0 auto}
@@ -1622,37 +1654,65 @@
   #app.app-container[data-view="mobile"] .chart-split-h{display:none !important}
   #app.app-container[data-view="mobile"] .vol-card{overflow:visible;resize:none}
   #app.app-container[data-view="mobile"] .vol-card .chart-tree{max-height:none;overflow:visible}
-  /* 空间不足优先隐藏占用可视化：总体条形/圆环 + 每项占用条一律不显示。 */
-  #app.app-container[data-view="mobile"] .vol-chart{display:none !important}
-  #app.app-container[data-view="mobile"] .vol-fmt{display:none !important}
+  /* 手机端保留占用条/环形与格式切换：高度可拖，信息不被省略。 */
+  #app.app-container[data-view="mobile"] .vol-chart{min-height:64px;padding:8px 10px}
+  #app.app-container[data-view="mobile"] .vol-chart.is-donut .vc-donut{width:72px;height:72px}
+  #app.app-container[data-view="mobile"] .vc-stack{height:24px}
+  #app.app-container[data-view="mobile"] .vol-fmt{display:inline-flex}
   #app.app-container[data-view="mobile"] .tree-occ{display:none !important}
   /* 树行换行：名称完整换行；徽标/模式/批量/体积另起一行，不被裁切。 */
-  #app.app-container[data-view="mobile"] .tree-row{display:grid;grid-template-columns:minmax(0,1fr) auto;
-    grid-template-areas:"main size" "extra extra";align-items:start;column-gap:6px;row-gap:3px;
-    min-height:0;padding:5px 4px 5px calc(4px + var(--depth, 0) * 9px)}
+  /* 手机树行：名称/体积/行内动作同一行；动作不再独占第二行，避免 9 行撑到 970px。 */
+  #app.app-container[data-view="mobile"] .tree-row{display:grid;grid-template-columns:minmax(0,1fr) auto auto;
+    grid-template-areas:"main size extra";align-items:center;column-gap:5px;row-gap:0;
+    min-height:46px;padding:4px 6px 4px calc(6px + var(--depth, 0) * 9px)}
+  #app.app-container[data-view="mobile"] .tree-check{width:20px;height:20px}
+  #app.app-container[data-view="mobile"] .tree-toggle{width:28px;height:28px}
+  #app.app-container[data-view="mobile"] .tree-ico{width:18px;height:18px}
+  #app.app-container[data-view="mobile"] .tree-label{font-size:12.5px}
+  #app.app-container[data-view="mobile"] .tree-size{font-size:11.5px}
+  #app.app-container[data-view="mobile"] .row-bulk{gap:3px}
+  #app.app-container[data-view="mobile"] .row-bulk button{min-width:32px;min-height:32px;font-size:13px}
+  /* 移动端顶部已有全选/全不选/反选；行内批量组会挤掉分类名，直接隐藏，操作不丢。 */
+  #app.app-container[data-view="mobile"] .tree-row .tree-extra .row-bulk{display:none !important}
+  #app.app-container[data-view="mobile"] .tree-mini{min-height:32px;padding:4px 8px;font-size:11.5px}
+  #app.app-container[data-view="mobile"] .tree-keepincompat input{width:18px;height:18px}
+  /* 手机上「保留不兼容」整行小勾隐藏：偏好面板已有完整开关，避免把「私有配置」挤成竖排。 */
+  #app.app-container[data-view="mobile"] .tree-keepincompat{display:none}
+  #app.app-container[data-view="mobile"] .chart-unavailable{margin:4px 6px;padding:5px 8px;font-size:10.5px}
+  #app.app-container[data-view="mobile"] .vol-fmt,
+  #app.app-container[data-view="mobile"] .vol-collapse{width:32px;height:32px}
+  #app.app-container[data-view="mobile"] .icon-btn{width:32px;height:32px}
+  #app.app-container[data-view="mobile"] .pkg-check{width:20px;height:20px}
+  #app.app-container[data-view="mobile"] .pkg-actions button{width:34px;height:34px}
+  #app.app-container[data-view="mobile"] .ext-dev-check input{width:20px;height:20px}
+  #app.app-container[data-view="mobile"] .ext-ext-row{min-height:46px}
+  #app.app-container[data-view="mobile"] .ext-copy-btn{width:32px;height:32px;font-size:12px}
+  #app.app-container[data-view="mobile"] .ext-gitopen-target{min-height:30px;display:inline-flex;align-items:center;padding:2px 6px}
   #app.app-container[data-view="mobile"] .tree-main{grid-area:main;flex:1 1 auto;align-items:flex-start;flex-wrap:nowrap}
-  #app.app-container[data-view="mobile"] .tree-extra{grid-area:extra;display:flex;flex-wrap:wrap;gap:4px;
-    align-items:center;min-width:0}
+  #app.app-container[data-view="mobile"] .tree-extra{grid-area:extra;display:flex;flex-wrap:nowrap;gap:3px;
+    align-items:center;justify-content:flex-end;min-width:0}
   #app.app-container[data-view="mobile"] .tree-extra:empty{display:none}
+  #app.app-container[data-view="mobile"] .tree-row .tree-main{align-items:center}
+  #app.app-container[data-view="mobile"] .tree-row .tree-label{line-height:1.3}
   #app.app-container[data-view="mobile"] .tree-label{flex:1 1 0;min-width:0;white-space:normal;overflow:visible;
     text-overflow:clip;line-height:1.35;overflow-wrap:anywhere}
   #app.app-container[data-view="mobile"] .tree-label .sub{margin-left:4px;white-space:normal}
   #app.app-container[data-view="mobile"] .tree-size{margin-left:auto;flex:0 0 auto;padding-top:1px}
   #app.app-container[data-view="mobile"] .tree-children{padding-left:8px;margin-left:4px}
-  #app.app-container[data-view="mobile"] .tree-pill{font-size:9px;padding:0 4px}
+  #app.app-container[data-view="mobile"] .tree-pill{font-size:10px;padding:1px 5px}
   #app.app-container[data-view="mobile"] .tree-pill .pill-sym{display:inline}
   #app.app-container[data-view="mobile"] .tree-pill .pill-txt{display:none}
-  #app.app-container[data-view="mobile"] .ext-suggest{padding:0 5px;margin-left:2px;font-size:9px}
+  #app.app-container[data-view="mobile"] .ext-suggest{padding:1px 5px;margin-left:2px;font-size:10px}
   #app.app-container[data-view="mobile"] .ext-suggest .sug-sym{display:inline}
   #app.app-container[data-view="mobile"] .ext-suggest .sug-txt{display:none}
-  #app.app-container[data-view="mobile"] .extmode-btn{padding:0 4px;font-size:9px;line-height:16px}
+  #app.app-container[data-view="mobile"] .extmode-btn{padding:0 6px;font-size:10.5px;line-height:20px;min-height:26px}
   #app.app-container[data-view="mobile"] .extmode-btn .em-sym{display:inline}
   #app.app-container[data-view="mobile"] .extmode-btn .em-txt{display:none}
   #app.app-container[data-view="mobile"] .tree-extmode{gap:2px;margin-left:2px}
   #app.app-container[data-view="mobile"] .row-bulk{margin-left:0}
   #app.app-container[data-view="mobile"] .vol-head{row-gap:3px;padding:5px 6px}
-  #app.app-container[data-view="mobile"] .vol-head .vol-total{font-size:9.5px}
-  #app.app-container[data-view="mobile"] .vol-head .vol-bulk button{padding:0 4px;font-size:9px}
+  #app.app-container[data-view="mobile"] .vol-head .vol-total{font-size:10.5px}
+  #app.app-container[data-view="mobile"] .vol-head .vol-bulk button{padding:0 6px;font-size:11px;min-height:28px}
   /* 手机任务队列：类型帧藏起来，名称完整换行；详情单列。 */
   #app.app-container[data-view="mobile"] .lq-summary{grid-template-columns:56px minmax(0,1fr) 38px 12px;gap:5px}
   #app.app-container[data-view="mobile"] .lq-type{display:none}
@@ -1660,7 +1720,10 @@
     line-height:1.35;overflow-wrap:anywhere}
   #app.app-container[data-view="mobile"] #view-log .latest{display:none}
   #app.app-container[data-view="mobile"] #view-log .log-toolbar{gap:2px}
-  #app.app-container[data-view="mobile"] #view-log .log-toolbar button{font-size:8.5px;padding:1px 3px;border-radius:4px}
+  #app.app-container[data-view="mobile"] #view-log .log-toolbar button{font-size:10.5px;padding:3px 6px;border-radius:5px;min-height:28px}
+  #app.app-container[data-view="mobile"] .lq-status,
+  #app.app-container[data-view="mobile"] .lq-count,
+  #app.app-container[data-view="mobile"] .lq-pct{font-size:10.5px}
   #app.app-container[data-view="mobile"] .lq-detail-grid{grid-template-columns:58px minmax(0,1fr)}
   #app.app-container[data-view="mobile"] .vol-collapse{display:inline-flex}
   #app.app-container[data-view="mobile"] .chart-stack > .chart-group:only-child .vol-card{height:auto}
@@ -1683,13 +1746,22 @@
   /* 手机页头：**宽度够就显示标题**，放不下整名降级为项目符号 ⇄（2026-11-15 裁定：禁止省略号）；
      徽标文字必须保留（U1/U2）。不再无条件 display:none。 */
   #app.app-container[data-view="mobile"] .app-title{display:flex;flex:0 1 auto;min-width:0}
-  #app.app-container[data-view="mobile"] #host-badge{flex:0 0 auto;height:21px;padding:0 8px;font-size:9.5px;
+  #app.app-container[data-view="mobile"] #host-badge{flex:0 0 auto;height:24px;padding:0 8px;font-size:10.5px;
     border-color:var(--border-strong)}
   #app.app-container[data-view="mobile"] .badge .host-icon,
   #app.app-container[data-view="mobile"] .badge .gh-icon,
   #app.app-container[data-view="mobile"] .badge .web-icon{width:11px;height:11px;left:5px}
   #app.app-container[data-view="mobile"] .header-actions{gap:4px;margin-left:auto}
   #app.app-container[data-view="mobile"] .header-actions .icon-btn{flex:0 0 auto}
+  /* 手机触控尺寸：不允许把复选框/行内动作压到 10px 级，避免误触。 */
+  #app.app-container[data-view="mobile"] .view-switch-btn{min-height:36px;padding:6px 10px;font-size:12px}
+  #app.app-container[data-view="mobile"] .chart-controls{gap:6px}
+  #app.app-container[data-view="mobile"] .chart-controls .field{font-size:11.5px}
+  #app.app-container[data-view="mobile"] .chart-controls select,
+  #app.app-container[data-view="mobile"] .chart-controls input,
+  #app.app-container[data-view="mobile"] .chart-controls .picker-btn{min-height:32px;height:32px}
+  #app.app-container[data-view="mobile"] .vol-chart-resize{flex-basis:14px;height:14px}
+  #app.app-container[data-view="mobile"] .legend{font-size:10.5px;gap:8px}
   /* 手机面板头**单行**（2026-11-15 裁定，推翻 2026-11-11 的两行布局）：
      视图切换与面板动作同排，切换行放不下整排退化为纯图标，绝不换行。 */
   #app.app-container[data-view="mobile"] .panel-head--switch > .panel-title--zone{display:none}
@@ -1697,6 +1769,31 @@
   #app.app-container[data-view="mobile"] .panel-title .source-chip{max-width:150px}
   #app.app-container .zone-mobile-close{display:none}
   #app.app-container[data-view="mobile"][data-zone-open="1"] .zone-mobile-close{display:inline-flex;margin-left:auto}
+  /* 手机数据包下拉：列表顶部整行「收起」条（2026-11-17 用户裁定）。
+     放在面板头之前、zone-body 之外，滚动列表时始终可见，不再被教程横幅或面板头挤掉。 */
+  #app.app-container .zone-mobile-collapse-bar{display:none}
+  #app.app-container[data-view="mobile"][data-zone-open="1"] .zone-mobile-collapse-bar{
+    display:flex;align-items:center;justify-content:space-between;gap:8px;flex:0 0 auto;
+    padding:6px 10px;border-bottom:1px solid var(--border);
+    background:color-mix(in srgb,var(--panel-3) 88%,transparent)}
+  #app.app-container .zone-mobile-collapse-bar .zmcb-title{font-size:12px;font-weight:650;color:var(--text);
+    min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  #app.app-container .zone-mobile-collapse-bar .zmcb-btn{display:inline-flex;align-items:center;justify-content:center;gap:5px;
+    flex:0 0 auto;min-height:36px;padding:0 12px;font-size:12px;line-height:1;
+    border:1px solid var(--border);border-radius:7px;background:var(--panel-3);color:var(--text)}
+  /* 手机数据包下拉已有整行收起条：旧的空面板头（只剩一个 ×）整行隐藏，少一行。 */
+  #app.app-container[data-view="mobile"][data-zone-open="1"] #zone-card > .panel-head{display:none}
+  #app.app-container .zone-mobile-collapse-bar .zmcb-btn:hover{border-color:var(--accent);color:var(--accent)}
+  /* 手机云端配置：表单单列、按钮两列、徽标隐藏，避免 390px 下挤成一条。 */
+  #app.app-container[data-view="mobile"] #cloud-provider-tag{display:none}
+  #app.app-container[data-view="mobile"] .cloud-view{padding:8px}
+  #app.app-container[data-view="mobile"] .cloud-card{padding:9px 10px;gap:7px}
+  #app.app-container[data-view="mobile"] .cloud-grid{grid-template-columns:minmax(0,1fr)}
+  #app.app-container[data-view="mobile"] .cloud-field.span-2,
+  #app.app-container[data-view="mobile"] .cloud-check.span-2{grid-column:auto}
+  #app.app-container[data-view="mobile"] .cloud-guide-group{grid-template-columns:minmax(0,1fr)}
+  #app.app-container[data-view="mobile"] .cloud-action-buttons .btn{flex:1 1 120px;font-size:10.5px;padding:5px 7px}
+  #app.app-container[data-view="mobile"] .cloud-card-header{flex-wrap:wrap}
   #app.app-container[data-view="mobile"] .ext-last-scan-tip{padding:2px 5px}
   #app.app-container[data-view="mobile"] .ext-last-scan-tip .ext-last-scan-text{max-width:85px;overflow:hidden;text-overflow:ellipsis}
   /* 手机扩展行：repo（即插件名）→ 作者 → 版本/完整-清单，自动更新控件另起一行。 */
@@ -1820,29 +1917,29 @@
 #app.app-container .transfer-subtabs{flex:0 0 auto;padding:6px 12px 0;display:flex;align-items:center;gap:8px}
 #app.app-container .transfer-subpane{flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
 #app.app-container .transfer-subpane[hidden]{display:none}
-#app.app-container .cloud-view, #app.app-container #cloud-view{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;gap:10px;padding:10px 12px;overflow-y:auto;overflow-x:hidden}
+#app.app-container .cloud-view, #app.app-container #cloud-view{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;gap:8px;padding:8px 10px;overflow-y:auto;overflow-x:hidden}
 #app.app-container #cloud-view[hidden]{display:none}
-#app.app-container .cloud-card{display:flex;flex-direction:column;gap:10px;padding:12px 14px;border-radius:10px;
+#app.app-container .cloud-card{display:flex;flex-direction:column;gap:8px;padding:10px 12px;border-radius:10px;
   border:1px solid var(--border);background:color-mix(in srgb,var(--panel-3) 55%,transparent);
   box-shadow:0 2px 8px rgba(0,0,0,0.12);transition:border-color .2s cubic-bezier(0.16,1,0.3,1),box-shadow .2s cubic-bezier(0.16,1,0.3,1)}
 #app.app-container .cloud-card:hover{border-color:var(--border-strong)}
-#app.app-container .cloud-card-header{display:flex;align-items:center;justify-content:space-between;gap:8px;padding-bottom:8px;
+#app.app-container .cloud-card-header{display:flex;align-items:center;justify-content:space-between;gap:6px;padding-bottom:6px;
   border-bottom:1px solid color-mix(in srgb,var(--border) 60%,transparent)}
 #app.app-container .cloud-card-header .cch-title{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:650;color:var(--text)}
 #app.app-container .cloud-card-header .cch-title i{color:var(--accent);font-size:13px}
 #app.app-container .cloud-card-header .cch-tag{font-size:10px;font-weight:550;padding:1px 7px;border-radius:999px;
   background:color-mix(in srgb,var(--panel) 80%,transparent);color:var(--muted);border:1px solid var(--border)}
-#app.app-container .cloud-provider-header{padding-bottom:10px}
+#app.app-container .cloud-provider-header{padding-bottom:7px}
 #app.app-container .cloud-provider-tabs{display:inline-flex;border-radius:8px;padding:2px;background:var(--panel-3);border:1px solid var(--border)}
 #app.app-container .cloud-provider-tabs .seg-btn{display:inline-flex;align-items:center;gap:6px;padding:3px 12px;font-size:11.5px;font-weight:600;border-radius:6px;transition:all .18s cubic-bezier(0.16,1,0.3,1)}
 #app.app-container .cloud-provider-tabs .seg-btn.active{background:color-mix(in srgb,var(--accent) 20%,var(--panel));border-color:var(--accent);color:var(--accent);box-shadow:0 1px 4px rgba(0,0,0,0.2)}
-#app.app-container .cloud-body{display:flex;flex-direction:column;gap:10px;padding:0;min-height:0}
-#app.app-container .cloud-note-box{display:flex;align-items:flex-start;gap:7px;padding:7px 10px;border-radius:6px;
+#app.app-container .cloud-body{display:flex;flex-direction:column;gap:8px;padding:0;min-height:0}
+#app.app-container .cloud-note-box{display:flex;align-items:flex-start;gap:5px;padding:5px 8px;border-radius:6px;
   background:color-mix(in srgb,var(--panel) 60%,transparent);border:1px solid color-mix(in srgb,var(--border) 60%,transparent);
-  font-size:11px;line-height:1.4;color:var(--muted)}
+  font-size:10.5px;line-height:1.35;color:var(--muted)}
 #app.app-container .cloud-note-box i{flex:0 0 auto;margin-top:2px;color:var(--accent);font-size:11px}
-#app.app-container .cloud-note{font-size:11px;line-height:1.4;color:var(--muted);margin:0}
-#app.app-container .cloud-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 12px;align-items:end}
+#app.app-container .cloud-note{font-size:10.5px;line-height:1.35;color:var(--muted);margin:0}
+#app.app-container .cloud-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 10px;align-items:end}
 #app.app-container .cloud-field.span-2{grid-column:span 2}
 #app.app-container .cloud-check.span-2{grid-column:span 2}
 #app.app-container .cloud-field{display:flex;flex-direction:column;gap:4px;font-size:10.5px;font-weight:550;color:var(--muted);min-width:0}
@@ -1851,7 +1948,9 @@
 #app.app-container .cloud-field .text_pole:focus{border-color:var(--accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 25%,transparent)}
 #app.app-container .cloud-check{display:inline-flex;align-items:center;gap:7px;font-size:11px;color:var(--muted);white-space:nowrap;cursor:pointer;user-select:none;margin-top:2px}
 #app.app-container .cloud-check input{margin:0;accent-color:var(--accent)}
-#app.app-container .cloud-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+#app.app-container .cloud-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+#app.app-container .cloud-action-buttons .btn{flex:1 1 150px;min-width:0;justify-content:center;padding:5px 10px}
+#app.app-container .cloud-action-buttons .btn span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #app.app-container .cloud-btn-primary{font-weight:650;padding:6px 14px;box-shadow:0 2px 6px color-mix(in srgb,var(--accent) 30%,transparent);
   transition:all .18s cubic-bezier(0.16,1,0.3,1)}
 #app.app-container .cloud-btn-primary:not(:disabled):hover{transform:translateY(-1px);box-shadow:0 4px 12px color-mix(in srgb,var(--accent) 45%,transparent)}
@@ -1860,9 +1959,10 @@
   transition:all .2s ease;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #app.app-container .cloud-picked.is-selected{background:color-mix(in srgb,var(--accent) 18%,transparent);color:var(--accent);border:1px solid var(--accent);font-weight:600}
 #app.app-container .cloud-picked.is-empty{color:var(--muted);border:1px dashed var(--border);background:var(--panel-3)}
-#app.app-container .cloud-status{font-size:11px;color:var(--text);min-height:16px;font-family:Consolas,monospace;padding:2px 4px}
-#app.app-container .cloud-guide-group{display:flex;flex-direction:column;gap:6px}
-#app.app-container .cloud-test-box{margin-top:4px;font-size:11px;border-radius:6px;animation:extRowFadeIn .2s ease-out}
+#app.app-container .cloud-status{font-size:11px;color:var(--text);font-family:Consolas,monospace;padding:1px 4px}
+#app.app-container .cloud-status:empty{display:none}
+#app.app-container .cloud-guide-group{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+#app.app-container .cloud-test-box{margin-top:0;font-size:10.5px;border-radius:6px;animation:extRowFadeIn .2s ease-out}
 #app.app-container .cloud-list{display:flex;flex-direction:column;gap:4px}
 #app.app-container .cloud-item{display:flex;align-items:center;gap:8px;padding:6px 10px;border:1px solid var(--border);border-radius:7px;font-size:11px;
   background:color-mix(in srgb,var(--panel-3) 40%,transparent);transition:all .16s ease}

@@ -4,8 +4,8 @@
     {
       "name": "ST-pack-transfer-preview",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "preview", "--", "--port", "4173", "--strictPort"],
-      "port": 4173
+      "runtimeArgs": ["run", "preview", "--", "--port", "3040", "--strictPort"],
+      "port": 3040
     }
   ]
 }

@@ -50,6 +50,11 @@ export function getWorkbenchHtml() {
             </div>
           </div>
 
+          <div class="chart-mobile-summary" id="chart-mobile-summary">
+            <span class="cms-text" id="chart-mobile-summary-text"></span>
+            <button type="button" class="btn cms-toggle" id="chart-mobile-settings-toggle" aria-expanded="false" data-i18n="chart.mobileSettings"></button>
+          </div>
+
           <div class="chart-controls">
             <div class="field"><span data-i18n="chart.target"></span>
               <div class="picker" id="target-select">
@@ -269,8 +274,6 @@ export function getWorkbenchHtml() {
             <div class="cloud-row cloud-action-buttons">
               <button type="button" class="btn accent cloud-btn-primary" id="cloud-backup-selected"><i class="fa-solid fa-cloud-arrow-up"></i> <span data-i18n="cloud.backupSelected"></span></button>
               <button type="button" class="btn cloud-btn-secondary" id="cloud-upload" disabled><i class="fa-solid fa-upload"></i> <span data-i18n="cloud.upload"></span></button>
-            </div>
-            <div class="cloud-row cloud-action-buttons">
               <button type="button" class="btn accent cloud-btn-primary" id="cloud-auto-backup"><i class="fa-solid fa-bolt"></i> <span data-i18n="cloud.autoBackup"></span></button>
             </div>
             <div class="cloud-note-box"><i class="fa-solid fa-bolt"></i> <div class="cloud-note" data-i18n="cloud.autoBackupHint"></div></div>
@@ -368,6 +371,13 @@ export function getWorkbenchHtml() {
 
       <div class="col-side">
         <section class="panel zone-card" id="zone-card">
+          <div class="zone-mobile-collapse-bar" id="zone-mobile-collapse-bar">
+            <span class="zmcb-title" data-i18n="zones.title"></span>
+            <button type="button" class="btn zmcb-btn" id="zone-mobile-collapse" data-i18n-title="zones.collapse" data-i18n-aria="zones.collapse">
+              <span data-i18n="zones.collapseShort"></span>
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg>
+            </button>
+          </div>
           <div class="panel-head panel-head--switch">
             <div class="panel-title panel-title--zone">
               <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 7h16v13H4z"/><path d="M8 7V4h8v3"/><path d="M4 12h16"/></svg>

@@ -75,6 +75,14 @@ export function onLocaleChange(fn) {
   return () => listeners.delete(fn);
 }
 
+/** 是否存在某个 key（当前语言或回退语言任一有值即可）；用于避免把中文标签当 key 去查。 */
+export function hasKey(key, locale = getLocale()) {
+  const k = String(key || '');
+  if (!k) return false;
+  const dict = LOCALES[locale] || LOCALES[FALLBACK];
+  return typeof dict[k] === 'string' || typeof LOCALES[FALLBACK][k] === 'string';
+}
+
 export function t(key, params = {}) {
   const dict = LOCALES[getLocale()] || LOCALES[FALLBACK];
   let value = dict[key];

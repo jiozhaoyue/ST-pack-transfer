@@ -12,8 +12,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 npm test                          # Vitest 全量（当前 934 passed / 2 skipped / 95 文件）
 npx vitest run test/xxx.test.js   # 单文件
 npx vitest run -t "用例名"         # 单条用例
-npm run dev                       # 开发热重载（仅开发；**UI 验收不用它**）
-npm run build && npm run preview  # UI 验收：本地静态服务器托管 dist（4173）
+npm run dev                       # 开发热重载（仅开发；**UI 验收不用它**），本地端口 3040
+npm run build && npm run preview  # UI 验收：本地静态服务器托管 dist（同一端口 3040）
 npm run build                     # vite build --base=./（产出 GitHub Pages 静态站点）
 npm run e2e                       # 实例侧 E2E（需要 Dev 实例在跑；只许连 Dev，见 e2e/lib/guard.cjs）
 npm run e2e:web                   # 独立 Web / 云子路径形态 E2E（**不需要实例**；自己起静态服务器）
@@ -28,7 +28,9 @@ npm run gen-fixtures              # 重新生成测试固件 fixtures/
 
 无独立 lint/typecheck 命令——类型契约靠 JSDoc + 运行时目标守卫，质量门槛就是 `npm test` 全绿。
 
-**UI 验收只走** `npm run build && npm run preview`（本地静态服务器 4173）；禁止 `file://` 或 `npm run dev` 作为验收入口（2026-11-09 用户裁定）。按用户禁令，不得跑全量/大内存测试，只跑目标小测试。
+**UI 验收只走** `npm run build && npm run preview`（本地静态服务器 3040，与 dev 共用唯一端口）；禁止 `file://` 或 `npm run dev` 作为验收入口（2026-11-09 用户裁定）。按用户禁令，不得跑全量/大内存测试，只跑目标小测试。
+
+**改端口**：只改 `vite.config.js` 的 `LOCAL_PORT`（默认 `3040`），或启动时设置环境变量 `PORT`；dev / preview / 本地静态服务共用这一处，不另开第二端口。
 
 ## 高层架构（跨文件才能看懂的部分）
 
@@ -381,7 +383,7 @@ npm run gen-fixtures              # 重新生成测试固件 fixtures/
 - **`8000` 为出厂默认，禁止直接使用**：任何脚本/CI/服务启动不得绑定或请求 8000，需要 ST 兼容默认值的场景必须显式覆盖环境变量/配置（不改上游分发物）；
 - **`3000` 划归系统保留**：任何酒馆项目不再使用（实测被系统 `svchost` 实占，且多个工具默认撞车）；
 - **周边工具自 `3010` 起申请**（Tavern-Viewer → 3010、TavernHeadless → 3020、PureTavern remote-server 显式注入 3030），间隔 10 为后续同类工具留号；
-- 已登记独占端口：`8899`（PureTavern web dev，`strictPort`）、`4173`（Vite preview）、`8233`（nocturne 后端内部）、`6080`（noVNC）。
+- 已登记独占端口：`8899`（PureTavern web dev，`strictPort`）、`3040`（本仓本地 dev / preview 唯一端口）、`8233`（nocturne 后端内部）、`6080`（noVNC）。
 
 **原因**：8000 六处出厂默认互抢、3000 三方撞车（工具默认 + 系统实占）都是实测形态；且 Dev/Real 实例仅差 1 个端口，端口混乱直接放大误连真实数据的风险（P-11/P-14/P-15）。
 

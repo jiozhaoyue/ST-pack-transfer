@@ -30,6 +30,10 @@ try {
   }
 } catch { /* 非 git 环境：保留发布提交回退与发布摘要 */ }
 
+/* 本地服务唯一端口：dev / preview 共用；改这里或设置环境变量 PORT 即可。
+   L0-16：5173 是 Vite 默认端口，禁止占用（env-sync 桌面应用的 Tauri devUrl 就是它）。 */
+const LOCAL_PORT = Number(process.env.PORT) || 3040;
+
 export default defineConfig({
   base: './',
   define: {
@@ -42,15 +46,13 @@ export default defineConfig({
     format: 'es',
   },
   // 端口显式声明 + strictPort（L0-16：禁止占用出厂/通用默认端口）。
-  // 5173 是 Vite 默认端口，**不能占**——env-sync 桌面应用的 Tauri `devUrl` 就是
-  // `http://localhost:5173`，占用它会使其 GUI 窗口加载到本插件页面（2026-09-25 实测事故）。
+  // dev 与 preview 共用 LOCAL_PORT：同一时间只跑一个本地服务，绝不再开第二端口。
   server: {
-    port: 3040,
+    port: LOCAL_PORT,
     strictPort: true,
   },
-  // 4173 已在 L0-16 登记为 Vite preview
   preview: {
-    port: 4173,
+    port: LOCAL_PORT,
     strictPort: true,
   },
 });

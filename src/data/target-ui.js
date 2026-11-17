@@ -1,16 +1,15 @@
 /**
- * 目标平台 UI 配色（唯一真源）。
+ * 目标平台 UI 配色映射。
  *
- * 用户 2026-11-17 裁定：
- * - 目标平台所有按钮/区域统一使用同一鲜艳色；
- * - 按钮内文字始终白色，不随主题或目标平台切换；
- * - 不要在 CSS 里写死这些值；改本文件即可整体调整。
+ * 2026-11-17 用户改判：目标平台按钮必须按各自品牌色变化，禁止再好写死单一紫色。
+ * 具体色值唯一真源是 `src/data/ui-tokens.js` 的 brand 令牌；
+ * 本文件只把宿主码映射到对应的 CSS 变量名，供测试/文档核对。
  */
 export const TARGET_UI = Object.freeze({
-  accent: '#6c5ce7',
-  accentStrong: '#5a4bd1',
-  accentSoft: 'rgba(108, 92, 231, 0.20)',
-  ink: '#ffffff',
-  inkSoft: 'rgba(255, 255, 255, 0.86)',
-  border: 'rgba(255, 255, 255, 0.55)',
+  byHost: Object.freeze({
+    st: Object.freeze({ accent: 'var(--brand-st)', ink: 'var(--brand-st-ink)', ring: 'var(--brand-st-ring)' }),
+    luker: Object.freeze({ accent: 'var(--brand-luker)', ink: 'var(--brand-luker-ink)', ring: 'var(--brand-luker-ring)' }),
+    tt: Object.freeze({ accent: 'var(--brand-tt)', ink: 'var(--brand-tt-ink)', ring: 'var(--brand-tt-ring)' }),
+    pt: Object.freeze({ accent: 'var(--brand-pt)', ink: 'var(--brand-pt-ink)', ring: 'var(--brand-pt-ring)' }),
+  }),
 });

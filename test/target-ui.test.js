@@ -16,11 +16,13 @@ describe('target platform UI metadata', () => {
     expect(NAMING_TARGETS).toEqual(TARGET_PLATFORMS.map(({ code, name }) => ({ code, name })));
   });
 
-  it('uses one vivid accent with always-white target ink', () => {
-    expect(TARGET_UI.ink).toBe('#ffffff');
-    expect(TARGET_UI.accent).toMatch(/^#[0-9a-f]{6}$/i);
-    expect(TARGET_UI.accentStrong).toMatch(/^#[0-9a-f]{6}$/i);
-    expect(TARGET_UI.accentSoft).toMatch(/^rgba?\(/);
+  it('maps every target host to its own brand tokens (no fixed purple single accent)', () => {
+    expect(Object.keys(TARGET_UI.byHost)).toEqual(['st', 'luker', 'tt', 'pt']);
+    for (const host of ['st', 'luker', 'tt', 'pt']) {
+      expect(TARGET_UI.byHost[host].accent).toBe(`var(--brand-${host})`);
+      expect(TARGET_UI.byHost[host].ink).toBe(`var(--brand-${host}-ink)`);
+      expect(TARGET_UI.byHost[host].ring).toBe(`var(--brand-${host}-ring)`);
+    }
   });
 
   it('does not reintroduce per-target accent overrides or a local TARGETS array', () => {

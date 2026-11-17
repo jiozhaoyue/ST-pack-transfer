@@ -42,12 +42,16 @@ describe('铁律门禁：全 UI 绝对禁止重复语义按钮与非架构孤岛
     expect(viewContent).not.toContain('ext-bottom-actions');
   });
 
-  it('铁律 5：目标平台统一主色，由 target-ui.js 单一真源驱动，禁止 per-target 覆盖全局 accent', () => {
+  it('铁律 5：目标平台按钮按各自品牌色变化，禁止写死单一紫色主色', () => {
     const cssContent = fs.readFileSync(cssPath, 'utf-8');
-    // 2026-11-17 用户裁定：四个目标平台统一鲜艳色 + 白字，颜色只从 --target-accent* 消费。
-    expect(cssContent).toMatch(/#app\.app-container \.picker-btn\[data-host\]\s*\{[^}]*background:var\(--target-accent\)/);
-    expect(cssContent).toMatch(/#app\.app-container \.picker-btn\[data-host\]\s*\{[^}]*color:var\(--target-ink\)/);
-    // 禁止重新引入按目标平台覆盖全局主题色（会把整个界面染成平台色）。
+    // 2026-11-17 用户改判：四个目标平台分别消费 --brand-*，切换目标必须变色。
+    for (const host of ['st', 'luker', 'tt', 'pt']) {
+      expect(cssContent).toMatch(new RegExp(`\\.picker-btn\\[data-host="${host}"\\]\\s*\\{[^}]*background:var\\(--brand-${host}\\)`));
+      expect(cssContent).toMatch(new RegExp(`\\.picker-btn\\[data-host="${host}"\\]\\s*\\{[^}]*color:var\\(--brand-${host}-ink\\)`));
+    }
+    // 不再允许固定紫色 --target-accent 作为目标平台主色。
+    expect(cssContent).not.toContain('--target-accent');
+    // 禁止按目标平台覆盖全局主题色（会把整个界面染成平台色）。
     expect(cssContent).not.toMatch(/#app\.app-container\[data-target-host=["'][^"']+["']\]\s*\{[^}]*--accent:/);
   });
 

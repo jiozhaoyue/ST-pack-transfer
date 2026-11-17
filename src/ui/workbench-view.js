@@ -10,6 +10,7 @@
  */
 
 import { chartTreeFor, deriveExportOptions, deriveCategorySelection, annotateChatLinks, counterpartsOf, CHART_GROUPS, SPLIT_MIN, SPLIT_MAX } from '../core/chart-model.js';
+import { demoTree, demoUnknownTree } from '../core/demo-tree.js';
 import {
   applyExtensionPackModes,
   extensionPackModeSummary,
@@ -60,7 +61,7 @@ import {
 } from '../core/git-oauth.js';
 import { createGitRemote } from './git-remote.js';
 import { gitSiteIcon } from './git-icons.js';
-import { t } from '../i18n/index.js';
+import { hasKey, t } from '../i18n/index.js';
 import { logger } from '../core/logger.js';
 import { loadSettings, saveSettings } from './settings-store.js';
 import { normalizeUpdateInterval, updatePolicyOf, updateBackoffDelay, applyWebTheme } from './settings-panel.js';
@@ -70,7 +71,6 @@ import { loadChartPrefs, saveChartPrefs, normalizeChartPrefs } from './chart-pre
 import demoExtensionsData from '../data/demo-extensions.js';
 import { TARGET_PLATFORMS } from '../data/target-platforms.js';
 import { applyUiTokens } from '../data/ui-tokens.js';
-import { TARGET_UI } from '../data/target-ui.js';
 
 /**
  * 教程锚点纯几何：用 overlay 自身矩形做基准，兼容宿主容器的 transform。
@@ -233,13 +233,6 @@ const ICO = {
 function svg(name, cls){ return '<svg class="'+(cls||'tree-ico')+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">'+(ICO[name]||ICO.file)+'</svg>'; }
 
 /* ── 数据模型 ── */
-function node(id,label,mb,suggest,opts){
-  opts = opts || {};
-  return { id, label, mb, suggest, icon:opts.icon||'folder', children:opts.children||[],
-    checked: opts.checked!==undefined ? opts.checked : (suggest==='keep'||suggest==='private'),
-    expanded: !!opts.expanded, badge:opts.badge||'', note:opts.note||'', privateConfig:!!opts.privateConfig,
-    uploadable:!!opts.uploadable };
-}
 function hostNodes(host){
   const nodes = state.hostTree || [];
   applyIncompatibleDefault(nodes);
@@ -353,11 +346,17 @@ function persistLog() {
 const CHART_LAYOUT_KEY = 'stpt.chartLayout';
 
 function normalizeChartLayout(input){
-  const out = { col: 0.5, rows: [] };
+  const out = { col: 0.5, rows: [], charts: {} };
   if(input && typeof input === 'object'){
     const col = Number(input.col);
     if(Number.isFinite(col)) out.col = Math.max(0.2, Math.min(0.8, col));
     if(Array.isArray(input.rows)) out.rows = input.rows.map((n)=>Math.max(0.15, Math.min(0.85, Number(n)||0.5)));
+    if(input.charts && typeof input.charts === 'object'){
+      for(const [key, value] of Object.entries(input.charts)){
+        const h = Number(value);
+        if(Number.isFinite(h) && h >= 48 && h <= 600) out.charts[String(key)] = Math.round(h);
+      }
+    }
   }
   return out;
 }
@@ -550,10 +549,10 @@ function isExtensionPackageMode(){
 }
 /** 包内单选：同步 active/selected/extSelected/source/引擎，唯一真源。 */
 function selectPackageForExtension(id){
-  const pkg=(state.packages||[]).find((p)=>p && p.id===id && p.zone!=='export') || null;
+  const pkg=(state.packages||[]).find((p)=>p && p.id===id) || null;
   state.extSelectedPackageId = pkg ? pkg.id : '';
+  /* 扩展包内选择是独立单选，不覆盖数据包列表的批量复选框选择。 */
   state.activePkgs = new Set(pkg ? [pkg.id] : []);
-  state.selectedPkgs = new Set(pkg ? [pkg.id] : []);
   syncSourceToActive();
   autoEngineForPackage(pkg);
 }
@@ -900,13 +899,7 @@ function renderTargetPicker(){
   }
   const app=document.getElementById('app');
   if(app){
-    /* 统一鲜艳色 + 永远白色文字：唯一真源 src/data/target-ui.js，禁止在 CSS 里写死。 */
-    app.style.setProperty('--target-accent', TARGET_UI.accent);
-    app.style.setProperty('--target-accent-strong', TARGET_UI.accentStrong);
-    app.style.setProperty('--target-accent-soft', TARGET_UI.accentSoft);
-    app.style.setProperty('--target-ink', TARGET_UI.ink);
-    app.style.setProperty('--target-ink-soft', TARGET_UI.inkSoft);
-    app.style.setProperty('--target-border', TARGET_UI.border);
+    /* 颜色由 CSS 按 cur.host 直接消费 --brand-* 令牌；此处只标记当前目标宿主。 */
     app.setAttribute('data-target-host', cur.host);
   }
   /* 存储引擎只对 Luker 目标开放：其他宿主没有这三种后端，显示出来只会误导。 */
@@ -983,7 +976,8 @@ function restoreViewPkgs(){
   const key=currentViewKey();
   const mem=state.viewPkgMem[key]||VIEW_PKG_MEM_DEFAULT;
   const alive=new Set(state.packages.map((p)=>p.id));
-  state.activePkgs=new Set((mem.active||[]).filter((id)=>alive.has(id)));
+  /* 外框框选只允许一个：旧记录即使存了多个，也最多恢复第一个。 */
+  state.activePkgs=new Set((mem.active||[]).filter((id)=>alive.has(id)).slice(0,1));
   state.selectedPkgs=new Set((mem.checked||[]).filter((id)=>alive.has(id)));
   syncSourceToActive();
 }
@@ -1091,15 +1085,11 @@ let siSeq=0;
 const SI_DOTS=8;
 
 function siEntryLabel(entry){
-  if(entry?.labelKey) {
-    const direct=t(entry.labelKey);
-    if(direct && direct!==entry.labelKey) return direct;
-  }
+  if(entry?.labelKey && hasKey(entry.labelKey)) return t(entry.labelKey);
   const raw=String(entry?.label ?? entry?.key ?? '');
-  // 智能分类与别名全量走 i18n，彻底杜绝技术名词与英文混杂
+  // 智能分类与别名全量走 i18n；只有 key 真实存在才翻译，绝不把中文标签拼成 key 去刷缺键告警。
   const catKey='si.cat.'+(entry?.categoryKey || entry?.key || raw);
-  const transCat=t(catKey);
-  if(transCat && transCat!==catKey) return transCat;
+  if(hasKey(catKey)) return t(catKey);
   return raw;
 }
 function siEntryCount(entry){
@@ -1153,11 +1143,11 @@ function renderStorageInspector(){
       const last=i===crumbs.length-1;
       let text='';
       if(c.labelKey==='si.root') text=si.source==='host'?t('si.rootHost'):t('si.rootBrowser');
-      else if(c.labelKey) text=t(c.labelKey);
+      else if(c.labelKey) text=hasKey(c.labelKey)?t(c.labelKey):String(c.labelKey);
       else text=String(c.label??'');
       // 已知类目走 i18n；原始数据库/仓库名保持原样，不强行中文化。
-      const fallbackCat=t('si.cat.'+text);
-      if(fallbackCat && fallbackCat!=='si.cat.'+text) text=fallbackCat;
+      const fallbackKey='si.cat.'+text;
+      if(hasKey(fallbackKey)) text=t(fallbackKey);
       text=escapeHtml(text);
       if(last) return '<span class="si-crumb is-current">'+text+'</span>';
       return '<button type="button" class="si-crumb" data-si-crumb="'+i+'">'+text+'</button>'
@@ -1382,9 +1372,10 @@ function selectedMbMap(nodes, scope){
   return map;
 }
 function volColorClass(index){ return 'vc-c'+((Math.max(1,index)-1)%VC_PALETTE_SIZE+1); }
-function volChartHtml(nodes, fmt, mbMap){
+function volChartHtml(nodes, fmt, mbMap, height){
   const { items, total } = volChartData(nodes, mbMap);
   if(!items.length) return '<div class="vol-chart is-empty" data-volchart="1"></div>';
+  const heightStyle = Number(height) > 0 ? ' style="height:'+Math.round(height)+'px"' : '';
   if(fmt==='donut'){
     let offset = 25;
     const arcs = items.map((it,i)=>{
@@ -1396,13 +1387,13 @@ function volChartHtml(nodes, fmt, mbMap){
       offset -= shown;
       return arc;
     }).join('');
-    return '<div class="vol-chart is-donut" data-volchart="1"><svg class="vc-donut" viewBox="0 0 42 42" role="img">'+arcs+'</svg></div>';
+    return '<div class="vol-chart is-donut"'+heightStyle+' data-volchart="1"><svg class="vc-donut" viewBox="0 0 42 42" role="img">'+arcs+'</svg></div>';
   }
   const segs = items.map((it,i)=>{
     const p = total ? it.mb/total*100 : 0;
     return '<i class="vc-seg '+volColorClass(i+1)+'" style="flex-grow:'+p.toFixed(2)+'" title="'+escapeHtml(it.label)+' · '+fmtMB(it.mb)+'"></i>';
   }).join('');
-  return '<div class="vol-chart is-bar" data-volchart="1"><div class="vc-stack">'+segs+'</div></div>';
+  return '<div class="vol-chart is-bar"'+heightStyle+' data-volchart="1"><div class="vc-stack">'+segs+'</div></div>';
 }
 function volColorMap(nodes, mbMap){
   const map = {};
@@ -1497,6 +1488,12 @@ function extUrlMapOf(pkgs){
   return map;
 }
 
+function chartHeightOf(key){
+  const value = Number(state.chartLayout?.charts?.[key]);
+  if(!Number.isFinite(value) || value <= 0) return 0;
+  const max = state.view === 'mobile' ? 260 : 600;
+  return Math.round(Math.max(48, Math.min(max, value)));
+}
 function chartCardHtml(o, place){
   const maxed = state.volMaxKey === o.key;
   const collapsed = !maxed && (state.collapsedVol[o.key]!==undefined ? !!state.collapsedVol[o.key] : !!o.defaultCollapsed);
@@ -1581,7 +1578,10 @@ function chartCardHtml(o, place){
     +(maxed ? volBreadcrumbHtml(o) : '')
     +'<div class="vol-body">'
       +(o.noticeHtml||'')
-      +volChartHtml(scopeNodes, fmt, selectedMap)
+      +volChartHtml(scopeNodes, fmt, selectedMap, chartHeightOf(o.key))
+      +((volChartData(scopeNodes, selectedMap).items.length)
+        ? '<div class="vol-chart-resize" data-volresize="'+escapeHtml(o.key)+'" role="separator" aria-orientation="horizontal" title="'+escapeHtml(t('chart.dragChartHeight'))+'"></div>'
+        : '')
       +(o.extToolsHtml||'')
       +'<div class="chart-tree">'+renderTreeRows(scopeNodes,0,o.scope,o.readonly||dis,groupToolsOf(o),selectedTotal,maxed,colorMap,undefined,selectedMap)+'</div>'
       +(dis?'':('<div class="chart-foot"><span>'+t('chart.selected',{count:sum.count,size:fmtMB(sum.mb)})+'</span>'
@@ -1771,10 +1771,29 @@ function chartCanvasHtml(defs){
   });
   return html + '</div>';
 }
+function renderChartMobileSummary(){
+  const text=document.getElementById('chart-mobile-summary-text');
+  if(text){
+    const split = state.splitMb ? (state.splitMb+' MB') : t('chart.splitPlaceholder');
+    text.textContent=t('chart.mobileSummary',{
+      target: state.target,
+      compression: t('chart.compression'+state.compression),
+      split,
+    });
+  }
+  const card=document.getElementById('chart-card');
+  const btn=document.getElementById('chart-mobile-settings-toggle');
+  if(card && btn){
+    const open=card.classList.contains('is-mobile-settings');
+    btn.textContent=t(open?'chart.mobileSettingsClose':'chart.mobileSettings');
+    btn.setAttribute('aria-expanded', open?'true':'false');
+  }
+}
 function renderChart(){
   state.seq=pkgSeq();
   const targets=chartTargets();
   renderQuota();
+  renderChartMobileSummary();
   renderBatchBar(targets);
   const stack=document.getElementById('chart-stack');
   if(!stack) return;
@@ -1937,6 +1956,7 @@ function chartPrefsHtml(){
         +'<option value="strip"'+(state.gitMode===GIT_MODES.STRIP?' selected':'')+'>'+t('extension.gitStrip')+'</option>'
       +'</select></label>'
       +'<label class="check et-keepdev pref-keepdev"><input type="checkbox" data-prefkeepdev'+(state.keepDev?' checked':'')+'> '+t('chart.prefsKeepDev')+'</label>'
+      +'<label class="check et-keepdev pref-keepincompat" title="'+escapeHtml(t('chart.prefsKeepIncompatibleHint'))+'"><input type="checkbox" data-prefkeepincompat'+(state.keepIncompatible!==false?' checked':'')+'> '+t('chart.prefsKeepIncompatible')+'</label>'
     +'</div>'
     +'<div class="pref-actions">'
       +'<button type="button" class="btn" id="pref-cancel">'+t('chart.prefsCancel')+'</button>'
@@ -1950,6 +1970,7 @@ function openChartPrefs(){
     target: state.target, targetManual: state.targetManual,
     splitMb: state.splitMb, compression: state.compression,
     extensionMode: state.extensionMode, gitMode: state.gitMode, keepDev: state.keepDev,
+    keepIncompatible: state.keepIncompatible,
     filenameTemplate: state.filenameTemplate,
   };
   state.prefDraft = normalizeChartPrefs(chartPrefs);
@@ -1962,6 +1983,7 @@ function openChartPrefs(){
   state.extensionMode = chartPrefs.extensionMode;
   state.gitMode = chartPrefs.gitMode;
   state.keepDev = chartPrefs.keepDev;
+  state.keepIncompatible = chartPrefs.keepIncompatible !== false;
   syncTopControls();
   renderChart();
 }
@@ -1976,7 +1998,7 @@ function cancelChartPrefs(){
 function chartPrefsDirty(){
   if(!state.prefMode) return false;
   const snap = state.prefSnapshot || {};
-  const fields = ['target','splitMb','compression','filenameTemplate','extensionMode','gitMode','keepDev'];
+  const fields = ['target','splitMb','compression','filenameTemplate','extensionMode','gitMode','keepDev','keepIncompatible'];
   if(fields.some((k)=>state[k] !== snap[k])) return true;
   const draft = state.prefDraft || normalizeChartPrefs(chartPrefs);
   const base = normalizeChartPrefs(chartPrefs);
@@ -1995,6 +2017,8 @@ function toggleChartPrefs(){
 }
 function saveChartPrefsDraft(){
   const checked = [...document.querySelectorAll('[data-prefgroup]:checked')].map((el)=>el.dataset.prefgroup);
+  const keepIncompatEl = document.querySelector('[data-prefkeepincompat]');
+  if (keepIncompatEl) state.keepIncompatible = !!keepIncompatEl.checked;
   const next = {
     checkedGroups: checked,
     target: targetCodeOf(state.target),
@@ -2004,6 +2028,7 @@ function saveChartPrefsDraft(){
     extensionMode: state.prefDraft?.extensionMode || state.extensionMode,
     gitMode: state.gitMode,
     keepDev: state.keepDev,
+    keepIncompatible: state.keepIncompatible !== false,
   };
   /* 演示模式只改内存，不落 localStorage；退出时随快照整体还原。 */
   chartPrefs = state.tutorialMode ? normalizeChartPrefs(next) : saveChartPrefs(next);
@@ -2255,6 +2280,22 @@ function renderZoneModeRow(){
    不提供检出 / 提交 / 合并；历史被清理就如实显示「历史已丢失」。 */
 /* Git 页签常显（用户 2026-11-11 裁定：看不到等于没有；不再用开发者模式开关藏起来）。 */
 function sideTabAllowed(){ return true; }
+/** 版本号点击：把数据包列的 Git 页签打开；手机端同时展开数据包下拉并滚到 Git 面板。 */
+function openGitVizFor(name){
+  if(!name) return;
+  state.gitViz.name=name;
+  state.sideTab='git';
+  if(state.view==='mobile'){
+    const app=document.getElementById('app');
+    if(app) app.dataset.zoneOpen='1';
+    renderViewSwitch();
+    syncMainView();
+  }
+  renderZoneSide();
+  if(state.view==='mobile'){
+    document.getElementById('zone-side-git')?.scrollIntoView({ behavior:'smooth', block:'start' });
+  }
+}
 function renderZoneSide(){
   const allowed=sideTabAllowed();
   if(!allowed) state.sideTab='zone';
@@ -3906,10 +3947,12 @@ function formatExtRemoteUrlHtmlInner(rawUrl, fallbackName = ''){
   }
 
   const shownRepo=repoName||slug||url;
-  return '<span class="ext-remote-url" data-copyurl="'+escapeHtml(url)+'" title="'+escapeHtml(url)+' · '+t('extmgr.clickToCopy')+'">'
+  return '<span class="ext-remote-url" title="'+escapeHtml(url)+'">'
     +'<span class="ext-site-badge" title="'+escapeHtml(siteName)+'">'+siteIcon+'</span>'
     +'<span class="ext-repo" title="'+escapeHtml(shownRepo)+'">'+escapeHtml(shownRepo)+'</span>'
     +(author?'<span class="ext-author" title="'+escapeHtml(author)+'">'+escapeHtml(author)+'</span>':'')
+    +'<button type="button" class="ext-copy-btn" data-copyurl="'+escapeHtml(url)+'" title="'+t('extmgr.copyUrl')+'" aria-label="'+t('extmgr.copyUrl')+'">'
+      +'<i class="fa-regular fa-copy"></i></button>'
   +'</span>';
 }
 /** 扩展来源标记：只标「全局」（本地是常态，不再重复打断阅读）。 */
@@ -4513,7 +4556,7 @@ function packageExtensionItems(pkg){
       name,
       version: String(m.version || m.branch || m.ref || ''),
       kind: 'manifest',
-      url: String(m.url || m.link || ''),
+      url: String(m.url || m.link || m.homePage || m.homepage || ''),
       entry: m,
     });
   }
@@ -4530,16 +4573,27 @@ function packageExtensionItems(pkg){
   for(const e of rawExts){
     const name = String(e.name || e.id || e.folder || '').trim();
     if(!name) continue;
+    /* 包内实体扩展也要带版本/仓库地址：版本号开 Git、独立复制按钮都依赖它。 */
+    const manifest = e.manifest || e.entry?.manifest || {};
+    const gitMeta = e.gitMeta || {};
+    const sourceRecord = e.sourceRecord || {};
+    const url = String(e.url || manifest.homePage || manifest.homepage || gitMeta.remoteUrl || sourceRecord.remote_url || '');
+    const version = String(e.version || manifest.version || '');
     if(seen.has(name)){
       const hit = items.find(i => i.name === name);
-      if(hit) { hit.kind = 'original'; hit.hasManifest = true; }
+      if(hit) {
+        hit.kind = 'original';
+        hit.hasManifest = true;
+        if(!hit.url && url) hit.url = url;
+        if(!hit.version && version) hit.version = version;
+      }
     } else {
       seen.add(name);
       items.push({
         name,
-        version: String(e.version || ''),
+        version,
         kind: 'original',
-        url: String(e.url || ''),
+        url,
         entry: e,
         mb: e.mb || 0,
         files: e.files || 0,
@@ -4629,11 +4683,11 @@ async function renderExtInstalled(body){
   const sort=['custom','name','version','source','order'].includes(s.extSort)?s.extSort:'custom';
 
   const autoMasterOn=!!loadSettings().extAutoToolsOn;
-  /* 包内页签只认导入区数据包，且永远只有一个选中（唯一真源 extSelectedPackageId）。 */
-  const importPkgs = (state.packages||[]).filter(p=>p && p.id && p.zone!=='export');
-  let selectedPkg = importPkgs.find(p=>p.id===state.extSelectedPackageId)
-    || importPkgs.find(p=>(state.activePkgs||new Set()).has(p.id))
-    || importPkgs[0] || null;
+  /* 包内页签可查看任何已载入的数据包（导入区与导出区都算），且永远只有一个选中。 */
+  const selectablePkgs = (state.packages||[]).filter(p=>p && p.id);
+  let selectedPkg = selectablePkgs.find(p=>p.id===state.extSelectedPackageId)
+    || selectablePkgs.find(p=>(state.activePkgs||new Set()).has(p.id))
+    || selectablePkgs[0] || null;
   if(!isHost && selectedPkg){
     state.extSelectedPackageId = selectedPkg.id;
     if(!(state.activePkgs && state.activePkgs.size===1 && state.activePkgs.has(selectedPkg.id))){
@@ -4645,9 +4699,9 @@ async function renderExtInstalled(body){
     + '<span class="ext-pkg-current'+(selectedPkg?'':' is-unselected')+'" title="'+(selectedPkg?escapeHtml(selectedPkg.name):t('extmgr.noPackageSelected'))+'">'
       + '<i class="fa-solid fa-box"></i> '+(selectedPkg?escapeHtml(selectedPkg.name):t('extmgr.noPackageSelected'))
     + '</span>'
-    + '<select class="ext-pkg-picker" id="extmgr-package-select"'+(importPkgs.length?'':' disabled')+'>'
-      + (importPkgs.length
-        ? importPkgs.map(p=>'<option value="'+escapeHtml(p.id)+'"'+(selectedPkg&&selectedPkg.id===p.id?' selected':'')+'>'+escapeHtml(p.name)+' · '+fmtMB(p.mb||0)+'</option>').join('')
+    + '<select class="ext-pkg-picker" id="extmgr-package-select"'+(selectablePkgs.length?'':' disabled')+'>'
+      + (selectablePkgs.length
+        ? selectablePkgs.map(p=>'<option value="'+escapeHtml(p.id)+'"'+(selectedPkg&&selectedPkg.id===p.id?' selected':'')+'>'+escapeHtml(p.name)+' · '+fmtMB(p.mb||0)+(p.zone==='export'?' · '+t('zones.export'):'')+'</option>').join('')
         : '<option value="">'+t('extmgr.noPackageAvailable')+'</option>')
     + '</select>'
   + '</div>');
@@ -4693,15 +4747,15 @@ async function renderExtInstalled(body){
       if (scanSt === 'scanning') {
         versionBadge = '<span class="ext-state ext-version-badge is-scanning" title="'+t('extmgr.scanScanning')+'"><i class="fa-solid fa-spinner fa-spin"></i> '+(escapeHtml(version)||'-')+' ('+t('extmgr.scanScanning')+')</span>';
       } else if (scanRes?.status === 'update') {
-        versionBadge = '<span class="ext-state ext-version-badge is-update" data-extscan-single="'+escapeHtml(name)+'" title="'+t('extmgr.statusUpdate')+' · '+t('extmgr.singleScanHint')+'"><i class="fa-solid fa-arrow-up"></i> '+(escapeHtml(version)||'-')+' → '+(escapeHtml(scanRes.remoteVersion)||'-')+' ('+t('extmgr.statusUpdate')+')</span>';
+        versionBadge = '<span class="ext-state ext-version-badge is-update" data-gitopen="'+escapeHtml(name)+'" title="'+t('extmgr.statusUpdate')+' · '+t('extmgr.openGitHint')+'"><i class="fa-solid fa-arrow-up"></i> '+(escapeHtml(version)||'-')+' → '+(escapeHtml(scanRes.remoteVersion)||'-')+' ('+t('extmgr.statusUpdate')+')</span>';
       } else if (scanRes?.status === 'latest') {
-        versionBadge = '<span class="ext-state ext-version-badge is-latest" data-extscan-single="'+escapeHtml(name)+'" title="'+t('extmgr.statusLatest')+' · '+t('extmgr.singleScanHint')+'"><i class="fa-solid fa-check"></i> '+(escapeHtml(version)||'-')+' ('+t('extmgr.statusLatest')+')</span>';
+        versionBadge = '<span class="ext-state ext-version-badge is-latest" data-gitopen="'+escapeHtml(name)+'" title="'+t('extmgr.statusLatest')+' · '+t('extmgr.openGitHint')+'"><i class="fa-solid fa-check"></i> '+(escapeHtml(version)||'-')+' ('+t('extmgr.statusLatest')+')</span>';
       } else if (scanRes?.status === 'ahead') {
-        versionBadge = '<span class="ext-state ext-version-badge is-ahead" data-extscan-single="'+escapeHtml(name)+'" title="'+t('extmgr.statusAhead')+' · '+t('extmgr.singleScanHint')+'"><i class="fa-solid fa-code-commit"></i> '+(escapeHtml(version)||'-')+' ('+t('extmgr.statusAhead')+')</span>';
+        versionBadge = '<span class="ext-state ext-version-badge is-ahead" data-gitopen="'+escapeHtml(name)+'" title="'+t('extmgr.statusAhead')+' · '+t('extmgr.openGitHint')+'"><i class="fa-solid fa-code-commit"></i> '+(escapeHtml(version)||'-')+' ('+t('extmgr.statusAhead')+')</span>';
       } else if (scanRes?.status === 'failed') {
-        versionBadge = '<span class="ext-state ext-version-badge is-failed" data-extscan-single="'+escapeHtml(name)+'" title="'+escapeHtml(scanRes.reason||'error')+' · '+t('extmgr.singleScanHint')+'"><i class="fa-solid fa-triangle-exclamation"></i> '+(escapeHtml(version)||'-')+' ('+t('extmgr.scanFailed')+')</span>';
+        versionBadge = '<span class="ext-state ext-version-badge is-failed" data-gitopen="'+escapeHtml(name)+'" title="'+escapeHtml(scanRes.reason||'error')+' · '+t('extmgr.openGitHint')+'"><i class="fa-solid fa-triangle-exclamation"></i> '+(escapeHtml(version)||'-')+' ('+t('extmgr.scanFailed')+')</span>';
       } else {
-        versionBadge = '<span class="ext-state ext-version-badge is-local" data-extscan-single="'+escapeHtml(name)+'" title="'+t('extmgr.singleScanHint')+'">'+escapeHtml(version || '-')+'</span>';
+        versionBadge = '<span class="ext-state ext-version-badge is-local" data-gitopen="'+escapeHtml(name)+'" title="'+t('extmgr.openGitHint')+'">'+escapeHtml(version || '-')+'</span>';
       }
       return '<div class="ext-entry is-ok ext-ext-row'+(isCurrentGit?' is-active':'')+'" role="listitem" draggable="'+(sort==='custom'?'true':'false')+'" data-extrow="'+escapeHtml(name)+'">'
         +(sort==='custom'?'<span class="ext-drag" title="'+t('extmgr.dragHint')+'">'+gripSvg()+'</span>':'')
@@ -4722,7 +4776,7 @@ async function renderExtInstalled(body){
       rowsHtml = '<div class="ext-empty ext-pkg-empty-hint" role="status">'
         + '<div class="ext-empty-icon"><i class="fa-solid fa-box-open"></i></div>'
         + '<div class="ext-empty-title">' + t('extmgr.noPackageSelected') + '</div>'
-        + '<div class="ext-empty-desc">' + (importPkgs.length ? t('extmgr.noPackageSelectedDesc') : t('extmgr.noPackageAvailable')) + '</div>'
+        + '<div class="ext-empty-desc">' + (selectablePkgs.length ? t('extmgr.noPackageSelectedDesc') : t('extmgr.noPackageAvailable')) + '</div>'
         + '</div>';
     } else {
       logger.info(t('log.extPkgReading', { name: selectedPkg.name, size: fmtMB(selectedPkg.mb || 0) }));
@@ -4741,7 +4795,7 @@ async function renderExtInstalled(body){
           return '<div class="ext-entry is-ok ext-ext-row ext-pkg-row'+(isCurrentGit?' is-active':'')+'" role="listitem" data-extrow="'+escapeHtml(item.name)+'" style="animation-delay:'+Math.min(idx*35,350)+'ms">'
             +'<label class="check ext-dev-check"><input type="checkbox" data-extsel="'+escapeHtml(item.name)+'"></label>'
             +repoLink
-            +'<span class="ext-state">'+escapeHtml(item.version)+'</span>'
+            +'<span class="ext-state ext-version-badge is-local ext-gitopen-target" data-gitopen="'+escapeHtml(item.name)+'" title="'+t('extmgr.openGitHint')+'">'+(escapeHtml(item.version)||'-')+'</span>'
             +kindBadge
             +'</div>';
         }).join('');
@@ -4952,29 +5006,24 @@ async function renderExtInstalled(body){
     });
   }
 
-  /* 单击行联动右侧 Git 视图；手机（2026-11-15 用户裁定）点击扩展行即进入 Git 可视化视图 */
+  /* 扩展行点击 = 单框选（只高亮一个），不复制、不跳 Git；
+     复制地址走独立图标，版本号点击才打开 Git 可视化。 */
   body.querySelectorAll('.ext-ext-row').forEach((row)=>{
     row.addEventListener('click',(e)=>{
-      if(e.target.closest('input, select, label, button, .ext-drag, a')) return;
+      if(e.target.closest('input, select, label, button, .ext-drag, a, [data-copyurl], [data-gitopen]')) return;
       const name=row.dataset.extrow;
       if(!name) return;
       state.gitViz.name=name;
       body.querySelectorAll('.ext-ext-row').forEach((r)=>r.classList.toggle('is-active', r.dataset.extrow===name));
-      if(state.view==='mobile'){
-        state.sideTab='git';
-        renderZoneSide();
-        document.getElementById('zone-side-git')?.scrollIntoView({ behavior:'smooth', block:'start' });
-      }
-      renderGitViz();
     });
   });
 
-  /* 单项徽标点击：懒加载检查该项更新 */
-  body.querySelectorAll('[data-extscan-single]').forEach((badge)=>{
-    badge.addEventListener('click',(e)=>{
+  /* 版本号点击：打开 Git 可视化（移动端同时展开数据包抽屉并滚到 Git 面板）。 */
+  body.querySelectorAll('[data-gitopen]').forEach((el)=>{
+    el.addEventListener('click',(e)=>{
       e.stopPropagation();
-      const name=badge.dataset.extscanSingle;
-      if(name) void scanSingleExtensionVersion(name);
+      const name=el.dataset.gitopen;
+      if(name) openGitVizFor(name);
     });
   });
 
@@ -5670,7 +5719,8 @@ function renderCloud() {
       picked.innerHTML = '<i class="fa-solid fa-circle-check"></i> ' + t('cloud.selectedCount', { n: state.selectedPkgs.size });
     } else {
       picked.className = 'cloud-picked is-empty';
-      picked.innerHTML = '<i class="fa-regular fa-circle-question"></i> ' + t('cloud.noPackSelectedHint');
+      picked.innerHTML = '<i class="fa-regular fa-circle-question"></i> '
+        + t(state.view === 'mobile' ? 'cloud.noPackSelectedHintMobile' : 'cloud.noPackSelectedHint');
     }
   }
   const upload = document.getElementById('cloud-upload');
@@ -6393,63 +6443,39 @@ function cloneDemoState(){
   }
   return cloneDemoValue(state);
 }
+/* 教程树由 src/core/demo-tree.js 的真实 buildChartTree 生成；此处不再维护手写树。 */
 function buildDemoPackages(){
   const L=(k)=>t('demo.'+k);
-  const gb=(mb)=>Math.round((mb/1024)*100)/100;
-  /* 演示数据：四个宿主全覆盖、同宿主多包、体积覆盖 16 MB – 4 GB；导出区同样多条。 */
-  /* 教程必须覆盖 Luker 四种存储引擎（fs / postgres / mysql / sqlite）：
-     数据库源包在树上要能看到引擎载体，否则用户不知道 _engine_dump.bin 为何不能删。 */
-  const tree=(mb,engine='fs')=>{
-    const nodes=[
-      node('group:characters',L('characters'),gb(mb*0.12),'keep',{icon:'user',expanded:true,children:[
-        node('char:demo-1','Mira',gb(mb*0.07),'keep',{icon:'user'}),
-        node('char:demo-2','Kai',gb(mb*0.05),'keep',{icon:'user'}),
-      ]}),
-      node('group:chats',L('chats'),gb(mb*0.45),'keep',{icon:'chat',expanded:true,children:[
-        node('chat:demo-1',L('chatMira'),gb(mb*0.28),'keep',{icon:'chat'}),
-        node('chat:demo-2',L('chatKai'),gb(mb*0.17),'keep',{icon:'chat'}),
-      ]}),
-      node('group:worldinfo',L('worldinfo'),gb(mb*0.15),'keep',{icon:'book',children:[
-        node('world:demo-1',L('world'),gb(mb*0.10),'keep',{icon:'book'}),
-        node('world:demo-2',L('lore'),gb(mb*0.05),'optional',{icon:'book'}),
-      ]}),
-      node('group:presets',L('presets'),gb(mb*0.03),'optional',{icon:'sliders'}),
-      node('group:images',L('images'),gb(mb*0.15),'optional',{icon:'image'}),
-      node('group:extensions',L('extensions'),gb(mb*0.10),'keep',{icon:'puzzle',children:[
-        node('ext:demo-1',L('extOne'),gb(mb*0.10),'keep',{icon:'puzzle'}),
-      ]}),
-      node('group:vectors',L('vectors'),0,'drop',{icon:'brain'}),
-    ];
-    if(engine==='postgres'||engine==='mysql'){
-      nodes.push(node('group:engine',L('engineCarrier'),gb(mb*0.02),'keep',{icon:'db',expanded:true,children:[
-        node('engine:meta','_engine_meta.json',0.01,'keep',{icon:'file'}),
-        node('engine:dump','_engine_dump.bin',gb(mb*0.02),'keep',{icon:'file'}),
-      ]}));
-    }else if(engine==='sqlite'){
-      nodes.push(node('group:engine',L('engineCarrier'),gb(mb*0.02),'keep',{icon:'db',expanded:true,children:[
-        node('engine:sqlite','luker-storage.sqlite',gb(mb*0.02),'keep',{icon:'db'}),
-      ]}));
-    }
-    return nodes;
-  };
-  const mk=(id,name,host,mb,time,zone,engine='')=>({
-    id, name, host, size: mb>=1024 ? (mb/1024)+' GB' : mb+' MB', time, mb, zone,
-    origin:'demo', unrecognized:false, sourceEngine:engine||undefined, nodes:tree(mb,engine),
+  /* 与真实包同形状的扩展元数据：版本号开 Git、独立复制按钮在教程里也能验证。 */
+  const demoExtensions=[
+    { name:'ST-BgLoader', manifest:{ version:'1.2.0', homePage:'https://github.com/example/ST-BgLoader' } },
+    { name:'ST-zip-converter', manifest:{ version:'0.9.1', homePage:'https://github.com/example/ST-zip-converter' } },
+  ];
+  /* zipMb = 压缩包体积（列表/下载看到的大小）；rawMb = 解压恢复到宿主后的体积。
+     两者必须不同：树按 rawMb 构建，图表压缩预估再按压缩模型算回 zipMb 附近。 */
+  const mk=(id,name,host,zipMb,rawMb,time,zone,engine='')=>({
+    id, name, host, size:fmtMB(zipMb), mb:zipMb, rawMb, uncompressedMb:rawMb, time, zone,
+    origin:'demo', unrecognized:host==='unknown', sourceEngine:engine||undefined,
+    extensions: demoExtensions.map((item)=>({
+      name:item.name, manifest:{ ...item.manifest },
+    })),
+    nodes: host==='unknown' ? demoUnknownTree(rawMb) : demoTree(rawMb,host,engine),
   });
   return [
-    mk('demo-st-4g','st_full_backup_4g.zip','st',4096,'09:12','import'),
-    mk('demo-st-512','st_userdata_512m.zip','st',512,L('timeYesterday'),'import'),
-    mk('demo-luker-15g','luker_fs_backup_1.5g.zip','luker',1536,'08:40','import','fs'),
-    mk('demo-luker-96','luker_postgres_96m.zip','luker',96,L('timeOlder'),'import','postgres'),
-    mk('demo-luker-320','luker_mysql_320m.zip','luker',320,'08:35','import','mysql'),
-    mk('demo-luker-64','luker_sqlite_64m.zip','luker',64,'08:30','import','sqlite'),
-    mk('demo-tt-640','tauritavern_demo_640m.zip','tt',640,L('timeOlder'),'import'),
-    mk('demo-pt-16','puretavern_min_16m.zip','pt',16,'07:55','import'),
-    { id:'demo-unknown-48', name:'unknown_layout_48m.zip', host:'unknown', size:'48 MB',
-      time:L('timeOlder'), mb:48, zone:'import', origin:'demo', unrecognized:true, nodes:[] },
-    mk('demo-exp-st-2g','demo_st_export_2g.zip','st',2048,'09:20','export'),
-    mk('demo-exp-luker-256','demo_luker_export_256m.zip','luker',256,'09:18','export','postgres'),
-    mk('demo-exp-pt-32','demo_pt_export_32m.zip','pt',32,'09:16','export'),
+    /* zip 体积：一个极小（4.2 MB）+ 一个极大（2.4 GB），其余日常区间；
+       raw 体积约为 zip 的 2 倍，保证「预估压缩后 / 解压后」不再相同。 */
+    mk('demo-st-small','st_userdata_2026-11-15.zip','st',4.2,8.9,'09:12','import'),
+    mk('demo-st-normal','st_backup_2026-11-14.zip','st',128.0,246.8,L('timeYesterday'),'import'),
+    mk('demo-luker-fs','luker_fs_2026-11-15.zip','luker',386.7,812.4,'08:40','import','fs'),
+    mk('demo-luker-pg','luker_postgres_2026-11-13.zip','luker',742.5,1486.0,L('timeOlder'),'import','postgres'),
+    mk('demo-luker-mysql','luker_mysql_2026-11-12.zip','luker',96.4,201.5,'08:35','import','mysql'),
+    mk('demo-luker-sqlite','luker_sqlite_2026-11-11.zip','luker',32.4,68.9,'08:30','import','sqlite'),
+    mk('demo-tt-large','tauritavern_data_2026-11-14.zip','tt',2457.6,4915.2,L('timeOlder'),'import'),
+    mk('demo-pt-normal','puretavern_archive_2026-11-15.zip','pt',64.0,126.7,'07:55','import'),
+    mk('demo-unknown','unknown_layout_2026-11-10.zip','unknown',18.6,37.2,L('timeOlder'),'import'),
+    mk('demo-exp-st','st_export_2026-11-16.zip','st',212.8,428.6,'09:20','export'),
+    mk('demo-exp-luker','luker_export_2026-11-16.zip','luker',48.0,96.4,'09:18','export','postgres'),
+    mk('demo-exp-pt','puretavern_export_2026-11-16.zip','pt',8.6,17.9,'09:16','export'),
   ];
 }
 /**
@@ -6467,14 +6493,8 @@ function demoPackageStats(){
   };
 }
 function buildDemoHostTree(){
-  const L=(k)=>t('demo.'+k);
-  return [
-    node('group:characters',L('characters'),40,'keep',{icon:'user'}),
-    node('group:chats',L('chats'),180,'keep',{icon:'chat'}),
-    node('group:worldinfo',L('worldinfo'),25,'keep',{icon:'book'}),
-    node('group:images',L('images'),60,'optional',{icon:'image'}),
-    node('group:vectors',L('vectors'),12,'drop',{icon:'brain'}),
-  ];
+  /* 宿主树同样走真实 buildChartTree：结构随真实分组被动变化。 */
+  return demoTree(1142.4, state.host || 'st', state.engine || 'fs');
 }
 /* 演示动作：默认全部拦截（只提示）；少数动作在演示数据上做本地模拟，绝不触达真实通道。 */
 function demoTutorialActions(real){
@@ -6483,11 +6503,9 @@ function demoTutorialActions(real){
   for(const key of Object.keys(real||{})){
     wrap[key]=typeof real[key]==='function' ? demoOnly : real[key];
   }
-  const pending=(name,mb)=>({ id:'demo-'+Date.now()+'-'+Math.random().toString(36).slice(2,6), name, blob:{ size:mb*1048576 } });
   wrap.generate=()=>{
     if(!state.selectedPkgs.size){ toast(t('zones.selectHint')); return; }
-    state.pendingExports=[pending('demo_converted.zip',96), ...(state.pendingExports||[])];
-    renderZones(); renderActions();
+    /* 教程只提示“已模拟”，不再伪造 demo_converted.zip 之类的待导出项。 */
     toast(t('toast.tutorialSimulated'));
   };
   wrap.deleteSelected=(ids)=>{
@@ -6626,7 +6644,8 @@ function enterTutorialMode(){
   state.hostTree=buildDemoHostTree();
   state.storage={ browser:{ used:9.4*DEMO_GB, total:32*DEMO_GB }, host:null, page:{ available:false } };
   state.storageInspector={ open:false, source:'browser', path:[], data:null, loading:false, error:null };
-  state.pendingExports=[{ id:'demo-export-seed', name:'demo_converted.zip', blob:{ size:96*1048576 } }];
+  /* 教程进入时不得伪造任何待导出项；用户主动操作也不生成假包。 */
+  state.pendingExports=[];
   state.task=null;
   state.prefMode=false; state.prefDraft=null; state.prefSnapshot=null;
   state.delta=false; state.mergeMode=false;
@@ -7018,6 +7037,10 @@ function bind(){
     e.stopPropagation();
     closeMobileZonePanel();
   });
+  document.getElementById('zone-mobile-collapse')?.addEventListener('click',(e)=>{
+    e.stopPropagation();
+    closeMobileZonePanel();
+  });
   document.getElementById('extmgr-tabs')?.addEventListener('click',(e)=>{
     const b=e.target.closest('[data-exttab]'); if(!b) return;
     state.extTab=b.dataset.exttab; state.extReportOpen=false;
@@ -7264,6 +7287,16 @@ function bind(){
   }
 
   document.getElementById('chart-pref-btn')?.addEventListener('click', toggleChartPrefs);
+  document.getElementById('chart-mobile-settings-toggle')?.addEventListener('click',()=>{
+    const card=document.getElementById('chart-card');
+    if(!card) return;
+    const open=card.classList.toggle('is-mobile-settings');
+    const btn=document.getElementById('chart-mobile-settings-toggle');
+    if(btn){
+      btn.textContent=t(open?'chart.mobileSettingsClose':'chart.mobileSettings');
+      btn.setAttribute('aria-expanded', open?'true':'false');
+    }
+  });
 
   const stackEl=document.getElementById('chart-stack');
   const scopeFromEl=el=>{ const h=el.closest('[data-scope]'); return h?h.dataset.scope:null; };
@@ -7432,6 +7465,8 @@ function bind(){
     }
     const prefKeepDev=e.target.closest('[data-prefkeepdev]');
     if(prefKeepDev){ state.keepDev = !!prefKeepDev.checked; return; }
+    const prefKeepIncompat=e.target.closest('[data-prefkeepincompat]');
+    if(prefKeepIncompat){ state.keepIncompatible = !!prefKeepIncompat.checked; return; }
     const keepDev=e.target.closest('[data-keepdev]');
     if(keepDev){ state.keepDev = !!keepDev.checked; return; }
     const keepIncompat=e.target.closest('[data-keepincompat]');
@@ -7553,27 +7588,25 @@ function bind(){
         renderZones(); renderExtensionView();
         return;
       }
-      const wasActive=state.activePkgs.has(id);
       if(state.transfer.open){
+        /* 外框只做单框选；批量多选一律走复选框。 */
         const pkg=(state.packages||[]).find(p=>p.id===id);
-        if(state.selectedPkgs.has(id)){
-          state.selectedPkgs.delete(id);
-          if(pkg) logger.info(t('log.pkgUnchecked', { name: pkg.name, total: state.selectedPkgs.size }));
-        }else{
-          state.selectedPkgs.add(id);
-          autoEngineForPackage(pkg);
-          if(pkg) logger.info(t('log.pkgChecked', { name: pkg.name, size: fmtMB(pkg.mb||0), total: state.selectedPkgs.size }));
-        }
+        const already=state.selectedPkgs.size===1 && state.selectedPkgs.has(id);
+        state.selectedPkgs = already ? new Set() : new Set([id]);
+        state.activePkgs = already ? new Set() : new Set([id]);
+        state.extSelectedPackageId = already ? '' : id;
+        if(!already) autoEngineForPackage(pkg);
+        if(pkg) logger.info(t(already?'log.pkgUnchecked':'log.pkgChecked', { name: pkg.name, size: fmtMB(pkg.mb||0), total: state.selectedPkgs.size }));
         renderZones(); renderCloud(); return;
       }
-      if(state.activePkgs.has(id)){
-        state.activePkgs.delete(id);
-        if(state.extSelectedPackageId === id){
-          state.extSelectedPackageId = [...state.activePkgs][0] || '';
-        }
+      const wasActive=state.activePkgs.size===1 && state.activePkgs.has(id);
+      if(wasActive){
+        state.activePkgs=new Set();
+        state.extSelectedPackageId='';
       }else{
-        state.activePkgs.add(id);
-        state.extSelectedPackageId = id;
+        /* 外框框选是单选：新包替换旧包，绝不允许两个框同时亮。 */
+        state.activePkgs=new Set([id]);
+        state.extSelectedPackageId=id;
         const activatedPkg = (state.packages||[]).find(p=>p.id===id);
         if(activatedPkg){
           logger.info(t('log.pkgActivated', { name: activatedPkg.name, size: fmtMB(activatedPkg.mb || 0) }));
@@ -7753,7 +7786,20 @@ function initChartSplitters(){
   const stack=document.getElementById('chart-stack');
   if(!stack) return;
   let drag=null;
+  /** 占用条 / 环形的高度拖拽（与网格分隔条并存，互不抢 pointer）。 */
+  let dragVol=null;
   const stop=()=>{
+    if(dragVol){
+      dragVol.bar.classList.remove('is-dragging');
+      document.body.style.cursor='';
+      if(Number.isFinite(dragVol.currentH)){
+        state.chartLayout.charts = state.chartLayout.charts || {};
+        state.chartLayout.charts[dragVol.key] = dragVol.currentH;
+      }
+      dragVol=null;
+      persistChartLayout();
+      return;
+    }
     if(!drag) return;
     drag.bar.classList.remove('is-dragging');
     document.body.style.cursor='';
@@ -7761,6 +7807,19 @@ function initChartSplitters(){
     persistChartLayout();
   };
   stack.addEventListener('pointerdown',e=>{
+    const resize=e.target.closest('[data-volresize]');
+    if(resize){
+      const card=resize.closest('.vol-card');
+      const chart=card?.querySelector('.vol-chart');
+      if(!card || !chart) return;
+      dragVol={ bar:resize, card, chart, key:String(resize.dataset.volresize||''), startY:e.clientY,
+        startH:chart.getBoundingClientRect().height, currentH:null };
+      resize.classList.add('is-dragging');
+      try { resize.setPointerCapture(e.pointerId); } catch { /* 老浏览器 */ }
+      document.body.style.cursor='row-resize';
+      e.preventDefault();
+      return;
+    }
     const bar=e.target.closest('[data-split]');
     if(!bar) return;
     const canvas=bar.closest('.chart-canvas');
@@ -7772,6 +7831,14 @@ function initChartSplitters(){
     e.preventDefault();
   });
   stack.addEventListener('pointermove',e=>{
+    if(dragVol){
+      const cardH=dragVol.card.getBoundingClientRect().height;
+      const max=Math.max(64, Math.min(state.view==='mobile'?260:600, cardH-140));
+      const h=Math.max(48, Math.min(max, dragVol.startH + (e.clientY-dragVol.startY)));
+      dragVol.currentH=Math.round(h);
+      dragVol.chart.style.height=dragVol.currentH+'px';
+      return;
+    }
     if(!drag) return;
     const { kind, gap, canvas } = drag;
     const rect = canvas.getBoundingClientRect();
@@ -7981,15 +8048,22 @@ initSwitchDensity();
   /* 待导出队列不再是独立两列区块：作为导出区的条目渲染，动作仍走 pending* 通道。 */
   function pendingCardHtml(it){
     const mb=(it.blob?.size||0)/1048576;
+    /* 与普通包卡同构：勾选占位 + 图标/标签 + 名称/体积 + 右侧动作列。
+       不再用一套独立的小按钮样式，避免“样式都不一样”。 */
+    const dl='<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 4v11"/><path d="M7 11l5 5 5-5"/><path d="M5 20h14"/></svg>';
+    const stash='<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 7h16v13H4z"/><path d="M8 7V4h8v3"/><path d="M4 12h16"/></svg>';
+    const del='<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="M6 7l1 13h10l1-13"/></svg>';
     return '<div class="pkg-card is-export" data-pending="'+escapeHtml(it.id)+'">'
       +'<span class="pkg-check-spacer" aria-hidden="true"></span>'
-      +'<span class="pkg-icon-wrap"><span class="pkg-icon" data-host="file">'+svg('file','tree-ico')+'</span></span>'
+      +'<span class="pkg-icon-wrap"><span class="pkg-icon" data-host="file">'+svg('file','tree-ico')+'</span>'
+        +'<span class="pkg-host-tag" style="color:var(--accent);border-color:var(--accent)">ZIP</span></span>'
       +'<div class="pkg-info"><div class="pkg-name"><span class="pkg-name-txt" title="'+escapeHtml(it.name)+'">'+escapeHtml(it.name)+'</span></div>'
-      +'<div class="pkg-meta"><span class="pkg-badge">'+t('pending.badge')+'</span><span class="pending-size">'+fmtMB(mb)+'</span>'
-      +'<button class="mini" data-pending-act="download">'+t('pending.download')+'</button>'
-      +'<button class="mini" data-pending-act="stash">'+t('pending.stash')+'</button>'
-      +'<button class="mini" data-pending-act="remove">'+t('pending.remove')+'</button>'
-      +'</div></div></div>';
+      +'<div class="pkg-meta"><span class="pkg-badge">'+t('pending.badge')+'</span><span>'+fmtMB(mb)+'</span></div></div>'
+      +'<div class="pkg-actions">'
+        +'<button type="button" data-pending-act="download" title="'+t('pending.download')+'" aria-label="'+t('pending.download')+'">'+dl+'</button>'
+        +'<button type="button" data-pending-act="stash" title="'+t('pending.stash')+'" aria-label="'+t('pending.stash')+'">'+stash+'</button>'
+        +'<button type="button" data-pending-act="remove" title="'+t('pending.remove')+'" aria-label="'+t('pending.remove')+'">'+del+'</button>'
+      +'</div></div>';
   }
 
   /** 转换报告：结构化的计数 + 三类清单，全部来自 `Report#toJSON()` 的纯对象。 */
@@ -8069,6 +8143,8 @@ initSwitchDensity();
       for (const id of [...state.activePkgs]) {
         if (!alive.has(id)) state.activePkgs.delete(id);
       }
+      if (state.activePkgs.size > 1) state.activePkgs = new Set([...state.activePkgs].slice(0,1));
+      if (state.activePkgs.size === 1) state.extSelectedPackageId = [...state.activePkgs][0];
       syncSourceToActive();
       if (fresh.length) {
         fresh.forEach((pkg) => { applyPrefsToPackage(pkg); state.prefAppliedPkgs.add(pkg.id); });
@@ -8189,8 +8265,9 @@ initSwitchDensity();
     setExtensionResults(results){ state.extResults=Array.isArray(results)?results:[]; renderExtensionView(); },
     setActivePackage(id, { exclusive = false } = {}) {
       if(state.tutorialMode) return;
-      if(exclusive) state.activePkgs = new Set();
-      if(id) state.activePkgs.add(id);
+      /* 外框框选永远是单选；exclusive 参数仅为兼容旧调用保留。 */
+      state.activePkgs = id ? new Set([id]) : new Set();
+      state.extSelectedPackageId = id || '';
       autoEngineForPackage(state.packages.find((p)=>p.id===id));
       state.source = id ? { type: 'package', pkgId: id } : { type: 'host', pkgId: null };
       state.sourceKey = id ? ('pkg:' + id) : ('host:' + state.host);

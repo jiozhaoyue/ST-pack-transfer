@@ -97,7 +97,7 @@ Web 模式是一个脱离酒馆后端的纯前端工作台，以下功能因缺�
 - **首选推荐：装入酒馆作为插件运行**
   功能最为完整，拥有宿主原生数据拉取、一键切片恢复、服务端存储深度审查等全部功能，天然同源无跨域烦恼。
 - **次选推荐：本地或私有服务器静态部署**
-  在本地终端执行 `npm run dev`，地址以终端输出为准；构建产物预览使用 `npm run build && npm run preview`，同样以终端输出地址为准。
+  在本地终端执行 `npm run dev`，固定使用 **3040**；构建产物预览使用 `npm run build && npm run preview`，**共用同一个 3040**。同一时间只启动一个本地服务，不再另开预览端口。需要改端口时，只改 `vite.config.js` 里的 `LOCAL_PORT`（默认 `3040`），或启动前设置环境变量 `PORT`。
 - **在线体验：GitHub Pages 网页端**
   适合临时应急、离线解包、四端格式互转、分卷拆包与清单精简等纯本地沙盒操作。
 
@@ -165,13 +165,15 @@ https://github.com/jiozhaoyue/ST-pack-transfer.git
 git clone https://github.com/jiozhaoyue/ST-pack-transfer.git
 cd ST-pack-transfer
 npm install
-npm run dev            # 本地开发服务器，地址以终端输出为准
+npm run dev            # 本地开发服务器，固定 http://localhost:3040
 npm run build          # 产出 dist/（用于 GitHub Pages 或静态托管）
-npm run preview        # 预览 dist/，地址以终端输出为准
+npm run preview        # 预览 dist/，与 dev 共用 http://localhost:3040
 npm run build:offline  # 产出 dist-offline/ 与 download/ 下的单文件 HTML
 ```
 
 > 现代浏览器默认禁止 `file://` 直接加载模块化脚本；需要双击运行时请用单文件 HTML。在线 HTML 版：<https://jiozhaoyue.github.io/ST-pack-transfer/>。
+
+> **本地端口只有一处可改**：`vite.config.js` 的 `LOCAL_PORT`（默认 `3040`）；也可在启动前设置环境变量 `PORT`（例如 `$env:PORT=3050; npm run dev`）。`dev`、`preview` 与本地静态服务共用该值，不存在第二个端口。
 
 ## 🔐 七、隐私与凭据
 
