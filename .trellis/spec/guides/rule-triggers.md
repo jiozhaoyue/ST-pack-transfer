@@ -54,7 +54,8 @@
 | --- | --- | --- |
 | 测试 / E2E / 实例 / 启动实例 | `guides/instance-testing-discipline.md` | 13、23 |
 | 截图 / 验收 / UI 验证 | `frontend/ui-verification.md` | 23 |
-| 性能 / 慢 / 卡顿 / 延迟 / 耗时 | `guides/iron-rules.md` 第 27 条 | 27 |
+| 性能 / 慢 / 卡顿 / 延迟 / 耗时 | `frontend/perf-budget.md` | 27 |
+| 术语 / 中英混排 / 标签语言 / 英文原名 | `frontend/i18n-and-settings.md` | 29 |
 
 ## 六、工程纪律
 
