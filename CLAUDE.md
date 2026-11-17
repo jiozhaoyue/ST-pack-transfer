@@ -1,5 +1,9 @@
 # CLAUDE.md
 
+<!-- RULES-POINTER v1 -->
+本仓工程规则唯一真源：`RULES.md`（30 条）+ `RULES-DETAILS.md`（82 条细则）。动手前先读；收尾前跑 `npm run verify:rules`。
+本文件不得复制 RULES.md 条文；冲突一律以 RULES.md 为准。
+
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## 项目定位
@@ -826,7 +830,7 @@ junction**。同步器按"路径"逐条写入 ⇒ **1090 条穿透写进了那�
 
 <!-- TAVERN-RULES:END -->
 
-## 项目覆盖（2026-11-05 追加，用户明令）
+## 项目细则补充（2026-11-05 追加，用户明令）
 
 1. **文档先行 / 禁止直接读源码理解功能**（MUST）：任何功能理解先查
    `docs/DEVELOPER-GUIDE.md`、`.trellis/spec/`、`mini-trellis mem recall`。文档不足时**先补文档**，

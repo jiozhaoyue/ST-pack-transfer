@@ -37,6 +37,8 @@
     "check:docs-privacy": "node tooling/docs-privacy-guard.js",
     "check:ui-tokens": "node tooling/check-ui-tokens.mjs",
     "check:download-html": "node tooling/check-download-html.mjs",
+    "verify:rules": "node tooling/rules/run.mjs",
+    "verify:all": "npm run verify:rules && npm test",
     "docs:verify": "node tooling/docs-sync.mjs --verify",
     "docs:update": "node tooling/docs-sync.mjs --update",
     "docs:shots": "node tooling/capture-docs-shots.cjs",

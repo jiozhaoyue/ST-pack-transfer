@@ -1,0 +1,800 @@
+# 工作台单一视图与局域网互传
+
+> 2026-10-14 新建。来源：用户当轮死命令 + 实测取证。**本页自包含**，不引用任务目录。
+> 适用：`src/ui/workbench-template.js`、`style.css`、`src/ui/onboarding-guide.js`、
+> `src/ui/lan-transfer-panel.js`、`src/core/lan-transfer.js`。
+
+---
+
+## 1. 单一视图（无模式切换、无步骤条）
+
+**契约**：工作台只有**一个视图**。区块按层级顺序排列，没有「向导模式 / 高级模式」切换，
+没有步骤条，没有按步骤分段显隐。
+
+**为什么**：2026-10-13 引入的迁移向导把同一份 DOM 用 `data-wb-step` 分段显隐，
+用户 2026-10-14 实测后裁定整体删除。实测缺陷（截图 + DOM 双证）：
+
+| 现象 | 根因 |
+| --- | --- |
+| 第 6 步「核对」整步为空 | `#report-panel` 未参与 `data-wb-step` 显隐 |
+| 第 3 步「范围」显示的不是范围选择器 | `#category-panel` 初始 `display:none`，该步实际渲染打包折叠项 |
+| 配额条与日志台在每一步都可见 | 二者无 `data-wb-step`，属全局 chrome 却放在向导正文流里 |
+| 「从源重开」空壳框全程可见 | 见 §2 |
+
+**守卫**：`test/workbench-session.test.js` 断言模板里**不得**再出现
+`data-wb-step` / `btn-wb-view-toggle` / `wizard-rail` / `btn-wizard-*` / `wizard-step-counter`。
+
+---
+
+## 2. `[hidden]` 与 `display` 的特异度陷阱（真实事故）
+
+**契约**：任何「默认隐藏」的容器，若样式表给它写了 `display`，**必须同时写一条
+`[hidden]` 覆盖规则**，且该规则的特异度**不低于**写 `display` 的那条。
+
+**事故**：`#wizard-gate` 在模板里是 `hidden`，但 `style.css` 写了
+`#app.app-container .wb-gate { display: flex }`。插件内已有一条全局兜底
+`#app.app-container [hidden] { display: none }`，**但两者特异度相同**（id + 2 个 class 级），
+于是**源码顺序决定胜负**——`.wb-gate` 那条位置更靠后 ⇒ 它赢 ⇒ 空壳框永远可见。
+更糟的是 `showGate()` 在全仓**没有任何调用点**，所以它从不被触发、却永远显示，
+内容永远是空字符串。当时同类元素（`.host-tree-confirm-bar` / `.task-controls` / `.report-panel`，均已随
+2026-10-27 重写删除）都单独补了 `[hidden]` 覆盖规则，**唯独漏了 `.wb-gate`**——「逐元素打补丁而非根治」的实证。
+现役兜底是统一的一条高特异度规则 `#app.app-container [hidden]{display:none!important}`（`style.css`）。
+
+**正确写法**（提高特异度，不依赖源码顺序）：
+
+```css
+#app.app-container .wb-guide-overlay[hidden], .st-converter-drawer-app .wb-guide-overlay[hidden] {
+  display: none;
+}
+```
+
+**同类坑**：空容器仍占位。`#category-summary-badge` 无内容时渲染成一个空胶囊
+（截图里那个「▬」）。修法是 `:empty { display: none }`。
+
+**控件消费点守卫为何没拦住**：该守卫只强制「声明存在」，**不能验证声明为真**
+（守卫脚本自己的注释已写明）。`btn-wizard-reopen` 的声明在语法上成立，
+所以守卫放行了一个从不触发的控件。
+
+---
+
+## 3. 配色纪律：只用 `--SmartTheme*`
+
+**契约**：`style.css` 里除 `var(--SmartTheme*, 回退值)` 外，**不得出现颜色字面量**
+（无宿主时的中性回退值除外，且只能出现在变量定义块）。
+
+**2026-10-14 清理**：原变量块自建了一整套色板，全是硬编码字面量——
+四个平台品牌色（`--accent-st/luker/tt/pt`）、六个动作色（`--st-action-*`）、
+三个状态色（`--warning/danger/success`）——而同一段第 11 行自己写着「严禁在此硬编码覆盖」。
+现全部改为**映射到宿主已有令牌**：
+
+| 类别 | 映射到 |
+| --- | --- |
+| 强调 / 平台标识 / 动作色 / 警告 | `--SmartThemeQuoteColor`（宿主引用色） |
+| 正文 / 危险 / 动作丢弃与过滤 | `--SmartThemeBodyColorInverted`、`--SmartThemeEmColor` |
+| 成功 | `--SmartThemeUnderlineColor` |
+| 阴影 | `--SmartThemeShadowColor` |
+
+**四宿主主题变量实测**（`Instance/Dev/{SillyTavern,Luker,TauriTavern,PureTavern}`）：
+共享 17 个 `--SmartTheme*`；PureTavern 另有 `--SmartThemeMainColor` 与
+`--SmartThemeCheckboxBgColorA`。**四宿主都没有语义色变量**（无 danger / success / warning）
+——所以不可逆动作**不靠颜色区分，靠二次确认**（用户裁定 D-01）。
+
+---
+
+## 4. 文案纪律
+
+**契约**：界面上**禁止任何说明性文案**——不许括号补充、不许分号长句、不许教学 tooltip、
+不许空态解释段。允许保留的只有：状态与错误反馈、placeholder、图标悬停名、状态读数摘要。
+
+**判定**：`title=` 属性的值**不得超过 8 个字符**（只能是「暂停」「关闭工作台」这类悬停名）。
+
+**曾经的违反**：`git-mode` 三个 radio 各挂 30–60 字 `title=` 长句说明——
+而模板文件头第 13 行自己就写着「不出现解释性静态文案」。规则早已存在却被违反。
+
+**术语**：禁止「瘦身 / 剔除」这类黑话。Git 历史三档现文案为
+「保留历史 / 只留更新所需 / 不含历史」。
+
+---
+
+## 5. 控件纪律
+
+**契约**：
+
+1. 所有多选一**一律用枚举**（带 id 的下拉），不用并排 radio。三组已改：
+   `extension-mode-select` / `git-mode-select` / `restore-mode-select`。
+2. 设置项**一律单列**，禁止并排。
+3. 折叠区在区块内**紧凑成组**：去掉各自外边距与圆角，相邻项只留一条分隔线。
+4. 新增控件必须在 `scripts/control-consumer-guard.js` 的 `CONTROL_CONSUMERS` 里
+   写下「谁读它的值」；同时把 id 加进 `scripts/single-template-source.js` 的
+   `REQUIRED_TEMPLATE_IDS`（若该节点由模板产出且被静态引用）。
+
+**守卫的实现陷阱**：两个守卫都按**文件源码正则**提取控件，所以
+**注释里不得出现控件标签字面量**——否则会被当成无 id 的控件误报（2026-10-14 实际踩到）。
+同理，按源码正则做的「文案纪律」断言会把注释一并算进来，
+**要断言渲染结果就调用 `getWorkbenchHtml()`，不要读文件源码**。
+
+---
+
+## 6. 宿主动态识别
+
+**契约**：宿主标识必须**动态求得**，认不出时兜底 `unknown`；新增宿主**不改判定逻辑**。
+
+**四宿主实测判据**：
+
+| 宿主 | 前端全局 | `/version` 的 `agent` |
+| --- | --- | --- |
+| Luker | `globalThis.lukerContext` | `Luker:2.7.0:…`（含 `stCompatVersion`） |
+| TauriTavern | `window.__TAURITAVERN__` | `…:TauriTavern` |
+| PureTavern | `globalThis.__PURE_TAVERN__` | `…:PureTavern` |
+| SillyTavern | `globalThis.SillyTavern` / `#extensionsMenu` | 只有 `version`，无 `agent` |
+
+**已知缺口**：`src/ui/host-bridge.js` 的 `detectHost()` 目前只返回
+`st|luker|standalone`，**区分不出 TauriTavern 与 PureTavern**。
+它还有 `hostLayoutCode()` 归一（`luker → l`）与 `verifyHostPlatform()` 服务端二次校验。
+判定顺序不可颠倒：**Luker 前端同时暴露两个全局**，故必须先判 `lukerContext`。
+
+---
+
+## 7. 局域网互传
+
+**契约**：纯前端直连走 **WebRTC DataChannel**；会话模型＝**一次性取件码**；
+安全上下文不可用时**如实降级**，不假装能连。
+
+**为什么不能照搬参考实现**：Luker 是 Node 服务端、TauriTavern 是 Rust 侧，
+两者都是「本机起 HTTP/HTTPS 服务、对端连过来」。本插件纯前端，
+**浏览器不能监听端口**，故必须换成 WebRTC。
+
+**已实测的技术前提**（Playwright，2026-10-14）：
+
+- `file://` 与 `http://localhost` **都是安全上下文**；`RTCPeerConnection` /
+  `crypto.subtle` / `navigator.clipboard` 均可用。
+- 无 STUN 时 offer/answer 各带 2 个 **mDNS（`.local`）ICE 候选**，
+  DataChannel 两端 `connected`，32 KB 消息完整送达。
+- **单条消息有上限**，大包必须分块（本实现 64 KB/块）。
+- 端到端实测：两浏览器上下文传 300 KB，接收端 **SHA-256 与源端完全相同**。
+
+**必须如实告知的限制**：无服务器时信令是**两跳手工交换**
+（发送端出取件码 → 接收端回应答码 → 发送端粘贴）。装 Authority 才能并成一跳。
+**不得把它描述成一步。**
+
+**降级判据**：`probeDirectCapability()`——非安全上下文（`http://<局域网IP>`）
+或浏览器无 `RTCPeerConnection` 时返回不可直连并给出可读原因。
+
+**借鉴来源**：Luker 的一次性配对链接 / 按条目核对 / 分场景报错；
+TauriTavern 的阶段+进度事件 / 原子落盘 / 自然续传 / 地址发现。
+
+### 7.1 当前实现（2026-10-27）
+
+| 能力 | 实现 | 证据 |
+| --- | --- | --- |
+| 信令负载 v2 | `buildSignalPayload` / `readSignalPayload`，含 `file.id`（`name:size:lastModified` 的 FNV-1a）与 `resumeFrom`；v1 旧码仍可读 | `test/lan-transfer.test.js` |
+| 分块 | 64 KB/块；发送端 `bufferedAmount` 高低水位 + 250ms 兜底 | 同上 |
+| 摘要核对 | SHA-256 + 字节数；**两端都有摘要才比摘要**，缺任一端退回字节数并在界面标注「仅核对大小」 | 同上 + E2E L12 |
+| 续传 | 接收端保留 `.part`，应答码携带已有字节数；失败重试生成新码 | 设计见 `design.md` |
+| 一次性 | 成功后先清空取件码/应答码并断链，再入库；旧码重复使用被明确拒绝 | E2E L14–L16 |
+| 降级 | 非安全上下文 `probeDirectCapability()` 返回不可直连，按钮禁用并给出「导出文件手动传入」 | 单测 + 探针 |
+| 信令中继 | **未实现**（没有可依赖的中继端点契约）；界面如实写「两跳」 | PRD R-06 收口 |
+
+**接收端落盘的硬规则（2026-10-27 实测事故）**：数据帧可能**先于 OPFS sink 打开**到达。
+旧实现直接丢弃这些块，产物字节数不足、摘要核对失败——表现像「传输坏了」，根因却被掩盖。
+现在 `meta` 帧建立 `sinkReady` promise，写链**等待 sink 就绪**，**绝不丢块**；
+`failRecv` 只认第一次失败（sink 打开失败 / 写链异常 / 通道关闭会竞争触发）。
+
+**自动化证据**：`npm run e2e:web -- --only lan-transfer --rebuild`
+两个**独立上下文**（各自 IndexedDB，避免假阳性）真实互传 3 MB + 64 KB 合法 zip
+（跨越 64 KB 分块边界），**24/24 通过**：多包勾选 → 取件码/应答码生成 → 二维码渲染 →
+两包排队传输 → 摘要一致 → 接收端两包均标「远程导入」→ 一次性失效 → 坏码拒绝。
+
+### 7.1.1 吞吐性能铁律（2026-11-17 用户实测 ~300KB/s 后裁定）
+
+**病因**：每 64 KB 数据块到达都 `setRecv()`→`view.setLan()`→`renderLan()` 全量 DOM 重绘（约 30 个属性 + 二维码重写），
+`bufferedAmount` 高水位背压使「发送速率 ≡ 接收端消费速率」；1 GB 包约 16384 次重绘把吞吐压到 ~300KB/s。
+注意**不是**「每块等 ACK」——ACK 是 1 MB / 250 ms 粒度且与发送循环解耦。
+
+**修复**（`src/ui/lan-transfer-panel.js`）：
+- 发送循环与接收写链里的进度 UI 均节流到 `UI_THROTTLE_MS = 120` ms：每 120 ms 才 `setSend`/`setRecv` 一次。
+- **速率采样不受影响**：`transferDetail()`→`rateOf()` 在节流窗口内采样，3 秒窗口精度足够；ACK 逻辑原样保留。
+- **终态强制刷新**：发送 `done` 前、接收 `done` 控制帧里都无条件 `setXxx` 到 100%，不被节流吞掉进度。
+- **不得**为提速而改协议可靠性（`ordered:true` 不改）、不动 64 KB 块大小（SCTP `maxMessageSize` 保守值）、不做每块 ACK。
+  这些属于数据正确性与兼容性红线；提速只允许在 UI/IO 调度层做。
+
+**判据**：大包传输时进度条仍平滑推进、速率读数与真实吞吐一致、完成后摘要核对通过；吞吐提升依赖真实 LAN 环境（无头本机回环不能代表真实拥塞）。
+
+---
+
+### 7.2 交互模型二次重做（2026-10-27 · 正式接线已完成）
+
+用户四轮评审定稿，**推翻**「独立浮层 + 发送/接收两个绝对页签」：
+
+| 项 | 定稿 |
+| --- | --- |
+| 承载面 | **执行卡内可折叠区块**（`#lan-block`），不做独立弹窗；不设绝对页签 |
+| 一屏 | 发送在上、接收在下；移动端接收在上（CSS `order:-1`） |
+| 发送源 | **只发导入区当前勾选的包**；多选时逐个排队 |
+| 接收落地 | **直接进唯一的导入区**，自动选中；不弹确认 |
+| 来源徽标 | **不新造**「来自设备」；沿用文件名下 `.pkg-meta` 的徽标：`本地导入` / `远程导入` |
+| 宿主 | 接收后仍**扫包**判定 layout；图标角标显示 ST/L/TT/PT |
+| 二维码 | 文本码 + QR 同显；`getUserMedia({facingMode:'environment'})` + jsQR 解码；权限失败提示且粘贴始终可用 |
+| 扫码后 | 取件码自动 accept、应答码自动 apply（扫码即继续） |
+| 失败 | 新取件码 + 按 `fileId` 续传；显示已收比例 |
+| 同名 | 远程接收自动加序号，不覆盖 |
+
+**二维码来源**：`qrcode-generator` 2.0.4（MIT，编码）+ `jsQR` 1.4.0（Apache-2.0，解码），
+本地 vendor 到 `src/vendor/`；根许可证 **AGPL-3.0**。`src/ui/qr.js` 以 classic `<script>`
+注入本地文件（qrcode-generator 的顶层 `var qrcode` 在 ESM 里不会挂 window），
+`ready()` 失败时二维码隐藏、文本码与粘贴始终可用。
+
+**当前状态（2026-10-27 接线后）**：`index.js` 已传入 `qr` 与 `actions.lan`；
+`lan-transfer-panel.js` 已去浮层、只读模板 id 并通过 `view.setLan()` 驱动；
+`getSendTargets()` 取导入区勾选包（多包排队）；接收落库走 `ORIGINS.LAN`，
+`importFiles({remote:true})` 自动加序号并扫包。旧 `.wb-lan-*` 浮层样式已删除。
+剩余：四宿主/六对复跑、PT 快照重装、真机双设备 AC-10（见 HANDOFF）。
+
+**布局约束**：局域网展开时包区让出高度（`.col-side.lan-open > .zone-card{flex:0 0 28%}`），
+执行卡内部滚动；旧的 `inset:0` 全屏浮层在 TT 会塌陷（TT 的 `<html>` 有 transform 且高 0），
+全屏浮层一律 `100vw × 100vh`。
+
+> ⚠ **2026-11-05 起 §7.2 的「承载面 = 执行卡内可折叠区块」被 §7.3 取代**；其余条目
+> （发送源、接收落地、来源徽标、扫码、失败续传等）继续有效。
+
+---
+
+### 7.3 局域网改为整面板替换（2026-11-05 用户裁定）
+
+**契约**：局域网互传不再是执行卡内的折叠块，而是**左侧图表面板的完整替换**：
+
+- 三个顶层面板 DOM：`#chart-card`（左侧图表）、`#zone-card`（数据包列表）、`#action-card`（执行卡）。
+- 图表面板头（`#chart-card .panel-actions`）放一个「局域网互传」按钮 `#lan-open-btn`。
+- 点击后：`#chart-card` 整体 `hidden`，**同级**的 `#lan-view` 面板显示——替换的是**整个面板**
+  （含面板头与边框），不是只换里面的 `#chart-stack` 图表。
+- `#lan-view` 自己的面板头有标题与关闭按钮 `#lan-close-btn`，点击回到 `#chart-card`。
+- 移动端布局顺序由 DOM 决定：`.col-chart` 在最前 ⇒ 局域网面板自然出现在**最上方**，
+  下面依次是 `#zone-card`（数据包列表）、`#action-card`。不得用 CSS `order` 反序。
+
+**DOM 落点**（`src/ui/workbench-template.js`，唯一模板源）：
+
+```
+.col-chart
+  section.panel.chart-card#chart-card        ← 原有，面板头新增 #lan-open-btn
+  section.panel.lan-view#lan-view [hidden]   ← 新增，承载原 #lan-block 的全部内容
+```
+
+原 `#lan-block` 内的扫描 / 发送 / 接收结构**原样迁移**进 `#lan-view .lan-body`，
+不再保留 `.lan-block` 外框、`#lan-toggle`、`#lan-toggle-hint`。
+
+**状态与渲染**（`src/ui/workbench-view.js`）：
+
+- `state.lan.open` 仍是唯一开关，语义改为「局域网面板是否占据图表面板位置」。
+- `renderLan()` 只翻 `#chart-card` / `#lan-view` 的 `hidden`，**删除**
+  `.col-side.classList.toggle('lan-open')` 与 `#lan-toggle-hint` 的读写。
+- 点击 `#lan-open-btn` / `#lan-close-btn` 只改 `state.lan.open` 并重渲染，不直接操作 DOM。
+
+**CSS**（`style.css`，双前缀铁律不变）：
+
+- 删除 `.col-side.lan-open > .zone-card` 与 `.lan-toggle*` 规则。
+- `#lan-view` 与 `#chart-card` 同为 `.col-chart` 的直接子面板：`flex:1 1 auto; min-height:0`，
+  内部 `.lan-body` 是唯一滚动容器（R1 无外层滚动条）。
+- 默认隐藏的 `#lan-view` 若被写了 `display`，必须补一条特异度不低于它的
+  `#app.app-container #lan-view[hidden]{display:none}`（见本页 §2）。
+
+**守卫与登记**：
+
+- `scripts/single-template-source.js` 的 `REQUIRED_TEMPLATE_IDS`：新增 `chart-card`、
+  `lan-open-btn`、`lan-view`、`lan-close-btn`；移除 `lan-toggle`、`lan-toggle-hint`。
+- `scripts/control-consumer-guard.js` 的 `CONTROL_CONSUMERS`：为 `lan-open-btn` /
+  `lan-close-btn` 各写真实消费点（读 `state.lan.open`）。
+- 按钮文案「局域网互传」已在 `ui-orchestration-rules.md` §2 的动词封闭集内，不得换词。
+
+**验收**：
+
+1. 点「局域网互传」后，左侧整块图表（含面板头、配额条、图例、图表）消失，局域网面板占满该列。
+2. 右侧数据包列表与执行卡位置不变。
+3. 320px 视口下，局域网面板在数据包列表之上。
+4. `#chart-card[hidden]` 与 `#lan-view[hidden]` 的计算样式均为 `display:none`。
+5. `npm test` + 五个 UI 守卫全绿。
+
+---
+
+## 9. 正式 UI 即预览（2026-11-05 用户裁定，demo 页整体作废）
+
+**规则（唯一验收路径）**：开发热重载可用 `npm run dev`（3040）；**界面验收只走**
+`npm run build && npm run preview`（本地静态服务器 4173，托管 `dist/`），浏览器打开
+`http://localhost:4173/` 操作取证。**禁止** `file://`、直接双击 `dist/index.html`
+或 `npm run dev` 作为验收入口（2026-11-09 用户裁定）。
+
+- **不存在**任何独立 demo / 预览页。`src/ui/ui-demo.html` 已删除，
+  `test/ui-demo-isolation.test.js` 一并删除。
+- 正式三件套（`style.css`、`src/ui/workbench-template.js`、`src/ui/workbench-view.js`）
+  是唯一 UI 源，改完刷新即生效（Vite HMR）。
+- 正式代码、构建、测试、CI 中**不得**再出现 `ui-demo` 路径或演示外壳。
+
+**为什么**：demo 页需要维护第二套演示数据与外壳，与正式 UI 反复漂移——
+2026-10-26 就出现过「demo 有、生产无」的虚拟节点（完整扩展包 / 保留 Git 历史 / 保留构建配置）。
+dev server 已能直接跑正式 UI，demo 只剩维护成本与误导风险。
+
+**数据必须真实**：预览用真实数据——导入真实 zip 或从宿主拉取；不得在正式代码里注入演示数据。
+独立 Web 无数据源时显示空态引导，这是正确行为，不是缺陷。
+
+**形态由真实视口决定**：`data-view` 由 `matchMedia` 计算，不提供演示用的桌面/移动切换按钮。
+
+**验证方式**：内置浏览器打开 `http://127.0.0.1:3040/`，用 DOM 计算值（宽高、`grid-template-columns`、
+`overflow`、`getBoundingClientRect`）与截图取证；不再要求「先 demo 生效」。
+
+> 历史 `.trellis/research/**` 里关于 demo 的说明是**存档**，不再作为当前流程依据。
+
+**正式数据必须真实**：浏览器配额来自 `navigator.storage.estimate()`，不可用时显示「未提供」；
+宿主配额经宿主官方 Storage Inspector 模块（`/scripts/storage-inspector.js` 的 `RestProvider`）
+读取，读不到时显示「未提供」，**禁止**用演示数字冒充真实读数。
+
+**改动流程**：改正式三件套 → `npm test` + 守卫 → 内置浏览器在 3040 上取证。
+
+---
+
+## 8. 本轮验证读数（2026-10-14）
+
+- `npm test`：**817 passed / 2 skipped / 0 failed**（80 文件通过 / 1 skipped）。
+  改前的本轮基线是 783 passed / 11 failed（4 个文件锁的是旧设计契约，已按新契约重写）。
+- 五个 UI 守卫全绿：`check:css-scope`、`check:dom-injection`、`check:template-source`、
+  `check:dom-scope`、`check:control-consumer`。
+- `npm run e2e:web -- --rebuild` 通过。
+- `impeccable detect` 对模板与两个新模块：**零命中**。
+
+---
+
+## 9. 零浮层：设置 / 日志 / 帮助 / 确认一律面板内视图（2026-11-02）
+
+**契约**：工作台内**不得**出现 `position:fixed` 的业务浮层。设置、日志、帮助、确认
+（流量 / 删除 / 恢复 / 合并冲突 / 私有件 / 清空队列）全部是 `.app-body` 内的
+`.view-card`，同一时刻只显示一个；顶栏按钮进入，视图内关闭按钮或 Esc 返回工作台。
+
+**为什么**：2026-11-02 在 Luker 实测——`#modal-overlay` / `#log-overlay` 这类嵌套在面板里的
+`position:fixed` 浮层定位失效：设置与流量确认只剩暗色遮罩、内容不可见（用户表现为
+「两个从宿主拉取按钮点了没反应」），日志浮层跑到左上角。宿主 `html` 带
+`-webkit-transform: translateZ(0)`（Luker `public/style.css:143`）会改变固定定位的
+包含块；TauriTavern 已在 journal Session 55 记录同类塌陷。根因不修浮层，直接取消浮层。
+
+**结构**：
+
+```
+#app.app-container
+  header.app-header   （btn-guide / btn-log / btn-settings / btn-close）
+  div.app-body
+    main.app-main#view-workbench
+    section.view-card#view-settings / #view-log / #view-help / #view-confirm （hidden）
+  div.toast（absolute，面板内裁剪）
+  div.tutorial-overlay（保留：全屏引导，用户 2026-11-02 裁定）
+```
+
+**API**：`workbench-view.js` 的 `showPane(name)` / `backToWorkbench()`；
+`openModal(title, desc, extraHtml, actions)` 签名不变，内部改为渲染 `#view-confirm`；
+`openSettingsView(html, { onSave })` 渲染 `#view-settings`。
+
+**守卫**：
+- `check:template-source` 的业务节点清单必须包含 `view-*` 与 `settings-*`，且**不得**再包含
+  `modal-overlay` / `log-overlay` / `help-popover` / `fullname-pop`。
+- `check:control-consumer` 必须为 `settings-save` / `settings-cancel` / `settings-close` /
+  `help-close` / `modal-close` 各写一条真实消费点。
+- 浏览器实测：三个视图的 `getComputedStyle(el).position === 'static'`，且 DOM 中不存在旧浮层节点。
+
+**例外**：教程全屏引导、`#st-converter-modal-overlay`（插件外壳）仍是固定定位；
+新增**任何**业务浮层前必须先过用户裁定。
+
+**整页视图占满插件（2026-11-11 用户裁定）**：设置 / 日志 / 帮助 / 存储审查这类占满插件的视图，
+除页头外**不得**残留其它常驻行。2026-11-11 第二轮：全局动作条 `#top-actions` **已整体取消**
+（见 §12.4 修订），因此整页视图天然从页头下沿占满到插件底部，不再需要额外隐藏逻辑。
+判据：打开日志 / 设置 / 帮助 / 存储审查后，视图顶部紧贴页头底边，中间没有动作条。
+
+---
+
+## 11. 执行卡取消 · 进度条置底 · 图表网格（2026-11-05 用户裁定）
+
+**契约**：工作台不再有独立的「执行卡」面板。动作按钮并入数据包列表底部，
+进度条成为贯穿所有视图的常驻底栏，图表卡改为自适应网格。
+
+**为什么**：独立执行卡把可用的纵向空间切成三块，图表被压成一条；
+进度条藏在执行卡里，手机上滚动后就看不见，且必须先点顶栏日志按钮才能看日志。
+
+### 11.1 顶层面板只剩两个 + 常驻底栏
+
+```
+.app-body
+  .app-main#view-workbench
+    .col-chart        ← #chart-card / #lan-view（图表区）
+    .splitter-v
+    .col-side
+      #zone-card      ← 数据包列表；底部新增 #action-row
+  section.view-card#view-settings / #view-log / #view-help  (hidden)
+  footer#workbench-progress   ← 常驻底栏，任何 view-card 下都可见
+```
+
+- **删除** `#action-card`（含其面板头与 `data-help="action"`）。
+- `#action-row` 移入 `#zone-card` 底部，作为 `.zone-foot`；`renderActions()` 消费点不变。
+- **删除** 顶栏 `#btn-log`；`#log-dot` 迁入底栏。
+- `#workbench-progress` 是 `.app-body` 的**最后一个 flex 子项**（`flex:0 0 auto`），
+  `.app-main` 负责内部滚动 ⇒ 手机端滚动内容时底栏**不离开视口底部**。
+
+### 11.2 进度条即日志入口
+
+- 点击底栏任意位置（或聚焦后按 Enter/Space）→ `renderLog()` + `showPane('log')`。
+- 底栏内常驻一行提示文案 `progress.openLog`（「点此查看日志」），**这是唯一允许的
+  可操作提示**，不受 §4「零说明性文案」约束（用户 2026-11-05 明确要求显式提示）。
+- 日志视图不再自带进度条——底栏在 `#view-log` 下同样可见，读数天然同源。
+- `#log-dot`（警告/错误计数点）挂在底栏提示旁，不再挂顶栏。
+
+### 11.3 图表网格（2026-11-09 重做）
+
+- `.chart-stack` 只是**滚动容器**；真正的布局在 `.chart-canvas`，由 `chartCanvasHtml()` 按图表数量生成：
+  | 图表数 | 布局 |
+  | --- | --- |
+  | 1 | 单格占满 |
+  | 2 | 左右平分 |
+  | 3 | 2×2，右下留空 |
+  | 4 | 2×2 占满 |
+  | > 4 | 2 列多行，图表区纵向滚动 |
+- **禁止自由拖拽卡片尺寸**：`.vol-card` 不再有 `resize`，尺寸完全由宫格决定。
+- 拖拽条：列间 `.chart-split-v` 一条；行间每条左右各一段 `.chart-split-h`。
+  拖动只改相邻行列比例，写 `localStorage['stpt.chartLayout']`（`col` + `rows[]`）。
+- 每个 `.vol-card` 面板头有格式图标按钮 `[data-chartfmt-toggle]`（单条多色 / 圆环）。
+- 每张卡的 `.vol-body` 顶部渲染 `[data-volchart]`：
+  - `bar`：**一根** Luker 式堆积条，所有一级类目按体积占比上色；极小占比 `min-width:3px` 保可见；
+  - `donut`：同一份数据的 SVG 圆环（极小占比最小 0.6% 弧）。
+  - **占比按当前勾选动态计算**（2026-11-10）：未勾选的类目不占色块；`tree-occ` 用同一份 `selectedMbMap`。
+  - **图形区不再画图例**；颜色说明只在下方树行：一级类目 `.tree-dot` 与 `.tree-occ` 用同一套
+    12 色调色板（`--vc-c1..c12`）。
+- 扩展工具条（`.vol-body > .extension-tools`）在图形下方：**单行、禁止收缩、窄卡横向滑动**；
+  卡头只保留序号 / 容量 / 批量 / 格式 / 全屏 / 关闭，不得再放扩展控件。
+- 树行尾部占用条 `.tree-occ` 宽度 = 该行 `mb` / 本卡总 `mb`，颜色继承所属一级类目。
+- 全屏：`.vol-card.is-max` 使用 `position:fixed;inset:0`，占满插件 DOM；再次点击还原。
+- 全屏为 **Luker 式逐层下钻**（2026-11-10）：一次只显示当前一层，点分类/`›` 进入下一层；
+  面包屑 `[data-volcrumb]` 返回；**不得**在全屏态内联展开整棵树。
+- 逐文件「上传」按钮**已移除**（2026-11-09 用户明令）。
+
+### 11.3.1 数据包偏好
+
+- 面板头 `#chart-pref-btn` 进入偏好模式；图表区变为整列复选框（`[data-prefgroup]`）+ 取消 / 保存。
+- 默认勾选：除 `backups`（备份快照）与 `native`（原生资产）外全勾。
+- 保存内容：勾选组、目标平台、压缩、分卷、文件名模板、差量、扩展模式、Git、保留构建配置。
+- 语义：**取消**回滚草稿；**保存**写 `localStorage['stpt.chartPrefs']`，只对**以后导入**的包生效。
+- 设置页不再承载任何打包选项。
+
+### 11.4 守卫与登记
+
+- `scripts/single-template-source.js`：移除 `action-card`、`btn-log`；
+  新增 `workbench-progress`、`vol-chart`（若为模板节点）。`action-row`、`progress-fill`、
+  `progress-label`、`progress-pct`、`log-dot` 保留。
+- `scripts/control-consumer-guard.js`：移除 `btn-log`；为 `workbench-progress` 写真实消费点
+  （点开日志视图）。
+- `test/ui-verb-table.test.js` 的按钮封闭集不变（本次不新增按钮文案）。
+
+### 11.5 验收
+
+1. DOM 中不存在 `#action-card`；`#action-row` 在 `#zone-card` 内。
+2. 任一视图下 `#workbench-progress` 的 `getBoundingClientRect().bottom` 等于 `.app-body` 底边。
+3. 320px 视口滚动工作台，底栏仍在视口底部。
+4. 点底栏进入 `#view-log`；日志视图底部可见同一条底栏，读数与工作台一致。
+5. 顶栏无日志按钮。
+6. 图表按容器宽度分 1/2/3/4 列，相邻卡片间距 1px；宽屏最多 4 列。
+
+---
+
+## 12. 滚动、配额折叠与目标平台默认（2026-11-05 用户裁定）
+
+**为什么**：2026-11-05 实测——竖屏下 `.chart-stack` 与 `.zone-body` 各自滚动，
+图表只能看到一半，数据包列表被压成只剩标题；配额行、宿主配额、宿主数据卡三处
+重复表达同一份宿主信息；目标平台默认写死 `SillyTavern`，与宿主平台无关。
+
+### 12.1 滚动绝对保守：竖屏只有一个滚动条
+
+- **桌面**：`.app-main` 不滚动（`overflow:hidden`）。滚动只发生在内容列自己的容器内
+  （`.chart-stack` / `.zone-body`），且 `overflow-y:auto` —— **不溢出就不出现滚动条**。
+  滚动条一律细化（`scrollbar-width:thin`），不得出现系统粗滚动条。
+- **竖屏**（`[data-view="mobile"]` 与 `@media (max-width:860px)`）：
+  **唯一滚动容器是 `.app-main`**。`.chart-stack`、`.zone-body`、`.chart-card`、`.zone-card`
+  一律 `overflow:visible`、`max-height:none`、`flex:0 0 auto`，保证一次滚到底
+  看完全部图表与整张数据包列表。
+- **判据**（320px 视口）：
+  1. 全页 `scrollHeight > clientHeight + 1` 且 `overflow-y` 为 `auto|scroll` 的元素**恰好 1 个**（`.app-main`）。
+  2. 滚动到底部时，最后一个图表卡与数据包列表尾部都可见。
+  3. 底栏 `#workbench-progress` 全程贴视口底（见 §11.2）。
+
+### 12.2 配额两行常驻 · 宿主详细数据默认收起
+
+- `#quota-head` **直接**渲染「浏览器配额」「宿主配额」两行常驻内容。
+  **不得**把这两行放进折叠按钮、详情容器或任何「点开才看」的结构（2026-11-05 用户裁定：
+  「浏览器配额等禁止有这个折叠的东西，必须直接放置，必须用之前的」）。
+- **宿主详细数据**（宿主目录清单）与上述两行**同一个** `#quota-head` 块内，紧跟其后；
+  默认收起（`#quota-host-detail[hidden]`），点击 `#quota-host-toggle` 在**同一 DOM 内**展开，
+  再次点击收起。展开态只渲染只读行（路径 + 体积），不参与勾选与统计。
+- **全页唯一**：宿主信息只出现在这一处。图表栈不再有「宿主数据」卡（`chartTargets()` 无勾选包时返回空）。
+- 读不到显示「未提供 / 宿主未提供存储读数」，**禁止假 0**。
+
+### 12.4 动作按钮在数据包列表下方（勾选后才出现）
+
+- **全局动作条已取消（2026-11-11 第二轮用户裁定）**：不再有 `#top-actions` 三按钮行。
+  - 「从宿主拉取」在数据包模式行 `#zone-mode-row`，**只在导入分区**显示；
+  - 「覆盖 / 增量」数据包模式**只在导出分区**显示（同一行互斥）；
+  - 「迁移与备份」变成面板头切换行里的第 4 项 `[data-wbview="transfer"]`（☁️ 图标）；
+  - 「刷新页面」全局按钮取消：只在安装完成弹窗 / 恢复完成条里出现。
+- 数据包面板底部 `#zone-actions-bottom` 承载分区动作；**未勾选时不渲染动作按钮**，只显示提示。
+- 导入区：勾选后出现「生成导出包 / 删除」。
+- 导出区：勾选后出现「下载 / 上传 / 复制回导入区 / 删除」。
+- **删除**「合并上传」；「回传宿主」改名为「上传」，全界面只有一个上传概念。
+- **禁止**在单张包卡后追加动作按钮（2026-11-10 用户明令删除）。
+
+### 12.5 无数据包时两张引导卡并排居中
+
+- `.chart-empty-guide` 固定两列：`grid-template-columns:repeat(2,minmax(0,1fr))`，
+  `max-width:680px`、`justify-self:center`；`.chart-stack:has(> .chart-empty-guide)`
+  垂直居中（`align-content:center`）。
+- 竖屏（375×812）同样两列并排，并压紧：图标 28px、描述两行截断、按钮 26px 高、
+  卡片 padding ≤ 9px。两张卡不得纵向堆叠占满屏幕。
+
+### 12.3 目标平台默认值跟随宿主
+
+- 设置新增 `defaultTarget`：`auto | st | luker | tt | pt`，默认 `auto`。
+- `auto` ⇒ 目标平台等于宿主平台（宿主 → 目标映射：`st→SillyTavern`、
+  `luker→Luker`、`tt→TauriTavern`、`pt→PureTavern`；`standalone` 回退 `SillyTavern`）。
+- 用户在目标平台下拉里手动选过之后，本次会话以手动值为准；设置保存默认值后重新应用。
+- 目标平台按钮在「选中平台 == 宿主平台」时显示宿主标记 `.host-tag`
+  （与下拉项同一文案 `target.hostSuffix`）。
+- 判据：宿主 Luker 下首次启动，按钮文本为 `Luker` 且带宿主标记；
+  设置里把默认改为 `PureTavern` 后重新进入，按钮为 `PureTavern` 且无宿主标记。
+
+---
+
+## 10. 数据包选择语义（2026-11-05 用户裁定）
+
+**契约**：勾选集合 `state.selectedPkgs` **只能**由以下操作改变：
+
+- 数据包行内复选框（`[data-pkgcheck]`）；
+- 批量「全选 / 全不选 / 反选」。
+
+**禁止**：点击卡片主体、文件名、图标、空白处时清空勾选。点击卡片主体只允许切换
+`state.source`（当前查看的包）并重绘图表，**不得**触碰 `selectedPkgs`。
+
+**原因**：2026-11-05 实测，点数据包非复选框部分会把批量选择全部清空，用户无法连续多选。
+
+**判据**：选中 2 个包后，依次点另一个包的行文本 / 图标 / 空白处，`state.selectedPkgs.size` 保持 2。
+
+---
+
+## 13. 角色卡 ↔ 聊天记录联动（2026-11-05）
+
+**匹配规则**（`src/core/chart-model.js`，纯函数）：
+
+- 角色卡：`characters/<name>.<ext>` → 基名 `<name>`（`characterBaseName()`）。
+- 聊天：`chats/<name>/…` → 归属 `<name>`（`chatOwnerName()`）；
+  目录节点 id 兼容 `dir:chats:chats/<name>` 与 `dir:chats:<name>` 两种形态（`chatOwnerOfDirNode()`）。
+- 同一 `<name>` 精确配对；大小写不同按小写再比一次（只用于「是否已匹配」判定）。
+
+**行为**：
+
+- 勾选角色卡 ⇒ 同步勾选该角色的**聊天根目录**（一次带全部聊天），反之勾选聊天目录或任一聊天文件
+  也会同步勾选角色卡（`counterpartsOf()` + 勾选处理里 `setChecked`）。
+- 联动**只改勾选状态**，不删除、不改写任何文件；有联动时弹一条 `link.synced` 提示。
+- 配不上的角色卡 / 聊天目录在行内标 `link.unmatched`（「未匹配」），**不猜**；
+  已有 `note` 的节点不覆盖。
+- 分组节点（`group:characters` / `group:chats`）不参与联动——只认具体卡与具体目录。
+
+**测试**：`test/chat-character-link.test.js`（10 用例，覆盖 naming / 双向匹配 / 未匹配标注）。
+
+**实测（2026-11-05，`fixtures/fixture-st.zip`）**：同名对不再误标「未匹配」；
+取消角色卡 ⇒ 聊天目录同步取消；重新勾选 ⇒ 同步勾选；反向勾选聊天目录 ⇒ 角色卡同步；
+提示文案「已联动 1 项」。
+
+---
+
+## 14. 云端包仓库（S3 兼容，2026-11-05 用户选定 A+B）
+
+**定位**：本项目的第二传输通道是「包仓库」——把导出的 zip 上传/下载到 S3 兼容存储。
+**不是**常驻同步引擎：不做后端列表的自动轮询、不做文件级冲突版本卡、不做宿主同步端点代理。
+
+**边界（沿用 `host-capabilities.md`）**：
+
+- 不调用任何宿主 `/api/sync/v1/*`，不显示/触发/代理宿主原生局域网同步。
+- 现有近场 WebRTC 传输行为不删不扩；仅在面板顶部加了「方向 / 类别 / 状态」概览条（`#lan-overview`）。
+
+**凭据**：
+
+- endpoint / region / bucket / prefix / path-style / Access Key / Secret Key / 加密短语
+  只存本机 `localStorage`（键 `st-pack-transfer:s3`），面板内明示「不会上传到其他服务器」。
+- 直连对象存储需要存储桶配置 CORS；失败时如实显示错误，不假成功。
+
+**加密**：
+
+- 填了加密短语 → 上传前用 PBKDF2-SHA256（120k 次）+ AES-GCM 加密，文件名改 `.spt`；
+  下载时按 `SPT1` 魔数识别，用同一短语解密还原成 `.zip`。
+- 未填短语 → 明文上传（面板提示凭据只在本机，但包内容不加密）。
+- WebCrypto 不可用时 `encryptBytes` 直接拒绝，不静默降级成明文。
+
+**降级与错误**（实测 2026-11-05）：
+
+| 场景 | 表现 |
+| --- | --- |
+| 未配置端点/桶 | 「云端仓库未配置」，主路径不受影响 |
+| IP 端点 + 虚拟主机风格 | 「端点无效，IP 地址请开启路径风格请求」 |
+| 端点不可达 / CORS 拒绝 | 「操作失败：Failed to fetch」，列表保持上次内容 |
+| 列表为空 | 「云端暂无数据包」 |
+| 下载加密包但没填短语 | 「该包已加密，请先填写加密短语」 |
+| 短语错误 | 「加密短语不正确」 |
+
+**测试**：`test/s3-client.test.js`（路径/签名/XML 解析/降级）、`test/s3-crypto.test.js`（加解密往返）。
+
+---
+
+## 15. 扩展打包选择 · 每包 Git · 响应式单一判据（2026-11-11 用户裁定）
+
+### 15.1 扩展管理的「打包」页
+
+- 位置：`#extension-view` 的三个页签之一（宿主 / 开发者 / 打包）；宿主页常显安装报告条于面板底部，
+  底部另有可完全收起的「安装扩展」折叠区（`#extmgr-install-block`，默认收起）。
+- 组织方式：**跟随图表逻辑**——每个已载入数据包一组，不切包；组头显示包名、已选数、模式与 Git 选择器。
+- 粒度：一个扩展目录一行（`src/core/ext-pack.js` 的 `extensionUnitsOf`）。路径形态覆盖
+  `extensions/<n>`、`extensions/third-party/<n>`、`public/scripts/extensions/third-party/<n>`、
+  `data/extensions/third-party/<n>`、`_tauritavern/extension-sources/<n>.json`。
+  **`third-party/` 必须优先判定**，否则整个第三方目录会被折成一个叫 `third-party` 的假扩展。
+- 勾选语义：写 `state.sel['pkg:'+id+'::'+leaf.id]`，与图表树**同源**；任一侧改动后另一侧重渲染即同步。
+- 「本体全量」= **只过滤扩展**：聊天 / 角色 / 世界书等类目仍按图表树勾选，两侧互不影响。
+- 仅清单态（`extensionManifestOnly(pkg)`）下勾选不生效，界面如实标注并禁用，不假装可选。
+- 产物仍按目标宿主布局生成（选择只决定哪些扩展条目被写出，不改目标映射）。
+
+### 15.2 每包 Git 模式
+
+- `state.gitModeByPkg[pkgId]`；未设置时回落到全局 `state.gitMode`（偏好里的默认值）。
+- `getExportOptions(pkg)` 与合并计划的 `optionsByPkg` 都走 `packageGitMode(pkg)`，因此两次转换可以不同。
+- 图表卡 `[data-gitmode="<pkgId>"]` 与打包页 `[data-packgit="<pkgId>"]` 写同一份状态。
+
+### 15.3 响应式：`data-view` 是唯一判据（真实事故）
+
+- **事故**：JS 在 `window.innerWidth <= 640` 切手机态，CSS 在 `@media (max-width:860px)` 就堆叠；
+  641–860px 出现「布局已堆叠、但切页行只有 2 个按钮（无数据包）」⇒ 数据包面板只能缩在下方且无法完整查看。
+- **规则**：窄屏判定只有一个来源——`detectView()` 读容器宽度（`#app` 的 `getBoundingClientRect().width`，
+  为 0 时回退 `window.innerWidth`），阈值 `MOBILE_MAX_WIDTH = 860`，写 `#app.dataset.view`；
+  CSS 不再写第二套 `@media` 布局，只认 `[data-view="mobile"]`。
+- 容器尺寸变化必须重判：`ResizeObserver(#app)` + `requestAnimationFrame` 合帧（插件模态拉宽时 window 尺寸不变）。
+- 切页行始终在滚动容器之外；手机态必须有 3 项（存储图表 / 数据包 / 扩展管理）；桌面态数据包列常显。
+- **2026-11-11 修订**：切换按钮不再占用页头下的独立行，改为落在**各面板自己的面板头**里
+  （`#chart-card` / `#extension-view` / `#zone-card` 三处 `[data-view-switch]` 宿主；
+  桌面只渲染 2 项、数据包宿主为空且 `hidden`；手机渲染 3 项）。桌面端页头下没有切换行。
+  手机端面板头分两行：上一行切换按钮、下一行原面板按钮（`.panel-head--switch` 在 `[data-view="mobile"]` 下换行）。
+- 行序：`.app-main` 直接位于 `.app-body` 首位（全局动作条已取消）。
+
+### 15.4 验收
+
+- `test/ext-pack.test.js`（6 项：五种路径形态 / third-party 优先 / 体积求和 / 清单叶子）。
+- `scripts/ui-verify-responsive.cjs`（本地专属）：1280/900/800/700/500/380 六档，断言无横向溢出、
+  `data-view` 与按钮数一致、手机态可切到数据包、扩展管理 4 个 tab。
+- `scripts/ui-verify-ext-pack.cjs`（本地专属）：载入 `fixtures/fixture-l.zip`，断打包页勾选 ↔ 图表树
+  `group:extensions` 双向同步、每包 Git 改 `strip` 后保持。
+
+## 16. 迁移与备份面板头同构（2026-11-11 用户裁定）
+
+**契约**：`#transfer-view` 的面板头与 `#chart-card` / `#extension-view` **完全同一套 DOM 与渲染逻辑**，
+不得为它另写标题块、独立页签渲染或独立关闭逻辑。
+
+```
+<section class="panel transfer-view" id="transfer-view" hidden>
+  <div class="panel-head panel-head--switch">
+    <div class="view-switch" data-view-switch></div>       ← renderViewSwitch() 统一渲染
+    <div class="panel-actions">
+      <div class="segmented transfer-tabs" id="transfer-tabs">  ← 只有这两个页签
+        <button class="seg-btn" data-transfer-tab="lan">局域网互传</button>
+        <button class="seg-btn" data-transfer-tab="cloud">云端仓库</button>
+      </div>
+    </div>
+  </div>
+  ...
+```
+
+- 切换行内容由 `renderViewSwitch()` 决定：桌面 `存储图表 / 扩展管理 / 迁移与备份`，
+  手机再加 `数据包`；`迁移与备份` 打开时该项为 active。**不为迁移面板做第二套切换渲染。**
+- **禁止** `.panel-title`（迁移标题块）与任何 `×` 关闭按钮；离开迁移面板只能点切换行里的
+  `存储图表` / `扩展管理`（`#view-workbench` 上既有的 `[data-wbview]` 委托已覆盖）。
+- 页签仍是 `.panel-actions` 内的 `.segmented > .seg-btn`，与 `#extmgr-tabs` 同构，
+  **不新增容器、不新增样式**。
+- 手机形态沿用 `.panel-head--switch` 既有两行规则（第一行切换按钮，第二行面板动作）。
+
+**判据**（`scripts/ui-shot-transfer-head.cjs`，本地专属）：
+
+- `#transfer-view .panel-head` 的 class 含 `panel-head--switch`，内部存在 `[data-view-switch]`；
+- 切换按钮文本为 `存储图表 / 扩展管理 / 迁移与备份`，active 为 `迁移与备份`；
+- `#transfer-close-btn` 不存在，`#transfer-view` 内 `×` 按钮数为 0；
+- `.panel-title` 不存在；`#transfer-tabs` 内只有 `局域网互传 / 云端仓库` 两项；
+- 点切换行的 `存储图表` 后 `#transfer-view` 隐藏、`#chart-card` 显示。
+
+## 17. 数据包页签行 / 恢复模式 / 演示数据 / 教程模式（2026-11-11 用户裁定）
+
+### 17.1 恢复模式归位
+
+- `#zone-tabs` 一行内：左侧 `导入 / 导出` 两个页签，右侧同一行放
+  `#btn-fetch`（仅导入）+ `#zone-mode-extra` + `#zone-mode-row`（`恢复模式` 标签 + `覆盖 / 增量`）。
+- `#zone-mode-row` **不再**是页签下方的独立行；`renderZoneModeRow()` 仍按 `state.zone` 控制显隐。
+- `chart.deltaLabel` 文案为「恢复模式 / Restore mode」；不得再出现「数据包模式」。
+
+### 17.2 待导出两列区块已删除
+
+- 模板中**不得**再出现 `#pending-exports` / `.pending-head` / `.pending-row`。
+- 导出队列（`ExportQueue`）条目改为在**导出区列表**中渲染（`pendingCardHtml()`），
+  仍提供下载 / 存入工作区 / 移除，动作走 `pendingDownload` / `pendingStash` / `pendingRemove`。
+- 对应 CSS 与 `pending.title` / `pending.clear` 文案一并删除，禁止残留死引用。
+
+### 17.3 演示数据（教程模式）
+
+- 演示包数与体积区间由 `buildDemoPackages()` 决定（当前 7 个导入包、16 MB–4 GB，**四个宿主全覆盖**且同宿主可多包）。
+  教程文案必须经 `demoPackageStats()` 插值（`{count}/{min}/{max}`），**禁止在 i18n 写死**区间——插件更新后自动跟随。
+- 导出区至少 3 个包，另可含 1 个转换产物条目。
+- `enterTutorialMode()` 的默认选中源取「第一个导入包」，禁止写死旧 id（曾写死 `demo-st` 导致选中失效）。
+
+### 17.4 教程模式生命周期
+
+- 教程最后一步点「下一步」**只回到目标菜单**，不退出演示模式；退出有两条显式路径：
+  头部教程开关 `#btn-guide`、横幅「退出教程」。
+- 教程模式图标为书本图标，**不得**再用 `?`（`?` 仅用于面板帮助按钮）。
+- 迁移与备份面板头必须有 `help-btn[data-help="transfer"]`，内容含局域网互传 / 云端仓库 / 恢复模式三段。
+
+
+## 18. 扩展管理宿主页版式与安装页脚 / 数据包列 Git 页签（2026-11-11 第二轮用户裁定）
+
+### 18.1 宿主页版式（与存储图表同一套语言）
+
+```
+#extension-view
+  .panel-head            ← 切换行 + 页签 + ?
+  #extension-body
+    .ext-install
+      .ext-toolbar       ← 一行横线按钮：导出清单 / 检查更新 / 刷新 … 右端「排序」select
+      details.ext-host-list
+        summary.ext-summary   ← 只有标题 + .ext-count 徽标 + .ext-chev + 「点击展开 / 收起」
+        .ext-list-head        ← 共 N 项 + 拖拽提示 + 自动更新勾选组（全选 / 反选 / 取消）
+        .ext-list[role=list]  ← 每条 [data-extrow][role=listitem]，带拖拽手柄
+      details.ext-server-block ← 仅管理员
+      更新检查结果
+  .ext-footer#extmgr-install-block  ← 固定页脚（面板级，不在 #extension-body 内）
+  .ext-report-bar
+```
+
+- 顶部必须是**横线工具条**（`border-bottom`，与 `.chart-controls` 同形），不得把按钮散落在正文。
+- 折叠头（summary）**只写标题**；数量只允许出现在**列表头** `.ext-list-head`（`共 N 项`）或 `.ext-count` 徽标里。
+  **禁止** `已装扩展（0 个，点击折叠）` 这类把数量 / 操作提示塞进标签的写法。
+- 每个可折叠块都必须让人一眼看出「能点开」：`.ext-chev` 箭头 + `cursor:pointer` + `点击展开 / 收起` 提示；
+  展开后箭头旋转 180°、提示隐藏。
+- 列表必须是 DOM 结构（容器 + 行 + 列表语义），不得渲染成裸文本行；行可拖拽排序，
+  自定义顺序存 `settings.extOrder`，排序方式存 `settings.extSort`。
+- **安装扩展 = 面板固定页脚**：在 `#extension-body` 之后、`#extmgr-report-bar` 之前；页脚底边与报告条顶边相接
+  （间隙 0），展开区在按钮上方并自带上限滚动（向上展开）。宿主/开发者/打包页切换与报告展开时由
+  `syncExtInstallBlock()` 控制显隐，按钮监听器只在 `bind()` 绑定一次。
+
+### 18.2 数据包列「数据包 / Git」页签
+
+- 数据包列面板头 `.panel-actions` 内新增 `.segmented#zone-side-tabs`（`数据包 / Git`），
+  **常显**（2026-11-11 第三轮裁定：不再用开发者模式开关藏起来）。
+- 数据包内容放进 `#zone-side-zone`，Git 内容放进 `#zone-side-git`（`.git-viz`），二者同一列内互换；
+  渲染入口 `renderZoneSide()`（`renderAll()` / `applySettings()` / 页签点击都会调用）。
+- 手机形态不新增入口：Git 仍是「数据包」视图内的页签（`syncMainView()` 的行不作为第二套判据）。
+
+**判据**（本地 Playwright）：`#zone-side-tabs` 常显（`hidden === false`）且两个页签可互换；
+宿主页 `.ext-toolbar .btn` 数量 ≥ 3 且存在 `[data-extsort]`；`.ext-list-head` 文本含 `共 N 项`；
+summary 文本不含「点击折叠」；`#extmgr-install-block` 与 `#extmgr-report-bar` 间隙 0；
+每行有 `[data-upmode]` / `[data-upinterval]`（`min=5`）/ 更新 / 卸载；列表头有批量更新与批量卸载。
+
+### 18.3 教程浮层：卡片居中 + 字号（2026-11-11 第三轮）
+
+- **教程卡片一律居中于浮层**：`centerTutorialCard()` 用 `left/top:50% + translate(-50%,-50%)`，
+  不再跟随目标元素；目标高亮环（`#tutorial-ring`）仍按锚点定位。
+- 段落 / 目标名 / 目标说明字号为 12 / 12.5 / 11.5px；`#app` 基准字号仍是 14px。
+- **判据**：卡片中心与浮层中心偏差 `|dx| ≤ 1px`、`|dy| ≤ 1px`；`?` 帮助按钮必须有可见的 `?` 字符。
+
+## 19. Web 模式扩展读取、云端三层卡片与勾选联动交互（2026-11-16 用户裁定）
+
+1. **Web 模式扩展管理**：
+   - 严禁在 Web 模式或非宿主 tab 触发宿主扩展异步拉取阻断，防止永久卡在“正在读取已装扩展…”；
+   - 未选包或无可用包时展示明确的空状态引导卡片（`.ext-pkg-empty-hint`），并在日志输出 `INFO`；
+   - 选包后立即解析并渲染包内扩展条目，产生 `SUCCESS` 级日志（输出原件与清单统计），空包产生 `WARN`；
+2. **云端仓库卡片体系与层级顺序**：
+   - 第一位：具体云存储配置（`.cloud-storage-config-card`），Header 直接集成带有图标的 S3/WebDAV 切换分段按钮；
+   - 第二位：云端备份与同步操作（`.cloud-action-card`），大主操作按钮 + 已选包状态胶囊 + 状态流光栏；
+   - 第三位：备份策略与模式（`.cloud-strategy-card`），全量/增量模式与保留策略；
+3. **数据包勾选与视图智能联动**：
+   - 在 `transfer`（WebDAV / S3 / 局域网）视图下，右侧工具栏提示自动切换为【勾选目标包】，彻底移除图表专属的“外框显示”；
+   - 在 `transfer` 视图下，点击数据包卡片任意位置直接联动切换勾选（`selectedPkgs`），已选包数量和操作按钮实时响应；
+   - 勾选与取消勾选、全选/反选/清空、协议切换全链路输出结构化分级日志。

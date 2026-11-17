@@ -1,3 +1,7 @@
+<!-- RULES-POINTER v1 -->
+本仓工程规则唯一真源：`RULES.md`（30 条）+ `RULES-DETAILS.md`（82 条细则）。动手前先读；收尾前跑 `npm run verify:rules`。
+本文件不得复制 RULES.md 条文；冲突一律以 RULES.md 为准。
+
 <!-- IRON-RULE:REPORT-ALL-WRITES v1 (2026-11-11 用户铁律，禁止删除) -->
 # 铁律 0：任何配置写入与工具调用，必须全程出声（不可静默）
 
@@ -763,7 +767,7 @@ junction**。同步器按"路径"逐条写入 ⇒ **1090 条穿透写进了那�
 
 <!-- TAVERN-RULES:END -->
 
-## 项目覆盖（2026-11-05 追加，用户明令）
+## 项目细则补充（2026-11-05 追加，用户明令）
 
 1. **文档先行 / 禁止直接读源码理解功能**（MUST）：先查 `docs/DEVELOPER-GUIDE.md`、`.trellis/spec/`、
    `mini-trellis mem recall`；文档不足先补文档。只有进入编辑阶段才允许读目标源码片段，读完回流文档。
@@ -797,7 +801,7 @@ SillyTavern / Luker / TauriTavern / PureTavern 数据包互转工具，三形态
 - `src/ui/` — UI 模块（可 DOM）：`workbench-template.js`（HTML 模板唯一来源，`getWorkbenchHtml()` 无参数）、`workbench-view.js`（视图渲染：图表 / 选择树 / 配额 / 设置视图）、`host-bridge.js`（宿主嗅探/CSRF/备份拉取/恢复/扩展安装器，**含 `hostLayoutCode()`：宿主平台 luker→l 映射，宿主导出 target 必须经它归一**）、`export-queue.js`（产物待导出区）、`lan-transfer-panel.js`、`settings-panel.js`、`chat-store-bridge.js` / `chat-store-inject.js`（聊天库唯一接缝）、`qr.js`、`escape.js`；根 `index.js` 是根控制器
 - `src/storage/db.js` — IndexedDB 封装（DB_VERSION 2，files store 带 `origin` 字段：upload/host-export/converted/delta/split-part）
 - `src/vendor/` — zip.js / fzstd 本地副本，勿升级改动
-- `test/` — Vitest（本地专属目录，**永不入库/永不上云**，见铁律 21；`npm test` 当前 956 passed / 2 skipped）
+- `test/` — Vitest（**已纳入版本控制**，见 `.gitignore` 注记「测试目录按用户最新要求不再忽略」；`npm test` 当前 956 passed / 2 skipped）
 - `docs/superpowers/specs/` 与 `docs/superpowers/plans/` — 设计规格与实施计划；`docs/research/` — Luker 机制研究报告
 - `.trellis/` — Trellis 任务系统（见上方 TRELLIS 块）
 
