@@ -71,4 +71,15 @@ describe('实色填充与手机滚动防回归（2026-11-17 用户裁定）', ()
   it('触屏走桌面布局时的小控件有可点尺寸兜底', () => {
     expect(css).toMatch(/@media \(pointer: coarse\)\{[\s\S]*?\.tree-toggle\{width:24px;height:24px\}/);
   });
+
+  it('手机扩展动作行必须换行，不得无暗示横滚 + 半截按钮（UI-05）', () => {
+    const body = ruleBody('#app.app-container[data-view="mobile"] .ext-unified-actions{');
+    expect(body).toContain('flex-wrap:wrap');
+    expect(body).toContain('overflow-x:visible');
+  });
+
+  it('未识别徽章与手机 toast 的可读性兜底（UI-06 / UI-02）', () => {
+    expect(css).toContain('--unknown: var(--muted);');
+    expect(css).toContain('#app.app-container[data-view="mobile"] .toast{top:auto;bottom:46px');
+  });
 });

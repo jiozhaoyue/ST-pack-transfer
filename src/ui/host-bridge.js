@@ -2549,7 +2549,7 @@ export async function renderExtensionInstallerModal(extensions, onFinish, option
         <p style="margin: 4px 0 0 0; font-size: 0.85rem; color: color-mix(in srgb, var(--SmartThemeBodyColor, #f2f4f8) 78%, transparent);">
           数据包已恢复。以下扩展将由酒馆以 <strong>depth: 1</strong> 浅克隆在线拉取，保留一键更新能力。
         </p>
-        <p style="margin: 2px 0 0 0; font-size: 0.78rem; color: #f9e2af;">
+        <p style="margin: 2px 0 0 0; font-size: 0.78rem; color: var(--SmartThemeQuoteColor, #f9e2af);">
           <i class="fa-solid fa-circle-info"></i> 在线安装需要<b>网络连通</b>、宿主<b>扩展安装端点可用</b>（部分部署或权限配置会禁用它），
           且<b>扩展仓库可访问</b>（私有仓需手动处理）。
         </p>
@@ -2573,7 +2573,7 @@ export async function renderExtensionInstallerModal(extensions, onFinish, option
       <div>
         <strong><i class="fa-solid fa-triangle-exclamation"></i> 检测到错误目录残留：</strong> 本地存在旧版/错误的 <code>data/&lt;user&gt;/extensions/third-party/</code> 文件夹，会导致插件识别失效。
       </div>
-      <button id="ext-btn-clean-anomaly" class="menu_button" style="padding: 4px 10px; font-size: 0.78rem; background: #f38ba8; color: var(--SmartThemeBodyColor, #14161c); font-weight: bold; border: none; border-radius: 4px; cursor: pointer; white-space: nowrap;">一键清理残留 third-party</button>
+      <button id="ext-btn-clean-anomaly" class="menu_button" style="padding: 4px 10px; font-size: 0.78rem; background: rgba(243,139,168,0.15); color: #f38ba8; font-weight: bold; border: 1px solid #f38ba8; border-radius: 4px; cursor: pointer; white-space: nowrap;">一键清理残留 third-party</button>
     </div>` : '')}
 
     <div id="ext-list-container" style="padding: 12px 20px; overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 8px;">
@@ -2594,7 +2594,7 @@ export async function renderExtensionInstallerModal(extensions, onFinish, option
       <button id="ext-btn-start" class="menu_button menu_button_icon" style="padding: 8px 20px; background: var(--SmartThemeQuoteColor, #f59e0b); border: none; color: var(--SmartThemeBodyColor, #14161c); font-weight: bold; cursor: pointer;">
         <i class="fa-solid fa-play"></i> <span>开始安装勾选项</span>
       </button>
-      <button id="ext-btn-reload" class="menu_button menu_button_icon" style="display: none; padding: 8px 20px; background: #a6e3a1; border: none; color: var(--SmartThemeBodyColor, #14161c); font-weight: bold; cursor: pointer;">
+      <button id="ext-btn-reload" class="menu_button menu_button_icon" style="display: none; padding: 8px 20px; background: rgba(166,227,161,0.16); border: 1px solid #a6e3a1; color: #a6e3a1; font-weight: bold; cursor: pointer;">
         <i class="fa-solid fa-rotate"></i> <span>刷新酒馆生效</span>
       </button>
     </div>

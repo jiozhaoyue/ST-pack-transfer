@@ -37,7 +37,7 @@
     --optional-bg: rgba(225, 138, 36, 0.14);
     --drop: var(--SmartThemeEmColor, rgb(145, 145, 145));
     --drop-bg: rgba(145, 145, 145, 0.16);
-    --unknown: var(--muted-2);
+    --unknown: var(--muted);
     --unknown-bg: rgba(145, 145, 145, 0.14);
     --shadow: 0 24px 70px var(--SmartThemeShadowColor, rgba(0, 0, 0, 0.5));
 
@@ -409,6 +409,15 @@
     gap:10px;padding:16px;margin:auto;place-items:stretch;justify-self:center;
     grid-column:1/-1;width:100%;max-width:680px}
   #app.app-container .chart-stack:has(> .chart-empty-guide){align-content:center;justify-items:center}
+  /* 带鱼屏（≥2200px 可用宽）：空态引导放大，避免两张小卡悬在巨大空白里。 */
+  @media (min-width: 2200px){
+    #app.app-container .chart-empty-guide{max-width:860px;gap:14px}
+    #app.app-container .empty-guide-card{padding:28px 20px}
+    #app.app-container .empty-guide-card .guide-icon{width:56px;height:56px}
+    /* 超宽下树行限宽居中：否则「标签 → 右侧徽章」出现 >1000px 空白，眼球横跳。
+       只限内容列，不缩面板本身。 */
+    #app.app-container .vol-card .chart-tree{max-width:1200px;margin:0 auto}
+  }
   #app.app-container .empty-guide-card{display:flex;flex-direction:column;align-items:center;text-align:center;gap:10px;padding:20px 16px;border-radius:12px;border:1px solid var(--border);background:var(--panel-2)}
   #app.app-container .empty-guide-card .guide-icon{width:44px;height:44px;border-radius:50%;background:var(--panel-3);display:flex;align-items:center;justify-content:center;color:var(--accent)}
   #app.app-container .empty-guide-card .guide-title{font-size:13.5px;font-weight:600;color:var(--text)}
@@ -1008,6 +1017,9 @@
   #app.app-container .ext-sel-group{display:inline-flex;align-items:center;gap:3px}
   #app.app-container .ext-unified-actions{display:inline-flex;align-items:center;gap:6px;flex:0 1 auto;flex-wrap:nowrap;margin:0;overflow-x:auto;scrollbar-width:none}
   #app.app-container .ext-unified-actions::-webkit-scrollbar{display:none}
+  /* 手机（2026-11-17 视觉审计 UI-05）：动作行禁止「无暗示横滚 + 半截按钮」。
+     320 宽实测「转成清单」被拦腰裁切；改为换行，功能按钮全显示。 */
+  #app.app-container[data-view="mobile"] .ext-unified-actions{flex-wrap:wrap;overflow-x:visible;row-gap:6px}
   #app.app-container .ext-act-btn{padding:3px 9px;font-size:11px;font-weight:500;display:inline-flex;align-items:center;gap:5px;border-radius:6px;line-height:1.4;white-space:nowrap}
   #app.app-container .ext-act-btn:disabled{opacity:.4;cursor:not-allowed}
   #app.app-container .ext-head-right{display:inline-flex;align-items:center;gap:6px;flex:0 0 auto}
@@ -1506,6 +1518,10 @@
     font-size:11.5px;color:var(--text);box-shadow:var(--shadow);opacity:0;pointer-events:none;
     transition:opacity .18s ease,transform .18s ease;max-width:calc(100% - 32px)}
   #app.app-container .toast.show{opacity:1;transform:translate(-50%,0)}
+  /* 手机：toast 落到内容区底部，别在出现的前 3 秒盖住页头的设置/主题控件。
+     它本身 pointer-events:none，不拦点击；这里只解决视觉遮挡。 */
+  #app.app-container[data-view="mobile"] .toast{top:auto;bottom:46px;transform:translate(-50%,10px)}
+  #app.app-container[data-view="mobile"] .toast.show{transform:translate(-50%,0)}
 
   /* 教程浮层：**必须挂在 document.body**（index.js portalTutorialOverlay）。
      宿主抽屉/模态祖先常带 transform / filter / 滚动容器，position:fixed 会被困进祖先坐标系，
@@ -1693,6 +1709,8 @@
     grid-template-areas:"main size extra";align-items:center;column-gap:5px;row-gap:0;
     min-height:46px;padding:4px 6px 4px calc(6px + var(--depth, 0) * 9px)}
   #app.app-container[data-view="mobile"] .tree-check{width:20px;height:20px}
+  /* 包卡复选框热区与树内一致抬到 20px（2026-11-17 视觉审计 UI-10）。 */
+  #app.app-container[data-view="mobile"] .pkg-check{width:20px;height:20px}
   #app.app-container[data-view="mobile"] .tree-toggle{width:28px;height:28px}
   /* 2026-11-17：触屏但走桌面布局（平板横屏 / Duo 展开 / 触控笔记本）时，
      桌面态的 16px 折叠箭头与紧凑文字按钮低于可点尺寸——统一抬到 24/28px。 */
@@ -1783,6 +1801,16 @@
   /* 手机页头：**宽度够就显示标题**，放不下整名降级为项目符号 ⇄（2026-11-15 裁定：禁止省略号）；
      徽标文字必须保留（U1/U2）。不再无条件 display:none。 */
   #app.app-container[data-view="mobile"] .app-title{display:flex;flex:0 1 auto;min-width:0}
+  /* 极窄屏（≤340px）：页头允许换行，把右侧动作整行下移。
+     2026-11-17 实测 280 宽：页头内容 295px > 容器 242px，设置按钮右缘到 314px（屏外 34px）。
+     规则：空间不足先换行/堆叠，功能按钮一个都不能少。 */
+  @media (max-width: 340px){
+    #app.app-container[data-view="mobile"] .app-header{flex-wrap:wrap;row-gap:6px}
+    #app.app-container[data-view="mobile"] .header-actions{flex:1 0 100%;min-width:0;
+      flex-wrap:wrap;justify-content:flex-end;row-gap:4px}
+    /* 极窄屏空态改单列：两列各约 100px 会把说明文字压成碎行。 */
+    #app.app-container[data-view="mobile"] .chart-empty-guide{grid-template-columns:minmax(0,1fr)}
+  }
   #app.app-container[data-view="mobile"] #host-badge{flex:0 0 auto;height:24px;padding:0 8px;font-size:10.5px;
     border-color:var(--border-strong)}
   #app.app-container[data-view="mobile"] .badge .host-icon,
