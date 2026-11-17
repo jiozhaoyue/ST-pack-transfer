@@ -750,7 +750,7 @@
   #app.app-container .pkg-icon[data-host="file"] .tree-ico{color:var(--target-accent)}
   /* Luker 的图标是纯黑剪影，深色底上必须垫浅底 */
   #app.app-container .pkg-icon[data-host="luker"], #app.app-container .host-icon[data-host="luker"]{
-    background:#eceef2; border-radius:8px; padding:2px}
+    background:var(--icon-plate); border-radius:8px; padding:2px}
   #app.app-container .host-icon[data-host="luker"]{padding:1px;border-radius:5px}
   #app.app-container .host-icon[data-host="luker"], #app.app-container .host-icon[data-host="st"], #app.app-container .host-icon[data-host="tt"], #app.app-container .host-icon[data-host="pt"]{object-fit:contain}
   #app.app-container .pkg-info{min-width:0;flex:1 1 auto}
@@ -1908,7 +1908,7 @@
 #app.app-container .lan-detail{flex:1 0 100%;font-size:9px;color:var(--muted)}
 #app.app-container .lan-detail:empty{display:none}
 #app.app-container .lan-scan{display:flex;flex-direction:column;gap:6px;border:1px solid var(--border);border-radius:8px;padding:6px;background:var(--panel-3)}
-#app.app-container .lan-scan video{width:100%;max-height:220px;border-radius:6px;background:#000;object-fit:cover}
+#app.app-container .lan-scan video{width:100%;max-height:220px;border-radius:6px;background:var(--video-bg);object-fit:cover}
 #app.app-container .lan-scan-actions{display:flex;align-items:center;justify-content:space-between;font-size:10px;color:var(--muted)}
 #app.app-container .lan-scan-error{margin:0;font-size:10px;color:var(--optional)}
 @media (max-width:860px){

@@ -18,6 +18,8 @@ export const UI_TOKENS = Object.freeze({
     bg: '#0b0b0d',
     'ink-on-accent': '#fff',
     'qr-bg': '#fff',
+    'icon-plate': '#eceef2',
+    'video-bg': '#000',
   }),
   brand: Object.freeze({
     st: '#d32f2f',
