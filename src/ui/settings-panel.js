@@ -386,10 +386,10 @@ export function buildSettingsHtml(settings = {}) {
 
   const netGroup = '<label class="et-git"><span>' + t('settings.netProxy') + '</span>'
     + '<input class="text_pole" type="url" data-setting="netProxyUrl" placeholder="' + t('settings.netProxyPlaceholder')
-    + '" value="' + (s.netProxyUrl || '') + '"></label>'
+    + '" value="' + escapeHtml(s.netProxyUrl || '') + '"></label>'
     + '<label class="et-git" style="margin-top:6px"><span>' + t('settings.docsBaseUrl') + '</span>'
     + '<input class="text_pole" type="text" data-setting="docsBaseUrl" placeholder="' + t('settings.docsBaseUrlPlaceholder')
-    + '" value="' + (s.docsBaseUrl || '') + '"></label>'
+    + '" value="' + escapeHtml(s.docsBaseUrl || '') + '"></label>'
     + '<div class="ext-note">' + t('settings.docsBaseUrlNote') + '</div>'
     + (() => {
       const href = resolveDocsBase(s.docsBaseUrl);

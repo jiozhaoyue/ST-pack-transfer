@@ -211,7 +211,36 @@ export const zipIo = {
     bufferedWrite = false,
   } = {}) {
     const isFilePath = typeof destination === 'string';
-    const writerTarget = isFilePath ? new zip.Uint8ArrayWriter() : destination;
+    /* 2026-11-18（分卷同源修复 · 设计稿方案 B 变体）：对 **BlobWriter 形态**的目的地做
+       「原型继承计数包装」——只覆写 `writable` getter，把字节流导向一个计数
+       TransformStream 后再流入原生 writer：
+       - `getData()` / `close()` 走原型继承，语义零变化（8 处调用方无感）；
+       - `getWritten()` 实测与最终 `blob.size` **精确相等**（含中央目录；2026-11-18 实证）；
+       - 仅包装 BlobWriter：Uint8ArrayWriter（文件路径分支）继承形态下 vendor 抛
+         「Writer not initialized」，且该分支消费 close() 返回值而非 getData——不包装，
+         `getWritten()` 返回 -1，splitter 对负值回退旧估算（防御性降级）。
+       数据源：分卷阈值判定此前按未压缩源字节（F-01），现在可用实测产物字节同源判定。 */
+    let counter = null;
+    let writerTarget = isFilePath ? new zip.Uint8ArrayWriter() : destination;
+    if (!isFilePath
+      && destination instanceof zip.BlobWriter
+      && typeof destination.writable?.getWriter === 'function') {
+      let bytes = 0;
+      const ts = new TransformStream({
+        transform(chunk, controller) {
+          bytes += (chunk?.byteLength ?? 0);
+          controller.enqueue(chunk);
+        },
+      });
+      // 历史事故规避（2026-09-26）：pipeTo 的拒绝必须显式接住并转发 abort，
+      // 绝不允许未处理拒绝杀死 Node 进程。
+      ts.readable.pipeTo(destination.writable)
+        .catch((err) => { try { destination.abort?.(err); } catch { /* 忽略 */ } });
+      counter = { written: () => bytes, abort: (e) => ts.writable.abort(e).catch(() => {}) };
+      writerTarget = Object.create(destination);
+      Object.defineProperty(writerTarget, 'writable', { get: () => ts.writable });
+      writerTarget.getWritten = () => bytes;
+    }
     const writer = new zip.ZipWriter(writerTarget, { level, bufferedWrite });
     const written = new Set();
     /**
@@ -426,6 +455,13 @@ export const zipIo = {
        */
       getStoreStats: () => ({ ...storeStats }),
 
+      /**
+       * 实测已写入目的地的累计字节（含条目数据与中央目录，与最终 blob.size 同源）。
+       * 仅 BlobWriter 形态支持；其余形态返回 -1（调用方按「不支持」回退估算）。
+       * @returns {number} 累计字节数；不支持时 -1
+       */
+      getWritten: () => (counter ? counter.written() : -1),
+
       async close() {
         // 收齐**全部**未完成条目（含仍在排队的）再关闭 —— 只等 `inflight` 会漏掉排队者，
         // 产出「少了条目却看着完整」的包。收齐后中央目录才完整。
@@ -440,6 +476,9 @@ export const zipIo = {
       },
 
       async abort() {
+        /* 2026-11-18：abort 同时中止计数流——pipeTo 拒绝 → destination.abort(err)，
+           原生 writer 收到中止；此前 counter.abort 无调用方，abort 传播链半闭环。 */
+        if (counter) counter.abort(new Error('writer aborted'));
         await Promise.allSettled([...pending].map((p) => p.catch(() => {})));
       },
     };

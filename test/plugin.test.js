@@ -9,7 +9,10 @@ describe('SillyTavern 标准插件工程结构 (ST-pack-transfer)', () => {
     const manifest = JSON.parse(await readFile('manifest.json', 'utf8'));
     expect(manifest.name).toBe('ST-pack-transfer');
     expect(manifest.display_name).toBe('数据包转运');
-    expect(manifest.version).toBe('0.5.3');
+    // 2026-11-18：改为跨文件一致性不变量（manifest ↔ package.json 同步）——
+    // 硬编码具体版本会让每次发布都碎一次测试。
+    const pkg = JSON.parse(await readFile('package.json', 'utf8'));
+    expect(manifest.version).toBe(pkg.version);
     expect(manifest.author).toBe('jiozhaoyue');
     expect(manifest.js).toBe('index.js');
     expect(manifest.css).toBe('style.css');

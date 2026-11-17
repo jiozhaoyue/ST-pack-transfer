@@ -33,6 +33,19 @@ const ICE_TIMEOUT_MS = 6000;
 const OPEN_TIMEOUT_MS = 15000;
 const ACK_INTERVAL_MS = 250;
 const ACK_THRESHOLD_BYTES = 1024 * 1024;
+/* 2026-11-18 写链合并（DESIGN-split-lan-fixes.md 设计二 3.1）：接收端攒批写盘——
+   1 MiB 或 30ms 先到先触发，批任务拼单次 write；write 调用次数 ÷16（1 MiB / 64KB），
+   链上任务从「每块一个」降到「每批一个」。pending 上界 = 1 MiB + 1 块。 */
+const BATCH_WRITE_BYTES = 1024 * 1024;
+const BATCH_WRITE_MS = 30;
+/* 2026-11-18 信用流控（设计二 3.2）：复用既有 ack 帧做 8 MiB 信用窗口——
+   发送端 `offset - lastAckedBytes ≥ 窗口` 时暂停发送，等对端 ack 推进；不新增协议帧。
+   250ms 的 ack 时间条件保证窗口至少每 250ms 推进一次，无死锁；
+   快链路几乎不停顿，慢链路被对端写速自然限流。 */
+const CREDIT_WINDOW = 8 * 1024 * 1024;
+/* 信用等待超时：超时=信任对端继续（用户裁定）——重置账本退回 bufferedAmount 本地门限兜底，
+   不悬挂、不误杀慢对端；对端真死时 bufferedAmount 卡住 + 通道关闭走既有失败路径。 */
+const ACK_STALL_TIMEOUT_MS = 10_000;
 /* 2026-11-17 吞吐修复：每块都 setSend/setRecv 会触发 renderLan() 全量 DOM 重绘，
    成为接收端串行消费瓶颈（1GB 包约 16384 次重绘，实测仅 ~300KB/s）。
    进度 UI 节流到 120ms 一次；速率采样 rateSamples 不受影响，终态仍强制刷新。 */
@@ -64,6 +77,78 @@ function onceEvent(target, type, timeoutMs) {
     const onEvent = () => finish(true);
     const timer = setTimeout(() => finish(false), timeoutMs);
     target.addEventListener(type, onEvent, { once: true });
+  });
+}
+
+/** 把攒下的块拼成单个 Uint8Array（一次性分配 pendingBytes）；单块直达时原样返回，零拷贝。 */
+export function mergeChunks(chunks, totalBytes) {
+  if (chunks.length === 1) return chunks[0];
+  const merged = new Uint8Array(totalBytes);
+  let pos = 0;
+  for (const chunk of chunks) {
+    merged.set(chunk, pos);
+    pos += chunk.byteLength;
+  }
+  return merged;
+}
+
+/**
+ * 接收端攒批器（纯逻辑，Node 可测；装配在 bindReceiverChannel）。
+ * 「N 字节或 T ms 先到先触发」：批满立即 flush；否则首块入队起计时，到点 flush 兜底
+ * （慢速链路批不满时避免写盘饥饿）。flush() 同步拼接 pending 并交给 onFlush，
+ * 返回 onFlush 的返回值（通常是被挂上写链的 promise）；pending 为空时是 no-op 返回 null。
+ */
+export function createChunkBatcher({ batchBytes = BATCH_WRITE_BYTES, batchMs = BATCH_WRITE_MS, onFlush } = {}) {
+  let pending = [];
+  let pendingBytes = 0;
+  let timer = null;
+  const clearTimer = () => { if (timer) { clearTimeout(timer); timer = null; } };
+  function flush() {
+    clearTimer();
+    if (pendingBytes <= 0) return null;
+    const merged = mergeChunks(pending, pendingBytes);
+    pending = [];
+    pendingBytes = 0;
+    return onFlush(merged);
+  }
+  function push(chunk) {
+    pending.push(chunk);
+    pendingBytes += chunk.byteLength;
+    if (pendingBytes >= batchBytes) { flush(); return; }
+    if (!timer) timer = setTimeout(() => { timer = null; flush(); }, batchMs);
+  }
+  /** 丢弃 pending（cancel / 失败 / 新 meta）：丢的是「尚未写盘」的数据，校验必然失败，方向正确。 */
+  function reset() {
+    clearTimer();
+    pending = [];
+    pendingBytes = 0;
+  }
+  return { push, flush, reset, get pendingBytes() { return pendingBytes; } };
+}
+
+/**
+ * 发送端信用等待（设计二 3.2）：有界等 ack / ok / err 任意一帧（监听 message 事件，
+ * 与 bindSenderChannel 的 onmessage 属性互不干扰；ok/err 到达说明校验流程已接管，继续等 ack 无意义）。
+ * 到点返回 false——调用方按「信任对端继续」处理（用户裁定），绝不悬挂。
+ */
+export function waitForCreditAck(dc, timeoutMs) {
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (ok) => {
+      if (settled) return;
+      settled = true;
+      dc.removeEventListener('message', onMsg);
+      clearTimeout(timer);
+      resolve(ok);
+    };
+    const onMsg = (event) => {
+      if (typeof event.data !== 'string') return;
+      let msg = null;
+      try { msg = JSON.parse(event.data); } catch { return; }
+      if (msg.t === 'ack' || msg.t === 'ok' || msg.t === 'err') finish(true);
+    };
+    const timer = setTimeout(() => finish(false), timeoutMs);
+    dc.addEventListener('message', onMsg);
   });
 }
 
@@ -207,11 +292,51 @@ export function mountLanTransferPanel({ view, getSendTargets = null, onReceive =
   let doneWaiter = null;
   let cancelRequested = false;
   let rateSamples = [];
+  /** 接收端 ack 节流账本（已落写字节的 ack 基准）。与发送端信用账本分开——同一页面可同时收发。 */
   let ackBytes = 0;
   let ackAt = 0;
+  /** 发送端信用账本：对端最近一次 ack 回报的已落写字节。初值在 sendFile 里对齐续传起点。 */
+  let lastAckedBytes = 0;
   let lastRecvUiAt = 0;
   /** 内存兜底时的半成品；键为 fileId。OPFS 半成品直接读盘，不进这个表。 */
   const partials = new Map();
+
+  /* 接收端批写装配（设计二 3.1）：数据帧只进攒批器，写链上每批一个任务。
+     语义与旧逐块链逐条对应：等 sink 就绪（数据帧可先于 OPFS 打开到达，绝不丢块）→
+     单次 write → advanceReceived（按落写字节数推进，续传语义不变）→ UI 节流 → ack 判定（per-flush）。
+     错误沿既有 `.catch(err => failRecv(...))` 传播，形态不变。 */
+  const recvBatcher = createChunkBatcher({
+    batchBytes: BATCH_WRITE_BYTES,
+    batchMs: BATCH_WRITE_MS,
+    onFlush: (merged) => {
+      const current = incoming;
+      if (!current) { dbg('batch dropped: no incoming', merged.byteLength); return; }
+      writeChain = writeChain.then(async () => {
+        // 等 sink 就绪再写：数据帧可以来得比 OPFS 打开更早（实测首 8 块）。
+        const sink = current.sink || await current.sinkReady;
+        if (!sink) { dbg('batch dropped: sink unavailable', merged.byteLength); return; }
+        await sink.write(merged);
+        const bytes = sink.bytes;
+        current.batches = (current.batches || 0) + 1;
+        if (current.batches % 8 === 0) dbg('recv batch', current.batches, bytes, current.size);
+        try { machine.advanceReceived(merged.byteLength); } catch { /* 状态已终态 */ }
+        /* 进度 UI 节流：每批（而非每块）到达节流窗口才全量 renderLan()；
+           速率采样由 transferDetail()→rateOf() 在窗口内完成。
+           终态 100% 由 'done' 控制帧强制刷新，不受此节流影响。 */
+        const uiNow = Date.now();
+        if (uiNow - lastRecvUiAt >= UI_THROTTLE_MS) {
+          lastRecvUiAt = uiNow;
+          setRecv({ phase: t('lan.phase.receiving'), pct: progressPercent(bytes, current.size), detail: transferDetail(bytes, current.size) });
+        }
+        const now = Date.now();
+        if (bytes - ackBytes >= ACK_THRESHOLD_BYTES || now - ackAt >= ACK_INTERVAL_MS) {
+          ackBytes = bytes;
+          ackAt = now;
+          try { channel?.send(JSON.stringify({ t: 'ack', bytes })); } catch { /* 通道已断 */ }
+        }
+      }).catch((err) => failRecv(err.message));
+    },
+  });
 
   if (!capability.direct) {
     setSend({ phase: capability.reason, detail: t('lan.hintManual'), error: false });
@@ -232,6 +357,9 @@ export function mountLanTransferPanel({ view, getSendTargets = null, onReceive =
       doneWaiter = null;
       cb(false, t('lan.err.sessionClosed'));
     }
+    // abort/失败/页隐藏：丢弃攒批 pending（尚未写盘的数据，校验必然失败，方向正确）。
+    // 已入链批任务自然完成或失败，由 failRecv/closeSession 既有路径收尾。
+    recvBatcher.reset();
     if (incoming?.sink) {
       void incoming.sink.close();
       if (incoming.sink.kind === 'opfs') partials.delete(incoming.fileId);
@@ -323,7 +451,7 @@ export function mountLanTransferPanel({ view, getSendTargets = null, onReceive =
       if (typeof event.data !== 'string') return;
       let msg = null;
       try { msg = JSON.parse(event.data); } catch { return; }
-      if (msg.t === 'ack') { ackBytes = Number(msg.bytes) || 0; return; }
+      if (msg.t === 'ack') { lastAckedBytes = Number(msg.bytes) || 0; return; }
       if (msg.t === 'ok' && doneWaiter) { const cb = doneWaiter; doneWaiter = null; cb(true, ''); return; }
       if (msg.t === 'err' && doneWaiter) { const cb = doneWaiter; doneWaiter = null; cb(false, msg.message || t('lan.err.peerVerifyFailed')); }
     };
@@ -393,6 +521,9 @@ export function mountLanTransferPanel({ view, getSendTargets = null, onReceive =
     const total = file.size;
     const fileId = fileIdentity(file);
 
+    /* digest 策略（设计二 3.3 选项 a，2026-11-18 裁定）：≤512 MB 整块算 SHA-256；
+       超限两端都不算摘要，verifyTransfer 退字节核对并以 digestChecked:false 如实标注（既有语义）。
+       流式 sha256 需引入新 vendor 依赖（G-07 需授权），本版不落地，记为后续增强项。 */
     let digest = '';
     if (total <= DIGEST_MAX_BYTES) {
       try { digest = await sha256Hex(new Uint8Array(await file.arrayBuffer())); } catch { digest = ''; }
@@ -402,6 +533,8 @@ export function mountLanTransferPanel({ view, getSendTargets = null, onReceive =
     dbg('send meta', { total, fileId, digest: Boolean(digest), resumeFrom });
 
     let offset = Math.max(0, Math.min(Number(resumeFrom) || 0, total));
+    // 信用账本与续传起点同源：对端 sink.bytes 就是从这个起点接着落的（resume 语义不变）。
+    lastAckedBytes = offset;
     rateSamples = [{ t: Date.now(), b: offset }];
     let lastSendUiAt = 0;
     if (offset > 0) setSend({ pct: progressPercent(offset, total), phase: t('lan.phase.resuming'), detail: transferDetail(offset, total) });
@@ -409,6 +542,14 @@ export function mountLanTransferPanel({ view, getSendTargets = null, onReceive =
     while (offset < total) {
       if (cancelRequested) throw new Error(t('lan.err.cancelled'));
       if (dc.readyState !== 'open') throw new Error(t('lan.err.channelClosed'));
+      /* 信用门限（对端背压）：在飞未确认字节 ≥ CREDIT_WINDOW 时暂停，等 ack 推进。
+         本地 bufferedAmount 门限只反映「未发完」，对端写不动时它管不到——
+         两层独立限流（本地 4 MiB + 对端信用 8 MiB）合并成链积压的硬上界。 */
+      if (offset - lastAckedBytes >= CREDIT_WINDOW) {
+        const got = await waitForCreditAck(dc, ACK_STALL_TIMEOUT_MS);
+        if (!got) lastAckedBytes = offset; // 超时=信任对端继续（用户裁定）：窗口重置，退回本地门限兜底
+        continue;
+      }
       if (dc.bufferedAmount > HIGH_WATER_MARK) {
         await onceEvent(dc, 'bufferedamountlow', 250);
         continue;
@@ -545,6 +686,8 @@ export function mountLanTransferPanel({ view, getSendTargets = null, onReceive =
       return;
     }
 
+    /* digest 策略（设计二 3.3 选项 a）：≤512 MB 整块算 SHA-256，超限退字节核对 + digestChecked:false；
+       摘要失败 catch 后降级不崩（既有语义）。流式方案需新 vendor（G-07），本版不落地。 */
     let digest = '';
     if (expectedBytes <= DIGEST_MAX_BYTES) {
       try { digest = await sha256Hex(new Uint8Array(await blob.arrayBuffer())); } catch (err) {
@@ -611,6 +754,7 @@ export function mountLanTransferPanel({ view, getSendTargets = null, onReceive =
       ackAt = Date.now();
       lastRecvUiAt = 0;
       rateSamples = [{ t: Date.now(), b: 0 }];
+      recvBatcher.reset(); // 新文件开始：清掉旧残留 pending，批计时器一并复位
       writeChain = Promise.resolve();
       incoming = entry;
       dbg('recv meta', { size, fileId, digest: Boolean(entry.digest) });
@@ -636,6 +780,9 @@ export function mountLanTransferPanel({ view, getSendTargets = null, onReceive =
     if (msg.t === 'done' && incoming) {
       const expected = Number(msg.bytes) || incoming.size;
       dbg('recv done frame', expected);
+      // 先同步 flush 最后一批（不满批的数据此刻入链），再等整条写链走完才 finalize/校验——
+      // 保证 done 前所有字节都已落写，不会校验到残缺内容。
+      recvBatcher.flush();
       writeChain.then(() => finishReceive(expected, msg.digest || incoming.digest))
         .catch((err) => failRecv(err.message));
       return;
@@ -657,31 +804,9 @@ export function mountLanTransferPanel({ view, getSendTargets = null, onReceive =
       const chunk = event.data instanceof ArrayBuffer
         ? new Uint8Array(event.data)
         : new Uint8Array(event.data?.buffer || event.data || []);
-      const current = incoming;
-      writeChain = writeChain.then(async () => {
-        // 等 sink 就绪再写：数据帧可以来得比 OPFS 打开更早（实测首 8 块）。
-        const sink = current.sink || await current.sinkReady;
-        if (!sink) { dbg('chunk dropped: sink unavailable', chunk.byteLength); return; }
-        await sink.write(chunk);
-        const bytes = sink.bytes;
-        current.chunks = (current.chunks || 0) + 1;
-        if (current.chunks % 8 === 0) dbg('recv chunk', current.chunks, bytes, current.size);
-        try { machine.advanceReceived(chunk.byteLength); } catch { /* 状态已终态 */ }
-        /* 进度 UI 节流：每块全量 renderLan() 是接收端串行消费瓶颈（实测 ~300KB/s），
-           改为每 UI_THROTTLE_MS 一次；速率采样由 transferDetail()→rateOf() 在窗口内完成。
-           终态 100% 由 'done' 控制帧强制刷新，不受此节流影响。 */
-        const uiNow = Date.now();
-        if (uiNow - lastRecvUiAt >= UI_THROTTLE_MS) {
-          lastRecvUiAt = uiNow;
-          setRecv({ phase: t('lan.phase.receiving'), pct: progressPercent(bytes, current.size), detail: transferDetail(bytes, current.size) });
-        }
-        const now = Date.now();
-        if (bytes - ackBytes >= ACK_THRESHOLD_BYTES || now - ackAt >= ACK_INTERVAL_MS) {
-          ackBytes = bytes;
-          ackAt = now;
-          try { dc.send(JSON.stringify({ t: 'ack', bytes })); } catch { /* 通道已断 */ }
-        }
-      }).catch((err) => failRecv(err.message));
+      // 攒批入口（设计二 3.1）：块进 pending，凑满 1 MiB 或 30ms 到点由 onFlush 挂上写链——
+      // write 调用 ÷16、链上任务数 = 批数，内存上界 = pending(≤1 MiB+1 块) + 在飞批 ≤2。
+      recvBatcher.push(chunk);
     };
   }
 

@@ -1385,16 +1385,18 @@ export function supportsOpfs() {
  * @param {string} name
  * @param {boolean} [create=true]
  * @param {string} [dirName='fetch-tmp']
+ * @param {object} [opts] { quiet?: boolean } —— 预期内的「文件不存在」（如续传读侧
+ *   create:false 探测半成品）传 quiet:true，不打 WARN：缺文件=正常降级，不是故障。
  * @returns {Promise<FileSystemFileHandle|null>} OPFS 不可用时返回 null
  */
-export async function opfsTmpHandle(name, create = true, dirName = 'fetch-tmp') {
+export async function opfsTmpHandle(name, create = true, dirName = 'fetch-tmp', { quiet = false } = {}) {
   if (!supportsOpfs()) return null;
   try {
     const root = await navigator.storage.getDirectory();
     const dir = await root.getDirectoryHandle(dirName, { create: true });
     return await dir.getFileHandle(name, { create });
   } catch (err) {
-    logger.warn(`OPFS 文件句柄获取失败 (${err.message})，回退内存模式`);
+    if (!quiet) logger.warn(`OPFS 文件句柄获取失败 (${err.message})，回退内存模式`);
     return null;
   }
 }

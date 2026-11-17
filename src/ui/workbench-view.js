@@ -1314,20 +1314,27 @@ function renderTreeRows(nodes,depth,scope,readonly,tools,totalMb,drill,colorMap,
         + '<span class="ki-txt">'+t('chart.keepIncompatible')+'</span>'
       + '</label>'
       : '';
+    /* 2026-11-18：n.id/n.label/n.badge/n.note 直通 DOM——label/id 源自 ZIP 内路径（用户可控，
+       见 chart-model.js）⇒ 本行所有插值统一走转义别名（data-* 转义后 dataset 读取自动解码，
+       事件委托语义不变；修 workbench-view.js 文件头「动态值已转义」注释与实现不一致的漏网点）。 */
+    const idE=escapeHtml(n.id);
+    const labE=escapeHtml(n.label);
+    const badgeE=escapeHtml(n.badge||'');
+    const noteE=escapeHtml(n.note||'');
     const toggleHtml=hasKids
       ? (inMax
-        ? '<button class="tree-toggle vol-drill" data-voldrill="'+n.id+'" aria-label="'+t('chart.drill')+'" title="'+t('chart.drill')+'">'
+        ? '<button class="tree-toggle vol-drill" data-voldrill="'+idE+'" aria-label="'+t('chart.drill')+'" title="'+t('chart.drill')+'">'
           +'<svg class="chev" viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5l7 7-7 7"/></svg></button>'
-        : '<button class="tree-toggle" data-node="'+n.id+'" aria-label="'+t('chart.expand')+'">'
+        : '<button class="tree-toggle" data-node="'+idE+'" aria-label="'+t('chart.expand')+'">'
           +'<svg class="chev" viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5l7 7-7 7"/></svg></button>')
       : '<button class="tree-toggle empty" aria-hidden="true"></button>';
-    out+='<div class="tree-row'+(expanded?' expanded':'')+'" data-id="'+n.id+'" style="--depth:'+depth+'">'
+    out+='<div class="tree-row'+(expanded?' expanded':'')+'" data-id="'+idE+'" style="--depth:'+depth+'">'
       +'<span class="tree-main">'
       +toggleHtml
-      +'<input class="tree-check" type="checkbox" data-check="'+n.id+'"'+(checked?' checked':'')+(indeterminate?' data-ind="1"':'')+(readonly?' disabled':'')+'>'
+      +'<input class="tree-check" type="checkbox" data-check="'+idE+'"'+(checked?' checked':'')+(indeterminate?' data-ind="1"':'')+(readonly?' disabled':'')+'>'
       +(depth===0 && colorCls ? '<span class="tree-dot '+colorCls+'" aria-hidden="true"></span>' : '')
       +svg(n.icon,'tree-ico')
-      +'<span class="tree-label'+(inMax&&hasKids?' is-drill':'')+'"'+(inMax&&hasKids?' data-voldrill="'+n.id+'"':'')+' title="'+n.label+'">'+n.label+(n.badge?'<span class="sub">'+n.badge+'</span>':'')+(n.note?'<span class="sub">'+n.note+'</span>':'')+(nodePrivateIncompatible(n)?'<span class="sub is-incompat" title="'+t('private.incompatibleHint')+'">'+t('private.incompatible')+'</span>':'')+'</span>'
+      +'<span class="tree-label'+(inMax&&hasKids?' is-drill':'')+'"'+(inMax&&hasKids?' data-voldrill="'+idE+'"':'')+' title="'+labE+'">'+labE+(n.badge?'<span class="sub">'+badgeE+'</span>':'')+(n.note?'<span class="sub">'+noteE+'</span>':'')+(nodePrivateIncompatible(n)?'<span class="sub is-incompat" title="'+t('private.incompatibleHint')+'">'+t('private.incompatible')+'</span>':'')+'</span>'
       +extSuggestHtml
       +(showGenericPill?'<span class="tree-pill '+pillCls+'" title="'+pillText+'"><span class="pill-sym" aria-hidden="true">'+pillSym+'</span><span class="pill-txt">'+pillText+'</span></span>':'')
       +keepIncompatHtml
@@ -1337,11 +1344,11 @@ function renderTreeRows(nodes,depth,scope,readonly,tools,totalMb,drill,colorMap,
       +'<span class="tree-extra">'
         +extModeControlOf(n)
         +(hasKids && !readonly ? '<span class="row-bulk">'
-          +'<button data-suball="all" data-subnode="'+n.id+'" title="'+t('chart.selectAll')+'">✓</button>'
-          +'<button data-suball="none" data-subnode="'+n.id+'" title="'+t('chart.selectNone')+'">✕</button>'
-          +'<button data-suball="invert" data-subnode="'+n.id+'" title="'+t('chart.invert')+'">⇄</button>'
+          +'<button data-suball="all" data-subnode="'+idE+'" title="'+t('chart.selectAll')+'">✓</button>'
+          +'<button data-suball="none" data-subnode="'+idE+'" title="'+t('chart.selectNone')+'">✕</button>'
+          +'<button data-suball="invert" data-subnode="'+idE+'" title="'+t('chart.invert')+'">⇄</button>'
         +'</span>' : '')
-        +(drill && hasKids ? '<button class="tree-mini vol-drill" data-voldrill="'+n.id+'" title="'+t('chart.drill')+'">›</button>' : '')
+        +(drill && hasKids ? '<button class="tree-mini vol-drill" data-voldrill="'+idE+'" title="'+t('chart.drill')+'">›</button>' : '')
       +'</span>'
       +'</div>';
     if(hasKids && expanded && !inMax){
@@ -1514,11 +1521,14 @@ function chartCardHtml(o, place){
   /* 体积预估必须扣除 gitMode=minimal/strip 将剔除的 `.git` 条目；否则带 Git 历史的包会严重虚高。
      统一走 size-model：类目压缩比、ZIP 开销、分卷、扩展清单模式、引擎载体未知项都在模型内。 */
   const projected=selectedProjected(o.nodes,o.scope,chartPkg);
+  /* targetCodeOf 返回的是宿主码（st|luker|tt|pt，见 1931 行定义；chart-prefs 白名单同语义）。
+     2026-11-18 修复：此处曾写 `==='l'`（布局码）——Luker 永不命中，引擎附加条目
+     （_engine_meta/_engine_dump/luker-storage.sqlite/manifest.json）的体积预估全部失效。 */
   const targetCode=targetCodeOf(state.target);
   const srcEngine=String(chartPkg?.sourceEngine||'fs');
   const dstEngine=String(state.engine||'');
   const extraEntries=[];
-  if(targetCode==='l'){
+  if(targetCode==='luker'){
     const rawBytes=projected.mb*1024*1024;
     if(['postgres','mysql'].includes(dstEngine) && srcEngine!==dstEngine){
       extraEntries.push({path:'_engine_meta.json',bytes:2048,category:'unknown'});
@@ -2156,7 +2166,7 @@ function pkgCard(p){
     +'<input class="pkg-check" type="checkbox" data-pkgcheck="'+p.id+'"'+(state.selectedPkgs.has(p.id)?' checked':'')+' title="'+t('zones.checkboxActionTip')+'" aria-label="'+t('zones.checkboxActionTip')+'">'
     +icon
     +'<div class="pkg-info">'
-    +'<div class="pkg-name"><span class="pkg-name-txt" data-fullname="'+encodeURIComponent(p.name)+'" title="'+p.name+'">'+p.name+'</span></div>'
+    +'<div class="pkg-name"><span class="pkg-name-txt" data-fullname="'+encodeURIComponent(p.name)+'" title="'+escapeHtml(p.name)+'">'+escapeHtml(p.name)+'</span></div>'
     +'<div class="pkg-meta">'+badges.join('')+'<span>'+p.size+'</span>'+estHostHtml+'<span>'+p.time+'</span></div>'
     +'</div>'
     +(p.zone==='export'?'':'<div class="pkg-actions">'
@@ -5071,6 +5081,10 @@ async function renderExtInstalled(body){
     if(bInstall) bInstall.disabled=n===0;
     return n;
   };
+  /* 2026-11-18 修复：selCount 此前只在交互时被调（勾选变化/三键），渲染后从未初跑
+     ⇒ 包侧「导出扩展清单」钮即便已选中包也恒 disabled（宿主侧同理）；首帧按钮态
+     必须按 selectedPkg/勾选数同步一次。 */
+  selCount();
   body.querySelectorAll('.ext-dev-check').forEach((chk)=>{
     chk.addEventListener('click',(e)=>{ e.stopPropagation(); });
   });
@@ -5746,6 +5760,41 @@ function renderCloud() {
   if (backupSelected) backupSelected.disabled = !!C.busy || state.selectedPkgs.size === 0;
   const autoBackup = document.getElementById('cloud-auto-backup');
   if (autoBackup) autoBackup.disabled = !!C.busy || !cloudReady();
+  /* 云端列表渲染 —— 2026-11-18 恢复：99ab40b 重构操作栏时误删了这段，
+     委托监听（[data-cloud-get]/[data-cloud-restore]/[data-cloud-del*]）与四个动作函数
+     一直都在，唯独没人往 #cloud-list 写行 ⇒ 备份成功但界面无列表、无恢复入口。
+     逻辑按 99ab40b^ 原样恢复（快照=恢复钮；普通包=下载钮），插值全部 escapeHtml。 */
+  const list = document.getElementById('cloud-list');
+  if (list) {
+    if (!C.list.length) {
+      list.innerHTML = '<div class="cloud-empty">' + escapeHtml(t('cloud.empty')) + '</div>';
+    } else {
+      list.innerHTML = C.list
+        .map((item) => {
+          const snapshot = item.kind === 'set-snapshot';
+          const key = escapeHtml(item.key);
+          const label = snapshot ? escapeHtml((item.setName || '') + ' · ' + String(item.ts || '')) : escapeHtml(item.key);
+          const sizeText = snapshot
+            ? escapeHtml(t('cloud.snapshotMeta', { n: Number(item.entries) || 0 }))
+            : (item.size == null
+              ? escapeHtml(t('cloud.sizeUnknown'))
+              : escapeHtml(fmtMB((Number(item.size) || 0) / 1048576)
+                + (item.entryCount ? ' · ' + t('cloud.entries', { n: item.entryCount }) : '')));
+          const primary = snapshot
+            ? '<button type="button" class="ci-btn" data-cloud-restore="' + key + '">' + escapeHtml(t('cloud.restore')) + '</button>'
+            : '<button type="button" class="ci-btn" data-cloud-get="' + key + '">' + escapeHtml(t('cloud.download')) + '</button>';
+          const removeAttr = snapshot ? 'data-cloud-del-snapshot' : 'data-cloud-del';
+          return '<div class="cloud-item' + (snapshot ? ' is-snapshot' : '') + '" data-cloud-key="' + key + '">'
+            + '<span class="ci-name" title="' + label + '">' + label + '</span>'
+            + '<span class="ci-size">' + sizeText + '</span>'
+            + '<span class="ci-time">' + escapeHtml(String(item.lastModified || '').replace('T', ' ').slice(0, 16)) + '</span>'
+            + primary
+            + '<button type="button" class="ci-btn danger" ' + removeAttr + '="' + key + '">' + escapeHtml(t('cloud.remove')) + '</button>'
+            + '</div>';
+        })
+        .join('');
+    }
+  }
 }
 async function cloudSave() {
   const C = state.cloud;

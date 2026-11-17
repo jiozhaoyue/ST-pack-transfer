@@ -922,7 +922,12 @@ async function main(root) {
       let skipped = 0;
       let failed = 0;
       let encryptedPackages = 0;
-      const stamp = timestampName();
+      /* 2026-11-18 修复（E2E W9 间歇假红背后的真 bug）：快照戳只到秒 ⇒ **同一秒内
+         连续备份会用同一 base 互相覆盖**，用户静默丢快照（全量跑实测三连备只剩 1 份）。
+         增量集路径早有防撞守卫（backup-set-runner.js:187-193 的 used.has 回退），full 路径
+         此处补齐：秒级戳 + 4 位随机后缀；pruneFullSnapshots 按 manifest base 分组，
+         与 base 长度无关，兼容。 */
+      const stamp = `${timestampName()}-${Math.random().toString(36).slice(2, 6)}`;
       for (let i = 0; i < ids.length; i += 1) {
         if (signal?.aborted) break;
         const pkg = state.packages.find((p) => p.id === ids[i]);
@@ -1082,14 +1087,27 @@ async function main(root) {
     if (!ids.length) { view.toast(t('toast.selectDeleteFirst')); return; }
     const ok = await confirmDialog(t('modal.confirmDelete', { n: ids.length }));
     if (!ok) return;
-    await removePackages(ids);
-    view.toast(t('toast.deleted'));
+    const failed = await removePackages(ids);
+    /* G-20 失败不静默：有真实 IO 失败时如实提示，不再无条件报「已删除」。 */
+    if (failed.length) view.toast(t('toast.deleteFailedPartial', { n: failed.length }));
+    else view.toast(t('toast.deleted'));
   }
 
-  /** 无二次确认的删除（供「丢弃成功项」等已确认动作复用）。 */
+  /** 无二次确认的删除（供「丢弃成功项」等已确认动作复用）。
+   *  返回值：删除失败的 id 数组（全成功为空数组）。
+   *  2026-11-18（G-20）：不再吞删除异常——db.deleteFile 对「记录不存在」本就不抛
+   *  （IndexedDB delete 缺键即成功），旧写法的空 catch 只会吃真故障（配额/事务/连接失效）；
+   *  且失败项不再清缓存，避免包从 UI「假消失」。 */
   async function removePackages(ids) {
+    const failed = [];
     for (const id of ids) {
-      try { await deleteFile(id); } catch { /* 已不存在 */ }
+      try {
+        await deleteFile(id);
+      } catch (err) {
+        failed.push(id);
+        logger.warn(t('log.deleteFailed', { id, msg: err?.message || String(err) }));
+        continue;
+      }
       state.nodesById.delete(id);
       state.layoutById.delete(id);
       for (const key of [...packageGitCache.keys()]) {
@@ -1097,6 +1115,7 @@ async function main(root) {
       }
     }
     await syncPackages();
+    return failed;
   }
 
   async function restoreSelected(ids) {
@@ -1627,22 +1646,30 @@ async function main(root) {
         const resultBlob = outcome.resultBlob;
         if (!resultBlob) continue;
         if (limit) {
-          const entries = [];
+          /* 2026-11-18（分卷内存修复 · 设计稿 4.3）：改**懒描述符**——不再把整个转换产物
+             逐条解压进 entries 数组（GB 级包峰值 ≈ 2× 未压缩体积，浏览器可 OOM）。
+             传 `{path, size, read}` 让 splitter 决策后才读；reader 存活期覆盖整个 split，
+             异常路径 finally 必关。splitter 内部串行 read ⇒ 在飞数据 ≤ 1 个条目。 */
           const reader = await zipIo.openReader(resultBlob);
           try {
+            const entries = [];
             for await (const entry of reader.entries()) {
               if (entry.isDirectory) { entry.skip(); continue; }
-              entries.push({ path: entry.fileName, blob: await entry.read() });
+              entries.push({
+                path: entry.fileName,
+                size: entry.uncompressedSize,
+                read: () => entry.read(),
+              });
               entry.skip();
             }
+            const split = await splitArchiveEntries(entries, {
+              thresholdMB: limit, target: code, handle: 'default-user',
+              filenameTemplate: filenameTemplate || DEFAULT_FILENAME_TEMPLATE,
+            });
+            for (const part of split.parts) {
+              created.push({ blob: part.blob, name: part.partName });
+            }
           } finally { await reader.close(); }
-          const split = await splitArchiveEntries(entries, {
-            thresholdMB: limit, target: code, handle: 'default-user',
-            filenameTemplate: filenameTemplate || DEFAULT_FILENAME_TEMPLATE,
-          });
-          for (const part of split.parts) {
-            created.push({ blob: part.blob, name: part.partName });
-          }
         } else {
           const name = resolveFilename(filenameTemplate || DEFAULT_FILENAME_TEMPLATE, {
             sourceName: pkg.name, target: code, handle: 'default-user',
@@ -1862,6 +1889,14 @@ async function main(root) {
   function queueResume(id) {
     const index = taskQueue.findIndex((job) => job.id === id && job.status === 'paused');
     if (index < 0) return false;
+    /* 2026-11-18 修复（E2E R9 契约抓到的真 bug）：队列 job 恢复此前**不回填 pendingResume**
+       ⇒ job 重跑时 takeResumeFor() 拿到 null，暂停留下的半成品被静默无视、整包重做
+       （R7 的「已保留半成品」与实际续传行为自相矛盾）。回填暂停标记，两条恢复路径
+       （队列恢复 / 跨重载标记恢复）语义对齐。 */
+    if (!pendingResume) {
+      const marker = readPausedMarker();
+      if (marker && marker.taskId) pendingResume = marker;
+    }
     const [job] = taskQueue.splice(index, 1);
     job.status = 'queued';
     taskQueue.unshift(job);
@@ -1976,19 +2011,22 @@ async function main(root) {
 
       const created = [];
       if (limit) {
-        const entries = [];
+        /* 2026-11-18（分卷内存修复）：与单包路径同构——懒描述符 + reader 存活期覆盖 split，
+           免整包解压驻留内存。 */
         const reader = await zipIo.openReader(merged.blob);
         try {
+          const entries = [];
           for await (const entry of reader.entries()) {
-            entries.push({ path: entry.fileName, blob: await entry.read() });
+            if (entry.isDirectory) { entry.skip(); continue; }
+            entries.push({ path: entry.fileName, size: entry.uncompressedSize, read: () => entry.read() });
             entry.skip();
           }
+          const split = await splitArchiveEntries(entries, {
+            thresholdMB: limit, target: code, handle: 'default-user',
+            filenameTemplate: filenameTemplate || DEFAULT_FILENAME_TEMPLATE,
+          });
+          for (const part of split.parts) created.push({ blob: part.blob, name: part.partName });
         } finally { await reader.close(); }
-        const split = await splitArchiveEntries(entries, {
-          thresholdMB: limit, target: code, handle: 'default-user',
-          filenameTemplate: filenameTemplate || DEFAULT_FILENAME_TEMPLATE,
-        });
-        for (const part of split.parts) created.push({ blob: part.blob, name: part.partName });
       } else {
         const name = resolveFilename(filenameTemplate || DEFAULT_FILENAME_TEMPLATE, {
           sourceName: 'merged', target: code, handle: 'default-user',

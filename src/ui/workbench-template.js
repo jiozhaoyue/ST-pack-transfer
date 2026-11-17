@@ -274,7 +274,7 @@ export function getWorkbenchHtml() {
               <div class="cloud-note-box"><i class="fa-solid fa-circle-info"></i> <div class="cloud-note" id="cloud-unified-guide" data-i18n="cloud.unifiedPackHint"></div></div>
               <div class="cloud-note-box"><i class="fa-solid fa-lightbulb"></i> <div class="cloud-note" id="webdav-guide-card" data-i18n="webdav.tutorialGuide"></div></div>
             </div>
-            <div class="cloud-list" id="cloud-list" hidden></div>
+            <div class="cloud-list" id="cloud-list"></div>
           </div>
 
           <!-- 3. Backup strategy and format card (bottom) -->

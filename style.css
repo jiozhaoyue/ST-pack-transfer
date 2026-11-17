@@ -1523,6 +1523,12 @@
   #app.app-container #view-settings :is(input, select).text_pole{font-size:11px;padding:0 6px;height:var(--ctl-h);line-height:26px}
   #app.app-container #view-settings .ext-note{font-size:10px;color:var(--muted-2);margin:1px 0 3px}
   #app.app-container #view-settings .btn{font-size:11px;padding:3px 8px}
+  /* 2026-11-18（G-27 折行落地）：说明类文案已按 G-16/G-27 用 \n 分行，
+     容器必须保留换行（pre-line），否则 \n 折叠为空格、分行意图落空。 */
+  #app.app-container .toast{white-space:pre-line}
+  #app.app-container .ext-note{white-space:pre-line}
+  #app.app-container .cloud-note{white-space:pre-line}
+  #app.app-container .pref-head span{white-space:pre-line}
   #app.app-container .toast{position:absolute;left:50%;top:12px;bottom:auto;transform:translate(-50%,-10px);z-index:120;
     background:var(--panel);border:1px solid var(--accent);border-radius:9px;padding:8px 13px;
     font-size:11.5px;color:var(--text);box-shadow:var(--shadow);opacity:0;pointer-events:none;
@@ -1828,6 +1834,12 @@
   #app.app-container[data-view="mobile"] .badge .web-icon{width:11px;height:11px;left:5px}
   #app.app-container[data-view="mobile"] .header-actions{gap:4px;margin-left:auto}
   #app.app-container[data-view="mobile"] .header-actions .icon-btn{flex:0 0 auto}
+  /* 2026-11-18（视口矩阵 4px 高差修复）：触屏断点 icon-btn 放大到 32px，但主题下拉
+     仍是 var(--ctl-h)（28px）⇒ 页头一行两套高度。同步放大并允许收缩，窄屏折行时
+     不把相邻按钮挤出屏（视口矩阵 320/280 发现项）。 */
+  #app.app-container[data-view="mobile"] .header-theme-select{height:32px;line-height:30px;
+    min-width:0;flex-shrink:1;max-width:118px}
+  #app.app-container[data-view="mobile"] .header-theme-picker{min-width:0;flex-shrink:1}
   /* 手机触控尺寸：不允许把复选框/行内动作压到 10px 级，避免误触。 */
   #app.app-container[data-view="mobile"] .view-switch-btn{min-height:36px;padding:6px 10px;font-size:12px}
   #app.app-container[data-view="mobile"] .chart-controls{gap:6px}

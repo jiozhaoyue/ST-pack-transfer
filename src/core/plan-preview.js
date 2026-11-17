@@ -418,6 +418,16 @@ export async function generatePlan(source, target, {
   }
 
   // 3. 目标平台合成项预测
+  /* 2026-11-18 预测漂移修复（与 transform.emitSynthesized 逐条对齐）：
+     - ST 实际产出 _convert/INSTALL.md + _convert/meta.json（旧预测的 README-ST.txt 产物中不存在）；
+     - 补 _convert/extensions-manifest.json（st|l + 有扩展 + FULL/MANIFEST 模式，transform:1276）；
+     - 补 extensions-index.json（st|l + MANIFEST 模式且存在可安装清单条目，transform:1263；
+       残差：全部扩展都不可安装时 transform 不产出——预测宁多勿缺，UI 上是「预计将生成」提示）；
+     - 已知残余：PT/TT 的 data/_tauritavern/extension-sources/** 依赖每个扩展的 homePage
+       （transform.buildExtensionSources），plan-preview 拿不到该数据，暂不预测、如实注释。 */
+  const extFolderNames = [...new Set([...globalExtNames, ...userExtFolders])]
+    .filter((n) => !builtinExtNames.has(n));
+  const extSelected = !selection || selection.extensions !== false;
   if (target === TARGETS.L) {
     synthesizedItems.push({
       targetPath: 'manifest.json',
@@ -431,14 +441,49 @@ export async function generatePlan(source, target, {
   }
   if (target === TARGETS.ST) {
     synthesizedItems.push({
-      targetPath: '_convert/README-ST.txt',
+      targetPath: '_convert/INSTALL.md',
       action: ACTIONS.SYNTHESIZE,
-      reason: '生成 SillyTavern 用户解压覆盖指南',
-      estimatedSizeBytes: 300,
+      reason: '生成 SillyTavern 手动导入说明',
+      estimatedSizeBytes: 242,
     });
     expectedOutputFiles += 1;
-    expectedOutputBytes += 300;
+    expectedOutputBytes += 242;
     actionStats[ACTIONS.SYNTHESIZE] += 1;
+    synthesizedItems.push({
+      targetPath: '_convert/meta.json',
+      action: ACTIONS.SYNTHESIZE,
+      reason: '生成 _convert 目录元信息（仅供人工核对）',
+      estimatedSizeBytes: 130,
+    });
+    expectedOutputFiles += 1;
+    expectedOutputBytes += 130;
+    actionStats[ACTIONS.SYNTHESIZE] += 1;
+  }
+  const shouldEmitExtManifest = (target === TARGETS.ST || target === TARGETS.L)
+    && extFolderNames.length > 0
+    && extSelected
+    && (extensionMode === EXTENSION_MODES.MANIFEST || extensionMode === EXTENSION_MODES.FULL);
+  if (shouldEmitExtManifest) {
+    synthesizedItems.push({
+      targetPath: '_convert/extensions-manifest.json',
+      action: ACTIONS.SYNTHESIZE,
+      reason: '生成转换器私有扩展清单（供宿主插件恢复时引导安装/更新）',
+      estimatedSizeBytes: 640,
+    });
+    expectedOutputFiles += 1;
+    expectedOutputBytes += 640;
+    actionStats[ACTIONS.SYNTHESIZE] += 1;
+    if (extensionMode === EXTENSION_MODES.MANIFEST) {
+      synthesizedItems.push({
+        targetPath: 'extensions-index.json',
+        action: ACTIONS.SYNTHESIZE,
+        reason: '生成官方 Content Downloader 索引（仅清单条目可安装）',
+        estimatedSizeBytes: 1024,
+      });
+      expectedOutputFiles += 1;
+      expectedOutputBytes += 1024;
+      actionStats[ACTIONS.SYNTHESIZE] += 1;
+    }
   }
 
   // gitMode=minimal：为每个实际打包的 Git 扩展预测一个占位文件合成项（与 transform 的产出对齐）。

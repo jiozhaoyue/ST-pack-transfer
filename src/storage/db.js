@@ -138,6 +138,26 @@ export async function openDb() {
       console.warn('打开 IndexedDB 失败:', request.error);
       reject(request.error);
     };
+
+    /* 2026-11-18：版本升级被其他标签页的旧连接阻塞（blocked）时，若无监听则本 Promise
+       永不 settle——初始化静默挂起、上层无任何报错。onversionchange 已让旧连接尽快
+       close；这里再加限时拒绝（有界等待 L1-MR-7），把「升不了级」变成显式失败，
+       上层会走内存态降级路径而不是无限等。 */
+    let blockedTimer = null;
+    const clearBlockedTimer = () => { if (blockedTimer) { clearTimeout(blockedTimer); blockedTimer = null; } };
+    request.onblocked = () => {
+      console.warn('IndexedDB 版本升级被其他标签页阻塞（blocked），等待旧连接释放…');
+      if (blockedTimer) return;
+      blockedTimer = setTimeout(() => {
+        blockedTimer = null;
+        try { request.onerror = null; request.onsuccess = null; } catch { /* 忽略 */ }
+        reject(new DOMException('IndexedDB 版本升级被阻塞超时（其他标签页占用旧连接）', 'TimeoutError'));
+      }, 10_000);
+    };
+    const prevSuccess = request.onsuccess;
+    request.onsuccess = (ev) => { clearBlockedTimer(); prevSuccess.call(request, ev); };
+    const prevError = request.onerror;
+    request.onerror = (ev) => { clearBlockedTimer(); prevError.call(request, ev); };
   });
 }
 

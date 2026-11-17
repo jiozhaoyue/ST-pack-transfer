@@ -1,10 +1,13 @@
 /**
  * 局域网互传 · 纯逻辑核心验收。
  *
- * 只覆盖 `src/core/lan-transfer.js`——WebRTC 与 DOM 装配在浏览器侧，
- * 由独立 Web E2E 与手工双设备验证覆盖，不在此处假装测过。
+ * 覆盖 `src/core/lan-transfer.js` 与 `src/ui/lan-transfer-panel.js` 的**纯逻辑层**
+ * （攒批器 / 拼接 / 信用等待，2026-11-18 设计二落地后从面板导出）——
+ * 这些函数无 DOM / 无 WebRTC 依赖，Node 可直接测；
+ * WebRTC 与 DOM 装配（批写挂链、done 前落写、resume 语义）由独立 Web E2E
+ * （`e2e/standalone/specs/lan-transfer.e2e.cjs`）与手工双设备验证覆盖，不在此处假装测过。
  */
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   CHUNK_SIZE,
   PICKUP_PREFIX,
@@ -28,6 +31,11 @@ import {
   toBase64Url,
   verifyTransfer,
 } from '../src/core/lan-transfer.js';
+import {
+  createChunkBatcher,
+  mergeChunks,
+  waitForCreditAck,
+} from '../src/ui/lan-transfer-panel.js';
 
 describe('base64url 编解码', () => {
   it('往返一致，且不含 + / = 三个 URL 危险字符', () => {
@@ -293,5 +301,166 @@ describe('直连能力探测', () => {
   it('安全上下文 + 有 WebRTC 才可直连', () => {
     expect(probeDirectCapability({ isSecureContext: true, hasRTC: true }))
       .toEqual({ direct: true, reason: '' });
+  });
+});
+
+// ── 2026-11-18 设计二：接收端写链合并 + 发送端信用流控（面板纯逻辑层） ──
+
+describe('接收端攒批器（设计二 3.1）', () => {
+  const bytes = (n, fill = 0) => new Uint8Array(n).fill(fill);
+  const region = (buf, from, to) => Array.from(buf.slice(from, to));
+
+  it('mergeChunks：单块直达原样返回（零拷贝），多块按入队顺序拼接', () => {
+    const a = bytes(4, 1);
+    expect(mergeChunks([a], 4)).toBe(a);
+    const b = bytes(3, 2);
+    const c = bytes(2, 3);
+    const merged = mergeChunks([a, b, c], 9);
+    expect(merged.byteLength).toBe(9);
+    expect(region(merged, 0, 9)).toEqual([1, 1, 1, 1, 2, 2, 2, 3, 3]);
+  });
+
+  it('凑满 batchBytes 立即 flush，拼接字节序与入队顺序一致', () => {
+    const flushed = [];
+    const batcher = createChunkBatcher({ batchBytes: 100, batchMs: 10_000, onFlush: (m) => flushed.push(m) });
+    batcher.push(bytes(30, 1));
+    batcher.push(bytes(30, 2));
+    batcher.push(bytes(30, 3));
+    expect(flushed).toHaveLength(0); // 90 < 100：不满批不触发
+    batcher.push(bytes(10, 4));      // 100 ≥ 100：立即触发
+    expect(flushed).toHaveLength(1);
+    expect(flushed[0].byteLength).toBe(100);
+    expect(region(flushed[0], 0, 30)).toEqual(new Array(30).fill(1));
+    expect(region(flushed[0], 30, 60)).toEqual(new Array(30).fill(2));
+    expect(region(flushed[0], 60, 90)).toEqual(new Array(30).fill(3));
+    expect(region(flushed[0], 90, 100)).toEqual(new Array(10).fill(4));
+    expect(batcher.pendingBytes).toBe(0);
+  });
+
+  it('不足批时 batchMs 到点触发 flush（慢速链路批不满也不写盘饥饿）', () => {
+    vi.useFakeTimers();
+    const flushed = [];
+    const batcher = createChunkBatcher({ batchBytes: 1000, batchMs: 30, onFlush: (m) => flushed.push(m) });
+    batcher.push(bytes(10, 7));
+    vi.advanceTimersByTime(29);
+    expect(flushed).toHaveLength(0);
+    vi.advanceTimersByTime(1);
+    expect(flushed).toHaveLength(1);
+    expect(flushed[0].byteLength).toBe(10);
+  });
+
+  it('单块就超过批上限时立即 flush（pending 上界 = 批字节 + 1 块）', () => {
+    const flushed = [];
+    const batcher = createChunkBatcher({ batchBytes: 10, batchMs: 10_000, onFlush: (m) => flushed.push(m) });
+    batcher.push(bytes(50, 1));
+    expect(flushed).toHaveLength(1);
+    expect(flushed[0].byteLength).toBe(50);
+  });
+
+  it('flush 幂等：pending 空时 no-op 返回 null，重复调用不重复触发', () => {
+    const flushed = [];
+    const batcher = createChunkBatcher({ batchBytes: 10, batchMs: 10_000, onFlush: (m) => flushed.push(m) });
+    expect(batcher.flush()).toBeNull();
+    batcher.push(bytes(5, 9));
+    expect(batcher.flush()).not.toBeNull();
+    expect(batcher.flush()).toBeNull();
+    expect(flushed).toHaveLength(1);
+  });
+
+  it('done 前 flush：最后不满批的数据不丢（先 flush 再校验的前提）', () => {
+    const flushed = [];
+    const batcher = createChunkBatcher({ batchBytes: 100, batchMs: 10_000, onFlush: (m) => flushed.push(m) });
+    batcher.push(bytes(60, 1));
+    batcher.push(bytes(39, 2)); // 99 < 100：永远凑不满
+    batcher.flush();            // done 控制帧同步 flush
+    expect(flushed).toHaveLength(1);
+    expect(flushed[0].byteLength).toBe(99);
+    expect(region(flushed[0], 0, 60)).toEqual(new Array(60).fill(1));
+    expect(region(flushed[0], 60, 99)).toEqual(new Array(39).fill(2));
+    expect(batcher.pendingBytes).toBe(0);
+  });
+
+  it('reset 丢弃 pending 并清除计时器（cancel / 失败路径不产生写盘）', () => {
+    vi.useFakeTimers();
+    const flushed = [];
+    const batcher = createChunkBatcher({ batchBytes: 1000, batchMs: 30, onFlush: (m) => flushed.push(m) });
+    batcher.push(bytes(10, 1));
+    batcher.reset();
+    expect(batcher.pendingBytes).toBe(0);
+    vi.advanceTimersByTime(1000);
+    expect(flushed).toHaveLength(0);
+  });
+
+  it('flush 返回 onFlush 的返回值（done 前最后一批靠它同步入链；装配层由 writeChain.catch 兜错）', async () => {
+    const batcher = createChunkBatcher({
+      batchBytes: 100,
+      batchMs: 10_000,
+      onFlush: (m) => Promise.resolve(`入链 ${m.byteLength}B`),
+    });
+    batcher.push(bytes(10, 1));
+    await expect(batcher.flush()).resolves.toBe('入链 10B');
+  });
+});
+
+describe('发送端信用等待（设计二 3.2）', () => {
+  /** 最小 DataChannel 替身：只实现 waitForCreditAck 依赖的 EventTarget 面。 */
+  class FakeDc extends EventTarget {
+    /** 模拟对端发来一帧文本控制帧（事件对象带 data 属性，形态同 RTCDataChannel onmessage）。 */
+    emit(obj) {
+      const ev = new Event('message');
+      ev.data = typeof obj === 'string' ? obj : JSON.stringify(obj);
+      this.dispatchEvent(ev);
+    }
+    /** 模拟一帧二进制数据（ArrayBuffer 形态）。 */
+    emitBinary() {
+      const ev = new Event('message');
+      ev.data = new Uint8Array([1, 2, 3]).buffer;
+      this.dispatchEvent(ev);
+    }
+  }
+
+  afterEach(() => { vi.useRealTimers(); });
+
+  it('ack 帧到达立即 settle(true)（信用推进，发送恢复）', async () => {
+    vi.useFakeTimers();
+    const dc = new FakeDc();
+    const p = waitForCreditAck(dc, 10_000);
+    dc.emit({ t: 'ack', bytes: 8 * 1024 * 1024 });
+    await expect(p).resolves.toBe(true);
+  });
+
+  it('ok / err 帧提前 settle(true)（校验流程已接管，继续等 ack 无意义）', async () => {
+    vi.useFakeTimers();
+    const dc = new FakeDc();
+    const pOk = waitForCreditAck(dc, 10_000);
+    dc.emit({ t: 'ok', digest: 'x' });
+    await expect(pOk).resolves.toBe(true);
+    const pErr = waitForCreditAck(dc, 10_000);
+    dc.emit({ t: 'err', message: '不一致' });
+    await expect(pErr).resolves.toBe(true);
+  });
+
+  it('二进制数据帧与坏 JSON 不 settle；到超时返回 false（有界等待，绝不悬挂）', async () => {
+    vi.useFakeTimers();
+    const dc = new FakeDc();
+    const p = waitForCreditAck(dc, 10_000);
+    dc.emitBinary();
+    dc.emit('not-json');
+    vi.advanceTimersByTime(9_999);
+    vi.advanceTimersByTime(1);
+    await expect(p).resolves.toBe(false);
+  });
+
+  it('settle 后移除监听：迟到的帧不再影响后续等待', async () => {
+    vi.useFakeTimers();
+    const dc = new FakeDc();
+    const first = waitForCreditAck(dc, 10_000);
+    dc.emit({ t: 'ack', bytes: 1 });
+    await expect(first).resolves.toBe(true);
+    // 首次等待已 settle：后续新等待只能被新帧 settle，若旧监听未移除会立刻被残留引用误 settle——
+    // 这里新等待在新帧到来前超时，即证明监听已被移除。
+    const second = waitForCreditAck(dc, 10_000);
+    vi.advanceTimersByTime(10_000);
+    await expect(second).resolves.toBe(false);
   });
 });

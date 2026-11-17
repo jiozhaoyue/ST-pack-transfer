@@ -103,3 +103,6 @@ CLAUDE.md.bak
 /docs/research/
 /docs/superpowers/
 
+
+# ── 本机会话记忆（不入库）──
+.workbuddy/

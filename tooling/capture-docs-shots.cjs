@@ -181,11 +181,16 @@ async function captureDesktop(browser, url, outDir) {
   await page.waitForTimeout(300);
 
   // 设置 / 更新日志
+  // 2026-11-18 修复：演示模式下 actions.settings 是占位 toast（demoTutorialActions），
+  // 设置面板根本打不开 ⇒ 14/15 两张只会截成主界面。先退出演示模式（恢复真实状态），
+  // 再截真实设置页（含版本行 v0.6.0）与更新记录弹窗。
+  await page.evaluate(() => document.getElementById('tutorial-banner-exit')?.click());
+  await page.waitForTimeout(700);
   await clickIf(page, '#btn-settings');
-  await page.waitForTimeout(450);
+  await page.waitForTimeout(650);
   await shot('settings');
   await clickIf(page, '#settings-version');
-  await page.waitForTimeout(650);
+  await page.waitForTimeout(800);
   await shot('changelog');
   await page.keyboard.press('Escape').catch(() => {});
   await page.waitForTimeout(300);

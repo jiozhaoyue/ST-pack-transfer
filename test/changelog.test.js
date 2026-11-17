@@ -8,6 +8,7 @@ import {
   recentChangelog,
   shouldShowChangelog,
 } from '../src/core/changelog.js';
+import { APP_VERSION } from '../src/core/app-version.js';
 
 describe('changelog · 更新日志纯逻辑', () => {
   it('版本变化才自动弹；关闭开关后永不自动弹', () => {
@@ -33,6 +34,8 @@ describe('changelog · 更新日志纯逻辑', () => {
     expect(changelogCommits().length).toBeGreaterThanOrEqual(0);
     expect(recentChangelog(10).length).toBeGreaterThan(0);
     expect(fullChangelog().length).toBeGreaterThan(0);
-    expect(changelogReleases()[0].version).toBe('0.5.3');
+    // 2026-11-18：最新发布条目必须与 APP_VERSION 回退常量一致（发布纪律的真实不变量），
+    // 硬编码具体版本会让每次发布都碎一次测试。
+    expect(changelogReleases()[0].version).toBe(APP_VERSION);
   });
 });

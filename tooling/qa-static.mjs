@@ -1,7 +1,7 @@
 /**
  * 一键静态守卫串跑（`npm run qa:static`）——规范化测试流程 L1 层的唯一入口。
  *
- * 按 `docs/TESTING-PROCESS.md` §1 的顺序串行执行 8 条守卫；任何一条非零退出即中止并
+ * 按 `docs/TESTING-PROCESS.md` §1 的顺序串行执行 10 条守卫；任何一条非零退出即中止并
  * 以其退出码结束（失败先到先报，不留后续噪音）。全部通过时打印汇总并以 0 退出。
  *
  * 直接以 `node` 拉起各守卫脚本（与 package.json 的 check:* 一一对应），不经 npm/shell 层：

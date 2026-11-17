@@ -76,20 +76,43 @@ export async function runPlanTask({ source, target, options = {} }) {
   };
 
   return new Promise((resolve, reject) => {
+    let settled = false;
     const handler = (e) => {
       const data = e.data;
       if (!data || data.id !== id) return;
 
       if (data.type === 'PLAN_DONE') {
+        if (settled) return;
+        settled = true;
         worker.removeEventListener('message', handler);
+        worker.removeEventListener('error', onWorkerError);
+        worker.removeEventListener('messageerror', onWorkerError);
         resolve(data.plan);
       } else if (data.type === 'ERROR') {
+        if (settled) return;
+        settled = true;
         worker.removeEventListener('message', handler);
+        worker.removeEventListener('error', onWorkerError);
+        worker.removeEventListener('messageerror', onWorkerError);
         reject(new Error(data.error));
       }
     };
 
+    /* 2026-11-18：worker 脚本加载/解析失败（404、CSP 拦截、模块错误）只触发
+       error/messageerror 事件、不发 message ⇒ 没有监听时本 Promise 永不 settle，
+       UI 永久「规划中」且死实例留在池子里（后续任务全部向死 worker postMessage）。
+       对照：暂停路径有 30s 有界兜底（L1-MR-7），这条「worker 从未回话」的路此前零兜底。 */
+    const onWorkerError = () => {
+      worker.removeEventListener('message', handler);
+      worker.removeEventListener('error', onWorkerError);
+      worker.removeEventListener('messageerror', onWorkerError);
+      if (workerInstance === worker) workerInstance = null;
+      reject(new Error('[worker-client] Worker 加载失败（脚本 404 / CSP 拦截 / 模块解析错误）'));
+    };
+
     worker.addEventListener('message', handler);
+    worker.addEventListener('error', onWorkerError);
+    worker.addEventListener('messageerror', onWorkerError);
     worker.postMessage({
       type: 'PLAN',
       id,
@@ -277,6 +300,19 @@ export async function runConversionTask({ source, target, options = {}, onProgre
         reject(new Error(data.error));
       }
     };
+
+    /* 2026-11-18：与 runPlanTask 同源的「worker 从未回话」兜底——脚本加载失败只发
+       error/messageerror；不监听则 Promise 永不 settle（UI 永久挂死）、死实例不回收。 */
+    const onWorkerError = () => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      try { worker.terminate(); } catch { /* 已终止 */ }
+      if (workerInstance === worker) workerInstance = null;
+      reject(new Error('[worker-client] Worker 加载失败（脚本 404 / CSP 拦截 / 模块解析错误）'));
+    };
+    worker.addEventListener('error', onWorkerError);
+    worker.addEventListener('messageerror', onWorkerError);
 
     worker.addEventListener('message', handler);
     worker.postMessage({

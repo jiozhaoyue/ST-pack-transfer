@@ -144,14 +144,14 @@ SillyTavern / Luker / TauriTavern / PureTavern 数据包互转工具，三形态
 - `src/ui/` — UI 模块（可 DOM）：`workbench-template.js`（HTML 模板唯一来源，`getWorkbenchHtml()` 无参数）、`workbench-view.js`（视图渲染：图表 / 选择树 / 配额 / 设置视图）、`host-bridge.js`（宿主嗅探/CSRF/备份拉取/恢复/扩展安装器，**含 `hostLayoutCode()`：宿主平台 luker→l 映射，宿主导出 target 必须经它归一**）、`export-queue.js`（产物待导出区）、`lan-transfer-panel.js`、`settings-panel.js`、`chat-store-bridge.js` / `chat-store-inject.js`（聊天库唯一接缝）、`qr.js`、`escape.js`；根 `index.js` 是根控制器
 - `src/storage/db.js` — IndexedDB 封装（DB_VERSION 2，files store 带 `origin` 字段：upload/host-export/converted/delta/split-part）
 - `src/vendor/` — zip.js / fzstd 本地副本，勿升级改动
-- `test/` — Vitest（**已纳入版本控制**，见 `.gitignore` 注记「测试目录按用户最新要求不再忽略」；`npm test` 当前 956 passed / 2 skipped）
+- `test/` — Vitest（**已纳入版本控制**，见 `.gitignore` 注记「测试目录按用户最新要求不再忽略」；`npm test` 当前 1414 passed / 2 skipped）
 - `docs/superpowers/specs/` 与 `docs/superpowers/plans/` — 设计规格与实施计划；`docs/research/` — Luker 机制研究报告
 - `.trellis/` — Trellis 任务系统（见上方 TRELLIS 块）
 
 ## 常用命令
 
 ```bash
-npm test          # Vitest 全量（当前 956 passed / 2 skipped；test/ 本地专属，不入库）
+npm test          # Vitest 全量（当前 1414 passed / 2 skipped；test/ 已纳入版本控制）
 npx vitest run test/xxx.test.js   # 单文件
 npm run build     # vite build --base=./
 npm run dev       # vite 开发服务器（独立模式手测）

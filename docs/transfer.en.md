@@ -12,8 +12,8 @@ Open **Migration & backup** from the view switch at the top of the panel. Select
 
 ## Direct LAN transfer
 
-- **Scan and connect**: if the phone and computer are on the same Wi-Fi/LAN, scanning the QR code establishes a direct peer-to-peer connection.
-- **Private and fast**: data travels directly between the two devices without an external server.
+- **Scan and connect**: if the phone and computer are on the same Wi-Fi/LAN, scanning the QR code establishes a direct peer-to-peer connection. Scanning opens a full-screen viewfinder: the framing box tells you whether the code is aligned, and a successful scan connects automatically.
+- **Private and fast**: data travels directly between the two devices without an external server. Browsers cannot actively scan for nearby devices; connection info is exchanged once via QR code or copy-and-paste.
 - **Resume support**: large packages are transferred in chunks and resume automatically after network hiccups.
 
 ## Cloud backup: S3-compatible object storage

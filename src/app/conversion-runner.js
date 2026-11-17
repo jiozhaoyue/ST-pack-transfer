@@ -110,7 +110,9 @@ export function createConversionRunner({
     const name = checkpoint?.partialOpfsName || partialNameFor(taskId);
     if (!name || typeof opfsTmpHandle !== 'function') return { name, blob: null, entries: null };
     try {
-      const handle = await opfsTmpHandle(name, false);
+      /* quiet:true —— 读侧对「半成品不存在」是正常探测（无断点=完整重做），不是故障，
+         不该在日志里留下 WARN 噪音（2026-11-18）。 */
+      const handle = await opfsTmpHandle(name, false, 'fetch-tmp', { quiet: true });
       const blob = handle && typeof opfsHandleToFile === 'function' ? await opfsHandleToFile(handle) : null;
       if (!blob) return { name, blob: null, entries: null };
       let entries = null;

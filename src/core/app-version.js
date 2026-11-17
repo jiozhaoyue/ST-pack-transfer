@@ -6,5 +6,5 @@
  * - 宿主直装：没有构建步骤，`typeof` 回退到下面的发布常量。
  *   发布时同步更新这两个常量（与 tag 指向的提交保持一致）。
  */
-export const APP_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '0.5.3';
-export const APP_COMMIT = typeof __APP_COMMIT__ !== 'undefined' ? __APP_COMMIT__ : 'v0.5.3';
+export const APP_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '0.6.0';
+export const APP_COMMIT = typeof __APP_COMMIT__ !== 'undefined' ? __APP_COMMIT__ : 'v0.6.0';
