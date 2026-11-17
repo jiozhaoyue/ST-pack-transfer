@@ -2084,9 +2084,9 @@
 #app.app-container .lan-detail:empty{display:none}
 #app.app-container .lan-scan-error{margin:0;font-size:10px;color:var(--optional)}
 /* 全屏扫码覆盖层（2026-11-17 用户裁定：直接进摄像头，扫完跳出，带识别框三态提示） */
-#app.app-container .scan-overlay{position:fixed;inset:0;z-index:9000;display:flex;align-items:center;justify-content:center;background:#000}
+#app.app-container .scan-overlay{position:fixed;inset:0;z-index:9000;display:flex;align-items:center;justify-content:center;background:var(--video-bg)}
 #app.app-container .scan-overlay[hidden]{display:none}
-#app.app-container .scan-overlay video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#000}
+#app.app-container .scan-overlay video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:var(--video-bg)}
 #app.app-container .scan-frame{position:relative;width:min(74vw,320px);aspect-ratio:1;pointer-events:none}
 #app.app-container .scan-corner{position:absolute;width:26px;height:26px;border:3px solid var(--accent,#4c9ffe)}
 #app.app-container .scan-corner.tl{top:0;left:0;border-right:0;border-bottom:0;border-top-left-radius:8px}
@@ -2094,11 +2094,11 @@
 #app.app-container .scan-corner.bl{bottom:0;left:0;border-right:0;border-top:0;border-bottom-left-radius:8px}
 #app.app-container .scan-corner.br{bottom:0;right:0;border-left:0;border-top:0;border-bottom-right-radius:8px}
 #app.app-container .scan-status{position:absolute;left:50%;bottom:max(64px,10vh);transform:translateX(-50%);max-width:86vw;
-  padding:8px 14px;border-radius:999px;background:rgba(0,0,0,.72);color:#fff;font-size:12px;text-align:center;white-space:nowrap}
-#app.app-container .scan-status[data-state="hit"]{background:var(--keep,#28a745);color:#fff}
-#app.app-container .scan-status[data-state="other"]{background:var(--optional,#e0a800);color:#1a1a1a}
+  padding:8px 14px;border-radius:999px;background:rgba(0,0,0,.72);color:var(--qr-bg);font-size:12px;text-align:center;white-space:nowrap}
+#app.app-container .scan-status[data-state="hit"]{background:var(--keep);color:var(--ink-on-accent)}
+#app.app-container .scan-status[data-state="other"]{background:var(--optional);color:var(--video-bg)}
 #app.app-container .scan-close{position:absolute;top:max(14px,3vh);right:max(14px,3vw);width:40px;height:40px;border:0;border-radius:50%;
-  background:rgba(0,0,0,.6);color:#fff;font-size:24px;line-height:1;cursor:pointer}
+  background:rgba(0,0,0,.6);color:var(--qr-bg);font-size:24px;line-height:1;cursor:pointer}
 @media (max-width:860px){
   #app.app-container .lan-body{max-height:none}
   #app.app-container .lan-recv{order:-1;border-top:0;border-bottom:1px dashed var(--border);padding-top:0;padding-bottom:8px}

@@ -98,6 +98,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           PAGE_URL: ${{ steps.deployment.outputs.page_url }}
+          COMMIT_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
           repo="${GITHUB_REPOSITORY}"
@@ -109,10 +110,10 @@ jobs:
           gh api -X POST "repos/${repo}/deployments/${app_dep}/statuses" \
             -f state=success -f description="app: ${app_url}" -f environment_url="${app_url}" > /dev/null
 
-          # 文档站：独立 environment，单独一条 active
-          docs_dep=$(gh api -X POST "repos/${repo}/deployments" \
-            -f ref="${GITHUB_REF_NAME}" -f task=deploy -f environment=github-pages-docs \
-            -f description="docs: ${docs_url}" --jq '.id')
+          # 文档站：独立 environment，单独一条 active。
+          # required_contexts:[] 跳过 status check 校验——否则本 workflow 的 deploy check 尚未 success 时会 409 冲突。
+          docs_dep=$(printf '{"ref":"%s","task":"deploy","environment":"github-pages-docs","description":"docs: %s","required_contexts":[]}' \
+            "${COMMIT_SHA}" "${docs_url}" | gh api -X POST "repos/${repo}/deployments" --input - --jq '.id')
           gh api -X POST "repos/${repo}/deployments/${docs_dep}/statuses" \
             -f state=success -f description="docs deployed" -f environment_url="${docs_url}" > /dev/null
 
