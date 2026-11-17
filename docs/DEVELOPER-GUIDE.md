@@ -93,6 +93,18 @@ npm run qa:static        # 静态守卫串跑
 
 单文件 HTML 必须保持 `file://` 可双击运行：脚本为 IIFE、Worker 强制主线程降级、字体与样式内联、零外部资源。
 
+### 视觉与响应式约定（2026-11-17 起）
+
+- **禁止整块实色填充**：按钮/胶囊/徽章条/注入入口一律「浅染底（`*-soft`）+ 1px 品牌描边（`*-ring`）+ 品牌色文字」；
+  实色只用于 ≤16px 圆点、勾选标记、进度条、图表色块。目标平台按钮同理，选中项再加左侧 2px 色条。
+- **对比度**：强调控件文字与底色实测 ≥ 4.5:1；不要白字压品牌实色底。
+- **手机滚动**：唯一纵向滚动容器是 `.app-main`；只有自带内滚的视图（传输/扩展）才禁外滚，
+  禁止把 `overflow-y:hidden` 写成全局手机规则。
+- **触屏桌面布局**：`@media (pointer: coarse)` 下折叠箭头 ≥24px、紧凑文字按钮 ≥28px。
+- 自动守卫：`npm test -- ui-solid-fill-guard`。
+- 改动 UI 后跑 13 视口矩阵：`node tooling/ui-audit/matrix.cjs`（需 3040 服务），
+  产物在 `test-results/audit/<stamp>/`，含截图、`probe.json`、`summary.md`。
+
 ## 五、体积与分卷模型
 
 体积预测集中在 `src/core/size-model.js`，输入选中条目与导出选项，输出：

@@ -13,6 +13,7 @@
  */
 
 import { applyProxy } from './net-proxy.js';
+import { sanitizeRelativePath } from './path-safety.js';
 
 const PROPFIND_BODY = '<?xml version="1.0" encoding="utf-8"?>'
   + '<d:propfind xmlns:d="DAV:"><d:prop>'
@@ -29,9 +30,9 @@ const DEFAULT_TIMEOUT_MS = 20_000;
  */
 const DEFAULT_TRANSFER_TIMEOUT_MS = 120_000;
 
-/** 路径段编码，保留 `/`。 */
+/** 路径段编码，保留 `/`；先做段级净化（防 `..` 穿越）。 */
 export function encodeDavPath(path) {
-  return String(path || '').split('/').map((seg) => encodeURIComponent(seg)).join('/');
+  return sanitizeRelativePath(path).split('/').map((seg) => encodeURIComponent(seg)).join('/');
 }
 
 /** 拼接 WebDAV 对象地址；base 末尾斜杠归一。 */

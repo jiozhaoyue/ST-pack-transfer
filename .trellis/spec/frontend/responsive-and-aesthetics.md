@@ -34,3 +34,27 @@
   行高与对齐必须稳定；但必须能通过详情区/`title` 读到完整值。
 - `#app.app-container[data-view="mobile"]` 的**布局切换**（例如视图切换整行换到面板头第一行）
   属于容器级重排，不是「控件内文字换行」。
+
+## 4. 禁止整块实色填充（2026-11-17 用户裁定）
+
+**判据**：任何大面积可交互块（按钮、胶囊、徽章条、注入宿主的入口）都**不得**用品牌色/强调色整块铺底。
+强调靠「浅染底 + 1px 品牌描边 + 品牌色文字 + 图标/色条」，不靠铺满。
+
+- 允许：浅染 `*-soft`（约 14%–32% 透明度）、描边 `*-ring`、左侧 2px 色条、顶部内高光。
+- 允许的微指示（不受本条约束）：≤16px 圆点/计数徽章、勾选标记、进度条填充、图表色块。
+- 禁止：`background:var(--brand-*)`、`background:var(--accent)`、`background:var(--drop)` 直接铺在按钮/行/胶囊上。
+- 对比度：强调控件文字与底色的实测对比度必须 ≥ 4.5:1（大字或粗体大字 ≥ 3:1）。
+
+落点：`.btn.accent`、`.picker-btn[data-host]`、`.picker-item[aria-selected]`、`.mini:hover`、
+危险操作按钮（`workbench-view.js` 的 `openModal` 分支）、教程主按钮。
+自动守卫：`test/ui-solid-fill-guard.test.js`。
+
+## 5. 手机端滚动与触控（2026-11-17 增补）
+
+1. **唯一纵向滚动容器**：手机形态只有 `.app-main` 承担页面纵向滚动。
+   仅当视图自带内部滚动（传输 `.transfer-body`、扩展 `.extension-body`）时，才允许对 `.app-main` 禁外滚；
+   **禁止**把 `overflow-y:hidden` 写成全局规则，否则设置/数据包内容会被裁掉且滚不到。
+2. **触屏桌面布局**：平板横屏、Duo 展开、触控笔记本走桌面布局时，折叠箭头 ≥24px，
+   紧凑文字按钮 ≥28px（`@media (pointer: coarse)` 兜底）。
+3. 验证方式：13 视口矩阵 `node tooling/ui-audit/matrix.cjs`，产出截图 + `probe.json`；
+   重点看 `phone-320x568`、`fold-280x653`、`duo-unfolded-1114x705`。

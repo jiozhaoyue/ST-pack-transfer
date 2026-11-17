@@ -9,7 +9,9 @@ const ALGORITHM = 'AWS4-HMAC-SHA256';
 
 const toHex = (buf) => [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
 
-/** URI 编码：S3 要求保留 '/' 的路径分段编码。 */
+import { sanitizeRelativePath } from './path-safety.js';
+
+/** URI 编码：S3 要求保留 '/' 的路径分段编码，并先做段级净化（防 `..` 穿越）。 */
 export function encodeSegment(value) {
   return encodeURIComponent(String(value)).replace(
     /[!'()*]/g,
@@ -17,7 +19,11 @@ export function encodeSegment(value) {
   );
 }
 export function encodePath(path) {
-  return String(path).split('/').map(encodeSegment).join('/');
+  const raw = String(path ?? '');
+  const clean = sanitizeRelativePath(raw);
+  const lead = raw.startsWith('/') ? '/' : '';
+  const body = clean.split('/').filter(Boolean).map(encodeSegment).join('/');
+  return lead + body;
 }
 
 /** 前缀去掉首尾斜杠与反斜杠；其它保持原样。 */

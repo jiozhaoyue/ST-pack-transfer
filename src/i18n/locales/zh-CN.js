@@ -54,7 +54,7 @@ export default {
   'chart.volume': '卷 {i}/{n}',
   'chart.overLimit': '超单卷上限',
   'chart.selected': '已选 {count} 项 · 预计 {size}',
-  'chart.estZip': '预计压缩包: ~{size}',
+  'chart.estZip': '预计压缩包: {size}',
   'chart.estZipTitle': '按当前压缩策略预估的压缩包体积；已扣除 Git 清理将剔除的条目',
   'chart.estZipGit': 'Git 清理已剔除 {size}',
   'chart.estZipUnknown': '{n} 项体积未知，估算可能偏低',

@@ -224,6 +224,8 @@ npm run check:css-scope check:dom-injection check:template-source check:dom-scop
 npm run docs:verify           # 中英文档 / 教程截图 / 基线是否同步（CI 强制执行）
 npm run docs:update           # 确认改动完整后刷新 docs-sync.manifest.json
 npm run docs:shots            # 重拍教程截图（桌面 + 手机）
+npx vitest run test/ui-solid-fill-guard.test.js   # 禁止整块实色填充 / 手机唯一滚动容器
+node tooling/ui-audit/matrix.cjs                  # 13 视口 UI 矩阵截图 + 程序化度量（需 3040）
 ```
 
 代码库配有完善的静态检查与自动化测试，严格把关跨酒馆适配规范（如 CSS 隔离、DOM 范围、多语言完整度与免打包直装语法等），确保在各类酒馆中平稳加载。

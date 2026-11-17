@@ -2127,7 +2127,7 @@ function pkgCard(p){
   const hostCode=p.unrecognized?'?':({st:'ST',luker:'L',tt:'TT',pt:'PT'}[p.host]||'?');
   const brand=p.unrecognized?null:({st:'--brand-st',luker:'--brand-luker',tt:'--brand-tt',pt:'--brand-pt'}[p.host]||null);
   const tagStyle=brand
-    ? 'background:var('+brand+');color:var('+brand+'-ink);border-color:transparent'
+    ? 'background:var('+brand+'-soft);color:var('+brand+'-ring);border-color:var('+brand+'-ring)'
     : 'color:var(--unknown);border-color:var(--unknown)';
   const seqStyle=brand
     ? 'color:var('+brand+'-ring);border-color:var('+brand+'-ring)'
@@ -6313,7 +6313,7 @@ function openModal(title,desc,extraHtml,actions){
     const b=document.createElement('button');
     b.className='btn'+(a.primary?' accent':'');
     b.textContent=a.label;
-    if(a.danger) b.style.background='var(--drop)',b.style.borderColor='var(--drop)';
+    if(a.danger) b.style.background='var(--drop-bg)',b.style.borderColor='var(--drop)',b.style.color='var(--text)';
     b.addEventListener('click',a.onClick);
     acts.appendChild(b);
   });

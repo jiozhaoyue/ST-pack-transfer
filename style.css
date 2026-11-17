@@ -27,6 +27,10 @@
     --muted-2: rgba(176, 176, 168, 0.56);
     --accent: var(--SmartThemeQuoteColor, rgb(225, 138, 36));
     --accent-soft: rgba(225, 138, 36, 0.20);
+    /* 2026-11-17 用户裁定：禁止大面积实色填充。强调控件只用「浅染 + 描边 + 强调文字」，
+       这两个令牌是浅染的常态/悬停档，回退值为普通 rgba（WebView 不支持 color-mix 时也可见）。 */
+    --accent-soft-2: rgba(225, 138, 36, 0.32);
+    --accent-line: rgba(225, 138, 36, 0.62);
     --keep: var(--SmartThemeUnderlineColor, rgb(188, 231, 207));
     --keep-bg: rgba(188, 231, 207, 0.14);
     --optional: var(--accent);
@@ -51,6 +55,8 @@
       --muted: color-mix(in srgb, var(--text) 68%, transparent);
       --muted-2: color-mix(in srgb, var(--text) 48%, transparent);
       --accent-soft: color-mix(in srgb, var(--accent) 20%, transparent);
+      --accent-soft-2: color-mix(in srgb, var(--accent) 32%, transparent);
+      --accent-line: color-mix(in srgb, var(--accent) 62%, transparent);
       --keep-bg: color-mix(in srgb, var(--keep) 14%, transparent);
       --optional-bg: color-mix(in srgb, var(--optional) 14%, transparent);
       --drop-bg: color-mix(in srgb, var(--drop) 16%, transparent);
@@ -656,16 +662,18 @@
     border-radius:6px;background:transparent;color:var(--text);font-size:12px;text-align:left;white-space:nowrap}
   #app.app-container .picker-item:hover{background:var(--panel-3)}
   #app.app-container .picker-item[aria-selected="true"]{background:var(--accent-soft)}
-  /* 目标平台按钮必须随目标切换品牌色（2026-11-17 用户改判：禁止写死紫色单色）。 */
+  /* 目标平台按钮必须随目标切换品牌色（2026-11-17 用户改判：禁止写死紫色单色）。
+     2026-11-17 再改判：**禁止整块品牌实色填充**——改为品牌浅染 + 品牌描边 + 品牌色文字，
+     品牌识别度由「颜色 + 图标 + 文字」共同承担，不再靠大面积铺色。 */
   #app.app-container .picker-btn[data-host]{border-width:1px}
   #app.app-container .picker-btn[data-host="st"]{
-    background:var(--brand-st);border-color:var(--brand-st);color:var(--brand-st-ink)}
+    background:var(--brand-st-soft);border-color:var(--brand-st-ring);color:var(--brand-st-ring)}
   #app.app-container .picker-btn[data-host="luker"]{
-    background:var(--brand-luker);border-color:var(--brand-luker);color:var(--brand-luker-ink)}
+    background:var(--brand-luker-soft);border-color:var(--brand-luker-ring);color:var(--brand-luker-ring)}
   #app.app-container .picker-btn[data-host="tt"]{
-    background:var(--brand-tt);border-color:var(--brand-tt);color:var(--brand-tt-ink)}
+    background:var(--brand-tt-soft);border-color:var(--brand-tt-ring);color:var(--brand-tt-ring)}
   #app.app-container .picker-btn[data-host="pt"]{
-    background:var(--brand-pt);border-color:var(--brand-pt);color:var(--brand-pt-ink)}
+    background:var(--brand-pt-soft);border-color:var(--brand-pt-ring);color:var(--brand-pt-ring)}
   #app.app-container .picker-btn[data-host]:hover{filter:brightness(1.08)}
   #app.app-container .picker-btn[data-host][aria-expanded="true"]{border-color:currentColor}
   #app.app-container .picker-btn[data-host] #target-btn-text{color:currentColor;font-weight:650}
@@ -683,18 +691,19 @@
   #app.app-container .picker-item[data-host="pt"]{background:var(--brand-pt-soft)}
   #app.app-container .picker-item.is-host,
   #app.app-container .picker-item[aria-selected="true"]{font-weight:650}
+  /* 选中项同样禁止整块实色：浅染 + 品牌色文字 + 左侧 2px 品牌色条（选中态一眼可辨）。 */
   #app.app-container .picker-item[data-host="st"].is-host,
   #app.app-container .picker-item[data-host="st"][aria-selected="true"]{
-    background:var(--brand-st);color:var(--brand-st-ink)}
+    background:var(--brand-st-soft);color:var(--brand-st-ring);box-shadow:inset 2px 0 0 var(--brand-st-ring)}
   #app.app-container .picker-item[data-host="luker"].is-host,
   #app.app-container .picker-item[data-host="luker"][aria-selected="true"]{
-    background:var(--brand-luker);color:var(--brand-luker-ink)}
+    background:var(--brand-luker-soft);color:var(--brand-luker-ring);box-shadow:inset 2px 0 0 var(--brand-luker-ring)}
   #app.app-container .picker-item[data-host="tt"].is-host,
   #app.app-container .picker-item[data-host="tt"][aria-selected="true"]{
-    background:var(--brand-tt);color:var(--brand-tt-ink)}
+    background:var(--brand-tt-soft);color:var(--brand-tt-ring);box-shadow:inset 2px 0 0 var(--brand-tt-ring)}
   #app.app-container .picker-item[data-host="pt"].is-host,
   #app.app-container .picker-item[data-host="pt"][aria-selected="true"]{
-    background:var(--brand-pt);color:var(--brand-pt-ink)}
+    background:var(--brand-pt-soft);color:var(--brand-pt-ring);box-shadow:inset 2px 0 0 var(--brand-pt-ring)}
   #app.app-container .picker-item.is-host:hover,
   #app.app-container .picker-item[aria-selected="true"]:hover{filter:brightness(1.08)}
   #app.app-container .picker-pop{border-color:var(--border-strong)}
@@ -759,7 +768,7 @@
     border:1px solid var(--border);object-fit:contain}
   #app.app-container .pkg-icon-wrap{position:relative;flex:0 0 auto;width:30px;height:30px}
   #app.app-container .pkg-icon-wrap .pkg-icon{width:30px;height:30px}
-  #app.app-container .pkg-host-tag{position:absolute;right:-4px;bottom:-4px;font-size:7.5px;line-height:1.2;
+  #app.app-container .pkg-host-tag{position:absolute;right:-4px;bottom:-4px;font-size:8.5px;line-height:1.2;
     padding:1px 3px;border-radius:4px;background:var(--panel);border:1px solid currentColor;
     white-space:nowrap;letter-spacing:.2px}
   /* 平台品牌色：**只出现在标识上**（图标环 + 宿主角标 + 来源标签），不染面板底色/按钮。 */
@@ -791,8 +800,9 @@
   #app.app-container .mini{display:inline-flex;align-items:center;justify-content:center;min-height:var(--ctl-h);
     padding:2px 7px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--panel);
     color:var(--text);font:inherit;font-size:var(--font-xs);line-height:1.2;white-space:nowrap;cursor:pointer}
-  #app.app-container .mini:hover{border-color:var(--accent);background:var(--accent);color:var(--ink-on-accent)}
-  #app.app-container .mini[data-pending-act="remove"]:hover{border-color:var(--drop);background:var(--drop);color:var(--target-ink)}
+  /* hover 也不铺满实色：只加浅染与描边，避免整块色底（同 2026-11-17 裁定）。 */
+  #app.app-container .mini:hover{border-color:var(--accent-line);background:var(--accent-soft);color:var(--text)}
+  #app.app-container .mini[data-pending-act="remove"]:hover{border-color:var(--drop);background:var(--drop-bg);color:var(--text)}
   #app.app-container .pkg-badge.warn{color:var(--optional);border-color:var(--optional);background:var(--optional-bg)}
   #app.app-container .pkg-badge.unknown{color:var(--unknown);border-color:var(--unknown);background:var(--unknown-bg)}
   #app.app-container .pkg-badge.lock{color:var(--accent);border-color:var(--accent);background:var(--accent-soft)}
@@ -1286,8 +1296,11 @@
     box-sizing:border-box}
   #app.app-container .btn:hover{border-color:var(--border-strong)}
   #app.app-container .btn:disabled{opacity:.45;cursor:not-allowed}
-  #app.app-container .btn.accent{background:var(--accent);border-color:var(--accent);color:var(--ink-on-accent)}
-  #app.app-container .btn.accent:hover{filter:brightness(1.06)}
+  /* 主操作：浅染底 + 强调描边 + 强调文字。禁止整块实色填充（2026-11-17 用户裁定）。
+     实测：白字压实色 accent 仅 2.67:1；改为 accent 文字压浅染底后 ≥ 4.5:1。 */
+  #app.app-container .btn.accent{background:var(--accent-soft);border-color:var(--accent-line);color:var(--accent);
+    font-weight:650;box-shadow:inset 0 1px 0 color-mix(in srgb, var(--accent) 18%, transparent)}
+  #app.app-container .btn.accent:hover{background:var(--accent-soft-2);border-color:var(--accent);color:var(--text)}
   #app.app-container .btn.ghost{background:transparent}
   #app.app-container .btn .ico{width:14px;height:14px}
 
@@ -1510,6 +1523,10 @@
     --muted-2: rgba(176, 176, 168, 0.58);
     --accent: var(--SmartThemeQuoteColor, rgb(225, 138, 36));
     --accent-soft: rgba(225, 138, 36, 0.20);
+    /* 2026-11-17 用户裁定：禁止大面积实色填充。强调控件只用「浅染 + 描边 + 强调文字」，
+       这两个令牌是浅染的常态/悬停档，回退值为普通 rgba（WebView 不支持 color-mix 时也可见）。 */
+    --accent-soft-2: rgba(225, 138, 36, 0.32);
+    --accent-line: rgba(225, 138, 36, 0.62);
     --shadow: 0 24px 70px var(--SmartThemeShadowColor, rgba(0, 0, 0, 0.5));
     --ctl-h:28px;
     color: var(--text);
@@ -1523,6 +1540,8 @@
       --muted: color-mix(in srgb, var(--text) 68%, transparent);
       --muted-2: color-mix(in srgb, var(--text) 48%, transparent);
       --accent-soft: color-mix(in srgb, var(--accent) 20%, transparent);
+      --accent-soft-2: color-mix(in srgb, var(--accent) 32%, transparent);
+      --accent-line: color-mix(in srgb, var(--accent) 62%, transparent);
     }
   }
   #st-pt-tutorial-overlay .tutorial-card{color:var(--text)}
@@ -1557,7 +1576,7 @@
     justify-content:flex-end;overflow:hidden}
   #st-pt-tutorial-overlay .tutorial-card .acts button{border:1px solid var(--border);background:var(--panel-3);border-radius:6px;
     padding:4px 9px;font-size:10.5px;color:var(--text);flex:0 0 auto;white-space:nowrap}
-  #st-pt-tutorial-overlay .tutorial-card .acts button.primary{background:var(--accent);border-color:var(--accent);color:var(--ink-on-accent)}
+  #st-pt-tutorial-overlay .tutorial-card .acts button.primary{background:var(--accent-soft);border-color:var(--accent-line);color:var(--accent);font-weight:650}
   #st-pt-tutorial-overlay .tutorial-card .acts button.link{border-color:transparent;background:transparent;color:var(--muted);
     text-decoration:underline;margin-right:auto;padding-left:0}
   #st-pt-tutorial-overlay .tutorial-card .acts button.link:hover{color:var(--text)}
@@ -1566,8 +1585,8 @@
     font-size:10.5px;font-weight:600;color:var(--text);text-decoration:none;flex:0 0 auto;white-space:nowrap;
     transition:all .15s ease}
   #st-pt-tutorial-overlay .tutorial-card .acts .tutorial-doc-btn svg{color:var(--accent);flex:0 0 auto}
-  #st-pt-tutorial-overlay .tutorial-card .acts .tutorial-doc-btn:hover{background:var(--accent);color:var(--ink-on-accent);text-decoration:none}
-  #st-pt-tutorial-overlay .tutorial-card .acts .tutorial-doc-btn:hover svg{color:var(--ink-on-accent)}
+  #st-pt-tutorial-overlay .tutorial-card .acts .tutorial-doc-btn:hover{background:var(--accent-soft-2);color:var(--text);text-decoration:none}
+  #st-pt-tutorial-overlay .tutorial-card .acts .tutorial-doc-btn:hover svg{color:var(--accent)}
   #st-pt-tutorial-overlay .tutorial-card .acts .tutorial-doc-btn[hidden]{display:none !important}
 
   /* 移动端：窄屏布局（唯一判据是 data-view，由 JS 按容器宽度设置；
@@ -1603,6 +1622,9 @@
      内容超出时由 .extension-body 唯一滚动（app-main 禁滚，禁双滚动条）。 */
   #app.app-container[data-view="mobile"] .extension-view{flex:1 1 auto}
   #app.app-container[data-view="mobile"]:has(#extension-view:not([hidden])) .app-main{overflow:hidden}
+  /* 传输视图同样自带 .transfer-body 内滚（见本文件移动端段），故 app-main 也只在该视图禁外滚。
+     其余视图（图表/数据包/日志）必须由 .app-main 承担唯一纵向滚动，否则内容不可达。 */
+  #app.app-container[data-view="mobile"]:has(#transfer-view:not([hidden])) .app-main{overflow:hidden}
   /* 手机数据包列表（2026-11-16 用户裁定，五次修订＝凭圈定实锤终版）：
      **同层、挤压、绝对禁止浮层**——文档流内（`app-main` 内 `order:-1`，切换行 `order:-2` 最上）。
      **收起＝display:none**：0fr 收拢会把 zone-card 边框压成一条悬在页头与切换行之间的细线
@@ -1615,6 +1637,9 @@
     max-height:72vh;
     animation:zoneDrop .24s ease;
   }
+  /* 抽屉展开时冻结页面主体：否则「app-main + zone-body」双纵向滚动，滚轮会跳容器。
+     抽屉收起后自动恢复 app-main 唯一纵向滚动。 */
+  #app.app-container[data-view="mobile"][data-zone-open="1"] .app-main{overflow:hidden}
   #app.app-container[data-view="mobile"][data-zone-open="1"] #zone-card{
     display:flex;flex-direction:column;
   }
@@ -1669,6 +1694,16 @@
     min-height:46px;padding:4px 6px 4px calc(6px + var(--depth, 0) * 9px)}
   #app.app-container[data-view="mobile"] .tree-check{width:20px;height:20px}
   #app.app-container[data-view="mobile"] .tree-toggle{width:28px;height:28px}
+  /* 2026-11-17：触屏但走桌面布局（平板横屏 / Duo 展开 / 触控笔记本）时，
+     桌面态的 16px 折叠箭头与紧凑文字按钮低于可点尺寸——统一抬到 24/28px。 */
+  @media (pointer: coarse){
+    #app.app-container .tree-toggle{width:24px;height:24px}
+    #app.app-container .tree-tools button,
+    #app.app-container .row-bulk button,
+    #app.app-container .extmode-btn,
+    #app.app-container .quota-row,
+    #app.app-container .lan-link{min-height:28px}
+  }
   #app.app-container[data-view="mobile"] .tree-ico{width:18px;height:18px}
   #app.app-container[data-view="mobile"] .tree-label{font-size:12.5px}
   #app.app-container[data-view="mobile"] .tree-size{font-size:11.5px}
@@ -1729,7 +1764,7 @@
   #app.app-container[data-view="mobile"] .lq-detail-grid{grid-template-columns:58px minmax(0,1fr)}
   #app.app-container[data-view="mobile"] .vol-collapse{display:inline-flex}
   #app.app-container[data-view="mobile"] .chart-stack > .chart-group:only-child .vol-card{height:auto}
-  #app.app-container[data-view="mobile"] .app-main{overflow-y:hidden;overflow-x:hidden}
+  #app.app-container[data-view="mobile"] .app-main{overflow-x:hidden}
   #app.app-container[data-view="mobile"] .transfer-body{overflow-y:auto;overflow-x:hidden}
   #app.app-container[data-view="mobile"] .zone-body{overflow:visible}
   #app.app-container[data-view="mobile"] .zone-body > .card-list{overflow:visible;max-height:none}
