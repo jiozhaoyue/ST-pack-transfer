@@ -57,15 +57,17 @@ async function readBytes(relPath) {
   return readFile(path.join(ROOT, relPath));
 }
 
+/** 文本按 LF 归一化，二进制保持原样：本地 CRLF 与 CI LF 必须得到同一哈希。 */
+function normalizeBytes(relPath, bytes) {
+  if (/\.(md|html|css|js|mjs|json|ya?ml|txt)$/i.test(relPath)) {
+    return Buffer.from(bytes.toString('utf8').replace(/\r\n/g, '\n'), 'utf8');
+  }
+  return bytes;
+}
+
 async function hashFile(relPath) {
   try {
-    const bytes = await readBytes(relPath);
-    /* 文本文件按 LF 归一化再哈希：Windows 工作区是 CRLF，CI 是 LF；
-       不归一化会让同一提交在本地与 CI 得到不同基线（2026-11-17 Pages 部署实测）。 */
-    if (/\.(md|html|css|js|mjs|json|ya?ml|txt)$/i.test(relPath)) {
-      return sha256(Buffer.from(bytes.toString('utf8').replace(/\r\n/g, '\n'), 'utf8'));
-    }
-    return sha256(bytes);
+    return sha256(normalizeBytes(relPath, await readBytes(relPath)));
   } catch {
     return null;
   }
@@ -77,7 +79,7 @@ async function hashMany(relPaths) {
     const bytes = await readBytes(relPath).catch(() => Buffer.from(''));
     hash.update(relPath);
     hash.update('\0');
-    hash.update(bytes);
+    hash.update(normalizeBytes(relPath, bytes));
     hash.update('\0');
   }
   return hash.digest('hex');
