@@ -105,6 +105,19 @@ npm run qa:static        # 静态守卫串跑
 - 改动 UI 后跑 13 视口矩阵：`node tooling/ui-audit/matrix.cjs`（需本地开发服务），
   产物在 `test-results/audit/<stamp>/`，含截图、`probe.json`、`summary.md`。
 
+### 更新记录弹窗与身份徽标（术语与契约）
+
+- **术语统一**：「更新记录」「提交记录」「更新日志」指同一处弹窗（`openChangelog()`），
+  与 Git 可视化泳道图（`#zone-side-git`）无关。代码、文档、注释、回复不得混用。
+- **三列恒在**：`.changelog-row` 是 `74px / 58px / minmax(0,1fr)` 三列（日期 / 短 SHA / 说明）。
+  `index.js` 渲染时**无论 `entry.sha` 是否存在都必须输出三个单元**；无 SHA 时放
+  `<span class="changelog-sha is-empty">` 占位。少一列会让说明串进 58px 列、
+  被 `overflow-wrap:anywhere` 逐字折成竖排，右侧空出一大块（实测行高可达 145px）。
+- **身份徽标**：四个宿主都有登录态，**禁止匿名态文案**。用户名取 `readHostIdentity()` 的
+  `handle`，为空再取 `name`；三处赋值（页头 / 启动刷新 / 扩展管理）必须一致。
+  读不到时显示「正在读取」并定时重试，不得回退成宿主名或匿名态。
+- 回归守卫：`npm test -- header-badge.test.js changelog.test.js`。
+
 ### 本地云与实例自动化
 
 - 本机 S3 兼容服务器：`npm run cloud:serve:s3`（端口 0 自动分配，仅测试、无鉴权）。

@@ -14,8 +14,8 @@ export default {
   'header.plugin': '{host} plugin',
   'header.web': 'Web',
   'header.hostOnly': '{host}',
-  'header.noUser': 'Not signed in',
-  'header.noUserTitle': 'Host {host}: username unavailable',
+  'header.userLoading': 'Loading…',
+  'header.userLoadingTitle': 'Host {host}: reading username',
 
   'chart.title': 'Storage chart',
   'chart.format': 'Chart format',
@@ -1530,4 +1530,7 @@ export default {
   'qr.cameraUnsupported': 'Camera not supported in this environment',
   'qr.cameraFailed': 'Camera unavailable: {msg}',
   'qr.permissionDenied': 'permission denied',
+  'qr.scanIdle': 'Place the pickup code in the frame',
+  'qr.scanHit': 'Recognized, connecting…',
+  'qr.scanOther': 'Not a code from this tool',
 };

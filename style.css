@@ -1023,9 +1023,13 @@
   #app.app-container .ext-sel-group{display:inline-flex;align-items:center;gap:3px}
   #app.app-container .ext-unified-actions{display:inline-flex;align-items:center;gap:6px;flex:0 1 auto;flex-wrap:nowrap;margin:0;overflow-x:auto;scrollbar-width:none}
   #app.app-container .ext-unified-actions::-webkit-scrollbar{display:none}
-  /* 手机（2026-11-17 视觉审计 UI-05）：动作行禁止「无暗示横滚 + 半截按钮」。
-     320 宽实测「转成清单」被拦腰裁切；改为换行，功能按钮全显示。 */
-  #app.app-container[data-view="mobile"] .ext-unified-actions{flex-wrap:wrap;overflow-x:visible;row-gap:6px}
+  /* 手机「包内」动作行（限定 --pkg，隔离宿主页）：左计数/选择按钮一行，右操作按钮独占第二行。
+     根因：左边占 191px 时右边只剩 93px，4 个按钮被 flex-wrap 逐个挤成竖列。
+     修法：操作按钮 flex:1 1 100% 独占整行后换行——390 下整行横排，320 下多出的按钮另起一行完整显示，
+     不露半截、不引入无暗示横滚（保留 UI-05 裁定）。宿主页 headRow2 不命中本规则，维持原状。 */
+  #app.app-container[data-view="mobile"] .ext-list-head--pkg .ext-head-action-row{flex-wrap:wrap;row-gap:8px}
+  #app.app-container[data-view="mobile"] .ext-list-head--pkg .ext-head-left{flex:1 1 auto}
+  #app.app-container[data-view="mobile"] .ext-list-head--pkg .ext-unified-actions{flex:1 1 100%;flex-wrap:wrap;overflow-x:visible;row-gap:6px}
   #app.app-container .ext-act-btn{padding:3px 9px;font-size:11px;font-weight:500;display:inline-flex;align-items:center;gap:5px;border-radius:6px;line-height:1.4;white-space:nowrap}
   #app.app-container .ext-act-btn:disabled{opacity:.4;cursor:not-allowed}
   #app.app-container .ext-head-right{display:inline-flex;align-items:center;gap:6px;flex:0 0 auto}
@@ -2078,10 +2082,23 @@
 #app.app-container .lan-pct{min-width:30px;text-align:right;font-variant-numeric:tabular-nums}
 #app.app-container .lan-detail{flex:1 0 100%;font-size:9px;color:var(--muted)}
 #app.app-container .lan-detail:empty{display:none}
-#app.app-container .lan-scan{display:flex;flex-direction:column;gap:6px;border:1px solid var(--border);border-radius:8px;padding:6px;background:var(--panel-3)}
-#app.app-container .lan-scan video{width:100%;max-height:220px;border-radius:6px;background:var(--video-bg);object-fit:cover}
-#app.app-container .lan-scan-actions{display:flex;align-items:center;justify-content:space-between;font-size:10px;color:var(--muted)}
 #app.app-container .lan-scan-error{margin:0;font-size:10px;color:var(--optional)}
+/* 全屏扫码覆盖层（2026-11-17 用户裁定：直接进摄像头，扫完跳出，带识别框三态提示） */
+#app.app-container .scan-overlay{position:fixed;inset:0;z-index:9000;display:flex;align-items:center;justify-content:center;background:#000}
+#app.app-container .scan-overlay[hidden]{display:none}
+#app.app-container .scan-overlay video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#000}
+#app.app-container .scan-frame{position:relative;width:min(74vw,320px);aspect-ratio:1;pointer-events:none}
+#app.app-container .scan-corner{position:absolute;width:26px;height:26px;border:3px solid var(--accent,#4c9ffe)}
+#app.app-container .scan-corner.tl{top:0;left:0;border-right:0;border-bottom:0;border-top-left-radius:8px}
+#app.app-container .scan-corner.tr{top:0;right:0;border-left:0;border-bottom:0;border-top-right-radius:8px}
+#app.app-container .scan-corner.bl{bottom:0;left:0;border-right:0;border-top:0;border-bottom-left-radius:8px}
+#app.app-container .scan-corner.br{bottom:0;right:0;border-left:0;border-top:0;border-bottom-right-radius:8px}
+#app.app-container .scan-status{position:absolute;left:50%;bottom:max(64px,10vh);transform:translateX(-50%);max-width:86vw;
+  padding:8px 14px;border-radius:999px;background:rgba(0,0,0,.72);color:#fff;font-size:12px;text-align:center;white-space:nowrap}
+#app.app-container .scan-status[data-state="hit"]{background:var(--keep,#28a745);color:#fff}
+#app.app-container .scan-status[data-state="other"]{background:var(--optional,#e0a800);color:#1a1a1a}
+#app.app-container .scan-close{position:absolute;top:max(14px,3vh);right:max(14px,3vw);width:40px;height:40px;border:0;border-radius:50%;
+  background:rgba(0,0,0,.6);color:#fff;font-size:24px;line-height:1;cursor:pointer}
 @media (max-width:860px){
   #app.app-container .lan-body{max-height:none}
   #app.app-container .lan-recv{order:-1;border-top:0;border-bottom:1px dashed var(--border);padding-top:0;padding-bottom:8px}

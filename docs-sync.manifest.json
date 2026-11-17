@@ -1,7 +1,7 @@
 {
   "version": 1,
   "files": {
-    "docs/DEVELOPER-GUIDE.md": "e7dfa7f8f780fdc4dd57a9b828aad14071fa5074157a6e5b66fab9167bb901c9",
+    "docs/DEVELOPER-GUIDE.md": "d7ef0dfdc1e56f0f06212a3c83fdeb33642dbe90fc52b9da1562eb5c5ba80f23",
     "docs/_config.yml": "4158c65372fa1362448cd0cbbe10c1f176a5aa70ace9c765594cd5c9360a009c",
     "docs/_layouts/default.html": "6548a8e81044cad7f10644f5dd0fa89ee9691cc75999e21f13e15eac16405e55",
     "docs/assets/shots/desktop-01-tutorial-goal.png": "7c0493cd0d8bf4ccfc8da65feab133e606a0269ae1d994dde55df6968f6a5d31",
@@ -57,7 +57,7 @@
     "docs/testing.en.md": "cc15febfafbcf8fd228f6cc007b4b0c9681df4e4932263aa03dac879270462ad",
     "docs/testing.md": "ef730cad495c46de7785bdd4eb714a87a0678253b07ae17c38d81a3428e7db44",
     "docs/transfer.en.md": "4e06b441300c0df7533f94d3f7178ae3317cf3e2590f782dea15080298c373be",
-    "docs/transfer.md": "31f34a266e57db5cfce472e1a7c1a8e8505727e5da736b4f2f5265c9295da605",
+    "docs/transfer.md": "e550b968a15839a277608395e8c8dd55852b6dd567504ffb216451e8e5bfce48",
     "docs/tutorial.en.md": "36bf2a4a8012bc3dec6064af38090951c545d71bc08e2a333aedb52c741af48c",
     "docs/tutorial.md": "d859c74fd202a948b4a24db358e2a0856e09aad1a8e335aad4dfa4df8f42e7f2"
   },
@@ -115,7 +115,7 @@
       "zh": "docs/transfer.md",
       "en": "docs/transfer.en.md",
       "translation": "required",
-      "sourceHash": "31f34a266e57db5cfce472e1a7c1a8e8505727e5da736b4f2f5265c9295da605",
+      "sourceHash": "e550b968a15839a277608395e8c8dd55852b6dd567504ffb216451e8e5bfce48",
       "translationHash": "4e06b441300c0df7533f94d3f7178ae3317cf3e2590f782dea15080298c373be"
     },
     {
@@ -171,7 +171,7 @@
       "zh": "docs/DEVELOPER-GUIDE.md",
       "en": null,
       "translation": "pending",
-      "sourceHash": "e7dfa7f8f780fdc4dd57a9b828aad14071fa5074157a6e5b66fab9167bb901c9",
+      "sourceHash": "d7ef0dfdc1e56f0f06212a3c83fdeb33642dbe90fc52b9da1562eb5c5ba80f23",
       "translationHash": null
     }
   ],
@@ -182,7 +182,7 @@
       "style.css",
       "tooling/capture-docs-shots.cjs"
     ],
-    "sourcesHash": "4380ef5c722a35ba4d8d693c4f5762c8b407c8e942e60e8775d0047d4574c779",
+    "sourcesHash": "a073eb96b7600334b829d288791633bcf8b95dbd00d0866315c65fc10845aa84",
     "pages": {
       "docs/tutorial.md": [
         "docs/assets/shots/desktop-01-tutorial-goal.png",

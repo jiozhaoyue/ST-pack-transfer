@@ -875,12 +875,14 @@ function renderHeader(){
     if(!isWeb){ icon.src=h.icon; icon.dataset.host=state.host; }
   }
   const badge=document.getElementById('host-badge');
+  /* 四个宿主都有登录态，不存在匿名用户：拿不到用户名只可能是还没读到，
+     显示「正在读取」占位并继续重试，绝不退化成匿名态文案。 */
   const userText = state.extHostUser
     ? (escapeHtml(state.extHostUser) + (state.extHostAdmin ? ' <b class="is-admin">'+t('extmgr.adminBadge')+'</b>' : ''))
-    : (isWeb ? t('header.web') : t('header.noUser'));
+    : (isWeb ? t('header.web') : t('header.userLoading'));
   badge.title = state.extHostUser
     ? `${state.extHostUser} (${state.extHostAdmin ? t('extmgr.adminBadge') : t('extmgr.userBadgeTitle')})`
-    : (isWeb ? t('header.webTitle') : t('header.noUserTitle', { host: h.full }));
+    : (isWeb ? t('header.webTitle') : t('header.userLoadingTitle', { host: h.full }));
   const badgeTxt = document.getElementById('host-badge-text');
   if(badgeTxt) badgeTxt.innerHTML = userText;
   const versionEl = document.getElementById('app-version');
@@ -2126,9 +2128,11 @@ function pkgCard(p){
   const hostKey=p.unrecognized?'unknown':p.host;
   const hostCode=p.unrecognized?'?':({st:'ST',luker:'L',tt:'TT',pt:'PT'}[p.host]||'?');
   const brand=p.unrecognized?null:({st:'--brand-st',luker:'--brand-luker',tt:'--brand-tt',pt:'--brand-pt'}[p.host]||null);
+  /* 宿主角标 ST/L/TT/PT 必须实心（2026-11-17 用户裁定）：浅染底看不清。
+     背景用品牌实色 --brand-*，文字用配套 --brand-*-ink（专为此底色设计，保证对比）。 */
   const tagStyle=brand
-    ? 'background:var('+brand+'-soft);color:var('+brand+'-ring);border-color:var('+brand+'-ring)'
-    : 'color:var(--unknown);border-color:var(--unknown)';
+    ? 'background:var('+brand+');color:var('+brand+'-ink);border-color:var('+brand+')'
+    : 'background:var(--unknown);color:var(--text);border-color:var(--unknown)';
   const seqStyle=brand
     ? 'color:var('+brand+'-ring);border-color:var('+brand+'-ring)'
     : 'color:var(--unknown);border-color:var(--unknown)';
@@ -4094,7 +4098,8 @@ async function loadServerPlugins(){
   if(!identity) return;
   state.extServerLoaded=true;
   state.extHostAdmin=identity.admin===true;
-  state.extHostUser=identity.handle||'';
+  state.extHostUser=identity.handle||identity.name||'';
+  if(state.extHostUser) renderHeader();
   /* 用户徽标住页脚（非管理员也显示身份，只是不亮管理能力） */
   syncExtInstallBlock();
   if(!state.extHostAdmin){ state.extServerPlugins=[]; return; }
@@ -5417,9 +5422,12 @@ function renderLan(){
   const rp=document.getElementById('lan-recv-phase'); if(rp) rp.textContent=L.recv.phase||t('action.waiting');
   const rd=document.getElementById('lan-recv-detail'); if(rd) rd.textContent=L.recv.detail||'';
   setLanBar('lan-recv-bar','lan-recv-pct',L.recv.pct);
+  /* 全屏扫码 overlay：扫描中显示，结束隐藏。识别框三态由 onDetect 直接更新，不走整页重绘。 */
   const scanBox=document.getElementById('lan-scan'); if(scanBox) scanBox.hidden=!L.scanning;
-  const scanHint=document.getElementById('lan-scan-hint');
-  if(scanHint) scanHint.textContent=L.scanning==='answer'?t('lan.scanAnswerHint'):t('action.scanHint');
+  if(!L.scanning){
+    const st=document.getElementById('lan-scan-status');
+    if(st){ st.dataset.state='idle'; st.textContent=t('qr.scanIdle'); }
+  }
   const err=document.getElementById('lan-scan-error');
   if(err){ err.hidden=!L.scanError; err.textContent=L.scanError||''; }
 }
@@ -6098,9 +6106,15 @@ async function cloudDelete(key) {
 }
 
 let stopLanScan=null;
+let lanScanToken=0;          // 每次开始/结束自增，取消后延迟回调据此作废，杜绝关掉摄像头还跳结果
+let lanScanHitPending=false; // 已命中本工具码、等待高亮后跳出，避免重复触发
 function finishLanScan(){
+  lanScanToken+=1;
+  lanScanHitPending=false;
   if(stopLanScan){ try{ stopLanScan(); }catch{ /* 已停止 */ } stopLanScan=null; }
   state.lan.scanning=null;
+  const st=document.getElementById('lan-scan-status');
+  if(st){ st.dataset.state='idle'; st.textContent=t('qr.scanIdle'); }
   renderLan();
 }
 async function copyLanText(text){
@@ -6110,28 +6124,47 @@ async function copyLanText(text){
 }
 async function startLanScan(kind){
   if(typeof qr?.scan!=='function'){ toast(t('lan.scanUnsupported')); return; }
+  const myToken=++lanScanToken;
+  lanScanHitPending=false;
   state.lan.scanError=''; state.lan.scanning=kind; renderLan();
+  const status=document.getElementById('lan-scan-status');
+  const setStatus=(stateKey,i18nKey)=>{ if(status&&lanScanToken===myToken){ status.dataset.state=stateKey; status.textContent=t(i18nKey); } };
+  setStatus('idle','qr.scanIdle');
   try {
     stopLanScan=await qr.scan({
       video:document.getElementById('lan-scan-video'),
       canvas:document.getElementById('lan-scan-canvas'),
-      onResult:(text)=>{
-        finishLanScan();
-        if(kind==='offer'){
-          const el=document.getElementById('lan-offer-input');
-          if(el) el.value=text;
-          state.lan.recv.offer=text;
-          actions.lan?.acceptOffer?.(text);
-        }else{
-          const el=document.getElementById('lan-answer-input');
-          if(el) el.value=text;
-          state.lan.send.answer=text;
-          actions.lan?.applyAnswer?.(text);
-        }
+      /* 识别框三态：本工具码高亮后跳出；其他码提示继续扫。返回 false 让扫描器继续。 */
+      onDetect:(raw)=>{
+        if(lanScanToken!==myToken) return false;
+        if(!qr.isOurCode(raw)){ setStatus('other','qr.scanOther'); return false; }
+        if(lanScanHitPending) return false;
+        lanScanHitPending=true;
+        setStatus('hit','qr.scanHit');
+        setTimeout(()=>{
+          if(lanScanToken!==myToken) return; // 期间用户取消
+          state.lan.scanning=null;           // 停止扫描循环（onResult 后不再继续）
+          if(stopLanScan){ try{ stopLanScan(); }catch{} stopLanScan=null; }
+          if(kind==='offer'){
+            const el=document.getElementById('lan-offer-input');
+            if(el) el.value=raw;
+            state.lan.recv.offer=raw;
+            actions.lan?.acceptOffer?.(raw);
+          }else{
+            const el=document.getElementById('lan-answer-input');
+            if(el) el.value=raw;
+            state.lan.send.answer=raw;
+            actions.lan?.applyAnswer?.(raw);
+          }
+          lanScanToken+=1;
+          renderLan();
+        },450);
+        return false; // 延迟期间继续帧循环，但 hitPending 防止重复
       },
-      onError:(msg)=>{ state.lan.scanError=msg||t('lan.cameraUnavailable'); finishLanScan(); },
+      onError:(msg)=>{ if(lanScanToken!==myToken) return; state.lan.scanError=msg||t('lan.cameraUnavailable'); finishLanScan(); },
     });
   } catch(err) {
+    if(lanScanToken!==myToken) return;
     state.lan.scanError=err?.message||t('lan.cameraUnavailable');
     finishLanScan();
   }
@@ -7909,21 +7942,29 @@ function initSwitchDensity(){
   document.querySelectorAll('[data-view-switch]').forEach(host=>ro.observe(host));
 }
 
-/* 页头徽标要显示「宿主图标 + 当前用户名」，而不是宿主名：
-   身份以前只在扩展管理器打开时读取（loadServerPlugins），所以启动后徽标一直回退成宿主名。
-   这里在初始化阶段读一次；失败不报错，打开扩展管理器时仍会重试。 */
+/* 页头徽标要显示「宿主图标 + 当前用户名」，不是宿主名，更不退化成匿名态：
+   四个宿主都有登录态，用户名只可能暂时没读到（宿主刚重启 / CSRF 未就绪）。
+   启动后持续重试，直到读到 handle 或 name 为止，避免徽标永远停在占位态。 */
+let hostIdentityTimer=null;
 async function refreshHostIdentity(){
   if(state.mode==='web'||!state.host||state.host==='none'||state.host==='standalone') return;
   for(let attempt=0;attempt<2;attempt+=1){
     let identity=null;
     try{ identity=await actions.hostIdentity?.(); }catch{ identity=null; }
     if(identity && identity.ok){
-      state.extHostUser=identity.handle||'';
+      state.extHostUser=identity.handle||identity.name||'';
       state.extHostAdmin=identity.admin===true;
       renderHeader();
       return;
     }
     if(attempt<1) await new Promise((r)=>{ setTimeout(r,600); });
+  }
+  /* 两轮都失败：再排一次有界重试，读不到就一直等宿主就绪，不退化成匿名态。 */
+  if(!state.extHostUser && !hostIdentityTimer){
+    hostIdentityTimer=setTimeout(()=>{
+      hostIdentityTimer=null;
+      void refreshHostIdentity();
+    },3000);
   }
 }
 

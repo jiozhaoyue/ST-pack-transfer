@@ -96,6 +96,7 @@
 | 状态行固定 | `style.css:946-948` `.ext-list-head` | `position:static`（随 `.extension-body` 滚走）→ `position:sticky; top:0; z-index:3` | 桌面 1280：滚动 0→781px，`headTop` 恒 117、`countTop` 恒 155，**未移动** ✅ |
 | 手机包内只读 | `style.css:974-980` | 手机 `current:none`+下拉显示 → 双端 `picker:none !important`+`current:inline-flex` | 手机 390：`picker:none`、`current:flex` 只读包名；桌面同 ✅ |
 | 选包补扫描 | `workbench-view.js:551` `selectPackageForExtension` | 只同步 state → 追加 `actions.onActivePackage(id)` 补扫描并重绘 | 桌面：共 31 项、31 行清单正常显示 ✅ |
+| 手机包内按钮行（限定 `--pkg`，隔离宿主页） | `style.css` `.ext-list-head--pkg .ext-head-action-row` | 左块占 191px→右块仅 93px，4 按钮被 `flex-wrap` 挤成竖列 → 左块 `flex:1 1 auto`、右块 `flex:1 1 100%` 独占整行后换行 | 390：4 按钮 y≈253 全横排、无裁切；320：整齐两行、无半截；均 `clipped:[]` ✅。仍 `overflow-x:visible`（不引入无暗示横滚，保持 UI-05） |
 
 ## 5. 变更纪律（每次滚动相关改动必做）
 

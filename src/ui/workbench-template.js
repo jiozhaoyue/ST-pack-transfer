@@ -135,14 +135,6 @@ export function getWorkbenchHtml() {
               <span class="lo-item"><b data-i18n="lan.ovCats"></b><span id="lan-ov-cats"></span></span>
               <span class="lo-item"><b data-i18n="lan.ovState"></b><span id="lan-ov-state"></span></span>
             </div>
-            <div class="lan-scan" id="lan-scan" hidden>
-              <video id="lan-scan-video" playsinline muted></video>
-              <div class="lan-scan-actions">
-                <span id="lan-scan-hint" data-i18n="action.scanHint"></span>
-                <button type="button" id="lan-scan-cancel" data-i18n="action.cancel"></button>
-              </div>
-              <canvas id="lan-scan-canvas" hidden></canvas>
-            </div>
             <p class="lan-scan-error" id="lan-scan-error" hidden></p>
 
             <section class="lan-send" id="lan-send">
@@ -494,6 +486,15 @@ export function getWorkbenchHtml() {
         <span class="app-version" id="app-version"></span>
       </span>
     </button>
+
+    <!-- Fullscreen QR scan overlay: camera + detection frame with three-state hint -->
+    <div class="scan-overlay" id="lan-scan" hidden>
+      <video id="lan-scan-video" playsinline muted></video>
+      <canvas id="lan-scan-canvas" hidden></canvas>
+      <div class="scan-frame" id="lan-scan-frame"><span class="scan-corner tl"></span><span class="scan-corner tr"></span><span class="scan-corner bl"></span><span class="scan-corner br"></span></div>
+      <div class="scan-status" id="lan-scan-status" data-state="idle"><span data-i18n="qr.scanIdle"></span></div>
+      <button type="button" class="scan-close" id="lan-scan-cancel" data-i18n-aria="header.close">×</button>
+    </div>
 
     <dialog class="confirm-dialog" id="confirm-dialog">
       <div class="view-head">

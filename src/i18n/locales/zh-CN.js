@@ -17,8 +17,8 @@ export default {
   'header.plugin': '{host} 插件',
   'header.web': 'Web',
   'header.hostOnly': '{host}',
-  'header.noUser': '未登录',
-  'header.noUserTitle': '当前宿主 {host}：未读取到用户名',
+  'header.userLoading': '正在读取…',
+  'header.userLoadingTitle': '当前宿主 {host}：正在读取用户名',
 
   'chart.title': '存储图表',
   'chart.format': '图表格式',
@@ -1536,4 +1536,7 @@ export default {
   'qr.cameraUnsupported': '当前环境不支持摄像头',
   'qr.cameraFailed': '相机不可用：{msg}',
   'qr.permissionDenied': '权限被拒绝',
+  'qr.scanIdle': '把取件码放进框内',
+  'qr.scanHit': '已识别，正在连接…',
+  'qr.scanOther': '不是本工具的二维码',
 };

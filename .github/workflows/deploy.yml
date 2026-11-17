@@ -12,18 +12,31 @@ permissions:
   contents: read
   pages: write
   id-token: write
+  deployments: write   # 本体 + 文档站两条 active deployment / 清理历史
 
 concurrency:
   group: "pages"
   cancel-in-progress: true
 
 jobs:
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+  # 构建 + 清历史：独立 job，不绑定 github-pages environment，删除旧 deployment 不影响发布 job。
+  build:
     runs-on: ubuntu-latest
     steps:
+      # 零历史：清掉两个环境的旧 deployment。每次发布后全仓只剩本次的两条 active。
+      # 两个不同 environment（github-pages 本体 / github-pages-docs 文档站）才能各有 1 条 active。
+      - name: Clear old deployments
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          for env_name in github-pages github-pages-docs; do
+            ids=$(gh api "repos/${GITHUB_REPOSITORY}/deployments?environment=${env_name}&per_page=100" --jq '.[].id' || true)
+            for id in $ids; do
+              gh api -X DELETE "repos/${GITHUB_REPOSITORY}/deployments/${id}" --silent
+            done
+          done
+
       - name: Checkout
         uses: actions/checkout@v4
 
@@ -58,16 +71,50 @@ jobs:
           mkdir -p dist/docs
           cp -r _site_docs/. dist/docs/
 
-      - name: Setup Pages
-        uses: actions/configure-pages@v5
-        with:
-          enablement: true
-
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: './dist'
 
+  deploy:
+    needs: build
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+      # 本体 + 文档站各 1 条 active deployment。deploy-pages 已在 github-pages 建了一条（无描述），
+      # 这里补上 app 描述/URL；再在独立 environment github-pages-docs 建文档站一条并置 success。
+      - name: Publish two active deployments
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
+        run: |
+          set -euo pipefail
+          repo="${GITHUB_REPOSITORY}"
+          app_url="${PAGE_URL%/}"
+          docs_url="${app_url}/docs/"
+
+          # 本体：给 deploy-pages 刚建的那条 github-pages deployment 补描述与 URL
+          app_dep=$(gh api "repos/${repo}/deployments?environment=github-pages&per_page=1" --jq '.[0].id')
+          gh api -X POST "repos/${repo}/deployments/${app_dep}/statuses" \
+            -f state=success -f description="app: ${app_url}" -f environment_url="${app_url}" > /dev/null
+
+          # 文档站：独立 environment，单独一条 active
+          docs_dep=$(gh api -X POST "repos/${repo}/deployments" \
+            -f ref="${GITHUB_REF_NAME}" -f task=deploy -f environment=github-pages-docs \
+            -f description="docs: ${docs_url}" --jq '.id')
+          gh api -X POST "repos/${repo}/deployments/${docs_dep}/statuses" \
+            -f state=success -f description="docs deployed" -f environment_url="${docs_url}" > /dev/null
+
+          echo "app deployment ${app_dep} -> ${app_url}"
+          echo "docs deployment ${docs_dep} -> ${docs_url}"

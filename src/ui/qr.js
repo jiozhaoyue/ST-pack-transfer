@@ -11,6 +11,12 @@
 
 import qrcodeFactory from '../vendor/qrcode-generator.js';
 import { t } from '../i18n/index.js';
+import { PICKUP_PREFIX } from '../core/lan-transfer.js';
+
+/** 扫码识别框判定：文本是否本工具的局域网取件码（`SZC1.<flag>.<body>`）。 */
+export function isOurCode(text) {
+  return typeof text === 'string' && text.startsWith(`${PICKUP_PREFIX}.`);
+}
 
 const VENDOR = {
   decode: new URL('../vendor/jsqr.js', import.meta.url),
@@ -68,7 +74,7 @@ export function encodeSvg(text) {
  * 调摄像头扫二维码。返回停止函数；任何失败都经 `onError` 如实上报，
  * 粘贴输入不受影响。所有等待/循环都有明确出口。
  */
-export async function scan({ video, canvas, onResult, onError } = {}) {
+export async function scan({ video, canvas, onResult, onError, onDetect } = {}) {
   try {
     await ready();
   } catch (err) {
@@ -118,6 +124,13 @@ export async function scan({ video, canvas, onResult, onError } = {}) {
         const image = ctx.getImageData(0, 0, width, height);
         const hit = window.jsQR(image.data, width, height, { inversionAttempts: 'dontInvert' });
         if (hit?.data) {
+          /* 每帧命中都上报，驱动识别框三态提示。onDetect 返回 false 表示"非本工具码，继续扫"；
+             未传 onDetect 或返回非 false 则接受：停流 + onResult（保持旧行为的即时跳出）。 */
+          const accept = onDetect ? onDetect(hit.data) !== false : true;
+          if (!accept) {
+            raf = requestAnimationFrame(tick);
+            return;
+          }
           stop();
           onResult?.(hit.data);
           return;
@@ -130,4 +143,4 @@ export async function scan({ video, canvas, onResult, onError } = {}) {
   return stop;
 }
 
-export const qr = { ready, encodeReady, encodeSvg, scan };
+export const qr = { ready, encodeReady, encodeSvg, scan, isOurCode };

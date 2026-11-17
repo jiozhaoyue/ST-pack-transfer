@@ -2126,7 +2126,9 @@ async function main(root) {
       return '<div class="changelog-row' + (isRelease ? ' is-release' : '') + '"'
         + ' data-changelog-release="' + (isRelease ? '1' : '0') + '">'
         + '<span class="changelog-date">' + escapeText(entry.date || '') + '</span>'
-        + (entry.sha ? '<code class="changelog-sha">' + escapeText(entry.sha) + '</code>' : '')
+        /* 三列必须恒在：sha 缺位也要放空占位，否则说明文字串进 58px 列被挤成竖排、右侧空一大块。 */
+        + (entry.sha ? '<code class="changelog-sha">' + escapeText(entry.sha) + '</code>'
+          : '<span class="changelog-sha is-empty" aria-hidden="true"></span>')
         + '<span class="changelog-msg">'
         + (isRelease
           ? '<span class="changelog-tag">🏷 ' + escapeText(tags.join(' / ')) + '</span>'

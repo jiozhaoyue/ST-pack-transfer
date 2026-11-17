@@ -73,9 +73,13 @@ describe('实色填充与手机滚动防回归（2026-11-17 用户裁定）', ()
   });
 
   it('手机扩展动作行必须换行，不得无暗示横滚 + 半截按钮（UI-05）', () => {
-    const body = ruleBody('#app.app-container[data-view="mobile"] .ext-unified-actions{');
+    /* 选择器带 --pkg：只约束包内页，宿主页 headRow2 不命中（避免误伤管理员按钮行）。 */
+    const body = ruleBody('#app.app-container[data-view="mobile"] .ext-list-head--pkg .ext-unified-actions{');
     expect(body).toContain('flex-wrap:wrap');
     expect(body).toContain('overflow-x:visible');
+    // 绝不允许退回单行横滚（那会让 320 极窄屏露半截按钮）
+    expect(body).not.toContain('flex-wrap:nowrap');
+    expect(body).not.toContain('overflow-x:auto');
   });
 
   it('未识别徽章与手机 toast 的可读性兜底（UI-06 / UI-02）', () => {
