@@ -124,6 +124,21 @@ This single habit prevents most "forgot to update X" bugs.
 
 ---
 
+## 已删除符号（禁止当作现行实现引用）
+
+以下符号**已从源码移除**。若在某份 spec 正文里看到它们被描述为现行实现，**以本表为准**，该处属于待修过时内容。
+
+| 符号 | 状态 | 现行替代 | 仍残留引用的文件 |
+| --- | --- | --- | --- |
+| `.st-converter-drawer-app` | 随抽屉注入删除，`style.css` 中 0 处 | 作用域根只用 `#app.app-container` 或自有覆盖层 id | `frontend/quality-guidelines.md`、`frontend/type-safety.md`、`frontend/component-guidelines.md` |
+| `registerMenuButton()` | 扩展菜单（顶栏魔方棒）已禁止注入 | `mountExtensionRowButton()` / `mountNativeBackupButton()` 等经 `watchHostDom` 的注入点 | `frontend/component-guidelines.md` |
+| `#pending-exports` / `.pending-head` / `.pending-row` | 模板中不得再出现 | `ExportQueue` 的当前容器 | `frontend/directory-structure.md` |
+| `src/ui/migration-wizard.js` | **文件不存在** | 迁移向导现行实现见 `src/ui/` 对应模块 | `frontend/migration-compatibility-and-release.md`、`frontend/migration-user-journey.md` |
+
+判定方式：引用前先 `ls` 或 `grep src/` 核实；核实不到即视为已删除，不得照着 spec 旧文实现。
+
+---
+
 ## Contributing
 
 Found a new "didn't think of that" moment? Add it to the relevant guide.
