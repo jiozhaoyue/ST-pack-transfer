@@ -121,8 +121,15 @@ node tooling/ui-audit/matrix.cjs --url http://localhost:3040
 | UI-16 | P2 | **已修**：移除 `~` 与 `≈` 估算符号 |
 | UI-17 | P2 | **复核通过**：`renderViewSwitch` 每枚按钮均带 `aria-label` + `title` |
 
-## 待修（功能审计移交）
+## 本机宿主实例阻塞（跨宿主 LAN 未实测）
 
+- Dev ST（8001）与 Dev Luker（8003）都能启动，`/api/extensions/discover` 都能列出 `third-party/ST-pack-transfer`，`index.js` 返回 200。
+- 但页面里 `#app` 始终为 null（插件未挂载），控制台伴随资源 404；扩展管理器也没有可用条目。
+- 两次实例启停均符合“同时最多两个”，结束后 8001/8003 已确认释放。
+- 影响：ST↔Luker 跨宿主 LAN、宿主态徽标无法在本机实例内验证；网页态徽标已验证不溢出。
+- 下一步：按 Git 更新 Dev 实例插件到同一 commit，或换干净 Profile 后复测；不改宿主设置、不复制文件。
+
+## 待修（功能审计移交）
 | ID | 严重度 | 摘要 | 位置 |
 | --- | --- | --- | --- |
 | F-01 | P1 | 分卷阈值按未压缩源字节判断，与真实产物体积不同源 | `src/core/splitter.js:184,191,214` |
