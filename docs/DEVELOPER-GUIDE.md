@@ -113,7 +113,10 @@ npm run qa:static        # 静态守卫串跑
 - 核心云全流程：`npm run e2e:cloud-core`（真实数据包 → 上传 → 下载 → sha256）。
 - 实例成对启动：`npm run e2e:instance-pair -- dev-st dev-luker`；
   **同一时刻最多两个实例**，退出时校验端口释放。
-- 说明与限制：`tooling/local-cloud/README.md`、`docs/audit/2026-11-17/instance-availability.md`。
+- Luker ↔ TT 保真回归：`npm run test:luker-tt`（固定夹具）、`npm run e2e:luker-tt`（含真实大包）；
+  判定口径：关键项零丢失、计数不减少、同输入两次产物清单一致；预期丢弃与同名扩展去重单独记录。
+- 说明与限制：`tooling/local-cloud/README.md`、`docs/audit/2026-11-17/instance-availability.md`、
+  `docs/audit/2026-11-17/luker-tt-roundtrip.md`。
 
 ## 五、体积与分卷模型
 

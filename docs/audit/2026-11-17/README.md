@@ -12,6 +12,21 @@
 | `ui-visual-audit.md` | 全视口视觉审计（GLM-5.3），17 条：P0 1 / P1 4 / P2 11 + 3 复核通过 | 已交付（基于整改前截图，逐条复核见下） |
 | `cloud-core-e2e.md` | 本机 S3/WebDAV 全流程：上传→下载→sha256；大包 25,169,946 B | 已交付，实测通过 |
 | `instance-availability.md` | PureTavern / TauriTavern 能否参与跨宿主实测 | 已交付：PT 有条件、TT 不可浏览器自动化 |
+| `luker-tt-roundtrip.md` | Luker↔TauriTavern 往返保真（最高价值路径） | 固定夹具通过；真实大包运行中 |
+| `luker-tt-contract.md` | Luker↔TT 格式契约逐项映射 | 已交付：6 条缺陷候选（D1~D6） |
+
+## Luker ↔ TauriTavern（最高价值路径）
+
+| 样本 | 方向 | 关键项 | 计数 | 结论 |
+| --- | --- | --- | --- | --- |
+| `fixture-l.zip` | L→TT→L | 角色/聊天/世界书/设置/secrets/扩展 全在 | 角色 1、聊天 1、消息 2、世界书 1 | 通过，关键丢失 0 |
+| `fixture-tt.zip` | TT→L→TT | 同上 | 同上 | 通过，关键丢失 0 |
+| `real-l-to-tt.zip`（586 MB） | 往返 | 待补 | 待补 | 运行中 |
+| `real-tt-to-l.zip`（77 MB） | 往返 | 待补 | 待补 | 运行中 |
+
+- 角色卡 PNG 往返 `Buffer.compare == 0`（字节恒等）。
+- 预期丢弃：备份快照、缩略图、TT 派生缓存、重合成的 manifest。
+- 契约候选：D1 同名扩展全局副本去重（已裁决必须显式提醒）、D3 TT 设置丢弃（已裁决修入 `_compat/tt/`）、D2/D4/D5/D6 见报告。
 
 ## 自动化测试资产（持久化、可复用）
 
