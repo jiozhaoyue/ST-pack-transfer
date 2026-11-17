@@ -93,7 +93,7 @@ npm run qa:static        # 静态守卫串跑
 
 单文件 HTML 必须保持 `file://` 可双击运行：脚本为 IIFE、Worker 强制主线程降级、字体与样式内联、零外部资源。
 
-### 视觉与响应式约定（2026-11-17 起）
+### 视觉与响应式约定
 
 - **禁止整块实色填充**：按钮/胶囊/徽章条/注入入口一律「浅染底（`*-soft`）+ 1px 品牌描边（`*-ring`）+ 品牌色文字」；
   实色只用于 ≤16px 圆点、勾选标记、进度条、图表色块。目标平台按钮同理，选中项再加左侧 2px 色条。
@@ -102,10 +102,10 @@ npm run qa:static        # 静态守卫串跑
   禁止把 `overflow-y:hidden` 写成全局手机规则。
 - **触屏桌面布局**：`@media (pointer: coarse)` 下折叠箭头 ≥24px、紧凑文字按钮 ≥28px。
 - 自动守卫：`npm test -- ui-solid-fill-guard`。
-- 改动 UI 后跑 13 视口矩阵：`node tooling/ui-audit/matrix.cjs`（需 3040 服务），
+- 改动 UI 后跑 13 视口矩阵：`node tooling/ui-audit/matrix.cjs`（需本地开发服务），
   产物在 `test-results/audit/<stamp>/`，含截图、`probe.json`、`summary.md`。
 
-### 本地云与实例自动化（2026-11-17 起）
+### 本地云与实例自动化
 
 - 本机 S3 兼容服务器：`npm run cloud:serve:s3`（端口 0 自动分配，仅测试、无鉴权）。
 - 本机 WebDAV 服务器：`npm run cloud:serve:webdav`（同上）。
@@ -115,8 +115,15 @@ npm run qa:static        # 静态守卫串跑
   **同一时刻最多两个实例**，退出时校验端口释放。
 - Luker ↔ TT 保真回归：`npm run test:luker-tt`（固定夹具）、`npm run e2e:luker-tt`（含真实大包）；
   判定口径：关键项零丢失、计数不减少、同输入两次产物清单一致；预期丢弃与同名扩展去重单独记录。
-- 说明与限制：`tooling/local-cloud/README.md`、`docs/audit/2026-11-17/instance-availability.md`、
-  `docs/audit/2026-11-17/luker-tt-roundtrip.md`。
+- 说明与限制：本机测试服务器说明与仓内审计记录（不随站点发布）。
+
+### 两个云端 Page 与部署
+
+- “两个 page”只指 GitHub Pages 的**插件 Web 根页**与 **`/docs/` 文档站**，两者由同一
+  `Deploy to GitHub Pages` 工作流部署；本地开发服务与酒馆实例页面不属于该词。
+- 影响插件或 `docs/` 的改动必须重新部署：`gh workflow run "Deploy to GitHub Pages" --ref main`，
+  或打 `v*` tag；部署后验证两个 URL 均 200。
+- 细则：仓内规范「两个云端 Page 与部署」。
 
 ## 五、体积与分卷模型
 

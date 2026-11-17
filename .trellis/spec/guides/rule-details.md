@@ -142,3 +142,6 @@
 | D-87 | R-18 | 品牌色只用于描边、文字、浅染与色条，不整块铺底；目标平台选中态用「浅染 + 左侧 2px 品牌色条」保持识别 | <DATE> |
 | D-88 | R-05 | 预估类读数也不得加 `~` / `≈` 前缀；用「预计 / Est.」文案表达估算性质，数字本身保持确定格式 | <DATE> |
 | D-89 | R-27 | 每轮 UI 改动必须跑 13 视口矩阵（`node tooling/ui-audit/matrix.cjs`）并保留截图与 `probe.json`；覆盖 16:9、21:9 带鱼屏、平板横竖、Duo 折叠/展开、320/280 极窄 | <DATE> |
+| D-90 | R-11 | “两个 page”只指 GitHub Pages 根（插件 Web）与 `/docs/`（文档站）两个云端页面，同一工作流部署；本地 3040 与酒馆实例页面不属于该词 | <DATE> |
+| D-91 | R-11 | 影响插件或 `docs/` 的改动必须重新部署 Pages（`workflow_dispatch` 或 `v*` tag），并验证两个 URL 均 200；部署失败必须记录 run id 与日志 | <DATE> |
+| D-92 | R-11 | Pages 部署历史只保留最近 2 条 `github-pages` deployment（当前 + 上一条），其余删除；外部可见 deployment 必须恰好为 2 | <DATE> |
