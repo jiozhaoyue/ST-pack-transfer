@@ -1,7 +1,7 @@
 {
   "version": 1,
   "files": {
-    "docs/DEVELOPER-GUIDE.md": "db49c3b5cb26c981ce155ccba702b0e287ce00ef672a69977a23eeaf5c5f329f",
+    "docs/DEVELOPER-GUIDE.md": "632671adcba05904d6ea84ec19d6e5106b0302af8c3daa5e51f74c79fcc29f49",
     "docs/_config.yml": "4158c65372fa1362448cd0cbbe10c1f176a5aa70ace9c765594cd5c9360a009c",
     "docs/_layouts/default.html": "6548a8e81044cad7f10644f5dd0fa89ee9691cc75999e21f13e15eac16405e55",
     "docs/assets/shots/desktop-01-tutorial-goal.png": "bf99e2ffe6aa5953cc332edc8f90ba6cf02b5009b5134c29d13dd1b87611b8aa",
@@ -171,7 +171,7 @@
       "zh": "docs/DEVELOPER-GUIDE.md",
       "en": null,
       "translation": "pending",
-      "sourceHash": "db49c3b5cb26c981ce155ccba702b0e287ce00ef672a69977a23eeaf5c5f329f",
+      "sourceHash": "632671adcba05904d6ea84ec19d6e5106b0302af8c3daa5e51f74c79fcc29f49",
       "translationHash": null
     }
   ],
