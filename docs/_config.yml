@@ -7,6 +7,11 @@ plugins:
   - jekyll-seo-tag
 relative_links:
   enabled: true
+exclude:
+  - PLAN-*
+  - plans
+  - .trellis
+  - node_modules
 header_pages:
   - index.md
   - install.md

@@ -17,8 +17,8 @@ function fakeRoot(values) {
 describe('settings-panel 设置面板', () => {
   it('包含基础提示开关与导出清理项（打包选项不在设置页）', () => {
     const html = buildSettingsHtml(SETTINGS_DEFAULTS);
-    // 8 个行为开关 + 设置→数据 的 2 个凭据勾选（includeCreds / includeOauth）
-    expect((html.match(/type="checkbox"/g) || []).length).toBe(11);
+    // 9 个行为开关 + 设置→数据 的 2 个凭据勾选（includeCreds / includeOauth）
+    expect((html.match(/type="checkbox"/g) || []).length).toBe(12);
     expect(html).toContain('data-setting="deleteAfterExport"');
     expect(html).toContain('data-setting="logMaxEntries"');
     expect(html).toContain('data-setting="nativePullNotice"');
@@ -32,6 +32,7 @@ describe('settings-panel 设置面板', () => {
   it('从 DOM 读回设置项', () => {
     expect(readSettings(fakeRoot({
       deleteAfterExport: true,
+      autoDeleteBackupPacks: true,
       trafficPrompt: true,
       nativePullNotice: false,
       autoTutorial: false,
@@ -40,6 +41,7 @@ describe('settings-panel 设置面板', () => {
     }))).toEqual({
       ...SETTINGS_DEFAULTS,
       deleteAfterExport: true,
+      autoDeleteBackupPacks: true,
       trafficPrompt: true,
       nativePullNotice: false,
       autoTutorial: false,

@@ -36,6 +36,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Docs privacy guard
+        run: npm run check:docs-privacy
+
       - name: Build Web Application
         run: npm run build -- --base=./
 

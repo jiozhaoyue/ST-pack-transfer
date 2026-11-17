@@ -34,7 +34,7 @@ jobs:
       - name: Docs layout guard
         run: |
           set -e
-          allowed="_config.yml index.md install.md formats.md convert.md host-pull.md restore.md extensions.md transfer.md storage.md engines.md privacy.md tutorial.md faq.md DEVELOPER-GUIDE.md testing.md style.css PLAN-2026-11-17-ui-fixes.md PLAN-2026-11-17-v0.5.3.md queue-and-logs.md"
+          allowed="_config.yml index.md install.md formats.md convert.md host-pull.md restore.md extensions.md transfer.md storage.md engines.md privacy.md tutorial.md faq.md DEVELOPER-GUIDE.md testing.md style.css queue-and-logs.md"
           for f in docs/*; do
             if [ -d "$f" ]; then
               case "$(basename "$f")" in
@@ -49,6 +49,9 @@ jobs:
             esac
           done
           echo "docs 布局检查通过"
+
+      - name: Docs privacy guard
+        run: npm run check:docs-privacy
 
       - name: Build (sanity)
         run: npm run build -- --base=./

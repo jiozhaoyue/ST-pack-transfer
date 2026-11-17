@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs';
 const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8'));
 let commit = 'dev';
 let changelog = [];
+let tagMap = {};
 try {
   const cwd = new URL('.', import.meta.url);
   commit = execSync('git rev-parse --short HEAD', { cwd }).toString().trim() || commit;
@@ -14,6 +15,19 @@ try {
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter(Boolean);
+  // 发布 tag → 提交映射：更新日志高亮发版提交（轻量 / 附注 tag 都兼容）。
+  const tags = execSync('git for-each-ref --format="%(objectname) %(*objectname) %(refname:short)" refs/tags', { cwd })
+    .toString()
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  for (const line of tags) {
+    const [object, peeled, name] = line.split(/\s+/);
+    if (!name || !/^v?\d+\.\d+\.\d+/.test(name)) continue;
+    const sha = String(peeled || object || '').slice(0, 7);
+    if (!sha) continue;
+    (tagMap[sha] ||= []).push(name);
+  }
 } catch { /* 非 git 环境：保留发布提交回退与发布摘要 */ }
 
 export default defineConfig({
@@ -22,6 +36,7 @@ export default defineConfig({
     __APP_VERSION__: JSON.stringify(pkg.version),
     __APP_COMMIT__: JSON.stringify(commit),
     __APP_CHANGELOG__: JSON.stringify(changelog),
+    __APP_TAGS__: JSON.stringify(tagMap),
   },
   worker: {
     format: 'es',

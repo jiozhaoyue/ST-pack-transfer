@@ -21,6 +21,8 @@ export const CHART_PREF_DEFAULTS = Object.freeze({
   extensionMode: 'full',
   gitMode: 'minimal',
   keepDev: false,
+  /* 2026-11-17 用户裁定：默认保留与目标平台不兼容的私有配置项，默认勾选。 */
+  keepIncompatible: true,
 });
 
 export function normalizeChartPrefs(input) {
@@ -46,9 +48,10 @@ export function normalizeChartPrefs(input) {
   if (typeof input.filenameTemplate === 'string' && input.filenameTemplate.trim()) {
     out.filenameTemplate = input.filenameTemplate.trim();
   }
-  if (['full', 'manifest'].includes(input.extensionMode)) out.extensionMode = input.extensionMode;
+  if (['full', 'manifest', 'both', 'none'].includes(input.extensionMode)) out.extensionMode = input.extensionMode;
   if (['keep', 'minimal', 'strip'].includes(input.gitMode)) out.gitMode = input.gitMode;
   if (typeof input.keepDev === 'boolean') out.keepDev = input.keepDev;
+  if (typeof input.keepIncompatible === 'boolean') out.keepIncompatible = input.keepIncompatible;
   return out;
 }
 

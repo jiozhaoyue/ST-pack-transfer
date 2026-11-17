@@ -44,6 +44,7 @@ export function getWorkbenchHtml() {
             <div class="panel-actions">
               <button class="icon-btn chart-pref-btn" id="chart-pref-btn" data-i18n-title="chart.prefsBtn" data-i18n-aria="chart.prefsBtn">
                 <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h8M16 7h4M4 12h4M12 12h8M4 17h10M18 17h2"/><circle cx="14" cy="7" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="16" cy="17" r="2"/></svg>
+                <span class="pref-btn-txt" data-i18n="chart.prefsBtnText"></span>
               </button>
 
             </div>
@@ -269,6 +270,10 @@ export function getWorkbenchHtml() {
               <button type="button" class="btn accent cloud-btn-primary" id="cloud-backup-selected"><i class="fa-solid fa-cloud-arrow-up"></i> <span data-i18n="cloud.backupSelected"></span></button>
               <button type="button" class="btn cloud-btn-secondary" id="cloud-upload" disabled><i class="fa-solid fa-upload"></i> <span data-i18n="cloud.upload"></span></button>
             </div>
+            <div class="cloud-row cloud-action-buttons">
+              <button type="button" class="btn accent cloud-btn-primary" id="cloud-auto-backup"><i class="fa-solid fa-bolt"></i> <span data-i18n="cloud.autoBackup"></span></button>
+            </div>
+            <div class="cloud-note-box"><i class="fa-solid fa-bolt"></i> <div class="cloud-note" data-i18n="cloud.autoBackupHint"></div></div>
             <div class="cloud-status" id="cloud-status"></div>
             <div class="cloud-guide-group">
               <div class="cloud-note-box"><i class="fa-solid fa-circle-info"></i> <div class="cloud-note" id="cloud-unified-guide" data-i18n="cloud.unifiedPackHint"></div></div>
@@ -412,6 +417,13 @@ export function getWorkbenchHtml() {
         <button class="icon-btn" id="settings-close" data-i18n-title="header.close">×</button>
       </div>
       <div class="view-body" id="settings-body"></div>
+      <button type="button" class="settings-version" id="settings-version" data-action="changelog"
+        title="" aria-label="">
+        <span class="sv-main" id="settings-version-main"></span>
+        <span class="sv-hint" data-i18n="settings.openChangelog"></span>
+        <svg class="sv-chev" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor"
+          stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>
+      </button>
       <div class="view-actions">
         <button class="btn" id="settings-cancel" data-i18n="modal.cancel"></button>
         <button class="btn accent" id="settings-save" data-i18n="modal.save"></button>
@@ -421,22 +433,35 @@ export function getWorkbenchHtml() {
     <section class="panel view-card" id="view-log" hidden>
       <div class="view-head">
         <h3 data-i18n="log.title"></h3>
+        <div class="segmented log-tabs" id="log-tabs">
+          <button type="button" class="seg-btn active" data-logtab="log" data-i18n="log.tabLog"></button>
+          <button type="button" class="seg-btn" data-logtab="queue" data-i18n="log.tabQueue"></button>
+        </div>
 
         <span class="latest" id="log-latest" data-i18n="log.empty"></span>
         <button class="icon-btn" id="log-close" data-i18n-title="header.close">×</button>
       </div>
-      <div class="log-toolbar" id="log-toolbar">
-        <button class="log-level-btn" data-level="DEBUG" data-i18n="log.debug" title=""></button>
-        <button class="log-level-btn" data-level="INFO" data-i18n="log.info" title=""></button>
-        <button class="log-level-btn active" data-level="WARN" data-i18n="log.warn" title=""></button>
-        <button class="log-level-btn active" data-level="ERROR" data-i18n="log.error" title=""></button>
-        <button class="log-level-btn active" data-level="SUCCESS" data-i18n="log.success" title=""></button>
-        <span style="flex:1"></span>
-        <button id="log-export" data-i18n="log.export"></button>
-        <button id="log-copy" data-i18n="log.copy"></button>
-        <button id="log-clear" data-i18n="log.clear"></button>
+      <div class="log-pane" id="log-pane-log">
+        <div class="log-toolbar" id="log-toolbar">
+          <button class="log-level-btn" data-level="DEBUG" data-i18n="log.debug" title=""></button>
+          <button class="log-level-btn" data-level="INFO" data-i18n="log.info" title=""></button>
+          <button class="log-level-btn active" data-level="WARN" data-i18n="log.warn" title=""></button>
+          <button class="log-level-btn active" data-level="ERROR" data-i18n="log.error" title=""></button>
+          <button class="log-level-btn active" data-level="SUCCESS" data-i18n="log.success" title=""></button>
+          <span style="flex:1"></span>
+          <button id="log-export" data-i18n="log.export"></button>
+          <button id="log-copy" data-i18n="log.copy"></button>
+          <button id="log-clear" data-i18n="log.clear"></button>
+        </div>
+        <div class="log-body" id="log-body"><div id="log-lines"></div></div>
       </div>
-      <div class="log-body" id="log-body"><div id="log-lines"></div></div>
+      <div class="log-pane log-queue-pane" id="log-pane-queue" hidden>
+        <div class="lq-head">
+          <span data-i18n="taskq.title"></span>
+          <span class="lq-count" id="lq-count"></span>
+        </div>
+        <div class="lq-list" id="lq-list"></div>
+      </div>
     </section>
 
     <section class="panel view-card" id="view-help" hidden>
@@ -448,7 +473,7 @@ export function getWorkbenchHtml() {
     </section>
 
     <section class="task-queue" id="task-queue" hidden aria-live="polite">
-      <div class="tq-head"><b data-i18n="queue.title"></b><span class="tq-count" id="tq-count"></span></div>
+      <div class="tq-head"><b data-i18n="taskq.title"></b><span class="tq-count" id="tq-count"></span></div>
       <div class="tq-list" id="tq-list"></div>
     </section>
 
@@ -484,7 +509,7 @@ export function getWorkbenchHtml() {
     <div class="dots" id="tutorial-dots"></div>
     <div class="acts">
       <button id="tutorial-adv" class="link" data-i18n="tutorial.changeGoal"></button>
-      <a id="tutorial-doc-btn" class="tutorial-doc-btn" target="_blank" rel="noopener noreferrer" href="./docs/tutorial" data-i18n-title="tutorial.docHint"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><span id="tutorial-doc-text" data-i18n="tutorial.openDoc"></span></a>
+      <a id="tutorial-doc-btn" class="tutorial-doc-btn" target="_blank" rel="noopener noreferrer" href="https://jiozhaoyue.github.io/ST-pack-transfer/docs/tutorial.html" data-i18n-title="tutorial.docHint"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><span id="tutorial-doc-text" data-i18n="tutorial.openDoc"></span></a>
       <button id="tutorial-never" class="link" data-i18n="tutorial.never"></button>
       <button id="tutorial-skip" data-i18n="tutorial.skip"></button>
       <button id="tutorial-prev" data-i18n="tutorial.prev"></button>

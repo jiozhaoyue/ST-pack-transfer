@@ -464,11 +464,31 @@ layout: default
 | **智能建议** | `src/core/ext-pack.js` `suggestPackMode()`、`workbench-view.js` `decorateExtSuggestions()` / `extUrlMapOf()` | 本插件、无远端、私有凭据 → 完整；公开远端 → 清单。URL 取值链读 `pkg.extManifest` + `pkg.extensions[].gitMeta/sourceRecord/manifest.homePage`，避免全量误判。行内 `.ext-suggest` 徽标必须显眼，不再只显示灰色小字。教程/文档必须说明 GFW/弱网应选完整。 |
 | **移动端教程** | `index.js` `portalTutorialOverlay()`、`style.css` `#st-pt-tutorial-overlay` | 浮层必须挂 `document.body`；`position:fixed; inset:0; height:100dvh`，卡片 `max-height` 内滚。宿主祖先的 transform 不得把浮层带出视口。 |
 | **局域网二维码** | `src/ui/qr.js`、`src/vendor/qrcode-generator.js` | 编码器静态 ESM 导入，vendor 只保留 `export default qrcode`，**不得**留 UMD `module.exports`（会与 ESM 只读 getter 冲突）。生成二维码失败时显示明确占位，取件码仍可复制。 |
-| **更新日志** | `src/core/changelog.js`、`vite.config.js`、`index.js` | 构建期注入完整 git 日志；宿主直装回退发布摘要。版本变化自动弹窗（默认开，可勾「不再自动显示」）；设置页可打开最早→最新完整日志。`vite.config.js` 的 git format **必须加引号**，否则 Windows cmd 把 `|` 当管道导致注入为空。 |
-| **连续任务队列** | `index.js`（`enqueueTask` / `pumpQueue` / `enqueueHostPull` / `enqueueRestore` / `enqueueCloudBackup`）、`workbench-view.js` `renderTaskQueue()` | 生成 / 宿主拉取 / 恢复写回 / 云端备份共用串行队列；生成可暂停/继续，其它长任务至少可中断（AbortSignal + 协作标记）。排队可上移/下移/移出；最近 20 条结束任务保留。禁止 `state.busy` 直接拒绝新批次。 |
+| **更新日志** | `src/core/changelog.js`、`vite.config.js`、`index.js` | 构建期注入完整 git 日志 + `__APP_TAGS__` 发布 tag 映射；宿主直装回退发布摘要。版本变化自动弹窗（默认开，可勾「不再自动显示」）；设置页可打开**从新到旧**的完整日志，发版提交高亮 tag 徽标，可切换「只看发布提交」。`vite.config.js` 的 git format **必须加引号**，否则 Windows cmd 把 `|` 当管道导致注入为空。 |
+| **连续任务队列** | `index.js`（`enqueueTask` / `pumpQueue` / `enqueueHostPull` / `enqueueRestore` / `enqueueCloudBackup` / `recordActivity`）、`workbench-view.js` `renderTaskQueue()` / `renderLogQueue()` | 生成 / 宿主拉取 / 恢复写回 / 云端备份 / 下载 / 复制回 / 导入 / 云端下载恢复共用任务视图；生成可暂停/继续，其它长任务至少可中断（AbortSignal + 协作标记）。排队可上移/下移/移出；已结束任务保留最近 200 条。日志视图「任务队列」页签可展开详情（类型/状态/时间/耗时/进度条/错误）。禁止 `state.busy` 直接拒绝新批次。 |
 | **日志全量** | `src/core/logger.js`、设置页、日志视图 | 新增 DEBUG；**所有级别始终入账**，默认控制台/显示阈值 WARN。设置可选 debug/info/warn/error；日志视图默认 WARN+ERROR，DEBUG 按钮可回看全部。 |
 | **导出体积预测** | `src/core/git-policy.js`、`workbench-view.js` `selectedProjected()` | 预估必须扣除 `gitMode=minimal/strip` 将剔除的 `.git` 条目，并在 title 里写明剔除量。转换器与预测共用 `git-policy.js`，禁止两套判断。 |
 | **Luker 引擎自动切换** | `plan-preview.js` `sourceEngine`、`workbench-view.js` `autoEngineForPackage()` | Luker 宿主选中包后，目标引擎自动切到该包声明的源引擎（fs/postgres/mysql/sqlite）；读不到就保持原选择，不猜。 |
+
+### T. v0.5.4 手机图表 / 任务队列 / 一键自动备份（2026-11-17）
+
+| 功能 | 源码落点 | 行为与铁律 |
+| --- | --- | --- |
+| **边框令牌兜底** | `style.css` 顶部令牌 | `--border / --border-strong / --outline` 先给普通 `rgba()`，再由 `@supports (color: color-mix(...))` 增强。手机 WebView 不支持 `color-mix` 时**边框不得整条失效**。设置面板外圈用 `--outline` + 内描边，中圈分组用 `--border-strong`，两级必须可辨。 |
+| **手机图表滚动** | `style.css` `[data-view="mobile"]` 图表块 | 高度链 `app-main → col-chart → chart-card → chart-stack`；**只有 `.chart-stack` 滚**。卡片/树行内部禁止滚动；画布单列自然高度。隐藏 `.vol-chart` 与 `.tree-occ`，保证文件信息优先。 |
+| **图表行换行** | `workbench-view.js` `renderTreeRows()`、`style.css` `.tree-main / .tree-extra` | 身份簇（开关/勾选/色点/图标/名称/建议徽标）必须同一行；模式按钮与批量按钮放 `.tree-extra` 次行。每行加底部分隔线。手机端缩进用 `--depth` CSS 变量，禁止再写死 `padding-left`。 |
+| **符号徽标** | `renderTreeRows()` | 建议保留/可选/清理/未知 → ✓/○/✕/?；建议完整/清单 → 整/单；完整/清单按钮手机端显示单字。手机端隐藏文字版，保留 `title` / `aria`。 |
+| **数据包下拉不自动收** | `workbench-view.js` `#zone-card` 点击处理 | 勾选、点卡、切区都不得调用收起；只有「数据包」切换按钮可收起。 |
+| **日志单行工具栏** | `style.css` `#view-log .log-toolbar` | 8 个按钮（5 级别 + 导出/复制/清空）必须完整单行；窄屏压缩字号/内边距，**禁止换行、禁止横向滚动条**。 |
+| **任务队列页签** | `workbench-template.js` `#view-log`、`workbench-view.js` `renderLogQueue()` | 日志/任务队列互切；任务行可展开，含类型/状态/创建/开始/结束/耗时/进度条/错误；所有操作都要记录（`recordActivity`）。 |
+| **一键自动备份** | `index.js` `enqueueAutoBackup()` / `autoBackup()`、模板 `#cloud-auto-backup` | 自动拉取 → 图表勾选修剪 → 目标平台生成 → 上传校验 → 删除。复用 `deleteAfterExport`：开启时生成后立刻删自动导入；新增 `autoDeleteBackupPacks` 默认开，上传成功后删剩余自动包；失败保留。自动包 metadata `autoFlow: pull|export`，包卡显示「自动拉取/自动生成」徽标。 |
+| **文档站绝对地址** | `src/core/docs-site.js`、`settings-panel.js`、`workbench-view.js` | 「查看文档」只能跳到部署站 `https://jiozhaoyue.github.io/ST-pack-transfer/docs/`；**禁止 localhost / `./docs/` / 当前路径拼接**。自定义 `docsBaseUrl` 只接受绝对 http(s)。 |
+| **公开 docs 隐私** | `tooling/docs-privacy-guard.js`、`.github/workflows/checks.yml`、`deploy.yml`、`docs/_config.yml` | 公开 `docs/` 禁止 PLAN/handoff/research/tasks；守卫在本地、checks、deploy 三处执行。计划文件只放 `.private/plans/`（`.gitignore` 忽略）。 |
+| **设置版本行固定** | `workbench-template.js` `#settings-version`、`workbench-view.js` `openSettingsView()` | 版本行在滚动正文之外、按钮行之上，绝对不随设置内容滚动；整行可点击打开完整更新日志。 |
+| **偏好双选** | `chart-prefs.js`、`workbench-view.js` `chartPrefsHtml()` | 新扩展默认模式两个按钮可同时亮，再点各自取消；`full/manifest/both/none` 持久化。 |
+| **私有配置保留** | `renderTreeRows()` `data-keepincompat`、`applyIncompatibleDefault()` | 「保留不兼容」只在私有配置行出现，默认勾选；关闭时不兼容私有配置叶子默认取消勾选。 |
+| **教程避让** | `tutorialCardPlacement()`、`renderTutorial()` | 卡片按实际高度在下/上/右/左择位，禁止再调用居中覆盖定位；滚动/缩放实时重算。`查看文档`/`不再弹出` 只在最初目标选择浮层显示。 |
+| **目标平台品牌色** | `style.css` `--brand-*`、`renderTargetPicker()` | 高饱和品牌色 + 透明底（`--brand-*-soft`）；按钮与下拉项都带 `data-host`，禁止浑浊/发白。 |
 
 > 教程文案的插值实现：`renderTutorial()` 用 `t(step.desc, step.params ? step.params() : undefined)`；
 > 新增带数值的教程步骤必须提供 `params`，不得把数字写进 locale 字符串。

@@ -7,7 +7,8 @@
  *
  * 用户 2026-11-17 裁定：
  * - 每次版本变化后自动弹更新说明，默认开启，可关闭「不再自动显示」；
- * - 设置页永远可以打开完整提交日志（最早到最新）。
+ * - 设置页永远可以打开完整提交日志，**从新到旧**（最新在最上面）；
+ * - 可切换「只看发布提交」。
  */
 
 const FALLBACK_RELEASES = [
@@ -58,10 +59,24 @@ function parseCommitLine(line) {
   return { sha, date, subject };
 }
 
+/** 发布 tag（构建期 __APP_TAGS__ 注入；无构建环境返回空）。 */
+function tagsOf(sha) {
+  try {
+    if (typeof __APP_TAGS__ !== 'undefined' && __APP_TAGS__ && sha) {
+      const list = __APP_TAGS__[sha];
+      return Array.isArray(list) ? [...list] : [];
+    }
+  } catch { /* 未注入 */ }
+  return [];
+}
+
 /** 完整提交列表（最早→最新）。构建期注入优先。 */
 export function changelogCommits() {
   if (typeof __APP_CHANGELOG__ !== 'undefined' && Array.isArray(__APP_CHANGELOG__)) {
-    return __APP_CHANGELOG__.map(parseCommitLine).filter(Boolean);
+    return __APP_CHANGELOG__
+      .map(parseCommitLine)
+      .filter(Boolean)
+      .map((entry) => ({ ...entry, tags: tagsOf(entry.sha) }));
   }
   return [];
 }
@@ -76,12 +91,14 @@ export function recentChangelog(limit = 30) {
   }));
 }
 
-/** 完整日志：构建期有注入就全量；否则返回发布摘要。**必须最早→最新**（用户裁定）。 */
+/** 完整日志：构建期有注入就全量；**必须从新到旧**（2026-11-17 用户裁定）。 */
 export function fullChangelog() {
   const commits = changelogCommits();
-  if (commits.length) return commits.slice();
-  return FALLBACK_RELEASES.slice().reverse().flatMap((release) => release.notes.map((subject) => ({
-    sha: '', date: release.date, subject: `v${release.version} · ${subject}`, release: release.version,
+  if (commits.length) return commits.slice().reverse();
+  return FALLBACK_RELEASES.flatMap((release) => release.notes.map((subject, index) => ({
+    sha: '', date: release.date, subject: `v${release.version} · ${subject}`,
+    release: index === 0 ? release.version : undefined,
+    tags: index === 0 ? [`v${release.version}`] : [],
   })));
 }
 

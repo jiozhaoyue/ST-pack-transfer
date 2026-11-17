@@ -40,6 +40,7 @@ import { EXTENSION_MODES, GIT_MODES } from '../core/export-modes.js';
 import { isGitEntryDropped } from '../core/git-policy.js';
 import { queueControls } from '../core/task-queue-controls.js';
 import { APP_VERSION, APP_COMMIT } from '../core/app-version.js';
+import { docsPageUrl } from '../core/docs-site.js';
 import { extensionUnitName, extensionUnitsOf, suggestPackMode } from '../core/ext-pack.js';
 import { parseRepoUrl, refineRefWithBranches, isCommitRef, SITES } from '../core/git-url.js';
 import {
@@ -87,6 +88,46 @@ export function tutorialAnchor(targetRect, overlayRect, cardSize = { width: 330,
   cardLeft = Math.max(0, Math.min(cardLeft, o.width - width));
   cardTop = Math.max(0, Math.min(cardTop, o.height - cardSize.height));
   return { ring, card: { left: cardLeft, top: cardTop, width } };
+}
+
+/**
+ * 教程卡片避让聚光区（用户 2026-11-17 裁定：卡片绝不能挡住正在高亮的区域）。
+ * 依次尝试下 / 上 / 右 / 左；全部放不下时选重叠面积最小的位置。
+ * @returns {{ring:object, card:{left:number,top:number,width:number}}}
+ */
+export function tutorialCardPlacement(targetRect, overlayRect, cardSize = { width: 330, height: 180 }) {
+  const base = tutorialAnchor(targetRect, overlayRect, cardSize);
+  const o = overlayRect;
+  const width = base.card.width;
+  const height = Math.max(80, Number(cardSize.height) || 180);
+  const ring = base.ring;
+  const clamp = (v, min, max) => Math.max(min, Math.min(v, max));
+  const box = (left, top) => ({
+    left: clamp(left, 0, Math.max(0, o.width - width)),
+    top: clamp(top, 0, Math.max(0, o.height - height)),
+    width,
+    height,
+  });
+  const overlapArea = (a, b) => {
+    const w = Math.min(a.left + a.width, b.left + b.width) - Math.max(a.left, b.left);
+    const h = Math.min(a.top + a.height, b.top + b.height) - Math.max(a.top, b.top);
+    return w > 0 && h > 0 ? w * h : 0;
+  };
+  const candidates = [
+    box(ring.left, ring.top + ring.height + 10),
+    box(ring.left, ring.top - height - 10),
+    box(ring.left + ring.width + 10, ring.top),
+    box(ring.left - width - 10, ring.top),
+    box(base.card.left, base.card.top),
+  ];
+  let best = candidates[0];
+  let bestOverlap = overlapArea(best, ring);
+  for (const candidate of candidates) {
+    const area = overlapArea(candidate, ring);
+    if (area === 0) return { ring, card: candidate };
+    if (area < bestOverlap) { best = candidate; bestOverlap = area; }
+  }
+  return { ring, card: best };
 }
 
 export const EXT_SCAN_CACHE_KEY = 'st-pack-transfer:ext-scan-cache';
@@ -196,12 +237,15 @@ function node(id,label,mb,suggest,opts){
     uploadable:!!opts.uploadable };
 }
 function hostNodes(host){
-  return { unavailable: !(HOSTS[host] || {}).readable, nodes: state.hostTree || [] };
+  const nodes = state.hostTree || [];
+  applyIncompatibleDefault(nodes);
+  return { unavailable: !(HOSTS[host] || {}).readable, nodes };
 }
 function packageNodes(pkg){
   const nodes = chartTreeFor(pkg, EXTENSION_MODES.FULL);
   /* 角色卡 / 聊天目录按名称配对；配不上的标「未匹配」，不猜。 */
   annotateChatLinks(nodes, t('link.unmatched'));
+  applyIncompatibleDefault(nodes);
   /* 私有件「传云」只在 ST/Luker 有原生 files 接口时出现；宿主树没有源包字节，故不标。 */
   const canUpload = state.mode!=='web' && (state.host==='st' || state.host==='luker');
   if(canUpload){
@@ -214,9 +258,10 @@ function packageNodes(pkg){
 function extModeOf(name){
   const own = state.extPackMode[String(name||'')];
   if(own) return normalizeExtPackMode(own);
-  return chartPrefs.extensionMode === EXTENSION_MODES.MANIFEST
-    ? EXT_PACK_MODES.MANIFEST
-    : EXT_PACK_MODES.FULL;
+  const pref = chartPrefs.extensionMode;
+  if (pref === 'both') return EXT_PACK_MODES.BOTH;
+  if (pref === EXTENSION_MODES.MANIFEST) return EXT_PACK_MODES.MANIFEST;
+  return EXT_PACK_MODES.FULL;
 }
 /** 切换一个模式开关（完整 / 清单）；两个开关可同时为 true，至少保留一个。 */
 function toggleExtPackModes(names, mode){
@@ -360,6 +405,7 @@ const state = {
   gitMode: chartPrefs.gitMode,
   gitModeByPkg: {},
   keepDev: chartPrefs.keepDev,
+  keepIncompatible: chartPrefs.keepIncompatible,
   packages: INITIAL_PACKAGES.map(p=>({...p})),
   selectedPkgs:new Set(), activePkgs:new Set(), viewPkgMem:{}, mergeMode:false, privateFiles:[], expanded:{}, collapsedVol:{}, sel:{}, log:loadPersistedLog(),
   /* 日志按「条目类型」多选筛选：默认四类全选；取消某类即隐藏该类。 */
@@ -371,6 +417,8 @@ const state = {
   confirmDiscardChartPrefs:true,
   volMaxKey:null, volPath:{},
   task:null, pendingExports:[],
+  /* 日志视图页签：log | queue；任务队列展开状态跨重渲染保留。 */
+  logTab:'log', taskQueueItems:[], logQueueOpen:new Set(),
   chartFmt:{}, chartLayout:loadChartLayout(),
   filenameTemplate: chartPrefs.filenameTemplate,
   prefMode:false, prefDraft:null, prefAppliedPkgs:new Set(),
@@ -741,6 +789,13 @@ function nodePrivateIncompatible(n){
   if(n.privateConfig && privateIncompatible(n.path)) return true;
   return (n.children||[]).some(nodePrivateIncompatible);
 }
+/** 偏好「默认保留不兼容」：关闭时把不兼容的私有配置叶子默认取消勾选（用户显式选择仍优先）。 */
+function applyIncompatibleDefault(nodes){
+  const keep = state.keepIncompatible !== false;
+  walk(nodes || [], (n)=>{
+    if(n.leaf && n.privateConfig && privateIncompatible(n.path)) n.checked = keep;
+  });
+}
 function targetForHost(hostKey){
   const pref = chartPrefs.target;
   if (pref && pref !== 'auto') {
@@ -790,6 +845,7 @@ function renderTargetPicker(){
   const targetBtn=document.getElementById('target-btn');
   if(targetBtn){
     const isHostNow = state.mode!=='web' && cur.host===state.host;
+    targetBtn.dataset.host = cur.host;
     targetBtn.classList.toggle('is-host',isHostNow);
     targetBtn.title=isHostNow?t('target.hostSuffix'):'';
   }
@@ -802,7 +858,7 @@ function renderTargetPicker(){
   if(engineSelect) engineSelect.value = state.engine;
   document.getElementById('target-pop').innerHTML=TARGETS.map(opt=>{
     const isHost = state.mode!=='web' && opt.host===state.host;
-    return '<button class="picker-item'+(isHost?' is-host':'')+'" role="option" data-target="'+opt.value+'" aria-selected="'+(opt.value===state.target)+'"'
+    return '<button class="picker-item'+(isHost?' is-host':'')+'" role="option" data-target="'+opt.value+'" data-host="'+opt.host+'" aria-selected="'+(opt.value===state.target)+'"'
       +(isHost?' title="'+t('target.hostSuffix')+'"':'')
       +'>'
       +'<img class="picker-ico" data-host="'+opt.host+'" src="'+hostIcon(opt.host)+'" alt="">'
@@ -1041,7 +1097,7 @@ function renderStorageInspector(){
       if(c.labelKey==='si.root') text=si.source==='host'?t('si.rootHost'):t('si.rootBrowser');
       else if(c.labelKey) text=t(c.labelKey);
       else text=String(c.label??'');
-      // 如果属于已知英文类目，二次翻译保证绝不出现英文
+      // 已知类目走 i18n；原始数据库/仓库名保持原样，不强行中文化。
       const fallbackCat=t('si.cat.'+text);
       if(fallbackCat && fallbackCat!=='si.cat.'+text) text=fallbackCat;
       text=escapeHtml(text);
@@ -1152,7 +1208,10 @@ function extModeButtonsHtml(names, labelScope){
     +(on?' is-on':'')
     +'" data-extpackmode="'+mode+'" data-extpacknames="'+payload+'"'
     +' aria-pressed="'+(on?'true':'false')+'"'
-    +' title="'+label+'">'+label+'</button>';
+    +' title="'+label+'" aria-label="'+label+'">'
+    +'<span class="em-sym" aria-hidden="true">'+(mode===EXT_PACK_MODES.FULL?t('extension.fullSym'):t('extension.manifestSym'))+'</span>'
+    +'<span class="em-txt">'+label+'</span>'
+    +'</button>';
   return '<span class="tree-extmode" data-extmodescope="'+escapeHtml(labelScope||'ext')+'">'
     +btn(EXT_PACK_MODES.FULL,current.full,t('extension.full'))
     +btn(EXT_PACK_MODES.MANIFEST,current.manifest,t('extension.manifest'))
@@ -1176,18 +1235,26 @@ function renderTreeRows(nodes,depth,scope,readonly,tools,totalMb,drill,colorMap,
     const hasKids=n.children && n.children.length;
     const checked = hasKids ? !!n._checked : isChecked(n,scope);
     const indeterminate = hasKids && !!n._indeterminate;
-    const ind=Math.min(depth,8)*15;
     const pct = totalMb>0 ? Math.max(0,Math.min(100,Math.round(((mbMap?mbMap.get(n):Number(n.mb))||0)/totalMb*100))) : 0;
     const pillCls=n.suggest==='keep'?'keep':n.suggest==='optional'?'optional':n.suggest==='drop'?'drop':'unknown';
     const pillText=n.suggest==='keep'?t('tree.suggestKeep'):n.suggest==='optional'?t('tree.suggestOptional'):n.suggest==='drop'?t('tree.suggestDrop'):t('tree.suggestUnknown');
+    const pillSym=n.suggest==='keep'?'✓':n.suggest==='optional'?'○':n.suggest==='drop'?'✕':'?';
     /* 扩展行用专属「建议完整 / 建议清单」徽标；不再显示通用的「建议保留」，避免两枚徽标打架。 */
     const extSuggestHtml=n.extSuggest
       ? '<span class="ext-suggest is-'+n.extSuggest.mode+'" title="'
         + escapeHtml(t(n.extSuggest.mode==='manifest'?'extmgr.recManifestHint':'extmgr.recFullHint'))+'">'
-        + t(n.extSuggest.mode==='manifest'?'extmgr.recManifest':'extmgr.recFull')+'</span>'
+        + '<span class="sug-sym" aria-hidden="true">'+(n.extSuggest.mode==='manifest'?t('extension.manifestSym'):t('extension.fullSym'))+'</span>'
+        + '<span class="sug-txt">'+t(n.extSuggest.mode==='manifest'?'extmgr.recManifest':'extmgr.recFull')+'</span>'
+        + '</span>'
       : '';
     const showGenericPill=!n.extSuggest && n.extModeScope!=='group' && n.id!=='group:extensions' && n.id!=='group:globalExtensions';
     const inMax=!!drill;
+    const keepIncompatHtml = n.id==='group:private'
+      ? '<label class="tree-keepincompat" title="'+t('chart.keepIncompatibleHint')+'">'
+        + '<input type="checkbox" data-keepincompat'+(state.keepIncompatible!==false?' checked':'')+'>'
+        + '<span class="ki-txt">'+t('chart.keepIncompatible')+'</span>'
+      + '</label>'
+      : '';
     const toggleHtml=hasKids
       ? (inMax
         ? '<button class="tree-toggle vol-drill" data-voldrill="'+n.id+'" aria-label="'+t('chart.drill')+'" title="'+t('chart.drill')+'">'
@@ -1195,23 +1262,28 @@ function renderTreeRows(nodes,depth,scope,readonly,tools,totalMb,drill,colorMap,
         : '<button class="tree-toggle" data-node="'+n.id+'" aria-label="'+t('chart.expand')+'">'
           +'<svg class="chev" viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5l7 7-7 7"/></svg></button>')
       : '<button class="tree-toggle empty" aria-hidden="true"></button>';
-    out+='<div class="tree-row'+(expanded?' expanded':'')+'" data-id="'+n.id+'" style="padding-left:'+(6+ind)+'px">'
+    out+='<div class="tree-row'+(expanded?' expanded':'')+'" data-id="'+n.id+'" style="--depth:'+depth+'">'
+      +'<span class="tree-main">'
       +toggleHtml
       +'<input class="tree-check" type="checkbox" data-check="'+n.id+'"'+(checked?' checked':'')+(indeterminate?' data-ind="1"':'')+(readonly?' disabled':'')+'>'
       +(depth===0 && colorCls ? '<span class="tree-dot '+colorCls+'" aria-hidden="true"></span>' : '')
       +svg(n.icon,'tree-ico')
       +'<span class="tree-label'+(inMax&&hasKids?' is-drill':'')+'"'+(inMax&&hasKids?' data-voldrill="'+n.id+'"':'')+' title="'+n.label+'">'+n.label+(n.badge?'<span class="sub">'+n.badge+'</span>':'')+(n.note?'<span class="sub">'+n.note+'</span>':'')+(nodePrivateIncompatible(n)?'<span class="sub is-incompat" title="'+t('private.incompatibleHint')+'">'+t('private.incompatible')+'</span>':'')+'</span>'
       +extSuggestHtml
-      +extModeControlOf(n)
-      +(showGenericPill?'<span class="tree-pill '+pillCls+'">'+pillText+'</span>':'')
-      +(hasKids && !readonly ? '<span class="row-bulk">'
-        +'<button data-suball="all" data-subnode="'+n.id+'" title="'+t('chart.selectAll')+'">✓</button>'
-        +'<button data-suball="none" data-subnode="'+n.id+'" title="'+t('chart.selectNone')+'">✕</button>'
-        +'<button data-suball="invert" data-subnode="'+n.id+'" title="'+t('chart.invert')+'">⇄</button>'
-      +'</span>' : '')
+      +(showGenericPill?'<span class="tree-pill '+pillCls+'" title="'+pillText+'"><span class="pill-sym" aria-hidden="true">'+pillSym+'</span><span class="pill-txt">'+pillText+'</span></span>':'')
+      +keepIncompatHtml
+      +'</span>'
       +'<span class="tree-occ" aria-hidden="true"><i class="'+colorCls+'" style="width:'+pct+'%"></i></span>'
       +'<span class="tree-size">'+fmtMB(n.mb)+'</span>'
-      +(drill && hasKids ? '<button class="tree-mini vol-drill" data-voldrill="'+n.id+'" title="'+t('chart.drill')+'">›</button>' : '')
+      +'<span class="tree-extra">'
+        +extModeControlOf(n)
+        +(hasKids && !readonly ? '<span class="row-bulk">'
+          +'<button data-suball="all" data-subnode="'+n.id+'" title="'+t('chart.selectAll')+'">✓</button>'
+          +'<button data-suball="none" data-subnode="'+n.id+'" title="'+t('chart.selectNone')+'">✕</button>'
+          +'<button data-suball="invert" data-subnode="'+n.id+'" title="'+t('chart.invert')+'">⇄</button>'
+        +'</span>' : '')
+        +(drill && hasKids ? '<button class="tree-mini vol-drill" data-voldrill="'+n.id+'" title="'+t('chart.drill')+'">›</button>' : '')
+      +'</span>'
       +'</div>';
     if(hasKids && expanded && !inMax){
       out+='<div class="tree-children">'+renderTreeRows(n.children,depth+1,scope,readonly,tools,totalMb,drill,colorMap,root,mbMap)+'</div>';
@@ -1755,15 +1827,16 @@ function chartPrefsHtml(){
       +'<span class="pref-dot '+volColorClass(i+1)+'" aria-hidden="true"></span>'
       +'<span class="pref-label">'+g.label+'</span>'
     +'</label>').join('');
-  const prefFull = p.extensionMode !== EXTENSION_MODES.MANIFEST;
+  const prefFull = p.extensionMode === 'full' || p.extensionMode === 'both';
+  const prefManifest = p.extensionMode === 'manifest' || p.extensionMode === 'both';
   return '<div class="chart-prefs">'
     +'<div class="pref-head"><b>'+t('chart.prefsTitle')+'</b><span>'+t('chart.prefsDesc')+'</span></div>'
     +'<div class="pref-list">'+rows+'</div>'
     +'<div class="pref-extra">'
       +'<div class="pref-extmode"><span class="pref-label">'+t('chart.prefsExtDefault')+'</span>'
         +'<div class="segmented et-mode">'
-          +'<button type="button" class="seg-btn'+(prefFull?' active':'')+'" data-prefextmode="full">'+t('extension.full')+'</button>'
-          +'<button type="button" class="seg-btn'+(prefFull?'':' active')+'" data-prefextmode="manifest">'+t('extension.manifest')+'</button>'
+          +'<button type="button" class="seg-btn'+(prefFull?' active':'')+'" data-prefextmode="full" aria-pressed="'+prefFull+'">'+t('extension.full')+'</button>'
+          +'<button type="button" class="seg-btn'+(prefManifest?' active':'')+'" data-prefextmode="manifest" aria-pressed="'+prefManifest+'">'+t('extension.manifest')+'</button>'
         +'</div>'
       +'</div>'
       +'<label class="et-git"><span>'+t('chart.prefsGit')+'</span><select class="text_pole" data-prefgitmode>'
@@ -1771,7 +1844,7 @@ function chartPrefsHtml(){
         +'<option value="minimal"'+(state.gitMode===GIT_MODES.MINIMAL?' selected':'')+'>'+t('extension.gitMinimal')+'</option>'
         +'<option value="strip"'+(state.gitMode===GIT_MODES.STRIP?' selected':'')+'>'+t('extension.gitStrip')+'</option>'
       +'</select></label>'
-      +'<label class="check et-keepdev"><input type="checkbox" data-prefkeepdev'+(state.keepDev?' checked':'')+'> '+t('extension.keepDev')+'</label>'
+      +'<label class="check et-keepdev pref-keepdev"><input type="checkbox" data-prefkeepdev'+(state.keepDev?' checked':'')+'> '+t('chart.prefsKeepDev')+'</label>'
     +'</div>'
     +'<div class="pref-actions">'
       +'<button type="button" class="btn" id="pref-cancel">'+t('chart.prefsCancel')+'</button>'
@@ -1816,6 +1889,7 @@ function chartPrefsDirty(){
   const draft = state.prefDraft || normalizeChartPrefs(chartPrefs);
   const base = normalizeChartPrefs(chartPrefs);
   const norm = (x)=>[...(x.checkedGroups || [])].sort().join('|');
+  if (draft.extensionMode !== base.extensionMode) return true;
   return norm(draft) !== norm(base);
 }
 /* 二次点击偏好按钮：无改动直接退出；有改动先问「是否放弃」（可被设置项关闭）。 */
@@ -1943,6 +2017,8 @@ function pkgCard(p){
   const limit=splitLimit();
   if(limit && (p.mb||0)>limit) badges.push('<span class="pkg-badge warn">'+t('pkg.split',{n:Math.ceil(p.mb/limit)})+'</span>');
   if(p.zone==='export') badges.push('<span class="pkg-badge lock">'+t('pkg.readonly')+'</span>');
+  if(p.autoFlow==='pull') badges.push('<span class="pkg-badge auto" title="'+t('pkg.autoPullHint')+'">⚡ '+t('pkg.autoPull')+'</span>');
+  else if(p.autoFlow==='export') badges.push('<span class="pkg-badge auto" title="'+t('pkg.autoExportHint')+'">⚡ '+t('pkg.autoExport')+'</span>');
   if(p.origin) badges.push('<span class="pkg-badge">'+p.origin+'</span>');
   const estHostMb = realUncompressedMbOf(p);
   const estHostHtml = estHostMb ? '<span class="pkg-est-host" title="'+t('pkg.estHostTitle')+'"><i class="fa-solid fa-hard-drive"></i> '+t('pkg.estHost',{size:fmtMB(estHostMb)})+'</span>' : '';
@@ -5160,37 +5236,111 @@ function renderLan(){
   if(err){ err.hidden=!L.scanError; err.textContent=L.scanError||''; }
 }
 
-/* ── 连续任务队列（生成 / 拉取 / 恢复共用；可暂停、继续、中断、排序） ── */
-function renderTaskQueue(items){
-  const box=document.getElementById('task-queue');
-  if(!box) return;
-  const list=Array.isArray(items)?items:[];
-  box.hidden=list.length===0;
-  const count=document.getElementById('tq-count');
-  if(count) count.textContent=t('queue.count',{n:list.length});
-  const host=document.getElementById('tq-list');
-  if(!host) return;
-  host.innerHTML=list.map((item)=>{
-    const status=String(item.status||'queued');
-    const running=status==='running';
-    const paused=status==='paused';
-    const pct=Math.max(0,Math.min(100,Math.round(Number(item.pct)||0)));
-    const ctl=queueControls(item);
+/* ── 连续任务队列（生成 / 拉取 / 恢复 / 云端 / 下载 / 复制 / 导入共用） ── */
+function taskTypeLabel(type){
+  const key=String(type||'task');
+  const label=t('taskq.type.'+key);
+  return label===('taskq.type.'+key) ? key : label;
+}
+function taskClock(ts){
+  const n=Number(ts);
+  if(!n) return '';
+  try{
+    return new Date(n).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  }catch{ return ''; }
+}
+function taskElapsed(item){
+  const start=Number(item.startedAt)||0;
+  if(!start) return '';
+  const end=Number(item.finishedAt)|| (item.status==='running'||item.status==='paused' ? Date.now() : 0);
+  if(!end || end<start) return '';
+  const sec=Math.max(0,Math.round((end-start)/1000));
+  return t('taskq.seconds',{n:sec});
+}
+function taskActionsHtml(item){
+  const ctl=queueControls(item);
+  const id=escapeHtml(item.id);
+  return (ctl.pause?'<button type="button" class="tree-mini" data-lqact="pause" data-lqid="'+id+'">'+t('taskq.pause')+'</button>':'')
+    +(ctl.resume?'<button type="button" class="tree-mini" data-lqact="resume" data-lqid="'+id+'">'+t('taskq.resume')+'</button>':'')
+    +(ctl.abort?'<button type="button" class="tree-mini" data-lqact="abort" data-lqid="'+id+'">'+t('taskq.abort')+'</button>':'')
+    +(ctl.up?'<button type="button" class="tree-mini" data-lqact="up" data-lqid="'+id+'" title="'+t('taskq.up')+'">↑</button>':'')
+    +(ctl.down?'<button type="button" class="tree-mini" data-lqact="down" data-lqid="'+id+'" title="'+t('taskq.down')+'">↓</button>':'')
+    +(ctl.remove?'<button type="button" class="tree-mini" data-lqact="remove" data-lqid="'+id+'" title="'+t('taskq.remove')+'">×</button>':'');
+}
+function taskDetailHtml(item){
+  const rows=[];
+  const add=(k,v)=>{ if(v) rows.push('<span>'+escapeHtml(k)+'</span><b>'+escapeHtml(v)+'</b>'); };
+  add(t('taskq.type'),taskTypeLabel(item.type));
+  add(t('taskq.createdAt'),taskClock(item.createdAt));
+  add(t('taskq.startedAt'),taskClock(item.startedAt));
+  add(t('taskq.finishedAt'),taskClock(item.finishedAt));
+  add(t('taskq.elapsed'),taskElapsed(item));
+  add(t('taskq.progress'),(Math.max(0,Math.min(100,Math.round(Number(item.pct)||0)))+'%'));
+  if(item.error) add(t('taskq.error'),String(item.error));
+  if(item.detail) add(t('taskq.detail'),String(item.detail));
+  const acts=taskActionsHtml(item);
+  return '<div class="lq-detail-grid">'+(rows.join('') || '<span>'+t('taskq.noDetail')+'</span><b></b>')+'</div>'
+    +(acts?'<div class="lq-detail-acts">'+acts+'</div>':'');
+}
+function queueRowHtml(item,{detailed=false}={}){
+  const status=String(item.status||'queued');
+  const pct=Math.max(0,Math.min(100,Math.round(Number(item.pct)||0)));
+  if(!detailed){
     return '<div class="tq-row is-'+escapeHtml(status)+'" data-tqid="'+escapeHtml(item.id)+'">'
-      +'<span class="tq-status">'+escapeHtml(t('queue.status.'+status))+'</span>'
+      +'<span class="tq-status">'+escapeHtml(t('taskq.status.'+status))+'</span>'
       +'<span class="tq-label" title="'+escapeHtml(item.label||'')+'">'+escapeHtml(item.label||'')+'</span>'
-      +'<span class="tq-pct">'+(running||paused?pct+'%':'')+'</span>'
-      +'<span class="tq-acts">'
-        +(ctl.pause?'<button type="button" class="tree-mini" data-tqact="pause" data-tqid="'+escapeHtml(item.id)+'">'+t('queue.pause')+'</button>':'')
-        +(ctl.resume?'<button type="button" class="tree-mini" data-tqact="resume" data-tqid="'+escapeHtml(item.id)+'">'+t('queue.resume')+'</button>':'')
-        +(ctl.abort?'<button type="button" class="tree-mini" data-tqact="abort" data-tqid="'+escapeHtml(item.id)+'">'+t('queue.abort')+'</button>':'')
-        +(ctl.up?'<button type="button" class="tree-mini" data-tqact="up" data-tqid="'+escapeHtml(item.id)+'" title="'+t('queue.up')+'">↑</button>':'')
-        +(ctl.down?'<button type="button" class="tree-mini" data-tqact="down" data-tqid="'+escapeHtml(item.id)+'" title="'+t('queue.down')+'">↓</button>':'')
-        +(ctl.remove?'<button type="button" class="tree-mini" data-tqact="remove" data-tqid="'+escapeHtml(item.id)+'" title="'+t('queue.remove')+'">×</button>':'')
-      +'</span>'
+      +'<span class="tq-pct">'+((status==='running'||status==='paused'||status==='done')?pct+'%':'')+'</span>'
+      +'<span class="tq-acts">'+taskActionsHtml(item).replaceAll('data-lqact','data-tqact').replaceAll('data-lqid','data-tqid')+'</span>'
       +'<span class="tq-bar"><i style="width:'+pct+'%"></i></span>'
     +'</div>';
-  }).join('') || '<div class="ext-note">'+t('queue.empty')+'</div>';
+  }
+  const open=state.logQueueOpen.has(item.id);
+  return '<div class="lq-row is-'+escapeHtml(status)+(open?' is-open':'')+'" data-lqid="'+escapeHtml(item.id)+'">'
+    +'<div class="lq-summary" role="button" tabindex="0" data-lqtoggle="'+escapeHtml(item.id)+'"'
+      +' aria-expanded="'+(open?'true':'false')+'" aria-label="'+(open?t('taskq.collapse'):t('taskq.expand'))+'">'
+      +'<span class="lq-status">'+escapeHtml(t('taskq.status.'+status))+'</span>'
+      +'<span class="lq-type">'+escapeHtml(taskTypeLabel(item.type))+'</span>'
+      +'<span class="lq-label" title="'+escapeHtml(item.label||'')+'">'+escapeHtml(item.label||'')+'</span>'
+      +'<span class="lq-pct">'+((status==='running'||status==='paused'||status==='done')?pct+'%':'')+'</span>'
+      +'<svg class="lq-chev" viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>'
+    +'</div>'
+    +'<span class="lq-bar"><i style="width:'+pct+'%"></i></span>'
+    +'<div class="lq-detail"'+ (open?'':' hidden') +'>'+taskDetailHtml(item)+'</div>'
+  +'</div>';
+}
+function renderLogQueue(items){
+  const host=document.getElementById('lq-list');
+  if(!host) return;
+  const list=Array.isArray(items)?items:[];
+  const count=document.getElementById('lq-count');
+  if(count) count.textContent=t('taskq.count',{n:list.length});
+  host.innerHTML=list.map((item)=>queueRowHtml(item,{detailed:true})).join('')
+    || '<div class="ext-note">'+t('taskq.empty')+'</div>';
+}
+function renderTaskQueue(items){
+  const list=Array.isArray(items)?items:[];
+  state.taskQueueItems=list;
+  const box=document.getElementById('task-queue');
+  if(box){
+    box.hidden=list.length===0;
+    const count=document.getElementById('tq-count');
+    if(count) count.textContent=t('taskq.count',{n:list.length});
+    const host=document.getElementById('tq-list');
+    if(host) host.innerHTML=list.map((item)=>queueRowHtml(item)).join('')
+      || '<div class="ext-note">'+t('taskq.empty')+'</div>';
+  }
+  renderLogQueue(list);
+}
+function renderLogTab(){
+  const tab=state.logTab==='queue'?'queue':'log';
+  document.querySelectorAll('#log-tabs [data-logtab]').forEach((b)=>{
+    b.classList.toggle('active',b.dataset.logtab===tab);
+  });
+  const logPane=document.getElementById('log-pane-log');
+  const queuePane=document.getElementById('log-pane-queue');
+  if(logPane) logPane.hidden=tab!=='log';
+  if(queuePane) queuePane.hidden=tab!=='queue';
+  if(tab==='queue') renderLogQueue(state.taskQueueItems);
 }
 
 /* ── 云端包仓库（S3 兼容；凭据默认只存本机浏览器，不可用时如实降级） ── */
@@ -5414,6 +5564,8 @@ function renderCloud() {
   if (upload) upload.disabled = !!C.busy || state.selectedPkgs.size === 0 || !cloudReady();
   const backupSelected = document.getElementById('cloud-backup-selected');
   if (backupSelected) backupSelected.disabled = !!C.busy || state.selectedPkgs.size === 0;
+  const autoBackup = document.getElementById('cloud-auto-backup');
+  if (autoBackup) autoBackup.disabled = !!C.busy || !cloudReady();
 }
 async function cloudSave() {
   const C = state.cloud;
@@ -5575,6 +5727,7 @@ function cloudErrorText(code) {
 async function cloudDownload(key) {
   const C = state.cloud;
   const cfg = activeCloudConfig();
+  const act = actions.activity?.({ type: 'clouddownload', label: t('taskq.labelCloudDownload', { name: key }) });
   const target = createTransferTarget({
     kind: C.provider === 'webdav' ? 'webdav' : 's3',
     config: cfg,
@@ -5599,6 +5752,8 @@ async function cloudDownload(key) {
         done: (Number(progress.downloadedBytes) / 1048576).toFixed(1),
         total: (Number(progress.totalBytes) / 1048576).toFixed(1),
       });
+      const total = Number(progress.totalBytes) || 0;
+      if (total > 0) act?.update(Math.round((Number(progress.downloadedBytes) / total) * 100));
       renderCloud();
     },
   });
@@ -5606,6 +5761,7 @@ async function cloudDownload(key) {
   C.busy = false;
   if (!res.ok) {
     C.status = cloudErrorText(res.code || res.message);
+    act?.fail(res.code || res.message);
     renderCloud();
     return;
   }
@@ -5633,11 +5789,13 @@ async function cloudDownload(key) {
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 5000);
   C.status = t('cloud.downloaded', { name });
+  act?.done(t('cloud.downloaded', { name }));
   renderCloud();
 }
 async function cloudRestoreSnapshot(key) {
   const C = state.cloud;
   const cfg = activeCloudConfig();
+  const act = actions.activity?.({ type: 'cloudrestore', label: t('taskq.labelCloudRestore', { name: key }) });
   const target = createTransferTarget({
     kind: C.provider === 'webdav' ? 'webdav' : 's3',
     config: cfg,
@@ -5668,6 +5826,8 @@ async function cloudRestoreSnapshot(key) {
       passphrase: cfg.passphrase,
       onProgress: (progress) => {
         C.status = t('cloud.restoringEntry', { done: progress.done, total: progress.total });
+        const total = Math.max(1, Number(progress.total) || 1);
+        act?.update(Math.round((Number(progress.done) / total) * 100));
         renderCloud();
       },
     });
@@ -5677,11 +5837,13 @@ async function cloudRestoreSnapshot(key) {
   C.busy = false;
   if (!result.ok) {
     C.status = cloudErrorText(result.code || result.message);
+    act?.fail(result.code || result.message);
     renderCloud();
     return;
   }
   await actions.importCloudPack?.({ name: result.name, blob: result.blob });
   C.status = t('cloud.restoredSnapshot', { name: result.name, n: result.entries });
+  act?.done(t('cloud.restoredSnapshot', { name: result.name, n: result.entries }));
   renderCloud();
 }
 
@@ -5828,6 +5990,7 @@ function renderLog(){
   const dot=document.getElementById('log-dot');
   if(dot){ const n=counts.WARN+counts.ERROR; dot.hidden=n===0; dot.title=t('log.dotTitle',{n}); }
   const body=document.getElementById('log-body'); body.scrollTop=body.scrollHeight;
+  renderLogQueue(state.taskQueueItems);
 }
 function escapeHtml(s){ return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
@@ -5853,6 +6016,7 @@ function showPane(name){
   });
   document.querySelectorAll('.app-header .icon-btn').forEach(b=>b.classList.remove('active-view'));
   if(state.pane==='settings') document.getElementById('btn-settings')?.classList.add('active-view');
+  if(state.pane==='log') renderLogTab();
 }
 function backToWorkbench(){ showPane('workbench'); }
 
@@ -5883,6 +6047,16 @@ function openSettingsView(html,{onSave,onClose,onAction}={}){
   const body=document.getElementById('settings-body');
   if(!body) return;
   body.innerHTML=html||'';
+  /* 版本行固定在面板底部（不随设置正文滚动）：文案与点击在此绑定。 */
+  const versionBtn=document.getElementById('settings-version');
+  if(versionBtn){
+    const label=t('settings.openChangelog');
+    versionBtn.title=label;
+    versionBtn.setAttribute('aria-label',label);
+    const main=document.getElementById('settings-version-main');
+    if(main) main.textContent=t('settings.versionLine',{version:APP_VERSION,commit:APP_COMMIT});
+    versionBtn.onclick=()=>onAction?.('changelog',versionBtn);
+  }
   /* 三态：× = 关闭但保留草稿（内存，刷新即丢）；取消 = 丢弃改动；保存 = 双写持久化。
      2026-11-15 用户裁定：× / 取消时若有**未保存的更改**，必须先确认「是否离开」。 */
   applySettingsDraft(body);
@@ -6478,17 +6652,18 @@ function renderTutorial(){
   const next=document.getElementById('tutorial-next');
   const adv=document.getElementById('tutorial-adv');
   const docBtn=document.getElementById('tutorial-doc-btn');
+  const neverBtn=document.getElementById('tutorial-never');
   const ring=document.getElementById('tutorial-ring');
   const card=document.getElementById('tutorial-card');
   const goal=currentTutorialGoal();
 
   if(docBtn){
     const s=loadSettings();
-    let base=(s.docsBaseUrl||'./docs/').trim();
-    if(!base.endsWith('/')) base+='/';
-    docBtn.href=base+(goal&&goal.docPage?goal.docPage:'tutorial');
-    docBtn.hidden=false;
+    docBtn.href=docsPageUrl((goal&&goal.docPage?goal.docPage:'tutorial'), s.docsBaseUrl);
+    /* 用户 2026-11-17 裁定：只有最初的目标选择浮层显示「查看文档 / 不再弹出」。 */
+    docBtn.hidden=!!goal;
   }
+  if(neverBtn) neverBtn.hidden=!!goal;
 
   /* 首页：选目标（按平台过滤；Web 形态没有宿主，不显示宿主相关目标）。 */
   if(!goal){
@@ -6521,9 +6696,7 @@ function renderTutorial(){
   if(adv){ adv.hidden=false; adv.textContent=t('tutorial.changeGoal'); }
   if(docBtn){
     const s=loadSettings();
-    let base=(s.docsBaseUrl||'./docs/').trim();
-    if(!base.endsWith('/')) base+='/';
-    docBtn.href=base+((step&&step.docPage)||(goal&&goal.docPage)||'tutorial');
+    docBtn.href=docsPageUrl((step&&step.docPage)||(goal&&goal.docPage)||'tutorial', s.docsBaseUrl);
   }
   title.textContent=t(step.title);
   desc.textContent=t(step.desc, step.params ? step.params() : undefined);
@@ -6542,14 +6715,18 @@ function renderTutorial(){
   }
   ring.style.display='';
   card.style.display='';
-  const anchor=tutorialAnchor(rect, overlay.getBoundingClientRect());
+  const overlayRect=overlay.getBoundingClientRect();
+  const cardWidth=Math.min(330, Math.max(120, overlayRect.width-24));
+  card.style.width=cardWidth+'px';
+  card.style.transform='none';
+  const cardHeight=card.offsetHeight||180;
+  const anchor=tutorialCardPlacement(rect, overlayRect, { width: cardWidth, height: cardHeight });
   ring.style.left=anchor.ring.left+'px';
   ring.style.top=anchor.ring.top+'px';
   ring.style.width=anchor.ring.width+'px';
   ring.style.height=anchor.ring.height+'px';
   card.style.left=anchor.card.left+'px';
   card.style.top=anchor.card.top+'px';
-  centerTutorialCard(card, overlay);
   ensureTutorialVisible(el);
 }
 /* 目标在滚动容器外时滚进来；只在完全不可见时执行，避免滚动回调互相触发。 */
@@ -6835,6 +7012,17 @@ function bind(){
     });
     await cloudRefresh();
   });
+  document.getElementById('cloud-auto-backup')?.addEventListener('click',async()=>{
+    const cfg = activeCloudConfig();
+    await actions.autoBackup?.({
+      provider: state.cloud.provider,
+      config: cfg,
+      mode: cfg.mode || 'full',
+      setName: cfg.setName || 'default',
+      retention: cfg.retention || 10,
+    });
+    await cloudRefresh();
+  });
   document.getElementById('cloud-list')?.addEventListener('click',(e)=>{
     const get=e.target.closest('[data-cloud-get]');
     if(get){ cloudDownload(get.dataset.cloudGet); return; }
@@ -7017,10 +7205,19 @@ function bind(){
     }
     const prefExtMode=e.target.closest('[data-prefextmode]');
     if(prefExtMode){
-      const next=prefExtMode.dataset.prefextmode==='manifest' ? EXTENSION_MODES.MANIFEST : EXTENSION_MODES.FULL;
-      if(state.prefDraft) state.prefDraft.extensionMode=next;
-      else state.extensionMode=next;
-      prefExtMode.parentElement.querySelectorAll('[data-prefextmode]').forEach((b)=>b.classList.toggle('active', b===prefExtMode));
+      const draft=state.prefDraft||normalizeChartPrefs(chartPrefs);
+      let full=draft.extensionMode==='full'||draft.extensionMode==='both';
+      let manifest=draft.extensionMode==='manifest'||draft.extensionMode==='both';
+      if(prefExtMode.dataset.prefextmode==='manifest') manifest=!manifest;
+      else full=!full;
+      // 两个都灭 = 「不默认选择」；新导入仍按完整兜底（extPackModeOf 语义）。
+      draft.extensionMode = full&&manifest ? 'both' : full ? 'full' : manifest ? 'manifest' : 'none';
+      state.prefDraft=draft;
+      prefExtMode.parentElement.querySelectorAll('[data-prefextmode]').forEach((b)=>{
+        const on=b.dataset.prefextmode==='manifest'?manifest:full;
+        b.classList.toggle('active',on);
+        b.setAttribute('aria-pressed',on?'true':'false');
+      });
       return;
     }
     const sub=e.target.closest('[data-suball]');
@@ -7086,6 +7283,15 @@ function bind(){
     if(prefKeepDev){ state.keepDev = !!prefKeepDev.checked; return; }
     const keepDev=e.target.closest('[data-keepdev]');
     if(keepDev){ state.keepDev = !!keepDev.checked; return; }
+    const keepIncompat=e.target.closest('[data-keepincompat]');
+    if(keepIncompat){
+      state.keepIncompatible=!!keepIncompat.checked;
+      chartPrefs = state.tutorialMode
+        ? normalizeChartPrefs({...chartPrefs, keepIncompatible: state.keepIncompatible})
+        : saveChartPrefs({...chartPrefs, keepIncompatible: state.keepIncompatible});
+      renderChart();
+      return;
+    }
     const cb=e.target.closest('[data-check]'); if(!cb) return;
     const scope=scopeFromEl(cb); if(!scope) return;
     const tree=nodesForScope(scope);
@@ -7126,14 +7332,8 @@ function bind(){
   });
 
   document.getElementById('zone-card').addEventListener('click',e=>{
-    /* 手机下拉态：点完包卡（勾选或外框）即收起下拉界面 */
-    const appEl=document.getElementById('app');
-    const closeZoneDropdown=()=>{
-      if(state.view==='mobile' && appEl?.dataset.zoneOpen==='1'){
-        /* 走切换按钮的同一条动画收起路径（is-closing → display:none） */
-        document.querySelector('#chart-card [data-view-switch] button[data-wbview="zone"]')?.click();
-      }
-    };
+    /* 2026-11-17 用户铁律：数据包下拉**绝对禁止自动收起**——
+       勾选、点卡、切区都不得收起；只有「数据包」按钮本身可以切换。 */
     const check=e.target.closest('[data-pkgcheck]');
     if(check){
       const id=check.dataset.pkgcheck;
@@ -7145,7 +7345,7 @@ function bind(){
         state.selectedPkgs.delete(id);
         if(pkg) logger.info(t('log.pkgUnchecked', { name: pkg.name, total: state.selectedPkgs.size }));
       }
-      renderZones(); renderActions(); renderCloud(); closeZoneDropdown(); return;
+      renderZones(); renderActions(); renderCloud(); return;
     }
     const act=e.target.closest('[data-pkgact]');
     if(act){
@@ -7198,7 +7398,7 @@ function bind(){
           autoEngineForPackage(pkg);
           if(pkg) logger.info(t('log.pkgChecked', { name: pkg.name, size: fmtMB(pkg.mb||0), total: state.selectedPkgs.size }));
         }
-        renderZones(); renderCloud(); closeZoneDropdown(); return;
+        renderZones(); renderCloud(); return;
       }
       if(state.activePkgs.has(id)){
         state.activePkgs.delete(id);
@@ -7214,7 +7414,6 @@ function bind(){
         }
       }
       syncSourceToActive();
-      closeZoneDropdown();
       /* 取消选中不再回调 onActivePackage（否则会把刚删掉的包又加回去）；新增/切换才需要补扫描。 */
       if(!wasActive && actions.onActivePackage) actions.onActivePackage(id);
       else renderAll();
@@ -7235,6 +7434,54 @@ function bind(){
     else if(act==='down') actions.queueMove?.(id,1);
     else if(act==='remove') actions.queueRemove?.(id);
   });
+
+  // 日志页签：日志 / 任务队列
+  document.getElementById('log-tabs')?.addEventListener('click',(e)=>{
+    const b=e.target.closest('[data-logtab]');
+    if(!b) return;
+    state.logTab=b.dataset.logtab==='queue'?'queue':'log';
+    renderLogTab();
+  });
+  // 任务队列（日志页签）：展开详情 + 动作
+  const lqList=document.getElementById('lq-list');
+  if(lqList){
+    const toggleRow=(row)=>{
+      if(!row) return;
+      const id=row.dataset.lqid||'';
+      if(!id) return;
+      const open=!state.logQueueOpen.has(id);
+      if(open) state.logQueueOpen.add(id); else state.logQueueOpen.delete(id);
+      row.classList.toggle('is-open',open);
+      const summary=row.querySelector('[data-lqtoggle]');
+      if(summary) summary.setAttribute('aria-expanded',open?'true':'false');
+      const detail=row.querySelector('.lq-detail');
+      if(detail) detail.hidden=!open;
+    };
+    lqList.addEventListener('click',(e)=>{
+      const act=e.target.closest('[data-lqact]');
+      if(act){
+        const id=act.dataset.lqid||'';
+        const kind=act.dataset.lqact||'';
+        if(!id) return;
+        if(kind==='pause') actions.queuePause?.(id);
+        else if(kind==='resume') actions.queueResume?.(id);
+        else if(kind==='abort') actions.queueAbort?.(id);
+        else if(kind==='up') actions.queueMove?.(id,-1);
+        else if(kind==='down') actions.queueMove?.(id,1);
+        else if(kind==='remove') actions.queueRemove?.(id);
+        return;
+      }
+      const toggle=e.target.closest('[data-lqtoggle]');
+      if(toggle){ toggleRow(toggle.closest('.lq-row')); }
+    });
+    lqList.addEventListener('keydown',(e)=>{
+      if(e.key!=='Enter' && e.key!==' ') return;
+      const toggle=e.target.closest('[data-lqtoggle]');
+      if(!toggle) return;
+      e.preventDefault();
+      toggleRow(toggle.closest('.lq-row'));
+    });
+  }
 
   // 进度条即日志入口：点击或键盘激活都进日志视图
   const progressBar=document.getElementById('workbench-progress');

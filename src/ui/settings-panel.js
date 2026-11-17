@@ -8,6 +8,7 @@ import { t } from '../i18n/index.js';
 import { normalizeAccounts } from '../core/git-accounts.js';
 import { escapeHtml } from './escape.js';
 import { APP_VERSION, APP_COMMIT } from '../core/app-version.js';
+import { resolveDocsBase } from '../core/docs-site.js';
 
 /** 设置默认值。新增项必须同步 zh-CN / en-US 文案与测试。 */
 export const SETTINGS_DEFAULTS = Object.freeze({
@@ -19,9 +20,11 @@ export const SETTINGS_DEFAULTS = Object.freeze({
   showChangelogOnUpdate: true,
   /** 下载导出区里的包后是否把它从导出区删除；默认不删。 */
   deleteAfterExport: false,
+  /** 一键自动备份成功后是否删除自动流程产生的包（导入 + 导出）；默认删除（用户 2026-11-17 裁定）。 */
+  autoDeleteBackupPacks: true,
   /** 可选 CORS 代理地址：只用于插件自己的 Git / WebDAV 外发请求；留空即直连。 */
   netProxyUrl: '',
-  /** 自定义文档站基准地址：留空默认使用内置相对路径 ./docs/。 */
+  /** 自定义文档站基准地址：留空默认使用已部署的 GitHub Pages 文档站（绝对地址）。 */
   docsBaseUrl: '',
   /** 日志上限（条）；0/非法回落默认。 */
   logMaxEntries: 500,
@@ -243,6 +246,7 @@ export function normalizeSettings(input) {
     if (typeof input.nativePullNotice === 'boolean') out.nativePullNotice = input.nativePullNotice;
     if (typeof input.autoTutorial === 'boolean') out.autoTutorial = input.autoTutorial;
     if (typeof input.deleteAfterExport === 'boolean') out.deleteAfterExport = input.deleteAfterExport;
+    if (typeof input.autoDeleteBackupPacks === 'boolean') out.autoDeleteBackupPacks = input.autoDeleteBackupPacks;
     if (typeof input.netProxyUrl === 'string') out.netProxyUrl = input.netProxyUrl.trim();
     if (typeof input.docsBaseUrl === 'string') out.docsBaseUrl = input.docsBaseUrl.trim();
     const logMax = Number(input.logMaxEntries);
@@ -324,23 +328,28 @@ export function buildSettingsHtml(settings = {}) {
     + '<summary class="set-group-head">' + title + '</summary>'
     + '<div class="set-group-body">' + body + '</div></details>';
 
-  const tips = setting('set-traffic', 'trafficPrompt', t('settings.trafficPrompt'), s.trafficPrompt)
+  const tips = '<div class="settings-subhead">'+t('settings.hintsFetch')+'</div>'
+    + setting('set-traffic', 'trafficPrompt', t('settings.trafficPrompt'), s.trafficPrompt)
     + setting('set-native-pull-notice', 'nativePullNotice', t('settings.nativePullNotice'), s.nativePullNotice)
+    + '<div class="settings-subhead">'+t('settings.hintsGuide')+'</div>'
     + setting('set-auto-tutorial', 'autoTutorial', t('settings.autoTutorial'), s.autoTutorial)
     + setting('set-show-changelog', 'showChangelogOnUpdate', t('settings.showChangelog'), s.showChangelogOnUpdate)
-    + '<div class="ext-row" style="margin-top:4px"><button type="button" class="btn" data-action="changelog">'
-      + t('settings.openChangelog') + '</button></div>'
+    + '<div class="settings-subhead">'+t('settings.hintsConfirm')+'</div>'
     + setting('set-confirm-discard-prefs', 'confirmDiscardChartPrefs', t('settings.confirmDiscardChartPrefs'), s.confirmDiscardChartPrefs);
 
-  const exportGroup = setting('set-delete-after-export', 'deleteAfterExport', t('settings.deleteAfterExport'), s.deleteAfterExport)
-    + setting('set-clear-packages', 'clearPackagesOnLoad', t('settings.clearPackagesOnLoad'), s.clearPackagesOnLoad)
+  const exportGroup = '<div class="settings-subhead">'+t('settings.exportAfterUpload')+'</div>'
     + setting('set-auto-refresh', 'autoRefreshAfterUpload', t('settings.autoRefreshAfterUpload'), s.autoRefreshAfterUpload)
-    + '<label class="et-git" style="margin-top:6px"><span>' + t('settings.autoInstallManifest') + '</span>'
+    + '<label class="et-git"><span>' + t('settings.autoInstallManifest') + '</span>'
     + '<select class="text_pole" data-setting="autoInstallManifestAfterUpload">'
     + '<option value="prompt"' + (s.autoInstallManifestAfterUpload === 'prompt' ? ' selected' : '') + '>' + t('settings.autoInstallPrompt') + '</option>'
     + '<option value="auto"' + (s.autoInstallManifestAfterUpload === 'auto' ? ' selected' : '') + '>' + t('settings.autoInstallAuto') + '</option>'
     + '<option value="off"' + (s.autoInstallManifestAfterUpload === 'off' ? ' selected' : '') + '>' + t('settings.autoInstallOff') + '</option>'
-    + '</select></label>';
+    + '</select></label>'
+    + '<div class="settings-subhead">'+t('settings.exportLifecycle')+'</div>'
+    + setting('set-delete-after-export', 'deleteAfterExport', t('settings.deleteAfterExport'), s.deleteAfterExport)
+    + setting('set-auto-delete-backup', 'autoDeleteBackupPacks', t('settings.autoDeleteBackupPacks'), s.autoDeleteBackupPacks)
+    + '<div class="settings-subhead">'+t('settings.exportStartup')+'</div>'
+    + setting('set-clear-packages', 'clearPackagesOnLoad', t('settings.clearPackagesOnLoad'), s.clearPackagesOnLoad);
 
   const logging = '<label class="et-git"><span>' + t('settings.logLevel') + '</span>'
     + '<select class="text_pole" data-setting="logLevel">'
@@ -383,8 +392,7 @@ export function buildSettingsHtml(settings = {}) {
     + '" value="' + (s.docsBaseUrl || '') + '"></label>'
     + '<div class="ext-note">' + t('settings.docsBaseUrlNote') + '</div>'
     + (() => {
-      const base = String(s.docsBaseUrl || './docs/').trim() || './docs/';
-      const href = base.endsWith('/') ? base : `${base}/`;
+      const href = resolveDocsBase(s.docsBaseUrl);
       return '<div class="ext-row" style="margin-top:6px"><a class="btn" id="settings-open-docs" href="'
         + escapeHtml(href) + '" target="_blank" rel="noopener noreferrer">' + t('settings.openDocs') + '</a></div>';
     })();
@@ -396,9 +404,6 @@ export function buildSettingsHtml(settings = {}) {
     + group('net', t('settings.groupNet'), netGroup, false)
     + group('log', t('settings.groupLog'), logging, false)
     + group('data', t('settings.groupData'), dataGroup, false)
-    + '<div class="settings-version" id="settings-version">'
-      + t('settings.versionLine', { version: APP_VERSION, commit: APP_COMMIT })
-    + '</div>'
     + '</div>';
 }
 
@@ -428,6 +433,8 @@ export function readSettings(root, base = SETTINGS_DEFAULTS) {
   if (confirmDiscardEl && typeof confirmDiscardEl.checked === 'boolean') out.confirmDiscardChartPrefs = confirmDiscardEl.checked;
   const deleteEl = root.querySelector?.('[data-setting="deleteAfterExport"]');
   if (deleteEl && typeof deleteEl.checked === 'boolean') out.deleteAfterExport = deleteEl.checked;
+  const autoDeleteBackupEl = root.querySelector?.('[data-setting="autoDeleteBackupPacks"]');
+  if (autoDeleteBackupEl && typeof autoDeleteBackupEl.checked === 'boolean') out.autoDeleteBackupPacks = autoDeleteBackupEl.checked;
 
   const logMaxEl = root.querySelector?.('[data-setting="logMaxEntries"]');
   if (logMaxEl?.value) out.logMaxEntries = Number(logMaxEl.value);

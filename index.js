@@ -180,13 +180,21 @@ async function main(root) {
   const taskQueue = [];
   /** 已结束任务保留展示（最多 20 条）；不参与执行，可手动移除。 */
   const queueFinished = [];
+  /** 不进入串行队列的短任务记录（下载 / 复制回 / 导入 / 云端下载等），供日志页签全量展示。 */
+  const activityTasks = [];
+  const rememberActivity = (job) => {
+    activityTasks.push(job);
+    while (activityTasks.length > 200) activityTasks.shift();
+  };
   const rememberFinished = (job) => {
     queueFinished.push(job);
-    while (queueFinished.length > 20) queueFinished.shift();
+    while (queueFinished.length > 200) queueFinished.shift();
   };
   let taskSeq = 0;
   let queueBusy = false;
   let queueCurrent = null;
+  /** 最近一次生成落库的产物 id（自动备份流程用来定位导出包）。 */
+  let lastCreatedIds = [];
   /** 恢复 / 云端备份的协作式取消标记（在批次边界与上传循环内检查）。 */
   let restoreCancelRequested = false;
   let cloudCancelRequested = false;
@@ -194,6 +202,7 @@ async function main(root) {
     ...(queueCurrent ? [queueCurrent] : []),
     ...taskQueue,
     ...queueFinished,
+    ...activityTasks,
   ].map((job) => ({
     id: job.id,
     type: job.type || 'task',
@@ -202,6 +211,11 @@ async function main(root) {
     pct: job.pct || 0,
     canPause: job.canPause !== false,
     canAbort: job.canAbort !== false,
+    createdAt: job.createdAt || 0,
+    startedAt: job.startedAt || 0,
+    finishedAt: job.finishedAt || 0,
+    detail: job.detail || '',
+    error: job.error || '',
   }));
   const syncQueue = () => { try { view.setTaskQueue(queueSnapshot()); } catch { /* 视图尚未创建 */ } };
   const setQueueProgress = (pct) => {
@@ -209,6 +223,47 @@ async function main(root) {
     queueCurrent.pct = Math.max(0, Math.min(100, Number(pct) || 0));
     syncQueue();
   };
+  /**
+   * 记录不进入串行队列的操作（下载 / 复制回 / 导入 / 云端下载等）。
+   * 返回 updater，供调用方推进进度并收尾；失败必须显式 fail，不能静默丢。
+   */
+  function recordActivity({ type = 'task', label = '', detail = '', pct = 0 } = {}) {
+    const job = {
+      id: `a${++taskSeq}`,
+      type,
+      label: label || t('taskq.title'),
+      status: 'running',
+      pct: Math.max(0, Math.min(100, Number(pct) || 0)),
+      detail: String(detail || ''),
+      createdAt: Date.now(),
+      startedAt: Date.now(),
+      finishedAt: 0,
+      canPause: false,
+      canAbort: false,
+    };
+    rememberActivity(job);
+    syncQueue();
+    return {
+      update(nextPct, nextDetail) {
+        if (nextPct !== undefined && nextPct !== null) job.pct = Math.max(0, Math.min(100, Number(nextPct) || 0));
+        if (nextDetail !== undefined && nextDetail !== null) job.detail = String(nextDetail);
+        syncQueue();
+      },
+      done(nextDetail) {
+        job.status = 'done';
+        job.pct = 100;
+        job.finishedAt = Date.now();
+        if (nextDetail !== undefined) job.detail = String(nextDetail || '');
+        syncQueue();
+      },
+      fail(err) {
+        job.status = 'failed';
+        job.finishedAt = Date.now();
+        job.error = String(err?.message || err || '');
+        syncQueue();
+      },
+    };
+  }
 
   async function getTaskManager() {
     if (!taskManagerPromise) {
@@ -290,6 +345,9 @@ async function main(root) {
       time: clockOf(record.createdAt),
       /** 产物声明的目标布局（转换时写入）；用于区分结构相同但平台不同的 TT / PT 包。 */
       declaredLayout: record.layout || '',
+      originCode: record.origin,
+      metadata: record.metadata || {},
+      autoFlow: String(record.metadata?.autoFlow || ''),
       origin: record.origin === ORIGINS.LAN ? t('origin.remote')
         : record.origin === ORIGINS.EXPORT_COPY ? t('origin.exportCopy')
         : record.origin === ORIGINS.SPLIT_PART ? t('origin.split')
@@ -537,6 +595,11 @@ async function main(root) {
     if (!list.length) return;
     if (!isStorageSupported()) { view.toast(t('toast.storageUnsupported')); return; }
     const used = new Set(state.packages.map((p) => p.name));
+    const act = recordActivity({
+      type: 'import',
+      label: t('taskq.labelImport', { n: list.length }),
+    });
+    let imported = 0;
     for (const file of list) {
       const name = remote ? uniqueRemoteName(file.name, used) : file.name;
       used.add(name);
@@ -546,7 +609,9 @@ async function main(root) {
         origin: remote ? ORIGINS.LAN : ORIGINS.UPLOAD,
         metadata: { importedAt: Date.now(), ...(remote ? { remote: true } : {}) },
       });
+      act.update((imported / Math.max(1, list.length)) * 100, name);
       logger.info(t(remote ? 'log.received' : 'log.imported', { name }));
+      imported += 1;
     }
     await syncPackages();
     if (remote) view.setZone('import');
@@ -557,6 +622,7 @@ async function main(root) {
       view.applySettings?.(settings);
       view.setActivePackage(newest.id, { exclusive: true });
     }
+    act.done();
     view.toast(t(remote ? 'toast.receivedCount' : 'toast.importedCount', { n: list.length }));
   }
 
@@ -691,21 +757,25 @@ async function main(root) {
    */
   async function backupSelectedToCloud({
     provider = 's3', config = {}, mode = 'full', setName = 'default', retention = 10, signal = null,
+    ids: passedIds = null,
   } = {}) {
     // 2026-11-14 修 bug：选中包的真源在**视图状态**（`view.getState().selectedPkgs`），
     // 本作用域的 `state` 没有该字段 ⇒ 旧写法 `[...undefined]` 抛 TypeError，
     // 云端备份按钮自状态重构后对真实用户一直是坏的（单测只覆盖 runner 纯逻辑，没覆盖这段接线）。
-    const ids = [...(view.getState().selectedPkgs || [])];
-    if (!ids.length) { view.toast(t('toast.selectPackFirst')); return; }
-    if (mode === 'set' && ids.length !== 1) { view.toast(t('cloud.setSinglePack')); return; }
-    if (state.busy) return;
+    // 2026-11-17：自动备份流程可显式传入 ids（自动生成的导出包不一定在左侧勾选集合里）。
+    const ids = Array.isArray(passedIds) && passedIds.length
+      ? [...passedIds]
+      : [...(view.getState().selectedPkgs || [])];
+    if (!ids.length) { view.toast(t('toast.selectPackFirst')); return { ok: false, reason: 'empty' }; }
+    if (mode === 'set' && ids.length !== 1) { view.toast(t('cloud.setSinglePack')); return { ok: false, reason: 'set-single-pack' }; }
+    if (state.busy) return { ok: false, reason: 'busy' };
     const target = createTransferTarget({
       kind: provider === 'webdav' ? 'webdav' : 's3',
       config,
       fetchImpl: (url, init) => fetch(url, init),
       proxyUrl: loadSettings().netProxyUrl || '',
     });
-    if (!target.ready) { view.toast(t('cloud.notConfigured')); return; }
+    if (!target.ready) { view.toast(t('cloud.notConfigured')); return { ok: false, reason: 'not-ready' }; }
 
     state.busy = true;
     try {
@@ -714,7 +784,7 @@ async function main(root) {
         const collection = await target.ensureCollection(config.prefix);
         if (!collection.ok) {
           view.toast(t('cloud.error', { msg: collection.message || collection.code || 'mkcol-failed' }));
-          return;
+          return { ok: false, reason: collection.code || 'mkcol-failed' };
         }
       }
 
@@ -770,13 +840,13 @@ async function main(root) {
         }
         if (signal?.aborted) {
           view.setProgress(0, t('progress.aborted'));
-          return { aborted: true };
+          return { ok: false, aborted: true };
         }
         const summary = { uploaded, skipped, failed, encrypted: encryptedPackages };
         view.setProgress(100, t('cloud.uploadDone', summary));
         view.toast(t('cloud.uploadDone', summary));
         logger.info(t('cloud.uploadDone', summary));
-        return;
+        return { ok: failed === 0 && (uploaded + skipped) > 0, summary };
       }
 
       if (mode === 'set') {
@@ -785,7 +855,7 @@ async function main(root) {
         if (!blob) {
           logger.warn(t('cloud.backupMissingBlob', { name: pkg?.name || ids[0] }));
           view.toast(t('cloud.backupMissingBlob', { name: pkg?.name || ids[0] }));
-          return;
+          return { ok: false, reason: 'missing-blob' };
         }
         const set = safeSegment(setName || 'default', 'default');
         const setBase = objectKey(config.prefix, `sets/${set}`);
@@ -814,7 +884,7 @@ async function main(root) {
             const msg = result.code || result.message || 'backup-failed';
             view.toast(t('cloud.error', { msg }));
             logger.error(t('cloud.backupItemFailed', { name: pkg.name, msg }));
-            return;
+            return { ok: false, reason: msg };
           }
           const registry = await updateSetRegistry({
             target,
@@ -834,17 +904,17 @@ async function main(root) {
           view.setProgress(100, t('cloud.setBackupDone', summary));
           view.toast(t('cloud.setBackupDone', summary));
           logger.info(t('cloud.setBackupDone', summary));
+          return { ok: true, summary };
         } finally {
           await session.close();
         }
-        return;
       }
 
       if (provider === 'webdav' && config.prefix && typeof target.ensureCollection === 'function') {
         const collection = await target.ensureCollection(`${config.prefix}/snapshots`);
         if (!collection.ok) {
           view.toast(t('cloud.error', { msg: collection.message || collection.code || 'mkcol-failed' }));
-          return;
+          return { ok: false, reason: collection.code || 'mkcol-failed' };
         }
       }
 
@@ -897,7 +967,7 @@ async function main(root) {
 
       if (signal?.aborted) {
         view.setProgress(0, t('progress.aborted'));
-        return { aborted: true };
+        return { ok: false, aborted: true };
       }
       // 只有全部选中包都成功时才执行保留策略：失败时删旧快照会让用户两头落空。
       let prune = { ok: true, removed: [] };
@@ -918,10 +988,12 @@ async function main(root) {
       view.setProgress(100, t('cloud.backupDone', summary));
       view.toast(t('cloud.backupDone', summary));
       logger.info(t('cloud.backupDone', summary));
+      return { ok: failed === 0 && succeeded > 0, summary };
     } catch (error) {
       const msg = String(error?.message || error);
       logger.error(t('cloud.backupItemFailed', { name: 'backup', msg }));
       view.toast(t('cloud.error', { msg }));
+      return { ok: false, reason: msg };
     } finally {
       state.busy = false;
     }
@@ -953,35 +1025,57 @@ async function main(root) {
   }
 
   async function downloadSelected(ids) {
+    const act = recordActivity({
+      type: 'download',
+      label: t('taskq.labelDownload', { n: ids.length }),
+    });
     let count = 0;
-    for (const id of ids) {
-      const pkg = pkgById(id);
-      const blob = await blobOf(pkg);
-      if (!blob) continue;
-      downloadBlob(blob, pkg.name);
-      count += 1;
-      if (settings.deleteAfterExport) {
-        try { await deleteFile(id); } catch { /* 已不存在 */ }
+    try {
+      for (const id of ids) {
+        const pkg = pkgById(id);
+        const blob = await blobOf(pkg);
+        if (!blob) continue;
+        downloadBlob(blob, pkg.name);
+        count += 1;
+        act.update((count / Math.max(1, ids.length)) * 100, pkg.name);
+        if (settings.deleteAfterExport) {
+          try { await deleteFile(id); } catch { /* 已不存在 */ }
+        }
       }
+      if (settings.deleteAfterExport && count) await syncPackages();
+      act.done();
+    } catch (err) {
+      act.fail(err);
+      logger.warn(t('toast.downloadFailed', { msg: err?.message || err }));
     }
-    if (settings.deleteAfterExport && count) await syncPackages();
   }
 
   async function copyBack(ids) {
+    const act = recordActivity({
+      type: 'copyback',
+      label: t('taskq.labelCopyback', { n: ids.length }),
+    });
     let count = 0;
-    for (const id of ids) {
-      const pkg = pkgById(id);
-      const blob = await blobOf(pkg);
-      if (!blob) continue;
-      const plan = copyBackRecord(pkg);
-      await saveFile({
-        ...plan,
-        size: blob.size, blob,
-      });
-      count += 1;
+    try {
+      for (const id of ids) {
+        const pkg = pkgById(id);
+        const blob = await blobOf(pkg);
+        if (!blob) continue;
+        const plan = copyBackRecord(pkg);
+        await saveFile({
+          ...plan,
+          size: blob.size, blob,
+        });
+        count += 1;
+        act.update((count / Math.max(1, ids.length)) * 100, pkg.name);
+      }
+      await syncPackages();
+      act.done();
+      view.toast(t('toast.copiedBackCount', { n: count }));
+    } catch (err) {
+      act.fail(err);
+      throw err;
     }
-    await syncPackages();
-    view.toast(t('toast.copiedBackCount', { n: count }));
   }
 
   async function deleteSelected(ids) {
@@ -1030,7 +1124,7 @@ async function main(root) {
     try {
       for (let i = 0; i < targets.length; i += 1) {
         if (restoreCancelRequested) {
-          logger.warn(t('queue.abortedToast'));
+          logger.warn(t('taskq.abortedToast'));
           break;
         }
         const pkg = targets[i];
@@ -1198,8 +1292,8 @@ async function main(root) {
   nativePullHook = pullFromNativeUi;
 
   /** PureTavern：原生数据管理面板的模块勾选 → 原生归档端点 → 入库。 */
-  async function pullFromPt(options) {
-    if (state.busy) return;
+  async function pullFromPt(options, { autoFlow = false } = {}) {
+    if (state.busy) return false;
     state.busy = true;
     const pullStart = performance.now();
     const ac = new AbortController();
@@ -1229,7 +1323,9 @@ async function main(root) {
         opfsDir: null,
         fromNativeUi: true,
         pullStart,
+        autoFlow,
       });
+      return true;
     } catch (err) {
       if (err?.name === 'AbortError') {
         logger.warn(t('log.hostPullCancelled'));
@@ -1238,6 +1334,7 @@ async function main(root) {
         logger.error(t('log.hostFetchFailed', { msg: err.message }));
         view.setProgress(0, t('progress.hostFetchFailed'));
       }
+      return false;
     } finally {
       if (activePullAbort === ac) activePullAbort = null;
       state.busy = false;
@@ -1248,13 +1345,14 @@ async function main(root) {
    * 拉取落库的公共尾段：入库 → 同步 → 设为活动包 → 完成提示。
    * @param {{id: string, name: string, blob?: Blob, opfsName?: string|null, opfsDir?: string|null, size: number, fromNativeUi: boolean, pullStart: number}} pack
    */
-  async function commitPulledPack({ id, name, blob, opfsName, opfsDir, size, fromNativeUi, pullStart }) {
+  async function commitPulledPack({ id, name, blob, opfsName, opfsDir, size, fromNativeUi, pullStart, autoFlow = false }) {
     const storeStart = performance.now();
     await saveFile({
       id, name, size, blob: opfsName ? null : namedBlob(blob, name),
       opfsName, opfsDir,
       layout: hostLayoutCode(host.platform), role: 'source',
-      origin: ORIGINS.HOST_EXPORT, metadata: { fetchedAt: Date.now() },
+      origin: ORIGINS.HOST_EXPORT,
+      metadata: { fetchedAt: Date.now(), ...(autoFlow ? { autoFlow: 'pull' } : {}) },
     });
     logger.info(t('log.packStored', {
       target: opfsName ? `OPFS ${opfsDir}/${opfsName}` : 'IndexedDB',
@@ -1281,9 +1379,9 @@ async function main(root) {
    * @param {Record<string, boolean>} selection 端点类目布尔（含宿主端新增的 backups 键）
    * @param {boolean} fromNativeUi 是否由原生界面按钮触发（完成时用宿主原生 toast）
    */
-  async function pullFromHost(selection, fromNativeUi) {
-    logger.debug(`[pull] start host pull fromNativeUi=${!!fromNativeUi} selection=${JSON.stringify(selection || {})}`);
-    if (state.busy) return;
+  async function pullFromHost(selection, fromNativeUi, { autoFlow = false } = {}) {
+    logger.debug(`[pull] start host pull fromNativeUi=${!!fromNativeUi} autoFlow=${!!autoFlow} selection=${JSON.stringify(selection || {})}`);
+    if (state.busy) return false;
     state.busy = true;
     const pullStart = performance.now();
     const ac = new AbortController();
@@ -1317,7 +1415,9 @@ async function main(root) {
         opfsDir: fetched?.kind === 'opfs' ? (fetched.dir || 'packages') : null,
         fromNativeUi,
         pullStart,
+        autoFlow,
       });
+      return true;
     } catch (err) {
       if (err?.name === 'AbortError') {
         logger.warn(t('log.hostPullCancelled'));
@@ -1326,6 +1426,7 @@ async function main(root) {
         logger.error(t('log.hostFetchFailed', { msg: err.message }));
         view.setProgress(0, t('progress.hostFetchFailed'));
       }
+      return false;
     } finally {
       if (activePullAbort === ac) activePullAbort = null;
       state.busy = false;
@@ -1336,7 +1437,7 @@ async function main(root) {
   function generate(args = {}) {
     const packages = Array.isArray(args.packages) ? args.packages : [];
     if (!packages.length) { view.toast(t('toast.selectExportFirst')); return; }
-    const label = t('queue.labelGenerate', { n: packages.length, target: args.target || '' });
+    const label = t('taskq.labelGenerate', { n: packages.length, target: args.target || '' });
     enqueueTask({ type: 'generate', label, run: () => executeGenerate(args) });
   }
 
@@ -1344,7 +1445,7 @@ async function main(root) {
   function enqueueHostPull() {
     const job = enqueueTask({
       type: 'pull',
-      label: t('queue.labelPull'),
+      label: t('taskq.labelPull'),
       canPause: false,
       cancel: () => { try { activePullAbort?.abort(); } catch { /* 已结束 */ } },
       run: async () => { await fetchFromHost(); return 'done'; },
@@ -1358,7 +1459,7 @@ async function main(root) {
     if (!targets.length) { view.toast(t('toast.selectExportPack')); return Promise.resolve({ status: 'empty' }); }
     const job = enqueueTask({
       type: 'restore',
-      label: t('queue.labelRestore', { n: targets.length }),
+      label: t('taskq.labelRestore', { n: targets.length }),
       canPause: false,
       cancel: () => { restoreCancelRequested = true; },
       run: async () => {
@@ -1374,7 +1475,7 @@ async function main(root) {
   function enqueueCloudBackup(options = {}) {
     const job = enqueueTask({
       type: 'cloud',
-      label: t('queue.labelCloud', { provider: String(options.provider || 's3').toUpperCase() }),
+      label: t('taskq.labelCloud', { provider: String(options.provider || 's3').toUpperCase() }),
       canPause: false,
       cancel: () => { cloudCancelRequested = true; },
       run: async ({ signal }) => {
@@ -1386,8 +1487,113 @@ async function main(root) {
     return job?.promise;
   }
 
+  /**
+   * 一键自动备份：自动拉取 → 按当前图表勾选/扩展模式修剪 → 生成导出 →
+   * 上传 → 校验成功 → 按设置删除自动流程包。
+   * 全程只用现有能力，不引入后台 cron；失败时保留包并如实记录。
+   */
+  function enqueueAutoBackup(options = {}) {
+    const job = enqueueTask({
+      type: 'autobackup',
+      label: t('taskq.labelAutoBackup', { provider: String(options.provider || 's3').toUpperCase() }),
+      canPause: false,
+      canAbort: true,
+      cancel: () => {
+        cloudCancelRequested = true;
+        try { activePullAbort?.abort(); } catch { /* 已结束 */ }
+      },
+      run: async ({ signal }) => {
+        cloudCancelRequested = false;
+        return autoBackup({ ...options, signal });
+      },
+    });
+    return job?.promise;
+  }
+
+  async function autoBackup({
+    provider = 's3', config = {}, mode = 'full', setName = 'default', retention = 10, signal = null,
+  } = {}) {
+    if (!host.isPlugin) { view.toast(t('toast.webNoHost')); return 'failed'; }
+    const before = new Set(state.packages.map((p) => p.id));
+    const vt = view.getState();
+    const targetName = vt.target || state.target;
+    view.setProgress(2, t('progress.autoPull'));
+    logger.info(t('log.autoStart'));
+
+    let pulled = false;
+    try {
+      pulled = host.platform === 'pt'
+        ? await pullFromPt(readPtExportOptions() || { moduleIds: [], includeSecrets: false }, { autoFlow: true })
+        : await pullFromHost(FULL_SELECTION, false, { autoFlow: true });
+    } catch (err) {
+      logger.error(t('log.autoPullFailed', { msg: err?.message || err }));
+      return 'failed';
+    }
+    if (!pulled) {
+      logger.warn(t('log.autoPullFailed', { msg: 'pull-returned-false' }));
+      return 'failed';
+    }
+    await syncPackages();
+    const autoImport = state.packages
+      .filter((p) => p.zone === 'import' && p.autoFlow === 'pull' && !before.has(p.id))
+      .sort((a, b) => (Number(b.ts) || 0) - (Number(a.ts) || 0))[0];
+    if (!autoImport) {
+      logger.warn(t('log.autoNoImport'));
+      return 'failed';
+    }
+    logger.info(t('log.autoPulled', { name: autoImport.name }));
+
+    view.setProgress(20, t('progress.autoGenerate'));
+    let status = 'failed';
+    try {
+      status = await executeGenerate({
+        packages: [autoImport],
+        target: targetName,
+        splitMb: vt.splitMb,
+        filenameTemplate: vt.filenameTemplate,
+        autoFlow: true,
+      });
+    } catch (err) {
+      logger.error(t('log.autoGenerateFailed', { msg: err?.message || err }));
+      return 'failed';
+    }
+    if (status !== 'done') return status === 'aborted' ? 'aborted' : 'failed';
+    const exportIds = lastCreatedIds.slice();
+    if (!exportIds.length) {
+      logger.warn(t('log.autoGenerateFailed', { msg: 'no-export' }));
+      return 'failed';
+    }
+
+    // 复用「生成导出包后删除导出区里的包」：开启则生成后立刻删自动导入包。
+    if (settings.deleteAfterExport) {
+      await removePackages([autoImport.id]);
+      logger.info(t('log.autoImportDeleted', { name: autoImport.name }));
+    }
+
+    view.setProgress(60, t('progress.autoUpload'));
+    const result = await backupSelectedToCloud({
+      provider, config, mode, setName, retention, signal, ids: exportIds,
+    });
+    if (!result?.ok) {
+      logger.warn(t('log.autoUploadFailed', { msg: result?.reason || (result?.aborted ? 'aborted' : 'unknown') }));
+      return result?.aborted ? 'aborted' : 'failed';
+    }
+
+    if (settings.autoDeleteBackupPacks !== false) {
+      const autoIds = [...new Set([...exportIds, autoImport.id])]
+        .filter((id) => state.packages.some((p) => p.id === id));
+      if (autoIds.length) {
+        await removePackages(autoIds);
+        logger.info(t('log.autoPacksDeleted', { n: autoIds.length }));
+      }
+    }
+    view.setProgress(100, t('progress.autoDone'));
+    logger.success(t('log.autoDone'));
+    return 'done';
+  }
+
   /** 真正执行一次生成；返回 `done|paused|aborted|empty`，失败抛错由队列记 failed。 */
-  async function executeGenerate({ packages, merge = false, target, splitMb, filenameTemplate }) {
+  async function executeGenerate({ packages, merge = false, target, splitMb, filenameTemplate, autoFlow = false }) {
     if (!packages?.length) { view.toast(t('toast.selectExportFirst')); return 'empty'; }
     if (merge && packages.length >= 2) {
       return generateMerged({ packages, target, splitMb, filenameTemplate });
@@ -1446,7 +1652,7 @@ async function main(root) {
         }
         logger.info(t('log.converted', { name: pkg.name }));
       }
-      await deliverCreated(created, code);
+      await deliverCreated(created, code, { autoFlow });
       if (reports.length) view.showReport(reports[reports.length - 1]);
       return 'done';
     } catch (err) {
@@ -1463,20 +1669,24 @@ async function main(root) {
    * 产物落地：始终写工作区（导出区列表），**不自动下载**；下载是用户在导出区里的显式动作。
    * 是否在下载后删除该包由设置「导出后删除导出区里的包」决定。
    */
-  async function deliverCreated(created, layout = 'unknown') {
-    if (!created.length) { view.setProgress(0, t('toast.convertFailed')); return; }
+  async function deliverCreated(created, layout = 'unknown', { autoFlow = false } = {}) {
+    lastCreatedIds = [];
+    if (!created.length) { view.setProgress(0, t('toast.convertFailed')); return lastCreatedIds; }
     for (const item of created) {
+      const id = `out-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
       await saveFile({
-        id: `out-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        id,
         name: item.name, size: item.blob.size, blob: namedBlob(item.blob, item.name),
         layout, role: 'output', origin: ORIGINS.CONVERTED,
-        metadata: { convertedAt: Date.now() },
+        metadata: { convertedAt: Date.now(), ...(autoFlow ? { autoFlow: 'export' } : {}) },
       });
+      lastCreatedIds.push(id);
     }
     await syncPackages();
     view.setProgress(100, t('progress.exportReady'));
     view.toast(t('toast.generated', { n: created.length }));
     view.setZone('export');
+    return lastCreatedIds;
   }
 
   /** 取本次转换要用的断点：只有「同一源包」才复用，换包则丢弃旧标记（避免拿别人的半成品续写）。 */
@@ -1522,7 +1732,7 @@ async function main(root) {
     const job = {
       id: `q${++taskSeq}`,
       type,
-      label: label || t('queue.title'),
+      label: label || t('taskq.title'),
       status: 'queued',
       pct: 0,
       run,
@@ -1530,14 +1740,19 @@ async function main(root) {
       canPause: canPause !== false,
       canAbort: canAbort !== false,
       abortRequested: false,
+      createdAt: Date.now(),
+      startedAt: 0,
+      finishedAt: 0,
+      detail: '',
+      error: '',
       resolve: null,
     };
     job.promise = new Promise((resolve) => { job.resolve = resolve; });
     taskQueue.push(job);
     logger.debug(`[queue] enqueue ${job.id} type=${job.type} label=${job.label}`);
     syncQueue();
-    view.toast(t('queue.added', { label: job.label }));
-    logger.info(t('queue.added', { label: job.label }));
+    view.toast(t('taskq.added', { label: job.label }));
+    logger.info(t('taskq.added', { label: job.label }));
     void pumpQueue();
     return job;
   }
@@ -1551,15 +1766,19 @@ async function main(root) {
         queueCurrent = job;
         job.status = 'running';
         job.pct = 0;
+        job.startedAt = Date.now();
+        job.finishedAt = 0;
+        job.error = '';
         job.controller = new AbortController();
         syncQueue();
-        logger.info(t('queue.started', { label: job.label }));
+        logger.info(t('taskq.started', { label: job.label }));
         let status = 'done';
         try {
           status = await job.run({ signal: job.controller.signal });
         } catch (err) {
           status = 'failed';
-          logger.error(t('queue.failedToast', { label: job.label }), err);
+          job.error = String(err?.message || err || '');
+          logger.error(t('taskq.failedToast', { label: job.label }), err);
         }
         if (job.abortRequested && status !== 'paused') status = 'aborted';
         queueCurrent = null;
@@ -1567,21 +1786,23 @@ async function main(root) {
           job.status = 'paused';
           taskQueue.unshift(job);
           syncQueue();
-          view.toast(t('queue.pausedToast'));
+          view.toast(t('taskq.pausedToast'));
           break;
         }
         if (status === 'aborted') {
           job.status = 'aborted';
           job.pct = 0;
+          job.finishedAt = Date.now();
           rememberFinished(job);
           job.resolve?.({ status: 'aborted' });
           syncQueue();
-          view.toast(t('queue.abortedToast'));
-          logger.info(t('queue.abortedToast'));
+          view.toast(t('taskq.abortedToast'));
+          logger.info(t('taskq.abortedToast'));
           continue;
         }
         if (status === 'failed' || status === 'empty') {
           job.status = 'failed';
+          job.finishedAt = Date.now();
           rememberFinished(job);
           job.resolve?.({ status: 'failed' });
           syncQueue();
@@ -1589,11 +1810,12 @@ async function main(root) {
         }
         job.status = 'done';
         job.pct = 100;
+        job.finishedAt = Date.now();
         rememberFinished(job);
         job.resolve?.({ status: 'done' });
         syncQueue();
-        view.toast(t('queue.doneToast', { label: job.label }));
-        logger.info(t('queue.doneToast', { label: job.label }));
+        view.toast(t('taskq.doneToast', { label: job.label }));
+        logger.info(t('taskq.doneToast', { label: job.label }));
       }
     } finally {
       queueBusy = false;
@@ -1613,7 +1835,7 @@ async function main(root) {
     const hit = findQueueJob(id);
     if (!hit || !hit.current || hit.job.canPause === false) return false;
     const ok = await conversionRunner?.pause?.();
-    if (ok) logger.info(t('queue.pausedToast'));
+    if (ok) logger.info(t('taskq.pausedToast'));
     return !!ok;
   }
 
@@ -1709,7 +1931,7 @@ async function main(root) {
    * 合并模式：各包先按合并树里自己的勾选转换，再把产物合并成一个包。
    * 同名路径直接停止（用户 2026-10-27 裁定）。
    */
-  async function generateMerged({ packages, target, splitMb, filenameTemplate }) {
+  async function generateMerged({ packages, target, splitMb, filenameTemplate, autoFlow = false }) {
     const code = targetCodeOf(target);
     const limit = splitLimitOf(splitMb);
     const plan = view.getMergedPlan(packages);
@@ -1775,7 +1997,7 @@ async function main(root) {
         created.push({ blob: merged.blob, name });
       }
       logger.info(t('log.mergeDone', { n: packages.length, files: merged.fileCount }));
-      await deliverCreated(created, code);
+      await deliverCreated(created, code, { autoFlow });
       if (reports.length) view.showReport(reports[reports.length - 1]);
       return 'done';
     } catch (err) {
@@ -1891,15 +2113,33 @@ async function main(root) {
     });
   }
 
-  /** 更新日志弹窗：auto=true 显示本次更新摘要；否则显示最早→最新完整提交。 */
+  /** 更新日志弹窗：auto=true 显示本次更新摘要；否则显示**从新到旧**的完整提交。 */
   function openChangelog({ auto = false } = {}) {
     const entries = auto ? recentChangelog(40) : fullChangelog();
-    const rows = entries.map((entry) => '<div class="changelog-row">'
-      + '<span class="changelog-date">' + escapeText(entry.date || '') + '</span>'
-      + (entry.sha ? '<code class="changelog-sha">' + escapeText(entry.sha) + '</code>' : '')
-      + '<span class="changelog-msg">' + escapeText(entry.subject || '') + '</span>'
-      + '</div>').join('');
-    const body = '<div class="changelog-list">' + (rows || '<div class="ext-note">' + escapeText(t('log.empty')) + '</div>') + '</div>'
+    const hasRelease = entries.some((entry) => (Array.isArray(entry.tags) && entry.tags.length)
+      || entry.release);
+    const rows = entries.map((entry) => {
+      const tags = Array.isArray(entry.tags) && entry.tags.length
+        ? entry.tags
+        : (entry.release ? [`v${entry.release}`] : []);
+      const isRelease = tags.length > 0;
+      return '<div class="changelog-row' + (isRelease ? ' is-release' : '') + '"'
+        + ' data-changelog-release="' + (isRelease ? '1' : '0') + '">'
+        + '<span class="changelog-date">' + escapeText(entry.date || '') + '</span>'
+        + (entry.sha ? '<code class="changelog-sha">' + escapeText(entry.sha) + '</code>' : '')
+        + '<span class="changelog-msg">'
+        + (isRelease
+          ? '<span class="changelog-tag">🏷 ' + escapeText(tags.join(' / ')) + '</span>'
+          : '')
+        + escapeText(entry.subject || '') + '</span>'
+        + '</div>';
+    }).join('');
+    const filter = hasRelease
+      ? '<label class="check changelog-filter"><input type="checkbox" id="changelog-release-only"> '
+        + escapeText(t('changelog.releaseOnly')) + '</label>'
+      : '';
+    const body = filter
+      + '<div class="changelog-list">' + (rows || '<div class="ext-note">' + escapeText(t('log.empty')) + '</div>') + '</div>'
       + (auto ? '<label class="check" style="margin-top:8px"><input type="checkbox" id="changelog-never"> '
         + escapeText(t('changelog.never')) + '</label>' : '');
     markSeenVersion(APP_VERSION);
@@ -1917,6 +2157,14 @@ async function main(root) {
         view.closeModal();
       } }],
     );
+    const releaseOnly = document.getElementById('changelog-release-only');
+    if (releaseOnly) {
+      releaseOnly.addEventListener('change', () => {
+        document.querySelectorAll('#modal-extra .changelog-row').forEach((row) => {
+          row.hidden = releaseOnly.checked && row.dataset.changelogRelease !== '1';
+        });
+      });
+    }
   }
 
   function maybeShowChangelog() {
@@ -1998,6 +2246,7 @@ async function main(root) {
     qr,
     actions: {
       onProgress: setQueueProgress,
+      activity: (opts) => recordActivity(opts),
       fetch: enqueueHostPull,
       generate,
       restore: enqueueRestore,
@@ -2089,6 +2338,7 @@ async function main(root) {
       updateExtension: (name, isGlobal) => updateExtensionViaHost(name, isGlobal),
       moveExtension: (name, source, destination) => moveExtensionViaHost(name, source, destination),
       backupSelectedToCloud: enqueueCloudBackup,
+      autoBackup: enqueueAutoBackup,
       importCloudPack,
       lan: lanActions,
       settings: openSettings,

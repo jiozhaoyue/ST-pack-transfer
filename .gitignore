@@ -89,3 +89,6 @@ CLAUDE.md.bak
 # Agent 工具私有目录
 /.unipi/
 
+# 本地私有计划与内部资料（禁止进入公开仓 / GitHub Pages）
+/.private/
+
