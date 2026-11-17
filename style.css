@@ -136,15 +136,21 @@
   /* 徽标：文字必须在**整个徽标**几何居中（用户 2026-11-17 裁定）。
      图标绝对定位到左侧，不再参与主轴排布；否则图标占宽会把文字挤偏。
      右侧用户名容器同样绝对定位（当前为空，保留兼容）。 */
-  #app.app-container .badge{position:relative;display:grid;place-items:center;padding:0 16px;border-radius:999px;
+  /* 徽标：宿主图标 + 当前用户名（2026-11-17 用户裁定）。
+     以前文字在整块居中、图标绝对定位，窄屏时文字会冲出胶囊；改为单行 flex，
+     文字单行省略且 title 保留全名；Luker 黑图标加浅色底板，深色主题下才看得见。 */
+  #app.app-container .badge{position:relative;display:inline-flex;align-items:center;gap:6px;padding:0 10px;border-radius:999px;
     border:1px solid var(--border);background:var(--panel-3);font-size:10.5px;color:var(--muted);white-space:nowrap;
-    height:24px;line-height:1;box-sizing:border-box;text-align:center}
-  #app.app-container .badge #host-badge-text{display:block;line-height:1;text-align:center;margin:0;padding:0}
+    height:24px;line-height:1;box-sizing:border-box;min-width:0;max-width:min(240px,42vw);flex:0 1 auto}
+  #app.app-container .badge #host-badge-text{display:block;line-height:1;text-align:left;margin:0;padding:0;
+    min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   #app.app-container .badge #host-badge-user{position:absolute;right:7px;top:50%;transform:translateY(-50%);
     display:flex;align-items:center;line-height:1}
   #app.app-container .badge .host-icon,
   #app.app-container .badge .gh-icon,
-  #app.app-container .badge .web-icon{position:absolute;left:7px;top:50%;transform:translateY(-50%);flex:0 0 auto}
+  #app.app-container .badge .web-icon{position:static;left:auto;top:auto;transform:none;flex:0 0 auto}
+  #app.app-container .badge .host-icon{background:var(--icon-plate);border-radius:4px;padding:1px;
+    width:14px;height:14px;box-sizing:content-box}
   #app.app-container .badge .host-icon{width:14px;height:14px;object-fit:contain}
   #app.app-container .badge .web-icon{color:var(--accent)}
   #app.app-container .badge .gh-icon[hidden], #app.app-container .badge .host-icon[hidden], #app.app-container .badge .web-icon[hidden]{display:none}

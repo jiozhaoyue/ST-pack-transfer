@@ -28,13 +28,15 @@
     "docs/assets/shots/mobile-07-export-area.png": "b9c750926341d9246a7a8ea54fbe379a17ff32778a927135e29b762333719d36",
     "docs/assets/shots/mobile-08-task-queue.png": "f0e4cbbb21f66dba41a58047afd6933ed41a4d252758aa2f40f19ff730e9eb30",
     "docs/assets/shots/mobile-09-log-view.png": "71395ccff5d27d58590d5b4c3f8cc45a0d0ab2054904080890dbd79791fe98a4",
-    "docs/audit/2026-11-17/README.md": "38d8ff3e569fac970236a392a28fd72ba5e96c6a4617a6dc6ad512675889b2a2",
+    "docs/audit/2026-11-17/README.md": "c39c5dbda8cf624dc0a7d801c9f6155c5fbea3c9292bebb58ef8b5723f199d26",
     "docs/audit/2026-11-17/cloud-core-e2e.md": "d300f7f717c30ca8ae7cfa81350a6edb28afb216bba2dac47f6aa7f431770fa1",
     "docs/audit/2026-11-17/function-audit.md": "a6c7c84fc30ef3342dd1844657e3a7dd4f6e3770e94366a7f3d32e52ecdfddea",
     "docs/audit/2026-11-17/instance-availability.md": "cbb3fa3112a2248cdaca07a4941f389c34634c29d1bf865240ddd8f58747830a",
     "docs/audit/2026-11-17/luker-tt-contract.md": "3b7fc3936ae2dfb86ac3377b2ebf848bdb97f66dce1500d089adf416571cb055",
+    "docs/audit/2026-11-17/luker-tt-fixes.md": "9e2dbca4be99eb70564d50711f44cdd0c740ced0381aeb87e5428b7f6f29d6f1",
     "docs/audit/2026-11-17/luker-tt-roundtrip.md": "2e4d7052b3c7e59f619ceaedeb670d23a6e619279d2f7b377f45017603cb0c45",
     "docs/audit/2026-11-17/perf-audit.md": "655f3892cf575b1c27089f91b4654a69aafdebebc8240d2614f91a51492d0778",
+    "docs/audit/2026-11-17/pt-integration.md": "149dc9f7096dd668be559ed27ada0db3662bd396d921e0dfc32c166d75c70881",
     "docs/audit/2026-11-17/ui-visual-audit.md": "0be1521c6f1eb416a6907a164c17d948f36fa57a2dfa994da320a3bbd1f8185c",
     "docs/convert.en.md": "673fc6e68293fe6405a0ee36281b0ddb7a030f4931c77ed2331fc2cf4ab48d5f",
     "docs/convert.md": "0a63f08bed365c58a1603056a65910ac8e77bff1636bfe4a09191d23da34b3e8",
@@ -190,7 +192,7 @@
       "style.css",
       "tooling/capture-docs-shots.cjs"
     ],
-    "sourcesHash": "528f94d691ab7ec3a1ab5358155ab55f5d0006648652f10e12db8a5e6081c9e0",
+    "sourcesHash": "e3c275a8ac00758b603c59e33079c10ae132603cdd35fd5192ce5503e4940561",
     "pages": {
       "docs/tutorial.md": [
         "docs/assets/shots/desktop-01-tutorial-goal.png",

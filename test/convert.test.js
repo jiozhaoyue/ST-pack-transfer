@@ -252,14 +252,15 @@ describe('TT 用户目录内的私有变体(T1 发现)', () => {
     ['data/default-user/content.log', Buffer.from('log', 'utf8')],
   ];
 
-  it('tt→l:应用私有设置与派生缓存默认丢弃', async () => {
+  it('tt→l:应用私有设置写入 _compat/tt/，派生缓存丢弃', async () => {
     const { files, report } = await runConvert(ttWithUserPrivates(), TARGETS.L);
     expect(files.has('tauritavern-settings.json')).toBe(false);
+    expect(files.get('_compat/tt/tauritavern-settings.json')).toBeTruthy();
     expect(files.has('user/lan-sync/automation.json')).toBe(false);
     expect(files.has('user/cache/index_v1.json')).toBe(false);
     expect(files.has('content.log')).toBe(false);
     const dropped = report.toJSON().dropped.map((d) => d.path);
-    expect(dropped).toContain('tauritavern-settings.json');
+    expect(dropped).not.toContain('tauritavern-settings.json');
     expect(dropped).toContain('user/cache/index_v1.json');
   });
 
@@ -270,9 +271,10 @@ describe('TT 用户目录内的私有变体(T1 发现)', () => {
     expect(files.has('data/default-user/user/cache/index_v1.json')).toBe(false);
   });
 
-  it('tt→st --keep-all:全部保留在 hub 根', async () => {
+  it('tt→st --keep-all:私设进 _compat/tt/，其余保留在 hub 根', async () => {
     const { files } = await runConvert(ttWithUserPrivates(), TARGETS.ST, { keepAll: true });
-    expect(files.has('tauritavern-settings.json')).toBe(true);
+    expect(files.has('tauritavern-settings.json')).toBe(false);
+    expect(files.get('_compat/tt/tauritavern-settings.json')).toBeTruthy();
     expect(files.has('user/lan-sync/automation.json')).toBe(true);
     expect(files.has('user/cache/index_v1.json')).toBe(true);
     expect(files.has('content.log')).toBe(true);

@@ -491,6 +491,7 @@ export async function convert(sourcePath, targetPath, {
     thirdPartyFlattenedCount: 0, // ST/L 目标: 消除错误的 third-party 嵌套并拉平的条目数
     userExtensionsMigrated: 0, // PT 目标: 迁移为 third-party 布局的用户级扩展条目数
     globalShadowedByUser: new Set(), // 因同名用户级存在而跳过的全局扩展名
+    globalShadowedEntries: 0, // D1: 被同名去重跳过的全局副本**源条目数**（警告汇总用）
     builtinExts: new Set(), // 被剥离的宿主自带插件名
     globalExtFolders: new Set(), // 源包里的全局扩展目录名（含被覆盖的）
     userExtFolders: new Set(), // 源包里的用户级扩展目录名
@@ -652,7 +653,18 @@ export async function convert(sourcePath, targetPath, {
         continue;
       }
       if (routed.kind === 'tt-app-private') {
-        // TT 应用级私有设置:TT 目标原位保留,其余目标丢弃
+        // D3 修复:tauritavern-settings.json 与 L 的 stats.json/macros.json 同属
+        // 「跨宿主可回带的私有配置」。非 TT 目标必须落 _compat/tt/ 沙箱,
+        // 不再因 keepAll/includeAppPrivate 缺省而丢弃,也不写成 hub 根散文件。
+        // targetEntryPath 已按目标给出正确落点(L/ST: _compat/tt/<file>;
+        // PT: data/default-user/_compat/tt/<file>);TT 目标走下方原位分支,行为不变。
+        if (target !== TARGETS.TT && routed.hubPath === 'tauritavern-settings.json') {
+          const outPath = targetEntryPath(routed.hubPath, target);
+          if (!dryRun) writer.addLazy(outPath, lazyOpen(entry), entry.uncompressedSize);
+          report.copied(routed.hubPath, entry.uncompressedSize);
+          continue;
+        }
+        // 其余 TT 应用私有:TT 目标原位保留,其余目标沿用既有 keepAll/includeAppPrivate 语义
         if (target === TARGETS.TT || keepAll || includeAppPrivate) {
           const outPath = target === TARGETS.TT ? entry.fileName : routed.hubPath;
           if (!dryRun) writer.addLazy(outPath, lazyOpen(entry), entry.uncompressedSize);
@@ -727,6 +739,7 @@ export async function convert(sourcePath, targetPath, {
         const extScope = routed.extScope || 'user';
         if (extScope === 'global' && userExtFolders.has(extFolder)) {
           context.globalShadowedByUser.add(extFolder);
+          context.globalShadowedEntries += 1; // D1: 显式警告需要精确的跳过条目数
           entry.skip();
           report.dropped(routed.hubPath, `同名扩展 "${extFolder}" 已有用户级副本，全局副本跳过（宿主同样优先用户级）`);
           continue;
@@ -1306,9 +1319,12 @@ async function emitSynthesized(writer, report, context, target, selection, {
   // 否则用户会以为扩展丢了；同时给出「想在宿主里清理哪一份」的指引。
   if (context.globalShadowedByUser.size > 0) {
     const names = [...context.globalShadowedByUser].sort();
+    // D1: 逐扩展点名 + 汇总条数，走 Report#warn → toJSON().warnings 既有通道，
+    // 不新造字段；去重语义（用户级优先、全局副本不写）保持不变。
+    const details = names.map((name) => `同名扩展 "${name}" 的全局副本已跳过（用户级优先）`).join('；');
     report.warn(
-      `检测到 ${names.length} 组同名扩展（用户级与全局各一份）：已按宿主加载语义保留**用户级**，`
-      + `跳过全局副本 —— ${names.join(', ')}。`
+      `${details}。共 ${names.length} 个扩展、${context.globalShadowedEntries} 个源条目未写入产物。`
+      + ' 去重语义未变：宿主按用户级优先加载，全局副本仅为冗余。'
       + ' 如需消除宿主里的重复安装，请在该宿主删除全局那一份（数据包中也可不勾选对应扩展）。',
     );
   }

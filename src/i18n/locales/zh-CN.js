@@ -17,6 +17,8 @@ export default {
   'header.plugin': '{host} 插件',
   'header.web': 'Web',
   'header.hostOnly': '{host}',
+  'header.noUser': '未登录',
+  'header.noUserTitle': '当前宿主 {host}：未读取到用户名',
 
   'chart.title': '存储图表',
   'chart.format': '图表格式',

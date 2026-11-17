@@ -21,8 +21,8 @@
 | --- | --- | --- | --- | --- |
 | `fixture-l.zip` | L→TT→L | 角色/聊天/世界书/设置/secrets/扩展 全在 | 角色 1、聊天 1、消息 2、世界书 1 | 通过，关键丢失 0 |
 | `fixture-tt.zip` | TT→L→TT | 同上 | 同上 | 通过，关键丢失 0 |
-| `real-l-to-tt.zip`（586 MB） | 往返 | 待补 | 待补 | 运行中 |
-| `real-tt-to-l.zip`（77 MB） | 往返 | 待补 | 待补 | 运行中 |
+| `real-l-to-tt.zip`（586 MB） | TT→L→TT | 关键项全在 | 聊天 18/18、消息 868/868、世界书条目 360/364 | 通过，关键丢失 0，98.6s |
+| `real-tt-to-l.zip`（77 MB） | L→TT→L | 关键项全在 | 角色 5/6、聊天 18/18、消息 868/868 | 通过，关键丢失 0，34.5s |
 
 - 角色卡 PNG 往返 `Buffer.compare == 0`（字节恒等）。
 - 预期丢弃：备份快照、缩略图、TT 派生缓存、重合成的 manifest。
@@ -36,7 +36,8 @@
 | 本机 WebDAV 服务器 | `npm run cloud:serve:webdav` | OPTIONS/PROPFIND/PUT/GET/HEAD/DELETE/MKCOL | 冒烟 207/201/409 |
 | 云契约测试 | `npm run test:local-cloud` | 真实 HTTP + Range + multipart + 路径穿越 + Authorization | 7 passed |
 | 核心云全流程 | `npm run e2e:cloud-core` | 真实 zip → S3/WebDAV → 下载 → sha256 | S3 上行 75.663 MB/s、下行 141.252 MB/s；WebDAV 上行 116.541 MB/s、下行 144.402 MB/s（25.17 MB 包） |
-| 实例成对启动 | `npm run e2e:instance-pair -- dev-st dev-luker` | 最多两个实例、就绪探测、退出清理端口 | 单实例冒烟 PASS（8001 释放） |
+| 实例成对启动 | `npm run e2e:instance-pair -- dev-st dev-luker` | 最多两个实例、就绪探测、退出清理端口 | 单实例冒烟 PASS（8001 释放）；双实例启动实测通过 |
+| PureTavern | 端口 8899→8005（PT 实例），注册表同步 | PT 启动/就绪 | 可启动（HTTP 200）；插件安装 502（仓库内文件 404），未纳入跨宿主 |
 | UI 多分辨率流程 | 待 GLM-5.3-flash **free** 额度恢复 | 1920/820/390/280 关键路径 | 脚本未交付：免费额度耗尽 |
 | ST↔Luker 跨宿主互传 | 待 GLM-5.3-flash **free** 额度恢复 | 两实例 WebRTC 实测 | 脚本未交付：免费额度耗尽 |
 
@@ -92,6 +93,9 @@ node tooling/ui-audit/matrix.cjs --url http://localhost:3040
 | 3440 树行「标签→徽章」千像素空白（UI-13） | ≥2200px 树内容限宽 1200px 居中 | CSS 实测 |
 | 体积读数 `≈` 估算符号（UI-16） | 中英文案移除 `≈`，仅保留「预计 / Est.」语义 | i18n 键 `pkg.estHost` / `zones.estHostTotal` |
 | 注入宿主弹窗危险/成功按钮整块实色 + 硬编码色（UI-09） | 改浅染 + 描边；告警文字走 `--SmartThemeQuoteColor` 回退 | `host-bridge.js` 三处 |
+| 页头徽标显示宿主名且溢出胶囊 | 改为「宿主图标 + 当前用户名」；未取到显示“未登录”；单行省略 + title；Luker 黑图标加浅色底板；启动即拉身份 | 280/390/1920 实测 `overflow:false` |
+| D1 同名扩展全局副本被静默跳过 | 保持用户级优先，但报告逐扩展点名 + 汇总计数 | `test/luker-tt-contract-fixes.test.js` 7 用例 |
+| D3 TT 私有设置被丢弃 | 非 TT 目标写入 `_compat/tt/tauritavern-settings.json` | 同上 + `test/convert.test.js` 已同步 |
 
 ## 视觉审计（GLM-5.3）逐条复核
 

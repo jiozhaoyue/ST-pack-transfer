@@ -14,6 +14,8 @@ export default {
   'header.plugin': '{host} plugin',
   'header.web': 'Web',
   'header.hostOnly': '{host}',
+  'header.noUser': 'Not signed in',
+  'header.noUserTitle': 'Host {host}: username unavailable',
 
   'chart.title': 'Storage chart',
   'chart.format': 'Chart format',

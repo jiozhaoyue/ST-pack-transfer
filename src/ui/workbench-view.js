@@ -877,10 +877,10 @@ function renderHeader(){
   const badge=document.getElementById('host-badge');
   const userText = state.extHostUser
     ? (escapeHtml(state.extHostUser) + (state.extHostAdmin ? ' <b class="is-admin">'+t('extmgr.adminBadge')+'</b>' : ''))
-    : (isWeb ? t('header.web') : t('header.hostOnly', { host: h.full }));
+    : (isWeb ? t('header.web') : t('header.noUser'));
   badge.title = state.extHostUser
     ? `${state.extHostUser} (${state.extHostAdmin ? t('extmgr.adminBadge') : t('extmgr.userBadgeTitle')})`
-    : (isWeb ? t('header.webTitle') : t('header.hostTitle', { host: h.full }));
+    : (isWeb ? t('header.webTitle') : t('header.noUserTitle', { host: h.full }));
   const badgeTxt = document.getElementById('host-badge-text');
   if(badgeTxt) badgeTxt.innerHTML = userText;
   const versionEl = document.getElementById('app-version');
@@ -7909,6 +7909,24 @@ function initSwitchDensity(){
   document.querySelectorAll('[data-view-switch]').forEach(host=>ro.observe(host));
 }
 
+/* 页头徽标要显示「宿主图标 + 当前用户名」，而不是宿主名：
+   身份以前只在扩展管理器打开时读取（loadServerPlugins），所以启动后徽标一直回退成宿主名。
+   这里在初始化阶段读一次；失败不报错，打开扩展管理器时仍会重试。 */
+async function refreshHostIdentity(){
+  if(state.mode==='web'||!state.host||state.host==='none'||state.host==='standalone') return;
+  for(let attempt=0;attempt<2;attempt+=1){
+    let identity=null;
+    try{ identity=await actions.hostIdentity?.(); }catch{ identity=null; }
+    if(identity && identity.ok){
+      state.extHostUser=identity.handle||'';
+      state.extHostAdmin=identity.admin===true;
+      renderHeader();
+      return;
+    }
+    if(attempt<1) await new Promise((r)=>{ setTimeout(r,600); });
+  }
+}
+
 /* ── 初始化（视图自有，不依赖外部数据） ── */
 applyUiTokens(document.getElementById('app'));
 renderAll();
@@ -7919,6 +7937,7 @@ initSplitters();
 initChartSplitters();
 initChartTight();
 initSwitchDensity();
+void refreshHostIdentity();
 
   /* ── 对外 API ── */
   function renderAll() {
