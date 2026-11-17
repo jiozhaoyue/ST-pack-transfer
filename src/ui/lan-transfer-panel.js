@@ -33,6 +33,10 @@ const ICE_TIMEOUT_MS = 6000;
 const OPEN_TIMEOUT_MS = 15000;
 const ACK_INTERVAL_MS = 250;
 const ACK_THRESHOLD_BYTES = 1024 * 1024;
+/* 2026-11-17 吞吐修复：每块都 setSend/setRecv 会触发 renderLan() 全量 DOM 重绘，
+   成为接收端串行消费瓶颈（1GB 包约 16384 次重绘，实测仅 ~300KB/s）。
+   进度 UI 节流到 120ms 一次；速率采样 rateSamples 不受影响，终态仍强制刷新。 */
+const UI_THROTTLE_MS = 120;
 const HIGH_WATER_MARK = CHUNK_SIZE * 64;
 const LOW_WATER_MARK = CHUNK_SIZE * 16;
 const DISCONNECT_GRACE_MS = 8000;
@@ -205,6 +209,7 @@ export function mountLanTransferPanel({ view, getSendTargets = null, onReceive =
   let rateSamples = [];
   let ackBytes = 0;
   let ackAt = 0;
+  let lastRecvUiAt = 0;
   /** 内存兜底时的半成品；键为 fileId。OPFS 半成品直接读盘，不进这个表。 */
   const partials = new Map();
 
@@ -398,6 +403,7 @@ export function mountLanTransferPanel({ view, getSendTargets = null, onReceive =
 
     let offset = Math.max(0, Math.min(Number(resumeFrom) || 0, total));
     rateSamples = [{ t: Date.now(), b: offset }];
+    let lastSendUiAt = 0;
     if (offset > 0) setSend({ pct: progressPercent(offset, total), phase: t('lan.phase.resuming'), detail: transferDetail(offset, total) });
 
     while (offset < total) {
@@ -413,7 +419,13 @@ export function mountLanTransferPanel({ view, getSendTargets = null, onReceive =
       dc.send(chunk);
       offset = end;
       try { machine.advanceSent(chunk.byteLength); } catch { /* 状态已终态 */ }
-      setSend({ pct: progressPercent(offset, total), phase: t('lan.phase.sending'), detail: transferDetail(offset, total) });
+      /* 进度 UI 节流：只每 UI_THROTTLE_MS 重绘一次，避免全量 renderLan() 拖垮吞吐。
+         速率采样由 transferDetail()→rateOf() 在该节流窗口内完成，3 秒窗口足够准确。 */
+      const uiNow = Date.now();
+      if (uiNow - lastSendUiAt >= UI_THROTTLE_MS) {
+        lastSendUiAt = uiNow;
+        setSend({ pct: progressPercent(offset, total), phase: t('lan.phase.sending'), detail: transferDetail(offset, total) });
+      }
     }
 
     dc.send(JSON.stringify({ t: 'done', bytes: total, digest }));
@@ -597,6 +609,7 @@ export function mountLanTransferPanel({ view, getSendTargets = null, onReceive =
       recvState = 'receiving';
       ackBytes = 0;
       ackAt = Date.now();
+      lastRecvUiAt = 0;
       rateSamples = [{ t: Date.now(), b: 0 }];
       writeChain = Promise.resolve();
       incoming = entry;
@@ -654,7 +667,14 @@ export function mountLanTransferPanel({ view, getSendTargets = null, onReceive =
         current.chunks = (current.chunks || 0) + 1;
         if (current.chunks % 8 === 0) dbg('recv chunk', current.chunks, bytes, current.size);
         try { machine.advanceReceived(chunk.byteLength); } catch { /* 状态已终态 */ }
-        setRecv({ phase: t('lan.phase.receiving'), pct: progressPercent(bytes, current.size), detail: transferDetail(bytes, current.size) });
+        /* 进度 UI 节流：每块全量 renderLan() 是接收端串行消费瓶颈（实测 ~300KB/s），
+           改为每 UI_THROTTLE_MS 一次；速率采样由 transferDetail()→rateOf() 在窗口内完成。
+           终态 100% 由 'done' 控制帧强制刷新，不受此节流影响。 */
+        const uiNow = Date.now();
+        if (uiNow - lastRecvUiAt >= UI_THROTTLE_MS) {
+          lastRecvUiAt = uiNow;
+          setRecv({ phase: t('lan.phase.receiving'), pct: progressPercent(bytes, current.size), detail: transferDetail(bytes, current.size) });
+        }
         const now = Date.now();
         if (bytes - ackBytes >= ACK_THRESHOLD_BYTES || now - ackAt >= ACK_INTERVAL_MS) {
           ackBytes = bytes;

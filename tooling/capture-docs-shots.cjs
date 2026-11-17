@@ -34,7 +34,18 @@ async function clickIf(page, selector, timeout = 5000) {
     await loc.click({ timeout });
     return true;
   } catch {
-    return false;
+    // 兜底：页面存在多组同选择器按钮（头/图表卡/底栏），.first() 可能点到不可见或被裁切的那组，
+    // 导致视图切换静默失败、所有截图截成同一张（真实事故）。DOM click 能可靠触发 click handler。
+    try {
+      return await page.evaluate((sel) => {
+        const el = document.querySelector(sel);
+        if (!el) return false;
+        el.click();
+        return true;
+      }, selector);
+    } catch {
+      return false;
+    }
   }
 }
 
@@ -90,6 +101,13 @@ async function captureDesktop(browser, url, outDir) {
     colorScheme: 'light',
     acceptDownloads: true,
   });
+  // 关掉首次加载自动弹出的更新日志弹窗（<dialog open>）：它会拦截教程/视图切换点击，
+  // 而 clickIf 会静默吞掉失败，导致所有视图都截成同一张图（实测事故）。
+  await ctx.addInitScript(() => {
+    try {
+      localStorage.setItem('st-pack-transfer:settings', JSON.stringify({ showChangelogOnUpdate: false }));
+    } catch { /* 隐私模式 */ }
+  });
   const page = await ctx.newPage();
   const shot = makeShot(page, outDir, 'desktop');
   const failures = [];
@@ -104,12 +122,20 @@ async function captureDesktop(browser, url, outDir) {
   await page.waitForTimeout(450);
   await shot('export-area');
 
-  // 扩展管理
+  // 扩展管理：先宿主页、再包内页，两张必须不同（页签真实值为 package，非 pack）
   await clickIf(page, '.view-switch-btn[data-wbview="extension"]');
   await page.waitForTimeout(500);
-  await shot('extension-manager');
-  await clickIf(page, '#extmgr-tabs [data-exttab="pack"]');
+  await clickIf(page, '#extmgr-tabs [data-exttab="host"]');
   await page.waitForTimeout(450);
+  await shot('extension-manager');
+  await clickIf(page, '#extmgr-tabs [data-exttab="package"]');
+  await page.waitForTimeout(450);
+  // 独立 Web 无宿主页签（会被强制回 package），故用「勾选若干扩展的待打包态」区别于列表态
+  await page.evaluate(() => {
+    const boxes = [...document.querySelectorAll('.ext-pkg-row [data-extsel]')].slice(0, 2);
+    boxes.forEach((b) => { if (!b.checked) b.click(); });
+  });
+  await page.waitForTimeout(350);
   await shot('extension-pack');
 
   // 迁移与备份
@@ -177,6 +203,12 @@ async function captureMobile(browser, url, outDir) {
     hasTouch: true,
     acceptDownloads: true,
   });
+  // 同桌面：关掉更新日志弹窗，避免拦截点击导致所有视图截成同一张图。
+  await ctx.addInitScript(() => {
+    try {
+      localStorage.setItem('st-pack-transfer:settings', JSON.stringify({ showChangelogOnUpdate: false }));
+    } catch { /* 隐私模式 */ }
+  });
   const page = await ctx.newPage();
   const shot = makeShot(page, outDir, 'mobile');
   const failures = [];
@@ -188,9 +220,17 @@ async function captureMobile(browser, url, outDir) {
 
   await clickIf(page, '.view-switch-btn[data-wbview="extension"]');
   await page.waitForTimeout(500);
+  await clickIf(page, '#extmgr-tabs [data-exttab="host"]');
+  await page.waitForTimeout(450);
   await shot('extension-manager');
   await clickIf(page, '#extmgr-tabs [data-exttab="package"]');
   await page.waitForTimeout(450);
+  // 独立 Web 无宿主页签（会被强制回 package），故用「勾选若干扩展的待打包态」区别于列表态
+  await page.evaluate(() => {
+    const boxes = [...document.querySelectorAll('.ext-pkg-row [data-extsel]')].slice(0, 2);
+    boxes.forEach((b) => { if (!b.checked) b.click(); });
+  });
+  await page.waitForTimeout(350);
   await shot('extension-pack');
 
   await clickIf(page, '.view-switch-btn[data-wbview="transfer"]');

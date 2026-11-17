@@ -555,6 +555,15 @@ function selectPackageForExtension(id){
   state.activePkgs = new Set(pkg ? [pkg.id] : []);
   syncSourceToActive();
   autoEngineForPackage(pkg);
+  /* 2026-11-17 用户铁律：包内单选必须**确保该包已扫描**。
+     扩展清单的 nodes/extensions/extManifest 只在 ensurePlan 扫描后写入包对象；
+     导入多包时只有最新包被扫描，点到未扫描包就会「共 N 项却没有任何扩展」。
+     onActivePackage 内部 = setActivePackage（立即重绘）+ ensurePlan（补齐后再次重绘），
+     是本仓唯一的「切换包并补扫描」入口；demo wrapper 里为 undefined（自带数据，安全跳过）。 */
+  const scanned = pkg && ((Array.isArray(pkg.nodes) && pkg.nodes.length)
+    || (Array.isArray(pkg.extensions) && pkg.extensions.length)
+    || (Array.isArray(pkg.extManifest) && pkg.extManifest.length));
+  if(pkg && !scanned && typeof actions.onActivePackage==='function') actions.onActivePackage(id);
 }
 function packageGitMode(pkg){
   const own = pkg && state.gitModeByPkg[pkg.id];

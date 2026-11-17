@@ -18,6 +18,16 @@ Open it from the view switch at the top of the left panel: switch between **Stor
 | **Developer** | Git accounts, OAuth login, token guidance, and advanced developer switches |
 | **Extension packing** | Choose which extensions travel with the currently selected package |
 
+## Interface consistency and scrolling
+
+To keep desktop and mobile behavior identical, the extension manager follows these rules:
+
+- **Read-only current package**: the **Inside package** section shows only the name of the package currently being viewed — there is no separate package dropdown here. To switch packages, select one in the **Packages** section; the inside-package view follows automatically. This prevents a mismatch between the dropdown and the package actually in effect.
+- **Selecting a package shows its extensions**: whenever you switch packages, the app makes sure that package's extension information is ready and lists it immediately. Even a freshly imported, not-yet-parsed package is completed in the background first, so you never see "a selected package with no extensions".
+- **The summary and action row stays fixed**: the row showing "N items / N selected", together with select-all, invert, clear, and the action buttons, is pinned to the top of the list. No matter how long the list or how far you scroll, that row never moves with the scrollbar and is never covered by list content.
+- **Buttons and labels never break mid-word**: action buttons, status badges, and package names stay on one complete line; when space runs out the row degrades to icons or stacks onto another line, rather than cutting a word apart or squeezing it into an unreadable strip.
+- **Same on both ends**: all of the above applies identically on desktop and mobile, regardless of screen width; mobile has only a single scroll area and never shows nested scrollbars.
+
 ## Full / manifest: dual selection and suggestions
 
 Each extension row has **Full** and **Manifest** buttons, and **both can be active**:
