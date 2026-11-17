@@ -182,7 +182,7 @@
       "style.css",
       "tooling/capture-docs-shots.cjs"
     ],
-    "sourcesHash": "a073eb96b7600334b829d288791633bcf8b95dbd00d0866315c65fc10845aa84",
+    "sourcesHash": "34205accb385f625e0990ffeca71b1d37e7e0f856693e282a8bd0bdd58e26f27",
     "pages": {
       "docs/tutorial.md": [
         "docs/assets/shots/desktop-01-tutorial-goal.png",
