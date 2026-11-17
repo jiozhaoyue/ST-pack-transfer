@@ -5,22 +5,18 @@
  * 各自只代表自己，任何一个都不得顶替另一个（R6.5）。
  */
 
-/** 四宿主英文全称。平台码与布局码都收，未知码原样返回。 */
+import { TARGET_PLATFORMS as TARGET_PLATFORM_META } from '../data/target-platforms.js';
+
+/** 四宿主英文全称。平台码与布局码都收，未知码原样返回；由唯一真源派生。 */
 export const HOST_DISPLAY_NAMES = Object.freeze({
-  st: 'SillyTavern',
-  luker: 'Luker',
-  l: 'Luker',
-  tt: 'TauriTavern',
-  pt: 'PureTavern',
+  ...Object.fromEntries(TARGET_PLATFORM_META.map((p) => [p.code, p.name])),
+  ...Object.fromEntries(TARGET_PLATFORM_META.map((p) => [p.host, p.name])),
 });
 
-/** 目标平台选择器固定四项，顺序即展示顺序。 */
-export const TARGET_PLATFORMS = Object.freeze([
-  { code: 'st', name: 'SillyTavern' },
-  { code: 'l', name: 'Luker' },
-  { code: 'tt', name: 'TauriTavern' },
-  { code: 'pt', name: 'PureTavern' },
-]);
+/** 目标平台选择器固定四项，顺序即展示顺序；由唯一真源派生。 */
+export const TARGET_PLATFORMS = Object.freeze(
+  TARGET_PLATFORM_META.map(({ code, name }) => ({ code, name })),
+);
 
 /** 规范占位符集合（AC-4 要求逐个有单测）。 */
 export const PLACEHOLDERS = Object.freeze([

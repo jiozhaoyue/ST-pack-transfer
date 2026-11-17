@@ -1,6 +1,8 @@
 ---
 title: 数据包转换
 layout: default
+alt_url: convert.en.html
+alt_lang: en
 ---
 
 # 数据包转换

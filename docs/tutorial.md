@@ -1,11 +1,45 @@
 ---
 title: 教程演示模式
 layout: default
+alt_url: tutorial.en.html
+alt_lang: en
 ---
 
 # 教程演示模式
 
 内置沙盒式演练环境，带你在模拟示例数据上完整体验各项转运与备份操作。体验过程完全在本地模拟，不会改动你的任何真实聊天与配置，退出后即刻完整还原真实界面。
+
+## 界面预览
+
+以下截图全部来自教程演示模式，展示真实界面与模拟数据（不含任何用户聊天内容）：
+
+![教程目标选择](assets/shots/desktop-01-tutorial-goal.png)
+![教程分步指引](assets/shots/desktop-02-tutorial-step.png)
+![演示工作台](assets/shots/desktop-03-workbench-demo.png)
+![导出区](assets/shots/desktop-04-export-area.png)
+![扩展管理](assets/shots/desktop-05-extension-manager.png)
+![扩展打包](assets/shots/desktop-06-extension-pack.png)
+![局域网传输](assets/shots/desktop-07-transfer-lan.png)
+![云端仓库](assets/shots/desktop-08-transfer-cloud.png)
+![WebDAV](assets/shots/desktop-09-transfer-webdav.png)
+![存储审查](assets/shots/desktop-10-storage-inspector.png)
+![localStorage 审查](assets/shots/desktop-11-storage-localstorage.png)
+![日志与任务队列](assets/shots/desktop-12-log-view.png)
+![任务队列半展开](assets/shots/desktop-13-task-queue.png)
+![设置](assets/shots/desktop-14-settings.png)
+![更新日志](assets/shots/desktop-15-changelog.png)
+
+### 手机端（390×844）
+
+![手机教程目标](assets/shots/mobile-01-tutorial-goal.png)
+![手机教程分步](assets/shots/mobile-02-tutorial-step.png)
+![手机工作台](assets/shots/mobile-03-workbench-demo.png)
+![手机扩展管理](assets/shots/mobile-04-extension-manager.png)
+![手机包内单选](assets/shots/mobile-05-extension-pack.png)
+![手机迁移备份](assets/shots/mobile-06-transfer.png)
+![手机导出区](assets/shots/mobile-07-export-area.png)
+![手机任务队列半展开](assets/shots/mobile-08-task-queue.png)
+![手机日志全展开](assets/shots/mobile-09-log-view.png)
 
 ## 如何开启
 

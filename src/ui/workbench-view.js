@@ -38,6 +38,7 @@ import { decryptBytes, isEncrypted } from '../core/s3-crypto.js';
 import { mergeChartTrees } from '../core/merge-packages.js';
 import { EXTENSION_MODES, GIT_MODES } from '../core/export-modes.js';
 import { isGitEntryDropped } from '../core/git-policy.js';
+import { estimateSize, mbToBytes, bytesToMb } from '../core/size-model.js';
 import { queueControls } from '../core/task-queue-controls.js';
 import { APP_VERSION, APP_COMMIT } from '../core/app-version.js';
 import { docsPageUrl } from '../core/docs-site.js';
@@ -67,6 +68,9 @@ import { loadChartPrefs, saveChartPrefs, normalizeChartPrefs } from './chart-pre
 /* 占位/演示扩展清单从数据文件读取（禁止在 JS 里硬编码仓库清单）。 */
 /* 演示数据必须是纯 ESM（浏览器直装不能 import JSON，见 src/data/demo-extensions.js 头注释）。 */
 import demoExtensionsData from '../data/demo-extensions.js';
+import { TARGET_PLATFORMS } from '../data/target-platforms.js';
+import { applyUiTokens } from '../data/ui-tokens.js';
+import { TARGET_UI } from '../data/target-ui.js';
 
 /**
  * 教程锚点纯几何：用 overlay 自身矩形做基准，兼容宿主容器的 transform。
@@ -417,8 +421,9 @@ const state = {
   confirmDiscardChartPrefs:true,
   volMaxKey:null, volPath:{},
   task:null, pendingExports:[],
-  /* 日志视图页签：log | queue；任务队列展开状态跨重渲染保留。 */
-  logTab:'log', taskQueueItems:[], logQueueOpen:new Set(),
+  /* 日志视图三态：closed（只留进度条）→ half（半展开任务队列）→ full（整页日志/队列双页签）。
+     logTab 记忆页签；任务队列展开状态跨重渲染保留。 */
+  logExpand:'closed', logTab:'log', taskQueueItems:[], logQueueOpen:new Set(),
   chartFmt:{}, chartLayout:loadChartLayout(),
   filenameTemplate: chartPrefs.filenameTemplate,
   prefMode:false, prefDraft:null, prefAppliedPkgs:new Set(),
@@ -539,6 +544,19 @@ function autoEngineForPackage(pkg){
   if(sel) sel.value=kind;
   logger.info(t('log.engineAuto',{name:pkg.name||pkg.id||'',engine:kind}));
 }
+/** 扩展管理「包内」页签：单选数据包，禁止多选。 */
+function isExtensionPackageMode(){
+  return state.extTab === 'package' && (state.mainView === 'extension' || state.mobileView === 'extension');
+}
+/** 包内单选：同步 active/selected/extSelected/source/引擎，唯一真源。 */
+function selectPackageForExtension(id){
+  const pkg=(state.packages||[]).find((p)=>p && p.id===id && p.zone!=='export') || null;
+  state.extSelectedPackageId = pkg ? pkg.id : '';
+  state.activePkgs = new Set(pkg ? [pkg.id] : []);
+  state.selectedPkgs = new Set(pkg ? [pkg.id] : []);
+  syncSourceToActive();
+  autoEngineForPackage(pkg);
+}
 function packageGitMode(pkg){
   const own = pkg && state.gitModeByPkg[pkg.id];
   if([GIT_MODES.KEEP,GIT_MODES.MINIMAL,GIT_MODES.STRIP].includes(own)) return own;
@@ -564,11 +582,11 @@ function sumSelected(nodes,scope){
   }
   return { mb, count };
 }
-/** 选中体积 + Git 策略剔除量（导出包体积预估的数据源）。
+/** 选中叶子 → 体积模型条目（类目 / 字节 / Git 剔除）。
  *  `.git` 条目按所属扩展的 `packageGitMode()` 判定：minimal 只留 config/HEAD/index/refs/heads，
  *  strip 全剔；keep 不剔。合并树按叶子的 `srcPkgId` 找各自包。 */
-function selectedProjected(nodes,scope,basePkg=null){
-  let mb=0,droppedMb=0,count=0;
+function selectedEntries(nodes,scope,basePkg=null){
+  const out=[];
   const pkgCache=new Map();
   const pkgOf=(n)=>{
     if(basePkg) return basePkg;
@@ -577,25 +595,41 @@ function selectedProjected(nodes,scope,basePkg=null){
     if(!pkgCache.has(id)) pkgCache.set(id,(state.packages||[]).find((p)=>p.id===id)||null);
     return pkgCache.get(id);
   };
-  const visit=(list)=>{
+  const visit=(list,group='unknown')=>{
     for(const n of list||[]){
-      if(n.children && n.children.length){ visit(n.children); continue; }
+      const id=String(n?.id||'');
+      const key=id.startsWith('group:')?id.slice('group:'.length):group;
+      if(n?.children && n.children.length){ visit(n.children,key); continue; }
       if(!isChecked(n,scope)) continue;
-      count++;
       const path=String(n.path||'');
       const name=extensionUnitName(path);
-      let drop=false;
+      let dropped=false;
       if(name){
         const idx=path.indexOf('/.git/');
         const rel=idx>=0 ? path.slice(idx+1) : (path.endsWith('/.git')?'.git':'');
-        if(rel) drop=isGitEntryDropped(rel,packageGitMode(pkgOf(n)));
+        if(rel) dropped=isGitEntryDropped(rel,packageGitMode(pkgOf(n)));
       }
-      if(drop) droppedMb+=Number(n.mb)||0;
-      else mb+=Number(n.mb)||0;
+      const mb=Number(n.mb);
+      out.push({
+        path,
+        category:key,
+        bytes:Number.isFinite(mb) ? mbToBytes(mb) : null,
+        dropped,
+      });
     }
   };
   visit(nodes);
-  return { mb,droppedMb,count };
+  return out;
+}
+function selectedProjected(nodes,scope,basePkg=null){
+  const entries=selectedEntries(nodes,scope,basePkg);
+  let mb=0,droppedMb=0,count=0;
+  for(const entry of entries){
+    const entryMb=bytesToMb(entry.bytes||0);
+    if(entry.dropped) droppedMb+=entryMb;
+    else { mb+=entryMb; count++; }
+  }
+  return { mb,droppedMb,count,entries };
 }
 /* 包序号：导入区、导出区**各自独立编号**，按导入时间升序 01..N，
    前缀区分来源，所以两边都叫「包·导入01 / 包·导出01」也不会撞。删除后不重排。 */
@@ -757,16 +791,31 @@ function syncMainView(){
   renderViewSwitch();
 }
 
+/** 关闭手机数据包列表（同层挤压段）：先播 is-closing，动画结束再 display:none。 */
+function closeMobileZonePanel(){
+  const app=document.getElementById('app');
+  if(!app || app.dataset.zoneOpen!=='1') return;
+  const side=document.querySelector('.col-side');
+  const finishClose=()=>{
+    side?.classList.remove('is-closing');
+    app.dataset.zoneOpen='';
+    renderViewSwitch();
+    syncMainView();
+  };
+  if(side && !side.classList.contains('is-closing')){
+    side.classList.add('is-closing');
+    let done=false;
+    const onEnd=()=>{ if(done) return; done=true; side.removeEventListener('animationend',onEnd); finishClose(); };
+    side.addEventListener('animationend',onEnd);
+    setTimeout(onEnd,320);
+  } else {
+    finishClose();
+  }
+}
+
 /* ── 渲染：头部 ── */
-/* 目标平台固定四项 + 英文全称；图标只在标识处用品牌色环，面板本身不染色。 */
-const TARGETS=[
-  { value:'SillyTavern', host:'st' },
-  { value:'Luker', host:'luker' },
-  { value:'TauriTavern', host:'tt' },
-  { value:'PureTavern', host:'pt' }
-];
-/** 宿主平台 → 目标平台默认值（偏好 target=auto 时生效）。 */
-const HOST_TO_TARGET = { st:'SillyTavern', luker:'Luker', tt:'TauriTavern', pt:'PureTavern' };
+/** 宿主平台 → 目标平台默认值（偏好 target=auto 时生效；由唯一真源派生）。 */
+const HOST_TO_TARGET = Object.fromEntries(TARGET_PLATFORMS.map((p) => [p.host, p.name]));
 /** 私有配置所属宿主（布局码）：Luker 边车 / TT 应用私有 / PT 兼容区；通用密钥返回空串。 */
 function privateHostCode(path){
   const p=String(path||'').toLowerCase();
@@ -776,8 +825,8 @@ function privateHostCode(path){
   return '';
 }
 function targetHostCode(){
-  const hit=TARGETS.find(x=>x.value===state.target);
-  const code=hit?hit.host:'st';
+  const hit=TARGET_PLATFORMS.find(x=>x.name===state.target);
+  const code=hit?hit.host:TARGET_PLATFORMS[0].host;
   return code==='luker'?'l':code;
 }
 function privateIncompatible(path){
@@ -799,10 +848,10 @@ function applyIncompatibleDefault(nodes){
 function targetForHost(hostKey){
   const pref = chartPrefs.target;
   if (pref && pref !== 'auto') {
-    const hit = TARGETS.find(x=>x.host===pref);
-    if (hit) return hit.value;
+    const hit = TARGET_PLATFORMS.find(x=>x.host===pref);
+    if (hit) return hit.name;
   }
-  return HOST_TO_TARGET[hostKey] || 'SillyTavern';
+  return HOST_TO_TARGET[hostKey] || TARGET_PLATFORMS[0].name;
 }
 function renderHeader(){
   const h=HOSTS[state.host];
@@ -834,10 +883,10 @@ function renderHeader(){
   renderTargetPicker();
 }
 function renderTargetPicker(){
-  const cur=TARGETS.find(t=>t.value===state.target)||TARGETS[0];
+  const cur=TARGET_PLATFORMS.find(t=>t.name===state.target)||TARGET_PLATFORMS[0];
   const bi=document.getElementById('target-btn-icon');
   bi.src=hostIcon(cur.host); bi.dataset.host=cur.host;
-  document.getElementById('target-btn-text').textContent=cur.value;
+  document.getElementById('target-btn-text').textContent=cur.name;
   /* 2026-11-15 用户裁定：「宿主」状态**禁止**用「（宿主）」文字标签占宽——
      一律用特殊颜色（accent）表示：按钮文字与弹层条目均加 .is-host，由 CSS 染色。 */
   const hostTag=document.getElementById('target-btn-host');
@@ -850,19 +899,28 @@ function renderTargetPicker(){
     targetBtn.title=isHostNow?t('target.hostSuffix'):'';
   }
   const app=document.getElementById('app');
-  if(app) app.setAttribute('data-target-host', cur.host);
+  if(app){
+    /* 统一鲜艳色 + 永远白色文字：唯一真源 src/data/target-ui.js，禁止在 CSS 里写死。 */
+    app.style.setProperty('--target-accent', TARGET_UI.accent);
+    app.style.setProperty('--target-accent-strong', TARGET_UI.accentStrong);
+    app.style.setProperty('--target-accent-soft', TARGET_UI.accentSoft);
+    app.style.setProperty('--target-ink', TARGET_UI.ink);
+    app.style.setProperty('--target-ink-soft', TARGET_UI.inkSoft);
+    app.style.setProperty('--target-border', TARGET_UI.border);
+    app.setAttribute('data-target-host', cur.host);
+  }
   /* 存储引擎只对 Luker 目标开放：其他宿主没有这三种后端，显示出来只会误导。 */
   const engineField=document.getElementById('engine-field');
   if(engineField) engineField.hidden = cur.host !== 'luker';
   const engineSelect=document.getElementById('target-engine');
   if(engineSelect) engineSelect.value = state.engine;
-  document.getElementById('target-pop').innerHTML=TARGETS.map(opt=>{
+  document.getElementById('target-pop').innerHTML=TARGET_PLATFORMS.map(opt=>{
     const isHost = state.mode!=='web' && opt.host===state.host;
-    return '<button class="picker-item'+(isHost?' is-host':'')+'" role="option" data-target="'+opt.value+'" data-host="'+opt.host+'" aria-selected="'+(opt.value===state.target)+'"'
+    return '<button class="picker-item'+(isHost?' is-host':'')+'" role="option" data-target="'+opt.name+'" data-host="'+opt.host+'" aria-selected="'+(opt.name===state.target)+'"'
       +(isHost?' title="'+t('target.hostSuffix')+'"':'')
       +'>'
       +'<img class="picker-ico" data-host="'+opt.host+'" src="'+hostIcon(opt.host)+'" alt="">'
-      +'<span>'+opt.value+'</span>'
+      +'<span>'+opt.name+'</span>'
       +'</button>';
   }).join('');
 }
@@ -1445,13 +1503,47 @@ function chartCardHtml(o, place){
   syncAncestors(o.nodes,o.scope);
   const sum=sumSelected(o.nodes,o.scope);
   const chartPkg=o.pkgId ? (state.packages||[]).find((p)=>p.id===o.pkgId)||null : null;
-  /* 体积预估必须扣除 gitMode=minimal/strip 将剔除的 `.git` 条目；否则带 Git 历史的包会严重虚高。 */
+  /* 体积预估必须扣除 gitMode=minimal/strip 将剔除的 `.git` 条目；否则带 Git 历史的包会严重虚高。
+     统一走 size-model：类目压缩比、ZIP 开销、分卷、扩展清单模式、引擎载体未知项都在模型内。 */
   const projected=selectedProjected(o.nodes,o.scope,chartPkg);
-  const estRatio=state.compression==='fast'?0.65:state.compression==='maximum'?0.42:state.compression==='store'?1.0:0.5;
-  const estZipMb=Math.max(0.01, projected.mb*estRatio);
-  const estTitle=t('chart.estZipTitle')+(projected.droppedMb>0
+  const targetCode=targetCodeOf(state.target);
+  const srcEngine=String(chartPkg?.sourceEngine||'fs');
+  const dstEngine=String(state.engine||'');
+  const extraEntries=[];
+  if(targetCode==='l'){
+    const rawBytes=projected.mb*1024*1024;
+    if(['postgres','mysql'].includes(dstEngine) && srcEngine!==dstEngine){
+      extraEntries.push({path:'_engine_meta.json',bytes:2048,category:'unknown'});
+      extraEntries.push({path:'_engine_dump.bin',bytes:null,category:'unknown',reason:'engine-dump-size',
+        estimateBytes:[rawBytes*0.8,rawBytes*1.5]});
+    }else if(dstEngine==='sqlite' && srcEngine!=='sqlite'){
+      extraEntries.push({path:'luker-storage.sqlite',bytes:null,category:'unknown',reason:'sqlite-db-size',
+        estimateBytes:[rawBytes*0.7,rawBytes*1.4]});
+    }
+    if(chartPkg && chartPkg.host!=='luker') extraEntries.push({path:'manifest.json',bytes:2048,category:'unknown'});
+  }
+  const sizeEstimate=estimateSize({
+    entries:projected.entries,
+    options:{
+      compression:state.compression,
+      splitMb:splitLimit(),
+      extensionMode:state.extensionMode,
+      extraEntries,
+    },
+  });
+  const estZipMb=bytesToMb(sizeEstimate.predictedBytes);
+  let estTitle=t('chart.estZipTitle')+(projected.droppedMb>0
     ? ' · '+t('chart.estZipGit',{size:fmtMB(projected.droppedMb)})
     : '');
+  if(sizeEstimate.unknowns.length){
+    estTitle+=' · '+t('chart.estZipUnknown',{n:sizeEstimate.unknowns.length});
+    if(sizeEstimate.range.high>0){
+      estTitle+=' · '+t('chart.estZipRange',{low:fmtMB(bytesToMb(sizeEstimate.range.low)),high:fmtMB(bytesToMb(sizeEstimate.range.high))});
+    }
+  }
+  const estZipLabel=sizeEstimate.predictedBytes>0
+    ? fmtMB(estZipMb)+(sizeEstimate.unknowns.length?' ?':'')
+    : (sizeEstimate.unknowns.length?'?':'0 KB');
   const dis = !!o.disabled;
   const fmt = chartFmtOf(o.key);
   const scopeNodes = maxed ? volScopedNodes(o) : o.nodes;
@@ -1493,7 +1585,7 @@ function chartCardHtml(o, place){
       +(o.extToolsHtml||'')
       +'<div class="chart-tree">'+renderTreeRows(scopeNodes,0,o.scope,o.readonly||dis,groupToolsOf(o),selectedTotal,maxed,colorMap,undefined,selectedMap)+'</div>'
       +(dis?'':('<div class="chart-foot"><span>'+t('chart.selected',{count:sum.count,size:fmtMB(sum.mb)})+'</span>'
-        +(projected.mb>0?'<span class="chart-est-zip" title="'+escapeHtml(estTitle)+'"><i class="fa-solid fa-file-zipper"></i> '+t('chart.estZip',{size:fmtMB(estZipMb)})+'</span>':'')
+        +((projected.mb>0||sizeEstimate.unknowns.length)?'<span class="chart-est-zip" title="'+escapeHtml(estTitle)+'"><i class="fa-solid fa-file-zipper"></i> '+t('chart.estZip',{size:estZipLabel})+'</span>':'')
       +'</div>'))
     +'</div>'
   +'</div>';
@@ -1801,13 +1893,13 @@ function renderChart(){
 /* ── 数据包偏好：占位复选框 + 顶部控件并入保存 ── */
 function targetCodeOf(value){
   if(value==='auto') return 'auto';
-  const hit=TARGETS.find(x=>x.value===value);
+  const hit=TARGET_PLATFORMS.find(x=>x.name===value);
   return hit ? hit.host : 'auto';
 }
 function targetValueOfCode(code){
   if(!code || code==='auto') return targetForHost(state.host);
-  const hit=TARGETS.find(x=>x.host===code);
-  return hit ? hit.value : targetForHost(state.host);
+  const hit=TARGET_PLATFORMS.find(x=>x.host===code);
+  return hit ? hit.name : targetForHost(state.host);
 }
 function syncTopControls(){
   const comp=document.getElementById('compression-select'); if(comp) comp.value=state.compression;
@@ -3749,29 +3841,41 @@ async function runAutoUpdateTick(){
   }
   scheduleAutoUpdates();
 }
-/** 格式化远端仓库 URL 展示：截断、优先显示后面的作者/仓库，带 Git 平台小徽标，绝不换行。 */
-function formatExtRemoteUrlHtml(rawUrl){
+/** 格式化远端仓库展示：repo 即插件名，作者跟在后面；无远端时回退本地目录名，绝不截断。 */
+function formatExtRemoteUrlHtml(rawUrl, fallbackName = ''){
   /* 单行 URL 的任何意外都不得拖垮整块渲染（2026-11-16 实测：SITES 未定义让服务端插件区
      整段中断，用户侧表现就是永远停在「正在读取」）。失败就退化为纯文本，不假成功。 */
-  try { return formatExtRemoteUrlHtmlInner(rawUrl); }
+  try { return formatExtRemoteUrlHtmlInner(rawUrl, fallbackName); }
   catch {
     const u=String(rawUrl||'').trim();
-    if(!u) return '<span class="ext-remote-url is-none">—</span>';
-    return '<span class="ext-remote-url" title="'+escapeHtml(u)+'">'
-      +'<span class="ext-repo-slug">'+escapeHtml(u)+'</span></span>';
+    const fallback=String(fallbackName||'').trim();
+    if(!u && !fallback) return '<span class="ext-remote-url is-none">—</span>';
+    return '<span class="ext-remote-url" title="'+escapeHtml(u||fallback)+'">'
+      +'<span class="ext-repo">'+escapeHtml(fallback||u)+'</span></span>';
   }
 }
-function formatExtRemoteUrlHtmlInner(rawUrl){
+function formatExtRemoteUrlHtmlInner(rawUrl, fallbackName = ''){
   const url=String(rawUrl||'').trim();
-  if(!url) return '<span class="ext-remote-url is-none" title="'+t('extmgr.autoNeedsRepoShort')+'">—</span>';
+  const fallback=String(fallbackName||'').trim();
+  if(!url){
+    if(!fallback) return '<span class="ext-remote-url is-none" title="'+t('extmgr.autoNeedsRepoShort')+'">—</span>';
+    return '<span class="ext-remote-url is-local" title="'+escapeHtml(fallback)+'">'
+      +'<span class="ext-site-badge" title="Local"><i class="fa-solid fa-folder"></i></span>'
+      +'<span class="ext-repo" title="'+escapeHtml(fallback)+'">'+escapeHtml(fallback)+'</span>'
+    +'</span>';
+  }
 
   /* 平台标一律用该平台的原版品牌图标（不接受通用分支/立方体近似） */
   let siteIcon='<i class="fa-brands fa-git-alt"></i>';
   let siteName='Git';
   let slug='';
+  let repoName='';
+  let author='';
 
   const parsed=parseRepoUrl(url);
   if(parsed && parsed.ok){
+    repoName=parsed.repo||'';
+    author=parsed.owner||'';
     slug=(parsed.owner && parsed.repo) ? (parsed.owner+'/'+parsed.repo) : (parsed.repo || parsed.cloneUrl);
     if(parsed.site===SITES.GITHUB){
       siteIcon=gitSiteIcon('github');
@@ -3795,14 +3899,17 @@ function formatExtRemoteUrlHtmlInner(rawUrl){
     const clean=url.replace(/\.git$/i,'').replace(/\/+$/,'');
     const m=clean.match(/([^/:]+\/[^/:]+)$/);
     slug=m ? m[1] : clean.replace(/^https?:\/\//i,'');
+    repoName=slug;
     if(/github\.com/i.test(url)){ siteIcon=gitSiteIcon('github'); siteName='GitHub'; }
     else if(/gitlab\.com/i.test(url)){ siteIcon=gitSiteIcon('gitlab'); siteName='GitLab'; }
     else if(/gitee\.com/i.test(url)){ siteIcon=gitSiteIcon('gitee'); siteName='Gitee'; }
   }
 
+  const shownRepo=repoName||slug||url;
   return '<span class="ext-remote-url" data-copyurl="'+escapeHtml(url)+'" title="'+escapeHtml(url)+' · '+t('extmgr.clickToCopy')+'">'
     +'<span class="ext-site-badge" title="'+escapeHtml(siteName)+'">'+siteIcon+'</span>'
-    +'<span class="ext-repo-slug" title="'+escapeHtml(slug)+'">'+escapeHtml(slug)+'</span>'
+    +'<span class="ext-repo" title="'+escapeHtml(shownRepo)+'">'+escapeHtml(shownRepo)+'</span>'
+    +(author?'<span class="ext-author" title="'+escapeHtml(author)+'">'+escapeHtml(author)+'</span>':'')
   +'</span>';
 }
 /** 扩展来源标记：只标「全局」（本地是常态，不再重复打断阅读）。 */
@@ -4522,11 +4629,28 @@ async function renderExtInstalled(body){
   const sort=['custom','name','version','source','order'].includes(s.extSort)?s.extSort:'custom';
 
   const autoMasterOn=!!loadSettings().extAutoToolsOn;
-  const importPkgs = (state.packages||[]).filter(p=>p && p.id);
-  const activePkgId = (state.activePkgs && state.activePkgs.size === 1) ? Array.from(state.activePkgs)[0] : (state.source?.pkgId || null);
-  const selectedPkg = (activePkgId && importPkgs.find(p=>p.id===activePkgId))
-    || (state.extSelectedPackageId && importPkgs.find(p=>p.id===state.extSelectedPackageId))
-    || (importPkgs.length === 1 ? importPkgs[0] : null);
+  /* 包内页签只认导入区数据包，且永远只有一个选中（唯一真源 extSelectedPackageId）。 */
+  const importPkgs = (state.packages||[]).filter(p=>p && p.id && p.zone!=='export');
+  let selectedPkg = importPkgs.find(p=>p.id===state.extSelectedPackageId)
+    || importPkgs.find(p=>(state.activePkgs||new Set()).has(p.id))
+    || importPkgs[0] || null;
+  if(!isHost && selectedPkg){
+    state.extSelectedPackageId = selectedPkg.id;
+    if(!(state.activePkgs && state.activePkgs.size===1 && state.activePkgs.has(selectedPkg.id))){
+      state.activePkgs = new Set([selectedPkg.id]);
+      syncSourceToActive();
+    }
+  }
+  const pkgBar = isHost ? '' : ('<div class="ext-pkg-bar">'
+    + '<span class="ext-pkg-current'+(selectedPkg?'':' is-unselected')+'" title="'+(selectedPkg?escapeHtml(selectedPkg.name):t('extmgr.noPackageSelected'))+'">'
+      + '<i class="fa-solid fa-box"></i> '+(selectedPkg?escapeHtml(selectedPkg.name):t('extmgr.noPackageSelected'))
+    + '</span>'
+    + '<select class="ext-pkg-picker" id="extmgr-package-select"'+(importPkgs.length?'':' disabled')+'>'
+      + (importPkgs.length
+        ? importPkgs.map(p=>'<option value="'+escapeHtml(p.id)+'"'+(selectedPkg&&selectedPkg.id===p.id?' selected':'')+'>'+escapeHtml(p.name)+' · '+fmtMB(p.mb||0)+'</option>').join('')
+        : '<option value="">'+t('extmgr.noPackageAvailable')+'</option>')
+    + '</select>'
+  + '</div>');
 
   /* 列表头左侧控制：包内视图统一由数据包列表选择，宿主展示策略入口 */
   const leftHeadControl=isHost && autoMasterOn
@@ -4552,7 +4676,7 @@ async function renderExtInstalled(body){
       const privTag=priv
         ? '<span class="ext-priv-tag is-'+priv+'">'+t(priv==='private'?'extmgr.privBadge':'extmgr.pubBadge')+'</span>'
         : '';
-      const remoteEl=formatExtRemoteUrlHtml(remoteUrl);
+      const remoteEl=formatExtRemoteUrlHtml(remoteUrl, name);
       const auto=autoMasterOn?'<span class="ext-auto">'
         +'<select class="text_pole ext-up-mode" data-upmode="'+escapeHtml(name)+'" title="'+t('extmgr.autoUpdate')+'">'
           +'<option value="off"'+(rule?'':' selected')+'>'+t('extmgr.devOff')+'</option>'
@@ -4583,11 +4707,10 @@ async function renderExtInstalled(body){
         +(sort==='custom'?'<span class="ext-drag" title="'+t('extmgr.dragHint')+'">'+gripSvg()+'</span>':'')
         +'<label class="check ext-dev-check"><input type="checkbox" data-extsel="'+escapeHtml(name)+'"></label>'
         +(x?.loadingOrder!=null?'<span class="ext-flag ext-order" title="'+t('extmgr.orderHint')+'">#'+escapeHtml(String(x.loadingOrder))+'</span>':'')
-        +'<span class="ext-url" title="'+escapeHtml(name)+'">'+escapeHtml(name)+'</span>'
         +remoteEl
         +privTag
-        +versionBadge
         +extSourceTag(x?.sourceType)
+        +versionBadge
         +auto
         +'</div>';
     }).join('');
@@ -4614,13 +4737,12 @@ async function renderExtInstalled(body){
           const kindBadge = item.kind === 'original'
             ? '<span class="ext-flag ext-kind-tag is-orig">'+t('extmgr.kindOriginal')+'</span>'
             : '<span class="ext-flag ext-kind-tag is-man">'+t('extmgr.kindManifest')+'</span>';
-          const repoLink = item.url ? formatExtRemoteUrlHtml(item.url) : '';
+          const repoLink = formatExtRemoteUrlHtml(item.url, item.name);
           return '<div class="ext-entry is-ok ext-ext-row ext-pkg-row'+(isCurrentGit?' is-active':'')+'" role="listitem" data-extrow="'+escapeHtml(item.name)+'" style="animation-delay:'+Math.min(idx*35,350)+'ms">'
             +'<label class="check ext-dev-check"><input type="checkbox" data-extsel="'+escapeHtml(item.name)+'"></label>'
-            +'<span class="ext-url" title="'+escapeHtml(item.name)+'">'+escapeHtml(item.name)+'</span>'
+            +repoLink
             +'<span class="ext-state">'+escapeHtml(item.version)+'</span>'
             +kindBadge
-            +repoLink
             +'</div>';
         }).join('');
       } else {
@@ -4736,9 +4858,9 @@ async function renderExtInstalled(body){
         +headRow2
       +'</div>')
     : ('<div class="ext-list-head ext-list-head--pkg" id="extmgr-list-head">'
+        +pkgBar
         +'<div class="ext-head-row ext-head-action-row">'
           +'<div class="ext-head-left">'
-            +(selectedPkg ? ('<span class="ext-pkg-current" title="'+escapeHtml(selectedPkg.name)+'"><i class="fa-solid fa-box"></i> '+escapeHtml(selectedPkg.name)+'</span>') : '')
             +'<span class="ext-list-count">'+t('extmgr.listCount',{n:countTotal})+'</span>'
             +'<span class="ext-state" id="extmgr-sel-count">'+t('extmgr.selectedN',{n:0,total:countTotal})+'</span>'
             +'<div class="ext-sel-group">'
@@ -4761,6 +4883,14 @@ async function renderExtInstalled(body){
         +updBlock
         /* 服务端扩展块已迁入页脚（syncExtInstallBlock 渲染，2026-11-15 裁定） */
       +'</div>');
+
+  /* 包内单选：下拉、复选框、点卡片统一走 selectPackageForExtension，禁止多选。 */
+  body.querySelector('#extmgr-package-select')?.addEventListener('change',(e)=>{
+    selectPackageForExtension(e.target.value);
+    renderExtensionView();
+    renderChart();
+    renderZones();
+  });
 
   /* 事件绑定 */
   body.querySelector('#extmgr-policy-close')?.addEventListener('click',()=>{
@@ -5282,18 +5412,9 @@ function taskDetailHtml(item){
   return '<div class="lq-detail-grid">'+(rows.join('') || '<span>'+t('taskq.noDetail')+'</span><b></b>')+'</div>'
     +(acts?'<div class="lq-detail-acts">'+acts+'</div>':'');
 }
-function queueRowHtml(item,{detailed=false}={}){
+function queueRowHtml(item){
   const status=String(item.status||'queued');
   const pct=Math.max(0,Math.min(100,Math.round(Number(item.pct)||0)));
-  if(!detailed){
-    return '<div class="tq-row is-'+escapeHtml(status)+'" data-tqid="'+escapeHtml(item.id)+'">'
-      +'<span class="tq-status">'+escapeHtml(t('taskq.status.'+status))+'</span>'
-      +'<span class="tq-label" title="'+escapeHtml(item.label||'')+'">'+escapeHtml(item.label||'')+'</span>'
-      +'<span class="tq-pct">'+((status==='running'||status==='paused'||status==='done')?pct+'%':'')+'</span>'
-      +'<span class="tq-acts">'+taskActionsHtml(item).replaceAll('data-lqact','data-tqact').replaceAll('data-lqid','data-tqid')+'</span>'
-      +'<span class="tq-bar"><i style="width:'+pct+'%"></i></span>'
-    +'</div>';
-  }
   const open=state.logQueueOpen.has(item.id);
   return '<div class="lq-row is-'+escapeHtml(status)+(open?' is-open':'')+'" data-lqid="'+escapeHtml(item.id)+'">'
     +'<div class="lq-summary" role="button" tabindex="0" data-lqtoggle="'+escapeHtml(item.id)+'"'
@@ -5314,21 +5435,13 @@ function renderLogQueue(items){
   const list=Array.isArray(items)?items:[];
   const count=document.getElementById('lq-count');
   if(count) count.textContent=t('taskq.count',{n:list.length});
-  host.innerHTML=list.map((item)=>queueRowHtml(item,{detailed:true})).join('')
+  host.innerHTML=list.map((item)=>queueRowHtml(item)).join('')
     || '<div class="ext-note">'+t('taskq.empty')+'</div>';
 }
 function renderTaskQueue(items){
   const list=Array.isArray(items)?items:[];
   state.taskQueueItems=list;
-  const box=document.getElementById('task-queue');
-  if(box){
-    box.hidden=list.length===0;
-    const count=document.getElementById('tq-count');
-    if(count) count.textContent=t('taskq.count',{n:list.length});
-    const host=document.getElementById('tq-list');
-    if(host) host.innerHTML=list.map((item)=>queueRowHtml(item)).join('')
-      || '<div class="ext-note">'+t('taskq.empty')+'</div>';
-  }
+  /* 任务队列只存在于日志面板内（半展开或全展开的队列页签），不再有独立区块。 */
   renderLogQueue(list);
 }
 function renderLogTab(){
@@ -6006,14 +6119,46 @@ function doDeleteSelected(){ actions.deleteSelected?.([...state.selectedPkgs]); 
 
 /* ── 面板内视图（设置 / 日志 / 帮助；确认框为顶层 dialog） ── */
 const PANES=['workbench','settings','log','help'];
+const LOG_EXPANDS=['closed','half','full'];
+/** 日志面板三态与普通面板的可见性唯一落点。 */
+function applyPaneVisibility(){
+  if(!LOG_EXPANDS.includes(state.logExpand)) state.logExpand='closed';
+  const expand=state.logExpand;
+  const logFull=expand==='full';
+  const main=document.getElementById('view-workbench');
+  if(main) main.hidden=state.pane!=='workbench' || logFull;
+  ['settings','help'].forEach(p=>{
+    const el=document.getElementById('view-'+p);
+    if(el) el.hidden=state.pane!==p || logFull;
+  });
+  const log=document.getElementById('view-log');
+  if(log){
+    log.hidden=expand==='closed';
+    log.dataset.logExpand=expand;
+  }
+  const progress=document.getElementById('workbench-progress');
+  if(progress) progress.setAttribute('aria-expanded',expand==='closed'?'false':'true');
+}
+/** 日志三态：0 收起 → 1 半展开（任务队列）→ 2 全展开（日志/队列双页签）。 */
+function setLogExpand(expand){
+  const next=expand==='half'||expand==='full'?expand:'closed';
+  state.logExpand=next;
+  if(next==='full'){
+    state.pane='log';
+  } else if(next==='half'){
+    state.pane='workbench';
+    state.logTab='queue';
+  } else if(state.pane==='log'){
+    state.pane='workbench';
+  }
+  applyPaneVisibility();
+  renderLogTab();
+}
 function showPane(name){
   state.pane=PANES.includes(name)?name:'workbench';
-  const main=document.getElementById('view-workbench');
-  if(main) main.hidden=state.pane!=='workbench';
-  PANES.slice(1).forEach(p=>{
-    const el=document.getElementById('view-'+p);
-    if(el) el.hidden=state.pane!==p;
-  });
+  if(state.pane==='log') state.logExpand='full';
+  else if(state.logExpand!=='closed') state.logExpand='closed';
+  applyPaneVisibility();
   document.querySelectorAll('.app-header .icon-btn').forEach(b=>b.classList.remove('active-view'));
   if(state.pane==='settings') document.getElementById('btn-settings')?.classList.add('active-view');
   if(state.pane==='log') renderLogTab();
@@ -6252,41 +6397,58 @@ function buildDemoPackages(){
   const L=(k)=>t('demo.'+k);
   const gb=(mb)=>Math.round((mb/1024)*100)/100;
   /* 演示数据：四个宿主全覆盖、同宿主多包、体积覆盖 16 MB – 4 GB；导出区同样多条。 */
-  const tree=(mb)=>[
-    node('group:characters',L('characters'),gb(mb*0.12),'keep',{icon:'user',expanded:true,children:[
-      node('char:demo-1','Mira',gb(mb*0.07),'keep',{icon:'user'}),
-      node('char:demo-2','Kai',gb(mb*0.05),'keep',{icon:'user'}),
-    ]}),
-    node('group:chats',L('chats'),gb(mb*0.45),'keep',{icon:'chat',expanded:true,children:[
-      node('chat:demo-1',L('chatMira'),gb(mb*0.28),'keep',{icon:'chat'}),
-      node('chat:demo-2',L('chatKai'),gb(mb*0.17),'keep',{icon:'chat'}),
-    ]}),
-    node('group:worldinfo',L('worldinfo'),gb(mb*0.15),'keep',{icon:'book',children:[
-      node('world:demo-1',L('world'),gb(mb*0.10),'keep',{icon:'book'}),
-      node('world:demo-2',L('lore'),gb(mb*0.05),'optional',{icon:'book'}),
-    ]}),
-    node('group:presets',L('presets'),gb(mb*0.03),'optional',{icon:'sliders'}),
-    node('group:images',L('images'),gb(mb*0.15),'optional',{icon:'image'}),
-    node('group:extensions',L('extensions'),gb(mb*0.10),'keep',{icon:'puzzle',children:[
-      node('ext:demo-1',L('extOne'),gb(mb*0.10),'keep',{icon:'puzzle'}),
-    ]}),
-    node('group:vectors',L('vectors'),0,'drop',{icon:'brain'}),
-  ];
-  const mk=(id,name,host,mb,time,zone)=>({
+  /* 教程必须覆盖 Luker 四种存储引擎（fs / postgres / mysql / sqlite）：
+     数据库源包在树上要能看到引擎载体，否则用户不知道 _engine_dump.bin 为何不能删。 */
+  const tree=(mb,engine='fs')=>{
+    const nodes=[
+      node('group:characters',L('characters'),gb(mb*0.12),'keep',{icon:'user',expanded:true,children:[
+        node('char:demo-1','Mira',gb(mb*0.07),'keep',{icon:'user'}),
+        node('char:demo-2','Kai',gb(mb*0.05),'keep',{icon:'user'}),
+      ]}),
+      node('group:chats',L('chats'),gb(mb*0.45),'keep',{icon:'chat',expanded:true,children:[
+        node('chat:demo-1',L('chatMira'),gb(mb*0.28),'keep',{icon:'chat'}),
+        node('chat:demo-2',L('chatKai'),gb(mb*0.17),'keep',{icon:'chat'}),
+      ]}),
+      node('group:worldinfo',L('worldinfo'),gb(mb*0.15),'keep',{icon:'book',children:[
+        node('world:demo-1',L('world'),gb(mb*0.10),'keep',{icon:'book'}),
+        node('world:demo-2',L('lore'),gb(mb*0.05),'optional',{icon:'book'}),
+      ]}),
+      node('group:presets',L('presets'),gb(mb*0.03),'optional',{icon:'sliders'}),
+      node('group:images',L('images'),gb(mb*0.15),'optional',{icon:'image'}),
+      node('group:extensions',L('extensions'),gb(mb*0.10),'keep',{icon:'puzzle',children:[
+        node('ext:demo-1',L('extOne'),gb(mb*0.10),'keep',{icon:'puzzle'}),
+      ]}),
+      node('group:vectors',L('vectors'),0,'drop',{icon:'brain'}),
+    ];
+    if(engine==='postgres'||engine==='mysql'){
+      nodes.push(node('group:engine',L('engineCarrier'),gb(mb*0.02),'keep',{icon:'db',expanded:true,children:[
+        node('engine:meta','_engine_meta.json',0.01,'keep',{icon:'file'}),
+        node('engine:dump','_engine_dump.bin',gb(mb*0.02),'keep',{icon:'file'}),
+      ]}));
+    }else if(engine==='sqlite'){
+      nodes.push(node('group:engine',L('engineCarrier'),gb(mb*0.02),'keep',{icon:'db',expanded:true,children:[
+        node('engine:sqlite','luker-storage.sqlite',gb(mb*0.02),'keep',{icon:'db'}),
+      ]}));
+    }
+    return nodes;
+  };
+  const mk=(id,name,host,mb,time,zone,engine='')=>({
     id, name, host, size: mb>=1024 ? (mb/1024)+' GB' : mb+' MB', time, mb, zone,
-    origin:'demo', unrecognized:false, nodes:tree(mb),
+    origin:'demo', unrecognized:false, sourceEngine:engine||undefined, nodes:tree(mb,engine),
   });
   return [
     mk('demo-st-4g','st_full_backup_4g.zip','st',4096,'09:12','import'),
     mk('demo-st-512','st_userdata_512m.zip','st',512,L('timeYesterday'),'import'),
-    mk('demo-luker-15g','luker_backup_1.5g.zip','luker',1536,'08:40','import'),
-    mk('demo-luker-96','luker_chats_96m.zip','luker',96,L('timeOlder'),'import'),
+    mk('demo-luker-15g','luker_fs_backup_1.5g.zip','luker',1536,'08:40','import','fs'),
+    mk('demo-luker-96','luker_postgres_96m.zip','luker',96,L('timeOlder'),'import','postgres'),
+    mk('demo-luker-320','luker_mysql_320m.zip','luker',320,'08:35','import','mysql'),
+    mk('demo-luker-64','luker_sqlite_64m.zip','luker',64,'08:30','import','sqlite'),
     mk('demo-tt-640','tauritavern_demo_640m.zip','tt',640,L('timeOlder'),'import'),
     mk('demo-pt-16','puretavern_min_16m.zip','pt',16,'07:55','import'),
     { id:'demo-unknown-48', name:'unknown_layout_48m.zip', host:'unknown', size:'48 MB',
       time:L('timeOlder'), mb:48, zone:'import', origin:'demo', unrecognized:true, nodes:[] },
     mk('demo-exp-st-2g','demo_st_export_2g.zip','st',2048,'09:20','export'),
-    mk('demo-exp-luker-256','demo_luker_export_256m.zip','luker',256,'09:18','export'),
+    mk('demo-exp-luker-256','demo_luker_export_256m.zip','luker',256,'09:18','export','postgres'),
     mk('demo-exp-pt-32','demo_pt_export_32m.zip','pt',32,'09:16','export'),
   ];
 }
@@ -6836,22 +6998,7 @@ function bind(){
         syncMainView();
         return;
       }
-      const side=document.querySelector('.col-side');
-      const finishClose=()=>{
-        side?.classList.remove('is-closing');
-        if(app) app.dataset.zoneOpen='';
-        renderViewSwitch();
-        syncMainView();
-      };
-      if(side && !side.classList.contains('is-closing')){
-        side.classList.add('is-closing');
-        let done=false;
-        const onEnd=()=>{ if(done) return; done=true; side.removeEventListener('animationend',onEnd); finishClose(); };
-        side.addEventListener('animationend',onEnd);
-        setTimeout(onEnd,320);
-      } else {
-        finishClose();
-      }
+      closeMobileZonePanel();
       return;
     }
     if(state.transfer.open){ state.transfer.open=false; renderTransfer(); }
@@ -6866,6 +7013,10 @@ function bind(){
         : t('log.extViewSwitchedHost', { host: state.host }));
       renderExtensionView();
     }
+  });
+  document.getElementById('zone-mobile-close')?.addEventListener('click',(e)=>{
+    e.stopPropagation();
+    closeMobileZonePanel();
   });
   document.getElementById('extmgr-tabs')?.addEventListener('click',(e)=>{
     const b=e.target.closest('[data-exttab]'); if(!b) return;
@@ -7338,6 +7489,11 @@ function bind(){
     if(check){
       const id=check.dataset.pkgcheck;
       const pkg=(state.packages||[]).find(p=>p.id===id);
+      if(isExtensionPackageMode()){
+        selectPackageForExtension(id);
+        renderZones(); renderActions(); renderCloud(); renderExtensionView();
+        return;
+      }
       if(check.checked){
         state.selectedPkgs.add(id);
         if(pkg) logger.info(t('log.pkgChecked', { name: pkg.name, size: fmtMB(pkg.mb||0), total: state.selectedPkgs.size }));
@@ -7379,6 +7535,11 @@ function bind(){
         list.forEach(p=>state.selectedPkgs.delete(p.id));
         logger.info(t('log.pkgNoneChecked'));
       }
+      if(isExtensionPackageMode()){
+        const keep=[...state.selectedPkgs][0] || (state.packages||[]).find(p=>p.zone!=='export')?.id || '';
+        selectPackageForExtension(keep);
+        renderExtensionView();
+      }
       renderZones(); renderActions(); renderCloud();
       return;
     }
@@ -7387,6 +7548,11 @@ function bind(){
     const card=e.target.closest('[data-pkg]');
     if(card && !e.target.closest('input')){
       const id=card.dataset.pkg;
+      if(isExtensionPackageMode()){
+        selectPackageForExtension(id);
+        renderZones(); renderExtensionView();
+        return;
+      }
       const wasActive=state.activePkgs.has(id);
       if(state.transfer.open){
         const pkg=(state.packages||[]).find(p=>p.id===id);
@@ -7420,27 +7586,19 @@ function bind(){
     }
   });
 
-  // 任务队列：暂停 / 继续 / 中断 / 上移 / 下移 / 移出
-  document.getElementById('task-queue')?.addEventListener('click',(e)=>{
-    const btn=e.target.closest('[data-tqact]');
-    if(!btn) return;
-    const id=btn.dataset.tqid||'';
-    const act=btn.dataset.tqact||'';
-    if(!id||!act) return;
-    if(act==='pause') actions.queuePause?.(id);
-    else if(act==='resume') actions.queueResume?.(id);
-    else if(act==='abort') actions.queueAbort?.(id);
-    else if(act==='up') actions.queueMove?.(id,-1);
-    else if(act==='down') actions.queueMove?.(id,1);
-    else if(act==='remove') actions.queueRemove?.(id);
-  });
-
-  // 日志页签：日志 / 任务队列
+  // 日志页签：日志 / 任务队列。半展开态点「日志」自动升到全展开。
   document.getElementById('log-tabs')?.addEventListener('click',(e)=>{
     const b=e.target.closest('[data-logtab]');
     if(!b) return;
-    state.logTab=b.dataset.logtab==='queue'?'queue':'log';
-    renderLogTab();
+    const tab=b.dataset.logtab==='queue'?'queue':'log';
+    if(tab==='log' && state.logExpand!=='full'){
+      state.logTab='log';
+      setLogExpand('full');
+      return;
+    }
+    state.logTab=tab;
+    if(state.logExpand==='closed') setLogExpand('half');
+    else renderLogTab();
   });
   // 任务队列（日志页签）：展开详情 + 动作
   const lqList=document.getElementById('lq-list');
@@ -7483,13 +7641,19 @@ function bind(){
     });
   }
 
-  // 进度条即日志入口：点击或键盘激活都进日志视图
+  // 进度条即日志入口：0 收起 → 1 半展开任务队列 → 2 全展开日志/队列 → 0
   const progressBar=document.getElementById('workbench-progress');
   if(progressBar){
-    const openLogView=()=>{ renderLog(); showPane('log'); };
-    progressBar.addEventListener('click',openLogView);
+    const cycleLogView=()=>{
+      renderLog();
+      const next=state.logExpand==='closed'
+        ? (state.pane==='workbench'?'half':'full')
+        : (state.logExpand==='half'?'full':'closed');
+      setLogExpand(next);
+    };
+    progressBar.addEventListener('click',cycleLogView);
     progressBar.addEventListener('keydown',(e)=>{
-      if(e.key==='Enter'||e.key===' '){ e.preventDefault(); openLogView(); }
+      if(e.key==='Enter'||e.key===' '){ e.preventDefault(); cycleLogView(); }
     });
   }
   document.getElementById('log-close').addEventListener('click',backToWorkbench);
@@ -7670,8 +7834,10 @@ function initSwitchDensity(){
 }
 
 /* ── 初始化（视图自有，不依赖外部数据） ── */
+applyUiTokens(document.getElementById('app'));
 renderAll();
 bind();
+applyPaneVisibility();
 syncTopControls();
 initSplitters();
 initChartSplitters();
@@ -7816,9 +7982,10 @@ initSwitchDensity();
   function pendingCardHtml(it){
     const mb=(it.blob?.size||0)/1048576;
     return '<div class="pkg-card is-export" data-pending="'+escapeHtml(it.id)+'">'
-      +'<span class="pkg-icon-wrap"><span class="pkg-icon" data-host="st">'+svg('file','tree-ico')+'</span></span>'
+      +'<span class="pkg-check-spacer" aria-hidden="true"></span>'
+      +'<span class="pkg-icon-wrap"><span class="pkg-icon" data-host="file">'+svg('file','tree-ico')+'</span></span>'
       +'<div class="pkg-info"><div class="pkg-name"><span class="pkg-name-txt" title="'+escapeHtml(it.name)+'">'+escapeHtml(it.name)+'</span></div>'
-      +'<div class="pkg-meta"><span class="pending-size">'+fmtMB(mb)+'</span>'
+      +'<div class="pkg-meta"><span class="pkg-badge">'+t('pending.badge')+'</span><span class="pending-size">'+fmtMB(mb)+'</span>'
       +'<button class="mini" data-pending-act="download">'+t('pending.download')+'</button>'
       +'<button class="mini" data-pending-act="stash">'+t('pending.stash')+'</button>'
       +'<button class="mini" data-pending-act="remove">'+t('pending.remove')+'</button>'

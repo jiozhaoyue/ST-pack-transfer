@@ -1,5 +1,7 @@
 title: ST-pack-transfer 文档
+title_en: ST-pack-transfer Docs
 description: 四酒馆（SillyTavern / Luker / TauriTavern / PureTavern）数据包互转、迁移与备份
+description_en: Data pack transfer, migration and backup across SillyTavern, Luker, TauriTavern and PureTavern.
 theme: minima
 markdown: kramdown
 plugins:
@@ -8,10 +10,8 @@ plugins:
 relative_links:
   enabled: true
 exclude:
-  - PLAN-*
-  - plans
-  - .trellis
   - node_modules
+  - README.md
 header_pages:
   - index.md
   - install.md

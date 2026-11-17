@@ -1,6 +1,8 @@
 ---
 title: 常见问题解答
 layout: default
+alt_url: faq.en.html
+alt_lang: en
 ---
 
 # 常见问题解答

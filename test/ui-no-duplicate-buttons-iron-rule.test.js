@@ -42,13 +42,13 @@ describe('铁律门禁：全 UI 绝对禁止重复语义按钮与非架构孤岛
     expect(viewContent).not.toContain('ext-bottom-actions');
   });
 
-  it('铁律 5：CSS 必须支持目标平台驱动主色，确保操作按钮颜色实时跟随当前选中的目标平台', () => {
+  it('铁律 5：目标平台统一主色，由 target-ui.js 单一真源驱动，禁止 per-target 覆盖全局 accent', () => {
     const cssContent = fs.readFileSync(cssPath, 'utf-8');
-    // 断言必须存在针对 4 个目标平台的 --accent 定义，按钮颜色跟随目标平台实时变色
-    expect(cssContent).toMatch(/#app\.app-container\[data-target-host=["']st["']\]\s*\{[^}]*--accent:/);
-    expect(cssContent).toMatch(/#app\.app-container\[data-target-host=["']luker["']\]\s*\{[^}]*--accent:/);
-    expect(cssContent).toMatch(/#app\.app-container\[data-target-host=["']tt["']\]\s*\{[^}]*--accent:/);
-    expect(cssContent).toMatch(/#app\.app-container\[data-target-host=["']pt["']\]\s*\{[^}]*--accent:/);
+    // 2026-11-17 用户裁定：四个目标平台统一鲜艳色 + 白字，颜色只从 --target-accent* 消费。
+    expect(cssContent).toMatch(/#app\.app-container \.picker-btn\[data-host\]\s*\{[^}]*background:var\(--target-accent\)/);
+    expect(cssContent).toMatch(/#app\.app-container \.picker-btn\[data-host\]\s*\{[^}]*color:var\(--target-ink\)/);
+    // 禁止重新引入按目标平台覆盖全局主题色（会把整个界面染成平台色）。
+    expect(cssContent).not.toMatch(/#app\.app-container\[data-target-host=["'][^"']+["']\]\s*\{[^}]*--accent:/);
   });
 
   it('铁律 6：设置项包含按清单自动安装与 Web 模式主题切换，且归一化正常', async () => {

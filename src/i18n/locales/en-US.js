@@ -54,6 +54,8 @@ export default {
   'chart.estZip': 'Est. zip: ~{size}',
   'chart.estZipTitle': 'Estimated archive size under the current compression policy; Git cleanup removals are excluded',
   'chart.estZipGit': 'Git cleanup removes {size}',
+  'chart.estZipUnknown': '{n} items have unknown size; the estimate may be low',
+  'chart.estZipRange': 'Range {low} – {high}',
   'chart.unrecognizedTitle': 'Unrecognized pack',
   'chart.expand': 'Expand or collapse',
   'chart.maximize': 'Maximize this chart',
@@ -100,6 +102,7 @@ export default {
   'zones.help': 'Packs help',
   'zones.import': 'Import',
   'zones.export': 'Export',
+  'zones.collapse': 'Collapse package list',
 
   'action.title': 'Run',
   'action.help': 'Run help',
@@ -1081,6 +1084,7 @@ export default {
   'demo.extensions': 'Extensions',
   'demo.extOne': 'Sample extension',
   'demo.vectors': 'Vectors',
+  'demo.engineCarrier': 'Engine carrier',
   'demo.timeYesterday': 'Yesterday 21:40',
   'demo.timeOlder': 'Yesterday 18:05',
 
@@ -1188,7 +1192,7 @@ export default {
   'toast.deltaOverwrite': 'Mode: overwrite',
   'toast.deltaIncremental': 'Mode: incremental',
   'progress.waitingCode': 'Waiting for pickup code',
-  'progress.openLog': 'Open log',
+  'progress.openLog': 'Open tasks / log',
   'chart.total': 'Whole pack {size}',
   'lan.selectedSummary': '{n} selected · {size}',
 
@@ -1251,6 +1255,7 @@ export default {
   'log.taskAborted': 'Conversion aborted; partial zip removed',
   'log.taskResumed': 'Conversion resumed from partial zip',
   'log.resumeDropped': 'Dropped the previous paused checkpoint (different source pack)',
+  'pending.badge': 'Generated',
   'pending.download': 'Download',
   'pending.stash': 'Save to workspace',
   'pending.remove': 'Remove',

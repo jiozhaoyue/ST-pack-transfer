@@ -1,11 +1,30 @@
 ---
 title: 安装与部署
 layout: default
+alt_url: install.en.html
+alt_lang: en
 ---
 
 # 安装与部署
 
-## 一、装进酒馆（推荐）
+## 一、先选运行形态
+
+| 形态 | 怎么用 | 适合场景 | 宿主 / 浏览器要求 |
+| --- | --- | --- | --- |
+| 酒馆扩展 | 在酒馆扩展管理里从仓库 URL 安装 | 在酒馆内直接拉取、恢复、管理扩展 | 见下方“宿主版本” |
+| 在线 Web | 直接打开在线地址 | 纯本地转换、分析、分卷 | 现代桌面或手机浏览器 |
+| 单文件 HTML | 下载后双击 | 无网络、离线、随身携带 | 现代桌面浏览器；`file://` 可运行 |
+| 本地静态服务 | 构建后通过 HTTP 打开 | 自建站点、局域网共享 | 任意现代浏览器 |
+
+### 单文件 HTML 的确切下载路径
+
+- 仓库内路径：`download/ST-pack-transfer-offline.html`
+- 直接下载：<https://github.com/jiozhaoyue/ST-pack-transfer/raw/main/download/ST-pack-transfer-offline.html>
+- 在线 HTML：<https://jiozhaoyue.github.io/ST-pack-transfer/>
+
+> 根目录的 `index.html` 是开发骨架，**不能单独下载后双击使用**；它依赖开发服务器或构建后的静态服务。想要双击即用，请下载上面的单文件 HTML。
+
+## 二、装进酒馆（推荐）
 
 打开酒馆的「扩展管理」→「从 URL 安装」，粘贴仓库地址：
 
@@ -13,54 +32,63 @@ layout: default
 https://github.com/jiozhaoyue/ST-pack-transfer.git
 ```
 
-> 💡 **插件极简瘦身建议（强烈推荐）**：  
-> 在酒馆日常使用中，插件目录内的测试与构建辅助文件夹（如 `test/`、`e2e/`、`scripts/` 等）仅供工程开发验证。日常使用完全可以直接删除这些测试目录，立刻为酒馆节省数十 MB 磁盘空间，核心转换与转运功能 100% 正常运行。
+也可以手动把仓库克隆到酒馆的扩展目录。刷新酒馆页面后，在扩展列表里展开 **「数据包转运」** 并点击 **「打开面板」**。
 
-或者手动将仓库克隆到酒馆的 `public/scripts/extensions/third-party/` 目录中。
+> Luker 的用户私有扩展放在 `data/<user>/extensions/<name>/`，直接放插件目录即可，不要再嵌套一层 `third-party`。
 
-刷新酒馆页面后，在扩展列表里展开 **「数据包转运」** 并点击 **「打开面板」** 即可。
+## 三、宿主版本与能力
 
-> 提示：在 Luker 中如果是用户私有扩展（`data/<user>/extensions/<name>/`），直接放置插件目录即可，无需额外嵌套 `third-party` 目录。
+| 宿主 | 已实测版本 | 最低要求 | 能力说明 |
+| --- | --- | --- | --- |
+| SillyTavern | 1.19.0 | 1.19.0 级别端点 | 支持拉取、恢复、扩展管理；更低版本未验证 |
+| Luker | 2.7.0 / 2.9.0 级别 | 2.7.0 级别基础功能；2.9+ 账户窗口 | 2.9+ 才有自绘账户窗口、图形化存储页与备份选择 |
+| TauriTavern | 当前公开桌面构建 | 按宿主公开版本 | 迁移端点按能力探测；不支持时明确提示 |
+| PureTavern | 当前公开版本 | 按宿主公开版本 | 部分迁移端点在宿主侧可能返回 501，插件会如实提示 |
+| 独立 Web | 不适用 | 现代浏览器 | 无宿主后端，宿主相关功能禁用 |
 
-## 二、本地部署（端口明确：3040 与 4173，默认仅启动 3040）
+插件不猜测宿主版本，而是按公开端点做能力探测：能力存在就使用，不存在就明确降级，不假装成功。
 
-- **本地 Web 模式服务（端口 3040，默认唯一启动）**：  
-  直接运行开发服务器，带实时热更新与完整本地沙盒能力，系统默认仅启动并常驻这一个服务（当前已启动）：
-  ```bash
-  git clone https://github.com/jiozhaoyue/ST-pack-transfer.git
-  cd ST-pack-transfer
-  npm install
-  npm run dev          # 启动本地 Web 模式（固定端口 3040，严格防冲突）
-  ```
-- **生产构建产物预览（端口 4173，构建后按需使用）**：  
-  对打包压缩后的静态 `dist/` 进行独立生产预览：
-  ```bash
-  npm run build        # 产出 dist/（用于部署到静态托管）
-  npm run preview      # 本地启动预览服务器（端口 4173）
-  npm run build:offline # 产出可直接双击运行的离线单文件
-  ```
+## 四、浏览器与 WebView
 
-> 提示：在本地作为独立网页运行时，请通过本地 Web 服务器（如 `npm run preview`）打开。现代浏览器默认限制通过 `file://` 协议直接加载模块化代码；如果需要脱离服务器直接双击打开运行，可使用 `npm run build:offline` 生成的离线单文件。
+| 内核 | 建议版本 | 已验证 | 降级行为 |
+| --- | --- | --- | --- |
+| Chromium（Chrome / Edge 等） | 120+ | Chromium 151 | 支持选位置保存与拖拽下载；旧内核回退普通下载 |
+| Firefox | 120+ | 未单独实测 | 不支持 `showSaveFilePicker` / 拖拽下载时回退普通下载 |
+| Safari / iOS WebView | 17+ | 未单独实测 | 不支持 `color-mix` 时使用 rgba 边框；文件保存回退下载 |
+| Tauri WebView | 随宿主 | 按宿主 | Windows 使用 WebView2，macOS 使用 WKWebView |
 
-## 三、在线使用（Web 模式）
+移动端布局按 390×844 验收，桌面端按 1440×900 验收。手机浏览器与酒馆内置 WebView 使用同一套响应式规则。
 
-无需下载安装，直接在浏览器中打开：<https://jiozhaoyue.github.io/ST-pack-transfer/>
+## 五、本地构建与预览
 
-如果你想搭建属于自己的转运站点：Fork 本仓库后，在仓库的 **Settings → Pages** 中将 Source 设为 **GitHub Actions**，此后每次发布都会自动更新并部署插件本体与文档站。
+```bash
+git clone https://github.com/jiozhaoyue/ST-pack-transfer.git
+cd ST-pack-transfer
+npm install
+npm run dev        # 本地开发服务器，终端会打印实际地址
+npm run build      # 生产构建，输出 dist/
+npm run preview    # 预览 dist/，终端会打印实际地址
+npm run build:offline  # 生成单文件 HTML
+```
 
-### Web 模式说明（限制与网络代理真相）
+- `npm run dev` 与 `npm run preview` 的地址以终端输出为准。
+- 直接双击根目录 `index.html` 会被浏览器的模块安全策略拦截，这是 `file://` 的正常限制；需要双击运行时请用单文件 HTML。
 
-- **Web 模式不支持什么**：Web 模式纯在本地前端运行，由于没有酒馆后端进程，因此无法直接「从宿主拉取」当前运行的酒馆数据，无法一键「写回宿主（恢复）」，无法读取宿主服务器磁盘物理存储，也无法管理宿主服务端的 plugins 插件。所有数据转换、分卷切片、轻量清单化等纯本地沙盒操作 100% 完整可用。
-- **ZeroOmega / SwitchyOmega 等代理扩展有用吗？**  
-  **能代理网络流量，但彻底解不了跨域（CORS）报错！**  
-  代理扩展工作在底层网络栈，能够接管 Web 模式发起的 `fetch` 流量走代理转发，解决域名解析与网络链路连通问题；但跨域（CORS）是浏览器内核层面的核心安全策略。即便代理顺利把请求转发到了外部 S3 或 WebDAV 并拿回了响应，只要目标服务器未携带 `Access-Control-Allow-Origin` 等跨域头，浏览器内核在收到响应的瞬间依然会掐断数据并报错 `TypeError: Failed to fetch`。同理，HTTPS 网页下的 HTTP 明文混合内容阻断，代理也无权放行。
-- **Web 模式下使用云功能的推荐服务端配置**：
-  - **S3 存储桶**：在云厂商后台的 CORS 规则中添加允许来源（`*` 或前端地址）、允许方法（`GET, PUT, POST, DELETE, HEAD, OPTIONS`）与允许头（`*`）。
-  - **WebDAV 服务**：在反代配置中补齐 CORS 响应头，并放行 `PROPFIND, MKCOL` 等非标 HTTP 动词。
-  - **协议匹配**：HTTPS 页面务必使用 HTTPS 云端点。
+## 六、在线使用（Web 模式）
 
-## 四、安装后建议步骤
+无需安装，直接打开：<https://jiozhaoyue.github.io/ST-pack-transfer/>
 
-1. 首次打开面板会自动开启 [教程演示模式](tutorial.md)，带你快速熟悉界面与操作步骤，体验过程完全在模拟数据上进行，保护你的真实数据。
-2. 需要备份当前酒馆的数据时，可以参考 [从宿主拉取](host-pull.md) 引导，直接在界面中导出标准格式。
-3. 如果需要安装私有仓库中的扩展插件，请先阅读 [隐私与凭据](privacy.md) 了解令牌配置方法。
+想搭建自己的站点：Fork 本仓库，在 **Settings → Pages** 中把 Source 设为 **GitHub Actions**。
+
+### Web 模式限制
+
+- 不能直接「从宿主拉取」或「写回宿主」，因为 Web 模式没有酒馆后端。
+- 不能读取宿主服务器磁盘，也不能管理服务端插件。
+- 所有纯本地转换、分卷、清单化、体积分析功能完整可用。
+- 云端 S3 / WebDAV 需要目标服务端正确配置 CORS；代理扩展只能转发流量，不能绕过浏览器 CORS。
+
+## 七、安装后建议
+
+1. 首次打开会进入 [教程演示模式](tutorial.md)，在模拟数据上熟悉界面。
+2. 需要备份当前酒馆时，按 [从宿主拉取](host-pull.md) 操作。
+3. 安装私有仓库扩展前，先读 [隐私与凭据](privacy.md)。

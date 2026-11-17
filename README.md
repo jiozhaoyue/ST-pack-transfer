@@ -31,7 +31,7 @@
 - 📱 **手机端图表整块滚动**：图表容器是唯一滚动条（图表外、容器内），卡片与树行内部不再出现第二个滚动条；树行允许换行、缩小徽标为符号版、每项有清晰分隔线，空间不足时优先隐藏总体与单项占用可视化，保证文件信息完整。
 - ⚡ **一键自动备份**：云端卡片可一键执行「自动拉取 → 按当前图表勾选与扩展模式修剪 → 按当前目标平台生成导出 → 上传并校验」；自动流程产生的导入/导出包带「自动拉取 / 自动生成」徽标，默认上传成功后删除，可在设置里保留；上传或校验失败时如实保留。
 - 🧭 **教程浮层动态避让**：具体教程的说明卡片会在目标上方/下方/左右自动择位，滚动与缩放实时重算，绝不遮挡正在高亮的区域；「查看文档 / 不再弹出」只在最初的目标选择浮层出现。
-- 🔗 **文档站绝对地址**：教程与设置里的「查看文档」固定跳转已部署的 GitHub Pages 文档站（`https://jiozhaoyue.github.io/ST-pack-transfer/docs/`），不再使用 localhost 或当前路径拼接；公开 `docs/` 由隐私守卫拦截计划、交接、研究底稿等内部资料。
+- 🔗 **文档站绝对地址**：教程与设置里的「查看文档」固定跳转已部署的 GitHub Pages 文档站（`https://jiozhaoyue.github.io/ST-pack-transfer/docs/`），不拼接当前页面路径；公开 `docs/` 由隐私守卫拦截内部资料。
 - 🎓 **优雅的移动端教程**：教程浮层直接挂在 `document.body` 并用 `100dvh` 铺满，不再被宿主抽屉的 transform / 滚动容器带到屏幕外；手机端卡片最大高度内滚，按钮永远可达。
 - 📲 **手机电脑面对面扫码秒传**：手机和电脑连接在同一个 Wi-Fi 或局域网下，扫码即可通过 WebRTC 点对点直连传输数据包，直接走内网传输不经过任何外部服务器，速度快且免外网流量，协议思路参考了 Luker 的实现。二维码编码器已改为**本地 ESM 直接导入**，不再依赖宿主全局 `window.qrcode`，也不会被其它扩展或 CSP 静默掐掉。
 - 📜 **更新日志与全量日志**：每次版本更新后自动弹出本次更新说明，可在弹窗里勾选「不再自动显示」；设置页随时可打开**从新到旧**的完整提交日志，发版 tag 对应提交高亮，并可切换「只看发布提交」。日志系统记录全部级别（含 DEBUG），默认只显示 WARN 及以上，需要排障时在设置里切到 DEBUG 即可回看全部。
@@ -94,11 +94,11 @@ Web 模式是一个脱离酒馆后端的纯前端工作台，以下功能因缺�
 
 ### 3. 推荐部署方式
 
-- **首选推荐：装入酒馆作为插件运行**  
+- **首选推荐：装入酒馆作为插件运行**
   功能最为完整，拥有宿主原生数据拉取、一键切片恢复、服务端存储深度审查等全部功能，天然同源无跨域烦恼。
-- **次选推荐：本地或私有服务器静态部署（默认仅启动 3040 单一服务）**  
-  在本地终端执行 `npm run dev`（固定运行在 `http://localhost:3040`，当前默认常驻启动这一个端口服务，开箱即用；系统绝不乱起多端口）；构建产物预览端口为 `4173`（执行 `npm run build && npm run preview` 运行，用于校验静态产物）。
-- **在线体验：GitHub Pages 网页端**  
+- **次选推荐：本地或私有服务器静态部署**
+  在本地终端执行 `npm run dev`，地址以终端输出为准；构建产物预览使用 `npm run build && npm run preview`，同样以终端输出地址为准。
+- **在线体验：GitHub Pages 网页端**
   适合临时应急、离线解包、四端格式互转、分卷拆包与清单精简等纯本地沙盒操作。
 
 ### 4. 如果要在 Web 模式使用云功能（S3 / WebDAV），服务端配置推荐
@@ -150,25 +150,28 @@ https://github.com/jiozhaoyue/ST-pack-transfer.git
 或者手动将仓库克隆到酒馆的 `public/scripts/extensions/third-party/` 目录中。
 刷新酒馆页面后，在扩展列表中展开 **「数据包转运」** 并点击 **「打开面板」** 即可使用。
 
-### 2. 本地部署（端口明确：3040 与 4173，默认仅启动 3040）
+### 2. 单文件 HTML / 本地部署
 
-- **本地 Web 模式服务（端口 3040，默认唯一启动）**：  
-  直接运行开发服务器，带实时热更新与完整本地沙盒能力，系统默认仅启动并常驻这一个服务（当前已启动）：
-  ```bash
-  git clone https://github.com/jiozhaoyue/ST-pack-transfer.git
-  cd ST-pack-transfer
-  npm install
-  npm run dev          # 启动本地 Web 模式（固定端口 3040，严格防冲突）
-  ```
-- **生产构建产物预览（端口 4173，构建后按需使用）**：  
-  对打包压缩后的静态 `dist/` 进行独立生产预览：
-  ```bash
-  npm run build        # 产出 dist/（用于 GitHub Pages 或 Web 服务器）
-  npm run preview      # 预览生产产物（固定端口 4173）
-  npm run build:offline # 产出可直接双击运行的离线单文件
-  ```
+**想直接双击用 HTML**：下载仓库内的固定路径
 
-> 提示：在本地作为独立网页使用时，请通过本地 Web 服务器（如 `npm run preview`）打开。现代浏览器默认限制通过 `file://` 协议直接加载模块化脚本；如果需要双击直接运行，可使用 `npm run build:offline` 生成的离线单文件。
+- 仓库路径：`download/ST-pack-transfer-offline.html`
+- 直接下载：<https://github.com/jiozhaoyue/ST-pack-transfer/raw/main/download/ST-pack-transfer-offline.html>
+
+下载后双击即可运行，不需要安装 Node、不需要本地服务器。根目录的 `index.html` 是开发骨架，**不能单独下载双击使用**。
+
+**想自己构建 / 本地开发**：
+
+```bash
+git clone https://github.com/jiozhaoyue/ST-pack-transfer.git
+cd ST-pack-transfer
+npm install
+npm run dev            # 本地开发服务器，地址以终端输出为准
+npm run build          # 产出 dist/（用于 GitHub Pages 或静态托管）
+npm run preview        # 预览 dist/，地址以终端输出为准
+npm run build:offline  # 产出 dist-offline/ 与 download/ 下的单文件 HTML
+```
+
+> 现代浏览器默认禁止 `file://` 直接加载模块化脚本；需要双击运行时请用单文件 HTML。在线 HTML 版：<https://jiozhaoyue.github.io/ST-pack-transfer/>。
 
 ## 🔐 七、隐私与凭据
 
@@ -206,23 +209,34 @@ https://github.com/jiozhaoyue/ST-pack-transfer.git
 
 ## 🧑‍💻 九、开发与质量
 
-- 开发者功能清单与源码落点：[docs/DEVELOPER-GUIDE.md](docs/DEVELOPER-GUIDE.md)
+- 开发者指南：[docs/DEVELOPER-GUIDE.md](docs/DEVELOPER-GUIDE.md)
 - 面向用户的完整说明文档：[docs/](docs/)（纯 Markdown 编写，随 Pages 自动发布）
-- 分层架构设计与技术规范：[.trellis/spec/](.trellis/spec/)
+- 贡献指南：[CONTRIBUTING.md](CONTRIBUTING.md)
 
 ```bash
 npm test                      # 单元测试（测试核心转换逻辑）
-npm run build && npm run preview   # 构建并启动本地预览（端口 4173）
+npm run build && npm run preview   # 构建并启动本地预览（地址以终端输出为准）
 npm run e2e:web               # 独立 Web 与离线单文件端到端测试
-npm run e2e                   # 酒馆实例兼容性与功能测试（连接 Dev 实例）
+npm run e2e                   # 酒馆实例兼容性测试（需自备测试环境）
 npm run check:css-scope check:dom-injection check:template-source check:dom-scope check:control-consumer check:i18n check:no-bundler-only check:docs-privacy
+npm run docs:verify           # 中英文档 / 教程截图 / 基线是否同步（CI 强制执行）
+npm run docs:update           # 确认改动完整后刷新 docs-sync.manifest.json
+npm run docs:shots            # 重拍教程截图（桌面 + 手机）
 ```
 
 代码库配有完善的静态检查与自动化测试，严格把关跨酒馆适配规范（如 CSS 隔离、DOM 范围、多语言完整度与免打包直装语法等），确保在各类酒馆中平稳加载。
 
-## 📄 十、许可证
+## 🤝 十、参与贡献
+
+- [贡献指南](CONTRIBUTING.md) —— 运行形态、宿主/浏览器兼容矩阵、测试矩阵、隐私红线
+- [行为准则](CODE_OF_CONDUCT.md) —— 公开交流与数据处理边界
+- [安全政策](SECURITY.md) —— 漏洞走私密报告，不要公开利用细节
+- [Issue 模板](.github/ISSUE_TEMPLATE/bug_report.yml) —— 报告 Bug 时请填写宿主、宿主版本、浏览器/WebView 版本与复现步骤
+- [PR 模板](.github/PULL_REQUEST_TEMPLATE.md) —— 提交前逐项确认测试与隐私
+
+## 📄 十一、许可证
 
 GNU Affero General Public License v3.0 or later（AGPL-3.0-or-later）。
 完整条款见 [LICENSE](LICENSE)。
 
-Copyright (C) 2026 jiozhaoyue
+Copyright (C) jiozhaoyue

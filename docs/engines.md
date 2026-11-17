@@ -1,6 +1,8 @@
 ---
 title: 存储引擎互转
 layout: default
+alt_url: engines.en.html
+alt_lang: en
 ---
 
 # 存储引擎互转（Luker 专属）
@@ -25,6 +27,23 @@ Luker 支持将用户数据存储在多种底层引擎中（包括普通文件�
 ## 多种存储形态任意互转
 
 支持在文件系统与各类数据库引擎之间双向互转，同时也支持 PostgreSQL 与 MySQL 之间的数据库同构迁移。
+
+## 包内引擎载体（bin）是否必须
+
+- **文件系统源包**没有 `_engine_meta.json` / `_engine_dump.bin`；文件系统转数据库时**不需要** bin。
+- **PostgreSQL / MySQL 源包**必须同时保留 `_engine_meta.json` 与 `_engine_dump.bin`。缺少 dump 时转换会在开始前直接失败并说明原因，不会产出半成品。
+- **SQLite 源包**保留单文件 `luker-storage.sqlite`，不使用 `_engine_dump.bin`。
+- **数据库转文件系统**必须先有 dump（或 SQLite 数据库文件）才能还原；只保留零散文件不算完整备份。
+- **目标为数据库**时，插件会写出对应引擎的 `_engine_meta.json` 与转储（SQLite 写出 `luker-storage.sqlite`）。
+
+### 快而稳的做法
+
+- 文件系统 → 文件系统：直接搬运目录，不经过数据库模型。
+- 文件系统 → 数据库：走统一行模型 + 目标引擎 sink，逐表写入。
+- 数据库 → 文件系统：先校验 `_engine_meta.json` 与 dump 完整性，再按表重建文件。
+- PostgreSQL ↔ MySQL：走同一套 canonical 行模型，不经过中间 SQL 文本。
+- SQLite 只在需要时加载 sql.js，避免为纯文件转换付出初始化成本。
+- 大包优先流式处理，避免把整包读入内存。
 
 ## 跨酒馆平滑迁移
 

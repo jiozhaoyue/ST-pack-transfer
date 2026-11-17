@@ -1,6 +1,8 @@
 ---
 title: 四酒馆数据包格式
 layout: default
+alt_url: formats.en.html
+alt_lang: en
 ---
 
 # 四款酒馆数据包格式对照

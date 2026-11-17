@@ -1,6 +1,8 @@
 ---
 title: 从宿主拉取
 layout: default
+alt_url: host-pull.en.html
+alt_lang: en
 ---
 
 # 从当前酒馆直接拉取

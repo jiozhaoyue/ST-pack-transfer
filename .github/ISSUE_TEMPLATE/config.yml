@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 使用文档
+    url: https://jiozhaoyue.github.io/ST-pack-transfer/docs/
+    about: 安装、转换、恢复、扩展、传输、存储引擎与常见问题
+  - name: 安全问题（私密报告）
+    url: https://github.com/jiozhaoyue/ST-pack-transfer/security/advisories/new
+    about: 不要公开提交漏洞利用细节或真实凭据

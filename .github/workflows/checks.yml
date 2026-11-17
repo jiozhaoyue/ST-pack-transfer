@@ -34,15 +34,18 @@ jobs:
       - name: Docs layout guard
         run: |
           set -e
-          allowed="_config.yml index.md install.md formats.md convert.md host-pull.md restore.md extensions.md transfer.md storage.md engines.md privacy.md tutorial.md faq.md DEVELOPER-GUIDE.md testing.md style.css queue-and-logs.md"
+          allowed="_config.yml index.md install.md formats.md convert.md host-pull.md restore.md extensions.md transfer.md storage.md engines.md privacy.md tutorial.md faq.md DEVELOPER-GUIDE.md testing.md style.css docs.js queue-and-logs.md"
           for f in docs/*; do
             if [ -d "$f" ]; then
               case "$(basename "$f")" in
-                _layouts) continue ;;
+                _layouts|assets) continue ;;
                 *) echo "docs/ 下不允许目录：$f"; exit 1 ;;
               esac
             fi
             base=$(basename "$f")
+            case "$base" in
+              *.en.md) continue ;;
+            esac
             case " $allowed " in
               *" $base "*) ;;
               *) echo "docs/ 下出现未登记文件：$f"; exit 1 ;;
@@ -52,6 +55,15 @@ jobs:
 
       - name: Docs privacy guard
         run: npm run check:docs-privacy
+
+      - name: Docs sync verify
+        run: npm run docs:verify
+
+      - name: UI token guard
+        run: npm run check:ui-tokens
+
+      - name: Download HTML guard
+        run: npm run check:download-html
 
       - name: Build (sanity)
         run: npm run build -- --base=./

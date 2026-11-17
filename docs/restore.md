@@ -1,6 +1,8 @@
 ---
 title: 恢复写回宿主
 layout: default
+alt_url: restore.en.html
+alt_lang: en
 ---
 
 # 恢复写回酒馆

@@ -39,6 +39,9 @@ jobs:
       - name: Docs privacy guard
         run: npm run check:docs-privacy
 
+      - name: Docs sync verify
+        run: npm run docs:verify
+
       - name: Build Web Application
         run: npm run build -- --base=./
 

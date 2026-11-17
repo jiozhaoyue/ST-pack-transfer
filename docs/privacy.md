@@ -1,6 +1,8 @@
 ---
 title: 隐私与凭据说明
 layout: default
+alt_url: privacy.en.html
+alt_lang: en
 ---
 
 # 隐私与凭据说明

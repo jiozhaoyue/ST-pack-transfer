@@ -1,6 +1,8 @@
 ---
 title: 存储审查
 layout: default
+alt_url: storage.en.html
+alt_lang: en
 ---
 
 # 存储审查

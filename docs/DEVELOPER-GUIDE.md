@@ -1,621 +1,123 @@
 ---
 title: 开发者指南
 layout: default
+translation: pending
 ---
 
-# 开发者指南 · 功能清单与源码落点
+# 开发者指南
 
-> 本文档面向参与本仓库开发与维护的开发者。面向最终用户的说明请参考 [README.md](../README.md)，跨会话架构规范请参考 `.trellis/spec/`。
-> 本文系统梳理了项目中**已实现的功能**与对应的源码文件位置，帮助开发者快速定位核心逻辑。
->
-> 最后核对：2026-11-12（对照 `src/` 与目标测试）。
+本页面向想阅读源码、构建或参与改进的开发者。普通用户请从 [安装与部署](install.md) 开始。
 
----
+## 一、运行形态
 
-## 一、三种运行形态（同一份核心）
+同一份核心逻辑支持五种入口：
 
-同一份 `src/core/` 跑在三种入口下，入口分别装配、核心零分叉：
-
-| 形态 | 入口 | 装配点 | 差异 |
+| 形态 | 入口 | 适合场景 | 主要限制 |
 | --- | --- | --- | --- |
-| **独立 Web** | `index.html`（仅空骨架 `#app.app-container`） | `index.js` → `bootstrap()` → `main()` | 无宿主；`file-protocol-notice.js` 只在 `file://` 下给提示 |
-| **酒馆扩展插件** | `index.js` 检测到宿主 | `index.js` → 扩展列表行按钮 → `openConverterModal()` | 全屏模态；额外注入宿主原生备份 UI 入口 |
-| **模态态** | `openConverterModal()` 导出 | `index.js:2662` 附近 | 自绘覆盖层 `#st-converter-modal-overlay` |
-| **file:// 单文件离线**（新） | `dist-offline/ST-pack-transfer-offline.html` | `scripts/build-offline.mjs` | 单文件、IIFE、Worker 强制主线程降级 |
+| SillyTavern 扩展 | 仓库根目录装进扩展管理器 | 在酒馆内直接拉取、恢复、管理扩展 | 依赖 ST 的 `/api/users/*` 与扩展端点 |
+| Luker 扩展 | 仓库根目录装进扩展管理器 | 同上，并额外支持 Luker 账户窗口与存储页 | 账户窗口 / 存储页需要 Luker 2.9+ |
+| TauriTavern 扩展 | 仓库根目录装进扩展管理器 | 在 TauriTavern 内转换与迁移 | 宿主能力按公开端点探测 |
+| PureTavern 扩展 | 仓库根目录装进扩展管理器 | 在 PureTavern 内转换与迁移 | 宿主能力按公开端点探测 |
+| 独立 Web / 单文件 HTML | 根目录 `index.html`（HTTP）或下载的单文件 HTML（`file://`） | 纯本地转换、分析、分卷、清单化 | 无法直接读写酒馆后端；云功能受 CORS 限制 |
 
-**单一模板源**：`src/ui/workbench-template.js` 的 `getWorkbenchHtml()` 是 HTML 的**唯一**来源；
-`index.html` 只允许有空骨架容器（`scripts/single-template-source.js` 守卫强制）。
+### 单文件 HTML 的确切下载位置
 
----
+- **从仓库直接下载**：`download/ST-pack-transfer-offline.html`
+- **直接下载链接**：`https://github.com/jiozhaoyue/ST-pack-transfer/raw/main/download/ST-pack-transfer-offline.html`
+- **在线 HTML（无需下载）**：`https://jiozhaoyue.github.io/ST-pack-transfer/`
 
-## 二、功能清单
+根目录的 `index.html` 是开发骨架，**不能单独下载后双击运行**；它需要 Vite 开发服务器或构建后的静态服务器。单文件 HTML 才是双击即用的形态。
 
-### 0. 能力矩阵：四酒馆原生 vs 插件
+## 二、宿主与浏览器兼容性
 
-> 取证时点 2026-11-10，来源为四宿主实例源码（非推测）。
-> 判定口径见 `.trellis/spec/frontend/host-capability-matrix.md`。
+### 宿主版本
 
-#### 0.1 数据包能力（宿主原生）
+| 宿主 | 已实测版本 | 最低要求 | 说明 |
+| --- | --- | --- | --- |
+| SillyTavern | 1.19.0 | 1.19.0 级别端点 | 更早版本未验证；缺少端点时会明确降级并提示 |
+| Luker | 2.7.0 / 2.9.0 级别 | 2.7.0 级别基础功能；2.9+ 账户窗口 | 2.9+ 才提供自绘账户窗口、图形化存储页与备份选择 |
+| TauriTavern | 当前公开桌面构建 | 按宿主公开版本 | 扩展注入与迁移端点按能力探测，不锁定内部版本 |
+| PureTavern | 当前公开版本 | 按宿主公开版本 | 部分迁移端点在宿主侧可能返回 501，插件会如实提示 |
+| 独立 Web | 不适用 | 现代浏览器 | 无宿主后端，宿主相关功能明确禁用 |
 
-| 能力 | SillyTavern | Luker | TauriTavern | PureTavern |
-| --- | --- | --- | --- | --- |
-| **导出端点** | `POST /api/users/backup`（忽略 selection，全量） | 同端点，**支持 10 键 selection** | `POST /api/extensions/data-migration/export`（返回 job_id，轮询 `/job?id=`）；另有 `/api/users/backup` 兼容层 | `POST /api/backups/archive/export`（versioned/hashed ZIP） |
-| **导入 / 恢复端点** | ❌ 无恢复端点 | ✅ `POST /api/users/restore-backup` + **8 MiB 分片** | ✅ `POST /api/extensions/data-migration/import`（multipart `archive`） | ✅ `POST /api/backups/archive/import`（另 `import/preview` 冲突预览） |
-| **可导入格式** | — | 本包 ZIP | ZIP / tar / tar.gz / tgz，**可直接导入 ST 数据包** | 本包 ZIP + **TT 包**（语义转换） |
-| **包内布局** | `data/<handle>/` 目录树 | 同 ST，selection 决定类目 | `data/default-user/` 树（ST 兼容） | `manifest.json` + 模块记录（versioned/hashed） |
-| **导入策略** | — | 合并 / 覆盖 | 由迁移作业处理 | merge / skip / replace-module / replace-all / 受保护的本地替换 |
-| **恢复点** | ❌ | ❌ | ❌ | ✅ 导入前自动建恢复点 + 导入日志 |
-| **本地备份库** | ❌ | ❌ | ❌ | ✅ `/api/backups/archive/local/*`（默认保留 5 份） |
-| **跨宿主互操作** | ❌ | ❌ | ✅ 导入端兼容 ST 布局 | ✅ 内置 TT 互操作（模块记录 ↔ `data/default-user` 语义转换） |
+“已实测”表示在当前开发环境的真实宿主中完成过注入、转换、拉取或恢复验证；“最低要求”表示低于该版本不承诺对应端点存在。插件不会猜测宿主版本，而是按能力探测并降级。
 
-#### 0.2 传输能力（宿主原生）
+### 浏览器 / WebView
 
-| 能力 | ST | Luker | TT | PT |
-| --- | --- | --- | --- | --- |
-| 局域网互传 | ❌ | ✅ `/api/sync/v1/*`（服务端 ↔ 服务端） | ✅ 但为 **Rust 命令**，扩展不可 invoke | ❌ |
-| 云端对象存储 | ❌ | ✅ S3 Sync（加密桶 / 冲突决策 / Undo） | ✅ TT-Sync v2 | ❌ |
-| WebDAV | ❌ | ❌ | ❌ | ❌ |
-| 存储面板 / 配额（原生） | ❌ | ✅ `storage-inspector.js` | ❌ | ❌ |
+| 内核 | 建议版本 | 已验证 | 降级行为 |
+| --- | --- | --- | --- |
+| Chromium（Chrome / Edge / 其他 Chromium 浏览器） | 120+ | Chromium 151 实测 | 支持文件选择保存与拖拽下载；旧内核回退为普通下载 |
+| Firefox | 120+ | 未单独实测 | 不支持 `showSaveFilePicker` / 拖拽下载时回退为浏览器下载 |
+| Safari / iOS WebView | 17+ | 未单独实测 | `color-mix` 不支持时使用普通 rgba 边框；文件保存回退为下载 |
+| Tauri WebView | 随宿主 | 按宿主实测 | Windows 使用 WebView2，macOS 使用 WKWebView；以宿主实际能力为准 |
 
-> 本插件另有**自建存储审查面板**（四宿主可用，浏览器源全平台；宿主数据源仅 Luker），见 §二·O。
+移动端按 390×844 视口做布局验收；桌面端按 1440×900 做布局验收。手机浏览器与酒馆内置 WebView 都走同一套响应式规则。
 
-#### 0.3 插件功能来源：哪些直接用原生
+## 三、目录结构
 
-| 插件功能 | ST | Luker | TT | PT | 来源 |
-| --- | --- | --- | --- | --- | --- |
-| 从宿主拉取数据包 | 原生端点 | 原生端点 + selection | 原生端点 | 原生端点 + moduleIds | **用原生** |
-| 写回 / 恢复宿主 | 无原生恢复端点 | 原生 + 8 MiB 分片 | 原生导入端点 | 原生导入 + 预览 | **用原生** |
-| 扩展清单 / 批量安装 | 原生 `discover` + manifest | 同左 + 原生安装器 | 原生 | 原生（当前 501） | **原生 + 增强** |
-| 存储面板 / 配额 | 自建（浏览器源） | 原生数据源（`RestProvider`） | 自建（浏览器源） | 自建（浏览器源） | **原生数据优先** |
-| 四酒馆格式互转 | 插件 | 插件 | 插件 | 插件 | **自建**（四家都没有） |
-| 局域网互传 | 插件 | 插件 | 插件 | 插件 | **自建**（原生接不了，见下） |
-| S3 / WebDAV 包仓库 | 插件 | 插件 | 插件 | 插件 | **自建**（Luker↔Luker 用原生） |
-| 条目级差量导出 | 插件 | 插件 | 插件 | 插件 | **自建** |
-| 暂停 / 续传 / 中止 | 插件 | 插件 | 插件 | 插件 | **自建**（原生无手动暂停） |
-
-#### 0.4 两条边界
-
-1. **原生同步接不了插件包**：Luker 的同步单位是「类目下的文件路径」（`src/sync/categories.js`），
-   TT 的是 `DatasetPolicy` + per-file/bundle；协议里**没有「包」这一层**。把包塞进去只能先解压进宿主数据目录，
-   那会写宿主数据且跨宿主失效。
-2. **S3 / 局域网只在 Luker↔Luker 时该用原生**：插件这两项的价值在跨宿主（ST/PT/TT/云）与跨形态搬运。
-   同宿主之间应引导用户走原生 Sync，避免重复配置凭据。
-
-### A. 宿主数据导出（插件态）
-
-| 功能 | UI 入口 | 源码落点 |
-| --- | --- | --- |
-| 从当前宿主拉取整份用户数据 | 恢复模式行 `#btn-fetch`（**仅导入分区**）/ 宿主原生界面注入按钮 | `index.js` 的 `fetchFromHost()` / `pullFromNativeUi()`；`src/ui/host-bridge.js` 的 `openNativeBackupUi()` / `fetchHostBackup()` |
-| 迁移与备份 / 导出扩展清单 | 面板头切换行 `[data-wbview="transfer"]`（☁️）/ 扩展管理 → 宿主页 | `src/ui/workbench-view.js` 的 `renderViewSwitch()`（transfer 项）/ `renderExtInstalled()` |
-| **Luker 2.9+ 账户窗口**（备份页注入 / 勾选读取；存储页跳转能力保留但**配额行已改走自建面板**） | 账户 → Backup / Storage | `openHostAccountWindow()` / `openHostStoragePage()` / `readNativeBackupSelection()`；契约见 `.trellis/spec/frontend/luker-2.9-account-window.md` |
-| **原生界面生命周期**（拉取后自动关闭、宿主原生导出优先） | 原生界面「从宿主拉取」 | `closeNativeBackupUi()` / `isNativeExportBusy()` / `watchNativeExportStart()`；契约见 `.trellis/spec/frontend/host-native-pull-lifecycle.md` |
-| 细粒度类目勾选（10 类目 + 3 特殊类目） | `#chart-stack` 的类目卡与选择树 | `src/ui/workbench-view.js` 的 `renderTreeRows()`、`src/core/inspect.js`、`src/core/chart-model.js` |
-| 类目内逐文件穿透排除 | 同一棵选择树 | `src/ui/workbench-view.js` 的 `renderTreeRows()`、`src/ui/host-bridge.js` 的 `exclude` 链路 |
-| 一步直出目标布局（拉取时即指定目标格式） | `#target-select` | `src/core/plan-preview.js` 的路由/合成分支 |
-| 拉取进度 / 半成品续传 | `#workbench-progress` | `src/ui/host-bridge.js` 的 `fetchHostBackup()`（`Range` 续传）、`src/core/worker-client.js` || 转换进度 / 暂停 / 继续 / 中止 | 动作行 `#btn-task-pause` / `#btn-task-resume` / `#btn-task-abort` | `src/app/conversion-runner.js`、`src/core/task-manager.js`、`src/app/task-runtime.js` 的 `persistPartial` |
-
-### B. 包转换（三形态都有）
-
-| 功能 | UI 入口 | 源码落点 |
-| --- | --- | --- |
-| 四布局互转 `st` / `l` / `tt` / `pt` | `#btn-generate` + `#target-select` | `src/core/transform.js`（`convert()` 主入口） |
-| 转换前完全扫描与动作预测 | 计划摘要条 | `src/core/plan-preview.js` |
-| 转换报告（计数 + 丢弃/过滤/警告三类清单 + 下载 `.txt`） | 转换完成后模态框 `view.showReport(report)` | `src/core/report.js` 的 `reportToHuman()`、`src/ui/workbench-view.js` 的 `showReport()` |
-| 剔除酒馆原生重复资产 | 类目树的 `group:native` 勾选（`chart-model.js:408` 据此算 `pruneBuiltinAssets`） | `src/core/builtin-assets.js` |
-| Zstandard（Method 93）/ 7-Zip ZS 透明解压 | 自动 | `src/core/zip-io.js` + `src/vendor/fzstd.js` |
-
-### C. 增量与差量
-
-| 功能 | UI 入口 | 源码落点 |
-| --- | --- | --- |
-| 两包差量合并（新版更新、历史独有保留） | `#host-incremental-export` + 基准 ZIP | `src/core/delta.js` |
-| 源包增强（惰性直通复制） | 内部 | `src/core/zip-augment.js` |
-| 智能分卷（规避云酒馆单包上限） | `#split-input` | `src/core/splitter.js` |
-
-### D. 恢复写回宿主（插件态）
-
-| 功能 | UI 入口 | 源码落点 |
-| --- | --- | --- |
-| 合并写入（`merge`：覆盖同名、不删独有） | 恢复模态 `name:restore-mode` | `src/ui/host-bridge.js` 的 `restoreToHost()` |
-| 覆盖写入（二次警示） | 同上 | 同上 |
-| 批量恢复编排 | 恢复模态 | `src/core/restore-batch.js` |
-| **跨引擎裸 SQL 转储净化**（`_engine_dump.bin` / `_engine_meta.json`） | 自动 | `src/core/engine-sanitize.js`；`index.js` 的 `restoreSelectedConfirmed()`。PG→文件系统、文件系统→PG、PG→PG 不兼容一律剔除后走标准便携恢复，避免 `settings_pkey` 主键冲突；纯引擎转储包如实提示并跳过 |
-| **批量恢复容错与报告**（单包失败不中断、完整报告、保留/丢弃部分成果、进度落盘） | 恢复完成模态 | `index.js` 的 `restoreSelectedConfirmed()`（`stpt.restoreProgress`）；`src/ui/workbench-view.js` 的 `showRestoreReport()` |
-| **上传后刷新**（设置默认关；否则报告内提供「刷新页面」） | 设置 → 导出 / 恢复报告 | `src/ui/settings-panel.js` 的 `autoRefreshAfterUpload`；`index.js` 恢复完成分支 |
-| **目标写入安全守护**（写回前校验备份与环境状态，存在风险时暂停写入） | `#restore-backup-confirmed` | `src/ui/migration-controller.js` 的 `guardedRestore()` / `buildTargetEvidence()` |
-
-### E. 迁移计划与安全判定（S1–S4，2026-10-13）
-
-| 功能 | 源码落点 |
+| 路径 | 职责 |
 | --- | --- |
-| 统一不可变计划快照（requested / effective / capabilities 分离） | `src/core/migration-plan.js` 的 `createMigrationPlan()` |
-| 目标写入唯一安全门 | `src/core/migration-evidence.js` 的 `evaluateWriteGate()` |
-| 重试资格判定（只认证据，不认界面态） | 同文件的 `assessRetry()` |
-| 核对结论四态（completed / completed-with-exclusions / needs-verification / failed） | 同文件的 `classifyOutcome()` / `buildVerificationEvidence()` |
-| 源端三类交付（源备份 / 目标包 / 独立报告） | `src/ui/migration-controller.js` 的 `buildSourceDeliveries()` |
-| 向导与工作台共享状态接缝 | 同文件的 `createMigrationSession()` |
+| `index.html` | 独立 Web 的空骨架，只提供 `#app` 容器 |
+| `index.js` | 根控制器：宿主嗅探、动作绑定、启动 |
+| `src/core/` | 纯逻辑核心：转换、检测、计划、分卷、差量、体积模型、引擎桥 |
+| `src/ui/` | 有 DOM 的界面层：模板、视图、宿主桥、导出队列、设置、传输面板 |
+| `src/storage/` | IndexedDB 封装 |
+| `src/data/` | 目标平台、UI 令牌、演示数据等可读配置 |
+| `src/vendor/` | 本地依赖副本，勿升级改动 |
+| `docs/` | 公开文档站（纯 Markdown） |
+| `download/` | 可下载的单文件 HTML 产物 |
+| `test/` | 单元测试 |
+| `tooling/` | 构建、文档同步、静态守卫 |
+| `scripts/` | 本地实例探针与调试脚本（不随公开仓库分发） |
 
-### F. 迁移向导（S5 第二步，2026-10-13 · **默认入口**）
+核心层不得依赖 DOM；界面层不得反向持有宿主判断。平台差异集中在宿主桥接层。
 
-| 功能 | UI 入口 | 源码落点 |
-| --- | --- | --- |
-| 六步向导（来源→目标→范围→检查→执行→核对） | `#wizard-rail` | `src/ui/migration-wizard.js` 的 `WIZARD_STEPS` / `createWizardMachine()` |
-| 视图切换（向导 ⇄ 高级工作台） | `#btn-wb-view-toggle` | 同文件的 `mountMigrationWizard()` |
-| 键盘导航（←/→/Home/End） | 步骤条 | 同上（`onRailKeydown`） |
-| 检查页（执行前集中说明范围与排除项） | `#wizard-check-panel` | 同上 `setCheckPanel()`；数据来自 `index.js` 的 `syncWizardCheckPanel()` |
-| **旧会话不兼容门** | `#wizard-gate` | 同文件的 `buildSessionGateVerdict()` |
-
-### G. 会话与存储
-
-| 功能 | 源码落点 |
-| --- | --- |
-| 工作区会话（跨重载恢复源包/目标/选择） | `src/storage/db.js` 的 `saveWorkspaceState()` / `loadWorkspaceState()` |
-| **强制不兼容**（非 v2 会话一律作废） | `src/core/migration-session.js` 的 `classifySessionCompatibility()` / `SESSION_SCHEMA_VERSION` |
-| 断点续传（crc 台账 + OPFS 半成品） | `src/core/task-manager.js`、`src/core/transform.js` 的 `resumeCrcMap` |
-| 产物落地（`keepExport` 决定入库；否则进本次待导出队列） | `index.js` 的 `deliverCreated()`；`src/ui/export-queue.js`（`ExportQueue` + `#pending-exports`） |
-| 可选 Authority 后端增强（不可用即静默降级） | `src/storage/authority-store.js` |
-
-### H. 聊天库适配（纯库模式）
-
-| 方向 | 源码落点 |
-| --- | --- |
-| 打包时补齐库里磁盘没有的聊天 | `src/core/pack-inject.js`（纯决策）、`src/ui/chat-store-inject.js` |
-| 从聊天库导出成标准数据包（产物进**导出区**统一出口、尊重当前 UI 目标平台——2026-11-14 起） | `#btn-library-export`、`src/ui/chat-store-bridge.js` |
-| 还原后把包里聊天录入库 | `src/ui/chat-store-inject.js` |
-
-> 前置：需聊天库插件暴露带版本号的接入接口（契约见 `.trellis/spec/frontend/chat-store-seam.md`）。
-> **上游当前未实现** ⇒ 该能力在真实纯库环境尚未跑通（已按"不可用即静默透传"处理）。
-
-### I. 诊断与可观测
-
-| 功能 | 源码落点 |
-| --- | --- |
-| 结构化实时日志（**按条目类型多选筛选**：INFO / WARN / ERROR / SUCCESS，默认四类全选；类型按钮自带条数；毫秒时间戳 / 条数上限 / 加载时清空） | `src/ui/workbench-view.js` 的 `renderLog()` / `nowTime()` / `logLimit()`；筛选状态 `state.logLevels`（Set）；`test` 外无独立模块 |
-| 存储配额两行（浏览器 / 宿主）：两行都打开**同一个存储审查面板**（占满内容区），面板内可切换数据源；初始来源 = 点击的那一行。只读 | `src/ui/workbench-view.js` 的 `renderQuota()` / `renderStorageInspector()` / `openStorageInspector()` / `siRequest()`；`src/core/storage-inspector-model.js`（纯逻辑）；`src/ui/storage-inspector-browser.js`（浏览器 provider）；`index.js` 的 `actions.storageInspector`；`src/ui/host-bridge.js` 的 `fetchHostStorageInspect()` / `hostStorageInspectCapability()`。契约见 [HANDOFF-2026-11-11-storage-inspector.md](./HANDOFF-2026-11-11-storage-inspector.md) |
-| 教程演示模式（占位数据可操作；退出整体还原；不写真实数据/宿主） | `#btn-guide` / 教程菜单 / `#tutorial-banner-exit` | `src/ui/workbench-view.js` 的 `enterTutorialMode()` / `exitTutorialMode()` / `demoTutorialActions()` / `buildDemoPackages()`；模板 `#tutorial-banner`。**首帧即时出现**：`index.js` 在 `main()` 第一个 `await` 之前 `openTutorial()`，真实读库/配额推迟到退出教程（`actions.onTutorialExit`） |
-| 目标任务式教程（选目标 → 逐步高亮；按平台与桌面/手机视图自适应；目标缺失时卡片居中保留；扩展 / 迁移目标会引导填凭据） | `#btn-guide` → 目标菜单 | `src/ui/workbench-view.js` 的 `TUTORIAL_GOALS` / `renderTutorial()` / `tutorialPrepareStep()` / `centerTutorialCard()` |
-| 宿主配额读数（Luker `RestProvider`，供配额行） | `src/ui/host-bridge.js` 的 `readHostStorageQuota()`；面板内的逐层读取走 `fetchHostStorageInspect()` |
-| 导出扩展资产列表（官方扁平 JSON，可导入「下载扩展和资源菜单」） | 每张图表卡 `[data-assetlist]`；扩展管理 → 宿主页**列表下方** `#extmgr-export-selected`（先在列表勾选，未勾选时禁用；空态不再提供入口） | `src/core/asset-list.js`、`src/ui/host-bridge.js` 的 `listHostExtensions()`、`index.js` 的 `exportPackageAssetList()` / `exportHostAssetList({names})`；契约见 `.trellis/spec/frontend/asset-list-export.md` |
-| 设置分组可收起（提示 / 导出 / 日志） | `src/ui/settings-panel.js` 的 `buildSettingsHtml()`（三个 `<details>`） |
-| 图表单独最大化 + 逐层下钻（勾选逻辑不变） | `src/ui/workbench-view.js` 的 `chartCardHtml()` / `volScopedNodes()` / `volBreadcrumbHtml()`；**最大化只铺满 `#app.app-container`，不是浏览器视口全屏**（`style.css` 的 `.vol-card.is-max` 用 `position:absolute`） |
-| 扩展未勾选时的「保持不选 / 清单」 | `src/ui/workbench-view.js` 的 `extensionToolsHtml()` / `extensionManifestOnly()`；清单时保留扩展元数据扫描、实体由 manifest 模式丢弃 |
-| 私有配置目标宿主兼容标记 | `src/ui/workbench-view.js` 的 `privateHostCode()` / `nodePrivateIncompatible()`；跨宿主仍打包到 `_compat/`，树内显示「不兼容」 |
-
-### J. file:// 单文件离线产物（S7，2026-10-13）
-
-| 功能 | 源码落点 |
-| --- | --- |
-| IIFE 单包 + CSS/字体内联 + 零外部请求 | `scripts/build-offline.mjs`、`scripts/offline/entry.js` |
-| Worker 构建期换空实现（IIFE 不接受 `new Worker(new URL(...))`） | `src/core/worker-factory.js` + `scripts/offline/worker-factory.stub.js` |
-| 运行期离线标记（确定走主线程降级） | `src/core/worker-client.js` 的 `isOfflineBuild()` |
-| 验证 | `e2e/standalone/specs/offline-single-file.e2e.cjs`（28 断言） |
-
-### K. 局域网互传（整面板视图，2026-11-05）
-| 功能 | UI 入口 | 源码落点 |
-| --- | --- | --- |
-| 用「迁移与备份」面板**完整替换**左侧图表面板 | 面板头切换行 `[data-wbview="transfer"]`（`存储图表 / 扩展管理 / 迁移与备份`） | `src/ui/workbench-template.js`（`#transfer-view` + `#transfer-tabs`）、`src/ui/workbench-view.js` 的 `renderTransfer()` / `renderLan()` |
-| 离开迁移面板、回到图表 | 面板头切换行里的「存储图表 / 扩展管理」（迁移面板头**没有** ×） | `renderViewSwitch()` + `#view-workbench` 的事件委托 |
-| 一级 tab：局域网 / 公网 | `#transfer-tabs` | `src/ui/workbench-view.js` 的 `renderTransfer()` |
-| WebRTC 分块传输 / 二维码信令 / 续传 | 局域网 pane 内发送与接收区 | `src/core/lan-transfer.js`、`src/ui/lan-transfer-panel.js` |
-
-> 新的承载面契约见 `.trellis/spec/frontend/workbench-single-view.md` §7.3；
-> 旧「执行卡内折叠块」模型（`.lan-block` / `#lan-toggle` / `.col-side.lan-open`）已废弃。
-
-### K2. 内联扩展管理（2026-11-11）
-
-| 功能 | UI 入口 | 源码落点 |
-| --- | --- | --- |
-| 视图切换（桌面 2 / 手机 3；桌面数据包列常显） | 各面板头内 `[data-view-switch]`（图表 / 扩展管理 / 数据包；手机上一行切换、下一行原面板按钮） | `src/ui/workbench-view.js` 的 `renderViewSwitch()` / `syncMainView()` |
-| 扩展管理整面板（宿主 / 开发者 / 打包） | `#extension-view` | 同文件的 `renderExtensionView()` / `renderExtInstalled()` / `renderExtCredentials()` / `renderExtPack()` |
-| **报告常驻底部（不随页签）** | `#extmgr-report-bar` / `#extmgr-report-panel` | `renderExtensionView()` 的展开逻辑 + `renderExtReport()`；展开时隐藏 `#extension-body` |
-| **插件数据导入导出 JSON** | 设置 → 数据 | `src/ui/plugin-data.js` 的 `buildPluginData()` / `applyPluginData()`；凭据需勾选，OAuth 需再勾一次；导入后重载 |
-| 批量安装（多行链接 / `.txt` / `.json`；`url \| 分支`、`url#分支`） | 宿主页底部「安装扩展」折叠区（`#extmgr-install-block`，默认收起） | 同文件的 `parseExtEntries()` / `renderExtInstall()` / `refreshInstallArea()`；执行端 `src/ui/host-bridge.js` 的 `installExtensionBatch()` |
-| 导出日志 / 失败链接 txt / 安装报告 JSON | 安装区与报告页底部按钮 | 同文件的 `downloadTextFile()` |
-| 宿主扩展清单导出收束 | 已装页「导出扩展清单」 | `index.js` 的 `exportAssetList()`（`source:'host'`） |
-| 包清单入口收束 | 图表卡 `[data-extmanifest]` → 扩展管理并预填 | `index.js` 的 `openExtensionManifest` → `view.openExtensionManager()` |
-| **打包页：按数据包选择扩展** | 扩展管理 → 打包 | `src/ui/workbench-view.js` 的 `renderExtPack()`；扩展折叠为单元的纯逻辑在 `src/core/ext-pack.js`（`extensionUnitsOf` / `extensionUnitName`） |
-| **每包独立 Git 模式** | 打包页组头 / 图表卡 `[data-gitmode]` | `state.gitModeByPkg` + `packageGitMode(pkg)`；`getExportOptions(pkg)` 与合并计划按包取值 |
-| **v0.5.2 整改（2026-11-17 用户裁定）** | ① **逐扩展双模式（v0.5.3 已升级为双选）**：每个扩展目录行只有「完整 / 清单」两个按钮，**可以同时点亮**；组级/批量级按「是否存在完整 / 是否存在清单」分别点亮，两者可同时亮，界面不再显示「混合」。单图表与多图表共用同一 `state.extPackMode`。② **同一包内两种模式并存**：转换器新增 `extensionManifestNames`，只丢弃名单内扩展实体，其余照常完整写出；私有清单每条记录 `packMode`，顶层 `mode` 可为 `mixed`；官方索引只列清单模式的可安装项。③ **清单扩展在图表中折叠为一条 0 体积叶子**（勾选镜像扩展目录），切换模式立即恢复/折叠。④ **二级占用条递归**：`selectedMbMap()` 覆盖全部后代，不再只填一级。⑤ **存储审查四类**：移除 `quota` 分类条目，配额只在面板头；中文类目去英文括号。⑥ **包内 Git 真实提交**：新增 `src/core/git-local.js` 读 `.git` 的 HEAD/refs/packed-refs/loose objects/packfile（含 ofs/ref delta），本地/云端页签常显，云端关闭时明确提示；泳道列与提交行分别包裹。⑦ **二维码占位**：未就绪只显示矩形提示，不生成占位真二维码 | `src/core/extension-pack-mode.js`、`src/core/git-local.js`、`src/core/transform.js`、`src/core/extension-manifest.js`、`src/ui/workbench-view.js`、`src/ui/storage-inspector-browser.js`、`style.css`、`src/i18n/locales/*.js`、`index.js`、测试 `test/extension-pack-mode.test.js` / `test/git-local.test.js` / `test/mixed-ext-mode.test.js` |
-| **第八轮整改（2026-11-16 用户裁定，实机逐条）** | ① **扩展面板终版布局**：全部留在文档流（页脚/报告条不 fixed、不脱离 DOM）；面板 flex 撑满列高=**面板底即屏幕底**（页脚贴底、完整显示、永不遮挡）；`.ext-scroll` **内容定高**（去掉 flex 拉伸+min-height:96 的占高度空白带）；列表长时 `.extension-body` 唯一滚动。② **手机数据包抽屉**：收起＝`display:none`（0fr 收拢会把 zone-card 边框压成悬在页头与切换行之间的细线——用户圈选实锤后消灭）；展开＝`1fr + zoneDrop` 滑开挤压；**收起也有动画**（`.is-closing` zoneClose，animationend 后才摘除，选包自动收起走同一路径）。③ **全局动画纪律**：所有 details 折叠卡开（discloseOpen）/合（discloseClose+全局委托 JS 托管摘 open）、安装区/报告面板展开统一过渡。④ **开发者页设置卡**：三个开关（自动更新/Git 云端读取/切换分支按钮）**逐字照抄 .ext-accounts 卡片范式**（details+ext-summary 标题头「开发者设置 3」+ 名左说明右单行行）；提示文案全部缩短为单行。⑤ **最外层滚动条彻底禁止**（手机）：app-main overflow:hidden，图表栈/迁移面板/扩展正文/数据包抽屉各自内滚。⑥ 面板头 help-btn 全拆（第七轮）与守卫表同步 | `style.css`（扩展布局终版/抽屉动画/设置卡/内滚）、`workbench-view.js`（抽屉动画 JS/全局 details 收合委托/设置卡）、`workbench-template.js`（无改动） |
-| **第七轮整改（2026-11-15 用户裁定，最终定案）** | ① **手机数据包列表＝同层挤压**（推翻第六轮浮层版，终审裁定「绝对禁止浮层」）：恢复文档流内 `order:-1` 段 + `grid-template-rows 0fr→1fr` 滑开挤压下方内容；`syncMainView` 的 side.hidden 回到 `siActive`（hidden 不参与显隐，全由 `data-zone-open` 驱动 CSS）。② **面板头孤零零「?」全拆**（举一反三）：模板中 6 处 `help-btn`（chart/transfer/credentials/extmgr/zone/log）全部删除；`scripts/control-consumer-guard.js` 的 `group:.help-btn` 僵尸消费点声明删除；两条教程锚点改指现存控件（`#transfer-tabs [data-transfer-tab="cloud"]` / `#cloud-provider-tabs`）。**教训**：模板批量删改用了 `sed -i`（违反块级编辑铁律，已当场用 diff 核验只动了目标行并补用 Edit 删漏网 1 处——下不为例） | `workbench-template.js`（6 处 help-btn 删除）、`scripts/control-consumer-guard.js`、`workbench-view.js`（教程锚点）、`style.css`（挤压段） |
-| **第六轮整改（2026-11-15 用户裁定，回退 81022e1 后重做）** | ① **回退 81022e1 的内嵌抽屉**（占一行布局高度被否），重做为**零高度锚定下拉**：关闭 `display:none`、打开 `absolute` + `--zone-drop-top`（JS 按切换行实时底边写入）贴行正下方浮出，`zoneDrop` 滑入动画；`syncMainView` 的 side.hidden 恢复 `siActive || (mobile && zoneOpen!=='1')`。② **Git 云端读取开关**：开发者页 `gitCloudReadOn`（默认关）——`loadGitTarget` 云端段与 `loadGitCommitDiff` 双门控，关=零云端请求、如实显示「云端读取已关闭」（`gitv.cloudReadOff`） | `workbench-view.js`（`syncMainView`/wbview 点击处理/`loadGitTarget`/`loadGitCommitDiff`/`renderExtCredentials`）、`style.css`（`zoneDrop`/锚定规则/去 `order:-2`） |
-| **第五轮整改（2026-11-15 用户裁定，实机反馈）** | ① **手机数据包＝内嵌抽屉**（推翻浮层版）：`.col-side` 在 `app-main` 内 `order:-1`（切换行 `order:-2` 保持最上），`grid-template-rows:0fr→1fr` **从上至下滑动动画**，非 fixed、无投影；抽屉内**只留包列表**（`.zone-side-tabs`/`#zone-side-git` 在抽屉内禁用）；开关只翻 `#app[data-zone-open]`，显隐/动画全在 CSS。② **4 钮空间够必须显示文字**：废除「手机固定纯图标」强制规则，`applySwitchDensity` 量宽是唯一退化路径；切换行 `flex-wrap:nowrap` **禁止换行**；教程横幅手机用短文案 `tutorial.modeBannerShort` + nowrap 单行。③ **自动更新总开关迁开发者页**（默认关，推翻来源行按钮版）：`renderExtCredentials` 渲染 `#extmgr-auto-master` 复选框 + 策略入口；宿主页逐扩展控件由 `autoMasterOn` 门控；策略子视图自带 `#extmgr-policy-close`。④ **分支切换按钮开关**：开发者页 `gitRefInstallOn`（默认关）门控 `renderGitVizHeadbar` 的 ref chips 与 `#git-viz-install`。⑤ **扩展管理禁双滚动条**：`[data-view="mobile"]:has(#extension-view:not([hidden])) .app-main{overflow:hidden}`。⑥ **设置 × / 取消未保存确认**：`openSettingsView` 捕获 `baseline`，`isDirty()` 时弹「有未保存的更改，是否离开」。⑦ 区头 `[data-view-switch-zone]` 旧切换组**任何形态都不渲染**（修手机端重复 4 钮） | `workbench-view.js`（`renderViewSwitch`/`syncMainView`/`setTutorialBanner`/`renderExtCredentials`/`renderGitVizHeadbar`/`openSettingsView`）、`style.css`（抽屉/横幅/nowrap/:has 规则）、i18n 双语新键 |
-| **第四轮整改（2026-11-15 用户裁定）** | ① **包选择语义翻转**：`state.activePkgs`（外框点击多选累加）驱动图表与合并模式；复选框（`selectedPkgs`）只管列表操作、不再 renderChart；`syncSourceToActive()` 保兼容位。② **分区记忆**：`viewPkgMem`（chart/extension/transfer 各存 active+checked），切页 snapshot→restore；扩展管理的包选择本来就是独立的 `extSelectedPackageId`。③ **手机数据包=下拉**：视图行 4 钮、数据包最右，`#app[data-zone-open]` + `.col-side` 固定浮层 CSS，点包卡自动收起。④ **导出扩展清单收口**：`extensionToolsHtml` 的 `data-assetlist` 链路拆除；扩展管理宿主行（`#extmgr-export-assetlist`，随勾选可用）与包内行（`#extmgr-export-assetlist-pkg`，随当前包可用）各一枚**纯图标**钮。⑤ **图表扩展行建议徽标**：`decorateExtSuggestions()` + core `suggestPackMode()`（完整/清单建议，与打包智能推荐同源），覆盖完整树 `dir:extensions:<名>`（含 third-party 一层）与清单树 `ext:<名>`。⑥ **Git 乱码修复**：`git-remote.js` 的 `request()` 改为 `arrayBuffer()` + **强制 UTF-8** 解码（不信响应头 charset）；手机点扩展行 `sideTab='git'` 并滚入可视化视图。⑦ **宿主行 URL 全量直显**：`installedRemoteUrlOf()`（登记/规则，同步）+ `enrichHostRemoteUrls()`（逐条读宿主 origin，缓存 `state.extRemoteUrls`，含空值防重请求）+ `repoPrivacyOf()` 私有/公开徽标。⑧ **自动更新总开关**：`settings.extAutoToolsOn`（默认 false）——关=行内不渲染 `.ext-auto`；开=逐行控件 + 滑杆图标开策略子视图。⑨ **服务端插件区迁入页脚**（`#extmgr-server-area`，默认收起，`ext-footer` 内自带上限滚动、向上挤压）；行内 URL+徽标+更新/装依赖/删除、按 URL 安装；`host-bridge` 新增 `serverPluginUpdate/Delete/InstallDeps/Install`（端点：`POST /api/users/plugins/{update,delete,install-dependencies,install}`，users-admin、requireAdmin，`restartRecommended` 如实转达）。⑩ **页脚用户徽标**：`#extmgr-user-line` 显示 `readHostIdentity()` 的 handle，管理员加 `fa-user-shield`+「管理员」。⑪ **页脚钉底全端**：独立态根 `height:calc(100vh-36px)`（上一轮）+ 手机 `.extension-view{height:calc(100dvh-104px)}`（本轮）。⑫ **包内「转成清单」**：`prunePackageExtensions(...,{keepManifest:true,manifestSeed})` 删实体留清单（无清单文件按种子补建）。⑬ 手机树行全选/全不选/反选**常显**（`[data-view="mobile"] .row-bulk{display:inline-flex}`） | `workbench-view.js`（`chartTargets`/`decorateExtSuggestions`/`enrichHostRemoteUrls`/`serverPluginBlockHtml`/`bindServerPluginArea`/`syncExtInstallBlock`/`snapshotViewPkgs`）、`src/core/ext-pack.js`（`suggestPackMode`）、`src/core/ext-prune.js`、`src/ui/git-remote.js`、`src/ui/host-bridge.js`、`index.js` actions、`workbench-template.js`（页脚两容器） |
-| **包内视图整改（2026-11-15 用户裁定，第三轮）** | ① **「选择数据包」文案彻底删除**（双语 i18n 键已删，label 不复存在）；**桌面**只读展示当前包名 `.ext-pkg-current`（默认最新导入包）；**手机版必须可选**——无文字标签的 `#extmgr-pkg-select` 保留，`[data-view]` 互斥显示（`style.css`：`:not([data-view="mobile"])` 隐藏 picker、`[data-view="mobile"]` 隐藏只读包名）；② 扩展行（宿主 + 包内）**直接显示远程 URL** `.ext-remote-url`，点击文本即复制（`data-copyurl` 委托，防重复绑定），**禁止单独的复制按钮**与外链图标；未登记以「—」占位；③ 工具行新增「移除所选」= **包内清理（只做减法）**：从当前包删除勾选扩展的实体条目与清单条目并重建 zip 原位替换；④ 「安装扩展」页脚钉底（独立态根容器补 `height:calc(100vh-36px)`，否则整页随内容生长、页脚滚出视口）；⑤ 目标下拉「宿主」状态只用颜色（`.picker-item.is-host` accent 染字 + 内嵌左色条），「（宿主）」文字标签废除；⑥ 原生 select 弹出项显式归一 `option{padding:4px 10px}` 禁止左侧空白 | `workbench-view.js` 的 `renderExtInstalled()` / `installedRemoteUrlOf()` / `pruneSelectedFromPackage()`；`src/core/ext-prune.js`（`prunePackageExtensions`，零命中原样返回）；`index.js` 的 `actions.prunePackageExtensions`；测试 `test/ext-prune.test.js` |
-| **UI 一致性整改（2026-11-15 用户裁定，两轮）** | ① 页头标题两态：宽度够显示全名，放不下整名降级为项目符号 `⇄`（`h1.is-symbol`，可访问名经 `aria-label` 保全）；② 扩展管理内**禁止省略号**（列表行/安装/报告行名称完整换行；包名下拉按最长选项自适应）；③ **面板头任何宽度单行**（推翻 2026-11-11 手机两行布局），**手机视图切换固定纯图标**（不量宽不回退）；④ **全插件控件等高 `--ctl-h:28px`**：按钮/输入/下拉/分段/徽标/图标钮/方形小钮全部归一，`style.css` 尾部有兜底范式规则（豁免：多行 textarea、复选框、拖拽手柄、状态 pill、`git-graph-row` 泳道行——与 SVG 坐标对齐禁改、`#workbench-progress`）。**固定高度下拉铁律**：`appearance:none` + `line-height` 对齐内容高(26px) + wrapper `::after` 自绘箭头——Blink 原生 menulist 文字顶部对齐、computed line-height 恒回落 UA 值（实测钉不动），上下 padding 还会裁掉选项文字（2026-11-15 实测「Dark Lite」）。**级联顺序铁律**：`.text_pole` 基座规则必须排在该文件所有复合规则**之前**（同特异性按源码顺序取胜——基座曾在文件尾部把 `.header-theme-select` / `.chart-fmt` / `.ext-up-*` 的字号与 padding 全部静默压掉）。**标题符号**：`⇄` 恒显示在名称前（⇄ 数据包转运），放不下时整名退化为仅符号；⑤ 面板动作行子项与 `.segmented` **禁止 flex 收缩**（收缩+overflow 会剪字；放不下由切换行退化图标承担）；⑥「安装至宿主」收束到页脚安装面板 | `workbench-template.js` 的 h1 两 span 结构；`workbench-view.js` 的 `applySwitchDensity()`（标题测量）/ `renderExtInstalled()` / `renderExtInstall()`；`style.css` 的 `--ctl-h` / `.ext-scroll` / `.ext-list-head` / `.app-title-sym` / 尾部等高兜底块。**范围边界**：`source-chip` / 存储审查 `si-*` 文字行 / 树 `tree-label` / Git 可视化 `git-viz-ref span` / 数据包卡 `pkg-name` / LAN / restore 行的省略号**未动**，属下一轮裁定范围 |
-
-| **扩展列表禁常驻分隔细线（2026-11-15 用户裁定）** | 扩展管理 → 宿主页来源行与工具行之间 | 移除来源行下的 dashed 分隔线**及其恒占高度的 padding**——两者叠加过会在两行之间凭空多出一条线并占掉高度。两行之间只用面板既有间距 | `style.css` 的扩展来源行样式；`workbench-view.js` 的 `renderExtInstalled()` 行结构 |
-
-### K3. 数据包页签行 / 恢复模式 / 待导出合并 / 开发模式（2026-11-11）
-
-| 功能 | UI 入口 | 源码落点 |
-| --- | --- | --- |
-| **恢复模式**（原「数据包模式」）与覆盖/增量 | 数据包 `导入 / 导出` 页签**右侧**同一行 | `workbench-template.js` 的 `#zone-tabs > #zone-mode-row`；`workbench-view.js` 的 `renderZoneModeRow()`；文案 `chart.deltaLabel` |
-| 从宿主拉取 | 同上，仅在导入分区显示 | `#btn-fetch` → `doFetch()` |
-| **待导出两列区块已删除** | — | 模板无 `#pending-exports`；队列条目由 `renderZones()` 用 `pendingCardHtml()` 渲染到导出区，动作仍走 `pendingDownload` / `pendingStash` / `pendingRemove` |
-| **自动更新（逐扩展 + 策略）** | 宿主页每行：关闭 / 仅提醒 / 直接更新 + 间隔（秒）；策略在宿主页来源行「自动更新」按钮——**打开即替换列表区域**为策略子视图（2026-11-15 改：禁长名、替换式，不再是折叠块） | `saveUpdateRule()` / `resolveUpdateRepo()` / `scheduleAutoUpdates()` / `runAutoUpdateTick()`；策略来自 `updatePolicyOf()`，退避用 `updateBackoffDelay()`（`intervalSec × backoff^failures`，截断到上限）；`renderExtInstalled()` 的 `extAutoPolicyBlockHtml()` |
-| 迁移与备份教程 | 迁移面板头 `?` | `HELP.transfer`（局域网互传 / 云端仓库 / 恢复模式） |
-| 教程模式不自动退出 | 头部书本图标 `#btn-guide` / 横幅「退出教程」 | `tutorial-next` 最后一步只回目标菜单；`closeTutorial()` 才是退出 |
-| 设置三态（×保留草稿 / 取消丢弃 / 保存持久化） | 设置面板顶部 × 与底部按钮 | `workbench-view.js` 的 `captureSettingsDraft()` / `applySettingsDraft()` / `openSettingsView()`；`state.settingsDraft` 仅内存 |
-| 整窗口铺满（桌面与窄屏一致）/ 选择锁 | `#app` 两种视图都占 100vw×100vh、零圆角；除日志与输入框外不可选 | `style.css` 的 `#app.app-container:not([data-view="mobile"])` 与 `[data-view="mobile"]` 两条容器规则、`user-select` 例外块；窄屏图表列/卡片用 `flex:1 0 auto`（可增不可缩）拉伸填满，树不限高以免压住底部汇总条 |
-| 切换行顺序（迁移与备份在扩展管理前） | 各面板头 `[data-view-switch]` | `workbench-view.js` 的 `renderViewSwitch()` 项序 |
-| 教程跳过 / 重新打开 | 浮层「跳过」、横幅「重新打开教程」 | `hideTutorialOverlay()`（只关浮层）与 `#tutorial-banner-reopen` → `openTutorial()` |
-| 宿主页 / 宿主列表 / 安装页脚 | 扩展管理 | 宿主页**不再有顶部工具条**：检查更新 / 刷新 / 全选 / 批量都在列表头 `ext-list-head` 按钮行（图标按钮），导出清单沉到列表下方且必须先勾选；行内动作（移至全局 / 更新 / 卸载）一律图标按钮；加载顺序 `#N` 在扩展名前，本地作用域不再打「本地」标签；**2026-11-15 起列表不再是独立 details DOM**——无「扩展列表」头、无 `.ext-host-list` 包裹层，直接嵌在 `#extension-body` 流内，按钮行固定、`.ext-scroll` 滚动区始终占满剩余高度；安装扩展是面板**固定页脚** `#extmgr-install-block`（`renderExtInstalled()` / `syncExtInstallBlock()`），紧贴安装报告条，**所有安装操作（含数据包「安装至宿主」）只在此面板内** |
-| **扩展作用域互转（全局 ⇄ 用户）** | 扩展管理 → 宿主页每行图标按钮（`fa-right-left`，**仅管理员**渲染；悬停/aria 给「移至全局 / 移至用户」） | 宿主 `POST /api/extensions/move`；`src/ui/host-bridge.js` 的 `moveExtensionViaHost()`、`src/ui/workbench-view.js` 的 `moveScopeWithConfirm()` / `moveInstalledExtension()`；`index.js` 的 `actions.moveExtension` |
-| **扩展作用域与同名去重（四宿主）** | 转出的包对同一扩展只保留一份 | `src/core/transform.js` 的 `extensionScopeOf()`（五形态分类）/ `routeSource()`（返回 `extScope`）/ `targetEntryPath(hub, target, extScope)`；`public/scripts/extensions/third-party/` 是 ST/Luker **全局**扩展在包内的真实路径（宿主常量 `globalExtensions`）；`public/scripts/extensions/<内置>/` 判为 `builtin-ext` **剥离**；同名按宿主语义**保留用户级**（ST/Luker `discover` 源码注释：conflict 时从 user 目录加载；TT 同 local 优先）；PT 无用户级目录 ⇒ 迁 `data/extensions/third-party/` 并补 `extension-sources/<scope>/`。UI 汇总条与行内标注读 `plan.extensionScopes` |
-| **安装到全局** | 扩展管理 → 宿主页安装区「安装到全局」（**仅管理员**可见） | `src/ui/host-bridge.js` 的 `installExtensionBatch()` 透传 `global` 给 `installExtensionViaHost()`；`workbench-view.js` 的 `renderExtInstall()` / `runExtInstall()` |
-| **加载顺序只读展示** | 扩展列表 `#N` 徽标 + 排序「加载顺序」；**不提供编辑**（宿主无写回端点） | `src/core/asset-list.js` 的 `manifestToExtension().loadingOrder`；`workbench-view.js` 的 `installedRowRecords()` / `sortedInstalledRecords()` |
-| **扩展写操作全串行（规避宿主 staging 竞态）** | 扩展管理任意写操作：安装 / 更新 / 卸载 / 重装 / 移动；手动、批量、自动更新共用一条队列 | `src/ui/workbench-view.js` 的 `queueExtMutation()`；宿主竞态取证与上游修复建议见 `.trellis/spec/frontend/extension-git-manager.md` §15 |
-| 演示占位扩展读数据模块 | 教程模式宿主列表 | `src/data/demo-extensions.js`（GitHub `st` 前缀仓库生成；**必须是 ESM 而不是 JSON**，否则浏览器直装整图失败——见 K2 段落与 2026-11-11 事故记录） |
-| 凭据双写（导出不必回读 settings.json） | 设置 → 数据 / 扩展管理 → 开发者 | `src/ui/settings-store.js` 的 `saveSettings()`：localStorage 与宿主 `extension_settings` 始终同写 |
-| 导出默认值（登录凭据默认勾选、OAuth 子项默认不勾） | 设置 → 数据 | `src/ui/settings-panel.js` 的 `dataGroup`；`src/ui/plugin-data.js` 的 `buildPluginData()` |
-| **Git 账号（多站点多账号）** | 扩展管理 → 开发者 →「Git 账号」 | `src/core/git-accounts.js`（归一/增删/默认/匹配/脱敏）；`src/ui/git-remote.js`（测试账号）；持久化在 `settings-store.js` 与 `extension_settings` |
-| **OAuth 登录（授权码 + PKCE）** | 开发者页「OAuth 登录」 | `src/core/git-oauth.js`（端点事实 / PKCE / 换 token）；`workbench-view.js` 的 `startOAuth()` / `completeOAuthFromUrl()`；待完成态存 `sessionStorage['stpt.oauth.pending']` |
-| **令牌获取指引（一页教程）** | 开发者页「令牌获取指引」→ 帮助视图 `gitToken` | `workbench-view.js` 的 `HELP.gitToken`（含站点链接与最小权限）；帮助渲染支持 `intro` / `links` |
-| **Web 形态安装扩展（写进数据包）** | 扩展管理 → 宿主页安装区（需先在数据列表勾一个导入包） | `index.js` 的 `installExtensionsIntoPackage()`：`src/core/repo-files.js` 列树 + 并发逐文件取（6 并发、20s 单请求超时、1200 文件 / 80 MB 上限）；`src/core/ext-install-web.js` 判类型与落点（ST/L `extensions/<名>/`、TT `data/default-user/extensions/<名>/`）；`augmentZip` 注入源包后另存为「(含扩展)」包 |
-| **凭据与令牌说明（四类凭据总表）** | 迁移与备份 → 公网页签 `?` → 帮助视图 `credentials` | `workbench-view.js` 的 `HELP.credentials`；覆盖 Git 令牌 / S3 / WebDAV / 存放位置；模板 `#cloud-provider-tabs` 右侧 `data-help="credentials"` |
-| **教程引导填凭据** | 扩展管理 / 迁移备份教程 | `workbench-view.js` 的 `TUTORIAL_GOALS` 中 `extTab / openAccounts / openOauth / view:'cloud' / transferTab / cloudProvider` 由 `tutorialPrepareStep()` 处理 |
-| **安装日志 = 全局日志** | 安装区 / 报告页「查看日志」 | `extLogAppend()` 写入 `state.log`；`renderExtReport()` 不再有独立日志块；报告与失败链接仍为本页独有 |
-| **凭据存放位置（设置 → 隐私，2026-11-16 用户裁定）** | 设置弹窗「隐私」组三项独立开关（Git / S3 / WebDAV） | `settings-panel.js` 的 `gitCredentialStorage` / `s3CredentialStorage` / `webdavCredentialStorage`（**默认全 `browser`**）；`settings-store.js` 的 `saveSettings()` 按各档剥除服务端副本（`forHost`），`loadSettings()` 显式值优先 → 服务端已有凭据则按 `server` → 否则 `browser`；账号区不再放单选，只显示状态 + 「去隐私设置」 |
-| **URL 归一（含 `/tree/<ref>`）** | 安装条目行 | `src/core/git-url.js` 的 `parseRepoUrl()` / `refineRefWithBranches()`；仓库页地址必须解析成「根 + ref」——宿主用 URL 最后一段做目录名 |
-| **分支列举 / 仓库摘要 / 私有预检** | 条目行「列分支」与解析后自动预检 | `src/core/git-site.js`（端点/鉴权/归一）+ `src/ui/git-remote.js`（有界超时 fetch） |
-| **私有仓安装（凭据注入）** | 安装执行 | `host-bridge.js` 的 `installExtensionBatch()` 用 `buildAuthedUrl()` 拼进交给宿主的 URL；日志/报告用 `scrubUrlCredentials()` 脱敏 |
-| **更新检查（只读）** | 已装页「检查更新」 | `workbench-view.js` 的 `checkExtUpdates()`；本地版本读宿主静态 `manifest.json`，远端读 raw manifest，`compareVersions()` 比较 |
-
-> 宿主「从宿主拉取」注入只允许落在**备份**动作区：ST/TT 的 `.userBackupButton`、
-> Luker 的 `.backupActionRow`（必须含 `.backupDownloadButton`）或 2.9+ `.dw-foot`（含
-> `[data-act="backup-go"]`）、TT 的 `#data_migration_export_button`、PT 的 `#ptdm-export`。
-> **禁止**回退到「首个 `.backupActionRow`」——日志查看器同用该类名，会注错（2026-11-11 实测）。
->
-> **凭据隐私是产品事实，不是可选文案**：插件没有自有远端；凭据默认随宿主
-> `extension_settings` 写入服务端 `settings.json`（有服务器/管理员权限者可见），
-> 可在账号区改成「仅浏览器」；任何展示位置必须脱敏。私有仓库安装时凭据会被拼进
-> 交给宿主克隆的 URL，宿主可能写入该扩展的 `.git/config`。
->
-> **账号对所有平台链接生效（2026-11-12）**：带凭据时，分支 / 仓库信息 / 标签 / 提交 /
-> manifest / 任意原始文件的读取都会带凭据，**不限于私有仓库**。自建主机按账号里选的
-> 站点类型解释仓库（GitHub Enterprise → `https://<host>/api/v3`、自建 GitLab → `/api/v4`、
-> Gitea → `/api/v1`），见 `git-site.js` 的 `resolveSite()`。关键通道事实：
-> GitHub 私有仓库的 raw 域名**不接受 `Authorization`** ⇒ 读文件改走 contents API
-> （`Accept: application/vnd.github.raw`）；Gitee 的 raw 必须带 `access_token` 查询参数。
-> 另外实测本机 `raw.githubusercontent.com` **会被连接重置**（`api.github.com` 200）⇒
-> 无凭据时先 raw、失败即回落内容 API；有凭据时 API 优先、失败再回落 raw。两条都读不到才如实报「未提供」。
-
-### K4. P2 / P3：开发者层级 · 管理员分区 · 误装预案 · Git 可视化（2026-11-11 第二轮）
-
-| 功能 | UI 入口 | 源码落点 |
-| --- | --- | --- |
-| **逐扩展自动更新（模式 + 秒级轮询 + 失败退避）** | 宿主页每行：关闭 / 仅提醒 / 直接更新 + 间隔（秒）；策略在宿主页来源行「自动更新」按钮（打开即替换列表区域，2026-11-15 改） | `saveUpdateRule()` / `resolveUpdateRepo()` / `scheduleAutoUpdates()` / `runAutoUpdateTick()`；策略来自 `updatePolicyOf()`，退避用 `updateBackoffDelay()`（`intervalSec × backoff^failures`，截断到上限） |
-| **列表内批量管理** | 列表头：全选 / 反选 / 取消 / 批量更新 / 批量卸载 / 指定版本分支 | `batchUpdateInstalled()` / `batchUninstallWithConfirm()`；逐条 `updateInstalledExtension()` / `uninstallWithConfirm()`；宿主 `POST /api/extensions/update`（`updateExtensionViaHost`）与 `/delete` |
-| **数据包扩展清单统一入口** | 恢复后自动进「宿主 → 安装扩展」 | `host-bridge.js` 的 `setExtensionManifestSink()`；`index.js` 注册 `view.openExtensionManager(entries)`；独立安装浮层不再使用 |
-| **更新失败预案** | 更新检查结果行「删除后重装」 | `reinstallWithConfirm()` → `reinstallExtension()`：二次确认后 `deleteExtensionViaHost()` 再按登记仓库重装 |
-| **管理员识别** | 宿主页 | `host-bridge.js` 的 `readHostIdentity()`：唯一判据是 `GET /api/users/me` 的 `admin === true`；非管理员不显示分区、不伪造 |
-| **服务端插件分区** | 宿主页（仅管理员） | `listServerPlugins()`（`POST /api/users/plugins/list`，`requireAdminMiddleware`）→ `serverPluginBlockHtml()`；可折叠、显示 `enabled` 与 `pluginsPath` |
-| **前后端误装拒绝** | 安装执行前 | `src/core/plugin-kind.js` 的 `classifyPluginKind()`（manifest.json ⇒ 前端扩展；仅 package.json ⇒ 服务端插件）；`preflightExtEntry()` 用 `rawFile('manifest.json' / 'package.json')` 识别；`runExtInstall()` 拦截并给替代措施 |
-| **`?` 帮助补全** | 扩展管理 `?` | `HELP.extmgr` 新增「开发者页」「前端扩展与服务端插件」「Git 可视化」三段 |
-| **Git 可视化（SVG 泳道图 + 版本切换）** | 数据包列头「数据包 / Git」分段按钮（常显） | `workbench-template.js` 的 `#zone-side-tabs` / `#zone-side-git`（`#git-viz-headbar` / `#git-viz-graph` / `#git-viz-detail`）；`workbench-view.js` 的 `renderZoneSide()` / `renderGitViz()` / `loadGitTarget()` / `loadGitCommitDiff()` / `installGitRefNow()`；布局纯逻辑在 `src/core/git-graph.js`（`layoutGitGraph` / `nodePoint`）。**落点标记与对齐读数（2026-11-14 加深）**：`src/core/git-viz.js` 的 `refPositions()`（本地分支 + HEAD 钉到提交行；云端分支无 sha 不伪造）与 `cloudAlignment()`（已同步 / 落后 N / 窗口外如实报告），diff 汇总复用既有 `diffStat()`。云端仓库优先取宿主 `/api/extensions/version` 的 `remoteUrl`（所有已装扩展都能读），安装登记只作兜底；分支/标签点选后出现「装到该版本」，走 `installExtensions replace:true` |
-| **Git 清理（插件侧）** | 扩展管理 → 宿主页「Git 清理」折叠块 | `gitCleanupBlockHtml()` / `clearPluginGitData()`：清安装登记、逐扩展自动更新规则、更新失败记录；宿主目录里的 `.git` 只读展示、不处理 |
-| 本地 `.git` 读取 | Git 视图 | `host-bridge.js` 的 `readHostExtensionGit()`：`POST /api/extensions/version`（分支 / HEAD / 是否最新 / remoteUrl）+ `/branches`；HEAD 为空 ⇒ 如实显示「历史已丢失」 |
-| 云端只读信息 | Git 视图 | `src/core/git-site.js` 的 `tagsEndpoint()` / `commitDetailEndpoint()` / `remoteFileUrl()` / `normalizeCommitList()` / `normalizeTags()` / `normalizeCommitFiles()`；`git-remote.js` 的 `listTags()` / `listCommits()` / `commitDetail()` / `rawFile()`；只取最近 20 条提交，不拉全量历史 |
-| 模型与判据 | — | `src/core/git-viz.js` 的 `normalizeLocalGit()` / `gitStateOf()` / `mergeBranches()` / `buildGitSummary()` / `selectGitTargets()` / `diffStat()`；工作区状态宿主无端点 ⇒ 显示「宿主未提供」 |
-| 排序 | 宿主页工具条「排序」+ 拖拽行 | `installedRowRecords()` / `sortedInstalledRecords()` / `reorderInstalled()`；`settings.extOrder` 保存自定义顺序，`extSort` 保存排序方式 |
-| **设置读取回归修复** | 设置面板保存 | `readSettings(root, base)`：只覆盖对话框里真实存在的控件，`gitAccounts` / `gitInstalls` / 自动更新等不再被默认值清空 |
-
-> **纪律**：Git 可视化只读，不提供检出 / 切换 / 提交 / 合并；识别不出插件类型时保持 `unknown`
->（不猜、不拦截）；宿主端点读不到就显示「未提供」或「历史已丢失」，**不得伪造提交或空分区**。
-
-### L. 工作台布局：执行卡取消 · 进度条常驻 · 图表网格（2026-11-05）
-
-| 功能 | UI 入口 | 源码落点 |
-| --- | --- | --- |
-| 顶层面板只剩图表面板与数据包面板 | — | `src/ui/workbench-template.js`：`.col-chart`（`#chart-card` / `#lan-view`）+ `.col-side`（`#zone-card`） |
-| 动作按钮并入数据包面板底部 | `#zone-card > #zone-actions-bottom` | `workbench-view.js` 的 `renderActions()`（仅在勾选后出现） |
-| 全局动作条（**2026-11-11 已取消**） | — | 从宿主拉取改到 `#zone-mode-row`（仅导入）；迁移与备份进入面板头切换行；刷新只在安装/恢复完成提示里出现 |
-| 导出区多选「上传」 | `#btn-upload` | `index.js` 的 `restoreSelectedConfirmed()` 逐包顺序恢复；任一失败即停止并报错 |
-| 进度条为常驻底栏，所有视图共用 | `#workbench-progress`（`.app-body` 末位子项） | `workbench-template.js` 模板末尾；`setProgress()` 写 `#progress-fill` / `#progress-label` / `#progress-pct` |
-| 点击进度条打开日志 | `#workbench-progress` 的 click | `workbench-view.js` 的 `bind()`（`renderLog()` + `showPane('log')`） |
-| 顶栏日志按钮已删除 | — | `#btn-log` 不再存在；`#log-dot` 迁入底栏 |
-| 图表动态宫格（1 张占满 / 2 张平分 / 3–4 张 2×2 / >4 张纵向滚动） | `.chart-canvas` | `src/ui/workbench-view.js` 的 `chartCanvasHtml()`；`style.css` 的 `.chart-canvas` |
-| 图表之间拖拽调整行列比例 | `.chart-split-v` / `.chart-split-h` | `initChartSplitters()` + `localStorage['stpt.chartLayout']` |
-| 图表格式切换（单条多色 / 圆环） | 每张卡的 `[data-chartfmt-toggle]` 图标按钮 | `chartFmtOf()` / `volChartHtml()`；状态 `state.chartFmt[key]` |
-| 图表占比动态跟随勾选 | 自动 | `selectedMbMap()` / `volChartData()`；取消勾选后色块与 `tree-occ` 同步重算 |
-| 最大化逐层下钻 | 图表卡 `⤢` + 分类行 | `renderTreeRows()` 在 `drill` 态只渲染下钻按钮，面包屑 `data-volcrumb` 返回 |
-| 数据包偏好（占位勾选 + 顶部控件并入） | `#chart-pref-btn` | `src/ui/chart-prefs.js`、`openChartPrefs()` / `saveChartPrefsDraft()`；保存后只影响以后导入的包。**覆盖/增量已移出偏好**，改到数据包列表顶部 `#delta-toggle`。再次点击按钮退出；有未保存改动先弹确认（设置项 `confirmDiscardChartPrefs`，默认开） |
-| 包名模板（默认折叠；按钮带 ✎ +「包名」+ 展开箭头；展开后预览独占下一行） | `#filename-toggle` / `#filename-row` | `src/ui/workbench-view.js` 的 `renderFilenamePreview()`；`style.css` 的 `.filename-toggle` / `.filename-edit` / `.filename-preview` |
-| 每行占用条与色标 | `.tree-row > .tree-dot` / `.tree-occ` | `renderTreeRows()` 用同一套调色板 |
-| 拖拽卡片改尺寸 | **已删除**（2026-11-09 用户裁定：图表大小由宫格动态决定，不允许自由拉伸） | — |
-
-> 完整契约与验收判据见 `.trellis/spec/frontend/workbench-single-view.md` §11。
-> 注意：`@container` 与基础 `grid-template-columns` **同特异度**，靠源码顺序决胜负——
-> 列数规则必须写在基础规则之后，否则恒为单列（2026-11-05 实测踩到）。
-
-### M. 公网传输：S3 / WebDAV（2026-11-09）
-
-| 功能 | UI 入口 | 源码落点 |
-| --- | --- | --- |
-| 公网内二级切换 S3 / WebDAV | `#cloud-provider-tabs` | `src/ui/workbench-view.js` 的 `renderCloud()` / `cloudClient()` |
-| 分片上传 / 断点续传 / 清单 | 云端面板的上传与备份按钮 | `src/core/transfer-plan.js`、`src/app/transfer-runner.js`、`src/core/transfer-target.js` |
-| 选包来源 | **只读左侧数据包列表的选中项**，面板内无独立文件选择器 | `state.selectedPkgs`；`#cloud-upload`（原包名上传）/ `#cloud-backup-selected`（建备份版本） |
-| S3 HEAD / Range / multipart | 自动 | `src/core/s3-client.js` |
-| WebDAV 全方法降级（OPTIONS/PROPFIND/MKCOL） | 自动 | `src/core/webdav-client.js` |
-| **WebDAV 测试连接**（OPTIONS → PROPFIND → MKCOL → PUT → GET 校验 → DELETE；落在**目录前缀**下，前缀可列则一起验） | 迁移与备份 → 公网 → WebDAV →「测试连接」`#webdav-test` | `webdav-client.js` 的 `selfTest()`；`workbench-view.js` 的 `testWebdavConnection()` |
-| **可选 CORS 代理**（Git / WebDAV 外发请求经用户自填转发地址；留空直连） | 设置 → 网络 → CORS 代理地址 | `src/core/net-proxy.js` 的 `applyProxy()`；`git-remote.js` 的 `getProxyUrl`；`webdav-client.js` 的 `proxyUrl` 参数 |
-| 逐片加密（可选） | S3/WebDAV 表单的「加密短语」；**留空即不加密** | `src/core/s3-crypto.js`；`transfer-runner` 每片独立 IV，续传沿用清单里的原 salt |
-| 一键备份：全量时间戳快照 | `#cloud-backup-selected` + `#cloud-mode-select=full` | `index.js` 的 `backupSelectedToCloud()`；每次独立对象，保留最近 `#cloud-retention` 份；**修剪逻辑在 `src/core/transfer-prune.js` 的 `pruneFullSnapshots()`（2026-11-14 从 index.js 抽出补测，单测 `test/transfer-prune.test.js` 7 项）**：清单不可列（如 WebDAV 禁 PROPFIND）时跳过修剪不阻断备份；keep 非法输入 0/NaN→默认 10、负数→收敛 1。**注意**：备份读的是**已保存**的 `activeCloudConfig()`（mode/setName/retention 全部取保存值）——表单改完必须点「保存」才生效；**2026-11-14 修 bug**：该函数曾读不存在的 `state.selectedPkgs`（真源在 `view.getState().selectedPkgs`）⇒ 按钮对真实用户恒抛 TypeError |
-| 备份集恢复落点 | 云列表「恢复」 | 重建 zip 后 `importCloudPack()` 落工作区；**2026-11-14 改进**：origin 新增 `cloud-restore` → **导入区**（恢复的包可继续当源转换），旧 origin=converted 会落导出区、与「恢复 → 再走迁移流程」相悖；映射登记在 `zone-model.js` ORIGIN_ZONE，标签 `queue.origin.cloudRestore`（zh「云端恢复」） |
-| 一键备份：增量备份集 | `#cloud-mode-select=set` + `#cloud-set-name` | `src/app/backup-set-runner.js`、`src/core/backup-set.js`；对象按 sha256 去重，每版一张完整快照 |
-| 备份集恢复 | 列表里的「恢复」按钮 | `restoreBackupSet()` → `actions.importCloudPack()` 落入工作区，再走既有迁移流程 |
-
-> 契约见 `.trellis/spec/frontend/transfer-s3-webdav.md`。
-> **无服务端直传、无 cron**：本插件禁止后台插件；`serverTransfer` 能力表全 false。
->
-> 2026-11-12 真机实测（`https://webdav.zhaoyuecst.us.ci/`，Apache mod_dav + Caddy）：> `OPTIONS 200`（`Allow` **不含** PUT/MKCOL）、`PROPFIND 207`、`MKCOL 201`、`PUT 201`、
-> `GET 200`、`DELETE 204`；响应带 `Access-Control-Allow-Origin: *`，浏览器可直连。
-> ⇒ `probe()` 不再按 `Allow` 判死写入能力（`declared` 字段保留声明供参考）。
->
-> **控制面与数据面两套超时**：`OPTIONS/HEAD/PROPFIND/MKCOL/DELETE` 用 20 秒；
-> `PUT/GET` 用 `transferTimeoutMs`（默认 120 秒）。原因：分片默认 8 MiB，20 秒要求 ≈410 KB/s，
-> 远端酒馆或家宽上行经常达不到 ⇒ 每片都超时、上传永远失败；120 秒对应 ≈70 KB/s 下限。
-> 更慢的链路仍会如实超时。
->
-> **自检分级**：`OPTIONS` / `PROPFIND` 是参考项（服务器可禁 PROPFIND，上传下载仍可用），
-> `MKCOL/PUT/GET/DELETE` 是必需项；参考项失败只标记 `advisoryFailed`，界面显示「连接可用」并列出 ⚠ 项。
->
-> 浏览器端无头实测（2026-11-12，Playwright + `npm run build && npm run preview` 的 4173）：
-> 「测试连接」六步全绿（OPTIONS 200 / PROPFIND 207 · 17 项 / MKCOL / PUT / GET 内容一致 / DELETE 204），
-> 控制台零报错。**S3 不走该代理**：SigV4 签名绑定 Host 与路径，经转发地址会直接失效。
-
-### N. 恢复上传：Luker 8 MiB 分片（2026-11-10）
-
-| 功能 | UI 入口 | 源码落点 |
-| --- | --- | --- |
-| 云酒馆大包恢复穿过 CF 100 MB 单请求上限 | 导出区「上传」 | `src/ui/host-bridge.js` 的 `tryLukerChunkedRestore()` |
-| 分片协议纯逻辑（8 MiB / 413 减半 / 3 次重试） | — | `src/core/chunked-restore.js` |
-| 旧版/无分片端点宿主的整包回退 | 自动 | `postRestoreWithFallback()` |
-| 仅清单包在插件内查看并安装 | 图表卡头 `[data-extmanifest]` | `index.js` 的 `readPackageExtensionManifest()` / `openExtensionManifest`；`host-bridge.js` 的 `renderExtensionInstallerModal()` |
-
-> 契约见 `.trellis/spec/frontend/large-pack-upload.md`。
-> 分片端点：`POST /api/users/restore-backup/uploads` → `PUT …/{uploadId}/chunks/{offset}` →
-> `POST …/finalize` → `POST /api/users/restore-backup`（`{uploadId, handle, mode, selection}`）。
-
-### O. 存储审查面板（2026-11-11）
-
-| 功能 | UI 入口 | 源码落点 |
-| --- | --- | --- |
-| 浏览器 / 宿主同一面板，初始来源跟随点击行，面板内可切换 | `#quota-head` 两行 → `#storage-inspector-view` | `src/ui/workbench-view.js` 的 `renderQuota()` / `renderStorageInspector()` / `openStorageInspector()` / `siSwitchSource()` / `siRequest()` |
-| 浏览器 L0 四类与下钻（本地键值存储 / 会话存储 / 本地对象库 / 网络缓存），只读；配额只在面板头显示「已用 / 总量」 | 面板内列表与面包屑 | `src/ui/storage-inspector-browser.js`、`src/core/storage-inspector-model.js`（纯逻辑） |
-| 宿主数据源（Luker `RestProvider`；失败回落 `POST /api/users/storage/inspect`） | 面板「宿主」页签 | `src/ui/host-bridge.js` 的 `fetchHostStorageInspect()` / `hostStorageInspectCapability()`；`index.js` 的 `actions.storageInspector` |
-| 占满内容区（隐藏数据包列与分隔条，网格改单列） | — | `syncMainView()` + `style.css` 的 `[data-si="1"]` / `.si-*` |
-
-> 契约与验收：`.trellis/spec/frontend/storage-inspector.md`；
-> 取证脚本 `scripts/ui-verify-storage-inspector.cjs`（本地专属，前置 `npm run build` + 4173）。
-> 非 Luker 宿主显示「当前宿主未提供存储审查」，不伪造数字；浏览器测不到的大小显示 `?`。
-
----
-
-### P. 存储引擎互转（2026-11-12）
-
-**目标**：转换后的包走宿主**原生恢复流程**时不再连接任何数据库 —— PG/MySQL/SQLite/文件系统
-四种存储形态之间可任意互转，全程零临时数据库。
-
-| 部件 | 源码落点 | 职责 |
-| --- | --- | --- |
-| canonical 行模型 | `src/core/engine-model.js` | 9 张 doc-store 表、列清单、目录名映射、旁车命名 |
-| PG/MySQL 转储 | `src/core/engine-adapters/jsonl-dump.js` | JSONL 解析/生成、方言占位符、`_engine_meta.json` |
-| 文件系统 | `src/core/engine-adapters/fs.js` | 行 ↔ 磁盘文件（含预设 hex 规范路径） |
-| SQLite | `src/core/engine-adapters/sqlite.js` + `src/core/sqlite-init.js` | `.sqlite` 读写（sql.js 内联 WASM，惰性加载） |
-| 注册表 / 探测 | `src/core/engine-registry.js` | `detectSourceEngine`、目标引擎清单（新增数据库只加这一项） |
-| 编排 | `src/core/engine-bridge.js` | 读源 → 行 → 目标；守卫、选择项过滤、行数对账 |
-| 接线 | `src/core/transform.js`（`engine` / `engineHandle` / `sqliteInit` 选项） | 主循环抑制引擎条目，尾部 `emit()` 重建 |
-
-**打包形态（决定「原生恢复不起临时库」）**
-
-- 目标 `fs`：产物**不含** `_engine_dump.bin` / `_engine_meta.json`；引擎管理的磁盘文件由行重建
-  （源包里的陈旧磁盘副本被替换，不静默保留）。
-- 目标 `postgres` / `mysql`：写 `_engine_meta.json`（`engineKind`、`schemaVersion:1`、`handle`）+ JSONL 转储，
-  并保留源包全部磁盘类目条目。
-- 目标 `sqlite`：写 `<handle>/luker-storage.sqlite`（结构与上游 DDL 逐字一致）。
-
-**纪律**
-
-- `single-template-source` / `control-consumer`：新控件 `#target-engine`（仅 Luker 目标可见）已登记。
-- 引擎承载物一律视为「由行重建」，转换后不存在旧 engineKind 的 dump 与新 meta 并存。
-- 读不到就报告：`schemaVersion ≠ 1` 拒绝；未知表/未知桶如实告警；坏 JSONL 中止；行数对账不符即失败。
-- `_engine_dump.bin` 是 **JSONL 明文**（不是 pg_dump 二进制），因此浏览器端可直接解析；
-  SQLite 才需要 WASM。
-
----
-
-### Q. 图表交互补充与教程启动（2026-11-12）
-
-| 功能 | 源码落点 | 行为 |
-| --- | --- | --- |
-| 十字交界拖动 | `src/ui/workbench-view.js` 的 `chartCanvasHtml()` / `initChartSplitters()`；`style.css` 的 `.chart-split-x` | 横竖分隔线交点（`data-split="both"`）一次同时改**列宽与该行高度**；每个行间隙都有一个，指针为 `move`，悬停显示圆点手柄 |
-| 空间不足优先隐藏占用可视化 | `initChartTight()` + `.vol-card.is-tight` | 卡片可视区**高 < 190 或宽 < 300** 时隐藏 `.vol-chart`（体积环/条），标题、勾选列表保持可用；用 ResizeObserver + MutationObserver（rAF 合帧）跟随渲染与拖动 |
-| 每次打开进入教程模式 | `src/ui/settings-panel.js`（`autoTutorial`，默认 true）、`index.js`、`src/ui/workbench-view.js` | 默认开；启动即进入教程（不再用 sessionStorage 拦）。教程浮层新增「不再弹出」= 持久化 `autoTutorial=false` |
-| 视图切换行**绝不换行** | `renderViewSwitch()` / `applySwitchDensity()` / `initSwitchDensity()`；`style.css` 的 `.view-switch.is-icon-only` | 行内 `flex-wrap:nowrap`；量出「带文字」宽度溢出即整行退化为纯图标（保留 `aria-label`/`title` 可读），不横向滚动、不换行 |
-| 响应式**美观优先** | `.trellis/spec/frontend/responsive-and-aesthetics.md` | 宁可不塞也不压扁/裁切：换行/堆叠/滚动 → 整块隐藏 → 纯图标；禁止 shrink-to-clip、禁止裁掉功能性文案 |
-
-> 两个新控件 `#target-engine`、`#tutorial-never` 已同步 `REQUIRED_TEMPLATE_IDS` 与 `CONTROL_CONSUMERS`。
-
----
-
-### R. 预估读数（写入宿主 / 压缩包）· 教程数值 · 平台原版图标（2026-11-16）
-
-| 功能 | 源码落点 | 行为与铁律 |
-| --- | --- | --- |
-| **数据包卡「写入宿主预估」** | `workbench-view.js` 的 `pkgCard(p)`；i18n `pkg.estHost` / `pkg.estHostTitle` | **只显示「图标 + ≈数值」**（如 🖴 ≈1.3 GB）。**禁止**出现「预计写入宿主:」等描述文字（2026-11-16 用户明令）；中英双语同形。说明文字只存在于 `title`。 |
-| **操作栏汇总预估** | `workbench-view.js` 的 `renderActions()`；i18n `zones.estHostTotal` | 与卡片**同一公式**（`p.rawMb \|\| p.uncompressedMb \|\| mb×2`），勾选变化即重算；同样只显示「图标 + ≈数值」。 |
-| **图表卡「预估压缩包」** | `chartCardHtml()` 的 `.chart-est-zip`；i18n `chart.estZip` / `chart.estZipTitle` | 按当前压缩模式系数估算（store 1.0 / fast 0.65 / standard 0.5 / maximum 0.42），系数读设置不写死；读数变化随勾选实时更新。 |
-| **教程数值必须与真源同源** | `workbench-view.js` 的 `buildDemoPackages()` → `demoPackageStats()`；`TUTORIAL_GOALS` 步骤的 `params` | 演示包数 / 体积区间由 `demoPackageStats()` 现算，分卷区间 `{min}/{max}` 取自 `SPLIT_MIN` / `SPLIT_MAX`（`core/chart-model.js`）。**禁止**在 i18n 文案里写死「6–10 个，16 MB–4 GB」这类会与真源脱节的固定值——插件更新后自动跟随。 |
-| **演示存储审查配额自洽** | `workbench-view.js` 的 `demoStorageInspect()` / `quotaFor()` | 已用配额由**分类求和**得出，「Storage Quota」行展示同一读数。**禁止**写死 `usedBytes` 与分类合计不一致（曾出现 9.4 GB 对 8.3 GB，用户一眼看出读数假）。 |
-| **凭据默认不落服务端** | `settings-panel.js`（隐私组三开关）/ `settings-store.js`（`saveSettings` 的 `forHost` 剥除）/ `workbench-view.js`（`credStoreMode()` + S3/WebDAV 的 `load*`/`persist*` 双通道）/ `plugin-data.js`（导入导出按档取写） | 默认 `browser`：凭据只进 localStorage，**不写** `settings.json`；`server` 档才落，且改回 `browser` 保存时清空服务端副本。**禁止**恢复「无条件双写服务端」——那是 2026-11-16 前一直存在的真实缺陷。 |
-| **管理员专属 UI 总规则（2026-11-16 用户规则）** | `workbench-view.js` 的 `loadServerPlugins()` / `syncExtInstallBlock()` / `serverPluginBlockHtml()` | 凡管理员专属能力（服务端插件区、作用域互转、装到全局、安装到全局……），**非管理员完全不渲染**：不留空壳容器、不发相关请求、不显示标题或占位。只有 `identity.admin === true` 才出现。 |
-| **身份必须真正读到（不得降级成「非管理员」）** | `loadServerPlugins()` 的 3 次重试；`host-bridge.js` 的 `readHostIdentity()` 返回 `{ok:false}` 而非 null | 只有 `ok === true` 才判定；`/api/users/me` 瞬时失败（宿主刚重启、CSRF 未就绪）时最多重试 3 次，仍失败则**不置位** `extServerLoaded`，下次进宿主页继续重试。**禁止**把「读不到」当成「不是管理员」。 |
-| **单点渲染失败不得拖垮整块** | `formatExtRemoteUrlHtml()` 外层 try/catch → `formatExtRemoteUrlHtmlInner()` | 单行 URL 的异常必须降级为纯文本，**不得**冒泡中断 `serverPluginBlockHtml`。2026-11-16 实测：`SITES` 未从 `git-url.js` 导入，服务端插件行一解析地址就抛错，整块中断，用户侧表现就是**永远停在「正在读取」**，收起动画也一并失效。 |
-| **Git 平台原版品牌图标** | `src/ui/git-icons.js`（`GIT_ICONS` / `gitSiteIcon()`）；调用点 `formatExtRemoteUrlHtml()`；CSS `#app.app-container .ext-remote-url .ext-site-badge svg` | GitHub / GitLab / Gitee / Gitea / Bitbucket / Codeberg 一律使用**官方品牌矢量路径**（内联 SVG，`fill:currentColor`）。**禁止**用 `fa-code-branch` / `fa-cube` 之类的通用图形近似平台标识；未登记站点才退回通用 `fa-git-alt`。 |
-
-### S. v0.5.3 收尾（双选 / 教程 / 更新日志 / 队列 / 日志 / 引擎）
-
-| 功能 | 源码落点 | 行为与铁律 |
-| --- | --- | --- |
-| **扩展双选** | `src/core/extension-pack-mode.js`、`src/core/transform.js`、`src/core/extension-manifest.js` | 模式为 `full / manifest / both`；两个按钮可同时亮。`extensionManifestNames` 与 `extensionFullNames` 独立；只有「清单开且完整关」才丢实体。官方索引按 `manifestListed` 收录 manifest/both，私有清单逐条写 `packMode`。 |
-| **术语统一** | locale | 界面一律「完整 / 清单」；禁止再出现「原件 / 仅清单 / 混合」按钮文字。 |
-| **智能建议** | `src/core/ext-pack.js` `suggestPackMode()`、`workbench-view.js` `decorateExtSuggestions()` / `extUrlMapOf()` | 本插件、无远端、私有凭据 → 完整；公开远端 → 清单。URL 取值链读 `pkg.extManifest` + `pkg.extensions[].gitMeta/sourceRecord/manifest.homePage`，避免全量误判。行内 `.ext-suggest` 徽标必须显眼，不再只显示灰色小字。教程/文档必须说明 GFW/弱网应选完整。 |
-| **移动端教程** | `index.js` `portalTutorialOverlay()`、`style.css` `#st-pt-tutorial-overlay` | 浮层必须挂 `document.body`；`position:fixed; inset:0; height:100dvh`，卡片 `max-height` 内滚。宿主祖先的 transform 不得把浮层带出视口。 |
-| **局域网二维码** | `src/ui/qr.js`、`src/vendor/qrcode-generator.js` | 编码器静态 ESM 导入，vendor 只保留 `export default qrcode`，**不得**留 UMD `module.exports`（会与 ESM 只读 getter 冲突）。生成二维码失败时显示明确占位，取件码仍可复制。 |
-| **更新日志** | `src/core/changelog.js`、`vite.config.js`、`index.js` | 构建期注入完整 git 日志 + `__APP_TAGS__` 发布 tag 映射；宿主直装回退发布摘要。版本变化自动弹窗（默认开，可勾「不再自动显示」）；设置页可打开**从新到旧**的完整日志，发版提交高亮 tag 徽标，可切换「只看发布提交」。`vite.config.js` 的 git format **必须加引号**，否则 Windows cmd 把 `|` 当管道导致注入为空。 |
-| **连续任务队列** | `index.js`（`enqueueTask` / `pumpQueue` / `enqueueHostPull` / `enqueueRestore` / `enqueueCloudBackup` / `recordActivity`）、`workbench-view.js` `renderTaskQueue()` / `renderLogQueue()` | 生成 / 宿主拉取 / 恢复写回 / 云端备份 / 下载 / 复制回 / 导入 / 云端下载恢复共用任务视图；生成可暂停/继续，其它长任务至少可中断（AbortSignal + 协作标记）。排队可上移/下移/移出；已结束任务保留最近 200 条。日志视图「任务队列」页签可展开详情（类型/状态/时间/耗时/进度条/错误）。禁止 `state.busy` 直接拒绝新批次。 |
-| **日志全量** | `src/core/logger.js`、设置页、日志视图 | 新增 DEBUG；**所有级别始终入账**，默认控制台/显示阈值 WARN。设置可选 debug/info/warn/error；日志视图默认 WARN+ERROR，DEBUG 按钮可回看全部。 |
-| **导出体积预测** | `src/core/git-policy.js`、`workbench-view.js` `selectedProjected()` | 预估必须扣除 `gitMode=minimal/strip` 将剔除的 `.git` 条目，并在 title 里写明剔除量。转换器与预测共用 `git-policy.js`，禁止两套判断。 |
-| **Luker 引擎自动切换** | `plan-preview.js` `sourceEngine`、`workbench-view.js` `autoEngineForPackage()` | Luker 宿主选中包后，目标引擎自动切到该包声明的源引擎（fs/postgres/mysql/sqlite）；读不到就保持原选择，不猜。 |
-
-### T. v0.5.4 手机图表 / 任务队列 / 一键自动备份（2026-11-17）
-
-| 功能 | 源码落点 | 行为与铁律 |
-| --- | --- | --- |
-| **边框令牌兜底** | `style.css` 顶部令牌 | `--border / --border-strong / --outline` 先给普通 `rgba()`，再由 `@supports (color: color-mix(...))` 增强。手机 WebView 不支持 `color-mix` 时**边框不得整条失效**。设置面板外圈用 `--outline` + 内描边，中圈分组用 `--border-strong`，两级必须可辨。 |
-| **手机图表滚动** | `style.css` `[data-view="mobile"]` 图表块 | 高度链 `app-main → col-chart → chart-card → chart-stack`；**只有 `.chart-stack` 滚**。卡片/树行内部禁止滚动；画布单列自然高度。隐藏 `.vol-chart` 与 `.tree-occ`，保证文件信息优先。 |
-| **图表行换行** | `workbench-view.js` `renderTreeRows()`、`style.css` `.tree-main / .tree-extra` | 身份簇（开关/勾选/色点/图标/名称/建议徽标）必须同一行；模式按钮与批量按钮放 `.tree-extra` 次行。每行加底部分隔线。手机端缩进用 `--depth` CSS 变量，禁止再写死 `padding-left`。 |
-| **符号徽标** | `renderTreeRows()` | 建议保留/可选/清理/未知 → ✓/○/✕/?；建议完整/清单 → 整/单；完整/清单按钮手机端显示单字。手机端隐藏文字版，保留 `title` / `aria`。 |
-| **数据包下拉不自动收** | `workbench-view.js` `#zone-card` 点击处理 | 勾选、点卡、切区都不得调用收起；只有「数据包」切换按钮可收起。 |
-| **日志单行工具栏** | `style.css` `#view-log .log-toolbar` | 8 个按钮（5 级别 + 导出/复制/清空）必须完整单行；窄屏压缩字号/内边距，**禁止换行、禁止横向滚动条**。 |
-| **任务队列页签** | `workbench-template.js` `#view-log`、`workbench-view.js` `renderLogQueue()` | 日志/任务队列互切；任务行可展开，含类型/状态/创建/开始/结束/耗时/进度条/错误；所有操作都要记录（`recordActivity`）。 |
-| **一键自动备份** | `index.js` `enqueueAutoBackup()` / `autoBackup()`、模板 `#cloud-auto-backup` | 自动拉取 → 图表勾选修剪 → 目标平台生成 → 上传校验 → 删除。复用 `deleteAfterExport`：开启时生成后立刻删自动导入；新增 `autoDeleteBackupPacks` 默认开，上传成功后删剩余自动包；失败保留。自动包 metadata `autoFlow: pull|export`，包卡显示「自动拉取/自动生成」徽标。 |
-| **文档站绝对地址** | `src/core/docs-site.js`、`settings-panel.js`、`workbench-view.js` | 「查看文档」只能跳到部署站 `https://jiozhaoyue.github.io/ST-pack-transfer/docs/`；**禁止 localhost / `./docs/` / 当前路径拼接**。自定义 `docsBaseUrl` 只接受绝对 http(s)。 |
-| **公开 docs 隐私** | `tooling/docs-privacy-guard.js`、`.github/workflows/checks.yml`、`deploy.yml`、`docs/_config.yml` | 公开 `docs/` 禁止 PLAN/handoff/research/tasks；守卫在本地、checks、deploy 三处执行。计划文件只放 `.private/plans/`（`.gitignore` 忽略）。 |
-| **设置版本行固定** | `workbench-template.js` `#settings-version`、`workbench-view.js` `openSettingsView()` | 版本行在滚动正文之外、按钮行之上，绝对不随设置内容滚动；整行可点击打开完整更新日志。 |
-| **偏好双选** | `chart-prefs.js`、`workbench-view.js` `chartPrefsHtml()` | 新扩展默认模式两个按钮可同时亮，再点各自取消；`full/manifest/both/none` 持久化。 |
-| **私有配置保留** | `renderTreeRows()` `data-keepincompat`、`applyIncompatibleDefault()` | 「保留不兼容」只在私有配置行出现，默认勾选；关闭时不兼容私有配置叶子默认取消勾选。 |
-| **教程避让** | `tutorialCardPlacement()`、`renderTutorial()` | 卡片按实际高度在下/上/右/左择位，禁止再调用居中覆盖定位；滚动/缩放实时重算。`查看文档`/`不再弹出` 只在最初目标选择浮层显示。 |
-| **目标平台品牌色** | `style.css` `--brand-*`、`renderTargetPicker()` | 高饱和品牌色 + 透明底（`--brand-*-soft`）；按钮与下拉项都带 `data-host`，禁止浑浊/发白。 |
-
-> 教程文案的插值实现：`renderTutorial()` 用 `t(step.desc, step.params ? step.params() : undefined)`；
-> 新增带数值的教程步骤必须提供 `params`，不得把数字写进 locale 字符串。
-
----
-
-## 三、分层与硬性边界
-
-```
-src/core/     纯逻辑，**禁止 DOM / window / fetch**（可在 Node/Vitest 直接跑）
-              新增：asset-list.js（官方资产列表）、transfer-plan.js（分片台账）、
-              webdav-client.js、transfer-target.js、host-capabilities.js、
-              ext-pack.js（扩展折叠为打包单元）、git-url.js（仓库地址归一）、
-              git-accounts.js（账号库）、git-site.js（站点 API 端点/归一）、
-              storage-inspector-model.js（存储审查的纯逻辑：尺寸/配色/点阵/归一）
-src/app/      转换/传输编排（task-runtime / conversion-runner / transfer-runner / pull-entry）
-src/ui/       可 DOM；host-bridge.js 是宿主差异的唯一落点；git-remote.js 是 Git 站点网络的唯一落点；
-              host-icons.js / git-icons.js 是四酒馆与 Git 平台「原版品牌图标」的唯一来源
-src/storage/  IndexedDB + 可选 Authority 适配器
-src/vendor/   zip.js / fzstd / fontawesome 本地副本 —— **勿升级改动**
-public/       仅 file-protocol-notice.js
-index.js      根控制器：detectHost → applyPluginUi → ExportQueue + TaskManager
-```
-
-不可越过的线（违反即返工）：
-
-1. **CSS 作用域**：所有规则必须挂在 `#app.app-container`（独立/模态统一根）或自有覆盖层 id
-   （`#st-converter-modal-overlay` / `#wb-detail-overlay` / `#st-pt-tutorial-overlay`）之下；
-   `.st-converter-drawer-app` 已删除（2026-10-15）。
-   配色走 `var(--SmartTheme*, 回退值)`。裸选择器会污染宿主全站 UI（2026-09 实际发生）。
-2. **单一模板源**：业务节点只允许出现在 `workbench-template.js`。
-3. **Worker terminate 后必须置空引用**（否则此后每次任务静默挂死）。
-4. **有界等待**：所有 `await`（媒体事件 / fetch / 渲染 promise）必须能 settle。
-5. **高频进度回调必须 rAF 合帧**。
-6. **宿主差异只进 `host-bridge.js`**；平台码 `st|luker|standalone` 与布局码 `st|l|tt|pt` 必须经
-   `hostLayoutCode()` 归一（`luker→l`）。
-7. **控件必须有消费点声明**（`scripts/control-consumer-guard.js`）——防"死控件"。
-
----
-
-## 四、质量门槛与命令
-
-> **执行顺序、每层判据、失败归因速查见 [TESTING-PROCESS.md](./TESTING-PROCESS.md)**（2026-11-14 建立的
-> 唯一权威流程）。下面是命令速查；静态守卫层可用 `npm run qa:static` 一键串跑全部 8 条。
+## 四、构建与测试
 
 ```bash
-npm test                      # Vitest 全量（2026-11-14 基线：1228 passed / 2 skipped / 127 文件）
-npx vitest run test/xxx.test.js
-npm run qa:static             # L1：8 条静态守卫一键串跑（css-scope/dom-injection/template-source/dom-scope/control-consumer/no-bundler-only/i18n/copy）
-npm run check:css-scope       # CSS 双前缀
-npm run check:dom-injection   # innerHTML 未转义插值
-npm run check:template-source # 单一模板源 + 必需节点 id
-npm run check:dom-scope       # 宿主 DOM 写入作用域
-npm run check:control-consumer# 控件消费点
-npm run check:no-bundler-only# 宿主直装：禁止 JSON 静态导入 / node: / 裸包名 / Vite 专有语法
-npm run build                 # GitHub Pages 静态站点（base=./）
-npm run preview               # 本地静态服务器托管 dist（4173）——**UI 验收唯一入口**
-npm run build:offline         # file:// 单文件离线产物
-npm run e2e                   # 实例侧 E2E（需 Dev 实例；只连 Dev 白名单端口）
-npm run e2e:web               # 独立 Web / 云子路径 / file:// 离线（不需要实例）
-npm run e2e:web -- --rebuild  # 删/换过源码文件时必须加（mtime 判据看不见"删了文件"）
+npm install
+npm test                 # 单元测试
+npm run build            # 生产构建，输出 dist/
+npm run preview          # 预览 dist/，终端会打印实际地址
+npm run dev              # 本地开发服务器，终端会打印实际地址
+npm run build:offline    # 生成单文件 HTML
+npm run qa:static        # 静态守卫串跑
 ```
 
-无独立 lint/typecheck —— 类型契约靠 JSDoc + 运行时守卫，**质量门槛就是 `npm test` 全绿**。
+`npm run build:offline` 会生成：
 
-**UI 验收唯一路径（2026-11-09 用户裁定）**：
+- `dist-offline/ST-pack-transfer-offline.html`
+- `download/ST-pack-transfer-offline.html`（对外下载路径）
+
+单文件 HTML 必须保持 `file://` 可双击运行：脚本为 IIFE、Worker 强制主线程降级、字体与样式内联、零外部资源。
+
+## 五、体积与分卷模型
+
+体积预测集中在 `src/core/size-model.js`，输入选中条目与导出选项，输出：
+
+- `predictedBytes`：已知条目的压缩后预测；
+- `breakdown`：按类目拆分的未压缩 / 压缩字节；
+- `range`：未知项导致的区间；
+- `confidence`：`high` / `medium` / `low`；
+- `unknowns`：读不到体积的条目，界面必须显示 `?` 或区间。
+
+界面不得再散落压缩比常量；新增类目、分卷、扩展模式或引擎载体时，只扩展模型与测试。
+
+## 六、质量门槛
+
+提交前至少通过：
 
 ```bash
-npm run build        # 产物必须是最新源码
-npm run preview      # 本地静态服务器托管 dist，默认 4173
+npm test
+npm run build
+npm run qa:static
+npm run docs:verify
 ```
 
-浏览器打开 `http://localhost:4173/` 操作取证。**禁止**用 `file://`、`npm run dev`
-或直接双击 `dist/index.html` 作为界面验收入口；`npm run dev` 只用于开发热重载。
-本机小规模取证脚本（不纳版本控制）：`scripts/ui-verify-static.cjs`。
+文档站的中文页、英文页、教程截图与基线哈希必须同步；源页改动但译文或截图未更新会被 CI 拒绝。
 
-**E2E 视图约定（2026-10-13 起）**：默认入口是向导，向导只披露当前步 ⇒ 测高级工作台的 spec
-必须显式调用 `common.useAdvancedView(page)`。测向导本身的用 `wizard.e2e.cjs`。
+## 七、参与与安全
 
----
-
-## 五、破坏性变更登记（Breaking changes）
-
-| 日期 | 变更 | 影响 | 依据 |
-| --- | --- | --- | --- |
-| 2026-10-13 | **会话 schema v1 一律作废**：`SESSION_SCHEMA_VERSION = 2`，`classifySessionCompatibility()` 对任何非 v2 记录返回 `reject-incompatible`；**结构未变的 v1 也拒** | 旧工作区会话不再自动恢复；向导显示"旧会话已作废 + 从源重开"。**磁盘上的包与半成品文件不删** | 用户裁定 U-1：「禁止兼容旧数据，任何即使没改也要强制不兼容」 |
-| 2026-10-13 | 删除 `normalizeLegacySession()`（静默补齐语义）→ 改为只读的 `readSessionRecord()` | 任何依赖"旧记录会被补默认值"的代码都失效 | 同上 |
-| 2026-10-13 | **默认入口改为迁移向导** | 非当前步的控件在向导视图下 `display:none`；E2E spec 需显式切高级视图 | `10-01` R-08「向导为默认入口」 |
-| 2026-10-13 | `new Worker(...)` 移入 `worker-factory.js` | 直接 `new Worker(new URL('./converter-worker.js', import.meta.url))` 的写法不再出现；离线构建靠 alias 换实现 | IIFE 单包构建要求 |
-
----
-
-## 六、已知限制（诚实登记，不当作已实现）
-
-| 项 | 状态 |
-| --- | --- |
-| 纯库聊天接口 | 上游未实现，三条聊天库路径均未在真实纯库环境跑通 |
-| 目标侧自动读回核对 | **判定就绪**（`buildRestoreVerification` / `summarizeVerification`）；**写入后**的宿主侧读回**仍未接入**（`coverage` 只到「宿主确认写入」）。⚠ 注意：读取宿主清单的**能力**已具备（见下两条），缺的是「写入之后再取一次并比对」的编排 |
-| 自动目标备份 | **已接入（2026-10-14）**：恢复对话框「自动备份并预检目标」→ `fetchHostInventory()` 触发 `/api/users/backup` → 只读中央目录 → 入待导出区 **且** 落工作区（IndexedDB）⇒ `readback-verified`。三条件（可读 / 范围覆盖 / 已留存）缺一即降级 `none`，**不**回落 `user-attested` |
-| 目标冲突预检 | **已接入（2026-10-14）**：`src/core/target-inventory.js` 的 `alignInventories` 对齐守卫 + `assessInventoryConflicts`。只有对齐成立才报真实冲突数；**伪报「0 冲突」比报 unknown 更危险**，故截断 / 清单为空 / 缺标准根标记 / 顶层段不可比 一律降级 `unknown` |
-| 自动重发重试 | **判定就绪**（`assessRetry` + `selectRetryCandidates` 双重门）；**执行未接入**（无部分重试 UI） |
-| 各异步阶段超时数值与测量 | **边界已逐条取证 + 测量装置已就位 + 首批实测读数已取（2026-10-14）**：`.trellis/spec/frontend/async-bounds.md`（10 阶段边界表，逐条 `file:line`；Dev ST 实测：凭证 53ms / TTFB 141ms / 685MB 传输 60.1s / 块间最大间隔 651ms）。**传输停滞守卫**已补（`readStreamChunkBounded`，只守间隔不守总时长——实测同一路径的正常传输就耗时 60.1s，总时限口径会误杀）。⚠ **Luker / 慢速网络 / 上传方向仍未测**，对应常量仍标「待实测校准」 |
-| 四个宿主的完整有向迁移路径证据 | 格式转换面 4 源 × 4 目标 = 16 条逐条走通（含 PT 原生源）；**目标侧写入**仍靠实例/人工证据 |
-| 外部用户试用 | 未做（公开发布关口未通过） |
-| TT 自动化 | 无浏览器端口 ⇒ 人工交付 |
-| PT 原生归档源的有损点 | 角色卡用自带卡的 `avatars` blob（运行期 PT 角色头像可能已被 PT 重编码）；聊天 jsonl 重序列化丢原始空白；预设 metadata 不重建 |
-| PT 原生源断点续传 | 不支持（重建条目无源 crc32 ⇒ 暂停后作废半成品并完整重做，安全降级） |
-| 资产列表 URL 来源 | 宿主 `/api/extensions/discover` 只给目录名/类型；URL 只能取各扩展 `manifest.json` 的 `homePage`。没有 `homePage` 的扩展无法导出可导入地址（如实提示，不伪造） |
-| 自动备份 | 两条路：① **全量时间戳快照**（每次独立新包，保留最近 N 份）；② **内容寻址增量备份集**（只传新增/修改条目，每版一张完整清单，任一张可独立恢复）。**加密可选**：填口令即逐片加密，留空即不加密。**无 cron、无服务端直传**（用户禁止后台插件）。**不做差量链**（用户 2026-11-09 裁定 D-8） |
-| WebDAV 真机 | **2026-11-12 已实测一台**（Apache mod_dav + Caddy：OPTIONS/PROPFIND/MKCOL/PUT/GET/DELETE 全通，CORS 允许直连）。其它服务端形态（Nextcloud 子路径、nginx-dav、S3 网关）仍未取证；能力判定仍以真实请求结果为准 |
-| 静态 UI 验收 | `npm run build && npm run preview` 只覆盖独立 Web / 插件模板本身；宿主注入（账户面板、原生按钮）仍需 Dev 实例 |
-| Git 账号与安装 | 站点 API 只在用户主动操作时请求；GitHub / GitLab / Gitee 支持 CORS，自建主机（含 GitHub Enterprise）视实例配置，失败一律显示「未提供」/原因码。浏览器无法直接使用 SOCKS/HTTP 代理，插件只支持自填 **CORS 代理地址**（设置 → 网络）；Luker/ST 的 `requestProxy` 与 `enableCorsProxy` 是服务端 `config.yaml` 项，需能编辑服务端文件并重启，不是 OS 管理员权限，插件不改也不探测 |
-| commit 安装 | 宿主 `git clone --branch` **不接受 commit SHA**；插件仍可传，失败信息原样回显并建议改用分支/标签 |
-| 私有仓库凭据 | 只能拼进交给宿主克隆的 URL；宿主可能写入扩展 `.git/config`，插件无法回收（安装前弹窗告知） |
-| 更新检查 | 只比对本地/远端 `manifest.json` 版本；任一缺失即 `unknown`，不自动更新 |
-| 宿主存储审查实机 | 面板与宿主数据源按 Luker 契约实现；**真实 Luker 实例下钻未取证**（8003 运行时可补）。能力判定与端点回落有单测；ST/TT/PT 如实显示「未提供」 |
-| 宿主存储审查删除能力 | 首版**只读**（用户 2026-11-11 裁定）；Luker 原生 inspector 支持删除，本插件不复刻 |
-
----
-
-## 七、相关文档
-
-- `.trellis/spec/frontend/` —— 分层规范（目录结构 / 组件 / 状态管理 / 宿主能力 / 质量 / DOM 写入作用域 / 迁移三篇）
-  - `workbench-single-view.md` §7.3 —— 局域网互传整面板替换
-  - `storage-inspector.md` —— 存储审查面板（浏览器 / 宿主同面板、provider 契约、验收脚本）
-  - `host-native-pull-lifecycle.md` —— 宿主原生导出界面的打开 / 拉取 / 关闭 / 让路
-- `.trellis/spec/backend/` —— 核心层规范
-- `.trellis/workflow.md` —— 任务流
-- [README.md](../README.md) —— 用户向说明
-- [AGENTS.md](../AGENTS.md) —— 项目规则与统一开发规则
+- 贡献方式与测试矩阵见 [CONTRIBUTING.md](https://github.com/jiozhaoyue/ST-pack-transfer/blob/main/CONTRIBUTING.md)。
+- 安全问题请按 [SECURITY.md](https://github.com/jiozhaoyue/ST-pack-transfer/blob/main/SECURITY.md) 的私密渠道报告，不要公开提交可利用细节。
+- 许可证：AGPL-3.0-or-later，详见 [LICENSE](https://github.com/jiozhaoyue/ST-pack-transfer/blob/main/LICENSE)。

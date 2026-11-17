@@ -57,6 +57,8 @@ export default {
   'chart.estZip': '预计压缩包: ~{size}',
   'chart.estZipTitle': '按当前压缩策略预估的压缩包体积；已扣除 Git 清理将剔除的条目',
   'chart.estZipGit': 'Git 清理已剔除 {size}',
+  'chart.estZipUnknown': '{n} 项体积未知，估算可能偏低',
+  'chart.estZipRange': '区间 {low} – {high}',
   'chart.unrecognizedTitle': '未识别包',
   'chart.expand': '展开或收起',
   'chart.maximize': '最大化这张图表',
@@ -103,6 +105,7 @@ export default {
   'zones.help': '数据包帮助',
   'zones.import': '导入',
   'zones.export': '导出',
+  'zones.collapse': '收起数据包列表',
 
   'action.title': '执行',
   'action.help': '执行帮助',
@@ -1087,6 +1090,7 @@ export default {
   'demo.extensions': '扩展',
   'demo.extOne': '示例扩展',
   'demo.vectors': '向量库',
+  'demo.engineCarrier': '存储引擎载体',
   'demo.timeYesterday': '昨天 21:40',
   'demo.timeOlder': '昨天 18:05',
 
@@ -1194,7 +1198,7 @@ export default {
   'toast.deltaOverwrite': '导出方式: 覆盖',
   'toast.deltaIncremental': '导出方式: 增量',
   'progress.waitingCode': '等待取件码',
-  'progress.openLog': '点此查看日志',
+  'progress.openLog': '点此展开任务队列 / 日志',
   'chart.total': '整包 {size}',
   'lan.selectedSummary': '已选 {n} 个包 · {size}',
 
@@ -1257,6 +1261,7 @@ export default {
   'log.taskAborted': '转换已中止，半成品已清理',
   'log.taskResumed': '转换已恢复：复用半成品，命中条目跳过',
   'log.resumeDropped': '已丢弃上一个暂停任务的断点（换包转换不续用别人的半成品）',
+  'pending.badge': '生成包',
   'pending.download': '下载',
   'pending.stash': '存入工作区',
   'pending.remove': '移除',

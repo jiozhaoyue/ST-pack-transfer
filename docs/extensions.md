@@ -1,6 +1,8 @@
 ---
 title: 扩展管理与打包
 layout: default
+alt_url: extensions.en.html
+alt_lang: en
 ---
 
 # 扩展管理与打包

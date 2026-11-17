@@ -18,6 +18,8 @@ const GUARDS = [
   ['check:no-bundler-only', 'tooling/no-bundler-only.js'],
   ['check:i18n', 'scripts/i18n-guard.js'],
   ['check:copy', 'scripts/copy-audit.js'],
+  ['check:ui-tokens', 'tooling/check-ui-tokens.mjs'],
+  ['check:download-html', 'tooling/check-download-html.mjs'],
 ];
 
 const results = [];
@@ -31,5 +33,5 @@ for (const [name, script] of GUARDS) {
   }
 }
 
-console.log('\n[qa:static] 8 条静态守卫全部通过：');
+console.log('\n[qa:static] 10 条静态守卫全部通过：');
 for (const [name] of results) console.log(`  ✓ ${name}`);

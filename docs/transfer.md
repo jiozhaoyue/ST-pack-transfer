@@ -1,6 +1,8 @@
 ---
 title: 传输与备份
 layout: default
+alt_url: transfer.en.html
+alt_lang: en
 ---
 
 # 传输与备份

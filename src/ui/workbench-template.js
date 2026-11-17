@@ -379,6 +379,7 @@ export function getWorkbenchHtml() {
                 <button type="button" class="seg-btn active" data-sidetab="zone" data-i18n="view.zone"></button>
                 <button type="button" class="seg-btn" data-sidetab="git" data-i18n="gitv.title"></button>
               </div>
+              <button type="button" class="icon-btn zone-mobile-close" id="zone-mobile-close" data-i18n-title="zones.collapse" data-i18n-aria="zones.collapse">×</button>
 
             </div>
           </div>
@@ -472,12 +473,8 @@ export function getWorkbenchHtml() {
       <div class="view-body help-view-body" id="help-body"></div>
     </section>
 
-    <section class="task-queue" id="task-queue" hidden aria-live="polite">
-      <div class="tq-head"><b data-i18n="taskq.title"></b><span class="tq-count" id="tq-count"></span></div>
-      <div class="tq-list" id="tq-list"></div>
-    </section>
-
-    <button type="button" class="workbench-progress" id="workbench-progress" data-i18n-title="progress.openLog">
+    <button type="button" class="workbench-progress" id="workbench-progress" data-i18n-title="progress.openLog"
+      aria-controls="view-log" aria-expanded="false">
       <span class="progress-bar"><span class="progress-fill" id="progress-fill"></span></span>
       <span class="progress-text">
         <span id="progress-label" data-i18n="progress.ready"></span>
