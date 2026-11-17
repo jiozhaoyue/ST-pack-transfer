@@ -10,6 +10,24 @@
 | `function-audit.md` | 功能/可用性审计（Hy4 flash Free），8 条：P0 0 / P1 5 / P2 3 | 已交付 |
 | `perf-audit.md` | 性能审计（Hy4 flash Free），10 条：P0 0 / P1 3 / P2 7 | 已交付 |
 | `ui-visual-audit.md` | 全视口视觉审计（GLM-5.3），17 条：P0 1 / P1 4 / P2 11 + 3 复核通过 | 已交付（基于整改前截图，逐条复核见下） |
+| `cloud-core-e2e.md` | 本机 S3/WebDAV 全流程：上传→下载→sha256；大包 25,169,946 B | 已交付，实测通过 |
+| `instance-availability.md` | PureTavern / TauriTavern 能否参与跨宿主实测 | 已交付：PT 有条件、TT 不可浏览器自动化 |
+
+## 自动化测试资产（持久化、可复用）
+
+| 资产 | 命令 | 覆盖 | 实测 |
+| --- | --- | --- | --- |
+| 本机 S3 服务器 | `npm run cloud:serve:s3` | PUT/GET/Range/HEAD/DELETE/ListV2/multipart（无鉴权，仅测试） | 冒烟 200/206/204 |
+| 本机 WebDAV 服务器 | `npm run cloud:serve:webdav` | OPTIONS/PROPFIND/PUT/GET/HEAD/DELETE/MKCOL | 冒烟 207/201/409 |
+| 云契约测试 | `npm run test:local-cloud` | 真实 HTTP + Range + multipart + 路径穿越 + Authorization | 7 passed |
+| 核心云全流程 | `npm run e2e:cloud-core` | 真实 zip → S3/WebDAV → 下载 → sha256 | S3 上行 75.663 MB/s、下行 141.252 MB/s；WebDAV 上行 116.541 MB/s、下行 144.402 MB/s（25.17 MB 包） |
+| 实例成对启动 | `npm run e2e:instance-pair -- dev-st dev-luker` | 最多两个实例、就绪探测、退出清理端口 | 单实例冒烟 PASS（8001 释放） |
+| UI 多分辨率流程 | 待 GLM-5.3-flash **free** 额度恢复 | 1920/820/390/280 关键路径 | 脚本未交付：免费额度耗尽 |
+| ST↔Luker 跨宿主互传 | 待 GLM-5.3-flash **free** 额度恢复 | 两实例 WebRTC 实测 | 脚本未交付：免费额度耗尽 |
+
+> 实例纪律：同一时刻最多两个酒馆实例；脚本启动前扫描 8001–8004/8899，超出即中止。
+> PT：依赖已装、纯前端 IndexedDB，但插件只能远程安装，且 8899 与本仓 3040 端口规则冲突，需授权后再纳入。
+> TT：无 HTTP dev server（只有桌面 Tauri 窗口），本机双实例自动化不可行，维持人工交付。
 
 ## 采集矩阵（可复跑）
 

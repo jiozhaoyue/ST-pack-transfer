@@ -226,6 +226,9 @@ npm run docs:update           # 确认改动完整后刷新 docs-sync.manifest.j
 npm run docs:shots            # 重拍教程截图（桌面 + 手机）
 npx vitest run test/ui-solid-fill-guard.test.js   # 禁止整块实色填充 / 手机唯一滚动容器
 node tooling/ui-audit/matrix.cjs                  # 13 视口 UI 矩阵截图 + 程序化度量（需 3040）
+npm run test:local-cloud      # 本机 S3/WebDAV 契约测试（真实 HTTP）
+npm run e2e:cloud-core        # 数据包 → 上传 → 下载 → sha256 全流程
+npm run e2e:instance-pair -- dev-st dev-luker   # 最多两个酒馆实例的启动/停止
 ```
 
 代码库配有完善的静态检查与自动化测试，严格把关跨酒馆适配规范（如 CSS 隔离、DOM 范围、多语言完整度与免打包直装语法等），确保在各类酒馆中平稳加载。

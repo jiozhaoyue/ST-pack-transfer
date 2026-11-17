@@ -105,6 +105,16 @@ npm run qa:static        # 静态守卫串跑
 - 改动 UI 后跑 13 视口矩阵：`node tooling/ui-audit/matrix.cjs`（需 3040 服务），
   产物在 `test-results/audit/<stamp>/`，含截图、`probe.json`、`summary.md`。
 
+### 本地云与实例自动化（2026-11-17 起）
+
+- 本机 S3 兼容服务器：`npm run cloud:serve:s3`（端口 0 自动分配，仅测试、无鉴权）。
+- 本机 WebDAV 服务器：`npm run cloud:serve:webdav`（同上）。
+- 客户端契约测试：`npm run test:local-cloud`（真实 HTTP + Range/multipart/PROPFIND）。
+- 核心云全流程：`npm run e2e:cloud-core`（真实数据包 → 上传 → 下载 → sha256）。
+- 实例成对启动：`npm run e2e:instance-pair -- dev-st dev-luker`；
+  **同一时刻最多两个实例**，退出时校验端口释放。
+- 说明与限制：`tooling/local-cloud/README.md`、`docs/audit/2026-11-17/instance-availability.md`。
+
 ## 五、体积与分卷模型
 
 体积预测集中在 `src/core/size-model.js`，输入选中条目与导出选项，输出：

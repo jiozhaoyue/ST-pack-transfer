@@ -1,7 +1,7 @@
 {
   "version": 1,
   "files": {
-    "docs/DEVELOPER-GUIDE.md": "9ccce01e39a5870e0d6ce32b53c9e10ea22181bf4c4e72704a0ecd6346449250",
+    "docs/DEVELOPER-GUIDE.md": "e5084a13bcbf44a67b660d5b7e1e0b94b8e03cc00b922c825b268cb44c1e1dbe",
     "docs/_config.yml": "4158c65372fa1362448cd0cbbe10c1f176a5aa70ace9c765594cd5c9360a009c",
     "docs/_layouts/default.html": "b167e8876b115ae49b92cc673b16b35ac63a99ef7453f1dba0b2efd753407403",
     "docs/assets/shots/desktop-01-tutorial-goal.png": "fd7b99af38e3ead2c9c8d9258b4dece8e5a40413b363d368e83d3c5d7c1c6e00",
@@ -28,8 +28,10 @@
     "docs/assets/shots/mobile-07-export-area.png": "b9c750926341d9246a7a8ea54fbe379a17ff32778a927135e29b762333719d36",
     "docs/assets/shots/mobile-08-task-queue.png": "f0e4cbbb21f66dba41a58047afd6933ed41a4d252758aa2f40f19ff730e9eb30",
     "docs/assets/shots/mobile-09-log-view.png": "71395ccff5d27d58590d5b4c3f8cc45a0d0ab2054904080890dbd79791fe98a4",
-    "docs/audit/2026-11-17/README.md": "447917c556e8172a8bccd91f33e1cb4736b2a3a364dba1499cae0cd5fedba651",
+    "docs/audit/2026-11-17/README.md": "3df9d3b934b4a68ef5744d3498d2921b18caf50eec99bdf7ba3531644e9e7d17",
+    "docs/audit/2026-11-17/cloud-core-e2e.md": "d300f7f717c30ca8ae7cfa81350a6edb28afb216bba2dac47f6aa7f431770fa1",
     "docs/audit/2026-11-17/function-audit.md": "a6c7c84fc30ef3342dd1844657e3a7dd4f6e3770e94366a7f3d32e52ecdfddea",
+    "docs/audit/2026-11-17/instance-availability.md": "cbb3fa3112a2248cdaca07a4941f389c34634c29d1bf865240ddd8f58747830a",
     "docs/audit/2026-11-17/perf-audit.md": "655f3892cf575b1c27089f91b4654a69aafdebebc8240d2614f91a51492d0778",
     "docs/audit/2026-11-17/ui-visual-audit.md": "0be1521c6f1eb416a6907a164c17d948f36fa57a2dfa994da320a3bbd1f8185c",
     "docs/convert.en.md": "673fc6e68293fe6405a0ee36281b0ddb7a030f4931c77ed2331fc2cf4ab48d5f",
@@ -175,7 +177,7 @@
       "zh": "docs/DEVELOPER-GUIDE.md",
       "en": null,
       "translation": "pending",
-      "sourceHash": "9ccce01e39a5870e0d6ce32b53c9e10ea22181bf4c4e72704a0ecd6346449250",
+      "sourceHash": "e5084a13bcbf44a67b660d5b7e1e0b94b8e03cc00b922c825b268cb44c1e1dbe",
       "translationHash": null
     }
   ],
