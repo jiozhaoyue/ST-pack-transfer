@@ -59,7 +59,13 @@ async function readBytes(relPath) {
 
 async function hashFile(relPath) {
   try {
-    return sha256(await readBytes(relPath));
+    const bytes = await readBytes(relPath);
+    /* 文本文件按 LF 归一化再哈希：Windows 工作区是 CRLF，CI 是 LF；
+       不归一化会让同一提交在本地与 CI 得到不同基线（2026-11-17 Pages 部署实测）。 */
+    if (/\.(md|html|css|js|mjs|json|ya?ml|txt)$/i.test(relPath)) {
+      return sha256(Buffer.from(bytes.toString('utf8').replace(/\r\n/g, '\n'), 'utf8'));
+    }
+    return sha256(bytes);
   } catch {
     return null;
   }
