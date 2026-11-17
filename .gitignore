@@ -92,3 +92,11 @@ CLAUDE.md.bak
 # 本地私有计划与内部资料（禁止进入公开仓 / GitHub Pages）
 /.private/
 
+# ── 公开仓安全边界（2026-11-17 历史清理） ──
+# 内部记忆 / 计划 / 交接 / 研究底稿只留本地，禁止入库与进入 GitHub Pages
+/.trellis/
+/docs/PLAN-*
+/docs/HANDOFF-*
+/docs/research/
+/docs/superpowers/
+
