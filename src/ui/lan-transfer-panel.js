@@ -49,6 +49,9 @@ const CREDIT_WINDOW = 8 * 1024 * 1024;
 /* 信用等待超时：超时=信任对端继续（用户裁定）——重置账本退回 bufferedAmount 本地门限兜底，
    不悬挂、不误杀慢对端；对端真死时 bufferedAmount 卡住 + 通道关闭走既有失败路径。 */
 const ACK_STALL_TIMEOUT_MS = 10_000;
+/* 发送缓冲排空上限（2026-11-19）：对端不再消费时 bufferedAmount 会永久高于高水位，
+   原 while 循环无超时即真·无界等待。超过此值按发送失败处理，让 finally 与队列继续推进。 */
+const HIGH_WATER_TIMEOUT_MS = 30_000;
 /* 2026-11-17 吞吐修复：每块都 setSend/setRecv 会触发 renderLan() 全量 DOM 重绘，
    成为接收端串行消费瓶颈（1GB 包约 16384 次重绘，实测仅 ~300KB/s）。
    进度 UI 节流到 120ms 一次；速率采样 rateSamples 不受影响，终态仍强制刷新。 */
@@ -955,19 +958,23 @@ export function mountLanTransferPanel({ view, getSendTargets = null, onReceive =
       peerManager.setConnState(PEER_CONN_STATES.CONNECTED);
       startPeerPing();
       syncPeerUi();
-      log('SUCCESS', '局域网对等长连接已建立');
-      toast('局域网对等长连接已就绪');
+      log('SUCCESS', t('lan.log.peerEstablished'));
+      toast(t('lan.toast.peerReady'));
     };
 
     dc.onclose = () => {
       stopPeerPing();
       peerManager.setConnState(PEER_CONN_STATES.DISCONNECTED);
       syncPeerUi();
-      log('WARN', '局域网对等连接已断开');
+      log('WARN', t('lan.log.peerClosed'));
     };
 
     dc.onerror = (err) => {
+      /* 2026-11-19：原先只有 dbg()，而 dbg 仅在 localStorage lan-debug=1 时输出，
+         生产环境通道错误完全不可见（静默失败）。现在同时入日志与界面提示。 */
       dbg('peer dc error', err);
+      log('ERROR', t('lan.err.channelError'));
+      toast(t('lan.err.channelError'));
     };
 
     dc.onmessage = async (event) => {
@@ -994,7 +1001,7 @@ export function mountLanTransferPanel({ view, getSendTargets = null, onReceive =
       }
       if (msg.t === 'q_meta') {
         const task = peerManager.startReceive(msg);
-        log('INFO', `开始接收对端文件: ${task.name} (${formatBytes(task.size)})`);
+        log('INFO', t('lan.log.recvStart', { name: task.name, size: formatBytes(task.size) }));
         incoming = {
           fileId: msg.taskId,
           name: task.name,
@@ -1011,14 +1018,24 @@ export function mountLanTransferPanel({ view, getSendTargets = null, onReceive =
         return;
       }
       if (msg.t === 'q_done') {
-        recvBatcher.flush();
-        await writeChain;
-        if (incoming?.sink) {
-          const blob = await incoming.sink.finalize();
-          log('SUCCESS', `接收完成: ${incoming.name}`);
-          peerManager.finishReceive(true);
-          try { dc.send(JSON.stringify({ t: 'q_ok', taskId: msg.taskId })); } catch {}
-          if (onReceive) void onReceive(blob, incoming.name);
+        /* 2026-11-19：本条 onmessage 是 async，finalize() 与 onReceive() 抛错会变成
+           未处理的 Promise rejection——用户侧表现为「接收莫名其妙没了」。整段兜住。 */
+        try {
+          recvBatcher.flush();
+          await writeChain;
+          if (incoming?.sink) {
+            const blob = await incoming.sink.finalize();
+            log('SUCCESS', t('lan.log.recvComplete', { name: incoming.name }));
+            peerManager.finishReceive(true);
+            try { dc.send(JSON.stringify({ t: 'q_ok', taskId: msg.taskId })); } catch {}
+            if (onReceive) void onReceive(blob, incoming.name);
+            incoming = null;
+            syncPeerUi();
+          }
+        } catch (err) {
+          log('ERROR', t('lan.err.sinkFailed', { msg: err?.message || String(err) }));
+          toast(t('lan.err.sinkFailed', { msg: err?.message || String(err) }));
+          peerManager.finishReceive(false);
           incoming = null;
           syncPeerUi();
         }
@@ -1034,7 +1051,13 @@ export function mountLanTransferPanel({ view, getSendTargets = null, onReceive =
 
   async function peerGenerate() {
     try {
+      /* 2026-11-19：与 generate/applyAnswer/retry/acceptOffer 对齐，补能力门禁——
+         非安全上下文下给出干净原因，而不是抛通用 createOffer 失败。 */
+      if (!capability.direct) { toast(capability.reason); return; }
       peerDisconnect();
+      /* 生成期间给即时反馈：步骤最长可等 waitIceComplete 的 6 秒，
+         原先全程零变化，用户无法区分「处理中」与「坏了」。 */
+      setPeer({ code: '', tip: t('lan.peer.generating') });
       const local = new RTCPeerConnection({ iceServers: [] });
       peerPc = local;
       const dc = local.createDataChannel('stpt-peer', { ordered: true });
@@ -1042,27 +1065,29 @@ export function mountLanTransferPanel({ view, getSendTargets = null, onReceive =
 
       const offer = await local.createOffer();
       await local.setLocalDescription(offer);
-      await waitIceComplete(local);
+      const iceDone = await waitIceComplete(local);
 
       const code = await encodePickupCode(buildPeerSignalPayload({
         role: 'peer_offer',
         sdp: local.localDescription.sdp,
       }));
-      setPeer({ code, tip: '互联码已生成，请对端扫码或输入此码' });
-      log('INFO', '已生成对等互联码');
+      setPeer({ code, tip: iceDone ? t('lan.peer.codeGeneratedTip') : t('lan.peer.codeGeneratedNoIce') });
+      log('INFO', t('lan.log.codeGenerated'));
+      if (!iceDone) log('WARN', t('lan.err.iceIncomplete'));
     } catch (err) {
-      log('ERROR', `生成互联码失败: ${err.message}`);
-      toast(`生成互联码失败: ${err.message}`);
+      log('ERROR', t('lan.log.generateFailed', { msg: err.message }));
+      toast(t('lan.log.generateFailed', { msg: err.message }));
     }
   }
 
   async function peerConnect(rawCode) {
     const text = String(rawCode || '').trim();
     if (!text) {
-      toast('请先粘贴对端的互联码，或点生成/扫码');
+      toast(t('lan.toast.pastePeerCode'));
       return;
     }
     try {
+      if (!capability.direct) { toast(capability.reason); return; }
       const payload = await decodePickupCode(text);
       const isOffer = payload.role === 'peer_offer' || payload.role === 'offer';
       const isAnswer = payload.role === 'peer_answer' || payload.role === 'answer';
@@ -1082,22 +1107,22 @@ export function mountLanTransferPanel({ view, getSendTargets = null, onReceive =
           role: 'peer_answer',
           sdp: local.localDescription.sdp,
         }));
-        setPeer({ code: answerCode, tip: '回执码已生成，请在对端输入或扫码完成握手' });
-        log('INFO', '对等回执码已生成');
-        toast('回执码已生成，请交给发起端');
+        setPeer({ code: answerCode, tip: t('lan.peer.answerTip') });
+        log('INFO', t('lan.log.answerGenerated'));
+        toast(t('lan.toast.answerGenerated'));
       } else if (isAnswer) {
         if (!peerPc) {
-          throw new Error('未找到等待回执的本地会话，请先点生成互联码');
+          throw new Error(t('lan.err.noPendingSession'));
         }
         await peerPc.setRemoteDescription({ type: 'answer', sdp: payload.sdp });
-        setPeer({ tip: '正在连接中...' });
-        log('INFO', '正在与对端建立长连接...');
+        setPeer({ tip: t('lan.peer.connectingTip') });
+        log('INFO', t('lan.log.connectingPeer'));
       } else {
-        throw new Error('互联码格式不正确');
+        throw new Error(t('lan.err.badCode'));
       }
     } catch (err) {
-      log('ERROR', `连接失败: ${err.message}`);
-      toast(`连接失败: ${err.message}`);
+      log('ERROR', t('lan.log.connectFailed', { msg: err.message }));
+      toast(t('lan.log.connectFailed', { msg: err.message }));
     }
   }
 
@@ -1109,7 +1134,7 @@ export function mountLanTransferPanel({ view, getSendTargets = null, onReceive =
     peerPc = null;
     peerManager.setConnState(PEER_CONN_STATES.DISCONNECTED);
     setPeer({ connected: false, code: '', active: null });
-    log('INFO', '已断开局域网对等连接');
+    log('INFO', t('lan.log.peerDisconnected'));
   }
 
   async function pumpPeerQueue() {
@@ -1121,9 +1146,9 @@ export function mountLanTransferPanel({ view, getSendTargets = null, onReceive =
 
     try {
       const file = task.file?.blob || task.file;
-      if (!file) throw new Error('无效的文件对象');
+      if (!file) throw new Error(t('lan.err.invalidFile'));
       const dc = peerDc;
-      if (!dc || dc.readyState !== 'open') throw new Error('连接已断开');
+      if (!dc || dc.readyState !== 'open') throw new Error(t('lan.err.linkDown'));
 
       dc.send(JSON.stringify({
         t: 'q_meta',
@@ -1139,7 +1164,15 @@ export function mountLanTransferPanel({ view, getSendTargets = null, onReceive =
       while (offset < total) {
         const slice = file.slice(offset, offset + CHUNK_SIZE);
         const buf = await slice.arrayBuffer();
+        /* 2026-11-19：原实现只有 20ms sleep，无超时、无 readyState 检查——
+           通道 stalled 或被 peerDisconnect() 关闭后此循环永久悬挂，
+           finally 与后续队列永不执行（真实无界等待）。现在加三重退出条件：
+           通道不再 open、调用方取消、或超过 HIGH_WATER_TIMEOUT_MS。超时按失败处理。 */
+        const drainDeadline = Date.now() + HIGH_WATER_TIMEOUT_MS;
         while (dc.bufferedAmount > HIGH_WATER_MARK) {
+          if (dc.readyState !== 'open') throw new Error(t('lan.err.linkDown'));
+          if (cancelRequested) throw new Error(t('lan.err.cancelled'));
+          if (Date.now() > drainDeadline) throw new Error(t('lan.err.sendStalled'));
           await new Promise((r) => setTimeout(r, 20));
         }
         dc.send(buf);
@@ -1150,20 +1183,20 @@ export function mountLanTransferPanel({ view, getSendTargets = null, onReceive =
         const dt = (Date.now() - startTime) / 1000;
         const rate = dt > 0.3 ? offset / dt : 0;
         const eta = rate > 0 ? (total - offset) / rate : 0;
-        task.detail = `${formatBytes(offset)} / ${formatBytes(total)} · ${formatRate(rate)} · 剩余 ${Math.round(eta)}秒`;
+        task.detail = `${formatBytes(offset)} / ${formatBytes(total)} · ${formatRate(rate)} · ${t('lan.detail.remaining', { duration: t('lan.duration.sec', { n: Math.round(eta) }) })}`;
         syncPeerUi();
       }
 
       dc.send(JSON.stringify({ t: 'q_done', taskId: task.id }));
       peerManager.finishSend(task.id, true);
-      log('SUCCESS', `发送完成: ${task.name}`);
-      toast(`发送完成: ${task.name}`);
+      log('SUCCESS', t('lan.log.sendDone', { name: task.name }));
+      toast(t('lan.toast.sendComplete', { name: task.name }));
 
       dc.send(JSON.stringify({ t: 'q_turn' }));
     } catch (err) {
       peerManager.finishSend(task.id, false, err.message);
-      log('ERROR', `发送失败: ${err.message}`);
-      toast(`发送失败: ${err.message}`);
+      log('ERROR', t('lan.log.sendFailed', { msg: err.message }));
+      toast(t('lan.toast.sendFailed', { msg: err.message }));
     } finally {
       peerSending = false;
       syncPeerUi();
@@ -1171,21 +1204,25 @@ export function mountLanTransferPanel({ view, getSendTargets = null, onReceive =
     }
   }
 
-  function peerSend() {
-    const targets = getSendTargets ? getSendTargets() : [];
+  /* 2026-11-19：getSendTargets 是 async（index.js:644，返回 Promise<File[]>）。
+     旧实现同步取用后直接读 .length ⇒ Promise 无此属性 ⇒ 恒判「未勾选」直接返回，
+     且入队时读 pkg.sizeBytes / pkg.blob，而目标是 File（只有 .size）⇒ 双重错配。
+     现在 await 后直接以 File 为准，入队与 pumpPeerQueue 的 slice 语义一致。 */
+  async function peerSend() {
+    const targets = getSendTargets ? await getSendTargets() : [];
     if (!targets.length) {
-      toast('请先在左侧数据包区勾选要发送的包');
+      toast(t('lan.toast.selectPacksToSend'));
       return;
     }
-    targets.forEach((pkg) => {
+    targets.forEach((file) => {
       peerManager.enqueueSend({
-        name: pkg.name || `${pkg.id}.zip`,
-        size: pkg.sizeBytes || 0,
-        blob: pkg.blob,
+        name: file.name || `${Date.now()}.zip`,
+        size: Number(file.size) || 0,
+        blob: file,
       });
     });
     syncPeerUi();
-    toast(`已添加 ${targets.length} 个任务到互传队列`);
+    toast(t('lan.toast.tasksQueued', { n: targets.length }));
     void pumpPeerQueue();
   }
 

@@ -749,6 +749,9 @@
 
   /* 分区 */
   #app.app-container .zone-tabs{display:flex;gap:4px;padding:7px 9px;border-bottom:1px solid var(--border)}
+  /* 切到 Git 可视化时导入/导出页签要一起藏起来；上面的 display:flex 与 UA 的
+     [hidden]{display:none} 同特异度，必须显式压过（铁律 6：默认隐藏容器补高特异度覆盖）。 */
+  #app.app-container .zone-tabs[hidden]{display:none}
   #app.app-container .zone-tab{border:1px solid transparent;background:transparent;color:var(--muted);
     padding:5px 12px;border-radius:7px;font-size:12px;display:inline-flex;align-items:center;flex:0 0 auto;
     height:var(--ctl-h);box-sizing:border-box}
@@ -802,9 +805,10 @@
   #app.app-container .pkg-icon[data-host="tt"]{border-color:var(--brand-tt-ring)}
   #app.app-container .pkg-icon[data-host="pt"]{border-color:var(--brand-pt-ring)}
   #app.app-container .pkg-icon[data-host="unknown"]{border-color:var(--unknown);opacity:.85}
-  #app.app-container .pkg-check-spacer{width:14px;height:14px;flex:0 0 auto}
-  #app.app-container .pkg-icon[data-host="file"]{border-color:var(--accent);color:var(--accent)}
-  #app.app-container .pkg-icon[data-host="file"] .tree-ico{color:var(--accent)}
+  /* 待导出项不可勾选：等宽透明占位，与 .pkg-check 同尺寸，保证与真实包卡逐像素对齐。
+     尺寸跟随 .pkg-check（含手机 20px 放大），不再单开一套 spacer 素材。 */
+  #app.app-container .pkg-check-slot{width:14px;height:14px;flex:0 0 auto}
+  #app.app-container[data-view="mobile"] .pkg-check-slot{width:20px;height:20px}
   /* Luker 的图标是纯黑剪影，深色底上必须垫浅底 */
   #app.app-container .pkg-icon[data-host="luker"], #app.app-container .host-icon[data-host="luker"]{
     background:var(--icon-plate); border-radius:8px; padding:2px}
@@ -1695,6 +1699,11 @@
      展开＝grid 1fr 从上滑开（zoneDrop 动画），把下方内容挤下去；段内只装包列表
     （zone/git 侧页签禁用，Git 可视化不在数据包列表里）。 */
   #app.app-container[data-view="mobile"] .col-side{display:none}
+  /* 2026-11-19 修复：展开态是 display:flex，收起态却切成 display:grid + 0fr。
+     布局算法中途切换会重建盒模型，`1fr→0fr` 的插值前提不成立，实际表现是
+     内容瞬间塌陷再淡出（注释声称的「收拢完再 display:none」并未发生）。
+     且 1697-1698 行已有明令裁定：**0fr 收拢会把 zone-card 边框压成一条细线，绝不允许**。
+     故两态统一为 flex，收起只播淡出+位移，动画结束后由 JS 置 display:none。 */
   #app.app-container[data-view="mobile"][data-zone-open="1"] .col-side{
     display:flex;flex-direction:column;order:-1;
     min-height:240px;max-height:75vh;
@@ -1719,8 +1728,14 @@
   /* 收起动画（2026-11-16 用户裁定：所有动作必须有流畅动画）：1fr→0fr 收拢完再 display:none。
      ⚠️ 此处**禁用 !important**——!important 会压过动画关键帧导致瞬间跳变；
      本规则在源码顺序上位于展开规则之后，同特异性自然取胜。 */
+  /* 2026-11-19 修复：展开态是 display:flex，收起态却切成 display:grid + 0fr。
+     布局算法中途切换会重建盒模型，`1fr→0fr` 的插值前提不成立，实际表现是
+     内容瞬间塌陷再淡出（注释声称的「收拢完再 display:none」并未发生）。
+     且 1697-1698 行已有明令裁定：**0fr 收拢会把 zone-card 边框压成一条细线，绝不允许**。
+     故收起改回既有裁定要求的路径：只播淡出+位移，动画结束后由 JS 置 display:none，
+     布局模型全程保持 flex，不做切换。 */
   #app.app-container[data-view="mobile"] .col-side.is-closing{
-    display:grid;grid-template-rows:0fr;
+    display:flex;flex-direction:column;
     animation:zoneClose .2s ease forwards;
   }
   @keyframes zoneDrop{
@@ -1976,16 +1991,22 @@
   background: var(--accent);
   border-color: var(--accent);
 }
+/* 2026-11-19 修复：对勾此前用绝对像素 left:4px/top:1px，是按 14px 方框算死的。
+   手机模式把 .tree-check 放大到 20px（见 [data-view="mobile"] 段）后偏移量没跟，
+   勾就偏在左上、不在中心（用户实测报障）。
+   现在用 50%/50% 锚点 + translate(-50%,-50%) 把勾的中心钉在 padding box 中心，
+   与尺寸完全解耦：14 / 18 / 20px 任何放大点都自动居中，不需要逐尺寸重算。
+   注意 50% 是相对 padding box（已扣掉 1px 边框），正是我们想要的对齐基准。 */
 #app.app-container input[type="checkbox"]:checked::after {
   content: '';
   position: absolute;
-  left: 4px;
-  top: 1px;
-  width: 4px;
-  height: 8px;
+  left: 50%;
+  top: 50%;
+  width: 3px;
+  height: 7px;
   border: solid var(--ink-on-accent);
   border-width: 0 2px 2px 0;
-  transform: rotate(45deg);
+  transform: translate(-50%, -50%) rotate(45deg);
 }
 #app.app-container input[type="checkbox"]:indeterminate::after {
   content: '';

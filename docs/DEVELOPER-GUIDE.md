@@ -60,7 +60,7 @@ translation: pending
 | `index.html` | 独立 Web 的空骨架，只提供 `#app` 容器 |
 | `index.js` | 根控制器：宿主嗅探、动作绑定、启动 |
 | `src/core/` | 纯逻辑核心：转换、检测、计划、分卷、差量、体积模型、引擎桥 |
-| `src/ui/` | 有 DOM 的界面层：模板、视图、宿主桥、导出队列、设置、传输面板 |
+| `src/ui/` | 有 DOM 的界面层：模板、视图、宿主桥、待导出区、设置、传输面板 |
 | `src/storage/` | IndexedDB 封装 |
 | `src/data/` | 目标平台、UI 令牌、演示数据等可读配置 |
 | `src/vendor/` | 本地依赖副本，勿升级改动 |
@@ -122,6 +122,10 @@ npm run qa:static        # 静态守卫串跑
   读不到时显示「正在读取」并定时重试，不得回退成宿主名或匿名态。
 - **三段式物理滚动隔离**：`.confirm-dialog .view-body.is-scroll-isolated` 必须强制 `overflow: hidden !important`，工具栏必须为 `flex: 0 0 auto; overflow: hidden;`，滚动条**仅且必须**出现在列表容器 `.changelog-list` 内部，工具栏右侧绝对不得延伸贯穿出现滚动条滑块与箭头；底部的「不再自动显示」复选框必须死死固定在 actions 操作栏，严禁塞入可滚动正文。
 - **局域网无身份单框对等互联**：面板彻底消灭上下堆叠与双列收发卡片，采用单一通用互联盒（`lan-peer-box`），长连接建立后常驻保持不重连（Ping/Pong 心跳与 RTT 测速），双向任务进入连续队列交替调度，互不抢占信道；保留传统单次模式作为降级方案。
+- **对等状态唯一通道 `setLan`**：`view.setLan()` 是视图状态的唯一写入口，支持 `open` / `send` / `recv` / `peer` / `scanError` 五个分支，全部按 `Object.assign` 合并（不得整体替换，否则后续只带部分字段的 patch 会清掉其它字段）。`lan-transfer-panel` 的所有对等状态都经 `setPeer → setLan({ peer })`。**新增任何 `setLan({ xxx })` 调用方时，必须同时在 `setLan` 加分支并在 `test/ui-lan-state-contract.test.js` 补用例**，否则 patch 会被静默丢弃（2026-11-19 曾因漏 `peer` 分支导致整个对等模式点按钮零反应）。
+- **对等发送源契约**：`getSendTargets()` 是 `async`，返回 `File[]`（`index.js`）。`peerSend` 必须 `await` 后以 `File` 为准取 `.name` / `.size`，不得假设存在 `sizeBytes` / `blob` 包装字段。
+- **对等通道等待必须有界**：`bufferedAmount` 排空循环必须同时检查 `readyState`、取消标志与超时（`HIGH_WATER_TIMEOUT_MS`），禁止纯 `sleep` 轮询；`waitIceComplete` 到点未收全时须在提示与日志中如实标注，不得让用户拿到缺候选的码却毫无提示。
+- **待导出卡复用唯一卡范式**：待导出项走 `pkgCard(pkg, { pendingId, pendingActions })` 渲染，与真实数据包卡同一套 DOM 与素材；**禁止为待导出另造图标、伪宿主角标或自造徽标文案**（2026-11-19 已删除 `pkg-check-spacer`、`data-host="file"`、手写 ZIP 角标与 `pending.badge`）。体积计算须兼容 `blob.size` 与演示态 `size/mb`。
 - **Luker 包与分卷包全特征识别**：`detect.js` 扩展识别 Luker 各类 manifest、`_convert/split-manifest.json` 分卷清单、平铺目录特征（`chats/`、`worlds/`、`groups/`、`user/`、`backgrounds/`、`extensions/`）与文件名强特征启发，杜绝 Luker 分卷包误判为「未识别包」。
 - 回归守卫：`npm test -- header-badge.test.js changelog.test.js ui-viewport-guard.test.js`。
 
@@ -172,10 +176,25 @@ npm run qa:static        # 静态守卫串跑
 
 ### 品牌色联动与 UI 交互规范
 
-- **品牌色统一管理**：唯一真源收口在 `src/data/target-ui.js`（`brandTokensOf`）与 `src/data/ui-tokens.js`（`UI_TOKENS.brand`）；严禁各模块手写散落的颜色映射字典；切换目标平台时动态联动容器 `--accent` 等关键变量，严禁被主题默认 QuoteColor 冲刷覆盖。
+- **品牌色统一管理与禁止屎黄色回退**：唯一真源收口在 `src/data/target-ui.js`（`brandTokensOf`）与 `src/data/ui-tokens.js`（`UI_TOKENS.brand`）；严禁各模块手写散落的颜色映射字典；彻底杜绝 `rgb(225, 138, 36)` 屎黄色回退，所有强调与高亮统一采用目标平台品牌色或标准转运色（`#8a5cf6`）。
+- **教程演示模式全面品牌色化**：教程「查看文档」按钮采用中性次要按钮样式（去除黄色边框与高亮），引导卡片、高亮环与横幅全站统一采用品牌色，杜绝刺眼黄色。示例扩展列表严格仅限收录用户 `jiozhaoyue` 的公开 `ST-` 开头扩展，支持运行时动态从 GitHub 仓库同步最新变更，且条目支持直接在新标签页中打开仓库。
+- **扩展管理包内六态状态机与假死根除**：
+  - 严格区分 `NO_PACKAGE`（未选包）、`UNSCANNED`（选包未扫描，带一键扫描通道）、`SCANNING`（扫描中）、`READY`（已扫描有扩展）、`EMPTY`（已扫描无扩展）、`ERROR`（扫描失败重试）六态；
+  - 彻底修复 `ensurePlan` 异步完成未回传与切页才刷新的缺陷：`actions.onActivePackage` 返回 Promise，扫描完成自动就地触发 `renderExtensionView()` 响应式刷新。
+- **列表行响应式与 CDP 物理断言守卫（彻底消灭 3 行折裂）**：
+  - 桌面端（`> 860px`）：严格单行（`nowrap`），超长文本省略，复制按钮单行尾随；
+  - 移动端（`<= 860px`）：严格两行（第一行：复选框 + 仓库与复制按钮同行；第二行：版本与模式标签），绝对禁止出现第 3 行；
+  - 守卫命令：`npm run check:ext-responsive`（`scripts/ui-verify-ext-responsive-cdp.cjs`），自动遍历 390px、439px、768px、1200px 测量垂直阶梯数，若出现 3 行换行则测试立即非零失败。
+- **数据包侧栏单行合流与勾选语义纯化**：
+  - 面板头左侧使用「[图标] 数据包 | Git」切页分段，删除重复的纯文字大标题；右侧紧跟「导入 N | 导出 N」，两层并一层消除空白死带；
+  - 彻底删除 `勾选操作·外框显示` 占位横栏；全选、反选、清空等批量控件纯粹用于控制卡片复选框；
+  - 彻底废除分页栏，所有卡片平铺滑动到底；重设列表时保留容器 `scrollTop`，点击卡片绝不强制回顶。
 - **扫码硬件流即时释放**：扫码窗口关闭或中途取消时立即物理终止所有 MediaStream tracks 并解绑 video.srcObject，支持 AbortSignal、遮罩背景点击与 ESC 按键退出，严格保证仅在扫码时启动摄像头。
-- **扩展管理包内展示收敛**：包内视图移除冗余的选包条，严格保持单行吸顶操作；包未扫描或扫描中展示读取中状态，杜绝过早误报无扩展。
 - **文案与出口规范**：绝对禁止裸字段拼接（如 `zones.allPrefix`）；云端仓库顶部统一采用纯文字指引，移除直接跳转设置按钮。
+- **弹窗与报告界面自适应重构规范（用户明令）**：
+  - 打包扩展弹窗：彻底废除 120px 窄网格，采用自适应 `.pack-modal-card` 卡片流（`minmax(250px, 1fr)`）；头部展示单行省略扩展名与状态胶囊标签，底部独占一行放置完整/清单分段切换按钮，杜绝文字与按钮穿模碰撞；弹窗限制最大高度并强制 `overflow-x: hidden`，彻底消除横向滚动条；
+  - 按钮文案严守短名规范（G-16）：绝对禁止长名按钮，操作文案精简为「拉取清单」（4 字以内），辅助说明收敛至 tooltip；
+  - 上传/恢复宿主报告：顶部必须提供 KPI 色差胶囊栏（`restore-summary-bar`，直观汇总成功、跳过、失败数），消除生硬黑边框，逐包项采用轻微阴影与色差分层。
 
 ## 六、质量门槛
 
@@ -189,6 +208,8 @@ npm run docs:verify
 ```
 
 文档站的中文页、英文页、教程截图与基线哈希必须同步；源页改动但译文或截图未更新会被 CI 拒绝。
+
+- **临时验证守卫**：为触发守卫反例而临时加的测试行，只写在新建临时文件里，或用 `Edit` 精确撤销那一处，或先复制到 `tmp/` 备份再动；禁止用 `git checkout -- <file>` / `git restore` / `git reset --hard` / `git clean` 回收，否则会抹掉会话开始时已有的未提交改动（铁律 40）。
 
 ## 七、参与与安全
 

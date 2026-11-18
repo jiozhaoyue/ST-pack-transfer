@@ -396,6 +396,9 @@ const state = {
     /* 2026-11-17：本地 / 云端常显切换；包内 `.git` 的提交单独缓存。 */
     source:'local', localCommits:[], localBranches:[], localError:'', localGit:null,
     cloudCommits:[], cloudBranches:[], cloudReadOff:false, hostLocalOnly:false,
+    /* 2026-11-18：云端三态单一真源。off=未勾选云端读取 / no-remote=真的没有远程源 /
+       ok=读到 / error=有远程源但读不到（URL 无效、私有仓、凭据不足）。 */
+    cloudState:'off', cloudReason:'', cloudNeedLogin:false,
   },
   source:{ type:'host', pkgId:null }, target:'SillyTavern', targetManual:false,
   /* Luker 存储引擎（'' = 跟随源包；fs/postgres/mysql/sqlite = 显式目标）。 */
@@ -440,8 +443,10 @@ const state = {
     peer:{
       connected: false,
       rtt: 0,
-      offerCode: '',
-      answerCode: '',
+      /* code / tip 由 lan-transfer-panel 的 setPeer 写入并驱动二维码与提示；
+         初始必须显式存在，否则 renderLan 读 undefined 与「键不存在」无法区分。 */
+      code: '',
+      tip: '',
       active: null,
       queue: [],
     },
@@ -565,26 +570,36 @@ function selectPackageForExtension(id){
   state.activePkgs = new Set(pkg ? [pkg.id] : []);
   syncSourceToActive();
   autoEngineForPackage(pkg);
-  /* 2026-11-17 用户铁律：包内单选必须**确保该包已扫描**。
-     扩展清单的 nodes/extensions/extManifest 只在 ensurePlan 扫描后写入包对象；
-     导入多包时只有最新包被扫描，点到未扫描包就会「共 N 项却没有任何扩展」。
-     onActivePackage 内部 = setActivePackage（立即重绘）+ ensurePlan（补齐后再次重绘），
-     是本仓唯一的「切换包并补扫描」入口；demo wrapper 里为 undefined（自带数据，安全跳过）。 */
+  /* 选包后，若未扫描则触发扫描并就地刷新；若已扫描则直接刷新视图。 */
   const scanned = pkg && (pkg.scanned || (Array.isArray(pkg.nodes) && pkg.nodes.length)
     || (Array.isArray(pkg.extensions) && pkg.extensions.length)
     || (Array.isArray(pkg.extManifest) && pkg.extManifest.length));
   if(pkg && !scanned){
-    state.pkgReadingExt = id;
-    if(typeof actions.onActivePackage==='function'){
-      Promise.resolve(actions.onActivePackage(id)).finally(()=>{
-        if(state.pkgReadingExt === id){
-          state.pkgReadingExt = '';
-          renderExtensionView();
-        }
-      });
-    }
+    void scanPackageForExtensions(id);
   } else {
     state.pkgReadingExt = '';
+    renderExtensionView();
+  }
+}
+/** 统一的包扫描执行器：负责状态切换、错误捕获与完成自动刷新，彻底消灭假死态。 */
+async function scanPackageForExtensions(id){
+  const pkg=(state.packages||[]).find((p)=>p && p.id===id) || null;
+  if(!pkg) return;
+  state.pkgReadingExt = id;
+  pkg._scanError = '';
+  renderExtensionView();
+  try {
+    if(typeof actions.onActivePackage==='function'){
+      await actions.onActivePackage(id);
+    }
+  } catch(err) {
+    pkg._scanError = err?.message || String(err);
+    logger.error(t('log.extPkgReadFailed', { err: pkg._scanError }));
+  } finally {
+    if(state.pkgReadingExt === id){
+      state.pkgReadingExt = '';
+    }
+    renderExtensionView();
   }
 }
 function packageGitMode(pkg){
@@ -2189,9 +2204,19 @@ function realUncompressedMbOf(p) {
   return 0;
 }
 
-function pkgCard(p){
+/**
+ * 数据包卡（唯一卡范式）。
+ *
+ * `opts.pendingId` / `opts.pendingActions` 供「本次待导出」条目复用本卡：
+ * 待导出项不在 state.packages 里、也不可勾选，故隐藏复选框换成等宽占位、
+ * 把动作列换成下载/存入工作区/移除三键（2026-11-19 用户裁定：
+ * 待导出卡不得另造一套素材与样式，必须与本卡同构）。
+ */
+function pkgCard(p, opts){
+  const pendingId = opts?.pendingId;
+  const isPending = pendingId !== undefined && pendingId !== null;
   /* 外框激活环 = 在图表显示集中（2026-11-15 用户裁定：外框点击驱动图表） */
-  const isActive=state.activePkgs.has(p.id);
+  const isActive=!isPending && state.activePkgs.has(p.id);
   const isMobile=state.view==='mobile';
   const hostKey=p.unrecognized?'unknown':p.host;
   const hostCode=p.unrecognized?'?':({st:'ST',luker:'L',tt:'TT',pt:'PT'}[p.host]||'?');
@@ -2208,9 +2233,13 @@ function pkgCard(p){
   const iconInner=p.unrecognized
     ? '<span class="pkg-icon" data-host="unknown" style="display:inline-flex;align-items:center;justify-content:center;color:var(--unknown)">'+svg('unknown','tree-ico')+'</span>'
     : '<img class="pkg-icon" data-host="'+hostKey+'" src="'+hostIcon(p.host)+'" alt="'+hostName(p.host)+'">';
-  const icon='<span class="pkg-icon-wrap">'
-    +'<span class="pkg-seq" style="'+seqStyle+'">'+seqNum(p)+'</span>'
-    +iconInner+'<span class="pkg-host-tag" style="'+tagStyle+'">'+hostCode+'</span></span>';
+  /* 待导出项没有宿主来源（内存产物），也不伪造宿主角标：图标用既有 file 图标表，
+     序号槽位留空，宿主角标整块不渲染——而不是拿 luker 图标兜底或手写 "ZIP" 字面量。 */
+  const icon = isPending
+    ? '<span class="pkg-icon-wrap">'+svg('file','tree-ico')+'</span>'
+    : '<span class="pkg-icon-wrap">'
+      +'<span class="pkg-seq" style="'+seqStyle+'">'+seqNum(p)+'</span>'
+      +iconInner+'<span class="pkg-host-tag" style="'+tagStyle+'">'+hostCode+'</span></span>';
   const badges=[];
   if(p.unrecognized) badges.push('<span class="pkg-badge unknown">'+t('pkg.unrecognized')+'</span>');
   const limit=splitLimit();
@@ -2221,16 +2250,24 @@ function pkgCard(p){
   if(p.origin) badges.push('<span class="pkg-badge">'+p.origin+'</span>');
   const estHostMb = realUncompressedMbOf(p);
   const estHostHtml = estHostMb ? '<span class="pkg-est-host" title="'+t('pkg.estHostTitle')+'"><i class="fa-solid fa-hard-drive"></i> '+t('pkg.estHost',{size:fmtMB(estHostMb)})+'</span>' : '';
-    return '<div class="pkg-card'+(isActive?' is-active':'')+(p.unrecognized?' unrecognized':'')+(p.zone==='export'?' is-export':'')+'" data-pkg="'+p.id+'" data-mobile="'+(isMobile?'1':'0')+'" title="'+t('zones.cardDisplayTip')+'">'
-    +'<input class="pkg-check" type="checkbox" data-pkgcheck="'+p.id+'"'+(state.selectedPkgs.has(p.id)?' checked':'')+' title="'+t('zones.checkboxActionTip')+'" aria-label="'+t('zones.checkboxActionTip')+'">'
+    return '<div class="pkg-card'+(isActive?' is-active':'')+(p.unrecognized?' unrecognized':'')+(p.zone==='export'?' is-export':'')+'"'
+      +(isPending?' data-pending="'+escapeHtml(pendingId)+'"':' data-pkg="'+p.id+'"')
+      +' data-mobile="'+(isMobile?'1':'0')+'" title="'+t('zones.cardDisplayTip')+'">'
+    +(isPending
+        /* 待导出项不可勾选：用与 .pkg-check 等宽的透明占位保持与真实卡完全对齐，
+           但仍复用既有 .pkg-check 尺寸规则，不再新建 .pkg-check-spacer 素材。 */
+        ? '<span class="pkg-check-slot" aria-hidden="true"></span>'
+        : '<input class="pkg-check" type="checkbox" data-pkgcheck="'+p.id+'"'+(state.selectedPkgs.has(p.id)?' checked':'')+' title="'+t('zones.checkboxActionTip')+'" aria-label="'+t('zones.checkboxActionTip')+'">')
     +icon
     +'<div class="pkg-info">'
     +'<div class="pkg-name"><span class="pkg-name-txt" data-fullname="'+encodeURIComponent(p.name)+'" title="'+escapeHtml(p.name)+'">'+escapeHtml(p.name)+'</span></div>'
     +'<div class="pkg-meta">'+badges.join('')+'<span>'+p.size+'</span>'+estHostHtml+'<span>'+p.time+'</span></div>'
     +'</div>'
-    +(p.zone==='export'?'':'<div class="pkg-actions">'
-      +'<button data-pkgact="delete" data-id="'+p.id+'" title="'+t('pkg.delete')+'">'+svg('archive','tree-ico')+'</button>'
-    +'</div>')
+    +(isPending
+        ? '<div class="pkg-actions">'+opts.pendingActions+'</div>'
+        : (p.zone==='export'?'':'<div class="pkg-actions">'
+            +'<button data-pkgact="delete" data-id="'+p.id+'" title="'+t('pkg.delete')+'">'+svg('archive','tree-ico')+'</button>'
+          +'</div>'))
     +'</div>';
 }
 function renderZones(){
@@ -2243,18 +2280,22 @@ function renderZones(){
   document.getElementById('count-export').textContent=exp;
 
   const body=document.getElementById('zone-body');
+  if(!body) return;
+  const prevScrollTop = body.scrollTop;
   const list=visiblePackages(state.zone);
   let html='';
+  const isTransferView = !!state.transfer.open;
+  /* 2026-11-18 用户明令：普通数据包视图完全删除「勾选操作·外框显示」！isTransferView ? t('zones.selTransferHintShort') : t('zones.selDiffHintShort') 中不再输出普通视图外框显示条 */
+  if(isTransferView){
+    html += '<div class="zone-top-hint-bar" title="' + escapeHtml(t('zones.selTransferHintFull')) + '">'
+      + '<i class="fa-solid fa-cloud-arrow-up" style="margin-right:6px"></i>'
+      + '<span>' + escapeHtml(t('zones.selTransferHintShort')) + '</span>'
+      + '</div>';
+  }
   const zoneSelButtons = '<div class="ext-sel-group zone-sel-group" title="' + t('zones.selGroupTitle') + '">'
     + '<button type="button" class="btn icon" data-pkgall title="' + t('extmgr.selectAll') + '" aria-label="' + t('extmgr.selectAll') + '"><i class="fa-solid fa-check-double"></i></button>'
     + '<button type="button" class="btn icon" data-pkginvert title="' + t('extmgr.invert') + '" aria-label="' + t('extmgr.invert') + '"><i class="fa-solid fa-shuffle"></i></button>'
     + '<button type="button" class="btn icon" data-pkgnone title="' + t('extmgr.selectNone') + '" aria-label="' + t('extmgr.selectNone') + '"><i class="fa-solid fa-xmark"></i></button>'
-    + '</div>';
-  const isTransferView = !!state.transfer.open;
-  const selDiffText = isTransferView ? t('zones.selTransferHintShort') : t('zones.selDiffHintShort');
-  const topHintHtml = '<div class="zone-top-hint-bar" title="' + escapeHtml(isTransferView ? t('zones.selTransferHintFull') : t('zones.selDiffHintFull')) + '">'
-    + '<i class="' + (isTransferView ? 'fa-solid fa-cloud-arrow-up' : 'fa-regular fa-circle-question') + '" style="margin-right:6px"></i>'
-    + '<span>' + escapeHtml(selDiffText) + '</span>'
     + '</div>';
   const sortBlock = '<label class="zone-sort-label">' + t('sort.label') + ' <select id="sort-select">'
     + '<option value="time-desc"' + (state.sort === 'time-desc' ? ' selected' : '') + '>' + t('sort.timeDesc') + '</option>'
@@ -2263,7 +2304,6 @@ function renderZones(){
     + '</select></label>';
   const toolbarHtml = '<div class="zone-toolbar">' + hostFilterHtml() + zoneSelButtons + '<span class="spacer"></span>' + sortBlock + '</div>';
 
-  html += topHintHtml;
   if(state.zone==='import'){
     html+='<div class="dropzone" id="dropzone"><span class="big">'+t('zones.dropTitle')+'</span>'+t('zones.dropHint')+'</div>' + toolbarHtml;
   }else{
@@ -2272,45 +2312,17 @@ function renderZones(){
   if(list.length===0){
     html+='<div class="zone-empty">'+(state.zone==='import'?t('zones.emptyImport'):t('zones.emptyExport'))+'</div>';
   }else{
-    const PKG_PAGE_SIZE = 8;
-    state.zonePage = state.zonePage || { import: 1, export: 1 };
-    const totalCount = list.length;
-    const totalPages = Math.max(1, Math.ceil(totalCount / PKG_PAGE_SIZE));
-    let curPage = state.zonePage[state.zone] || 1;
-    if(curPage > totalPages) curPage = totalPages;
-    if(curPage < 1) curPage = 1;
-    state.zonePage[state.zone] = curPage;
-
-    const pagedList = list.slice((curPage - 1) * PKG_PAGE_SIZE, curPage * PKG_PAGE_SIZE);
-    html+='<div class="card-list">'+pagedList.map(pkgCard).join('')+'</div>';
-    if(totalPages > 1){
-      html+='<div class="zone-pagination">'
-        +'<span>'+t('zones.pageInfo',{current:curPage,total:totalPages})+'</span>'
-        +'<div class="zp-actions">'
-          +'<button type="button" class="btn" id="zone-page-prev"'+(curPage<=1?' disabled':'')+'>'+t('zones.pagePrev')+'</button>'
-          +'<button type="button" class="btn" id="zone-page-next"'+(curPage>=totalPages?' disabled':'')+'>'+t('zones.pageNext')+'</button>'
-        +'</div>'
-      +'</div>';
-    }
+    html+='<div class="card-list">'+list.map(pkgCard).join('')+'</div>';
   }
   if(state.zone==='export'){
     const queue=state.pendingExports||[];
-    if(queue.length) html+='<div class="card-list" id="pending-cards">'+queue.map(pendingCardHtml).join('')+'</div>';
+    if(queue.length) html+='<div class="card-list" id="pending-cards">'+queue.map((it,i)=>pendingCardHtml(it,i)).join('')+'</div>';
   }
   body.innerHTML=html;
-  body.querySelector('#zone-page-prev')?.addEventListener('click',()=>{
-    if((state.zonePage[state.zone]||1) > 1){
-      state.zonePage[state.zone]--;
-      renderZones();
-    }
-  });
-  body.querySelector('#zone-page-next')?.addEventListener('click',()=>{
-    const totalPages = Math.max(1, Math.ceil(list.length / 8));
-    if((state.zonePage[state.zone]||1) < totalPages){
-      state.zonePage[state.zone]++;
-      renderZones();
-    }
-  });
+  if(prevScrollTop > 0){
+    body.scrollTop = prevScrollTop;
+    requestAnimationFrame(()=>{ if(body) body.scrollTop = prevScrollTop; });
+  }
   body.querySelectorAll('[data-pending-act]').forEach(btn=>btn.addEventListener('click',()=>{
     const id=btn.closest('[data-pending]')?.dataset.pending;
     if(!id) return;
@@ -2395,6 +2407,11 @@ function renderZoneSide(){
   }
   if(zonePanel) zonePanel.hidden=state.sideTab==='git';
   if(gitPanel) gitPanel.hidden=state.sideTab!=='git';
+  /* 2026-11-18 用户明令：电脑版切到 Git 可视化后，导入/导出页签必须一起隐藏。
+     这两颗页签在 .panel-actions 里，是 #zone-side-zone 的兄弟节点，不会随内容面板
+     一起消失；不隐藏就会出现「已在看 Git，头顶还挂着导入/导出」。 */
+  const zoneTabs=document.getElementById('zone-tabs');
+  if(zoneTabs) zoneTabs.hidden=state.sideTab==='git';
   if(state.sideTab==='git') renderGitViz();
 }
 function gitStateText(stateCode){
@@ -2429,8 +2446,19 @@ function gitGraphHtml(g){
   const commits=Array.isArray(g.commits)?g.commits:[];
   if(!commits.length){
     if(g.loading) return '<div class="git-graph-empty ext-empty">'+t('gitv.loading')+'</div>';
-    if(g.source==='cloud' && g.cloudReadOff){
-      return '<div class="git-graph-empty ext-note is-warn">'+t('gitv.cloudReadOffHint')+'</div>';
+    /* 云端三态各自给可行动指引，不再一律显示「没有可读的提交」：
+       ① off       = 有远程源但未勾选云端读取
+       ② no-remote = 真的没有远程源
+       ③ error     = 有远程源但读不到（URL 无效 / 私有仓 / 凭据不足） */
+    if(g.source==='cloud'){
+      if(g.cloudState==='off') return '<div class="git-graph-empty ext-note is-warn">'+t('gitv.cloudReadOffHint')+'</div>';
+      if(g.cloudState==='no-remote') return '<div class="git-graph-empty ext-note is-warn">'+t('gitv.noRemoteHint')+'</div>';
+      if(g.cloudState==='error'){
+        const head='<div class="git-graph-empty ext-note is-warn">'+escapeHtml(g.cloud?.error||t('gitv.cloudReadFailed'))+'</div>';
+        return g.cloudNeedLogin
+          ? head+'<div class="git-graph-empty ext-note">'+t('gitv.needLoginHint')+'</div>'
+          : head;
+      }
     }
     if(g.source==='local' && g.localError){
       return '<div class="git-graph-empty ext-note is-warn">'+escapeHtml(g.localError)+'</div>';
@@ -2557,6 +2585,7 @@ async function loadGitTarget(name, { force = false } = {}){
   g.remoteUrl=''; g.currentBranch=''; g.pickedRef=''; g.pickedKind='';
   g.localCommits=[]; g.localBranches=[]; g.localError=''; g.localGit=null;
   g.cloudCommits=[]; g.cloudBranches=[]; g.cloudReadOff=false; g.hostLocalOnly=false;
+  g.cloudState='off'; g.cloudReason=''; g.cloudNeedLogin=false;
   renderGitViz();
   const item=(state.extInstalled||[]).find((x)=>String(x?.id||x?.folder||x?.name||'')===name);
   const isGlobal=String(item?.sourceType||'')==='global';
@@ -2627,13 +2656,26 @@ async function loadGitTarget(name, { force = false } = {}){
     }));
   }
 
-  /* 云端来源：默认关闭；关闭时零请求，并如实显示提示。 */
+  /* 云端来源：默认关闭；关闭时零请求，并如实显示提示。
+     2026-11-18 用户明令：必须区分三种情况——① 真的没有远程源 ② 有远程源但未勾选云端读取
+     ③ 有远程源但读不到（URL 无效 / 私有仓 / 凭据不足）。此前三者混在一起：
+     无 URL 时 cloud 保持 null 且没有任何提示，读失败时 cloud.error 只赋值不渲染，
+     用户看不出到底哪一步挡住了。现在用 g.cloudState 单一真源区分，界面逐态给可行动指引。 */
   const cloudReadOn=!!loadSettings().gitCloudReadOn;
   g.cloudReadOff=!cloudReadOn;
   let cloud=null;
+  /** cloudState：off=未开启云端读取 / no-remote=没有远程源 / ok=读取成功 / error=读取失败 */
+  let cloudState='off';
+  let cloudReason='';
+  let cloudNeedLogin=false;
   if(!cloudReadOn){
+    cloudState='off';
     cloud={branches:[],tags:[],commits:[],error:t('gitv.cloudReadOff')};
-  } else if(remoteUrl){
+  } else if(!remoteUrl){
+    /* 远程源真的不存在：不再留空 cloud，显式记态，让面板给出「没有远程源」而不是空白。 */
+    cloudState='no-remote';
+    cloud={branches:[],tags:[],commits:[],error:t('gitv.noRemote')};
+  } else {
     const parsed=parseRepoUrl(remoteUrl);
     if(parsed.ok){
       const acc=accountForRepo(parsed);
@@ -2644,6 +2686,15 @@ async function loadGitTarget(name, { force = false } = {}){
         gitRemote().listCommits(parsed, ref, acc, {perPage:50}),
       ]);
       const reason=!branches.ok?branches.reason:(!tags.ok?tags.reason:(!commits.ok?commits.reason:''));
+      if(reason){
+        cloudState='error';
+        cloudReason=reason;
+        /* 401/403/404 在「私有仓 vs 真无效」之间**技术上无法区分**（同一仓库对未授权者
+           就是 404）。按用户要求：这种情况一律引导去开发者页登录账号，不做无根据的断言。 */
+        cloudNeedLogin = reason==='unauthorized' || reason==='forbidden' || reason==='not-found' || !acc;
+      } else {
+        cloudState='ok';
+      }
       cloud={
         branches:branches.ok?branches.branches:[],
         tags:tags.ok?tags.tags:[],
@@ -2651,9 +2702,16 @@ async function loadGitTarget(name, { force = false } = {}){
         error:reason?reasonText(reason):'',
       };
     } else {
+      cloudState='error';
+      cloudReason='unsupported';
+      cloudNeedLogin=!accountForRepo(parsed);
       cloud={branches:[],tags:[],commits:[],error:reasonText('unsupported')};
     }
   }
+  if(cloudState==='ok'&&cloudReadOn&&remoteUrl) cloud.error='';
+  g.cloudState=cloudState;
+  g.cloudReason=cloudReason;
+  g.cloudNeedLogin=cloudNeedLogin;
   g.cloud=cloud;
   g.cloudBranches=Array.isArray(cloud?.branches)?cloud.branches:[];
   g.cloudCommits=Array.isArray(cloud?.commits)?cloud.commits:[];
@@ -2768,7 +2826,17 @@ function renderGitViz(){
   const rows=selectGitTargets(installed, installs);
   /* 2026-11-16 用户明令：Git 可视化支持宿主与包内扩展联动！将包内扩展并入候选目标 */
   const importPkgs = (state.packages||[]).filter(p=>p && p.id);
-  const pkg = importPkgs.find(p=>p.id===state.extSelectedPackageId) || importPkgs[0];
+  /* 2026-11-18 用户报告修复：勾选数据包复选框会改写 extSelectedPackageId，
+     若只按它选候选包，已打开的 Git 目标就会掉出候选集，activeTarget 匹配失败 →
+     Git 面板退化成「请在左侧选择」的空态（表现为「勾选后可视化失效、只能点版本号恢复」）。
+     候选包改成三级优先：当前 Git 目标所在包 → 扩展页选中的包 → 首个包，
+     让勾选只影响导入导出候选，不再牵动已打开的 Git 视图。 */
+  const pkgHoldingGitTarget = state.gitViz.name
+    ? importPkgs.find(p => packageExtensionItems(p).some(i => i.name === state.gitViz.name))
+    : null;
+  const pkg = pkgHoldingGitTarget
+    || importPkgs.find(p=>p.id===state.extSelectedPackageId)
+    || importPkgs[0];
   const pkgItems = pkg ? packageExtensionItems(pkg) : [];
   for(const pi of pkgItems){
     if(!rows.some(r => r.name === pi.name)){
@@ -3232,10 +3300,12 @@ function accountsHtml(){
   return '<details class="ext-accounts" data-extaccounts'+(state.extAccountsOpen?' open':'')+'>'
     +extSummaryHtml(t('extmgr.accountsTitle'), list.length)
     +'<div class="ext-note privacy">'+t('extmgr.privacyNote')+'</div>'
+    /* 2026-11-18 用户明令：此处只做文案提醒，**不得提供任何直接跳转到隐私设置的按钮**。
+       各凭据的存放位置属于设置页的事，这里只如实说明当前状态，把选择权留给用户自己走过去。 */
     +'<div class="ext-row">'
       +'<span class="et-label">'+t('extmgr.storageLabel')+'</span>'
       +'<span class="acc-store-state">'+(mode==='server'?t('extmgr.storeServer'):t('extmgr.storeBrowser'))+'</span>'
-      +'<button type="button" class="btn" data-openprivacy>'+t('extmgr.storeGoPrivacy')+'</button>'
+      +'<span class="ext-note">'+t('extmgr.storeGoPrivacy')+'</span>'
     +'</div>'
     +'<div class="ext-row acc-add">'
       +'<select class="text_pole" data-accsite>'+ACCOUNT_SITES.map((s)=>'<option value="'+s+'">'+s+'</option>').join('')+'</select>'
@@ -3492,13 +3562,6 @@ function bindAccounts(body){
   const oauthBox=body.querySelector('[data-extoauth]');
   oauthBox?.addEventListener('toggle',()=>{ state.extOauthOpen=!!oauthBox.open; });
   /* 存放位置只在「设置 → 隐私」改，这里只显示状态与入口（单一真源，2026-11-16 用户裁定）。 */
-  body.querySelector('[data-openprivacy]')?.addEventListener('click',()=>{
-    actions.settings?.();
-    requestAnimationFrame(()=>{
-      const g=document.querySelector('#settings-body [data-group="privacy"]');
-      if(g){ g.setAttribute('open',''); g.scrollIntoView({block:'nearest'}); }
-    });
-  });
   body.querySelector('[data-accadd]')?.addEventListener('click',()=>{ void addAccountFromForm(body); });
   body.querySelector('[data-oauthstart]')?.addEventListener('click',()=>{ void startOAuth(body); });
   body.querySelector('[data-oauthcopy]')?.addEventListener('click',async()=>{
@@ -4030,9 +4093,12 @@ function formatExtRemoteUrlHtmlInner(rawUrl, fallbackName = ''){
   }
 
   const shownRepo=repoName||slug||url;
+  const repoContent = url && /^https?:\/\//i.test(url)
+    ? '<a class="ext-repo-link" href="'+escapeHtml(url)+'" target="_blank" rel="noopener noreferrer" title="'+t('extmgr.openRepo')+' · '+escapeHtml(url)+'">'+escapeHtml(shownRepo)+'</a>'
+    : '<span class="ext-repo" title="'+escapeHtml(shownRepo)+'">'+escapeHtml(shownRepo)+'</span>';
   return '<span class="ext-remote-url" title="'+escapeHtml(url)+'">'
     +'<span class="ext-site-badge" title="'+escapeHtml(siteName)+'">'+siteIcon+'</span>'
-    +'<span class="ext-repo" title="'+escapeHtml(shownRepo)+'">'+escapeHtml(shownRepo)+'</span>'
+    +repoContent
     +(author?'<span class="ext-author" title="'+escapeHtml(author)+'">'+escapeHtml(author)+'</span>':'')
     +'<button type="button" class="ext-copy-btn" data-copyurl="'+escapeHtml(url)+'" title="'+t('extmgr.copyUrl')+'" aria-label="'+t('extmgr.copyUrl')+'">'
       +'<i class="fa-regular fa-copy"></i></button>'
@@ -4450,18 +4516,23 @@ function batchPackWithConfirm(names){
       +'<button type="button" class="btn" id="pack-rec-btn"><i class="fa-solid fa-wand-magic-sparkles"></i><span>'+t('extmgr.packSmartRecommend')+'</span></button>'
       +'<button type="button" class="btn" id="pack-all-full">'+t('extmgr.packAllFull')+'</button>'
       +'<button type="button" class="btn" id="pack-all-manifest">'+t('extmgr.packAllManifest')+'</button>'
+      +'<label class="check pack-modal-pull-chk" title="'+t('extmgr.packPullManifestTip')+'">'
+        +'<input type="checkbox" id="pack-pull-manifest-chk"> <span>'+t('extmgr.packPullManifest')+'</span>'
+      +'</label>'
       +'</div>'
-      +'<div class="rep-grid pack-modal-grid">'
+      +'<div class="pack-modal-grid">'
       +analysis.map((item)=>{
         const cur=currentModes[item.name];
-        return '<div class="rep-row pack-modal-row" data-packext-row="'+escapeHtml(item.name)+'">'
-          +'<div class="pack-row-info">'
-            +'<strong class="pack-row-name">'+escapeHtml(item.name)+'</strong>'
-            +'<span class="pack-row-reason" title="'+escapeHtml(item.reason)+'">'+escapeHtml(item.reason)+'</span>'
+        return '<div class="pack-modal-card" data-packext-row="'+escapeHtml(item.name)+'">'
+          +'<div class="pack-card-head">'
+            +'<strong class="pack-card-name" title="'+escapeHtml(item.name)+'">'+escapeHtml(item.name)+'</strong>'
+            +'<span class="pack-card-reason" title="'+escapeHtml(item.reason)+'">'+escapeHtml(item.reason)+'</span>'
           +'</div>'
-          +'<div class="segmented pack-seg-toggle" data-packname="'+escapeHtml(item.name)+'">'
-            +'<button type="button" class="seg-btn'+(cur==='full'?' active':'')+'" data-mode="full">'+t('extmgr.packModeFull')+'</button>'
-            +'<button type="button" class="seg-btn'+(cur==='manifest'?' active':'')+'" data-mode="manifest">'+t('extmgr.packModeManifest')+'</button>'
+          +'<div class="pack-card-foot">'
+            +'<div class="segmented pack-seg-toggle" data-packname="'+escapeHtml(item.name)+'">'
+              +'<button type="button" class="seg-btn'+(cur==='full'?' active':'')+'" data-mode="full">'+t('extmgr.packModeFull')+'</button>'
+              +'<button type="button" class="seg-btn'+(cur==='manifest'?' active':'')+'" data-mode="manifest">'+t('extmgr.packModeManifest')+'</button>'
+            +'</div>'
           +'</div>'
         +'</div>';
       }).join('')
@@ -4506,8 +4577,9 @@ function batchPackWithConfirm(names){
     [
       {label:t('modal.cancel'),onClick:closeModal},
       {label:t('extmgr.batchPack'),primary:true,onClick:()=>{
+        const pullGit=!!document.getElementById('pack-pull-manifest-chk')?.checked;
         closeModal();
-        actions.exportAssetList?.({ source:'host', names:list, modes:{ ...currentModes } });
+        actions.exportAssetList?.({ source:'host', names:list, modes:{ ...currentModes }, pullManifestGit:pullGit });
       }},
     ]
   );
@@ -4770,14 +4842,16 @@ async function renderExtInstalled(body){
   /* 包内页签可查看任何已载入的数据包（导入区与导出区都算），且永远只有一个选中。 */
   const selectablePkgs = (state.packages||[]).filter(p=>p && p.id);
   let selectedPkg = selectablePkgs.find(p=>p.id===state.extSelectedPackageId)
-    || selectablePkgs.find(p=>(state.activePkgs||new Set()).has(p.id))
-    || selectablePkgs[0] || null;
+    || (state.activePkgs && state.activePkgs.size===1 ? selectablePkgs.find(p=>state.activePkgs.has(p.id)) : null)
+    || null;
   if(!isHost && selectedPkg){
     state.extSelectedPackageId = selectedPkg.id;
     if(!(state.activePkgs && state.activePkgs.size===1 && state.activePkgs.has(selectedPkg.id))){
       state.activePkgs = new Set([selectedPkg.id]);
       syncSourceToActive();
     }
+  } else if(!isHost && !selectedPkg){
+    state.extSelectedPackageId = '';
   }
 
   /* 列表头左侧控制：包内视图统一由数据包列表选择，宿主展示策略入口 */
@@ -4856,41 +4930,61 @@ async function renderExtInstalled(body){
       const isPkgScanned = selectedPkg && (selectedPkg.scanned || (Array.isArray(selectedPkg.nodes) && selectedPkg.nodes.length)
         || (Array.isArray(selectedPkg.extensions) && selectedPkg.extensions.length)
         || (Array.isArray(selectedPkg.extManifest) && selectedPkg.extManifest.length));
-      const isReading = state.pkgReadingExt === selectedPkg.id || (!isPkgScanned && !selectedPkg._emptyScanned);
-      if (isReading) {
+      const isReading = state.pkgReadingExt === selectedPkg.id;
+      const isScanError = !!selectedPkg._scanError;
+      const isUnscanned = !isPkgScanned && !selectedPkg._emptyScanned && !isReading;
+
+      if (isScanError) {
+        countTotal = 0;
+        rowsHtml = '<div class="ext-empty ext-pkg-error-state" role="status">'
+          + '<div class="ext-empty-icon" style="color:var(--drop)"><i class="fa-solid fa-triangle-exclamation"></i></div>'
+          + '<div class="ext-empty-title">' + t('extmgr.pkgScanFailed') + '</div>'
+          + '<div class="ext-empty-desc">' + escapeHtml(selectedPkg._scanError) + '</div>'
+          + '<div style="margin-top:10px"><button type="button" class="btn primary" id="extmgr-scan-pkg-btn" data-scanpkg="' + escapeHtml(selectedPkg.id) + '"><i class="fa-solid fa-rotate-right"></i> ' + t('extmgr.retryScan') + '</button></div>'
+          + '</div>';
+      } else if (isReading) {
         countTotal = 0;
         logger.info(t('log.extPkgReading', { name: selectedPkg.name, size: fmtMB(selectedPkg.mb || 0) }));
         rowsHtml = '<div class="ext-empty ext-loading-state" role="status">'
           + '<i class="fa-solid fa-spinner fa-spin"></i> ' + t('extmgr.readingPackage')
+          + '<div class="ext-empty-desc" style="margin-top:6px">' + escapeHtml(selectedPkg.name) + '</div>'
+          + '</div>';
+      } else if (isUnscanned) {
+        countTotal = 0;
+        rowsHtml = '<div class="ext-empty ext-pkg-unscanned-state" role="status">'
+          + '<div class="ext-empty-icon" style="color:var(--accent)"><i class="fa-solid fa-magnifying-glass"></i></div>'
+          + '<div class="ext-empty-title">' + t('extmgr.pkgUnscannedTitle') + '</div>'
+          + '<div class="ext-empty-desc">' + t('extmgr.pkgUnscannedDesc') + '</div>'
+          + '<div style="margin-top:10px"><button type="button" class="btn primary" id="extmgr-scan-pkg-btn" data-scanpkg="' + escapeHtml(selectedPkg.id) + '"><i class="fa-solid fa-bolt"></i> ' + t('extmgr.scanPackageNow') + '</button></div>'
           + '</div>';
       } else {
         logger.info(t('log.extPkgReading', { name: selectedPkg.name, size: fmtMB(selectedPkg.mb || 0) }));
         const pkgItems = packageExtensionItems(selectedPkg);
         countTotal = pkgItems.length;
-      if (pkgItems.length > 0) {
-        const origCount = pkgItems.filter(i => i.kind === 'original').length;
-        const manifestCount = pkgItems.filter(i => i.kind === 'manifest').length;
-        logger.success(t('log.extPkgReadSuccess', { name: selectedPkg.name, count: pkgItems.length, orig: origCount, manifest: manifestCount }));
-        rowsHtml = pkgItems.map((item, idx)=>{
-          const isCurrentGit = state.gitViz.name === item.name;
-          const kindBadge = item.kind === 'original'
-            ? '<span class="ext-flag ext-kind-tag is-orig">'+t('extmgr.kindOriginal')+'</span>'
-            : '<span class="ext-flag ext-kind-tag is-man">'+t('extmgr.kindManifest')+'</span>';
-          const repoLink = formatExtRemoteUrlHtml(item.url, item.name);
-          return '<div class="ext-entry is-ok ext-ext-row ext-pkg-row'+(isCurrentGit?' is-active':'')+'" role="listitem" data-extrow="'+escapeHtml(item.name)+'" style="animation-delay:'+Math.min(idx*35,350)+'ms">'
-            +'<label class="check ext-dev-check"><input type="checkbox" data-extsel="'+escapeHtml(item.name)+'"></label>'
-            +repoLink
-            +'<span class="ext-state ext-version-badge is-local ext-gitopen-target" data-gitopen="'+escapeHtml(item.name)+'" title="'+t('extmgr.openGitHint')+'">'+(escapeHtml(item.version)||'-')+'</span>'
-            +kindBadge
-            +'</div>';
-        }).join('');
-      } else {
-        logger.warn(t('log.extPkgReadEmpty', { name: selectedPkg.name }));
-        rowsHtml = '<div class="ext-empty ext-pkg-empty-none" role="status">'
-          + '<div class="ext-empty-icon"><i class="fa-solid fa-folder-open"></i></div>'
-          + '<div class="ext-empty-title">' + t('extmgr.noneInPackage') + '</div>'
-          + '</div>';
-      }
+        if (pkgItems.length > 0) {
+          const origCount = pkgItems.filter(i => i.kind === 'original').length;
+          const manifestCount = pkgItems.filter(i => i.kind === 'manifest').length;
+          logger.success(t('log.extPkgReadSuccess', { name: selectedPkg.name, count: pkgItems.length, orig: origCount, manifest: manifestCount }));
+          rowsHtml = pkgItems.map((item, idx)=>{
+            const isCurrentGit = state.gitViz.name === item.name;
+            const kindBadge = item.kind === 'original'
+              ? '<span class="ext-flag ext-kind-tag is-orig">'+t('extmgr.kindOriginal')+'</span>'
+              : '<span class="ext-flag ext-kind-tag is-man">'+t('extmgr.kindManifest')+'</span>';
+            const repoLink = formatExtRemoteUrlHtml(item.url, item.name);
+            return '<div class="ext-entry is-ok ext-ext-row ext-pkg-row'+(isCurrentGit?' is-active':'')+'" role="listitem" data-extrow="'+escapeHtml(item.name)+'" style="animation-delay:'+Math.min(idx*35,350)+'ms">'
+              +'<label class="check ext-dev-check"><input type="checkbox" data-extsel="'+escapeHtml(item.name)+'"></label>'
+              +repoLink
+              +'<span class="ext-state ext-version-badge is-local ext-gitopen-target" data-gitopen="'+escapeHtml(item.name)+'" title="'+t('extmgr.openGitHint')+'">'+(escapeHtml(item.version)||'-')+'</span>'
+              +kindBadge
+              +'</div>';
+          }).join('');
+        } else {
+          logger.warn(t('log.extPkgReadEmpty', { name: selectedPkg.name }));
+          rowsHtml = '<div class="ext-empty ext-pkg-empty-none" role="status">'
+            + '<div class="ext-empty-icon"><i class="fa-solid fa-folder-open"></i></div>'
+            + '<div class="ext-empty-title">' + t('extmgr.noneInPackage') + '</div>'
+            + '</div>';
+        }
       }
     }
   }
@@ -5201,6 +5295,12 @@ async function renderExtInstalled(body){
     });
   });
 
+  /* 扫描包内扩展动作 */
+  body.querySelector('#extmgr-scan-pkg-btn')?.addEventListener('click',(e)=>{
+    const pkgId = e.currentTarget.dataset.scanpkg || selectedPkg?.id;
+    if(pkgId) void scanPackageForExtensions(pkgId);
+  });
+
   /* 导出扩展清单（2026-11-15 用户裁定：只住扩展管理按钮行，纯图标） */
   body.querySelector('#extmgr-export-assetlist')?.addEventListener('click',()=>{
     const names=selectedNames();
@@ -5488,7 +5588,7 @@ function renderLan(){
     setLanQr('lan-peer-qr', P.code, !!P.code);
 
     const tipEl = document.getElementById('lan-peer-qr-tip');
-    if (tipEl) tipEl.textContent = P.tip || '等待对端扫码或输入回执...';
+    if (tipEl) tipEl.textContent = P.tip || t('lan.peer.qrTip');
   } else {
     const rttEl = document.getElementById('lan-peer-rtt-text');
     if (rttEl) rttEl.textContent = 'RTT ' + (Number(P.rtt) || 0) + 'ms';
@@ -5523,16 +5623,16 @@ function renderLan(){
     if (qCount) qCount.textContent = String(queue.length);
     if (qList) {
       if (!queue.length) {
-        qList.innerHTML = '<div class="ext-note" id="lan-peer-queue-empty">暂无传输任务，勾选数据包点发送即可排队</div>';
+        qList.innerHTML = '<div class="ext-note" id="lan-peer-queue-empty">' + escapeHtml(t('lan.peer.queueEmptyShort')) + '</div>';
       } else {
         qList.innerHTML = queue.map((item) => {
           const dirIco = item.dir === 'recv' ? '📥' : '📤';
-          const statusText = item.status === 'active' ? (item.dir === 'recv' ? '接收中' : '发送中')
-            : (item.status === 'done' ? '已完成' : (item.status === 'failed' ? '失败' : '队列中'));
+          const statusText = item.status === 'active' ? (item.dir === 'recv' ? t('lan.queue.status.recv') : t('lan.queue.status.send'))
+            : (item.status === 'done' ? t('lan.queue.status.done') : (item.status === 'failed' ? t('lan.queue.status.failed') : t('lan.queue.status.queued')));
           return '<div class="lan-peer-queue-item">'
             + '<span class="q-dir">' + dirIco + '</span>'
             + '<span class="q-name" title="' + escapeHtml(item.name || '') + '">' + escapeHtml(item.name || '') + '</span>'
-            + '<span class="q-meta">' + formatBytes(item.size || 0) + '</span>'
+            + '<span class="q-meta">' + fmtMB((Number(item.size) || 0) / 1048576) + '</span>'
             + '<span class="q-status">' + escapeHtml(statusText) + '</span>'
             + '</div>';
         }).join('');
@@ -6723,14 +6823,51 @@ function cloneDemoState(){
   }
   return cloneDemoValue(state);
 }
+/** 教程示例扩展列表：仅限用户 jiozhaoyue 的 ST- 开头公开仓库，支持自动随 GitHub 仓库动态更新 */
+const DEFAULT_USER_ST_EXTENSIONS = Object.freeze([
+  { name:'ST-pack-transfer', manifest:{ version:'0.6.0', homePage:'https://github.com/jiozhaoyue/ST-pack-transfer' } },
+  { name:'ST-BgLoader', manifest:{ version:'1.2.0', homePage:'https://github.com/jiozhaoyue/ST-BgLoader' } },
+  { name:'ST-chatfile-improve', manifest:{ version:'1.1.0', homePage:'https://github.com/jiozhaoyue/ST-chatfile-improve' } },
+  { name:'ST-msg-btn-mgr', manifest:{ version:'1.0.0', homePage:'https://github.com/jiozhaoyue/ST-msg-btn-mgr' } },
+  { name:'ST-PanelReset', manifest:{ version:'1.0.0', homePage:'https://github.com/jiozhaoyue/ST-PanelReset' } },
+]);
+let userStReposCache = null;
+async function syncUserStRepos(){
+  if(userStReposCache) return userStReposCache;
+  try {
+    const ctrl = new AbortController();
+    const tId = setTimeout(()=>ctrl.abort(), 6000);
+    const res = await fetch('https://api.github.com/users/jiozhaoyue/repos?per_page=100&sort=updated', { signal: ctrl.signal });
+    clearTimeout(tId);
+    if(res.ok){
+      const list = await res.json();
+      if(Array.isArray(list)){
+        const repos = list
+          .filter(r => r && !r.fork && typeof r.name === 'string' && r.name.startsWith('ST-'))
+          .map(r => ({
+            name: r.name,
+            manifest: {
+              version: '1.0.0',
+              homePage: r.html_url || ('https://github.com/jiozhaoyue/' + r.name),
+            }
+          }));
+        if(repos.length > 0){
+          userStReposCache = repos;
+          return repos;
+        }
+      }
+    }
+  } catch(e) {
+    /* 离线或受限时静默降级为静态兜底列表 */
+  }
+  return DEFAULT_USER_ST_EXTENSIONS;
+}
+
 /* 教程树由 src/core/demo-tree.js 的真实 buildChartTree 生成；此处不再维护手写树。 */
 function buildDemoPackages(){
   const L=(k)=>t('demo.'+k);
-  /* 与真实包同形状的扩展元数据：版本号开 Git、独立复制按钮在教程里也能验证。 */
-  const demoExtensions=[
-    { name:'ST-BgLoader', manifest:{ version:'1.2.0', homePage:'https://github.com/example/ST-BgLoader' } },
-    { name:'ST-zip-converter', manifest:{ version:'0.9.1', homePage:'https://github.com/example/ST-zip-converter' } },
-  ];
+  /* 与真实包同形状的扩展元数据：仅限用户的 ST- 开头公开扩展，可直跳。 */
+  const demoExtensions = (userStReposCache && userStReposCache.length) ? userStReposCache : DEFAULT_USER_ST_EXTENSIONS;
   /* zipMb = 压缩包体积（列表/下载看到的大小）；rawMb = 解压恢复到宿主后的体积。
      两者必须不同：树按 rawMb 构建，图表压缩预估再按压缩模型算回 zipMb 附近。 */
   const mk=(id,name,host,zipMb,rawMb,time,zone,engine='')=>({
@@ -6777,46 +6914,127 @@ function buildDemoHostTree(){
   return demoTree(1142.4, state.host || 'st', state.engine || 'fs');
 }
 /* 演示动作：默认全部拦截（只提示）；少数动作在演示数据上做本地模拟，绝不触达真实通道。 */
+/**
+ * 教程模式 = **脱离真实酒馆运行时的模拟酒馆**（2026-11-19 用户明令）。
+ *
+ * 定位纠正：教程不是在每个按钮上弹一句「演示模式」，而是给用户一套**可以真的操作**的
+ * 模拟环境——拉取、转换、生成待导出、删除、复制回、局域网互传、云端浏览、扩展安装、
+ * 设置、存储审查全都能走完整流程，只是结果只落在内存里，**绝不写入真实数据或宿主**。
+ *
+ * 三条不可动摇的边界：
+ *  1. 零真实 IO：不读真实数据包、不写 IndexedDB、不装扩展、不发网络请求。
+ *  2. 结果可观察：每个动作都要产生**可见的状态变化**（新包、新待导出项、新日志），
+ *     而不是一句 toast 了事。
+ *  3. 可逆：退出教程时整份 state 快照还原。
+ */
 function demoTutorialActions(real){
-  const demoOnly = ()=>toast(t('toast.tutorialDemoOnly'));
+  const demoOnly=()=>toast(t('toast.tutorialDemoOnly'));
   const wrap={};
+  /* 默认继承真实 action 的只读数据读取能力，写操作被下面逐个覆盖成模拟实现。 */
   for(const key of Object.keys(real||{})){
     wrap[key]=typeof real[key]==='function' ? demoOnly : real[key];
   }
-  wrap.generate=()=>{
-    if(!state.selectedPkgs.size){ toast(t('zones.selectHint')); return; }
-    /* 教程只提示“已模拟”，不再伪造 demo_converted.zip 之类的待导出项。 */
-    toast(t('toast.tutorialSimulated'));
+
+  /* ── 转换 → 真的产出待导出项 ──
+     签名与真实 actions.generate 对齐：({ packages, merge, target, delta, splitMb, filenameTemplate })。 */
+  wrap.generate=(payload={})=>{
+    const picked=Array.isArray(payload?.packages)&&payload.packages.length
+      ? payload.packages
+      : (state.packages||[]).filter(p=>state.selectedPkgs.has(p.id));
+    if(!picked.length){ toast(t('zones.selectHint')); return; }
+    const target=payload?.target||state.target||'SillyTavern';
+    const made=picked.map((p,idx)=>({
+      id:'demo-export-'+Date.now()+'-'+idx,
+      name:String(p.name||'pack').replace(/\.zip$/i,'')+'_'+String(target).toLowerCase()+'.zip',
+      mb:Math.max(0.01,Number(p.mb)||0.5),
+      size:fmtMB(Math.max(0.01,Number(p.mb)||0.5)),
+      zone:'export',
+      origin:'demo',
+      target,
+      time:new Date().toLocaleString(),
+      nodes:Array.isArray(p.nodes)?cloneDemoValue(p.nodes):[],
+    }));
+    state.pendingExports=[...(state.pendingExports||[]),...made];
+    logger.success(t('toast.tutorialGenerated',{n:made.length,target}));
+    /* 生成完自动切到导出区，否则用户看不到刚产出的东西（待导出卡片只在导出区渲染）。 */
+    state.zone='export';
+    renderZones(); renderActions();
   };
+
+  /* ── 删除 / 复制回：真实改变列表 ── */
   wrap.deleteSelected=(ids)=>{
     const set=new Set(ids||[]);
+    if(!set.size){ toast(t('zones.selectHint')); return; }
+    const before=(state.packages||[]).length;
     state.packages=state.packages.filter((p)=>!set.has(p.id));
     state.selectedPkgs=new Set([...state.selectedPkgs].filter((id)=>!set.has(id)));
     state.activePkgs=new Set([...state.activePkgs].filter((id)=>!set.has(id)));
     syncSourceToActive();
-    renderAll(); toast(t('toast.tutorialSimulated'));
+    logger.info(t('toast.tutorialDeleted',{n:before-state.packages.length}));
+    renderAll();
   };
   wrap.copyBack=(ids)=>{
     const set=new Set(ids||[]);
+    if(!set.size){ toast(t('zones.selectHint')); return; }
     const copies=state.packages.filter((p)=>set.has(p.id)).map((p)=>({
-      ...cloneDemoValue(p), id:'demo-copy-'+p.id, zone:'export',
+      ...cloneDemoValue(p), id:'demo-copy-'+p.id, zone:'export', origin:'demo',
       name:String(p.name||'pack').replace(/\.zip$/i,'')+'_copy.zip',
     }));
     state.packages=[...state.packages, ...copies];
     state.selectedPkgs=new Set();
-    renderAll(); toast(t('toast.tutorialSimulated'));
+    logger.info(t('toast.tutorialCopied',{n:copies.length}));
+    renderAll();
   };
   wrap.pendingRemove=(id)=>{ state.pendingExports=(state.pendingExports||[]).filter((x)=>x.id!==id); renderZones(); };
   wrap.pendingClear=()=>{ state.pendingExports=[]; renderZones(); };
-  wrap.settings=()=>demoOnly();
-  /* 关闭插件 = 先退出演示还原真实状态，再执行真实关闭，避免下次打开还停在演示态。 */
+
+  /* ── 下载 / 恢复 / 存工作区：模拟真实产物落在待导出区 ── */
+  wrap.download=(ids)=>{
+    const list=(ids||[]).length?ids:[...state.selectedPkgs];
+    if(!list.length){ toast(t('zones.selectHint')); return; }
+    state.pendingExports=[...(state.pendingExports||[]),...list.map((id,idx)=>{
+      const p=(state.packages||[]).find(x=>x.id===id);
+      return { id:'demo-dl-'+Date.now()+'-'+idx, name:String(p?.name||id)+'.zip',
+        mb:p?.mb||0.5, size:fmtMB(p?.mb||0.5), zone:'export', origin:'demo',
+        time:new Date().toLocaleString(), nodes:[] };
+    })];
+    logger.success(t('toast.tutorialDownloaded',{n:list.length}));
+    renderZones();
+  };
+  wrap.upload=()=>{ toast(t('toast.tutorialRestoreSim')); logger.info(t('toast.tutorialRestoreSim')); };
+
+  /* ── 局域网互传：走完整状态机，不碰真实网络 ── */
+  wrap.lan=Object.fromEntries(['generate','applyAnswer','acceptOffer','retry','cancel','abandon'].map((k)=>[k,(payload)=>{
+    const cur=state.lan||{};
+    state.lan={...cur,status:k==='generate'?'waiting':(k==='acceptOffer'?'accepted':(k==='cancel'||k==='abandon'?'idle':cur.status))};
+    logger.info(t('toast.tutorialLanStep',{step:k}));
+    renderLan();
+  }]));
+
+  /* ── 扩展安装：模拟成功，并把扩展并入演示包清单 ── */
+  wrap.installExtensions=async(items)=>{
+    const list=Array.isArray(items)?items:[];
+    const results=list.map((it,i)=>({ url:it?.url||'demo', status:'ok', name:'demo-ext-'+(i+1) }));
+    state.extResults=results;
+    state.extInstalled=[...(state.extInstalled||[]),...results.map((r)=>({ id:r.name, name:r.name, version:'1.0.0', sourceType:'package' }))];
+    logger.success(t('toast.tutorialInstallSim',{n:results.length}));
+    renderExtensionView();
+    return results;
+  };
+  wrap.listHostExtensions=async()=>({ items: demoExtensionsData.items });
+
+  /* ── 设置与凭据：可打开、可改，但不落盘 ── */
+  wrap.settings=()=>{ if(typeof real?.settings==='function') return real.settings(); };
+
+  /* 关闭插件：先退出演示还原真实状态，再执行真实关闭。 */
   wrap.close=()=>{ if(state.tutorialMode) closeTutorial(); real?.close?.(); };
   wrap.onActivePackage=undefined;
   wrap.onTargetChange=undefined;
-  wrap.privateFiles={ list:()=>[], verify:async()=>({ ok:true, verified:{} }), remove:async()=>({ ok:true }) };
-  wrap.installExtensions=async()=>{ demoOnly(); return []; };
-  wrap.listHostExtensions=async()=>({ items: demoExtensionsData.items });
-  wrap.lan=Object.fromEntries(['generate','applyAnswer','acceptOffer','retry','cancel','abandon'].map((k)=>[k, demoOnly]));
+  wrap.privateFiles={
+    list:()=>[],
+    verify:async()=>({ ok:true, verified:{} }),
+    remove:async()=>({ ok:true }),
+  };
   wrap.storageInspector=async (source,path)=>demoStorageInspect(source,path);
   return wrap;
 }
@@ -6934,6 +7152,18 @@ function enterTutorialMode(){
   state.log=[];
   setTutorialBanner(true);
   renderAll();
+  void syncUserStRepos().then((repos)=>{
+    if(repos && state.tutorialMode){
+      for(const p of (state.packages||[])){
+        if(p.origin === 'demo'){
+          p.extensions = repos.map(item => ({ name: item.name, manifest: { ...item.manifest } }));
+        }
+      }
+      if(state.mainView === 'extension' || state.mobileView === 'extension'){
+        renderExtensionView();
+      }
+    }
+  });
 }
 function exitTutorialMode(){
   if(!state.tutorialMode) return;
@@ -7443,7 +7673,7 @@ function bind(){
   });
   document.getElementById('lan-peer-btn-scan')?.addEventListener('click', () => startLanScan('peer'));
   document.getElementById('lan-peer-btn-disconnect')?.addEventListener('click', () => actions.lan?.peerDisconnect?.());
-  document.getElementById('lan-peer-btn-send')?.addEventListener('click', () => actions.lan?.peerSend?.());
+  document.getElementById('lan-peer-btn-send')?.addEventListener('click', () => { void actions.lan?.peerSend?.(); });
 
   // ── 局域网传统模式（降级） ──
   document.getElementById('lan-btn-generate')?.addEventListener('click',()=>actions.lan?.generate?.());
@@ -8383,26 +8613,38 @@ void refreshHostIdentity();
     return opts;
   }
 
-  /* ── 渲染：本次待导出（内存队列，不入库） ── */
-  /* 待导出队列不再是独立两列区块：作为导出区的条目渲染，动作仍走 pending* 通道。 */
-  function pendingCardHtml(it){
-    const mb=(it.blob?.size||0)/1048576;
-    /* 与普通包卡同构：勾选占位 + 图标/标签 + 名称/体积 + 右侧动作列。
-       不再用一套独立的小按钮样式，避免“样式都不一样”。 */
+  /* ── 渲染：本次待导出（内存队列，不入库） ──
+     2026-11-19 用户裁定：这里曾经用一套**私有卡片渲染**（pkg-check-spacer 空格占位、
+     data-host="file" 红框 ZIP 图标、手写 ZIP 伪角标、"生成包" 自造徽标），
+     与真实 pkgCard() 的视觉范式完全不同，属于「不应当存在的素材和样式」。
+     现在待导出项直接复用 pkgCard() 的同一套 DOM 结构与素材，只是数据来源换成内存队列；
+     体积同时兼容 blob（真实产物）与 size/mb（教程演示产物，无 blob）。 */
+  function pendingAsPackage(it, idx){
+    const platform = TARGET_PLATFORMS.find((x) => x.name === it.target || x.code === it.target);
+    const bytes = it.blob?.size || it.sizeBytes || Math.round((Number(it.mb) || 0) * 1024 * 1024);
+    return {
+      id: String(it.id || ('pending-' + idx)),
+      name: String(it.name || ''),
+      size: fmtMB(bytes / 1024 / 1024),
+      mb: bytes / 1024 / 1024,
+      time: it.time || '',
+      host: platform ? platform.host : 'file',
+      unrecognized: false,
+      zone: 'export',
+      origin: it.origin || 'converted',
+      nodes: Array.isArray(it.nodes) ? it.nodes : [],
+    };
+  }
+  function pendingCardHtml(it, idx){
+    const pkg = pendingAsPackage(it, idx);
+    /* 复用真实包卡范式（同一个 pkgCard），只在动作列位置追加待导出专属入口。 */
     const dl='<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 4v11"/><path d="M7 11l5 5 5-5"/><path d="M5 20h14"/></svg>';
     const stash='<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 7h16v13H4z"/><path d="M8 7V4h8v3"/><path d="M4 12h16"/></svg>';
     const del='<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="M6 7l1 13h10l1-13"/></svg>';
-    return '<div class="pkg-card is-export" data-pending="'+escapeHtml(it.id)+'">'
-      +'<span class="pkg-check-spacer" aria-hidden="true"></span>'
-      +'<span class="pkg-icon-wrap"><span class="pkg-icon" data-host="file">'+svg('file','tree-ico')+'</span>'
-        +'<span class="pkg-host-tag" style="color:var(--accent);border-color:var(--accent)">ZIP</span></span>'
-      +'<div class="pkg-info"><div class="pkg-name"><span class="pkg-name-txt" title="'+escapeHtml(it.name)+'">'+escapeHtml(it.name)+'</span></div>'
-      +'<div class="pkg-meta"><span class="pkg-badge">'+t('pending.badge')+'</span><span>'+fmtMB(mb)+'</span></div></div>'
-      +'<div class="pkg-actions">'
-        +'<button type="button" data-pending-act="download" title="'+t('pending.download')+'" aria-label="'+t('pending.download')+'">'+dl+'</button>'
-        +'<button type="button" data-pending-act="stash" title="'+t('pending.stash')+'" aria-label="'+t('pending.stash')+'">'+stash+'</button>'
-        +'<button type="button" data-pending-act="remove" title="'+t('pending.remove')+'" aria-label="'+t('pending.remove')+'">'+del+'</button>'
-      +'</div></div>';
+    const actions = '<button type="button" data-pending-act="download" title="'+t('pending.download')+'" aria-label="'+t('pending.download')+'">'+dl+'</button>'
+      +'<button type="button" data-pending-act="stash" title="'+t('pending.stash')+'" aria-label="'+t('pending.stash')+'">'+stash+'</button>'
+      +'<button type="button" data-pending-act="remove" title="'+t('pending.remove')+'" aria-label="'+t('pending.remove')+'">'+del+'</button>';
+    return pkgCard(pkg, { pendingId: it.id, pendingActions: actions });
   }
 
   /** 转换报告：结构化的计数 + 三类清单，全部来自 `Report#toJSON()` 的纯对象。 */
@@ -8437,19 +8679,25 @@ void refreshHostIdentity();
    */
   function showRestoreReport(results, { onKeepPartial, onDiscardPartial, onRefresh } = {}) {
     const list = Array.isArray(results) ? results : [];
+    const okCount = list.filter((r) => r.status === 'ok').length;
+    const skipCount = list.filter((r) => r.status === 'skipped').length;
+    const badCount = list.filter((r) => r.status !== 'ok' && r.status !== 'skipped').length;
+    const summaryBar = '<div class="restore-summary-bar">'
+      + '<span class="rs-pill is-ok"><span>' + t('restore.statusOk') + '</span><b>' + okCount + '</b></span>'
+      + (skipCount > 0 ? '<span class="rs-pill is-skip"><span>' + t('restore.statusSkipped') + '</span><b>' + skipCount + '</b></span>' : '')
+      + (badCount > 0 ? '<span class="rs-pill is-bad"><span>' + t('restore.statusFailed') + '</span><b>' + badCount + '</b></span>' : '')
+      + '</div>';
     const rows = list.map((r) => {
       const ok = r.status === 'ok';
       const skipped = r.status === 'skipped';
       const status = ok ? t('restore.statusOk') : skipped ? t('restore.statusSkipped') : t('restore.statusFailed');
       return '<div class="rep-row restore-row ' + (ok ? 'is-ok' : skipped ? 'is-skip' : 'is-bad') + '">'
         + '<span class="rr-name" title="' + escapeHtml(r.name) + '">' + escapeHtml(r.name) + '</span>'
-        + '<b>' + status + '</b>'
+        + '<span class="rr-badge">' + status + '</span>'
         + (r.message ? '<span class="rr-msg">' + escapeHtml(r.message) + '</span>' : '')
         + (r.note ? '<span class="rr-note">' + escapeHtml(r.note) + '</span>' : '')
         + '</div>';
     }).join('');
-    const okCount = list.filter((r) => r.status === 'ok').length;
-    const badCount = list.filter((r) => r.status !== 'ok').length;
     const actions = [];
     if (okCount > 0) {
       actions.push({ label: t('restore.keepPartial'), primary: true, onClick: () => { closeModal(); onKeepPartial?.(); } });
@@ -8461,7 +8709,7 @@ void refreshHostIdentity();
     openModal(
       t('restore.reportTitle'),
       t('restore.reportDesc', { ok: okCount, failed: badCount }),
-      ['<div class="rep-grid restore-report">' + (rows || '<div class="rep-row"><span>-</span><b>0</b></div>') + '</div>'],
+      [summaryBar + '<div class="rep-grid restore-report">' + (rows || '<div class="rep-row"><span>-</span><b>0</b></div>') + '</div>'],
       actions,
     );
   }
@@ -8532,6 +8780,10 @@ void refreshHostIdentity();
       }
       if (next.send) Object.assign(state.lan.send, next.send);
       if (next.recv) Object.assign(state.lan.recv, next.recv);
+      /* 2026-11-19：对等长连接的整条状态通道。此前漏掉此分支，导致
+         lan-transfer-panel 的 setPeer() 全部静默丢弃——生成互联码、
+         连接态、RTT、活跃卡与队列永远停在初始空态（点按钮零反应、零报错）。 */
+      if (next.peer) Object.assign(state.lan.peer, next.peer);
       if ('scanError' in next) state.lan.scanError = next.scanError;
       renderTransfer();
       renderLan();
@@ -8611,6 +8863,9 @@ void refreshHostIdentity();
       state.source = id ? { type: 'package', pkgId: id } : { type: 'host', pkgId: null };
       state.sourceKey = id ? ('pkg:' + id) : ('host:' + state.host);
       renderAll();
+      if (state.mainView === 'extension' || state.mobileView === 'extension') {
+        renderExtensionView();
+      }
     },
     pushLog(level, msg) { log(String(level || 'INFO').toUpperCase(), msg); },
     openModal,
