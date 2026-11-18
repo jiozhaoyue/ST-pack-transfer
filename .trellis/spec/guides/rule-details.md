@@ -145,3 +145,9 @@
 | D-90 | R-11 | “两个 page”只指 GitHub Pages 根（插件 Web）与 `/docs/`（文档站）两个云端页面，同一工作流部署；本地 3040 与酒馆实例页面不属于该词 | <DATE> |
 | D-91 | R-11 | 影响插件或 `docs/` 的改动必须重新部署 Pages（`workflow_dispatch` 或 `v*` tag），并验证两个 URL 均 200；部署失败必须记录 run id 与日志 | <DATE> |
 | D-92 | R-11 | Pages 部署历史只保留最近 2 条 `github-pages` deployment（当前 + 上一条），其余删除；外部可见 deployment 必须恰好为 2 | <DATE> |
+
+## J. 进程与工程环境
+
+| ID | 规则 | 细则 | 证据 |
+| --- | --- | --- | --- |
+| D-93 | R-24 | 持久服务（dev server 等长驻进程）必须用系统命令启动为独立进程（Windows `Start-Process`、POSIX `nohup` / `setsid`），禁止用 agent 内置后台 shell——其受 timeout 约束会被 SIGTERM 终止；判据：进程不随 agent 会话结束而消失 | <DATE> 会话实测 |
