@@ -64,8 +64,9 @@ describe('UI 视口、滚动隔离与防紧贴铁律守卫', () => {
     // 模式切换文案严禁超长说明与括号后缀
     expect(template).not.toContain('长连接队列 (推荐)');
     expect(template).not.toContain('传统单次 (降级)');
-    expect(template).toContain('>长连接</button>');
-    expect(template).toContain('>传统</button>');
+    // 标签来自 i18n（短标签 key），模板本身只保留 key
+    expect(template).toContain('data-i18n="lan.mode.peerShort"');
+    expect(template).toContain('data-i18n="lan.mode.legacyShort"');
   });
 
   it('内外边框与呼吸间距：控件之间严禁零间距紧贴，必须具备明确边框', () => {

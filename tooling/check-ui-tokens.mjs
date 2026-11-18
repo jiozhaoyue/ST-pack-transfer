@@ -23,16 +23,21 @@ for (const name of required) {
   if (!(name in vars) || !vars[name]) problems.push(`UI_TOKENS 缺少令牌：${name}`);
 }
 
-/* 颜色令牌值不得再次出现在 style.css（尺寸值如 6px 允许在布局中复用）。 */
+/* 颜色令牌值不得再次出现在 style.css（尺寸值如 6px 允许在布局中复用）。
+   豁免：宿主主题回退 `var(--SmartTheme*, 回退值)` —— 那是兼容层，本守卫开头已声明不在范围内。
+   判定方式是把行内所有 `var(--X, 回退值)` 片段先剥掉，再看剩余文本里有没有令牌字面量。 */
 const tokenValues = new Set(Object.values(vars)
   .map((value) => String(value).trim().toLowerCase())
   .filter((value) => /^#[0-9a-f]{3,8}$/.test(value) || /^rgba?\(/.test(value)));
+const STRIP_VAR_FALLBACK = /var\(\s*--[A-Za-z0-9_-]+\s*,[^)]*\)/g;
 for (const value of tokenValues) {
   if (!value || value.startsWith('var(')) continue;
   const needle = value.toLowerCase();
   const lines = css.split(/\r?\n/);
   for (let i = 0; i < lines.length; i += 1) {
-    if (lines[i].toLowerCase().includes(needle)) {
+    /* 先把 var(..., 回退值) 整段剥掉：回退值属于宿主兼容层，不算硬编码。 */
+    const stripped = lines[i].replace(STRIP_VAR_FALLBACK, '').toLowerCase();
+    if (stripped.includes(needle)) {
       problems.push(`style.css:${i + 1} 重复硬编码 UI 令牌值 ${value}`);
     }
   }

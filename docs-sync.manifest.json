@@ -1,7 +1,7 @@
 {
   "version": 1,
   "files": {
-    "docs/DEVELOPER-GUIDE.md": "fc28517affcd8690f19bb247225c04f972fc280b9087b464faf5af28260c9bb4",
+    "docs/DEVELOPER-GUIDE.md": "4a340b36b6ee1e7a45763bccf38fcf97456be5096b1a585d30109e90338d05a7",
     "docs/PLAN-2026-11-19-web-lan-tutorial-fixes.md": "25c6f8b308bd7133df461357fbfe18562536c5b8b0902cd673e797ebbfc6a903",
     "docs/_config.yml": "4158c65372fa1362448cd0cbbe10c1f176a5aa70ace9c765594cd5c9360a009c",
     "docs/_layouts/default.html": "6548a8e81044cad7f10644f5dd0fa89ee9691cc75999e21f13e15eac16405e55",
@@ -29,8 +29,8 @@
     "docs/assets/shots/mobile-07-export-area.png": "d85a85c9c8a7b5dd9c157fc4fc44cb66306a4f448f54928ec7faa20d0428ccca",
     "docs/assets/shots/mobile-08-task-queue.png": "56aea067d8d43a307cda46d12bbf04fb0aecfb82e9e1629642a77dd879ce5a48",
     "docs/assets/shots/mobile-09-log-view.png": "2731c8017e1b27baea19b4747d48e60ed1b14ab41e6071fa45e1ffe6d6619670",
-    "docs/convert.en.md": "673fc6e68293fe6405a0ee36281b0ddb7a030f4931c77ed2331fc2cf4ab48d5f",
-    "docs/convert.md": "0a63f08bed365c58a1603056a65910ac8e77bff1636bfe4a09191d23da34b3e8",
+    "docs/convert.en.md": "069857b35444246c91cae549bbefee43edfc2e691f411918ef961c9cb297d2e5",
+    "docs/convert.md": "ec365a235dd87ea9237ca38698dcbd605466faa1926bb87882ca78f7fd378ed0",
     "docs/docs.js": "1a7d87fee8478f33afea889413f6bb5aa8c0315d7faf4fdca09328284a660692",
     "docs/engines.en.md": "0c4bfc583cc1f66537f7947e7415e8b584e81312b59f017e06ecc8d74a4b269f",
     "docs/engines.md": "b09e08b96cad50235ec476d07f11ac0188e378cc2ea8d3d0bfb09a66df4b3785",
@@ -88,8 +88,8 @@
       "zh": "docs/convert.md",
       "en": "docs/convert.en.md",
       "translation": "required",
-      "sourceHash": "0a63f08bed365c58a1603056a65910ac8e77bff1636bfe4a09191d23da34b3e8",
-      "translationHash": "673fc6e68293fe6405a0ee36281b0ddb7a030f4931c77ed2331fc2cf4ab48d5f"
+      "sourceHash": "ec365a235dd87ea9237ca38698dcbd605466faa1926bb87882ca78f7fd378ed0",
+      "translationHash": "069857b35444246c91cae549bbefee43edfc2e691f411918ef961c9cb297d2e5"
     },
     {
       "zh": "docs/host-pull.md",
@@ -172,7 +172,7 @@
       "zh": "docs/DEVELOPER-GUIDE.md",
       "en": null,
       "translation": "pending",
-      "sourceHash": "fc28517affcd8690f19bb247225c04f972fc280b9087b464faf5af28260c9bb4",
+      "sourceHash": "4a340b36b6ee1e7a45763bccf38fcf97456be5096b1a585d30109e90338d05a7",
       "translationHash": null
     }
   ],
@@ -183,7 +183,7 @@
       "style.css",
       "tooling/capture-docs-shots.cjs"
     ],
-    "sourcesHash": "ec703cf0506b809eaed1f8c92416423dab2cbb745542dc3cd7f553c36d7eb5a9",
+    "sourcesHash": "5c24d234da04441f81c71704d07069fe621884ac7738b7272bdccf61b61a1467",
     "pages": {
       "docs/tutorial.md": [
         "docs/assets/shots/desktop-01-tutorial-goal.png",

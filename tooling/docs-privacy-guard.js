@@ -8,6 +8,7 @@
  */
 import { readdirSync, statSync, readFileSync } from 'node:fs';
 import { join, extname } from 'node:path';
+import { execFileSync } from 'node:child_process';
 
 const ROOT = process.cwd();
 const DOCS = join(ROOT, 'docs');
@@ -74,6 +75,46 @@ const CONTENT_RULES = [
 
 const hits = [];
 
+/**
+ * 公开文档站的真实发布口径 = GitHub Pages 工作流检出的**已入库**内容。
+ *
+ * `deploy.yml` 用 `actions/checkout` 检出后 `source: ./docs` 交给 Jekyll 构建，
+ * 被 `.gitignore` 忽略的文件不在检出树里，永远不会上传，例如 `/docs/PLAN-*`。
+ * 本地守卫若仍扫它们，就会在「本地干净、CI 也干净」的情况下报假失败，
+ * 并诱导把约定内的计划文件搬离 `docs/`——所以这里按同一口径跳过被忽略项。
+ *
+ * 失败方向必须收紧：git 不可用时返回空集合，等于「一个都不跳过」，全量检查。
+ */
+function ignoredInDocs() {
+  const set = new Set();
+  try {
+    const out = execFileSync('git', ['ls-files', '--others', '--ignored', '--exclude-standard', '--', 'docs'], {
+      cwd: ROOT,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    });
+    for (const line of out.split(/\r?\n/)) {
+      const rel = line.trim().replace(/\\/g, '/');
+      if (rel) set.add(rel);
+    }
+  } catch {
+    return set;
+  }
+  return set;
+}
+
+const IGNORED = ignoredInDocs();
+const skipped = [];
+
+/** 目录整体被忽略时，git 只列目录里的文件，故按前缀判断。 */
+function isIgnoredDir(rel) {
+  const prefix = `${rel}/`;
+  for (const item of IGNORED) {
+    if (item.startsWith(prefix)) return true;
+  }
+  return false;
+}
+
 function walk(dir, prefix = 'docs') {
   let entries = [];
   try {
@@ -87,6 +128,10 @@ function walk(dir, prefix = 'docs') {
     const full = join(dir, entry.name);
     if (entry.isDirectory()) {
       if (FORBIDDEN_NAMES.some((re) => re.test(entry.name))) {
+        if (isIgnoredDir(rel)) {
+          skipped.push(`${rel}/`);
+          continue;
+        }
         hits.push(`${rel} —— 目录名命中内部资料规则`);
         continue;
       }
@@ -94,10 +139,18 @@ function walk(dir, prefix = 'docs') {
       continue;
     }
     if (FORBIDDEN_NAMES.some((re) => re.test(entry.name))) {
+      if (IGNORED.has(rel)) {
+        skipped.push(rel);
+        continue;
+      }
       hits.push(`${rel} —— 文件名命中内部资料规则`);
       continue;
     }
     if (!TEXT_EXT.has(extname(entry.name).toLowerCase())) continue;
+    if (IGNORED.has(rel)) {
+      skipped.push(rel);
+      continue;
+    }
     const text = readFileSync(full, 'utf8');
     const lines = text.split(/\r?\n/);
     for (let i = 0; i < lines.length; i += 1) {
@@ -128,3 +181,7 @@ if (hits.length) {
 }
 
 console.log(`docs 隐私守卫通过：${topEntries.length} 个公开条目，无日期 / Trellis / 本机路径 / 凭据内容`);
+if (skipped.length) {
+  console.log(`按 .gitignore 跳过 ${skipped.length} 项（不进 Pages 检出树）：`);
+  for (const item of skipped) console.log(`  - ${item}`);
+}

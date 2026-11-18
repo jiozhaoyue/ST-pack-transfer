@@ -9,7 +9,7 @@ import { brandTokensOf } from '../data/target-ui.js';
 import { normalizeAccounts } from '../core/git-accounts.js';
 import { escapeHtml } from './escape.js';
 import { APP_VERSION, APP_COMMIT } from '../core/app-version.js';
-import { resolveDocsBase } from '../core/docs-site.js';
+import { resolveDocsTarget } from '../core/docs-site.js';
 
 /** 设置默认值。新增项必须同步 zh-CN / en-US 文案与测试。 */
 export const SETTINGS_DEFAULTS = Object.freeze({
@@ -334,6 +334,7 @@ function setting(id, key, label, checked) {
 /** 设置弹窗正文：分组可收起，不再全部平铺。 */
 export function buildSettingsHtml(settings = {}) {
   const s = normalizeSettings(settings);
+  ensureDocsSyncWired();
   const group = (key, title, body, open) => '<details class="set-group" data-group="' + key + '"' + (open ? ' open' : '') + '>'
     + '<summary class="set-group-head">' + title + '</summary>'
     + '<div class="set-group-body">' + body + '</div></details>';
@@ -378,13 +379,13 @@ export function buildSettingsHtml(settings = {}) {
     + '<option value="server"' + (s[key] === 'server' ? ' selected' : '') + '>' + t('settings.credStoreServer') + '</option>'
     + '</select></label>';
 
-  const dataCredGroup = '<div class="settings-subhead">' + (t('settings.subheadCred') || '凭据存储位置偏好') + '</div>'
+  const dataCredGroup = '<div class="settings-subhead">' + t('settings.subheadCred') + '</div>'
     + credSelect('gitCredentialStorage', t('settings.credGit'))
     + credSelect('s3CredentialStorage', t('settings.credS3'))
     + credSelect('webdavCredentialStorage', t('settings.credWebdav'))
     + '<div class="ext-note">' + t('settings.credPrivacyHint') + '</div>'
     + '<hr class="settings-divider" style="margin:10px 0;border:0;border-top:1px solid var(--border)">'
-    + '<div class="settings-subhead">' + (t('settings.subheadData') || '配置数据备份与维护') + '</div>'
+    + '<div class="settings-subhead">' + t('settings.subheadData') + '</div>'
     + '<div class="ext-row">'
       + '<button type="button" class="btn" data-action="plugin-export">' + t('settings.exportData') + '</button>'
       + '<button type="button" class="btn" data-action="plugin-import">' + t('settings.importData') + '</button>'
@@ -397,22 +398,25 @@ export function buildSettingsHtml(settings = {}) {
     + '</div>'
     + '<div class="ext-note">' + t('extmgr.gitCleanSettingsDesc') + '</div>';
 
+  const docsTarget = resolveDocsTarget(s.docsBaseUrl);
+  const docsHint = t('settings.docsBaseUrlHint');
+  const docsOpenLabel = t('settings.openDocsHint', { url: docsTarget.base });
   const netGroup = '<label class="et-git"><span>' + t('settings.netProxy') + '</span>'
     + '<input class="text_pole" type="url" data-setting="netProxyUrl" placeholder="' + t('settings.netProxyPlaceholder')
     + '" value="' + escapeHtml(s.netProxyUrl || '') + '"></label>'
     + '<label class="et-git" style="margin-top:6px"><span>' + t('settings.docsBaseUrl') + '</span>'
     + '<input class="text_pole" type="text" data-setting="docsBaseUrl" placeholder="' + t('settings.docsBaseUrlPlaceholder')
-    + '" value="' + escapeHtml(s.docsBaseUrl || '') + '"></label>'
+    + '" title="' + escapeHtml(docsHint) + '" value="' + escapeHtml(s.docsBaseUrl || '') + '"></label>'
     + '<div class="ext-note">' + t('settings.docsBaseUrlNote') + '</div>'
-    + (() => {
-      const href = resolveDocsBase(s.docsBaseUrl);
-      return '<div class="ext-row" style="margin-top:6px"><a class="btn" id="settings-open-docs" href="'
-        + escapeHtml(href) + '" target="_blank" rel="noopener noreferrer">' + t('settings.openDocs') + '</a></div>';
-    })();
+    + '<div class="ext-note" data-docs-invalid'
+    + (docsTarget.invalid ? '' : ' hidden style="display:none"') + '>' + t('settings.docsInvalid') + '</div>'
+    + '<div class="ext-row" style="margin-top:6px"><a class="btn" id="settings-open-docs" href="'
+    + escapeHtml(docsTarget.base) + '" target="_blank" rel="noopener noreferrer" style="text-decoration:none"'
+    + ' title="' + escapeHtml(docsOpenLabel) + '">' + t('settings.openDocs') + '</a></div>';
 
   return '<div class="settings-grid">'
     + group('behavior', t('settings.groupBehavior'), tips, true)
-    + group('data', t('settings.groupDataCred') || (t('settings.groupData') + '与凭据'), dataCredGroup, true)
+    + group('data', t('settings.groupDataCred'), dataCredGroup, true)
     + group('export', t('settings.groupExport'), exportGroup, true)
     + group('net', t('settings.groupNet'), netGroup, false)
     + group('log', t('settings.groupLog'), logging, false)
@@ -488,4 +492,70 @@ export function readSettings(root, base = SETTINGS_DEFAULTS) {
   }
 
   return normalizeSettings(out);
+}
+
+/**
+ * 把「打开文档站」按钮同步到当前输入值。
+ *
+ * 修复的真实缺陷：按钮的 `href` 原先只在渲染时算一次，用户改完输入框
+ * 不重新渲染就点按钮，跳的仍是旧地址（2026-11-19 用户报障）。
+ *
+ * 同时把非法地址显式暴露出来：`resolveDocsTarget` 对非绝对 http(s) 回退部署站，
+ * 若不提示，用户会以为用的是自己填的地址。
+ *
+ * @param {HTMLInputElement} input 文档站地址输入框
+ * @param {Element} link 「打开文档站」锚点
+ * @param {Element|null} warn 非法地址提示行
+ */
+function syncDocsLink(input, link, warn) {
+  const target = resolveDocsTarget(input.value);
+  link.setAttribute('href', target.base);
+  const label = t('settings.openDocsHint', { url: target.base });
+  link.setAttribute('title', label);
+  if (warn) {
+    warn.hidden = !target.invalid;
+    warn.style.display = target.invalid ? '' : 'none';
+  }
+}
+
+/** 文档站控件的事件委托只注册一次；模块导入本身无副作用（Node 测试无 document）。 */
+let docsSyncWired = false;
+
+/**
+ * 惰性注册文档站控件的委托监听。
+ *
+ * 必须在**捕获阶段**接 `click`：默认跳转发生在冒泡后，此时改 `href` 已太晚；
+ * 捕获阶段先重算，才能保证点下去用的就是输入框里的当前地址。
+ */
+function ensureDocsSyncWired() {
+  if (docsSyncWired) return;
+  if (typeof document === 'undefined' || typeof document.addEventListener !== 'function') return;
+  docsSyncWired = true;
+
+  const resolveParts = (node) => {
+    if (!node || typeof node.closest !== 'function' || !node.closest('#settings-body')) return null;
+    const input = node.closest('#settings-body')?.querySelector('[data-setting="docsBaseUrl"]');
+    const link = node.closest('#settings-body')?.querySelector('#settings-open-docs');
+    if (!input || !link) return null;
+    return { input, link, warn: node.closest('#settings-body').querySelector('[data-docs-invalid]') };
+  };
+
+  const onInput = (ev) => {
+    const el = ev.target;
+    if (!el || el.getAttribute?.('data-setting') !== 'docsBaseUrl') return;
+    const parts = resolveParts(el);
+    if (parts) syncDocsLink(parts.input, parts.link, parts.warn);
+  };
+
+  /* 草稿恢复（applySettingsDraft）直接写 value、不触发事件，故点击前再兜一次。 */
+  const onClick = (ev) => {
+    const link = ev.target?.closest?.('#settings-open-docs');
+    if (!link) return;
+    const parts = resolveParts(link);
+    if (parts) syncDocsLink(parts.input, parts.link, parts.warn);
+  };
+
+  document.addEventListener('input', onInput, true);
+  document.addEventListener('change', onInput, true);
+  document.addEventListener('click', onClick, true);
 }

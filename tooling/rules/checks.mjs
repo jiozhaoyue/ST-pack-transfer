@@ -635,4 +635,41 @@ export const checks = [
       };
     },
   },
+
+  {
+    id: 'login-state-copy',
+    rule: 'R-39',
+    title: '顶部徽标禁止登录态缺失（酒馆运行时一定有用户）',
+    severity: 'MUST',
+    run() {
+      /* 铁律 39：顶部身份徽标必须显示用户名，不存在「未登录 / 游客 / 匿名态」；
+         把「未登录」改写成近义词属于同一违规。范围只限徽标——Git/云盘凭据措辞另算，
+         不得扩大化（用户裁定）。判据由 tooling/login-state-guard.mjs 承担。 */
+      const script = path.join(ROOT, 'tooling', 'login-state-guard.mjs');
+      if (!existsSync(script)) {
+        return { ok: false, detail: '守卫脚本缺失：tooling/login-state-guard.mjs' };
+      }
+      let out = '';
+      let code = 0;
+      try {
+        out = execFileSync(process.execPath, [script, '--json'], {
+          cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
+        });
+      } catch (err) {
+        code = err.status === undefined ? 1 : err.status;
+        out = (err.stdout || '') + (err.stderr || '');
+      }
+      let parsed = null;
+      try { parsed = JSON.parse(out); } catch { /* 输出不是 JSON，按失败处理 */ }
+      if (!parsed) {
+        return { ok: false, detail: `守卫无法解析输出（退出码 ${code}）`, items: [{ file: 'tooling/login-state-guard.mjs', line: 0, text: out.trim().slice(0, 300) }] };
+      }
+      const hits = Array.isArray(parsed.hits) ? parsed.hits : [];
+      return {
+        ok: hits.length === 0,
+        detail: hits.length === 0 ? '无登录态语义绕过' : `${hits.length} 处违反铁律 39`,
+        items: hits.slice(0, 20).map((h) => ({ file: h.file, line: h.line, text: `[${h.label}] ${h.text}` })),
+      };
+    },
+  },
 ];

@@ -130,53 +130,53 @@ export function getWorkbenchHtml() {
           <div class="transfer-body">
           <div class="transfer-pane" id="lan-view">
           <div class="lan-body" id="lan-body">
-            <!-- 极简模式切换：长连接 / 传统 -->
+            <!-- Minimal mode switch: persistent / legacy -->
             <div class="lan-mode-bar" id="lan-mode-bar">
               <div class="segmented lan-mode-tabs" id="lan-mode-tabs">
-                <button type="button" class="seg-btn active" data-lan-mode="peer">长连接</button>
-                <button type="button" class="seg-btn" data-lan-mode="legacy">传统</button>
+                <button type="button" class="seg-btn active" data-lan-mode="peer" data-i18n="lan.mode.peerShort"></button>
+                <button type="button" class="seg-btn" data-lan-mode="legacy" data-i18n="lan.mode.legacyShort"></button>
               </div>
-              <span class="lan-mode-hint" id="lan-mode-hint">局域网对等互联</span>
+              <span class="lan-mode-hint" id="lan-mode-hint" data-i18n="lan.mode.hintShort"></span>
             </div>
 
-            <!-- 1. 无身份通用互联面板 (单输入框全自适应) -->
+            <!-- 1. Identity-free universal link panel (single adaptive input) -->
             <div class="lan-peer-container" id="lan-peer-container">
-              <!-- 未连接状态：单框自适应配对卡 -->
+              <!-- Disconnected: single adaptive pairing card -->
               <div class="lan-peer-box" id="lan-peer-unconnected">
                 <div class="lan-peer-input-row">
-                  <input type="text" class="text_pole" id="lan-peer-input" placeholder="粘贴互联码，或点下方生成 / 扫码">
+                  <input type="text" class="text_pole" id="lan-peer-input" data-i18n-placeholder="lan.peer.inputPlaceholder">
                 </div>
                 <div class="lan-peer-actions">
-                  <button type="button" class="btn" id="lan-peer-btn-generate">生成互联码</button>
-                  <button type="button" class="btn" id="lan-peer-btn-scan"><i class="fa-solid fa-camera"></i> 扫码</button>
-                  <button type="button" class="btn accent" id="lan-peer-btn-connect">连接</button>
-                  <button type="button" class="btn icon" id="lan-peer-btn-copy" hidden title="复制"><i class="fa-regular fa-copy"></i></button>
+                  <button type="button" class="btn" id="lan-peer-btn-generate" data-i18n="lan.peer.generateCode"></button>
+                  <button type="button" class="btn" id="lan-peer-btn-scan"><i class="fa-solid fa-camera"></i> <span data-i18n="action.scan"></span></button>
+                  <button type="button" class="btn accent" id="lan-peer-btn-connect" data-i18n="lan.peer.connect"></button>
+                  <button type="button" class="btn icon" id="lan-peer-btn-copy" hidden data-i18n-title="action.copy"><i class="fa-regular fa-copy"></i></button>
                 </div>
                 <div class="lan-peer-qr-wrap" id="lan-peer-qr-box" hidden>
                   <div class="lan-qr is-compact" id="lan-peer-qr"></div>
-                  <span class="lan-qr-tip" id="lan-peer-qr-tip">等待对端扫码或输入回执...</span>
+                  <span class="lan-qr-tip" id="lan-peer-qr-tip" data-i18n="lan.peer.qrTip"></span>
                 </div>
               </div>
 
-              <!-- 已连接状态：对等长连接看板 (常驻不重连，双向交替队列) -->
+              <!-- Connected: peer board (persistent, bi-directional alternating queue) -->
               <div class="lan-peer-connected" id="lan-peer-connected" hidden>
                 <div class="lan-peer-bar">
-                  <span class="lan-peer-badge"><i class="fa-solid fa-circle" style="color:var(--keep,#4caf50);font-size:10px;margin-right:4px"></i> <span id="lan-peer-status-label">已连接</span></span>
+                  <span class="lan-peer-badge"><i class="fa-solid fa-circle" style="color:var(--keep,#4caf50);font-size:10px;margin-right:4px"></i> <span id="lan-peer-status-label" data-i18n="lan.peer.statusConnected"></span></span>
                   <span class="lan-peer-rtt" id="lan-peer-rtt-text">RTT --ms</span>
                   <span class="spacer"></span>
-                  <button type="button" class="btn danger-btn" id="lan-peer-btn-disconnect">断开</button>
+                  <button type="button" class="btn danger-btn" id="lan-peer-btn-disconnect" data-i18n="lan.peer.disconnect"></button>
                 </div>
 
                 <div class="lan-peer-actions-row">
-                  <span class="lan-peer-sel-note" id="lan-peer-sel-summary">已在左侧勾选数据包</span>
-                  <button type="button" class="btn accent" id="lan-peer-btn-send">发送到对端</button>
+                  <span class="lan-peer-sel-note" id="lan-peer-sel-summary" data-i18n="lan.peer.selectedNote"></span>
+                  <button type="button" class="btn accent" id="lan-peer-btn-send" data-i18n="lan.peer.sendToPeerButton"></button>
                 </div>
 
-                <!-- 正在传输单条高密度进度卡 -->
+                <!-- Active single-transfer progress card -->
                 <div class="lan-peer-active-card" id="lan-peer-active-card" hidden>
                   <div class="lan-peer-active-head">
                     <span class="lan-peer-active-dir" id="lan-peer-active-dir">📤</span>
-                    <span class="lan-peer-active-name" id="lan-peer-active-name">正在传输...</span>
+                    <span class="lan-peer-active-name" id="lan-peer-active-name" data-i18n="lan.peer.transferring"></span>
                     <span class="spacer"></span>
                     <span class="lan-peer-active-pct" id="lan-peer-active-pct">0%</span>
                   </div>
@@ -186,20 +186,20 @@ export function getWorkbenchHtml() {
                   <div class="lan-peer-active-detail" id="lan-peer-active-detail">-- / -- · -- MB/s</div>
                 </div>
 
-                <!-- 双向任务队列看板 -->
+                <!-- Bi-directional task queue board -->
                 <div class="lan-peer-queue-card">
                   <div class="lan-peer-queue-head">
-                    <span class="lan-peer-queue-title">传输队列</span>
+                    <span class="lan-peer-queue-title" data-i18n="lan.peer.queueTitleShort"></span>
                     <span class="lan-peer-queue-count" id="lan-peer-queue-count">0</span>
                   </div>
                   <div class="lan-peer-queue-list" id="lan-peer-queue-list">
-                    <div class="ext-note" id="lan-peer-queue-empty">暂无传输任务，勾选数据包点发送即可排队</div>
+                    <div class="ext-note" id="lan-peer-queue-empty" data-i18n="lan.peer.queueEmptyShort"></div>
                   </div>
                 </div>
               </div>
             </div>
 
-            <!-- 2. 传统单次模式容器 (降级备用) -->
+            <!-- 2. Legacy single-transfer container (fallback) -->
             <div class="lan-legacy-container" id="lan-legacy-container" hidden>
               <div class="lan-overview" id="lan-overview">
                 <span class="lo-item"><b data-i18n="lan.ovPeer"></b><span id="lan-ov-peer"></span></span>
@@ -325,7 +325,10 @@ export function getWorkbenchHtml() {
                 <button type="button" class="btn" id="webdav-test" data-i18n-title="webdav.testHint"><i class="fa-solid fa-bolt"></i> <span data-i18n="webdav.test"></span></button>
                 <button type="button" class="btn" id="webdav-refresh"><i class="fa-solid fa-arrows-rotate"></i> <span data-i18n="cloud.refresh"></span></button>
               </div>
-              <div class="cloud-note-box cloud-test-box" id="webdav-test-result" hidden></div>
+              <!-- Self-test report: standalone block container; must NOT reuse the
+                   flex-based .cloud-note-box, otherwise multi-row reports get squeezed
+                   into unreadable vertical text. -->
+              <div class="cloud-test-box" id="webdav-test-result" hidden></div>
             </div>
             </div>
           </div>
@@ -444,35 +447,33 @@ export function getWorkbenchHtml() {
             </button>
           </div>
           <div class="panel-head panel-head--switch">
-            <div class="panel-title panel-title--zone">
-              <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 7h16v13H4z"/><path d="M8 7V4h8v3"/><path d="M4 12h16"/></svg>
-              <span data-i18n="zones.title"></span>
+            <div class="segmented zone-side-tabs" id="zone-side-tabs">
+              <button type="button" class="seg-btn active" data-sidetab="zone" data-i18n="view.zone">
+                <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 7h16v13H4z"/><path d="M8 7V4h8v3"/><path d="M4 12h16"/></svg>
+                <span data-i18n="zones.title"></span>
+              </button>
+              <button type="button" class="seg-btn" data-sidetab="git"><i class="fa-solid fa-code-branch"></i> <span data-i18n="gitv.title"></span></button>
             </div>
             <div class="view-switch" data-view-switch data-view-switch-zone hidden></div>
             <div class="panel-actions">
-              <div class="segmented zone-side-tabs" id="zone-side-tabs" hidden>
-                <button type="button" class="seg-btn active" data-sidetab="zone" data-i18n="view.zone"></button>
-                <button type="button" class="seg-btn" data-sidetab="git" data-i18n="gitv.title"></button>
+              <div class="zone-tabs" id="zone-tabs">
+                <button class="zone-tab active" data-zone="import"><span data-i18n="zones.import"></span><span class="count" id="count-import">4</span></button>
+                <button class="zone-tab" data-zone="export"><span data-i18n="zones.export"></span><span class="count" id="count-export">1</span></button>
               </div>
               <button type="button" class="icon-btn zone-mobile-close" id="zone-mobile-close" data-i18n-title="zones.collapse" data-i18n-aria="zones.collapse">×</button>
-
             </div>
           </div>
           <div class="zone-side-panel" id="zone-side-zone">
-          <div class="zone-tabs" id="zone-tabs">
-            <button class="zone-tab active" data-zone="import"><span data-i18n="zones.import"></span><span class="count" id="count-import">4</span></button>
-            <button class="zone-tab" data-zone="export"><span data-i18n="zones.export"></span><span class="count" id="count-export">1</span></button>
-          <div class="zone-delta-row" id="zone-mode-row">
-            <button type="button" class="btn zone-fetch-btn" id="btn-fetch"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M7 18a4 4 0 0 1 0-8 5 5 0 0 1 9.6-1.4A3.5 3.5 0 0 1 18 18z"/></svg><span data-i18n="action.fetch"></span></button>
-            <span class="zone-mode-extra" id="zone-mode-extra"></span>
-            <span class="zone-delta-label" data-i18n="chart.deltaLabel"></span>
-            <div class="segmented" id="delta-toggle" data-i18n-title="chart.overwrite">
-              <button class="seg-btn active" data-delta="overwrite" data-i18n="chart.overwrite"></button>
-              <button class="seg-btn" data-delta="incremental" data-i18n="chart.incremental"></button>
+            <div class="zone-delta-row" id="zone-mode-row">
+              <button type="button" class="btn zone-fetch-btn" id="btn-fetch"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M7 18a4 4 0 0 1 0-8 5 5 0 0 1 9.6-1.4A3.5 3.5 0 0 1 18 18z"/></svg><span data-i18n="action.fetch"></span></button>
+              <span class="zone-mode-extra" id="zone-mode-extra"></span>
+              <span class="zone-delta-label" data-i18n="chart.deltaLabel"></span>
+              <div class="segmented" id="delta-toggle" data-i18n-title="chart.overwrite">
+                <button class="seg-btn active" data-delta="overwrite" data-i18n="chart.overwrite"></button>
+                <button class="seg-btn" data-delta="incremental" data-i18n="chart.incremental"></button>
+              </div>
             </div>
-          </div>
-          </div>
-          <div class="zone-body" id="zone-body"></div>
+            <div class="zone-body" id="zone-body"></div>
           <div class="zone-foot-actions" id="zone-actions-bottom"></div>
           </div>
           <div class="zone-side-panel git-viz" id="zone-side-git" hidden>

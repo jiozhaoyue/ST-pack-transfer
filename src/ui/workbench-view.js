@@ -70,6 +70,7 @@ import { loadChartPrefs, saveChartPrefs, normalizeChartPrefs } from './chart-pre
 /* 演示数据必须是纯 ESM（浏览器直装不能 import JSON，见 src/data/demo-extensions.js 头注释）。 */
 import demoExtensionsData from '../data/demo-extensions.js';
 import { TARGET_PLATFORMS } from '../data/target-platforms.js';
+import { TARGET_AUTO, resolveAutoTarget, targetHostOf, targetNameOfHost } from '../core/naming.js';
 import { TARGET_UI, brandTokensOf } from '../data/target-ui.js';
 import { applyUiTokens } from '../data/ui-tokens.js';
 
@@ -345,6 +346,11 @@ function persistLog() {
 }
 
 const CHART_LAYOUT_KEY = 'stpt.chartLayout';
+/* 云端凭据键必须声明在 `const state` 之前：state 初始化即调用 loadCloudConfig() /
+   loadWebdavConfig()，若这两个常量仍在下方声明，读取会落进 TDZ（ReferenceError），
+   被 load* 的 catch 吞掉后恒返回 null ⇒ 写入成功也永远读不回（2026-11-19 数据丢失）。 */
+const CLOUD_KEY = 'st-pack-transfer:s3';
+const WEBDAV_KEY = 'st-pack-transfer:webdav';
 
 function normalizeChartLayout(input){
   const out = { col: 0.5, rows: [], charts: {} };
@@ -374,6 +380,19 @@ function persistChartLayout(){
 
 let chartPrefs = typeof localStorage !== 'undefined' ? loadChartPrefs() : normalizeChartPrefs(null);
 
+/**
+ * 启动时 `state.target` 的初值：只依赖偏好，不读 `state`（此时 `state` 尚未初始化）。
+ *
+ * - 偏好写死平台 → 用它；
+ * - 偏好为 `auto`（默认）→ 先填首项占位，`renderTargetPicker()` 首次渲染时
+ *   按 `refreshAutoTarget()` 解析成宿主 / 源包平台。
+ */
+function initialTargetName(){
+  const pref = chartPrefs.target;
+  if (pref && pref !== TARGET_AUTO) return targetNameOfHost(pref) || TARGET_PLATFORMS[0].name;
+  return TARGET_PLATFORMS[0].name;
+}
+
 const initialScanCache = typeof localStorage !== 'undefined' ? loadExtScanCache() : { lastScanAt: 0, results: {} };
 const initialScanState = {};
 for (const [name, res] of Object.entries(initialScanCache.results || {})) {
@@ -400,7 +419,7 @@ const state = {
        ok=读到 / error=有远程源但读不到（URL 无效、私有仓、凭据不足）。 */
     cloudState:'off', cloudReason:'', cloudNeedLogin:false,
   },
-  source:{ type:'host', pkgId:null }, target:'SillyTavern', targetManual:false,
+  source:{ type:'host', pkgId:null }, target: initialTargetName(), targetManual: chartPrefs.target !== TARGET_AUTO,
   /* Luker 存储引擎（'' = 跟随源包；fs/postgres/mysql/sqlite = 显式目标）。 */
   engine:'',
   delta: 'overwrite', splitMb: chartPrefs.splitMb,
@@ -885,8 +904,7 @@ function closeMobileZonePanel(){
 }
 
 /* ── 渲染：头部 ── */
-/** 宿主平台 → 目标平台默认值（偏好 target=auto 时生效；由唯一真源派生）。 */
-const HOST_TO_TARGET = Object.fromEntries(TARGET_PLATFORMS.map((p) => [p.host, p.name]));
+/** 目标自动模式的哨兵值与解析规则来自 `core/naming.js`（唯一真源，禁止本地再写一份映射）。 */
 /** 私有配置所属宿主（布局码）：Luker 边车 / TT 应用私有 / PT 兼容区；通用密钥返回空串。 */
 function privateHostCode(path){
   const p=String(path||'').toLowerCase();
@@ -916,13 +934,53 @@ function applyIncompatibleDefault(nodes){
     if(n.leaf && n.privateConfig && privateIncompatible(n.path)) n.checked = keep;
   });
 }
+/**
+ * 当前「源包」的来源宿主码（st|luker|tt|pt）。
+ *
+ * 只有一个激活包时才认定源包；多包合并 / 无包时返回空串，由自动模式回落宿主。
+ * `pkg.host` 由 `index.js` 的 `toPackage()` 从包的 layout 归一写入。
+ */
+function sourcePackageHost(){
+  if((state.activePkgs||[]).size!==1) return '';
+  const id=[...state.activePkgs][0];
+  const pkg=(state.packages||[]).find((p)=>p && p.id===id);
+  const host=String(pkg?.host||'');
+  return ['st','luker','tt','pt'].includes(host) ? host : '';
+}
+/**
+ * 「跟随来源」解析出的目标平台名：**源包优先，无源包回落宿主**。
+ *
+ * 用户 2026-11-19 裁定：默认就是跟随，不要求用户每次确认目标。
+ * 与同行的存储引擎「跟随源包」(`chart.engineAuto`) 保持同一语义——
+ * 从哪个平台来的包，默认就回哪个平台；还没选包时才看当前宿主。
+ */
+function autoTargetName(){
+  const sourceHost=sourcePackageHost();
+  return resolveAutoTarget({ sourceHost, host:state.host }) || TARGET_PLATFORMS[0].name;
+}
+/**
+ * 目标平台名：偏好写死 → 直接用它；偏好为 `auto` → 按 `autoTargetName()` 解析。
+ *
+ * @param {string} [hostKey] 当前宿主码（st|luker|tt|pt）；缺省读 `state.host`
+ */
 function targetForHost(hostKey){
   const pref = chartPrefs.target;
-  if (pref && pref !== 'auto') {
+  if (pref && pref !== TARGET_AUTO) {
     const hit = TARGET_PLATFORMS.find(x=>x.host===pref);
     if (hit) return hit.name;
   }
-  return HOST_TO_TARGET[hostKey] || TARGET_PLATFORMS[0].name;
+  if (hostKey && hostKey !== state.host) {
+    return resolveAutoTarget({ sourceHost: sourcePackageHost(), host: hostKey }) || TARGET_PLATFORMS[0].name;
+  }
+  return autoTargetName();
+}
+/** 自动模式下把解析结果同步进 `state.target`；手动模式一律不动。 */
+function refreshAutoTarget(){
+  if(state.targetManual) return false;
+  const next=autoTargetName();
+  if(next===state.target) return false;
+  state.target=next;
+  return true;
 }
 function renderHeader(){
   const h=HOSTS[state.host];
@@ -956,10 +1014,16 @@ function renderHeader(){
   renderTargetPicker();
 }
 function renderTargetPicker(){
+  /* 所有渲染路径的单点收敛：自动模式下先按当前源包/宿主解析目标，
+     再渲染按钮与弹层。否则包卡切换、宿主切换、区域切换各写一遍解析逻辑。 */
+  refreshAutoTarget();
   const cur=TARGET_PLATFORMS.find(t=>t.name===state.target)||TARGET_PLATFORMS[0];
+  /* 跟随来源（用户 2026-11-19 裁定）：默认模式，解析结果仍是上面四项之一。
+     按钮文字显示「跟随来源」，图标与品牌色跟随解析出的真实目标——只看按钮也知道会转成哪个平台。 */
+  const auto = !state.targetManual;
   const bi=document.getElementById('target-btn-icon');
   bi.src=hostIcon(cur.host); bi.dataset.host=cur.host;
-  document.getElementById('target-btn-text').textContent=cur.name;
+  document.getElementById('target-btn-text').textContent = auto ? t('target.autoShort') : cur.name;
   /* 2026-11-15 用户裁定：「宿主」状态**禁止**用「（宿主）」文字标签占宽——
      一律用特殊颜色（accent）表示：按钮文字与弹层条目均加 .is-host，由 CSS 染色。 */
   const hostTag=document.getElementById('target-btn-host');
@@ -969,7 +1033,7 @@ function renderTargetPicker(){
     const isHostNow = state.mode!=='web' && cur.host===state.host;
     targetBtn.dataset.host = cur.host;
     targetBtn.classList.toggle('is-host',isHostNow);
-    targetBtn.title=isHostNow?t('target.hostSuffix'):'';
+    targetBtn.title = auto ? t('target.autoTitle', { target: cur.name }) : (isHostNow?t('target.hostSuffix'):'');
   }
   const app=document.getElementById('app');
   if(app){
@@ -988,9 +1052,16 @@ function renderTargetPicker(){
   if(engineField) engineField.hidden = cur.host !== 'luker';
   const engineSelect=document.getElementById('target-engine');
   if(engineSelect) engineSelect.value = state.engine;
-  document.getElementById('target-pop').innerHTML=TARGET_PLATFORMS.map(opt=>{
+  /* 「跟随来源」条目复用现有 picker 类，零新增 CSS：
+     图标用解析出的平台图标，用户一眼看到会转到哪个平台；无解析结果时也不留空位。 */
+  const autoItem = '<button class="picker-item is-auto" role="option" data-target="'+TARGET_AUTO+'" data-host="'+cur.host+'" aria-selected="'+auto+'"'
+    +' title="'+t('target.autoTitle', { target: cur.name })+'">'
+    +'<img class="picker-ico" data-host="'+cur.host+'" src="'+hostIcon(cur.host)+'" alt="">'
+    +'<span>'+t('target.autoShort')+'</span>'
+    +'</button>';
+  document.getElementById('target-pop').innerHTML=autoItem+TARGET_PLATFORMS.map(opt=>{
     const isHost = state.mode!=='web' && opt.host===state.host;
-    return '<button class="picker-item'+(isHost?' is-host':'')+'" role="option" data-target="'+opt.name+'" data-host="'+opt.host+'" aria-selected="'+(opt.name===state.target)+'"'
+    return '<button class="picker-item'+(isHost?' is-host':'')+'" role="option" data-target="'+opt.name+'" data-host="'+opt.host+'" aria-selected="'+(!auto && opt.name===state.target)+'"'
       +(isHost?' title="'+t('target.hostSuffix')+'"':'')
       +'>'
       +'<img class="picker-ico" data-host="'+opt.host+'" src="'+hostIcon(opt.host)+'" alt="">'
@@ -2004,15 +2075,15 @@ function renderChart(){
 }
 
 /* ── 数据包偏好：占位复选框 + 顶部控件并入保存 ── */
+/** 选择器当前值 → 偏好存储值（宿主码 st|luker|tt|pt，或 `auto`）。 */
 function targetCodeOf(value){
-  if(value==='auto') return 'auto';
-  const hit=TARGET_PLATFORMS.find(x=>x.name===value);
-  return hit ? hit.host : 'auto';
+  if(value===TARGET_AUTO) return TARGET_AUTO;
+  return targetHostOf(value) || TARGET_AUTO;
 }
+/** 偏好存储值 → 选择器当前值（平台名）。`auto` 立即按源包/宿主解析成具体平台。 */
 function targetValueOfCode(code){
-  if(!code || code==='auto') return targetForHost(state.host);
-  const hit=TARGET_PLATFORMS.find(x=>x.host===code);
-  return hit ? hit.name : targetForHost(state.host);
+  if(!code || code===TARGET_AUTO) return targetForHost(state.host);
+  return targetNameOfHost(code) || targetForHost(state.host);
 }
 function syncTopControls(){
   const comp=document.getElementById('compression-select'); if(comp) comp.value=state.compression;
@@ -2034,10 +2105,20 @@ function chartPrefsHtml(){
     +'</label>').join('');
   const prefFull = p.extensionMode === 'full' || p.extensionMode === 'both';
   const prefManifest = p.extensionMode === 'manifest' || p.extensionMode === 'both';
+  /* 目标平台偏好：与顶部选择器同一套语义（`auto` = 跟随来源，其余 = 记住的平台码）。 */
+  const prefTarget = p.target || TARGET_AUTO;
+  const targetOpts = [TARGET_AUTO, ...TARGET_PLATFORMS.map((x)=>x.host)]
+    .map((code)=>{
+      const label = code===TARGET_AUTO ? t('target.autoShort') : targetNameOfHost(code);
+      return '<option value="'+code+'"'+(prefTarget===code?' selected':'')+'>'+label+'</option>';
+    }).join('');
   return '<div class="chart-prefs">'
     +'<div class="pref-head"><b>'+t('chart.prefsTitle')+'</b><span>'+t('chart.prefsDesc')+'</span></div>'
     +'<div class="pref-list">'+rows+'</div>'
     +'<div class="pref-extra">'
+      +'<label class="et-git"><span>'+t('chart.prefsTarget')+'</span><select class="text_pole" data-preftarget>'
+        +targetOpts
+      +'</select></label>'
       +'<div class="pref-extmode"><span class="pref-label">'+t('chart.prefsExtDefault')+'</span>'
         +'<div class="segmented et-mode">'
           +'<button type="button" class="seg-btn'+(prefFull?' active':'')+'" data-prefextmode="full" aria-pressed="'+prefFull+'">'+t('extension.full')+'</button>'
@@ -2070,7 +2151,7 @@ function openChartPrefs(){
   state.prefDraft = normalizeChartPrefs(chartPrefs);
   state.prefMode = true;
   state.target = targetValueOfCode(chartPrefs.target);
-  state.targetManual = chartPrefs.target !== 'auto';
+  state.targetManual = chartPrefs.target !== TARGET_AUTO;
   state.splitMb = chartPrefs.splitMb;
   state.compression = chartPrefs.compression;
   state.filenameTemplate = chartPrefs.filenameTemplate;
@@ -2092,10 +2173,14 @@ function cancelChartPrefs(){
 function chartPrefsDirty(){
   if(!state.prefMode) return false;
   const snap = state.prefSnapshot || {};
-  const fields = ['target','splitMb','compression','filenameTemplate','extensionMode','gitMode','keepDev','keepIncompatible'];
+  /* target 与 targetManual 成对出现：自动模式下 state.target 是解析结果，
+     只比平台名会把「手动选的正好等于解析结果」当成没改。 */
+  if(state.target !== snap.target || state.targetManual !== snap.targetManual) return true;
+  const fields = ['splitMb','compression','filenameTemplate','extensionMode','gitMode','keepDev','keepIncompatible'];
   if(fields.some((k)=>state[k] !== snap[k])) return true;
   const draft = state.prefDraft || normalizeChartPrefs(chartPrefs);
   const base = normalizeChartPrefs(chartPrefs);
+  if (draft.target !== base.target) return true;
   const norm = (x)=>[...(x.checkedGroups || [])].sort().join('|');
   if (draft.extensionMode !== base.extensionMode) return true;
   return norm(draft) !== norm(base);
@@ -2113,9 +2198,19 @@ function saveChartPrefsDraft(){
   const checked = [...document.querySelectorAll('[data-prefgroup]:checked')].map((el)=>el.dataset.prefgroup);
   const keepIncompatEl = document.querySelector('[data-prefkeepincompat]');
   if (keepIncompatEl) state.keepIncompatible = !!keepIncompatEl.checked;
+  /* 偏好面板里的目标平台是**偏好值**本身（auto | 平台码），不能反推 `state.target`：
+     自动模式下 state.target 存的是解析后的平台名，反推会把「跟随来源」永久固化成手动值。 */
+  const prefTargetEl = document.querySelector('[data-preftarget]');
+  const prefTargetRaw = prefTargetEl ? String(prefTargetEl.value || '') : targetCodeOf(state.target);
+  const prefTarget = prefTargetRaw === TARGET_AUTO || TARGET_PLATFORMS.some((x)=>x.host===prefTargetRaw)
+    ? prefTargetRaw
+    : targetCodeOf(state.target);
+  state.prefDraft = { ...(state.prefDraft || normalizeChartPrefs(chartPrefs)), target: prefTarget };
+  state.targetManual = prefTarget !== TARGET_AUTO;
+  state.target = targetValueOfCode(prefTarget);
   const next = {
     checkedGroups: checked,
-    target: targetCodeOf(state.target),
+    target: prefTarget,
     compression: state.compression,
     splitMb: state.splitMb,
     filenameTemplate: state.filenameTemplate,
@@ -2146,7 +2241,7 @@ function applyPrefsToPackage(pkg){
 }
 function applyTopControlsFromPrefs(){
   state.target = targetValueOfCode(chartPrefs.target);
-  state.targetManual = chartPrefs.target !== 'auto';
+  state.targetManual = chartPrefs.target !== TARGET_AUTO;
   state.splitMb = chartPrefs.splitMb;
   state.compression = chartPrefs.compression;
   state.filenameTemplate = chartPrefs.filenameTemplate;
@@ -3299,13 +3394,13 @@ function accountsHtml(){
     : '';
   return '<details class="ext-accounts" data-extaccounts'+(state.extAccountsOpen?' open':'')+'>'
     +extSummaryHtml(t('extmgr.accountsTitle'), list.length)
-    +'<div class="ext-note privacy">'+t('extmgr.privacyNote')+'</div>'
+    +'<div class="ext-note privacy" title="'+t('extmgr.privacyTokenHint')+'">'+t('extmgr.privacyNote')+'</div>'
     /* 2026-11-18 用户明令：此处只做文案提醒，**不得提供任何直接跳转到隐私设置的按钮**。
        各凭据的存放位置属于设置页的事，这里只如实说明当前状态，把选择权留给用户自己走过去。 */
     +'<div class="ext-row">'
       +'<span class="et-label">'+t('extmgr.storageLabel')+'</span>'
       +'<span class="acc-store-state">'+(mode==='server'?t('extmgr.storeServer'):t('extmgr.storeBrowser'))+'</span>'
-      +'<span class="ext-note">'+t('extmgr.storeGoPrivacy')+'</span>'
+      +'<span class="ext-note" title="'+t('extmgr.storeGoPrivacyHint')+'">'+t('extmgr.storeGoPrivacy')+'</span>'
     +'</div>'
     +'<div class="ext-row acc-add">'
       +'<select class="text_pole" data-accsite>'+ACCOUNT_SITES.map((s)=>'<option value="'+s+'">'+s+'</option>').join('')+'</select>'
@@ -3568,7 +3663,7 @@ function bindAccounts(body){
     try { await navigator.clipboard.writeText(oauthRedirectUri()); toast(t('extmgr.oauthCopied')); }
     catch { toast(t('extmgr.oauthFailed',{reason:'clipboard'})); }
   });
-  body.querySelector('[data-tokenguide]')?.addEventListener('click',()=>openHelp('gitToken'));
+  body.querySelectorAll('[data-tokenguide]').forEach((el)=>el.addEventListener('click',()=>openHelp('gitToken')));
   body.querySelectorAll('[data-accdefault]').forEach((btn)=>{
     btn.addEventListener('click',()=>{
       persistAccountList(setDefaultAccount(gitAccountList(), btn.dataset.accdefault));
@@ -5776,7 +5871,7 @@ function renderLogTab(){
 }
 
 /* ── 云端包仓库（S3 兼容；凭据默认只存本机浏览器，不可用时如实降级） ── */
-const CLOUD_KEY = 'st-pack-transfer:s3';
+/* CLOUD_KEY / WEBDAV_KEY 已上移到 state 初始化之前（避免 TDZ），此处不再声明。 */
 
 /**
  * 凭据存放位置（设置 → 隐私）。默认 `browser`；用户显式选 `server` 才落 settings.json。
@@ -5813,7 +5908,9 @@ function loadCloudConfig() {
   }
 }
 function persistCloudConfig(config) {
-  if (state.tutorialMode) return true;
+  /* 演示态必须返回 false：返回 true 会让 cloudSave 把「一字未存」当成功并显示「已保存」，
+     刷新后配置全空（2026-11-19 云端配置数据丢失缺陷）。 */
+  if (state.tutorialMode) return false;
   if (credStoreMode('s3') === 'server') {
     persistGit({ s3Config: config });
     return true;
@@ -5826,8 +5923,6 @@ function persistCloudConfig(config) {
     return false;
   }
 }
-
-const WEBDAV_KEY = 'st-pack-transfer:webdav';
 
 /** WebDAV 配置：默认只存本机浏览器；读不到时返回空配置而不是伪造。 */
 function normalizeWebdavConfig(parsed) {
@@ -5853,7 +5948,8 @@ function loadWebdavConfig() {
   }
 }
 function persistWebdavConfig(config) {
-  if (state.tutorialMode) return true;
+  /* 与 persistCloudConfig 同一条：演示态一律拒绝并返回 false，绝不假装已保存。 */
+  if (state.tutorialMode) return false;
   if (credStoreMode('webdav') === 'server') {
     persistGit({ webdavConfig: config });
     return true;
@@ -6038,17 +6134,22 @@ function renderCloud() {
 async function cloudSave() {
   const C = state.cloud;
   const cfg = cloudConfigFromForm();
+  /* 先落盘、成功后才写内存配置：此前无论成败都先写 C.config，
+     界面看起来「配置已在」，实则一字未存（2026-11-19 刷新后全空）。
+     演示态由 persist*Config 返回 false 拦下，这里只负责把原因说清楚。 */
   let saved;
   if (C.provider === 'webdav') {
-    C.webdav = cfg;
     saved = persistWebdavConfig(cfg);
+    if (saved) C.webdav = cfg;
   } else {
-    C.config = cfg;
     saved = persistCloudConfig(cfg);
+    if (saved) C.config = cfg;
   }
   if (!saved) {
-    C.status = t('cloud.saveFailed');
+    /* 失败不静默（R-30）：演示态给专属原因，其他失败走通用文案。 */
+    C.status = t(state.tutorialMode ? 'cloud.demoNoSave' : 'cloud.saveFailed');
     renderCloud();
+    if (state.tutorialMode) toast(t('cloud.demoNoSave'));
     return;
   }
   if (C.provider === 'webdav') {
@@ -6093,16 +6194,21 @@ async function testWebdavConnection(){
   }
   if (btn) btn.disabled = false;
   if (box) {
+    // 报告按「标题 + 每步一行」渲染为并列 block 行（容器 .cloud-test-box 已是 display:block）。
+    // 切勿复用 .cloud-note-box 的 flex 容器：并列 <div> 会各自成为 flex item 被横向压成逐字竖排。
     const rows = (res.steps || []).map((s) => {
       const mark = s.ok ? '✓' : (s.advisory ? '⚠' : '✗');
       const code = s.status ? String(s.status) : (s.code || '');
-      return '<div>' + escapeHtml(`${s.step} ${mark}${code ? ' · ' + code : ''}${s.detail ? ' · ' + s.detail : ''}`) + '</div>';
+      const tone = s.ok ? '' : (s.advisory ? ' is-advisory' : ' is-fail');
+      return '<div class="cloud-test-row' + tone + '">'
+        + escapeHtml(`${s.step} ${mark}${code ? ' · ' + code : ''}${s.detail ? ' · ' + s.detail : ''}`)
+        + '</div>';
     }).join('');
     const head = !res.ok
-      ? '<div class="ext-note">' + escapeHtml(t('webdav.testFail', { step: res.failedStep || '?', reason: res.code || '' })) + '</div>'
+      ? '<div class="cloud-test-head is-fail">' + escapeHtml(t('webdav.testFail', { step: res.failedStep || '?', reason: res.code || '' })) + '</div>'
       : (res.advisoryFailed
-        ? '<div class="ext-note">' + escapeHtml(t('webdav.testOkPartial', { n: res.advisoryFailed })) + '</div>'
-        : '<div class="ext-note">' + escapeHtml(t('webdav.testOk')) + '</div>');
+        ? '<div class="cloud-test-head">' + escapeHtml(t('webdav.testOkPartial', { n: res.advisoryFailed })) + '</div>'
+        : '<div class="cloud-test-head">' + escapeHtml(t('webdav.testOk')) + '</div>');
     box.innerHTML = head + rows;
   }
   if (!res.ok) log('WARN', t('webdav.testFail', { step: res.failedStep || '?', reason: res.code || '' }));
@@ -7308,11 +7414,17 @@ function centerTutorialCard(card, overlay){
   card.style.top='50%';
   card.style.transform='translate(-50%,-50%)';
 }
-/** 只关浮层，不退出演示模式（2026-11-11 用户裁定：跳过 ≠ 回正常模式）。 */
+/**
+ * 跳过 = 真正退出演示模式。
+ * 2026-11-11 曾裁定「跳过 ≠ 回正常模式」，但浮层隐藏后主界面可正常操作，
+ * 用户无法分辨自己仍在演示态：保存配置一字不落却被显示成成功（数据丢失）。
+ * 现统一复用 exitTutorialMode()，由它还原 state 快照并恢复真实 actions。
+ */
 function hideTutorialOverlay(){
   const overlay=document.getElementById('st-pt-tutorial-overlay');
   if(overlay) overlay.classList.remove('open');
   state.tutorialOpen=false;
+  exitTutorialMode();
 }
 function openTutorial(){
   if(!state.tutorialMode) enterTutorialMode();
@@ -7772,8 +7884,10 @@ function bind(){
   });
   targetPop.addEventListener('click',e=>{
     const it=e.target.closest('[data-target]'); if(!it) return;
-    state.target=it.dataset.target;
-    state.targetManual=true;
+    /* `auto` = 跟随来源：清掉手动标记，目标由源包/宿主解析；其余值 = 用户显式选定，记住它。 */
+    const picked=it.dataset.target;
+    state.targetManual = picked !== TARGET_AUTO;
+    state.target = state.targetManual ? picked : autoTargetName();
     closeTargetPop(); renderTargetPicker(); renderChart();
     log('INFO',t('toast.targetChanged',{target:state.target}));
     actions.onTargetChange?.(state.target);
@@ -8002,6 +8116,18 @@ function bind(){
     const prefGit=e.target.closest('[data-prefgitmode]');
     if(prefGit){
       state.gitMode = [GIT_MODES.KEEP,GIT_MODES.MINIMAL,GIT_MODES.STRIP].includes(prefGit.value) ? prefGit.value : GIT_MODES.KEEP;
+      return;
+    }
+    const prefTarget=e.target.closest('[data-preftarget]');
+    if(prefTarget){
+      const base=state.prefDraft || normalizeChartPrefs(chartPrefs);
+      const raw=String(prefTarget.value||'');
+      const value = raw===TARGET_AUTO || TARGET_PLATFORMS.some((x)=>x.host===raw) ? raw : TARGET_AUTO;
+      state.prefDraft={...base, target:value};
+      state.targetManual = value !== TARGET_AUTO;
+      state.target = targetValueOfCode(value);
+      renderTargetPicker();
+      renderChart();
       return;
     }
     const prefKeepDev=e.target.closest('[data-prefkeepdev]');
@@ -8737,16 +8863,20 @@ void refreshHostIdentity();
         fresh.forEach((pkg) => { applyPrefsToPackage(pkg); state.prefAppliedPkgs.add(pkg.id); });
         applyTopControlsFromPrefs();
       }
+      /* 包的来源平台可能刚变（新导入 / 换源），自动模式必须跟着重算。 */
+      refreshAutoTarget();
       renderAll();
     },
     setHost(hostKey, mode) {
       state.host = hostKey;
       state.mode = mode;
       if (mode === 'web' && state.extTab === 'host') state.extTab = 'package';
-      if (!state.targetManual) state.target = targetForHost(hostKey);
       state.activePkgs = new Set();
       state.source = { type: 'host', pkgId: null };
       state.sourceKey = 'host:' + hostKey;
+      /* 宿主切换必然清空激活包，故自动目标要在清空之后重算：
+         沿用旧源包会算出上一套宿主的平台（切宿主后目标不动的假象）。 */
+      if (!state.targetManual) state.target = targetForHost(hostKey);
       const isWeb = mode === 'web';
       const themePicker = document.getElementById('header-theme-picker');
       if (themePicker) themePicker.hidden = !isWeb;
@@ -8862,6 +8992,8 @@ void refreshHostIdentity();
       autoEngineForPackage(state.packages.find((p)=>p.id===id));
       state.source = id ? { type: 'package', pkgId: id } : { type: 'host', pkgId: null };
       state.sourceKey = id ? ('pkg:' + id) : ('host:' + state.host);
+      /* 源包换了，自动目标随之解析（手动选定则保持不动）。 */
+      refreshAutoTarget();
       renderAll();
       if (state.mainView === 'extension' || state.mobileView === 'extension') {
         renderExtensionView();

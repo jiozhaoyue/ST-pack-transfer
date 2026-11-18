@@ -18,6 +18,39 @@ export const TARGET_PLATFORMS = Object.freeze(
   TARGET_PLATFORM_META.map(({ code, name }) => ({ code, name })),
 );
 
+/**
+ * 目标自动模式的哨兵值（用户 2026-11-19 裁定「默认跟随」）。
+ *
+ * 语义：**跟随来源** —— 当前有源包时跟源包的来源平台，没有源包时回落当前宿主。
+ * 放在偏好里存这个值，选择器里存解析后的平台名；两条链路互不污染。
+ */
+export const TARGET_AUTO = 'auto';
+
+/** 目标平台名 → 宿主码（st|luker|tt|pt）。未知返回空串，不猜。 */
+export function targetHostOf(name) {
+  const hit = TARGET_PLATFORM_META.find((p) => p.name === name);
+  return hit ? hit.host : '';
+}
+
+/** 宿主码（st|luker|tt|pt）→ 目标平台名。未知返回空串，不猜。 */
+export function targetNameOfHost(host) {
+  const hit = TARGET_PLATFORM_META.find((p) => p.host === host);
+  return hit ? hit.name : '';
+}
+
+/**
+ * 解析「跟随来源」应该落到哪个目标平台名。
+ *
+ * 优先级：当前源包的来源宿主 → 运行宿主；两者都解析不出时返回空串，
+ * 由调用方决定兜底（`workbench-view` 兜底到选择器首项 SillyTavern）。
+ *
+ * @param {{ sourceHost?: string, host?: string }} [input]
+ * @returns {string}
+ */
+export function resolveAutoTarget({ sourceHost, host } = {}) {
+  return targetNameOfHost(sourceHost) || targetNameOfHost(host) || '';
+}
+
 /** 规范占位符集合（AC-4 要求逐个有单测）。 */
 export const PLACEHOLDERS = Object.freeze([
   'host',

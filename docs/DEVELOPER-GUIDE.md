@@ -122,10 +122,10 @@ npm run qa:static        # 静态守卫串跑
   读不到时显示「正在读取」并定时重试，不得回退成宿主名或匿名态。
 - **三段式物理滚动隔离**：`.confirm-dialog .view-body.is-scroll-isolated` 必须强制 `overflow: hidden !important`，工具栏必须为 `flex: 0 0 auto; overflow: hidden;`，滚动条**仅且必须**出现在列表容器 `.changelog-list` 内部，工具栏右侧绝对不得延伸贯穿出现滚动条滑块与箭头；底部的「不再自动显示」复选框必须死死固定在 actions 操作栏，严禁塞入可滚动正文。
 - **局域网无身份单框对等互联**：面板彻底消灭上下堆叠与双列收发卡片，采用单一通用互联盒（`lan-peer-box`），长连接建立后常驻保持不重连（Ping/Pong 心跳与 RTT 测速），双向任务进入连续队列交替调度，互不抢占信道；保留传统单次模式作为降级方案。
-- **对等状态唯一通道 `setLan`**：`view.setLan()` 是视图状态的唯一写入口，支持 `open` / `send` / `recv` / `peer` / `scanError` 五个分支，全部按 `Object.assign` 合并（不得整体替换，否则后续只带部分字段的 patch 会清掉其它字段）。`lan-transfer-panel` 的所有对等状态都经 `setPeer → setLan({ peer })`。**新增任何 `setLan({ xxx })` 调用方时，必须同时在 `setLan` 加分支并在 `test/ui-lan-state-contract.test.js` 补用例**，否则 patch 会被静默丢弃（2026-11-19 曾因漏 `peer` 分支导致整个对等模式点按钮零反应）。
+- **对等状态唯一通道 `setLan`**：`view.setLan()` 是视图状态的唯一写入口，支持 `open` / `send` / `recv` / `peer` / `scanError` 五个分支，全部按 `Object.assign` 合并（不得整体替换，否则后续只带部分字段的 patch 会清掉其它字段）。`lan-transfer-panel` 的所有对等状态都经 `setPeer → setLan({ peer })`。**新增任何 `setLan({ xxx })` 调用方时，必须同时在 `setLan` 加分支并在 `test/ui-lan-state-contract.test.js` 补用例**，否则 patch 会被静默丢弃（此前曾因漏 `peer` 分支导致整个对等模式点按钮零反应）。
 - **对等发送源契约**：`getSendTargets()` 是 `async`，返回 `File[]`（`index.js`）。`peerSend` 必须 `await` 后以 `File` 为准取 `.name` / `.size`，不得假设存在 `sizeBytes` / `blob` 包装字段。
 - **对等通道等待必须有界**：`bufferedAmount` 排空循环必须同时检查 `readyState`、取消标志与超时（`HIGH_WATER_TIMEOUT_MS`），禁止纯 `sleep` 轮询；`waitIceComplete` 到点未收全时须在提示与日志中如实标注，不得让用户拿到缺候选的码却毫无提示。
-- **待导出卡复用唯一卡范式**：待导出项走 `pkgCard(pkg, { pendingId, pendingActions })` 渲染，与真实数据包卡同一套 DOM 与素材；**禁止为待导出另造图标、伪宿主角标或自造徽标文案**（2026-11-19 已删除 `pkg-check-spacer`、`data-host="file"`、手写 ZIP 角标与 `pending.badge`）。体积计算须兼容 `blob.size` 与演示态 `size/mb`。
+- **待导出卡复用唯一卡范式**：待导出项走 `pkgCard(pkg, { pendingId, pendingActions })` 渲染，与真实数据包卡同一套 DOM 与素材；**禁止为待导出另造图标、伪宿主角标或自造徽标文案**（已在一次修复中删除 `pkg-check-spacer`、`data-host="file"`、手写 ZIP 角标与 `pending.badge`）。体积计算须兼容 `blob.size` 与演示态 `size/mb`。
 - **Luker 包与分卷包全特征识别**：`detect.js` 扩展识别 Luker 各类 manifest、`_convert/split-manifest.json` 分卷清单、平铺目录特征（`chats/`、`worlds/`、`groups/`、`user/`、`backgrounds/`、`extensions/`）与文件名强特征启发，杜绝 Luker 分卷包误判为「未识别包」。
 - 回归守卫：`npm test -- header-badge.test.js changelog.test.js ui-viewport-guard.test.js`。
 
@@ -178,6 +178,11 @@ npm run qa:static        # 静态守卫串跑
 
 - **品牌色统一管理与禁止屎黄色回退**：唯一真源收口在 `src/data/target-ui.js`（`brandTokensOf`）与 `src/data/ui-tokens.js`（`UI_TOKENS.brand`）；严禁各模块手写散落的颜色映射字典；彻底杜绝 `rgb(225, 138, 36)` 屎黄色回退，所有强调与高亮统一采用目标平台品牌色或标准转运色（`#8a5cf6`）。
 - **教程演示模式全面品牌色化**：教程「查看文档」按钮采用中性次要按钮样式（去除黄色边框与高亮），引导卡片、高亮环与横幅全站统一采用品牌色，杜绝刺眼黄色。示例扩展列表严格仅限收录用户 `jiozhaoyue` 的公开 `ST-` 开头扩展，支持运行时动态从 GitHub 仓库同步最新变更，且条目支持直接在新标签页中打开仓库。
+- **教程演示态零落盘与跳过即退出（数据丢失修复）**：
+  - `persistCloudConfig` / `persistWebdavConfig` 在 `state.tutorialMode` 下必须返回 `false`，禁止返回 `true` 制造「已保存」假成功；`cloudSave()` 仅在实际落盘成功后才写内存配置；
+  - 云端保存按钮在演示态给出 `cloud.demoNoSave`（「演示模式不保存配置」）状态与 toast，不静默；
+  - 教程浮层「跳过」必须调用 `exitTutorialMode()` 还原 state 快照并真正退出演示态，不得只关浮层（`tutorialMode` 残留会让后续保存全部静默失效）；
+  - `CLOUD_KEY` / `WEBDAV_KEY` 必须声明在 `const state` 之前：`state` 初始化即调用 `loadCloudConfig()`，常量后置会落进 TDZ 并被 `catch` 吞成 `null`，导致写入成功也永远读不回。
 - **扩展管理包内六态状态机与假死根除**：
   - 严格区分 `NO_PACKAGE`（未选包）、`UNSCANNED`（选包未扫描，带一键扫描通道）、`SCANNING`（扫描中）、`READY`（已扫描有扩展）、`EMPTY`（已扫描无扩展）、`ERROR`（扫描失败重试）六态；
   - 彻底修复 `ensurePlan` 异步完成未回传与切页才刷新的缺陷：`actions.onActivePackage` 返回 Promise，扫描完成自动就地触发 `renderExtensionView()` 响应式刷新。

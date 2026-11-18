@@ -648,7 +648,17 @@
   #app.app-container .vc-seg{display:block;height:100%;flex-basis:0;flex-shrink:0;min-width:3px;
     background:var(--vc,var(--accent));transition:filter .15s ease}
   #app.app-container .vc-seg:hover{filter:brightness(1.18)}
-  #app.app-container .vol-chart.is-donut .vc-donut{width:96px;height:96px;max-width:100%;transform:rotate(-90deg)}
+  /* 圆环边长只由**可用高度**决定（2026-11-19 修复 P1 定高失配）。
+     此前写死 96×96 且无高度上限：`.vol-chart` 在 min-height:84px 时内容盒仅
+     84-24(padding)-1(border)=59px；拖到下限 48px 又被 min-height 顶回 84
+     ⇒ 实测圆环上下各溢 6.5/5.5px，桌面靠 .vol-card{overflow:hidden} 裁掉，
+     手机端 .vol-card{overflow:visible} 直接盖到相邻行。
+     两个方向都必须 auto：只写宽度会让 aspect-ratio 先定宽再定高，受 max-height
+     夹住时只压高度 ⇒ 窄父下被拉成椭圆（实测父宽 100 时 70×96，比例 0.729）。
+     两轴 auto + aspect-ratio:1/1 + max-height:100% ⇒ 由可用高度反推宽度，比例恒为 1；
+     max-width:min(96px,100%) 保留默认高度下的既有 96px 观感（实测仍 96×96）。 */
+  #app.app-container .vol-chart.is-donut .vc-donut{width:auto;height:auto;aspect-ratio:1/1;
+    max-width:min(96px,100%);max-height:100%;min-width:0;min-height:0;transform:rotate(-90deg)}
   #app.app-container .vc-arc{stroke:var(--vc,var(--accent))}
   #app.app-container .tree-dot{width:9px;height:9px;border-radius:50%;flex:0 0 auto;background:var(--vc,var(--accent))}
 
@@ -1766,7 +1776,10 @@
   #app.app-container[data-view="mobile"] .vol-card .chart-tree{max-height:none;overflow:visible}
   /* 手机端保留占用条/环形与格式切换：高度可拖，信息不被省略。 */
   #app.app-container[data-view="mobile"] .vol-chart{min-height:64px;padding:8px 10px}
-  #app.app-container[data-view="mobile"] .vol-chart.is-donut .vc-donut{width:72px;height:72px}
+  /* 手机端只收窄上限（72px 观感），尺寸仍由可用高度反推；写死 72×72 时
+     min-height:64px + padding:8px 10px 的内容盒只有 47px ⇒ 溢出 25px，
+     而手机 .vol-card 是 overflow:visible，会盖到相邻行。 */
+  #app.app-container[data-view="mobile"] .vol-chart.is-donut .vc-donut{max-width:min(72px,100%)}
   #app.app-container[data-view="mobile"] .vc-stack{height:24px}
   #app.app-container[data-view="mobile"] .vol-fmt{display:inline-flex}
   #app.app-container[data-view="mobile"] .tree-occ{display:none !important}
@@ -2008,14 +2021,18 @@
   border-width: 0 2px 2px 0;
   transform: translate(-50%, -50%) rotate(45deg);
 }
+/* 2026-11-19 修复（与 :checked 同源）：半选横杠此前同样用绝对像素 left:3px/top:5px，
+   按 14px 方框算死。手机档把 .tree-check 放大到 20px 后横杠偏左上（实测 3px）。
+   改为百分比居中，两档尺寸共用一条规则，不再随放大点逐个重算。 */
 #app.app-container input[type="checkbox"]:indeterminate::after {
   content: '';
   position: absolute;
-  left: 3px;
-  top: 5px;
-  width: 6px;
+  left: 50%;
+  top: 50%;
+  width: 54%;
   height: 2px;
   background: var(--qr-bg);
+  transform: translate(-50%, -50%);
 }
 #app.app-container input[type="checkbox"]:disabled { opacity: .45; cursor: not-allowed; }
 #app.app-container input[type="checkbox"]:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
@@ -2112,7 +2129,22 @@
 #app.app-container .cloud-status{font-size:11px;color:var(--text);font-family:Consolas,monospace;padding:1px 4px}
 #app.app-container .cloud-status:empty{display:none}
 #app.app-container .cloud-guide-group{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
-#app.app-container .cloud-test-box{margin-top:0;font-size:10.5px;border-radius:6px;animation:extRowFadeIn .2s ease-out}
+/* 连接自检报告：**独立 block 布局**，不再复用 .cloud-note-box 的横向 flex。
+   多个报告行是并列子节点；若容器为 flex，每个 <div> 会成一个 flex item 被横向挤压，
+   文字退化为逐字竖排（2026-11-19 用户截图实测：整份报告压成一条竖排）。
+   block 下每行独占一行；长文本按容器宽度正常折行。 */
+#app.app-container .cloud-test-box{display:block;margin-top:0;padding:5px 8px;border-radius:6px;
+  background:color-mix(in srgb,var(--panel) 60%,transparent);border:1px solid color-mix(in srgb,var(--border) 60%,transparent);
+  font-size:10.5px;line-height:1.45;color:var(--muted);animation:extRowFadeIn .2s ease-out;
+  min-width:0;overflow-wrap:anywhere;word-break:break-word}
+/* author 的 display:block 会压过 UA 的 [hidden]{display:none}，必须显式补回（同本文件坑 10） */
+#app.app-container .cloud-test-box[hidden]{display:none}
+#app.app-container .cloud-test-box .cloud-test-head{font-weight:650;color:var(--text);margin-bottom:3px;white-space:pre-line}
+#app.app-container .cloud-test-box .cloud-test-head.is-fail{color:var(--drop)}
+#app.app-container .cloud-test-box .cloud-test-row{padding:1px 0;white-space:pre-line;
+  font-family:Consolas,monospace;font-variant-numeric:tabular-nums}
+#app.app-container .cloud-test-box .cloud-test-row.is-advisory{color:var(--optional)}
+#app.app-container .cloud-test-box .cloud-test-row.is-fail{color:var(--drop)}
 #app.app-container .cloud-list{display:flex;flex-direction:column;gap:4px}
 #app.app-container .cloud-item{display:flex;align-items:center;gap:8px;padding:6px 10px;border:1px solid var(--border);border-radius:7px;font-size:11px;
   background:color-mix(in srgb,var(--panel-3) 40%,transparent);transition:all .16s ease}
@@ -2134,7 +2166,9 @@
 #app.app-container .lan-peer-input-row .text_pole{flex:1 1 auto;height:var(--ctl-h);min-height:var(--ctl-h);font-size:12px;padding:6px 10px;box-sizing:border-box}
 #app.app-container .lan-peer-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 #app.app-container .lan-peer-qr-wrap{display:flex;flex-direction:column;align-items:center;gap:6px;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--panel-3);width:fit-content;margin:4px auto}
-#app.app-container .lan-peer-qr-wrap .lan-qr{width:116px;height:116px;display:flex;align-items:center;justify-content:center}
+/* 容器尺寸由 .lan-qr.is-compact 统一定义（见本文件 2181 段），此处不再重复声明，
+   否则 4 段选择器的特异性会压过统一的紧凑规则，回到「容器 116 / svg 150」的溢出老路。 */
+#app.app-container .lan-peer-qr-wrap .lan-qr{display:flex;align-items:center;justify-content:center}
 #app.app-container .lan-peer-qr-tip{font-size:11px;color:var(--muted)}
 #app.app-container .lan-peer-connected{display:flex;flex-direction:column;gap:10px}
 #app.app-container .lan-peer-bar{display:flex;align-items:center;gap:10px;padding:8px 12px;border:1px solid var(--border);border-radius:7px;background:var(--panel-2)}
@@ -2178,8 +2212,19 @@
   background:var(--panel-3);border:1px solid var(--border);border-radius:8px;color:var(--text)}
 #app.app-container .lan-row .menu_button:hover{border-color:var(--border-strong)}
 #app.app-container .lan-row .menu_button:disabled{opacity:.45;cursor:not-allowed}
-#app.app-container .lan-qr{display:flex;justify-content:center;align-items:center;padding:6px;background:var(--qr-bg);border-radius:8px;align-self:center}
-#app.app-container .lan-qr svg{width:150px;height:150px;display:block}
+/* 二维码尺寸链（2026-11-19 修复）：
+   qr.js 用 scalable:true 生成 SVG——只有 viewBox、没有 width/height 属性，
+   尺寸**完全由 CSS 决定**。此前把 svg 写死 150×150，而 .lan-peer-qr-wrap .lan-qr
+   容器只有 116×116（含 6px padding ⇒ 内容盒 104），svg 比容器大 46px，
+   直接顶出边框外（用户截图实测：二维码脱离白色卡片）。
+   改为 svg 充满容器（width/height:100% + aspect-ratio 由 viewBox 保持），
+   尺寸约束统一由父级给出，任何容器尺寸下都不会溢出。 */
+#app.app-container .lan-qr{display:flex;justify-content:center;align-items:center;padding:6px;background:var(--qr-bg);border-radius:8px;align-self:center;box-sizing:border-box;overflow:hidden}
+#app.app-container .lan-qr svg{width:100%;height:100%;max-width:100%;max-height:100%;display:block}
+/* 面板内的紧凑二维码：容器定死尺寸，svg 自适应填充（不再另设像素尺寸）。 */
+#app.app-container .lan-qr.is-compact{width:116px;height:116px}
+/* 传统模式（发送/接收）二维码：容器随内容，给一个可读上限。 */
+#app.app-container .lan-qr:not(.is-compact){width:min(100%,158px);height:auto;aspect-ratio:1/1}
 #app.app-container .lan-qr.is-placeholder{width:min(100%,260px);min-height:96px;box-sizing:border-box;
   background:color-mix(in srgb,var(--panel-3) 70%,transparent);border:1px dashed var(--border-strong);color:var(--muted)}
 #app.app-container .lan-qr-placeholder{font-size:12px;line-height:1.5;text-align:center;padding:0 12px;white-space:pre-wrap}

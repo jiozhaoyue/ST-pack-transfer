@@ -12,7 +12,7 @@ Convert data packs between SillyTavern, Luker, TauriTavern, and PureTavern—whe
 
 ## Basic steps
 
-1. **Choose the target platform**: select the tavern you will import into from the **Target platform** menu at the top. If the plugin is running inside a tavern, that tavern is marked as **Host**.
+1. **Choose the target platform**: the **Target platform** menu defaults to **Match source** — the selected package's source platform, or the current host when no package is selected. Pick an entry to override it; your explicit choice is then remembered.
 2. **Select what to bring**: use the **Storage chart** on the left to tick the items you want.
 3. **Choose source packages**: tick the packages to convert in the **Package list** on the right.
 4. **Generate**: click **Generate export package** at the bottom.
