@@ -70,6 +70,7 @@ import { loadChartPrefs, saveChartPrefs, normalizeChartPrefs } from './chart-pre
 /* 演示数据必须是纯 ESM（浏览器直装不能 import JSON，见 src/data/demo-extensions.js 头注释）。 */
 import demoExtensionsData from '../data/demo-extensions.js';
 import { TARGET_PLATFORMS } from '../data/target-platforms.js';
+import { TARGET_UI, brandTokensOf } from '../data/target-ui.js';
 import { applyUiTokens } from '../data/ui-tokens.js';
 
 /**
@@ -434,7 +435,16 @@ const state = {
   sourceKey:'host:luker', seq:{}, libraryExport:false,
   transfer:{ open:false, tab:'lan' },
   lan:{
+    mode: 'peer',
     scanning:null, scanError:'',
+    peer:{
+      connected: false,
+      rtt: 0,
+      offerCode: '',
+      answerCode: '',
+      active: null,
+      queue: [],
+    },
     send:{ code:'', answer:'', phase:t('action.ready'), pct:0, detail:'', busy:false, done:false },
     recv:{ code:'', phase:t('action.waiting'), pct:0, detail:'', busy:false, done:false }
   }
@@ -560,10 +570,22 @@ function selectPackageForExtension(id){
      导入多包时只有最新包被扫描，点到未扫描包就会「共 N 项却没有任何扩展」。
      onActivePackage 内部 = setActivePackage（立即重绘）+ ensurePlan（补齐后再次重绘），
      是本仓唯一的「切换包并补扫描」入口；demo wrapper 里为 undefined（自带数据，安全跳过）。 */
-  const scanned = pkg && ((Array.isArray(pkg.nodes) && pkg.nodes.length)
+  const scanned = pkg && (pkg.scanned || (Array.isArray(pkg.nodes) && pkg.nodes.length)
     || (Array.isArray(pkg.extensions) && pkg.extensions.length)
     || (Array.isArray(pkg.extManifest) && pkg.extManifest.length));
-  if(pkg && !scanned && typeof actions.onActivePackage==='function') actions.onActivePackage(id);
+  if(pkg && !scanned){
+    state.pkgReadingExt = id;
+    if(typeof actions.onActivePackage==='function'){
+      Promise.resolve(actions.onActivePackage(id)).finally(()=>{
+        if(state.pkgReadingExt === id){
+          state.pkgReadingExt = '';
+          renderExtensionView();
+        }
+      });
+    }
+  } else {
+    state.pkgReadingExt = '';
+  }
 }
 function packageGitMode(pkg){
   const own = pkg && state.gitModeByPkg[pkg.id];
@@ -745,13 +767,38 @@ function renderViewSwitch(){
 function applySwitchDensity(){
   document.querySelectorAll('[data-view-switch]').forEach((host)=>{
     if(host.hidden) return;
+    const isIcon = host.classList.contains('is-icon-only');
+    const needed = Number(host.dataset.fullWidth || 0);
+    /* 防闪烁铁律：若当前已是纯图标态且容器可用宽度仍小于展开所需宽度，绝对禁止盲目 remove 造成文字闪现 */
+    if (isIcon && needed > 0 && host.clientWidth < needed) {
+      return;
+    }
     host.classList.remove('is-icon-only');
-    if(host.scrollWidth > host.clientWidth + 1) host.classList.add('is-icon-only');
+    const sw = host.scrollWidth;
+    const cw = host.clientWidth;
+    if(sw > cw + 1){
+      host.dataset.fullWidth = String(Math.max(needed, sw));
+      host.classList.add('is-icon-only');
+    } else {
+      host.dataset.fullWidth = String(sw);
+    }
   });
   const h1=document.querySelector('#app .app-title h1');
   if(h1){
+    const isSym = h1.classList.contains('is-symbol');
+    const neededH1 = Number(h1.dataset.fullWidth || 0);
+    if (isSym && neededH1 > 0 && h1.clientWidth < neededH1) {
+      return;
+    }
     h1.classList.remove('is-symbol');
-    if(h1.scrollWidth > h1.clientWidth + 1) h1.classList.add('is-symbol');
+    const sw = h1.scrollWidth;
+    const cw = h1.clientWidth;
+    if(sw > cw + 1){
+      h1.dataset.fullWidth = String(Math.max(neededH1, sw));
+      h1.classList.add('is-symbol');
+    } else {
+      h1.dataset.fullWidth = String(sw);
+    }
   }
 }
 let switchDensityRaf=0;
@@ -763,6 +810,7 @@ function scheduleSwitchDensity(){
     : (setTimeout(run, 0), 1);
 }
 function syncMainView(){
+  if(state.lan?.scanning && !state.transfer?.open) finishLanScan();
   state.view = detectView();
   const app = document.getElementById('app');
   if(app) app.dataset.view = state.view;
@@ -910,8 +958,15 @@ function renderTargetPicker(){
   }
   const app=document.getElementById('app');
   if(app){
-    /* 颜色由 CSS 按 cur.host 直接消费 --brand-* 令牌；此处只标记当前目标宿主。 */
+    /* 颜色由品牌真源按 cur.host 联动 --brand-* 令牌；此处标记当前目标宿主并同步刷新强调色。 */
     app.setAttribute('data-target-host', cur.host);
+    const bt=brandTokensOf(cur.host);
+    if(bt){
+      app.style.setProperty('--accent', bt.ring);
+      app.style.setProperty('--accent-soft', bt.soft);
+      app.style.setProperty('--accent-soft-2', `color-mix(in srgb, ${bt.ring} 32%, transparent)`);
+      app.style.setProperty('--accent-line', `color-mix(in srgb, ${bt.ring} 62%, transparent)`);
+    }
   }
   /* 存储引擎只对 Luker 目标开放：其他宿主没有这三种后端，显示出来只会误导。 */
   const engineField=document.getElementById('engine-field');
@@ -1793,6 +1848,9 @@ function chartCanvasHtml(defs){
   return html + '</div>';
 }
 function renderChartMobileSummary(){
+  const cur=TARGET_PLATFORMS.find(t=>t.name===state.target)||TARGET_PLATFORMS[0];
+  const summaryBox=document.getElementById('chart-mobile-summary');
+  if(summaryBox && cur) summaryBox.dataset.host=cur.host;
   const text=document.getElementById('chart-mobile-summary-text');
   if(text){
     const split = state.splitMb ? (state.splitMb+' MB') : t('chart.splitPlaceholder');
@@ -2137,14 +2195,15 @@ function pkgCard(p){
   const isMobile=state.view==='mobile';
   const hostKey=p.unrecognized?'unknown':p.host;
   const hostCode=p.unrecognized?'?':({st:'ST',luker:'L',tt:'TT',pt:'PT'}[p.host]||'?');
-  const brand=p.unrecognized?null:({st:'--brand-st',luker:'--brand-luker',tt:'--brand-tt',pt:'--brand-pt'}[p.host]||null);
+  const bt=p.unrecognized?null:brandTokensOf(p.host);
   /* 宿主角标 ST/L/TT/PT 必须实心（2026-11-17 用户裁定）：浅染底看不清。
-     背景用品牌实色 --brand-*，文字用配套 --brand-*-ink（专为此底色设计，保证对比）。 */
-  const tagStyle=brand
-    ? 'background:var('+brand+');color:var('+brand+'-ink);border-color:var('+brand+')'
+     背景用品牌实色 --brand-*，文字用配套 --brand-*-ink（专为此底色设计，保证对比）。
+     品牌色由 brandTokensOf 统一驱动，严禁散落硬编码映射。 */
+  const tagStyle=bt
+    ? 'background:'+bt.accent+';color:'+bt.ink+';border-color:'+bt.accent
     : 'background:var(--unknown);color:var(--text);border-color:var(--unknown)';
-  const seqStyle=brand
-    ? 'color:var('+brand+'-ring);border-color:var('+brand+'-ring)'
+  const seqStyle=bt
+    ? 'color:'+bt.ring+';border-color:'+bt.ring
     : 'color:var(--unknown);border-color:var(--unknown)';
   const iconInner=p.unrecognized
     ? '<span class="pkg-icon" data-host="unknown" style="display:inline-flex;align-items:center;justify-content:center;color:var(--unknown)">'+svg('unknown','tree-ico')+'</span>'
@@ -2192,18 +2251,19 @@ function renderZones(){
     + '<button type="button" class="btn icon" data-pkgnone title="' + t('extmgr.selectNone') + '" aria-label="' + t('extmgr.selectNone') + '"><i class="fa-solid fa-xmark"></i></button>'
     + '</div>';
   const isTransferView = !!state.transfer.open;
-  const selDiffHint = isTransferView
-    ? ('<span class="zone-sel-diff-hint is-transfer" title="' + escapeHtml(t('zones.selTransferHintFull')) + '">'
-      + '<i class="fa-solid fa-cloud-arrow-up"></i><span>' + escapeHtml(t('zones.selTransferHintShort')) + '</span></span>')
-    : ('<span class="zone-sel-diff-hint" title="' + escapeHtml(t('zones.selDiffHintFull')) + '">'
-      + '<i class="fa-regular fa-circle-question"></i><span>' + escapeHtml(t('zones.selDiffHintShort')) + '</span></span>');
-  const sortBlock = '<label>' + t('sort.label') + ' <select id="sort-select">'
+  const selDiffText = isTransferView ? t('zones.selTransferHintShort') : t('zones.selDiffHintShort');
+  const topHintHtml = '<div class="zone-top-hint-bar" title="' + escapeHtml(isTransferView ? t('zones.selTransferHintFull') : t('zones.selDiffHintFull')) + '">'
+    + '<i class="' + (isTransferView ? 'fa-solid fa-cloud-arrow-up' : 'fa-regular fa-circle-question') + '" style="margin-right:6px"></i>'
+    + '<span>' + escapeHtml(selDiffText) + '</span>'
+    + '</div>';
+  const sortBlock = '<label class="zone-sort-label">' + t('sort.label') + ' <select id="sort-select">'
     + '<option value="time-desc"' + (state.sort === 'time-desc' ? ' selected' : '') + '>' + t('sort.timeDesc') + '</option>'
     + '<option value="name"' + (state.sort === 'name' ? ' selected' : '') + '>' + t('sort.name') + '</option>'
     + '<option value="size"' + (state.sort === 'size' ? ' selected' : '') + '>' + t('sort.size') + '</option>'
     + '</select></label>';
-  const toolbarHtml = '<div class="zone-toolbar">' + hostFilterHtml() + zoneSelButtons + selDiffHint + '<span class="spacer"></span>' + sortBlock + '</div>';
+  const toolbarHtml = '<div class="zone-toolbar">' + hostFilterHtml() + zoneSelButtons + '<span class="spacer"></span>' + sortBlock + '</div>';
 
+  html += topHintHtml;
   if(state.zone==='import'){
     html+='<div class="dropzone" id="dropzone"><span class="big">'+t('zones.dropTitle')+'</span>'+t('zones.dropHint')+'</div>' + toolbarHtml;
   }else{
@@ -4719,16 +4779,6 @@ async function renderExtInstalled(body){
       syncSourceToActive();
     }
   }
-  const pkgBar = isHost ? '' : ('<div class="ext-pkg-bar">'
-    + '<span class="ext-pkg-current'+(selectedPkg?'':' is-unselected')+'" title="'+(selectedPkg?escapeHtml(selectedPkg.name):t('extmgr.noPackageSelected'))+'">'
-      + '<i class="fa-solid fa-box"></i> '+(selectedPkg?escapeHtml(selectedPkg.name):t('extmgr.noPackageSelected'))
-    + '</span>'
-    + '<select class="ext-pkg-picker" id="extmgr-package-select"'+(selectablePkgs.length?'':' disabled')+'>'
-      + (selectablePkgs.length
-        ? selectablePkgs.map(p=>'<option value="'+escapeHtml(p.id)+'"'+(selectedPkg&&selectedPkg.id===p.id?' selected':'')+'>'+escapeHtml(p.name)+' · '+fmtMB(p.mb||0)+(p.zone==='export'?' · '+t('zones.export'):'')+'</option>').join('')
-        : '<option value="">'+t('extmgr.noPackageAvailable')+'</option>')
-    + '</select>'
-  + '</div>');
 
   /* 列表头左侧控制：包内视图统一由数据包列表选择，宿主展示策略入口 */
   const leftHeadControl=isHost && autoMasterOn
@@ -4803,9 +4853,20 @@ async function renderExtInstalled(body){
         + '<div class="ext-empty-desc">' + (selectablePkgs.length ? t('extmgr.noPackageSelectedDesc') : t('extmgr.noPackageAvailable')) + '</div>'
         + '</div>';
     } else {
-      logger.info(t('log.extPkgReading', { name: selectedPkg.name, size: fmtMB(selectedPkg.mb || 0) }));
-      const pkgItems = packageExtensionItems(selectedPkg);
-      countTotal = pkgItems.length;
+      const isPkgScanned = selectedPkg && (selectedPkg.scanned || (Array.isArray(selectedPkg.nodes) && selectedPkg.nodes.length)
+        || (Array.isArray(selectedPkg.extensions) && selectedPkg.extensions.length)
+        || (Array.isArray(selectedPkg.extManifest) && selectedPkg.extManifest.length));
+      const isReading = state.pkgReadingExt === selectedPkg.id || (!isPkgScanned && !selectedPkg._emptyScanned);
+      if (isReading) {
+        countTotal = 0;
+        logger.info(t('log.extPkgReading', { name: selectedPkg.name, size: fmtMB(selectedPkg.mb || 0) }));
+        rowsHtml = '<div class="ext-empty ext-loading-state" role="status">'
+          + '<i class="fa-solid fa-spinner fa-spin"></i> ' + t('extmgr.readingPackage')
+          + '</div>';
+      } else {
+        logger.info(t('log.extPkgReading', { name: selectedPkg.name, size: fmtMB(selectedPkg.mb || 0) }));
+        const pkgItems = packageExtensionItems(selectedPkg);
+        countTotal = pkgItems.length;
       if (pkgItems.length > 0) {
         const origCount = pkgItems.filter(i => i.kind === 'original').length;
         const manifestCount = pkgItems.filter(i => i.kind === 'manifest').length;
@@ -4829,6 +4890,7 @@ async function renderExtInstalled(body){
           + '<div class="ext-empty-icon"><i class="fa-solid fa-folder-open"></i></div>'
           + '<div class="ext-empty-title">' + t('extmgr.noneInPackage') + '</div>'
           + '</div>';
+      }
       }
     }
   }
@@ -4936,7 +4998,6 @@ async function renderExtInstalled(body){
         +headRow2
       +'</div>')
     : ('<div class="ext-list-head ext-list-head--pkg" id="extmgr-list-head">'
-        +pkgBar
         +'<div class="ext-head-row ext-head-action-row">'
           +'<div class="ext-head-left">'
             +'<span class="ext-list-count">'+t('extmgr.listCount',{n:countTotal})+'</span>'
@@ -4961,14 +5022,6 @@ async function renderExtInstalled(body){
         +updBlock
         /* 服务端扩展块已迁入页脚（syncExtInstallBlock 渲染，2026-11-15 裁定） */
       +'</div>');
-
-  /* 包内单选：下拉、复选框、点卡片统一走 selectPackageForExtension，禁止多选。 */
-  body.querySelector('#extmgr-package-select')?.addEventListener('change',(e)=>{
-    selectPackageForExtension(e.target.value);
-    renderExtensionView();
-    renderChart();
-    renderZones();
-  });
 
   /* 事件绑定 */
   body.querySelector('#extmgr-policy-close')?.addEventListener('click',()=>{
@@ -5388,6 +5441,7 @@ function renderExtensionView(){
 }
 
 function renderTransfer(){
+  if(state.lan?.scanning && state.transfer?.tab!=='lan') finishLanScan();
   document.querySelectorAll('[data-transfer-tab]').forEach(b=>{
     const on=b.dataset.transferTab===state.transfer.tab;
     b.classList.toggle('active',on);
@@ -5402,6 +5456,91 @@ function renderLan(){
   view.hidden=!(state.transfer.open && state.transfer.tab==='lan');
   const targets=lanTargets();
   const sum=document.getElementById('lan-send-summary'); if(sum) sum.textContent=lanSummaryText();
+
+  // 1. 模式切换显示
+  const mode = L.mode || 'peer';
+  const peerContainer = document.getElementById('lan-peer-container');
+  const legacyContainer = document.getElementById('lan-legacy-container');
+  if (peerContainer) peerContainer.hidden = (mode !== 'peer');
+  if (legacyContainer) legacyContainer.hidden = (mode === 'peer');
+  document.querySelectorAll('#lan-mode-tabs .seg-btn').forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.lanMode === mode);
+  });
+
+  // 2. 长连接对等模式渲染
+  const P = L.peer || {};
+  const isPeerConnected = Boolean(P.connected);
+  const unconnEl = document.getElementById('lan-peer-unconnected');
+  const connEl = document.getElementById('lan-peer-connected');
+  if (unconnEl) unconnEl.hidden = isPeerConnected;
+  if (connEl) connEl.hidden = !isPeerConnected;
+
+  if (!isPeerConnected) {
+    const inputEl = document.getElementById('lan-peer-input');
+    if (inputEl && document.activeElement !== inputEl) {
+      inputEl.value = P.code || '';
+    }
+    const copyBtn = document.getElementById('lan-peer-btn-copy');
+    if (copyBtn) copyBtn.hidden = !P.code;
+
+    const qrBox = document.getElementById('lan-peer-qr-box');
+    if (qrBox) qrBox.hidden = !P.code;
+    setLanQr('lan-peer-qr', P.code, !!P.code);
+
+    const tipEl = document.getElementById('lan-peer-qr-tip');
+    if (tipEl) tipEl.textContent = P.tip || '等待对端扫码或输入回执...';
+  } else {
+    const rttEl = document.getElementById('lan-peer-rtt-text');
+    if (rttEl) rttEl.textContent = 'RTT ' + (Number(P.rtt) || 0) + 'ms';
+    const selSumEl = document.getElementById('lan-peer-sel-summary');
+    if (selSumEl) selSumEl.textContent = lanSummaryText() || t('lan.ovNone');
+    const sendBtn = document.getElementById('lan-peer-btn-send');
+    if (sendBtn) sendBtn.disabled = !targets.length;
+
+    // 当前活跃传输卡片
+    const act = P.active;
+    const actCard = document.getElementById('lan-peer-active-card');
+    if (actCard) {
+      actCard.hidden = !act;
+      if (act) {
+        const dirEl = document.getElementById('lan-peer-active-dir');
+        if (dirEl) dirEl.textContent = act.dir === 'recv' ? '📥' : '📤';
+        const nameEl = document.getElementById('lan-peer-active-name');
+        if (nameEl) nameEl.textContent = act.name || '';
+        const pctEl = document.getElementById('lan-peer-active-pct');
+        if (pctEl) pctEl.textContent = Math.round(Number(act.pct) || 0) + '%';
+        const barEl = document.getElementById('lan-peer-active-bar');
+        if (barEl) barEl.style.width = Math.max(0, Math.min(100, Number(act.pct) || 0)) + '%';
+        const detEl = document.getElementById('lan-peer-active-detail');
+        if (detEl) detEl.textContent = act.detail || '';
+      }
+    }
+
+    // 互传队列渲染
+    const qList = document.getElementById('lan-peer-queue-list');
+    const qCount = document.getElementById('lan-peer-queue-count');
+    const queue = Array.isArray(P.queue) ? P.queue : [];
+    if (qCount) qCount.textContent = String(queue.length);
+    if (qList) {
+      if (!queue.length) {
+        qList.innerHTML = '<div class="ext-note" id="lan-peer-queue-empty">暂无传输任务，勾选数据包点发送即可排队</div>';
+      } else {
+        qList.innerHTML = queue.map((item) => {
+          const dirIco = item.dir === 'recv' ? '📥' : '📤';
+          const statusText = item.status === 'active' ? (item.dir === 'recv' ? '接收中' : '发送中')
+            : (item.status === 'done' ? '已完成' : (item.status === 'failed' ? '失败' : '队列中'));
+          return '<div class="lan-peer-queue-item">'
+            + '<span class="q-dir">' + dirIco + '</span>'
+            + '<span class="q-name" title="' + escapeHtml(item.name || '') + '">' + escapeHtml(item.name || '') + '</span>'
+            + '<span class="q-meta">' + formatBytes(item.size || 0) + '</span>'
+            + '<span class="q-status">' + escapeHtml(statusText) + '</span>'
+            + '</div>';
+        }).join('');
+      }
+    }
+  }
+
+  // 3. 传统单次模式（保持降级可用）
   /* 概览：对端 / 类别 / 状态（对齐 Luker 后端行的信息层级） */
   const ovPeer=document.getElementById('lan-ov-peer');
   if(ovPeer) ovPeer.textContent = L.send.busy||L.send.waiting ? t('action.send') : (L.recv.busy ? t('action.recv') : t('lan.ovIdle'));
@@ -6157,10 +6296,30 @@ async function cloudDelete(key) {
 let stopLanScan=null;
 let lanScanToken=0;          // 每次开始/结束自增，取消后延迟回调据此作废，杜绝关掉摄像头还跳结果
 let lanScanHitPending=false; // 已命中本工具码、等待高亮后跳出，避免重复触发
+let lanScanAbortCtrl=null;   // 扫码 AbortController，关闭时立即中止流获取与检测
+
+function releaseScanVideo(){
+  try {
+    const v=document.getElementById('lan-scan-video');
+    if(v){
+      if(v.srcObject && typeof v.srcObject.getTracks==='function'){
+        v.srcObject.getTracks().forEach((t)=>{ try{ t.stop(); }catch{} });
+      }
+      v.srcObject=null;
+      try{ v.pause(); }catch{}
+    }
+  }catch{}
+}
+
 function finishLanScan(){
   lanScanToken+=1;
   lanScanHitPending=false;
+  if(lanScanAbortCtrl){
+    try{ lanScanAbortCtrl.abort(); }catch{}
+    lanScanAbortCtrl=null;
+  }
   if(stopLanScan){ try{ stopLanScan(); }catch{ /* 已停止 */ } stopLanScan=null; }
+  releaseScanVideo();
   state.lan.scanning=null;
   const st=document.getElementById('lan-scan-status');
   if(st){ st.dataset.state='idle'; st.textContent=t('qr.scanIdle'); }
@@ -6173,16 +6332,20 @@ async function copyLanText(text){
 }
 async function startLanScan(kind){
   if(typeof qr?.scan!=='function'){ toast(t('lan.scanUnsupported')); return; }
+  if(state.lan.scanning) finishLanScan();
   const myToken=++lanScanToken;
   lanScanHitPending=false;
+  lanScanAbortCtrl = new AbortController();
+  const mySignal = lanScanAbortCtrl.signal;
   state.lan.scanError=''; state.lan.scanning=kind; renderLan();
   const status=document.getElementById('lan-scan-status');
   const setStatus=(stateKey,i18nKey)=>{ if(status&&lanScanToken===myToken){ status.dataset.state=stateKey; status.textContent=t(i18nKey); } };
   setStatus('idle','qr.scanIdle');
   try {
-    stopLanScan=await qr.scan({
+    const stopper = await qr.scan({
       video:document.getElementById('lan-scan-video'),
       canvas:document.getElementById('lan-scan-canvas'),
+      signal:mySignal,
       /* 识别框三态：本工具码高亮后跳出；其他码提示继续扫。返回 false 让扫描器继续。 */
       onDetect:(raw)=>{
         if(lanScanToken!==myToken) return false;
@@ -6194,7 +6357,13 @@ async function startLanScan(kind){
           if(lanScanToken!==myToken) return; // 期间用户取消
           state.lan.scanning=null;           // 停止扫描循环（onResult 后不再继续）
           if(stopLanScan){ try{ stopLanScan(); }catch{} stopLanScan=null; }
-          if(kind==='offer'){
+          releaseScanVideo();
+          if(kind==='peer'){
+            const el=document.getElementById('lan-peer-input');
+            if(el) el.value=raw;
+            state.lan.peer.code=raw;
+            actions.lan?.peerConnect?.(raw);
+          }else if(kind==='offer'){
             const el=document.getElementById('lan-offer-input');
             if(el) el.value=raw;
             state.lan.recv.offer=raw;
@@ -6212,6 +6381,12 @@ async function startLanScan(kind){
       },
       onError:(msg)=>{ if(lanScanToken!==myToken) return; state.lan.scanError=msg||t('lan.cameraUnavailable'); finishLanScan(); },
     });
+    if(lanScanToken!==myToken || !state.lan.scanning || mySignal.aborted){
+      try{ stopper?.(); }catch{}
+      releaseScanVideo();
+      return;
+    }
+    stopLanScan = stopper;
   } catch(err) {
     if(lanScanToken!==myToken) return;
     state.lan.scanError=err?.message||t('lan.cameraUnavailable');
@@ -6384,14 +6559,24 @@ function openSettingsView(html,{onSave,onClose,onAction}={}){
 
 /* ── 确认浮层（原生 dialog 顶层；签名沿用原弹窗，调用方零改动） ── */
 function confirmDialogEl(){ return document.getElementById('confirm-dialog'); }
-function openModal(title,desc,extraHtml,actions){
+function openModal(title,desc,extraHtml,actions,opts={}){
   const dlg=confirmDialogEl();
   if(!dlg) return;
+  const closeBtn=document.getElementById('modal-close');
+  if(closeBtn) closeBtn.hidden=!!opts.hideCloseX;
   document.getElementById('modal-title').textContent=title;
   document.getElementById('modal-desc').textContent=desc;
-  document.getElementById('modal-extra').innerHTML=(Array.isArray(extraHtml) ? extraHtml.join('') : (extraHtml || ''));
+  const extraBox=document.getElementById('modal-extra');
+  if(extraBox){
+    extraBox.className='view-body'+(opts.bodyClass ? ' '+opts.bodyClass : '');
+    extraBox.innerHTML=(Array.isArray(extraHtml) ? extraHtml.join('') : (extraHtml || ''));
+  }
   const acts=document.getElementById('modal-actions'); acts.innerHTML='';
   (actions||[]).forEach(a=>{
+    if(a.node){
+      acts.appendChild(a.node);
+      return;
+    }
     const b=document.createElement('button');
     b.className='btn'+(a.primary?' accent':'');
     b.textContent=a.label;
@@ -6408,6 +6593,10 @@ function openModal(title,desc,extraHtml,actions){
 function closeModal(){
   const dlg=confirmDialogEl();
   if(!dlg) return;
+  const closeBtn=document.getElementById('modal-close');
+  if(closeBtn) closeBtn.hidden=false;
+  const extraBox=document.getElementById('modal-extra');
+  if(extraBox) extraBox.className='view-body';
   if(typeof dlg.close==='function' && dlg.open) dlg.close();
   else dlg.removeAttribute('open');
   const acts=document.getElementById('modal-actions');
@@ -7064,7 +7253,7 @@ function bind(){
     }
   };
   ['modal-extra','settings-body'].forEach(id => document.getElementById(id)?.addEventListener('click', extModeClick));
-  document.getElementById('btn-close')?.addEventListener('click',()=>actions.close?.());
+  document.getElementById('btn-close')?.addEventListener('click',()=>{ finishLanScan(); actions.close?.(); });
   /* 2026-11-16 用户裁定：所有 details 折叠卡**收合必须有动画**——
      全局委托：点 summary 收起时先播 discloseClose，动画结束再摘 open（打开路径走 CSS discloseOpen）。 */
   document.addEventListener('click',(e)=>{
@@ -7232,25 +7421,56 @@ function bind(){
   document.getElementById('webdav-save')?.addEventListener('click',()=>cloudSave());
   document.getElementById('webdav-refresh')?.addEventListener('click',()=>cloudRefresh());
   document.getElementById('webdav-test')?.addEventListener('click',()=>{ void testWebdavConnection(); });
-  document.getElementById('lan-btn-generate').addEventListener('click',()=>actions.lan?.generate?.());
-  document.getElementById('lan-btn-copy-send').addEventListener('click',()=>{
+
+  // ── 局域网模式切换 ──
+  document.getElementById('lan-mode-tabs')?.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-lan-mode]');
+    if (!btn) return;
+    const mode = btn.dataset.lanMode === 'legacy' ? 'legacy' : 'peer';
+    state.lan.mode = mode;
+    actions.lan?.setMode?.(mode);
+    renderLan();
+  });
+
+  // ── 对等长连接操作 ──
+  document.getElementById('lan-peer-btn-generate')?.addEventListener('click', () => actions.lan?.peerGenerate?.());
+  document.getElementById('lan-peer-btn-connect')?.addEventListener('click', () => {
+    const val = document.getElementById('lan-peer-input')?.value.trim() || '';
+    actions.lan?.peerConnect?.(val);
+  });
+  document.getElementById('lan-peer-btn-copy')?.addEventListener('click', () => {
+    copyLanText(document.getElementById('lan-peer-input')?.value || '');
+  });
+  document.getElementById('lan-peer-btn-scan')?.addEventListener('click', () => startLanScan('peer'));
+  document.getElementById('lan-peer-btn-disconnect')?.addEventListener('click', () => actions.lan?.peerDisconnect?.());
+  document.getElementById('lan-peer-btn-send')?.addEventListener('click', () => actions.lan?.peerSend?.());
+
+  // ── 局域网传统模式（降级） ──
+  document.getElementById('lan-btn-generate')?.addEventListener('click',()=>actions.lan?.generate?.());
+  document.getElementById('lan-btn-copy-send')?.addEventListener('click',()=>{
     copyLanText(document.getElementById('lan-send-code')?.value||'');
   });
-  document.getElementById('lan-btn-apply-answer').addEventListener('click',()=>{
+  document.getElementById('lan-btn-apply-answer')?.addEventListener('click',()=>{
     actions.lan?.applyAnswer?.(document.getElementById('lan-answer-input')?.value.trim()||'');
   });
-  document.getElementById('lan-btn-accept').addEventListener('click',()=>{
+  document.getElementById('lan-btn-accept')?.addEventListener('click',()=>{
     actions.lan?.acceptOffer?.(document.getElementById('lan-offer-input')?.value.trim()||'');
   });
-  document.getElementById('lan-btn-copy-recv').addEventListener('click',()=>{
+  document.getElementById('lan-btn-copy-recv')?.addEventListener('click',()=>{
     copyLanText(document.getElementById('lan-recv-code')?.value||'');
   });
-  document.getElementById('lan-btn-retry').addEventListener('click',()=>actions.lan?.retry?.());
-  document.getElementById('lan-btn-cancel').addEventListener('click',()=>{ finishLanScan(); actions.lan?.cancel?.(); });
-  document.getElementById('lan-btn-abandon').addEventListener('click',()=>actions.lan?.abandon?.());
-  document.getElementById('lan-btn-scan-offer').addEventListener('click',()=>startLanScan('offer'));
-  document.getElementById('lan-btn-scan-answer').addEventListener('click',()=>startLanScan('answer'));
-  document.getElementById('lan-scan-cancel').addEventListener('click',()=>finishLanScan());
+  document.getElementById('lan-btn-retry')?.addEventListener('click',()=>actions.lan?.retry?.());
+  document.getElementById('lan-btn-cancel')?.addEventListener('click',()=>{ finishLanScan(); actions.lan?.cancel?.(); });
+  document.getElementById('lan-btn-abandon')?.addEventListener('click',()=>actions.lan?.abandon?.());
+  document.getElementById('lan-btn-scan-offer')?.addEventListener('click',()=>startLanScan('offer'));
+  document.getElementById('lan-btn-scan-answer')?.addEventListener('click',()=>startLanScan('answer'));
+  document.getElementById('lan-scan-cancel')?.addEventListener('click',()=>finishLanScan());
+  document.getElementById('lan-scan')?.addEventListener('click',(e)=>{
+    if(e.target && e.target.id==='lan-scan') finishLanScan();
+  });
+  window.addEventListener('keydown',(e)=>{
+    if(e.key==='Escape' && state.lan.scanning) finishLanScan();
+  });
 
   // ── 云端包仓库 ──
   document.getElementById('cloud-save')?.addEventListener('click',()=>cloudSave());
@@ -8034,6 +8254,7 @@ void refreshHostIdentity();
     syncView();
     state.seq = pkgSeq();
     renderHeader();
+    renderTargetPicker();
     renderZones();
     renderZoneSide();
     renderActions();

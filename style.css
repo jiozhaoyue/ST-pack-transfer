@@ -74,7 +74,6 @@
     --border-strong: rgba(170, 170, 162, 0.62);
     --outline: rgba(180, 180, 172, 0.72);
   }
-  /* 2026-11-17 用户改判：目标平台按各自品牌色变化；禁止写死紫色单色。 */
   #app.app-container input[type="checkbox"], #app.app-container .tree-check{
     accent-color: var(--accent);
   }
@@ -224,6 +223,14 @@
     overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   #app.app-container[data-view="mobile"] .chart-mobile-summary .cms-toggle{flex:0 0 auto;min-height:30px;
     padding:4px 9px;font-size:11px}
+  #app.app-container[data-view="mobile"] .chart-mobile-summary[data-host="st"] .cms-toggle{
+    background:var(--brand-st-soft);border-color:var(--brand-st-ring);color:var(--brand-st-ring)}
+  #app.app-container[data-view="mobile"] .chart-mobile-summary[data-host="luker"] .cms-toggle{
+    background:var(--brand-luker-soft);border-color:var(--brand-luker-ring);color:var(--brand-luker-ring)}
+  #app.app-container[data-view="mobile"] .chart-mobile-summary[data-host="tt"] .cms-toggle{
+    background:var(--brand-tt-soft);border-color:var(--brand-tt-ring);color:var(--brand-tt-ring)}
+  #app.app-container[data-view="mobile"] .chart-mobile-summary[data-host="pt"] .cms-toggle{
+    background:var(--brand-pt-soft);border-color:var(--brand-pt-ring);color:var(--brand-pt-ring)}
   #app.app-container[data-view="mobile"] #chart-card:not(.is-mobile-settings) .chart-controls,
   #app.app-container[data-view="mobile"] #chart-card:not(.is-mobile-settings) .filename-row,
   #app.app-container[data-view="mobile"] #chart-card:not(.is-mobile-settings) .quota-head,
@@ -763,10 +770,13 @@
     color:var(--muted);font-size:12px;background:var(--panel-3);cursor:pointer}
   #app.app-container .dropzone:hover{border-color:var(--accent);color:var(--text)}
   #app.app-container .dropzone .big{display:block;font-size:13px;color:var(--text);margin-bottom:2px}
-  #app.app-container .zone-toolbar{display:flex;align-items:center;gap:7px;flex-wrap:wrap;font-size:11px;color:var(--muted)}
-  #app.app-container .zone-toolbar select{background:var(--panel-3);border:1px solid var(--border);border-radius:7px;
-    padding:3px 7px;font-size:11px;color:var(--text)}
-  #app.app-container .zone-toolbar .spacer{flex:1}
+  #app.app-container .zone-toolbar{display:flex;align-items:center;gap:6px;flex-wrap:nowrap;font-size:11px;color:var(--muted);width:100%;min-width:0}
+  #app.app-container .zone-toolbar select{background:var(--panel-3);border:1px solid var(--border);border-radius:6px;
+    padding:2px 4px 2px 6px;font-size:11px;color:var(--text);height:var(--ctl-h);box-sizing:border-box}
+  #app.app-container .zone-toolbar #host-filter{max-width:96px;width:auto}
+  #app.app-container .zone-top-hint-bar{display:flex;align-items:center;padding:4px 8px;margin-bottom:6px;border-radius:6px;
+    background:color-mix(in srgb,var(--panel-3) 60%,transparent);border:1px solid var(--border);font-size:11px;color:var(--muted)}
+  #app.app-container .zone-toolbar .spacer{flex:1 1 auto}
   #app.app-container .zone-sel-group{display:inline-flex;align-items:center;gap:3px;flex:0 0 auto}
   #app.app-container .zone-sel-diff-hint{display:inline-flex;align-items:center;gap:4px;font-size:10.5px;color:var(--muted);padding:2px 6px;border-radius:4px;background:color-mix(in srgb,var(--panel) 70%,transparent);border:1px solid var(--border);line-height:1.4;cursor:help;white-space:nowrap;user-select:none;flex:0 0 auto}
   #app.app-container .zone-sel-diff-hint:hover{border-color:var(--border-strong);color:var(--text)}
@@ -848,7 +858,10 @@
     border:1px solid var(--border);background:var(--panel-3);color:var(--muted);padding:0 9px;border-radius:8px;
     font-size:12px;white-space:nowrap;flex:0 0 auto;height:var(--ctl-h)}
   #app.app-container .view-switch-btn .ico{width:15px;height:15px;flex:0 0 auto;color:currentColor}
-  #app.app-container .view-switch.is-icon-only .view-switch-btn{width:var(--ctl-h);padding:0;gap:0}
+  #app.app-container .view-switch.is-icon-only .view-switch-btn{
+    width:var(--ctl-h);height:var(--ctl-h);min-width:var(--ctl-h);max-width:var(--ctl-h);
+    aspect-ratio:1/1;padding:0;gap:0;box-sizing:border-box;
+  }
   #app.app-container .view-switch.is-icon-only .view-switch-btn span{display:none}
   /* 手机 4 钮（2026-11-15 二次裁定）：**空间够必须显示文字**——废除原「手机固定纯图标」强制规则，
      退化仍由 applySwitchDensity 按实测宽度唯一决定（is-icon-only） */
@@ -863,7 +876,7 @@
   #app.app-container .extension-view{flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
   #app.app-container .extension-view:not([hidden]){animation:extViewFadeIn .22s cubic-bezier(0.16,1,0.3,1)}
   @keyframes extViewFadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
-  #app.app-container .extension-body{flex:1 1 auto;min-height:0;overflow:auto;padding:9px;display:flex;flex-direction:column;gap:8px}
+  #app.app-container .extension-body{flex:1 1 auto;min-height:0;overflow:auto;padding:0 9px 9px;display:flex;flex-direction:column;gap:8px}
   /* 报告常驻底部：不随页签切换；点击展开后占满扩展管理正文区 */
   #app.app-container .ext-report-panel{flex:1 1 auto;min-height:0;overflow:auto;padding:9px}
   #app.app-container .ext-report-bar{flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:6px 10px;
@@ -874,13 +887,25 @@
   #app.app-container .ext-report-bar .erb-hint{margin-left:auto;color:var(--muted-2);white-space:nowrap}
   #app.app-container .ext-report-bar:hover{color:var(--text)}
   #app.app-container .ext-report-bar[aria-expanded="true"]{border-top-color:var(--accent)}
-  /* 开发者页设置卡（2026-11-16 用户裁定：**逐字照抄** .ext-accounts 卡片范式） */
-  #app.app-container .ext-settings-card{display:flex;flex-direction:column;gap:7px;padding:8px;border:1px solid var(--border);
-    border-radius:9px;background:color-mix(in srgb,var(--panel-3) 45%,transparent)}
-  #app.app-container .ext-settings-card > summary{cursor:pointer;font-size:11.5px;color:var(--muted);list-style:none}
-  #app.app-container .ext-settings-card > summary::-webkit-details-marker{display:none}
-  #app.app-container .ext-settings-card[open] > summary{color:var(--text)}
-  #app.app-container .ext-settings-body{display:flex;flex-direction:column;gap:2px}
+  /* 开发者页设置卡与 Git 账号卡：折叠态单行 34px 紧凑且垂直绝对居中，无多余上下空白 */
+  #app.app-container .ext-settings-card,
+  #app.app-container .ext-accounts{
+    display:block;padding:0;border:1px solid var(--border);border-radius:8px;
+    background:color-mix(in srgb,var(--panel-3) 45%,transparent);overflow:hidden;
+  }
+  #app.app-container .ext-settings-card > summary,
+  #app.app-container .ext-accounts > summary{
+    cursor:pointer;list-style:none;outline:none;
+    display:flex;align-items:center;gap:7px;padding:0 10px;height:34px;min-height:34px;box-sizing:border-box;
+    font-size:12px;color:var(--text);font-weight:600;
+  }
+  #app.app-container .ext-settings-card > summary::-webkit-details-marker,
+  #app.app-container .ext-accounts > summary::-webkit-details-marker{display:none}
+  #app.app-container .ext-settings-card[open] > summary,
+  #app.app-container .ext-accounts[open] > summary{
+    border-bottom:1px solid var(--border);background:color-mix(in srgb,var(--panel-3) 25%,transparent);
+  }
+  #app.app-container .ext-settings-body{display:flex;flex-direction:column;gap:2px;padding:8px 10px}
   #app.app-container .ext-ref-switch{display:flex;align-items:center;gap:9px;min-height:var(--ctl-h);cursor:pointer}
   #app.app-container .ext-ref-switch input{flex:0 0 auto;margin:0;accent-color:var(--accent)}
   #app.app-container .ext-ref-switch .esr-name{flex:0 0 auto;font-weight:600;color:var(--text);white-space:nowrap}
@@ -1401,8 +1426,8 @@
     opacity:.75;white-space:nowrap;font-variant-numeric:tabular-nums;letter-spacing:.2px}
   #app.app-container[data-view="mobile"] .workbench-progress .app-version{display:none}
 
-  /* 日志视图 */
-  #app.app-container #view-log .log-toolbar{flex-wrap:nowrap;padding:0;min-width:0;overflow:hidden}
+  /* 日志视图：允许自适应换行，禁止强制截断切掉清空/复制等按钮 */
+  #app.app-container #view-log .log-toolbar{flex-wrap:wrap;row-gap:5px;padding:0 0 4px;min-width:0;overflow:visible}
   #app.app-container #view-log .log-body{flex:1 1 auto;max-height:none;overflow:auto;padding:8px 10px;
     border:1px solid var(--border);border-radius:8px;background:var(--panel-2)}
   #app.app-container .log-level-btn{font-size:10px}
@@ -1443,9 +1468,10 @@
     display:none;flex-direction:column;gap:10px;overflow:hidden
   }
   #app.app-container .confirm-dialog[open]{display:flex}
-  /* 唯一滚动条：对话框正文。对话框本身与日志列表都不得再滚（2026-11-17 实测双滚动条）。 */
-  #app.app-container .confirm-dialog .view-body{flex:0 1 auto;min-height:0;overflow:auto;
-    max-height:calc(72vh - 96px)}
+  /* 弹窗正文容器：弹性列布局，默认有界滚动，但当内部存在独立滚动列表时禁止外层抢滚 */
+  #app.app-container .confirm-dialog .view-body{flex:1 1 auto;min-height:0;overflow:auto;
+    max-height:calc(72vh - 96px);display:flex;flex-direction:column}
+  #app.app-container .confirm-dialog .view-body.is-scroll-isolated{overflow:hidden !important}
   #app.app-container .confirm-dialog::backdrop{background:rgba(0,0,0,.55);backdrop-filter:blur(2px)}
   #app.app-container .help-view-body ul{margin:0;padding-left:16px;font-size:11.5px;color:var(--muted);line-height:1.8}
   #app.app-container .help-view-body .help-sec{margin-bottom:14px}
@@ -1464,10 +1490,15 @@
   #app.app-container .settings-version .sv-chev{flex:0 0 auto;color:var(--accent)}
   #app.app-container .settings-version:hover{border-color:var(--accent);background:var(--accent-soft)}
   #app.app-container .settings-version:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
-  /* 更新日志：日期 / 短 sha / 提交说明三列；长说明可换行，短字段不拆字。
-     列表自身**不滚动**（唯一滚动条由 .confirm-dialog .view-body 承担）。 */
-  #app.app-container .changelog-list{display:flex;flex-direction:column;gap:2px;max-height:none;overflow:visible;
-    padding-right:2px}
+  /* 更新日志三段式物理滚动隔离：
+     - 外层 wrap 弹性列布局且 overflow: hidden；
+     - 工具栏固定在顶部 flex: 0 0 auto，右侧绝不出现滚动条；
+     - 只有列表 changelog-list 内部承担 overflow-y: auto。 */
+  #app.app-container .changelog-modal-wrap{display:flex;flex-direction:column;flex:1 1 auto;min-height:0;overflow:hidden}
+  #app.app-container .changelog-toolbar{flex:0 0 auto;display:flex;align-items:center;gap:8px;flex-wrap:wrap;overflow:hidden;padding:2px 0 8px 0;margin-bottom:8px;border-bottom:1px solid var(--border)}
+  #app.app-container .changelog-toolbar #changelog-sort-toggle{font-size:11px;padding:2px 8px}
+  #app.app-container .changelog-filter{margin-left:auto;font-size:11px;display:inline-flex;align-items:center;gap:5px;cursor:pointer;user-select:none}
+  #app.app-container .changelog-list{display:flex;flex-direction:column;gap:2px;flex:1 1 auto;min-height:0;overflow-y:auto !important;padding-right:6px}
   #app.app-container .changelog-row{display:grid;grid-template-columns:74px 58px minmax(0,1fr);gap:7px;align-items:start;
     padding:3px 5px;border-radius:5px;font-size:11px;line-height:1.45}
   #app.app-container .changelog-row:nth-child(odd){background:var(--panel-3)}
@@ -1665,18 +1696,25 @@
     （zone/git 侧页签禁用，Git 可视化不在数据包列表里）。 */
   #app.app-container[data-view="mobile"] .col-side{display:none}
   #app.app-container[data-view="mobile"][data-zone-open="1"] .col-side{
-    display:grid;grid-template-rows:1fr;order:-1;
-    max-height:72vh;
+    display:flex;flex-direction:column;order:-1;
+    min-height:240px;max-height:75vh;
     animation:zoneDrop .24s ease;
   }
   /* 抽屉展开时冻结页面主体：否则「app-main + zone-body」双纵向滚动，滚轮会跳容器。
      抽屉收起后自动恢复 app-main 唯一纵向滚动。 */
   #app.app-container[data-view="mobile"][data-zone-open="1"] .app-main{overflow:hidden}
   #app.app-container[data-view="mobile"][data-zone-open="1"] #zone-card{
-    display:flex;flex-direction:column;
+    display:flex;flex-direction:column;flex:1 1 auto;min-height:220px;
+  }
+  #app.app-container[data-view="mobile"][data-zone-open="1"] .zone-side-panel{
+    display:flex;flex-direction:column;flex:1 1 auto;min-height:0;overflow:hidden;
   }
   #app.app-container[data-view="mobile"][data-zone-open="1"] .zone-body{
-    flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;
+    display:flex;flex-direction:column;flex:1 1 auto;min-height:160px;overflow-y:auto;overflow-x:hidden;
+  }
+  /* 手机端支持 Git 可视化面板正常展示 */
+  #app.app-container[data-view="mobile"][data-zone-open="1"] #zone-side-git{
+    display:flex;flex-direction:column;flex:1 1 auto;min-height:260px;max-height:75vh;overflow-y:auto;
   }
   /* 收起动画（2026-11-16 用户裁定：所有动作必须有流畅动画）：1fr→0fr 收拢完再 display:none。
      ⚠️ 此处**禁用 !important**——!important 会压过动画关键帧导致瞬间跳变；
@@ -1686,19 +1724,17 @@
     animation:zoneClose .2s ease forwards;
   }
   @keyframes zoneDrop{
-    from{grid-template-rows:0fr}
-    to{grid-template-rows:1fr}
+    from{opacity:0;transform:translateY(-8px)}
+    to{opacity:1;transform:none}
   }
   @keyframes zoneClose{
-    from{grid-template-rows:1fr}
-    to{grid-template-rows:0fr}
+    from{opacity:1;transform:none}
+    to{opacity:0;transform:translateY(-8px)}
   }
   #app.app-container[data-view="mobile"] .col-side > #zone-card{
     min-height:0;overflow:hidden;
   }
   #app.app-container[data-view="mobile"] .mobile-switch{order:-2}
-  #app.app-container[data-view="mobile"][data-zone-open="1"] .zone-side-tabs{display:none !important}
-  #app.app-container[data-view="mobile"][data-zone-open="1"] #zone-side-git{display:none !important}
   #app.app-container[data-view="mobile"] .col-chart{flex:1 1 auto;min-height:0}
   #app.app-container[data-view="mobile"] .chart-card{flex:1 1 auto;min-height:0}
   /* 2026-11-17 用户铁律：图表必须整块渲染全貌，唯一滚动条在图表外、图表容器内。
@@ -1842,6 +1878,10 @@
   #app.app-container[data-view="mobile"] .header-theme-picker{min-width:0;flex-shrink:1}
   /* 手机触控尺寸：不允许把复选框/行内动作压到 10px 级，避免误触。 */
   #app.app-container[data-view="mobile"] .view-switch-btn{min-height:36px;padding:6px 10px;font-size:12px}
+  #app.app-container[data-view="mobile"] .view-switch.is-icon-only .view-switch-btn{
+    width:36px;min-width:36px;max-width:36px;height:36px;min-height:36px;max-height:36px;
+    aspect-ratio:1/1;padding:0;gap:0;justify-content:center;align-items:center;
+  }
   #app.app-container[data-view="mobile"] .chart-controls{gap:6px}
   #app.app-container[data-view="mobile"] .chart-controls .field{font-size:11.5px}
   #app.app-container[data-view="mobile"] .chart-controls select,
@@ -1861,13 +1901,13 @@
   #app.app-container .zone-mobile-collapse-bar{display:none}
   #app.app-container[data-view="mobile"][data-zone-open="1"] .zone-mobile-collapse-bar{
     display:flex;align-items:center;justify-content:space-between;gap:8px;flex:0 0 auto;
-    padding:6px 10px;border-bottom:1px solid var(--border);
-    background:color-mix(in srgb,var(--panel-3) 88%,transparent)}
-  #app.app-container .zone-mobile-collapse-bar .zmcb-title{font-size:12px;font-weight:650;color:var(--text);
-    min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  #app.app-container .zone-mobile-collapse-bar .zmcb-btn{display:inline-flex;align-items:center;justify-content:center;gap:5px;
-    flex:0 0 auto;min-height:36px;padding:0 12px;font-size:12px;line-height:1;
-    border:1px solid var(--border);border-radius:7px;background:var(--panel-3);color:var(--text)}
+    padding:2px 8px;min-height:28px;height:28px;border-bottom:1px solid var(--border);
+    background:color-mix(in srgb,var(--panel-3) 88%,transparent);box-sizing:border-box}
+  #app.app-container .zone-mobile-collapse-bar .zmcb-title{font-size:11.5px;font-weight:600;color:var(--text);
+    min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:24px}
+  #app.app-container .zone-mobile-collapse-bar .zmcb-btn{display:inline-flex;align-items:center;justify-content:center;gap:4px;
+    flex:0 0 auto;min-height:22px;height:22px;padding:0 8px;font-size:11px;line-height:1;
+    border:1px solid var(--border);border-radius:5px;background:var(--panel-3);color:var(--text);box-sizing:border-box}
   /* 手机数据包下拉已有整行收起条：旧的空面板头（只剩一个 ×）整行隐藏，少一行。 */
   #app.app-container[data-view="mobile"][data-zone-open="1"] #zone-card > .panel-head{display:none}
   #app.app-container .zone-mobile-collapse-bar .zmcb-btn:hover{border-color:var(--accent);color:var(--accent)}
@@ -1883,15 +1923,16 @@
   #app.app-container[data-view="mobile"] .cloud-card-header{flex-wrap:wrap}
   #app.app-container[data-view="mobile"] .ext-last-scan-tip{padding:2px 5px}
   #app.app-container[data-view="mobile"] .ext-last-scan-tip .ext-last-scan-text{max-width:85px;overflow:hidden;text-overflow:ellipsis}
-  /* 手机扩展行：repo（即插件名）→ 作者 → 版本/完整-清单，自动更新控件另起一行。 */
-  #app.app-container[data-view="mobile"] .ext-ext-row{gap:6px;padding:6px 8px;align-items:flex-start}
-  #app.app-container[data-view="mobile"] .ext-ext-row .ext-remote-url{flex:1 1 100%;order:1}
+  /* 手机扩展行：最多两行！第1行：复选框 + 插件名与作者；第2行：版本/标签/更新模式。严禁复选框独占一行产生大面积空白！ */
+  #app.app-container[data-view="mobile"] .ext-ext-row{gap:6px 8px;padding:6px 8px;align-items:center;flex-wrap:wrap}
+  #app.app-container[data-view="mobile"] .ext-ext-row .ext-dev-check{flex:0 0 auto;margin:0;order:1}
+  #app.app-container[data-view="mobile"] .ext-ext-row .ext-remote-url{flex:1 1 calc(100% - 32px);min-width:0;max-width:calc(100% - 32px);order:2}
   #app.app-container[data-view="mobile"] .ext-ext-row .ext-version-badge,
   #app.app-container[data-view="mobile"] .ext-ext-row .ext-state,
   #app.app-container[data-view="mobile"] .ext-ext-row .ext-kind-tag,
   #app.app-container[data-view="mobile"] .ext-ext-row .ext-priv-tag,
-  #app.app-container[data-view="mobile"] .ext-ext-row .ext-flag:not(.ext-order){order:2}
-  #app.app-container[data-view="mobile"] .ext-ext-row .ext-auto{flex:1 1 100%;order:3;flex-wrap:wrap}
+  #app.app-container[data-view="mobile"] .ext-ext-row .ext-flag:not(.ext-order){order:3}
+  #app.app-container[data-view="mobile"] .ext-ext-row .ext-auto{flex:0 0 auto;margin-left:auto;order:3;flex-wrap:wrap}
 
   /* 窄屏不再用 @media 重复一套布局：JS 按容器宽度写 data-view="mobile"，
      上一段 [data-view="mobile"] 规则即唯一布局来源（2026-11-11 统一）。 */
@@ -2017,6 +2058,7 @@
 #app.app-container .cloud-card-header .cch-tag{font-size:10px;font-weight:550;padding:1px 7px;border-radius:999px;
   background:color-mix(in srgb,var(--panel) 80%,transparent);color:var(--muted);border:1px solid var(--border)}
 #app.app-container .cloud-provider-header{padding-bottom:7px}
+#app.app-container .cloud-settings-guide{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin:0 6px}
 #app.app-container .cloud-provider-tabs{display:inline-flex;border-radius:8px;padding:2px;background:var(--panel-3);border:1px solid var(--border)}
 #app.app-container .cloud-provider-tabs .seg-btn{display:inline-flex;align-items:center;gap:6px;padding:3px 12px;font-size:11.5px;font-weight:600;border-radius:6px;transition:all .18s cubic-bezier(0.16,1,0.3,1)}
 #app.app-container .cloud-provider-tabs .seg-btn.active{background:color-mix(in srgb,var(--accent) 20%,var(--panel));border-color:var(--accent);color:var(--accent);box-shadow:0 1px 4px rgba(0,0,0,0.2)}
@@ -2062,6 +2104,39 @@
 #app.app-container .lan-view{flex:1 1 auto;min-height:0}
 #app.app-container #lan-view[hidden]{display:none}
 #app.app-container .lan-body{display:flex;flex-direction:column;gap:10px;overflow:auto;padding:10px 12px;min-height:0}
+#app.app-container .lan-mode-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 10px;border:1px solid var(--border);border-radius:8px;background:var(--panel-3);flex-wrap:wrap}
+#app.app-container .lan-mode-tabs{flex:0 0 auto}
+#app.app-container .lan-mode-hint{font-size:11px;color:var(--muted);margin-left:auto}
+#app.app-container .lan-peer-container{display:flex;flex-direction:column;gap:10px}
+#app.app-container .lan-peer-box{display:flex;flex-direction:column;gap:10px;padding:12px;border:1px solid var(--border);border-radius:8px;background:var(--panel-2)}
+#app.app-container .lan-peer-input-row{display:flex;gap:8px}
+#app.app-container .lan-peer-input-row .text_pole{flex:1 1 auto;height:var(--ctl-h);min-height:var(--ctl-h);font-size:12px;padding:6px 10px;box-sizing:border-box}
+#app.app-container .lan-peer-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+#app.app-container .lan-peer-qr-wrap{display:flex;flex-direction:column;align-items:center;gap:6px;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--panel-3);width:fit-content;margin:4px auto}
+#app.app-container .lan-peer-qr-wrap .lan-qr{width:116px;height:116px;display:flex;align-items:center;justify-content:center}
+#app.app-container .lan-peer-qr-tip{font-size:11px;color:var(--muted)}
+#app.app-container .lan-peer-connected{display:flex;flex-direction:column;gap:10px}
+#app.app-container .lan-peer-bar{display:flex;align-items:center;gap:10px;padding:8px 12px;border:1px solid var(--border);border-radius:7px;background:var(--panel-2)}
+#app.app-container .lan-peer-badge{font-weight:600;font-size:12px;display:inline-flex;align-items:center}
+#app.app-container .lan-peer-rtt{font-size:11px;color:var(--muted);font-family:Consolas,monospace}
+#app.app-container .lan-peer-actions-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 12px;border:1px solid var(--border);border-radius:7px;background:var(--panel-3)}
+#app.app-container .lan-peer-sel-note{font-size:12px;color:var(--text)}
+#app.app-container .lan-peer-active-card{display:flex;flex-direction:column;gap:6px;padding:10px 12px;border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:7px;background:var(--panel-2)}
+#app.app-container .lan-peer-active-head{display:flex;align-items:center;gap:8px;font-size:12px}
+#app.app-container .lan-peer-active-dir{font-size:14px}
+#app.app-container .lan-peer-active-name{font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#app.app-container .lan-peer-active-pct{font-family:Consolas,monospace;font-weight:600;color:var(--accent)}
+#app.app-container .lan-peer-active-detail{font-size:11px;color:var(--muted);text-align:right}
+#app.app-container .lan-peer-queue-card{display:flex;flex-direction:column;gap:8px;border:1px solid var(--border);border-radius:8px;padding:10px 12px;background:var(--panel-2)}
+#app.app-container .lan-peer-queue-head{display:flex;align-items:center;justify-content:space-between;gap:6px;font-weight:600;font-size:12px;border-bottom:1px solid var(--border);padding-bottom:6px}
+#app.app-container .lan-peer-queue-count{font-size:11px;color:var(--muted);background:var(--panel-3);border:1px solid var(--border);border-radius:99px;padding:1px 6px}
+#app.app-container .lan-peer-queue-list{display:flex;flex-direction:column;gap:5px;max-height:190px;overflow-y:auto;overscroll-behavior:contain}
+#app.app-container .lan-peer-queue-item{display:flex;align-items:center;gap:8px;padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--panel-3);font-size:11.5px}
+#app.app-container .lan-peer-queue-item .q-dir{flex:0 0 auto}
+#app.app-container .lan-peer-queue-item .q-name{flex:1 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#app.app-container .lan-peer-queue-item .q-meta{flex:0 0 auto;font-size:10.5px;color:var(--muted)}
+#app.app-container .lan-peer-queue-item .q-status{flex:0 0 auto;font-size:10.5px;padding:1px 6px;border-radius:4px;border:1px solid var(--border)}
+#app.app-container .lan-legacy-container{display:flex;flex-direction:column;gap:10px}
 #app.app-container .lan-overview{display:flex;flex-wrap:wrap;gap:6px 14px;padding:6px 8px;
   border:1px solid var(--border);border-radius:8px;background:var(--panel-3);font-size:10.5px}
 #app.app-container .lan-overview .lo-item{display:inline-flex;align-items:baseline;gap:5px;min-width:0}

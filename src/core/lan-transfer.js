@@ -175,14 +175,28 @@ export function fileIdentity(file = {}) {
   return `f${fnv1a(`${name}:${size}:${mtime}`).toString(36)}`;
 }
 
+export const SIGNAL_ROLE_PEER_OFFER = 'peer_offer';
+export const SIGNAL_ROLE_PEER_ANSWER = 'peer_answer';
+
 /**
- * 组装信令负载。
+ * 组装信令负载（支持传统单次模式与长连接对等模式）。
  *
- * @param {{role: 'offer'|'answer', sdp: string, file?: object, fileId?: string, resumeFrom?: number}} input
+ * @param {{role: 'offer'|'answer'|'peer_offer'|'peer_answer', sdp: string, file?: object, fileId?: string, resumeFrom?: number, peerId?: string}} input
  * @returns {object}
  */
 export function buildSignalPayload(input = {}) {
-  const payload = { v: SIGNAL_VERSION, role: input.role, sdp: String(input.sdp ?? '') };
+  const isPeer = input.role === SIGNAL_ROLE_PEER_OFFER || input.role === SIGNAL_ROLE_PEER_ANSWER;
+  const payload = {
+    v: SIGNAL_VERSION,
+    role: input.role,
+    sdp: String(input.sdp ?? ''),
+  };
+  if (isPeer) {
+    payload.peer = true;
+    payload.peerId = String(input.peerId || `p_${Math.random().toString(36).slice(2, 8)}`);
+    payload.caps = { queue: true, batch: true, credit: true };
+    return payload;
+  }
   if (input.file) {
     payload.file = { id: input.fileId || fileIdentity(input.file), name: input.file.name, size: input.file.size };
   } else if (input.fileId) {
@@ -193,23 +207,40 @@ export function buildSignalPayload(input = {}) {
 }
 
 /**
- * 解析信令负载并归一化。v1 旧码（无 `v` / 无 `file`）按无续传处理。
+ * 组装对等长连接握手信令。
+ */
+export function buildPeerSignalPayload(input = {}) {
+  return buildSignalPayload({
+    ...input,
+    role: input.role === 'answer' || input.role === SIGNAL_ROLE_PEER_ANSWER
+      ? SIGNAL_ROLE_PEER_ANSWER
+      : SIGNAL_ROLE_PEER_OFFER,
+  });
+}
+
+/**
+ * 解析信令负载并归一化。
  *
  * @param {object} raw
- * @returns {{version: number, role: string, sdp: string, file: object|null, fileId: string, resumeFrom: number}}
+ * @returns {{version: number, role: string, sdp: string, file: object|null, fileId: string, resumeFrom: number, isPeer: boolean, peerId: string}}
  */
 export function readSignalPayload(raw = {}) {
   const role = raw.role;
-  if (role !== 'offer' && role !== 'answer') throw new Error('不是局域网互传的码');
+  const isPeer = role === SIGNAL_ROLE_PEER_OFFER || role === SIGNAL_ROLE_PEER_ANSWER || Boolean(raw.peer);
+  if (role !== 'offer' && role !== 'answer' && !isPeer) throw new Error('不是局域网互传的码');
   if (!raw.sdp || typeof raw.sdp !== 'string') throw new Error('码里没有连接信息');
   const file = raw.file && typeof raw.file === 'object' ? raw.file : null;
   return {
     version: Number(raw.v) || 1,
-    role,
+    role: isPeer
+      ? (role === SIGNAL_ROLE_PEER_ANSWER || role === 'answer' ? SIGNAL_ROLE_PEER_ANSWER : SIGNAL_ROLE_PEER_OFFER)
+      : role,
     sdp: raw.sdp,
     file,
     fileId: file?.id ? String(file.id) : '',
     resumeFrom: Math.max(0, Number(raw.resumeFrom) || 0),
+    isPeer,
+    peerId: isPeer ? String(raw.peerId || '') : '',
   };
 }
 
@@ -436,4 +467,150 @@ export function probeDirectCapability(env = {}) {
   if (!hasRtc) return { direct: false, reason: '本浏览器不支持直连' };
   if (!secure) return { direct: false, reason: '当前地址不是安全上下文' };
   return { direct: true, reason: '' };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// P0 对等长连接与双向任务队列状态机（无身份、保持连接不重连、交替调度）
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const PEER_CONN_STATES = Object.freeze({
+  DISCONNECTED: 'disconnected',
+  PAIRING: 'pairing',
+  CONNECTED: 'connected',
+  FAILED: 'failed',
+});
+
+/**
+ * 局域网对等长连接队列管理器（纯逻辑核心，Node 可测）。
+ */
+export function createPeerQueueManager({ now = () => Date.now() } = {}) {
+  let connState = PEER_CONN_STATES.DISCONNECTED;
+  let rtt = 0;
+  const sendQueue = [];
+  const recvQueue = [];
+  let currentSending = null;
+  let currentReceiving = null;
+  let turn = 'self'; // 'self' | 'peer' (交替轮换令牌，避免双方抢发信道冲突)
+
+  return {
+    getState: () => ({
+      connState,
+      rtt,
+      turn,
+      sendQueue: [...sendQueue],
+      recvQueue: [...recvQueue],
+      currentSending: currentSending ? { ...currentSending } : null,
+      currentReceiving: currentReceiving ? { ...currentReceiving } : null,
+    }),
+
+    setConnState(s) {
+      connState = s;
+      if (s === PEER_CONN_STATES.DISCONNECTED || s === PEER_CONN_STATES.FAILED) {
+        currentSending = null;
+        currentReceiving = null;
+      }
+      return this.getState();
+    },
+
+    setRtt(ms) {
+      rtt = Math.max(0, Math.round(Number(ms) || 0));
+      return rtt;
+    },
+
+    enqueueSend(file) {
+      const task = {
+        id: `task_${now()}_${Math.random().toString(36).slice(2, 7)}`,
+        file,
+        name: file?.name || 'unnamed.zip',
+        size: Number(file?.size) || 0,
+        status: 'queued', // queued | active | done | failed
+        progress: 0,
+        sentBytes: 0,
+        createdAt: now(),
+      };
+      sendQueue.push(task);
+      return task;
+    },
+
+    removeSend(id) {
+      const idx = sendQueue.findIndex((t) => t.id === id);
+      if (idx >= 0 && sendQueue[idx].status !== 'active') {
+        const [removed] = sendQueue.splice(idx, 1);
+        return removed;
+      }
+      return null;
+    },
+
+    /** 调度下一个发送任务：需连接就绪、无正在发送任务、且拥有发言令牌。 */
+    nextSend() {
+      if (connState !== PEER_CONN_STATES.CONNECTED) return null;
+      if (currentSending) return null;
+      const next = sendQueue.find((t) => t.status === 'queued');
+      if (!next) return null;
+      next.status = 'active';
+      currentSending = next;
+      return next;
+    },
+
+    finishSend(id, ok = true, errorMsg = '') {
+      if (currentSending && currentSending.id === id) {
+        currentSending.status = ok ? 'done' : 'failed';
+        if (errorMsg) currentSending.error = errorMsg;
+        const finished = currentSending;
+        currentSending = null;
+        // 交出发送令牌，允许对端发起传输（交替调度）
+        turn = 'peer';
+        return finished;
+      }
+      return null;
+    },
+
+    /** 登记对端开始传输任务。 */
+    startReceive(meta) {
+      const task = {
+        id: String(meta?.taskId || `r_${now()}`),
+        name: String(meta?.name || 'incoming.zip'),
+        size: Number(meta?.size) || 0,
+        digest: String(meta?.digest || ''),
+        status: 'active',
+        receivedBytes: 0,
+        progress: 0,
+        createdAt: now(),
+      };
+      currentReceiving = task;
+      recvQueue.unshift(task);
+      return task;
+    },
+
+    advanceReceive(bytes) {
+      if (!currentReceiving) return null;
+      currentReceiving.receivedBytes = Math.min(
+        currentReceiving.receivedBytes + (Number(bytes) || 0),
+        currentReceiving.size || Infinity,
+      );
+      if (currentReceiving.size > 0) {
+        currentReceiving.progress = progressPercent(currentReceiving.receivedBytes, currentReceiving.size);
+      }
+      return currentReceiving;
+    },
+
+    finishReceive(ok = true, errorMsg = '') {
+      if (!currentReceiving) return null;
+      currentReceiving.status = ok ? 'done' : 'failed';
+      if (errorMsg) currentReceiving.error = errorMsg;
+      const finished = currentReceiving;
+      currentReceiving = null;
+      // 接收完成后收回发送令牌，自己可以继续发
+      turn = 'self';
+      return finished;
+    },
+
+    yieldTurn() {
+      turn = 'peer';
+    },
+
+    takeTurn() {
+      turn = 'self';
+    },
+  };
 }

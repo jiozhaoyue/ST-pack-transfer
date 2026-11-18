@@ -73,7 +73,7 @@ import { pruneFullSnapshots } from './src/core/transfer-prune.js';
 import { ExportQueue } from './src/ui/export-queue.js';
 import { APP_VERSION } from './src/core/app-version.js';
 import {
-  fullChangelog, markSeenVersion, readSeenVersion, recentChangelog, shouldShowChangelog,
+  fetchCloudCommits, fullChangelog, markSeenVersion, paginateChangelog, readSeenVersion, recentChangelog, shouldShowChangelog,
 } from './src/core/changelog.js';
 import { reportToHuman } from './src/core/report.js';
 import { TaskManager, memoryAdapter } from './src/core/task-manager.js';
@@ -323,9 +323,23 @@ async function main(root) {
     }
   }
 
+  function inferLayoutFromName(name) {
+    const n = String(name || '').toLowerCase();
+    if (n.startsWith('luker_') || n.startsWith('luker-') || n.includes('luker')) return 'l';
+    if (n.startsWith('st_') || n.startsWith('sillytavern_')) return 'st';
+    if (n.startsWith('tt_') || n.startsWith('tauritavern_')) return 'tt';
+    if (n.startsWith('pt_') || n.startsWith('puretavern_')) return 'pt';
+    return 'unknown';
+  }
+
   function toPackage(record) {
     const zone = zoneOfOrigin(record.origin);
-    const layout = record.layout || state.layoutById.get(record.id) || 'unknown';
+    let layout = record.layout || state.layoutById.get(record.id) || '';
+    if (!layout || layout === 'unknown') {
+      const inferred = inferLayoutFromName(record.name);
+      if (inferred !== 'unknown') layout = inferred;
+      else layout = 'unknown';
+    }
     const sizeBytes = record.size || 0;
     return {
       id: record.id,
@@ -2152,42 +2166,88 @@ async function main(root) {
   }
 
   /** 更新日志弹窗：auto=true 显示本次更新摘要；否则显示**从新到旧**的完整提交。 */
+  /** 更新日志弹窗：支持本地/云端切换、严格分段懒加载（15条/窗）、从新到旧与从旧到新排序（2026-11-18 用户裁定）。 */
   function openChangelog({ auto = false } = {}) {
-    const entries = auto ? recentChangelog(40) : fullChangelog();
-    const hasRelease = entries.some((entry) => (Array.isArray(entry.tags) && entry.tags.length)
-      || entry.release);
-    const rows = entries.map((entry) => {
-      const tags = Array.isArray(entry.tags) && entry.tags.length
-        ? entry.tags
-        : (entry.release ? [`v${entry.release}`] : []);
-      const isRelease = tags.length > 0;
-      return '<div class="changelog-row' + (isRelease ? ' is-release' : '') + '"'
-        + ' data-changelog-release="' + (isRelease ? '1' : '0') + '">'
-        + '<span class="changelog-date">' + escapeText(entry.date || '') + '</span>'
-        /* 三列必须恒在：sha 缺位也要放空占位，否则说明文字串进 58px 列被挤成竖排、右侧空一大块。 */
-        + (entry.sha ? '<code class="changelog-sha">' + escapeText(entry.sha) + '</code>'
-          : '<span class="changelog-sha is-empty" aria-hidden="true"></span>')
-        + '<span class="changelog-msg">'
-        + (isRelease
-          ? '<span class="changelog-tag">🏷 ' + escapeText(tags.join(' / ')) + '</span>'
-          : '')
-        + escapeText(entry.subject || '') + '</span>'
-        + '</div>';
-    }).join('');
-    const filter = hasRelease
-      ? '<label class="check changelog-filter"><input type="checkbox" id="changelog-release-only"> '
-        + escapeText(t('changelog.releaseOnly')) + '</label>'
-      : '';
-    const body = filter
-      + '<div class="changelog-list">' + (rows || '<div class="ext-note">' + escapeText(t('log.empty')) + '</div>') + '</div>'
-      + (auto ? '<label class="check" style="margin-top:8px"><input type="checkbox" id="changelog-never"> '
-        + escapeText(t('changelog.never')) + '</label>' : '');
+    let source = (settings?.gitCloudReadOn) ? 'cloud' : 'local';
+    let sortOrder = 'desc';
+    let releaseOnly = false;
+    let localCommits = fullChangelog();
+    let cloudCommits = null;
+    let activeCommits = localCommits;
+    let currentOffset = 0;
+    const PAGE_SIZE = 15;
+
+    function renderRows(items) {
+      return items.map((entry) => {
+        const tags = Array.isArray(entry.tags) && entry.tags.length
+          ? entry.tags
+          : (entry.release ? [`v${entry.release}`] : []);
+        const isRelease = tags.length > 0;
+        return '<div class="changelog-row' + (isRelease ? ' is-release' : '') + '"'
+          + ' data-changelog-release="' + (isRelease ? '1' : '0') + '">'
+          + '<span class="changelog-date">' + escapeText(entry.date || '') + '</span>'
+          + (entry.sha ? '<code class="changelog-sha">' + escapeText(entry.sha) + '</code>'
+            : '<span class="changelog-sha is-empty" aria-hidden="true"></span>')
+          + '<span class="changelog-msg">'
+          + (isRelease ? '<span class="changelog-tag">🏷 ' + escapeText(tags.join(' / ')) + '</span>' : '')
+          + escapeText(entry.subject || '') + '</span>'
+          + '</div>';
+      }).join('');
+    }
+
+    function buildHeaderHtml() {
+      return '<div class="changelog-toolbar">'
+        + '<div class="segmented" id="changelog-source-tabs">'
+          + '<button type="button" class="seg-btn' + (source === 'local' ? ' active' : '') + '" data-cl-source="local">' + escapeText(t('changelog.sourceLocal')) + '</button>'
+          + '<button type="button" class="seg-btn' + (source === 'cloud' ? ' active' : '') + '" data-cl-source="cloud">' + escapeText(t('changelog.sourceCloud')) + '</button>'
+        + '</div>'
+        + '<button type="button" class="btn" id="changelog-sort-toggle">'
+          + escapeText(sortOrder === 'desc' ? t('changelog.sortNewest') : t('changelog.sortOldest'))
+        + '</button>'
+        + '<label class="check changelog-filter">'
+          + '<input type="checkbox" id="changelog-release-only"' + (releaseOnly ? ' checked' : '') + '> '
+          + escapeText(t('changelog.releaseOnly'))
+        + '</label>'
+      + '</div>';
+    }
+
+    const initialResult = paginateChangelog(activeCommits, {
+      offset: 0, limit: PAGE_SIZE, sortOrder, releaseOnly,
+    });
+    currentOffset = initialResult.items.length;
+
+    const listHtml = '<div class="changelog-list" id="changelog-list-container">'
+      + (renderRows(initialResult.items) || '<div class="ext-note">' + escapeText(t('log.empty')) + '</div>')
+      + '</div>';
+    const moreBtnHtml = '<div id="changelog-more-area" style="text-align:center;margin-top:8px;' + (initialResult.hasMore ? '' : 'display:none') + '">'
+      + '<button type="button" class="btn" id="changelog-load-more" style="font-size:11px;padding:3px 14px">'
+      + (t('changelog.loadMore') || '加载更多（每次 15 条）')
+      + '</button>'
+      + '</div>';
+    const body = '<div class="changelog-modal-wrap">'
+      + buildHeaderHtml()
+      + listHtml
+      + moreBtnHtml
+      + '</div>';
+
     markSeenVersion(APP_VERSION);
-    view.openModal(
-      auto ? t('changelog.updateTitle', { version: APP_VERSION }) : t('changelog.fullTitle'),
-      auto ? t('changelog.updateDesc') : t('changelog.fullDesc'),
-      [body],
-      [{ label: t('modal.close'), primary: true, onClick: () => {
+    const actionList = [];
+    if (auto) {
+      const neverLabel = document.createElement('label');
+      neverLabel.className = 'check changelog-never-fixed';
+      neverLabel.style.marginRight = 'auto';
+      neverLabel.style.fontSize = '12px';
+      neverLabel.style.display = 'inline-flex';
+      neverLabel.style.alignItems = 'center';
+      neverLabel.style.gap = '6px';
+      neverLabel.innerHTML = '<input type="checkbox" id="changelog-never"> '
+        + escapeText(t('changelog.never'));
+      actionList.push({ node: neverLabel });
+    }
+    actionList.push({
+      label: t('modal.close'),
+      primary: true,
+      onClick: () => {
         const never = document.getElementById('changelog-never');
         if (never?.checked) {
           settings.showChangelogOnUpdate = false;
@@ -2195,15 +2255,92 @@ async function main(root) {
           view.applySettings?.(settings);
         }
         view.closeModal();
-      } }],
+      },
+    });
+
+    view.openModal(
+      auto ? t('changelog.updateTitle', { version: APP_VERSION }) : t('changelog.fullTitle'),
+      auto ? t('changelog.updateDesc') : t('changelog.fullDesc'),
+      [body],
+      actionList,
+      { hideCloseX: true, bodyClass: 'is-scroll-isolated' },
     );
-    const releaseOnly = document.getElementById('changelog-release-only');
-    if (releaseOnly) {
-      releaseOnly.addEventListener('change', () => {
-        document.querySelectorAll('#modal-extra .changelog-row').forEach((row) => {
-          row.hidden = releaseOnly.checked && row.dataset.changelogRelease !== '1';
-        });
+
+    function updateListDisplay() {
+      const paged = paginateChangelog(activeCommits, {
+        offset: 0, limit: PAGE_SIZE, sortOrder, releaseOnly,
       });
+      currentOffset = paged.items.length;
+      const listEl = document.getElementById('changelog-list-container');
+      if (listEl) {
+        // dom-injection-guard:allow (renderRows outputs escaped commit data)
+        listEl.innerHTML = renderRows(paged.items) || ('<div class="ext-note">' + escapeText(t('log.empty')) + '</div>');
+      }
+      const moreArea = document.getElementById('changelog-more-area');
+      if (moreArea) moreArea.style.display = paged.hasMore ? '' : 'none';
+      const sortBtn = document.getElementById('changelog-sort-toggle');
+      if (sortBtn) {
+        sortBtn.textContent = sortOrder === 'desc'
+          ? (t('changelog.sortNewest') || '最新在前 ▾')
+          : (t('changelog.sortOldest') || '最早在前 ▴');
+      }
+    }
+
+    async function switchSource(newSource) {
+      if (source === newSource && activeCommits) return;
+      source = newSource;
+      document.querySelectorAll('#changelog-source-tabs [data-cl-source]').forEach((btn) => {
+        btn.classList.toggle('active', btn.dataset.clSource === source);
+      });
+      const listEl = document.getElementById('changelog-list-container');
+      if (source === 'cloud') {
+        if (!cloudCommits) {
+          if (listEl) listEl.innerHTML = '<div class="ext-note"><i class="fa-solid fa-spinner fa-spin"></i> ' + (t('changelog.fetchingCloud') || '正在从 GitHub 获取云端提交...') + '</div>';
+          try {
+            cloudCommits = await fetchCloudCommits({ proxyUrl: settings?.netProxyUrl || '' });
+          } catch (err) {
+            if (listEl) listEl.innerHTML = '<div class="ext-note" style="color:var(--drop)">' + escapeText(err.message || '获取云端提交失败') + '</div>';
+            return;
+          }
+        }
+        activeCommits = cloudCommits;
+      } else {
+        activeCommits = localCommits;
+      }
+      updateListDisplay();
+    }
+
+    document.getElementById('changelog-source-tabs')?.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-cl-source]');
+      if (btn) switchSource(btn.dataset.clSource);
+    });
+
+    document.getElementById('changelog-sort-toggle')?.addEventListener('click', () => {
+      sortOrder = sortOrder === 'desc' ? 'asc' : 'desc';
+      updateListDisplay();
+    });
+
+    document.getElementById('changelog-release-only')?.addEventListener('change', (e) => {
+      releaseOnly = !!e.target.checked;
+      updateListDisplay();
+    });
+
+    document.getElementById('changelog-load-more')?.addEventListener('click', () => {
+      const paged = paginateChangelog(activeCommits, {
+        offset: currentOffset, limit: PAGE_SIZE, sortOrder, releaseOnly,
+      });
+      currentOffset += paged.items.length;
+      const listEl = document.getElementById('changelog-list-container');
+      if (listEl && paged.items.length) {
+        // dom-injection-guard:allow (renderRows outputs escaped commit data)
+        listEl.insertAdjacentHTML('beforeend', renderRows(paged.items));
+      }
+      const moreArea = document.getElementById('changelog-more-area');
+      if (moreArea) moreArea.style.display = paged.hasMore ? '' : 'none';
+    });
+
+    if (source === 'cloud') {
+      void switchSource('cloud');
     }
   }
 
@@ -2280,6 +2417,11 @@ async function main(root) {
     retry: () => lanPanel?.retry(),
     cancel: () => lanPanel?.cancel(),
     abandon: () => lanPanel?.abandon(),
+    peerGenerate: () => lanPanel?.peerGenerate(),
+    peerConnect: (code) => lanPanel?.peerConnect(code),
+    peerDisconnect: () => lanPanel?.peerDisconnect(),
+    peerSend: () => lanPanel?.peerSend(),
+    setMode: (mode) => lanPanel?.setMode(mode),
   };
 
   const view = createWorkbenchView({

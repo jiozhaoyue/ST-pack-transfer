@@ -74,13 +74,15 @@ export function encodeSvg(text) {
  * 调摄像头扫二维码。返回停止函数；任何失败都经 `onError` 如实上报，
  * 粘贴输入不受影响。所有等待/循环都有明确出口。
  */
-export async function scan({ video, canvas, onResult, onError, onDetect } = {}) {
+export async function scan({ video, canvas, onResult, onError, onDetect, signal } = {}) {
+  if (signal?.aborted) return () => {};
   try {
     await ready();
   } catch (err) {
     onError?.(err?.message || t('qr.unavailable'));
     return () => {};
   }
+  if (signal?.aborted) return () => {};
   if (!video || !canvas) {
     onError?.(t('qr.canvasUnavailable'));
     return () => {};
@@ -98,8 +100,21 @@ export async function scan({ video, canvas, onResult, onError, onDetect } = {}) 
     return () => {};
   }
 
+  if (signal?.aborted) {
+    try { stream?.getTracks().forEach((track) => track.stop()); } catch {}
+    try { video.srcObject = null; } catch {}
+    return () => {};
+  }
+
   video.srcObject = stream;
   await video.play().catch(() => {});
+
+  if (signal?.aborted) {
+    try { stream?.getTracks().forEach((track) => track.stop()); } catch {}
+    try { video.srcObject = null; } catch {}
+    try { video.pause(); } catch {}
+    return () => {};
+  }
 
   let stopped = false;
   let raf = 0;
@@ -107,9 +122,14 @@ export async function scan({ video, canvas, onResult, onError, onDetect } = {}) 
     if (stopped) return;
     stopped = true;
     cancelAnimationFrame(raf);
-    try { stream.getTracks().forEach((track) => track.stop()); } catch { /* 已停止 */ }
+    try { stream?.getTracks().forEach((track) => track.stop()); } catch { /* 已停止 */ }
     try { video.srcObject = null; } catch { /* 已失效 */ }
+    try { video.pause(); } catch {}
   };
+
+  if (signal) {
+    signal.addEventListener('abort', stop, { once: true });
+  }
 
   const tick = () => {
     if (stopped) return;

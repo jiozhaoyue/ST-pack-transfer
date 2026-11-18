@@ -38,7 +38,7 @@ export function getWorkbenchHtml() {
     <div class="app-body">
     <main class="app-main" id="view-workbench">
       <div class="col-chart">
-        <section class="panel chart-card" id="chart-card">
+        <section class="panel chart-card is-mobile-settings" id="chart-card">
           <div class="panel-head panel-head--switch">
             <div class="view-switch" data-view-switch></div>
             <div class="panel-actions">
@@ -52,7 +52,7 @@ export function getWorkbenchHtml() {
 
           <div class="chart-mobile-summary" id="chart-mobile-summary">
             <span class="cms-text" id="chart-mobile-summary-text"></span>
-            <button type="button" class="btn cms-toggle" id="chart-mobile-settings-toggle" aria-expanded="false" data-i18n="chart.mobileSettings"></button>
+            <button type="button" class="btn cms-toggle" id="chart-mobile-settings-toggle" aria-expanded="true" data-i18n="chart.mobileSettingsClose"></button>
           </div>
 
           <div class="chart-controls">
@@ -89,14 +89,14 @@ export function getWorkbenchHtml() {
                 <option value="9" data-i18n="chart.compression9"></option>
               </select>
             </label>
-            <button type="button" class="icon-btn filename-toggle" id="filename-toggle" data-i18n-title="chart.filename" data-i18n-aria="chart.filename" aria-expanded="false">
+            <button type="button" class="icon-btn filename-toggle is-open" id="filename-toggle" data-i18n-title="chart.filename" data-i18n-aria="chart.filename" aria-expanded="true">
               <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 20h4l10-10-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg>
               <span data-i18n="chart.filename"></span>
               <svg class="chev" viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5l7 7-7 7"/></svg>
             </button>
           </div>
 
-          <div class="filename-row" id="filename-row" hidden>
+          <div class="filename-row" id="filename-row">
             <div class="filename-edit">
               <label class="field" for="filename-template" data-i18n="chart.filenameLabel"></label>
               <textarea id="filename-template" rows="1" spellcheck="false">{target}_{user}_{part}_{datetime}.zip</textarea>
@@ -130,67 +130,139 @@ export function getWorkbenchHtml() {
           <div class="transfer-body">
           <div class="transfer-pane" id="lan-view">
           <div class="lan-body" id="lan-body">
-            <div class="lan-overview" id="lan-overview">
-              <span class="lo-item"><b data-i18n="lan.ovPeer"></b><span id="lan-ov-peer"></span></span>
-              <span class="lo-item"><b data-i18n="lan.ovCats"></b><span id="lan-ov-cats"></span></span>
-              <span class="lo-item"><b data-i18n="lan.ovState"></b><span id="lan-ov-state"></span></span>
+            <!-- 极简模式切换：长连接 / 传统 -->
+            <div class="lan-mode-bar" id="lan-mode-bar">
+              <div class="segmented lan-mode-tabs" id="lan-mode-tabs">
+                <button type="button" class="seg-btn active" data-lan-mode="peer">长连接</button>
+                <button type="button" class="seg-btn" data-lan-mode="legacy">传统</button>
+              </div>
+              <span class="lan-mode-hint" id="lan-mode-hint">局域网对等互联</span>
             </div>
-            <p class="lan-scan-error" id="lan-scan-error" hidden></p>
 
-            <section class="lan-send" id="lan-send">
-              <div class="lan-sec-head">
-                <span class="lan-sec-title" data-i18n="action.send"></span>
-                <span class="lan-sec-note" id="lan-send-summary" data-i18n="action.sendHint"></span>
+            <!-- 1. 无身份通用互联面板 (单输入框全自适应) -->
+            <div class="lan-peer-container" id="lan-peer-container">
+              <!-- 未连接状态：单框自适应配对卡 -->
+              <div class="lan-peer-box" id="lan-peer-unconnected">
+                <div class="lan-peer-input-row">
+                  <input type="text" class="text_pole" id="lan-peer-input" placeholder="粘贴互联码，或点下方生成 / 扫码">
+                </div>
+                <div class="lan-peer-actions">
+                  <button type="button" class="btn" id="lan-peer-btn-generate">生成互联码</button>
+                  <button type="button" class="btn" id="lan-peer-btn-scan"><i class="fa-solid fa-camera"></i> 扫码</button>
+                  <button type="button" class="btn accent" id="lan-peer-btn-connect">连接</button>
+                  <button type="button" class="btn icon" id="lan-peer-btn-copy" hidden title="复制"><i class="fa-regular fa-copy"></i></button>
+                </div>
+                <div class="lan-peer-qr-wrap" id="lan-peer-qr-box" hidden>
+                  <div class="lan-qr is-compact" id="lan-peer-qr"></div>
+                  <span class="lan-qr-tip" id="lan-peer-qr-tip">等待对端扫码或输入回执...</span>
+                </div>
               </div>
-              <div class="lan-field">
-                <div class="lan-label"><span data-i18n="action.pickup"></span><button type="button" class="lan-link" id="lan-btn-copy-send" hidden data-i18n="action.copy"></button></div>
-                <textarea class="text_pole lan-code" id="lan-send-code" rows="2" readonly data-i18n-placeholder="action.pickupPlaceholder"></textarea>
-                <div class="lan-qr" id="lan-send-qr"></div>
-              </div>
-              <div class="lan-row">
-                <button type="button" class="menu_button" id="lan-btn-generate" data-i18n="action.generate"></button>
-                <button type="button" class="menu_button" id="lan-btn-retry" hidden data-i18n="action.retry"></button>
-                <button type="button" class="menu_button" id="lan-btn-cancel" hidden data-i18n="action.cancel"></button>
-              </div>
-              <div class="lan-field">
-                <div class="lan-label"><span data-i18n="action.answer"></span><button type="button" class="lan-link" id="lan-btn-scan-answer" hidden data-i18n="action.scan"></button></div>
-                <textarea class="text_pole lan-code" id="lan-answer-input" rows="2" data-i18n-placeholder="action.answerPlaceholder"></textarea>
-              </div>
-              <div class="lan-row">
-                <button type="button" class="menu_button" id="lan-btn-apply-answer" data-i18n="action.start"></button>
-              </div>
-              <div class="lan-progress">
-                <span class="lan-phase" id="lan-send-phase" data-i18n="action.ready"></span>
-                <span class="lan-bar"><i id="lan-send-bar"></i></span>
-                <span class="lan-pct" id="lan-send-pct">0%</span>
-                <span class="lan-detail" id="lan-send-detail"></span>
-              </div>
-            </section>
 
-            <section class="lan-recv" id="lan-recv">
-              <div class="lan-sec-head"><span class="lan-sec-title" data-i18n="action.recv"></span></div>
-              <div class="lan-field">
-                <div class="lan-label"><span data-i18n="action.pickup"></span><button type="button" class="lan-link" id="lan-btn-scan-offer" data-i18n="action.scan"></button></div>
-                <textarea class="text_pole lan-code" id="lan-offer-input" rows="2" data-i18n-placeholder="action.offerPlaceholder"></textarea>
+              <!-- 已连接状态：对等长连接看板 (常驻不重连，双向交替队列) -->
+              <div class="lan-peer-connected" id="lan-peer-connected" hidden>
+                <div class="lan-peer-bar">
+                  <span class="lan-peer-badge"><i class="fa-solid fa-circle" style="color:var(--keep,#4caf50);font-size:10px;margin-right:4px"></i> <span id="lan-peer-status-label">已连接</span></span>
+                  <span class="lan-peer-rtt" id="lan-peer-rtt-text">RTT --ms</span>
+                  <span class="spacer"></span>
+                  <button type="button" class="btn danger-btn" id="lan-peer-btn-disconnect">断开</button>
+                </div>
+
+                <div class="lan-peer-actions-row">
+                  <span class="lan-peer-sel-note" id="lan-peer-sel-summary">已在左侧勾选数据包</span>
+                  <button type="button" class="btn accent" id="lan-peer-btn-send">发送到对端</button>
+                </div>
+
+                <!-- 正在传输单条高密度进度卡 -->
+                <div class="lan-peer-active-card" id="lan-peer-active-card" hidden>
+                  <div class="lan-peer-active-head">
+                    <span class="lan-peer-active-dir" id="lan-peer-active-dir">📤</span>
+                    <span class="lan-peer-active-name" id="lan-peer-active-name">正在传输...</span>
+                    <span class="spacer"></span>
+                    <span class="lan-peer-active-pct" id="lan-peer-active-pct">0%</span>
+                  </div>
+                  <div class="lan-progress">
+                    <span class="lan-bar"><i id="lan-peer-active-bar"></i></span>
+                  </div>
+                  <div class="lan-peer-active-detail" id="lan-peer-active-detail">-- / -- · -- MB/s</div>
+                </div>
+
+                <!-- 双向任务队列看板 -->
+                <div class="lan-peer-queue-card">
+                  <div class="lan-peer-queue-head">
+                    <span class="lan-peer-queue-title">传输队列</span>
+                    <span class="lan-peer-queue-count" id="lan-peer-queue-count">0</span>
+                  </div>
+                  <div class="lan-peer-queue-list" id="lan-peer-queue-list">
+                    <div class="ext-note" id="lan-peer-queue-empty">暂无传输任务，勾选数据包点发送即可排队</div>
+                  </div>
+                </div>
               </div>
-              <div class="lan-row">
-                <button type="button" class="menu_button" id="lan-btn-accept" data-i18n="action.accept"></button>
+            </div>
+
+            <!-- 2. 传统单次模式容器 (降级备用) -->
+            <div class="lan-legacy-container" id="lan-legacy-container" hidden>
+              <div class="lan-overview" id="lan-overview">
+                <span class="lo-item"><b data-i18n="lan.ovPeer"></b><span id="lan-ov-peer"></span></span>
+                <span class="lo-item"><b data-i18n="lan.ovCats"></b><span id="lan-ov-cats"></span></span>
+                <span class="lo-item"><b data-i18n="lan.ovState"></b><span id="lan-ov-state"></span></span>
               </div>
-              <div class="lan-field">
-                <div class="lan-label"><span data-i18n="action.answer"></span><button type="button" class="lan-link" id="lan-btn-copy-recv" hidden data-i18n="action.copy"></button></div>
-                <textarea class="text_pole lan-code" id="lan-recv-code" rows="2" readonly data-i18n-placeholder="action.recvPlaceholder"></textarea>
-                <div class="lan-qr" id="lan-recv-qr"></div>
-              </div>
-              <div class="lan-progress">
-                <span class="lan-phase" id="lan-recv-phase" data-i18n="action.waiting"></span>
-                <span class="lan-bar"><i id="lan-recv-bar"></i></span>
-                <span class="lan-pct" id="lan-recv-pct">0%</span>
-                <span class="lan-detail" id="lan-recv-detail"></span>
-              </div>
-              <div class="lan-row">
-                <button type="button" class="menu_button" id="lan-btn-abandon" hidden data-i18n="action.abandon"></button>
-              </div>
-            </section>
+              <p class="lan-scan-error" id="lan-scan-error" hidden></p>
+
+              <section class="lan-send" id="lan-send">
+                <div class="lan-sec-head">
+                  <span class="lan-sec-title" data-i18n="action.send"></span>
+                  <span class="lan-sec-note" id="lan-send-summary" data-i18n="action.sendHint"></span>
+                </div>
+                <div class="lan-field">
+                  <div class="lan-label"><span data-i18n="action.pickup"></span><button type="button" class="lan-link" id="lan-btn-copy-send" hidden data-i18n="action.copy"></button></div>
+                  <textarea class="text_pole lan-code" id="lan-send-code" rows="2" readonly data-i18n-placeholder="action.pickupPlaceholder"></textarea>
+                  <div class="lan-qr" id="lan-send-qr"></div>
+                </div>
+                <div class="lan-row">
+                  <button type="button" class="menu_button" id="lan-btn-generate" data-i18n="action.generate"></button>
+                  <button type="button" class="menu_button" id="lan-btn-retry" hidden data-i18n="action.retry"></button>
+                  <button type="button" class="menu_button" id="lan-btn-cancel" hidden data-i18n="action.cancel"></button>
+                </div>
+                <div class="lan-field">
+                  <div class="lan-label"><span data-i18n="action.answer"></span><button type="button" class="lan-link" id="lan-btn-scan-answer" hidden data-i18n="action.scan"></button></div>
+                  <textarea class="text_pole lan-code" id="lan-answer-input" rows="2" data-i18n-placeholder="action.answerPlaceholder"></textarea>
+                </div>
+                <div class="lan-row">
+                  <button type="button" class="menu_button" id="lan-btn-apply-answer" data-i18n="action.start"></button>
+                </div>
+                <div class="lan-progress">
+                  <span class="lan-phase" id="lan-send-phase" data-i18n="action.ready"></span>
+                  <span class="lan-bar"><i id="lan-send-bar"></i></span>
+                  <span class="lan-pct" id="lan-send-pct">0%</span>
+                  <span class="lan-detail" id="lan-send-detail"></span>
+                </div>
+              </section>
+
+              <section class="lan-recv" id="lan-recv">
+                <div class="lan-sec-head"><span class="lan-sec-title" data-i18n="action.recv"></span></div>
+                <div class="lan-field">
+                  <div class="lan-label"><span data-i18n="action.pickup"></span><button type="button" class="lan-link" id="lan-btn-scan-offer" data-i18n="action.scan"></button></div>
+                  <textarea class="text_pole lan-code" id="lan-offer-input" rows="2" data-i18n-placeholder="action.offerPlaceholder"></textarea>
+                </div>
+                <div class="lan-row">
+                  <button type="button" class="menu_button" id="lan-btn-accept" data-i18n="action.accept"></button>
+                </div>
+                <div class="lan-field">
+                  <div class="lan-label"><span data-i18n="action.answer"></span><button type="button" class="lan-link" id="lan-btn-copy-recv" hidden data-i18n="action.copy"></button></div>
+                  <textarea class="text_pole lan-code" id="lan-recv-code" rows="2" readonly data-i18n-placeholder="action.recvPlaceholder"></textarea>
+                  <div class="lan-qr" id="lan-recv-qr"></div>
+                </div>
+                <div class="lan-progress">
+                  <span class="lan-phase" id="lan-recv-phase" data-i18n="action.waiting"></span>
+                  <span class="lan-bar"><i id="lan-recv-bar"></i></span>
+                  <span class="lan-pct" id="lan-recv-pct">0%</span>
+                  <span class="lan-detail" id="lan-recv-detail"></span>
+                </div>
+                <div class="lan-row">
+                  <button type="button" class="menu_button" id="lan-btn-abandon" hidden data-i18n="action.abandon"></button>
+                </div>
+              </section>
+            </div>
           </div>
           </div>
 
@@ -202,6 +274,7 @@ export function getWorkbenchHtml() {
                 <button type="button" class="seg-btn active" data-cloud-provider="s3"><i class="fa-solid fa-cloud"></i> <span data-i18n="cloud.providerS3"></span></button>
                 <button type="button" class="seg-btn" data-cloud-provider="webdav"><i class="fa-solid fa-network-wired"></i> <span data-i18n="cloud.providerWebdav"></span></button>
               </div>
+              <span class="cloud-settings-guide" data-i18n="cloud.settingsGuide"></span>
               <span class="cch-tag" id="cloud-provider-tag">S3 / WebDAV</span>
             </div>
 

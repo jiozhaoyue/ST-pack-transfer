@@ -116,6 +116,13 @@ export const CONTROL_CONSUMERS = Object.freeze({
   'lan-btn-copy-recv': 'src/ui/workbench-view.js — 读取 lan-recv-code 复制',
   'lan-btn-abandon': 'src/ui/workbench-view.js — 调 actions.lan.abandon',
   'lan-scan-cancel': 'src/ui/workbench-view.js — 停止相机并收起扫码区',
+  'lan-peer-input': 'src/ui/workbench-view.js — 读取与展示对等互联码',
+  'lan-peer-btn-generate': 'src/ui/workbench-view.js — 点击生成对等互联码',
+  'lan-peer-btn-scan': 'src/ui/workbench-view.js — 点击开启摄像头扫码',
+  'lan-peer-btn-connect': 'src/ui/workbench-view.js — 点击建立对等长连接',
+  'lan-peer-btn-copy': 'src/ui/workbench-view.js — 点击复制对等互联码',
+  'lan-peer-btn-disconnect': 'src/ui/workbench-view.js — 点击断开对等长连接',
+  'lan-peer-btn-send': 'src/ui/workbench-view.js — 点击将勾选数据包加入对等队列发送',
 });
 
 /** 从模板源码提取全部交互控件 */

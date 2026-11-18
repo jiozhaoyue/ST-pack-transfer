@@ -5,6 +5,7 @@
  * 属于图表选择面，不得回到这里。
  */
 import { t } from '../i18n/index.js';
+import { brandTokensOf } from '../data/target-ui.js';
 import { normalizeAccounts } from '../core/git-accounts.js';
 import { escapeHtml } from './escape.js';
 import { APP_VERSION, APP_COMMIT } from '../core/app-version.js';
@@ -198,7 +199,16 @@ export function applyWebTheme(themeKey) {
     // 强制同步刷新关键派生层级，确保立即生效无死角
     target.style.setProperty('--panel', theme.vars['--SmartThemeBlurTintColor']);
     target.style.setProperty('--text', theme.vars['--SmartThemeBodyColor']);
-    target.style.setProperty('--accent', theme.vars['--SmartThemeQuoteColor']);
+    const targetHost = target.getAttribute?.('data-target-host') || app?.getAttribute?.('data-target-host');
+    const brandTokens = targetHost ? brandTokensOf(targetHost) : null;
+    if (brandTokens) {
+      target.style.setProperty('--accent', brandTokens.ring);
+      target.style.setProperty('--accent-soft', brandTokens.soft);
+      target.style.setProperty('--accent-soft-2', `color-mix(in srgb, ${brandTokens.ring} 32%, transparent)`);
+      target.style.setProperty('--accent-line', `color-mix(in srgb, ${brandTokens.ring} 62%, transparent)`);
+    } else {
+      target.style.setProperty('--accent', theme.vars['--SmartThemeQuoteColor']);
+    }
   }
 }
 
@@ -361,7 +371,21 @@ export function buildSettingsHtml(settings = {}) {
     + '<input class="text_pole" type="number" min="50" max="5000" step="50" data-setting="logMaxEntries" value="' + s.logMaxEntries + '"></label>'
     + setting('set-clear-log', 'clearLogOnLoad', t('settings.clearLogOnLoad'), s.clearLogOnLoad);
 
-  const dataGroup = '<div class="ext-row">'
+  /* 凭据与数据合并：清晰划分两块（2026-11-18 用户裁定） */
+  const credSelect = (key, label) => '<label class="et-git"><span>' + label + '</span>'
+    + '<select class="text_pole" data-setting="' + key + '">'
+    + '<option value="browser"' + (s[key] === 'browser' ? ' selected' : '') + '>' + t('settings.credStoreBrowser') + '</option>'
+    + '<option value="server"' + (s[key] === 'server' ? ' selected' : '') + '>' + t('settings.credStoreServer') + '</option>'
+    + '</select></label>';
+
+  const dataCredGroup = '<div class="settings-subhead">' + (t('settings.subheadCred') || '凭据存储位置偏好') + '</div>'
+    + credSelect('gitCredentialStorage', t('settings.credGit'))
+    + credSelect('s3CredentialStorage', t('settings.credS3'))
+    + credSelect('webdavCredentialStorage', t('settings.credWebdav'))
+    + '<div class="ext-note">' + t('settings.credPrivacyHint') + '</div>'
+    + '<hr class="settings-divider" style="margin:10px 0;border:0;border-top:1px solid var(--border)">'
+    + '<div class="settings-subhead">' + (t('settings.subheadData') || '配置数据备份与维护') + '</div>'
+    + '<div class="ext-row">'
       + '<button type="button" class="btn" data-action="plugin-export">' + t('settings.exportData') + '</button>'
       + '<button type="button" class="btn" data-action="plugin-import">' + t('settings.importData') + '</button>'
     + '</div>'
@@ -372,17 +396,6 @@ export function buildSettingsHtml(settings = {}) {
       + '<button type="button" class="btn danger" data-action="plugin-git-clean">' + t('extmgr.gitCleanSettings') + '</button>'
     + '</div>'
     + '<div class="ext-note">' + t('extmgr.gitCleanSettingsDesc') + '</div>';
-
-  /* 隐私：全部凭据的存放位置集中一处，默认「仅浏览器」（2026-11-16 用户裁定） */
-  const credSelect = (key, label) => '<label class="et-git"><span>' + label + '</span>'
-    + '<select class="text_pole" data-setting="' + key + '">'
-    + '<option value="browser"' + (s[key] === 'browser' ? ' selected' : '') + '>' + t('settings.credStoreBrowser') + '</option>'
-    + '<option value="server"' + (s[key] === 'server' ? ' selected' : '') + '>' + t('settings.credStoreServer') + '</option>'
-    + '</select></label>';
-  const privacyGroup = credSelect('gitCredentialStorage', t('settings.credGit'))
-    + credSelect('s3CredentialStorage', t('settings.credS3'))
-    + credSelect('webdavCredentialStorage', t('settings.credWebdav'))
-    + '<div class="ext-note">' + t('settings.credPrivacyHint') + '</div>';
 
   const netGroup = '<label class="et-git"><span>' + t('settings.netProxy') + '</span>'
     + '<input class="text_pole" type="url" data-setting="netProxyUrl" placeholder="' + t('settings.netProxyPlaceholder')
@@ -399,11 +412,10 @@ export function buildSettingsHtml(settings = {}) {
 
   return '<div class="settings-grid">'
     + group('behavior', t('settings.groupBehavior'), tips, true)
-    + group('privacy', t('settings.groupPrivacy'), privacyGroup, true)
+    + group('data', t('settings.groupDataCred') || (t('settings.groupData') + '与凭据'), dataCredGroup, true)
     + group('export', t('settings.groupExport'), exportGroup, true)
     + group('net', t('settings.groupNet'), netGroup, false)
     + group('log', t('settings.groupLog'), logging, false)
-    + group('data', t('settings.groupData'), dataGroup, false)
     + '</div>';
 }
 

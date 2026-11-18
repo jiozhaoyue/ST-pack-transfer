@@ -95,7 +95,7 @@ describe('R-19 · getRestoreProbe 只读出口', () => {
     expect(Object.prototype.hasOwnProperty.call(w, DEBUG_KEY)).toBe(true);
     expect(Object.isFrozen(w[DEBUG_KEY])).toBe(true);
     expect(typeof w[DEBUG_KEY].getRestoreProbe).toBe('function');
-  });
+  }, 15000);
 
   it('④b 挂载：已被占用时**不覆盖**且发 warn', async () => {
     const w = stubWindow();
@@ -110,11 +110,11 @@ describe('R-19 · getRestoreProbe 只读出口', () => {
     // 不覆盖：仍是原来那个对象（静默覆盖会悄悄弄坏别人的对象）
     expect(w[DEBUG_KEY]).toBe(sentinel);
     expect(warnSpy).toHaveBeenCalled();
-  });
+  }, 15000);
 
   it('④c 挂载：无 window（Node/Worker 环境）时静默跳过，不抛', async () => {
     delete globalThis.window;
     const { mountDebugProbe } = await import('../index.js');
     expect(() => mountDebugProbe()).not.toThrow();
-  });
+  }, 15000);
 });

@@ -11,21 +11,28 @@ export const LAYOUTS = Object.freeze({
 /**
  * 识别源布局。判定顺序按 design.md §3:
  * 1) data/default-user/ 或 data/_tauritavern/ 前缀 → tt
- * 2) 根 manifest.json 解析:format/files[].moduleId → pt-native;schemaVersion+selection → l
- * 3) 根 characters/ 或 settings.json → st
- * 4) 其余 unknown
+ * 2) 根 manifest.json 解析:format/files[].moduleId → pt-native;schemaVersion/Luker标志 → l
+ * 3) _convert/split-manifest.json 分卷清单识别
+ * 4) 根 characters/ 或 settings.json 或其它酒馆用户目录（chats/worlds/groups/user/extensions） → st 或结合文件名判定 l
+ * 5) 其余 unknown
  */
-export async function detectFromReader(reader) {
+export async function detectFromReader(reader, { filename = '' } = {}) {
   let hasDataRoot = false;
   let hasCharactersRoot = false;
   let hasSettingsRoot = false;
+  let hasFlatTavernRoot = false;
   let manifestBuffer = null;
+  let splitManifestBuffer = null;
   let detectedHandle = null;
 
   for await (const entry of reader.entries()) {
     const name = entry.fileName;
     if (name === 'manifest.json') {
       manifestBuffer = await entry.read();
+      continue;
+    }
+    if (name === '_convert/split-manifest.json') {
+      splitManifestBuffer = await entry.read();
       continue;
     }
     if (name.startsWith('data/default-user/') || name.startsWith('data/_tauritavern/')) {
@@ -39,12 +46,25 @@ export async function detectFromReader(reader) {
       }
     } else if (name.startsWith('characters/') || name === 'characters') {
       hasCharactersRoot = true;
+      hasFlatTavernRoot = true;
     } else if (name === 'settings.json') {
       hasSettingsRoot = true;
+      hasFlatTavernRoot = true;
+    } else if (
+      name.startsWith('chats/')
+      || name.startsWith('worlds/')
+      || name.startsWith('groups/')
+      || name.startsWith('user/')
+      || name.startsWith('backgrounds/')
+      || name.startsWith('extensions/')
+      || name === 'secrets.json'
+    ) {
+      hasFlatTavernRoot = true;
     }
     entry.skip();
   }
 
+  // 1. 根 manifest.json 判定
   const manifest = manifestBuffer ? parseJson(manifestBuffer) : null;
   if (manifest && typeof manifest === 'object') {
     if (manifest.handle) {
@@ -55,17 +75,52 @@ export async function detectFromReader(reader) {
     if (manifest.format || perFileManifest) {
       return { layout: LAYOUTS.PT_NATIVE, evidence: 'manifest carries per-file moduleId list', handle: detectedHandle };
     }
-    if ('schemaVersion' in manifest && 'selection' in manifest) {
-      return { layout: LAYOUTS.L, evidence: 'manifest.json has schemaVersion+selection', handle: detectedHandle };
+    if (
+      'schemaVersion' in manifest
+      || 'selection' in manifest
+      || manifest.generator === 'Luker'
+      || manifest.platform === 'luker'
+      || manifest.target === 'l'
+      || manifest.source === 'luker'
+    ) {
+      return { layout: LAYOUTS.L, evidence: 'manifest.json indicates Luker layout', handle: detectedHandle };
     }
+  }
+
+  // 2. 分卷包专属 _convert/split-manifest.json 判定
+  const splitManifest = splitManifestBuffer ? parseJson(splitManifestBuffer) : null;
+  if (splitManifest && typeof splitManifest === 'object') {
+    if (splitManifest.handle) detectedHandle = splitManifest.handle;
+    const tgt = String(splitManifest.target || splitManifest.source || '').toLowerCase();
+    if (tgt === 'l' || tgt === 'luker') {
+      return { layout: LAYOUTS.L, evidence: 'split-manifest indicates Luker part', handle: detectedHandle };
+    }
+    if (tgt === 'tt' || tgt === 'tauritavern') {
+      return { layout: LAYOUTS.TT, evidence: 'split-manifest indicates TauriTavern part', handle: detectedHandle };
+    }
+    if (tgt === 'st' || tgt === 'sillytavern') {
+      return { layout: LAYOUTS.ST, evidence: 'split-manifest indicates SillyTavern part', handle: detectedHandle };
+    }
+  }
+
+  // 3. 文件名强特征启发（例如分卷包 Luker_default-user_part1_...）
+  const lowerName = String(filename || '').toLowerCase();
+  if (lowerName.startsWith('luker_') || lowerName.startsWith('luker-')) {
+    return { layout: LAYOUTS.L, evidence: 'filename indicates Luker package', handle: detectedHandle || 'default-user' };
+  }
+  if (lowerName.startsWith('sillytavern_') || lowerName.startsWith('st_')) {
+    return { layout: LAYOUTS.ST, evidence: 'filename indicates SillyTavern package', handle: detectedHandle || 'default-user' };
+  }
+  if (lowerName.startsWith('tauritavern_') || lowerName.startsWith('tt_')) {
+    return { layout: LAYOUTS.TT, evidence: 'filename indicates TauriTavern package', handle: detectedHandle || 'default-user' };
   }
 
   if (hasDataRoot) {
     return { layout: LAYOUTS.TT, evidence: 'entries under data/default-user or data/_tauritavern', handle: detectedHandle };
   }
 
-  if (hasCharactersRoot || hasSettingsRoot) {
-    return { layout: LAYOUTS.ST, evidence: 'flat user directory entries (characters/ or settings.json)', handle: detectedHandle };
+  if (hasCharactersRoot || hasSettingsRoot || hasFlatTavernRoot) {
+    return { layout: LAYOUTS.ST, evidence: 'flat user directory entries', handle: detectedHandle };
   }
 
   return { layout: LAYOUTS.UNKNOWN, evidence: 'no recognizable layout marker', handle: detectedHandle };
@@ -84,11 +139,14 @@ function parseJson(data) {
 /**
  * 识别指定 zip 源（Blob/File 或路径）的布局
  * @param {Blob|File|string} source
+ * @param {{ filename?: string }} [opts]
  */
-export async function detectLayout(source) {
+export async function detectLayout(source, opts = {}) {
+  const filename = opts.filename
+    || (typeof source === 'string' ? source.split(/[\\/]/).pop() : (source?.name || ''));
   const reader = await zipIo.openReader(source);
   try {
-    return await detectFromReader(reader);
+    return await detectFromReader(reader, { filename });
   } finally {
     await reader.close();
   }

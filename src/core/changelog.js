@@ -63,7 +63,66 @@ const FALLBACK_RELEASES = [
   },
 ];
 
-export const CHANGELOG_SEEN_KEY = 'st-pack-transfer:seen-version';
+import { applyProxy } from './net-proxy.js';
+
+export const CHANGELOG_PAGE_SIZE = 15;
+export const CHANGELOG_SEEN_KEY = 'st-pack-transfer:seen-changelog-version';
+
+/** 从 GitHub API 拉取云端真实提交列表（从新到旧）。 */
+export async function fetchCloudCommits({ proxyUrl = '', token = '', signal } = {}) {
+  const targetUrl = 'https://api.github.com/repos/jiozhaoyue/ST-pack-transfer/commits?per_page=100';
+  const finalUrl = applyProxy(targetUrl, proxyUrl);
+  const headers = {
+    Accept: 'application/vnd.github.v3+json',
+    ...(token ? { Authorization: `token ${token}` } : {}),
+  };
+  const res = await fetch(finalUrl, { headers, signal });
+  if (!res.ok) {
+    throw new Error(`GitHub API HTTP ${res.status}: ${res.statusText}`);
+  }
+  const data = await res.json();
+  if (!Array.isArray(data)) return [];
+  return data.map((item) => {
+    const sha = String(item?.sha || '').slice(0, 7);
+    const date = String(item?.commit?.committer?.date || item?.commit?.author?.date || '').slice(0, 10);
+    const message = String(item?.commit?.message || '').split(/\r?\n/)[0];
+    const tagMatch = message.match(/\b(v?\d+\.\d+\.\d+)\b/);
+    const releaseTag = tagMatch ? tagMatch[1] : undefined;
+    const isRel = releaseTag || tagsOf(sha).length > 0;
+    return {
+      sha,
+      date,
+      subject: message,
+      release: isRel ? (releaseTag || tagsOf(sha)[0]) : undefined,
+      tags: tagsOf(sha).length ? tagsOf(sha) : (releaseTag ? [releaseTag] : []),
+    };
+  });
+}
+
+/**
+ * 分页与排序处理（纯逻辑）：
+ * 严格按照单窗 15 条懒加载，支持从新到旧与从旧到新，支持只看 Release。
+ */
+export function paginateChangelog(commits, { offset = 0, limit = CHANGELOG_PAGE_SIZE, sortOrder = 'desc', releaseOnly = false } = {}) {
+  let list = Array.isArray(commits) ? [...commits] : [];
+  if (releaseOnly) {
+    list = list.filter((c) => (Array.isArray(c.tags) && c.tags.length) || c.release);
+  }
+  if (sortOrder === 'asc') {
+    list.reverse();
+  }
+  const total = list.length;
+  const page = list.slice(offset, offset + limit);
+  const hasMore = offset + limit < total;
+  return {
+    items: page,
+    total,
+    offset,
+    limit,
+    hasMore,
+    nextOffset: offset + limit,
+  };
+}
 
 function parseCommitLine(line) {
   const text = String(line || '');

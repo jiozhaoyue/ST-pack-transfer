@@ -15,6 +15,9 @@ import {
   DIGEST_MAX_BYTES,
   PICKUP_TTL_MS,
   buildSignalPayload,
+  buildPeerSignalPayload,
+  createPeerQueueManager,
+  PEER_CONN_STATES,
   createTransferMachine,
   decodePickupCode,
   encodePickupCode,
@@ -889,13 +892,317 @@ export function mountLanTransferPanel({ view, getSendTargets = null, onReceive =
     log('INFO', t('lan.log.abandoned'));
   }
 
-  const onPageHide = () => closeSession();
+  // ── P0 局域网对等长连接队列运行时 ──
+  let lanMode = 'peer';
+  const peerManager = createPeerQueueManager();
+  let peerPc = null;
+  let peerDc = null;
+  let peerPingTimer = null;
+  let peerSending = false;
+
+  const setPeer = (patch) => view.setLan({ peer: patch });
+
+  function stopPeerPing() {
+    if (peerPingTimer) { clearInterval(peerPingTimer); peerPingTimer = null; }
+  }
+
+  function startPeerPing() {
+    stopPeerPing();
+    peerPingTimer = setInterval(() => {
+      if (peerDc && peerDc.readyState === 'open') {
+        try {
+          peerDc.send(JSON.stringify({ t: 'ping', ts: Date.now() }));
+        } catch { /* 连接波动 */ }
+      }
+    }, 3000);
+  }
+
+  function syncPeerUi() {
+    const s = peerManager.getState();
+    const queueItems = [
+      ...s.sendQueue.map((item) => ({ ...item, dir: 'send' })),
+      ...s.recvQueue.map((item) => ({ ...item, dir: 'recv' })),
+    ];
+    let active = null;
+    if (s.currentSending) {
+      active = {
+        dir: 'send',
+        name: s.currentSending.name,
+        pct: s.currentSending.progress || 0,
+        detail: s.currentSending.detail || '',
+      };
+    } else if (s.currentReceiving) {
+      active = {
+        dir: 'recv',
+        name: s.currentReceiving.name,
+        pct: s.currentReceiving.progress || 0,
+        detail: s.currentReceiving.detail || '',
+      };
+    }
+    setPeer({
+      connected: s.connState === PEER_CONN_STATES.CONNECTED,
+      rtt: s.rtt,
+      active,
+      queue: queueItems,
+    });
+  }
+
+  function bindPeerChannel(dc) {
+    peerDc = dc;
+    dc.binaryType = 'arraybuffer';
+
+    dc.onopen = () => {
+      peerManager.setConnState(PEER_CONN_STATES.CONNECTED);
+      startPeerPing();
+      syncPeerUi();
+      log('SUCCESS', '局域网对等长连接已建立');
+      toast('局域网对等长连接已就绪');
+    };
+
+    dc.onclose = () => {
+      stopPeerPing();
+      peerManager.setConnState(PEER_CONN_STATES.DISCONNECTED);
+      syncPeerUi();
+      log('WARN', '局域网对等连接已断开');
+    };
+
+    dc.onerror = (err) => {
+      dbg('peer dc error', err);
+    };
+
+    dc.onmessage = async (event) => {
+      if (event.data instanceof ArrayBuffer) {
+        const chunk = new Uint8Array(event.data);
+        recvBatcher.push(chunk);
+        peerManager.advanceReceive(chunk.byteLength);
+        syncPeerUi();
+        return;
+      }
+      if (typeof event.data !== 'string') return;
+      let msg = null;
+      try { msg = JSON.parse(event.data); } catch { return; }
+
+      if (msg.t === 'ping') {
+        try { dc.send(JSON.stringify({ t: 'pong', ts: msg.ts })); } catch {}
+        return;
+      }
+      if (msg.t === 'pong') {
+        const rtt = Math.max(1, Date.now() - Number(msg.ts || 0));
+        peerManager.setRtt(rtt);
+        syncPeerUi();
+        return;
+      }
+      if (msg.t === 'q_meta') {
+        const task = peerManager.startReceive(msg);
+        log('INFO', `开始接收对端文件: ${task.name} (${formatBytes(task.size)})`);
+        incoming = {
+          fileId: msg.taskId,
+          name: task.name,
+          size: task.size,
+          sink: null,
+          sinkReady: (async () => {
+            const sink = (await opfsSink(msg.taskId)) || memorySink();
+            incoming.sink = sink;
+            return sink;
+          })(),
+        };
+        try { dc.send(JSON.stringify({ t: 'q_ready', taskId: msg.taskId })); } catch {}
+        syncPeerUi();
+        return;
+      }
+      if (msg.t === 'q_done') {
+        recvBatcher.flush();
+        await writeChain;
+        if (incoming?.sink) {
+          const blob = await incoming.sink.finalize();
+          log('SUCCESS', `接收完成: ${incoming.name}`);
+          peerManager.finishReceive(true);
+          try { dc.send(JSON.stringify({ t: 'q_ok', taskId: msg.taskId })); } catch {}
+          if (onReceive) void onReceive(blob, incoming.name);
+          incoming = null;
+          syncPeerUi();
+        }
+        return;
+      }
+      if (msg.t === 'q_turn') {
+        peerManager.takeTurn();
+        void pumpPeerQueue();
+        return;
+      }
+    };
+  }
+
+  async function peerGenerate() {
+    try {
+      peerDisconnect();
+      const local = new RTCPeerConnection({ iceServers: [] });
+      peerPc = local;
+      const dc = local.createDataChannel('stpt-peer', { ordered: true });
+      bindPeerChannel(dc);
+
+      const offer = await local.createOffer();
+      await local.setLocalDescription(offer);
+      await waitIceComplete(local);
+
+      const code = await encodePickupCode(buildPeerSignalPayload({
+        role: 'peer_offer',
+        sdp: local.localDescription.sdp,
+      }));
+      setPeer({ code, tip: '互联码已生成，请对端扫码或输入此码' });
+      log('INFO', '已生成对等互联码');
+    } catch (err) {
+      log('ERROR', `生成互联码失败: ${err.message}`);
+      toast(`生成互联码失败: ${err.message}`);
+    }
+  }
+
+  async function peerConnect(rawCode) {
+    const text = String(rawCode || '').trim();
+    if (!text) {
+      toast('请先粘贴对端的互联码，或点生成/扫码');
+      return;
+    }
+    try {
+      const payload = await decodePickupCode(text);
+      const isOffer = payload.role === 'peer_offer' || payload.role === 'offer';
+      const isAnswer = payload.role === 'peer_answer' || payload.role === 'answer';
+
+      if (isOffer) {
+        peerDisconnect();
+        const local = new RTCPeerConnection({ iceServers: [] });
+        peerPc = local;
+        local.ondatachannel = (e) => bindPeerChannel(e.channel);
+
+        await local.setRemoteDescription({ type: 'offer', sdp: payload.sdp });
+        const answer = await local.createAnswer();
+        await local.setLocalDescription(answer);
+        await waitIceComplete(local);
+
+        const answerCode = await encodePickupCode(buildPeerSignalPayload({
+          role: 'peer_answer',
+          sdp: local.localDescription.sdp,
+        }));
+        setPeer({ code: answerCode, tip: '回执码已生成，请在对端输入或扫码完成握手' });
+        log('INFO', '对等回执码已生成');
+        toast('回执码已生成，请交给发起端');
+      } else if (isAnswer) {
+        if (!peerPc) {
+          throw new Error('未找到等待回执的本地会话，请先点生成互联码');
+        }
+        await peerPc.setRemoteDescription({ type: 'answer', sdp: payload.sdp });
+        setPeer({ tip: '正在连接中...' });
+        log('INFO', '正在与对端建立长连接...');
+      } else {
+        throw new Error('互联码格式不正确');
+      }
+    } catch (err) {
+      log('ERROR', `连接失败: ${err.message}`);
+      toast(`连接失败: ${err.message}`);
+    }
+  }
+
+  function peerDisconnect() {
+    stopPeerPing();
+    try { peerDc?.close(); } catch {}
+    try { peerPc?.close(); } catch {}
+    peerDc = null;
+    peerPc = null;
+    peerManager.setConnState(PEER_CONN_STATES.DISCONNECTED);
+    setPeer({ connected: false, code: '', active: null });
+    log('INFO', '已断开局域网对等连接');
+  }
+
+  async function pumpPeerQueue() {
+    if (peerSending) return;
+    const task = peerManager.nextSend();
+    if (!task) return;
+    peerSending = true;
+    syncPeerUi();
+
+    try {
+      const file = task.file?.blob || task.file;
+      if (!file) throw new Error('无效的文件对象');
+      const dc = peerDc;
+      if (!dc || dc.readyState !== 'open') throw new Error('连接已断开');
+
+      dc.send(JSON.stringify({
+        t: 'q_meta',
+        taskId: task.id,
+        name: task.name,
+        size: task.size,
+      }));
+
+      const total = Number(task.size) || 0;
+      let offset = 0;
+      const startTime = Date.now();
+
+      while (offset < total) {
+        const slice = file.slice(offset, offset + CHUNK_SIZE);
+        const buf = await slice.arrayBuffer();
+        while (dc.bufferedAmount > HIGH_WATER_MARK) {
+          await new Promise((r) => setTimeout(r, 20));
+        }
+        dc.send(buf);
+        offset += buf.byteLength;
+        task.sentBytes = offset;
+        task.progress = progressPercent(offset, total);
+
+        const dt = (Date.now() - startTime) / 1000;
+        const rate = dt > 0.3 ? offset / dt : 0;
+        const eta = rate > 0 ? (total - offset) / rate : 0;
+        task.detail = `${formatBytes(offset)} / ${formatBytes(total)} · ${formatRate(rate)} · 剩余 ${Math.round(eta)}秒`;
+        syncPeerUi();
+      }
+
+      dc.send(JSON.stringify({ t: 'q_done', taskId: task.id }));
+      peerManager.finishSend(task.id, true);
+      log('SUCCESS', `发送完成: ${task.name}`);
+      toast(`发送完成: ${task.name}`);
+
+      dc.send(JSON.stringify({ t: 'q_turn' }));
+    } catch (err) {
+      peerManager.finishSend(task.id, false, err.message);
+      log('ERROR', `发送失败: ${err.message}`);
+      toast(`发送失败: ${err.message}`);
+    } finally {
+      peerSending = false;
+      syncPeerUi();
+      setTimeout(() => void pumpPeerQueue(), 100);
+    }
+  }
+
+  function peerSend() {
+    const targets = getSendTargets ? getSendTargets() : [];
+    if (!targets.length) {
+      toast('请先在左侧数据包区勾选要发送的包');
+      return;
+    }
+    targets.forEach((pkg) => {
+      peerManager.enqueueSend({
+        name: pkg.name || `${pkg.id}.zip`,
+        size: pkg.sizeBytes || 0,
+        blob: pkg.blob,
+      });
+    });
+    syncPeerUi();
+    toast(`已添加 ${targets.length} 个任务到互传队列`);
+    void pumpPeerQueue();
+  }
+
+  const onPageHide = () => {
+    closeSession();
+    peerDisconnect();
+  };
   if (typeof window !== 'undefined') window.addEventListener('pagehide', onPageHide);
 
   function destroy() {
     if (typeof window !== 'undefined') window.removeEventListener('pagehide', onPageHide);
     closeSession();
+    peerDisconnect();
   }
 
-  return { generate, applyAnswer, acceptOffer, retry, cancel, abandon, destroy };
+  return {
+    generate, applyAnswer, acceptOffer, retry, cancel, abandon, destroy,
+    peerGenerate, peerConnect, peerDisconnect, peerSend, setMode: (m) => { lanMode = m; },
+  };
 }

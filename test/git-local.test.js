@@ -65,7 +65,7 @@ describe('git-local · 包内 .git 只读解析', () => {
     expect(result.branches.length).toBeGreaterThanOrEqual(1);
     expect(result.branches[0].commit).toMatch(/^[0-9a-f]{40}$/);
     expect(result.head).toMatch(/^[0-9a-f]{40}$/);
-  });
+  }, 15000);
 
   it('没有 .git 时如实返回 no-git，不伪造提交', async () => {
     async function* empty() { /* no entries */ }

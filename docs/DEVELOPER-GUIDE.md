@@ -120,7 +120,10 @@ npm run qa:static        # 静态守卫串跑
 - **身份徽标**：四个宿主都有登录态，**禁止匿名态文案**。用户名取 `readHostIdentity()` 的
   `handle`，为空再取 `name`；三处赋值（页头 / 启动刷新 / 扩展管理）必须一致。
   读不到时显示「正在读取」并定时重试，不得回退成宿主名或匿名态。
-- 回归守卫：`npm test -- header-badge.test.js changelog.test.js`。
+- **三段式物理滚动隔离**：`.confirm-dialog .view-body.is-scroll-isolated` 必须强制 `overflow: hidden !important`，工具栏必须为 `flex: 0 0 auto; overflow: hidden;`，滚动条**仅且必须**出现在列表容器 `.changelog-list` 内部，工具栏右侧绝对不得延伸贯穿出现滚动条滑块与箭头；底部的「不再自动显示」复选框必须死死固定在 actions 操作栏，严禁塞入可滚动正文。
+- **局域网无身份单框对等互联**：面板彻底消灭上下堆叠与双列收发卡片，采用单一通用互联盒（`lan-peer-box`），长连接建立后常驻保持不重连（Ping/Pong 心跳与 RTT 测速），双向任务进入连续队列交替调度，互不抢占信道；保留传统单次模式作为降级方案。
+- **Luker 包与分卷包全特征识别**：`detect.js` 扩展识别 Luker 各类 manifest、`_convert/split-manifest.json` 分卷清单、平铺目录特征（`chats/`、`worlds/`、`groups/`、`user/`、`backgrounds/`、`extensions/`）与文件名强特征启发，杜绝 Luker 分卷包误判为「未识别包」。
+- 回归守卫：`npm test -- header-badge.test.js changelog.test.js ui-viewport-guard.test.js`。
 
 ### 本地云与实例自动化
 
@@ -166,6 +169,13 @@ npm run qa:static        # 静态守卫串跑
   manifest 里 `judgedBy` 字段如实标注 `written-bytes` / `uncompressed-estimate`。
 - 单文件独占成卷按**实测字节**判定（不再按未压缩预判）；封卷后守卫若发现
   `blob.size` 超阈值且卷内 >1 条目 ⇒ 该卷 `isOversized: true` 如实标注。
+
+### 品牌色联动与 UI 交互规范
+
+- **品牌色统一管理**：唯一真源收口在 `src/data/target-ui.js`（`brandTokensOf`）与 `src/data/ui-tokens.js`（`UI_TOKENS.brand`）；严禁各模块手写散落的颜色映射字典；切换目标平台时动态联动容器 `--accent` 等关键变量，严禁被主题默认 QuoteColor 冲刷覆盖。
+- **扫码硬件流即时释放**：扫码窗口关闭或中途取消时立即物理终止所有 MediaStream tracks 并解绑 video.srcObject，支持 AbortSignal、遮罩背景点击与 ESC 按键退出，严格保证仅在扫码时启动摄像头。
+- **扩展管理包内展示收敛**：包内视图移除冗余的选包条，严格保持单行吸顶操作；包未扫描或扫描中展示读取中状态，杜绝过早误报无扩展。
+- **文案与出口规范**：绝对禁止裸字段拼接（如 `zones.allPrefix`）；云端仓库顶部统一采用纯文字指引，移除直接跳转设置按钮。
 
 ## 六、质量门槛
 
