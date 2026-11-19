@@ -12,9 +12,9 @@
 | Luker 扩展 | 仓库根目录装进扩展管理器 | 同上 + Luker 账户窗口/存储页 | 账户窗口与存储页需要 Luker 2.9+ |
 | TauriTavern 扩展 | 仓库根目录装进扩展管理器 | TauriTavern 内迁移 | 按宿主公开能力探测 |
 | PureTavern 扩展 | 仓库根目录装进扩展管理器 | PureTavern 内迁移 | 部分端点可能返回 501 |
-| 独立 Web / 单文件 HTML | `index.html`（HTTP）或 `download/ST-pack-transfer-offline.html`（`file://`） | 纯本地转换、分析、分卷 | 不能直接读写酒馆后端 |
+| 独立 Web / 单文件 HTML | `index.html`（HTTP）或 `dist-offline/ST-pack-transfer-offline.html`（本地构建） | 纯本地转换、分析、分卷 | 不能直接读写酒馆后端 |
 
-单文件 HTML 的对外下载路径固定为 `download/ST-pack-transfer-offline.html`，由 `npm run build:offline` 同时写入 `dist-offline/` 与 `download/`。
+对外分发走 GitHub Release asset（`releases/latest/download/ST-pack-transfer-offline.html`），本地构建产物在 `dist-offline/`（`download/` 为本地副本且已 gitignore）。
 
 ## 二、兼容性矩阵（提交前对照）
 
@@ -60,7 +60,7 @@ npm run docs:verify  # 文档同步基线
 
 - Node.js 18+。
 - 不提交 `node_modules/`、`dist/`、`dist-offline/`、真实数据包、真实截图。
-- `download/ST-pack-transfer-offline.html` 是发布产物；只有确认要更新对外 HTML 时才提交。
+- `download/ST-pack-transfer-offline.html` 已不入库，发布由 `release.yml` 在 tag 时自动完成，无需手工提交。
 
 ## 四、改动边界
 

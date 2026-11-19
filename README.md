@@ -45,7 +45,7 @@ https://github.com/jiozhaoyue/ST-pack-transfer.git
 
 ### 单文件网页
 
-下载 [download/ST-pack-transfer-offline.html](https://github.com/jiozhaoyue/ST-pack-transfer/raw/main/download/ST-pack-transfer-offline.html) 双击即可运行，不需要 Node 与本地服务器。
+从 [GitHub Release 下载 ST-pack-transfer-offline.html](https://github.com/jiozhaoyue/ST-pack-transfer/releases/latest/download/ST-pack-transfer-offline.html) 双击即可运行，不需要 Node 与本地服务器。该文件由 Release 分发，不入库。
 
 根目录的 `index.html` 是开发骨架，不能单独双击使用。
 

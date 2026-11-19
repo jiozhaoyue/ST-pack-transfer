@@ -1,7 +1,7 @@
 # E2 · zcode / agy 真人输入 → 技术细则候选
 
 **输入**：`_zcode_user_msgs.json`（88 条，<DATE> ~ <DATE>）+ `_agy_user_msgs.json`（63 条，<DATE> ~ <DATE>），共 151 条。
-**对照**：`RULES.md` v1.1.0（R-01~R-30）+ `RULES-DETAILS.md`（D-01~D-82）。
+**对照**：当时的红线规则真源 v1.1.0（历史文件名已停用，现位于 `.trellis/spec/guides/rule-catalog.md`，R-01~R-30）+ 当时的技术细则清单（历史文件名已停用，现位于 `.trellis/spec/guides/rule-details.md`，D-01~D-82）。
 **判据**：只保留「可判定」的具体行为／数值／位置／顺序／禁止项；已被 D-01~D-82 覆盖的不重复（见第二节）。
 
 标注说明：正文引文全部为原话逐字片段（含脏话与错别字），未做任何改写。

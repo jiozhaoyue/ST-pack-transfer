@@ -2221,7 +2221,7 @@ async function main(root) {
       + '</div>';
     const moreBtnHtml = '<div id="changelog-more-area" style="text-align:center;margin-top:8px;' + (initialResult.hasMore ? '' : 'display:none') + '">'
       + '<button type="button" class="btn" id="changelog-load-more" style="font-size:11px;padding:3px 14px">'
-      + (t('changelog.loadMore') || '加载更多（每次 15 条）')
+      + t('changelog.loadMore')
       + '</button>'
       + '</div>';
     const body = '<div class="changelog-modal-wrap">'
@@ -2281,8 +2281,8 @@ async function main(root) {
       const sortBtn = document.getElementById('changelog-sort-toggle');
       if (sortBtn) {
         sortBtn.textContent = sortOrder === 'desc'
-          ? (t('changelog.sortNewest') || '最新在前 ▾')
-          : (t('changelog.sortOldest') || '最早在前 ▴');
+          ? t('changelog.sortNewest')
+          : t('changelog.sortOldest');
       }
     }
 
@@ -2295,11 +2295,11 @@ async function main(root) {
       const listEl = document.getElementById('changelog-list-container');
       if (source === 'cloud') {
         if (!cloudCommits) {
-          if (listEl) listEl.innerHTML = '<div class="ext-note"><i class="fa-solid fa-spinner fa-spin"></i> ' + (t('changelog.fetchingCloud') || '正在从 GitHub 获取云端提交...') + '</div>';
+          if (listEl) listEl.innerHTML = '<div class="ext-note"><i class="fa-solid fa-spinner fa-spin"></i> ' + t('changelog.fetchingCloud') + '</div>';
           try {
             cloudCommits = await fetchCloudCommits({ proxyUrl: settings?.netProxyUrl || '' });
           } catch (err) {
-            if (listEl) listEl.innerHTML = '<div class="ext-note" style="color:var(--drop)">' + escapeText(err.message || '获取云端提交失败') + '</div>';
+            if (listEl) listEl.innerHTML = '<div class="ext-note" style="color:var(--drop)">' + escapeText(err.message || t('changelog.fetchCloudFailed')) + '</div>';
             return;
           }
         }
@@ -2562,8 +2562,9 @@ async function main(root) {
       onActivePackage: (id) => {
         // 先切换视图（命中已缓存的清单时零等待），再后台补扫描；扫描完成后仅当仍是当前包才重绘。
         view.setActivePackage(id);
-        ensurePlan(id).then((plan) => {
+        return ensurePlan(id).then((plan) => {
           if (plan && view.getState().source?.pkgId === id) view.setActivePackage(id);
+          return plan;
         });
       },
       onTargetChange: (name) => {
@@ -2604,7 +2605,8 @@ async function main(root) {
   });
 
   logger.subscribe((entry) => {
-    view.pushLog(entry.level, entry.message);
+    // 透传完整 entry，保留 detail / id / timeMs，导出后仍可精确溯源。第三参数对旧视图向后兼容（可选）。
+    view.pushLog(entry.level, entry.message, { id: entry.id, timeMs: entry.timeMs, detail: entry.detail });
   });
 
   view.setHost(hostKey, host.isPlugin ? 'plugin' : 'web');

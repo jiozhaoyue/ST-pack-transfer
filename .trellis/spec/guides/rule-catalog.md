@@ -1,8 +1,8 @@
-# RULES.md · 工程规则唯一真源
+# 规则目录（Rule Catalog）· 工程规则唯一真源
 
 **版本** v1.1.0 ｜ **生效** <DATE> ｜ **条数** 30 / 上限 30
 
-配套文件：**`RULES-DETAILS.md`**（82 条技术细则，逐条挂到下列规则并附原文证据）。
+配套文件：**`rule-details.md`**（82 条技术细则，逐条挂到下列规则并附原文证据）。
 
 本文件是本仓全部 agent（Claude Code / Codex / Cursor / Gemini / Copilot / OpenCode / zcode / agy / WorkBuddy 等）的**唯一规则真源**。
 
@@ -78,7 +78,7 @@
 
 ### R-07 交付落点
 
-规范与校验器必须落在被 git 跟踪的位置：`RULES.md`、`tooling/**`、`test/**`、`.trellis/spec/**`。
+规范与校验器必须落在被 git 跟踪的位置：`rule-catalog.md`、`tooling/**`、`test/**`、`.trellis/spec/**`。
 
 `scripts/`、`.private/`、`e2e/`、`fixtures/` 被 `.gitignore` 忽略——放这里的产物**不算交付**，换机器即失效。
 
@@ -325,20 +325,20 @@ web / 手机 / 竖屏三种形态下：功能按钮必须全部显示、不得�
 
 自动覆盖 16 / 30 条。人工条目在 PR 描述里必须写明复核方式。
 
-**细则**：`RULES-DETAILS.md` 共 82 条（D-01~D-82），每条必须挂到上表中存在的规则 ID；出现悬空 ID 时 `details-coverage` 失败。
+**细则**：`rule-details.md` 共 82 条（D-01~D-82），每条必须挂到上表中存在的规则 ID；出现悬空 ID 时 `details-coverage` 失败。
 
 ---
 
 ## 十、指针协议（防堆砌的机制）
 
-**唯一真源**：本文件（规则）+ `RULES-DETAILS.md`（细则）。
+**唯一真源**：本文件 `rule-catalog.md`（30 条判据）+ `rule-details.md`（细则）+ `iron-rules.md`（注入铁律）+ `rule-triggers.md`（触发索引）。
 
 **其余文件只准放指针**，格式固定为三行：
 
 ```md
 <!-- RULES-POINTER v1 -->
-本仓工程规则唯一真源：`RULES.md`（30 条）+ `RULES-DETAILS.md`（82 条细则）。动手前先读；收尾前跑 `npm run verify:rules`。
-本文件不得复制 RULES.md 条文；冲突一律以 RULES.md 为准。
+本仓工程规则唯一真源位于 `.trellis/spec/guides/`：`rule-catalog.md`（30 条判据）、`rule-details.md`（细则）、`iron-rules.md`（会话注入铁律）、`rule-triggers.md`（触发索引）。动手前先读，收尾前跑 `npm run verify:rules`（用法见 rule-catalog.md）。
+本文件只放指针、不复述真源条文；冲突以真源为准。
 ```
 
 适用文件：`AGENTS.md`（顶部）、`CLAUDE.md`（顶部）、`GEMINI.md`、`.github/copilot-instructions.md`、`.cursor/rules/*.mdc`。
@@ -347,7 +347,7 @@ web / 手机 / 竖屏三种形态下：功能按钮必须全部显示、不得�
 
 1. **条数上限 30**。新增一条必须同时给出「校验 ID」或写明「人工 + 理由」。超过 30 条必须先合并或废弃旧条，不得追加。
 2. **禁止复制**。任何规则条文只准存在于本文件。其它文件出现逐字重复段落，`pointer-consistency` 直接失败。
-3. **案例不进规则**。事故案例与历史叙事写入 `.trellis/spec/guides/rule-evidence.md`；本文件只保留规则与一句判据。
+3. **案例不进规则**。事故案例与历史叙事写入 `.trellis/spec/guides/details/` 或 `.trellis/research/`；本文件只保留规则与一句判据。
 
 ---
 
@@ -355,5 +355,5 @@ web / 手机 / 竖屏三种形态下：功能按钮必须全部显示、不得�
 
 | 版本 | 日期 | 变更 |
 | --- | --- | --- |
-| v1.1.0 | <DATE> | 补 6 条旧规则完全缺失的门类：R-25 性能预算、R-26 宿主原生优先、R-27 全平台一致、R-28 教程隔离、R-29 安装来源唯一、R-30 失败不静默。同步产出 `RULES-DETAILS.md`（82 条技术细则，逐条挂规则 + 原文证据）。 |
+| v1.1.0 | <DATE> | 补 6 条旧规则完全缺失的门类：R-25 性能预算、R-26 宿主原生优先、R-27 全平台一致、R-28 教程隔离、R-29 安装来源唯一、R-30 失败不静默。同步产出 `rule-details.md`（82 条技术细则，逐条挂规则 + 原文证据）。 |
 | v1.0.0 | <DATE> | 首版。由 `AGENTS.md`（876 行 / 36 条 / 含 7 处内部重复与 2 个重复标题）+ `CLAUDE.md`（491 条去重行中 383 行重复，78%）+ `GEMINI.md` / `copilot-instructions.md` / `.cursor/rules` 三处复制同一铁律 收敛为 24 条单一真源，并配套 14 个自动校验。 |

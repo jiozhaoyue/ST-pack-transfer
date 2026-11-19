@@ -1,7 +1,7 @@
 # H2 · 滑动条 / 滚动条 / 滚动容器 / 拖拽分隔条 专项审计
 
 > 审计范围：`.private/rules-audit/claude-user-messages.md`、`_zcode_user_msgs.json`、`_agy_user_msgs.json`、
-> `.trellis/spec/**`、`AGENTS.md`、`CLAUDE.md`、`RULES.md`、`RULES-DETAILS.md`、`docs/**`、`src/ui/**`、`style.css`。
+> `.trellis/spec/**`、`AGENTS.md`、`CLAUDE.md`、当时的规则真源（历史文件名已停用，现位于 `.trellis/spec/guides/rule-catalog.md`）、当时的技术细则清单（历史文件名已停用，现位于 `.trellis/spec/guides/rule-details.md`）、`docs/**`、`src/ui/**`、`style.css`。
 > 关键词：滑动条 / 滚动条 / 滚动 / scroll / overflow / 拖拽条 / 拖拽分隔 / 竖屏 / 横向 / resize / scrollbar。
 > 结论：证据 17 条（其中 8 条铁律级），可判定细则 16 条，现状偏差 10 处（代码 6 / 规范冲突 3 / 结构风险 1）。
 

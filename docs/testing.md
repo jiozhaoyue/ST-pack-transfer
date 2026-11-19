@@ -13,7 +13,7 @@ alt_lang: en
 
 **目标**：确认解包、四端转换、细粒度勾选、分卷在纯前端环境闭环。
 
-1. 打开在线版，或下载 `download/ST-pack-transfer-offline.html` 后双击运行。
+1. 打开在线版，或从 GitHub Release 下载的 offline HTML（https://github.com/jiozhaoyue/ST-pack-transfer/releases/latest/download/ST-pack-transfer-offline.html）后双击运行。
 2. 选择一个现成的酒馆备份 ZIP。
 3. 检查左侧图表是否正确解析角色卡、聊天、世界书、图片、扩展等类目。
 4. 切换目标酒馆，勾选需要的类目，设置分卷大小。

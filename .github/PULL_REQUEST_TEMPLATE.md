@@ -47,7 +47,7 @@ npm run docs:verify
 - [ ] 对应 `*.en.md` 已同步
 - [ ] 教程截图已重拍并被页面引用
 - [ ] `npm run docs:update` 已刷新基线（仅确认改动完整后）
-- [ ] `download/ST-pack-transfer-offline.html` 已按需更新
+- [ ] 若改动影响单文件 HTML，已确认 `npm run build:offline` 可正常生成（产物由 Release 分发，无需提交）
 
 ## 隐私与安全确认
 

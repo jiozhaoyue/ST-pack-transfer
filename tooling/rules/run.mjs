@@ -89,7 +89,7 @@ async function main() {
     console.log('');
     if (mustFail.length) {
       console.log(`${C.red}✗ ${mustFail.length} 项 MUST 失败：${mustFail.map((r) => r.id).join(', ')}${C.reset}`);
-      console.log(`${C.dim}按 RULES.md 判断：未通过前不得声称完成。${C.reset}`);
+      console.log(`${C.dim}按规则目录判断：未通过前不得声称完成。${C.reset}`);
     } else {
       console.log(`${C.green}✓ 全部 MUST 通过${C.reset}${shouldFail.length ? `（${shouldFail.length} 项 SHOULD 待处理：${shouldFail.map((r) => r.id).join(', ')}）` : ''}`);
     }

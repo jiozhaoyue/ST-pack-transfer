@@ -14,7 +14,7 @@ This page only describes checks that end users can perform themselves. Back up r
 
 **Goal**: confirm unpacking, four-platform conversion, fine-grained selection, and splitting work entirely in the browser.
 
-1. Open the online version, or download `download/ST-pack-transfer-offline.html` and double-click it.
+1. Open the online version, or download the offline HTML from GitHub Release (https://github.com/jiozhaoyue/ST-pack-transfer/releases/latest/download/ST-pack-transfer-offline.html) and double-click it.
 2. Choose an existing tavern backup ZIP.
 3. Check that the left chart parses characters, chats, world info, images, extensions, and other categories correctly.
 4. Switch the target tavern, select categories, and set a split size.

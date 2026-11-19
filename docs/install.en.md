@@ -19,8 +19,7 @@ alt_lang: zh-CN
 
 ### Exact download path for the single-file HTML
 
-- Repository path: `download/ST-pack-transfer-offline.html`
-- Direct download: <https://github.com/jiozhaoyue/ST-pack-transfer/raw/main/download/ST-pack-transfer-offline.html>
+- Download from GitHub Release: <https://github.com/jiozhaoyue/ST-pack-transfer/releases/latest/download/ST-pack-transfer-offline.html>
 - Online HTML: <https://jiozhaoyue.github.io/ST-pack-transfer/>
 
 > The root `index.html` is a development skeleton and **cannot be downloaded and double-clicked by itself**; it needs a dev server or a built static server. Use the single-file HTML above when you want double-click behavior.

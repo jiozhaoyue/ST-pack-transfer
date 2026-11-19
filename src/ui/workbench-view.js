@@ -475,11 +475,25 @@ const state = {
 };
 
 /* ── 工具 ── */
+/**
+ * 体积格式化（唯一真源）。
+ *
+ * ⚠️ 铁律 5（数据正确性）：**禁止把非零字节显示成 0 KB**。
+ * 旧实现对 < 512 字节一律 `Math.round(mb*1000)` → `0 KB`，导致：
+ *   - 真实 462 字节的包显示 `0 KB`，与真正 0 字节的空文件**无法区分**；
+ *   - 用户误以为「包是空的」，实际是这个包很小或已损坏但仍有字节。
+ * 现约定：< 1 KB 一律用字节单位显示（含 0 → `0 B`），>= 1 KB 沿用 KB/MB/GB。
+ * @param {number} mb 以 MB 为单位的体积
+ * @returns {string}
+ */
 function fmtMB(mb){
   const n=Number(mb)||0;
   if(n>=1024) return (n/1024).toFixed(1)+' GB';
   if(n>=1) return (Math.round(n*10)/10)+' MB';
-  return Math.max(0,Math.round(n*1000))+' KB';
+  const bytes=n*1024*1024;
+  if(bytes>=1024) return Math.round(n*1000)+' KB';
+  /* 小于 1 KB：用字节表示，0 与 462 必须可区分 */
+  return Math.max(0,Math.round(bytes))+' B';
 }
 function hostIcon(host){ return (HOSTS[host]||{}).icon || HOSTS.luker.icon; }
 function hostName(host){ return (HOSTS[host]||{}).full || t('filter.unknown'); }
@@ -493,8 +507,15 @@ function dtNow(){
   const d=new Date(); const p=n=>String(n).padStart(2,'0');
   return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+'_'+p(d.getHours())+'-'+p(d.getMinutes())+'-'+p(d.getSeconds());
 }
-function log(level,msg){
-  state.log.push({ level, msg, time:nowTime() });
+function log(level,msg,extra){
+  /* extra 携带 logger 的结构化字段（id / timeMs / detail），供导出时完整还原；旧调用不传也能工作。 */
+  const e = { level, msg, time:nowTime() };
+  if (extra && typeof extra === 'object') {
+    if (extra.id !== undefined) e.id = extra.id;
+    if (extra.timeMs !== undefined) e.timeMs = extra.timeMs;
+    if (extra.detail !== undefined) e.detail = extra.detail;
+  }
+  state.log.push(e);
   const limit=logLimit();
   while(state.log.length>limit) state.log.shift();
   persistLog();
@@ -512,11 +533,26 @@ function logText(){
     t('log.auditCount', { n: state.log.length }),
     '---',
   ].join('\n');
-  return head + '\n' + state.log.map(l=>'['+l.time+'] ['+l.level+'] '+l.msg).join('\n');
+  /* 每条日志保留完整字段：id / timeMs / detail，并统一走 logger 脱敏层。 */
+  const lines = state.log.map(l => {
+    let line = '['+l.time+'] ['+l.level+'] '+(l.id!==undefined?('#'+l.id+' '):'')+l.msg
+      +(l.timeMs!==undefined?(' (t='+l.timeMs+')'):'');
+    if (l.detail !== undefined && l.detail !== null) {
+      let d;
+      try { d = typeof l.detail === 'object' ? JSON.stringify(l.detail, null, 2) : String(l.detail); }
+      catch { d = '[Unserializable Object]'; }
+      line += '\n  Detail: '+String(d).replace(/\n/g, '\n  ');
+    }
+    return line;
+  });
+  const text = head + '\n' + lines.join('\n');
+  return typeof logger.redact === 'function' ? logger.redact(text) : text;
 }
 function exportLog(){
   if (typeof document === 'undefined' || typeof URL === 'undefined') return;
-  const blob = new Blob([logText()], { type: 'text/plain;charset=utf-8' });
+  /* 统一使用 logger 的导出格式（含日期时间戳 / 完整字段 / 脱敏 / 环境头）。 */
+  const content = typeof logger.exportText === 'function' ? logger.exportText() : logText();
+  const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -8999,7 +9035,7 @@ void refreshHostIdentity();
         renderExtensionView();
       }
     },
-    pushLog(level, msg) { log(String(level || 'INFO').toUpperCase(), msg); },
+    pushLog(level, msg, extra) { log(String(level || 'INFO').toUpperCase(), msg, extra); },
     openModal,
     closeModal,
     openSettingsView,

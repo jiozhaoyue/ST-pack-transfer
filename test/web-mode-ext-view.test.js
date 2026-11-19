@@ -30,7 +30,9 @@ describe('Web模式扩展视图与分级日志契约', () => {
     // 空包记录 WARN
     expect(viewContent).toMatch(/logger\.warn\(.*extPkgReadEmpty/);
     // index.js 订阅 logger 时原样透传 SUCCESS，严禁降级为 INFO
-    expect(indexContent).toMatch(/logger\.subscribe\(\(entry\)\s*=>\s*\{[\s\S]*?view\.pushLog\(entry\.level,\s*entry\.message\);/);
+    expect(indexContent).toMatch(/logger\.subscribe\(\(entry\)\s*=>\s*\{[\s\S]*?view\.pushLog\(entry\.level,\s*entry\.message/);
+    // 桥接必须透传完整 entry（detail / id / timeMs），否则导出后无法溯源
+    expect(indexContent).toMatch(/view\.pushLog\(entry\.level,\s*entry\.message,\s*\{\s*id:\s*entry\.id,\s*timeMs:\s*entry\.timeMs,\s*detail:\s*entry\.detail\s*\}/);
     expect(indexContent).not.toContain("entry.level === 'SUCCESS' ? 'INFO'");
   });
 

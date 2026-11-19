@@ -1,10 +1,10 @@
-# RULES-DETAILS.md · 技术细则清单
+# 技术细则清单（rule-details）
 
-配套 `RULES.md` 使用。**规则是判据，细则是判据的具体参数**。
+配套 `rule-catalog.md` 使用。**规则是判据，细则是判据的具体参数**。
 
 - 来源：`<HOME>\.claude\projects\D--Repo-Tavern-repo-My-repo-ST-pack-transfer\` 35 个会话、45744 行、8718 条 user 行 → 132 条真人输入 → 去重 96 条（<DATE> ~ <DATE>）。
 - 每条细则都有原文证据（日期 + session 前缀），可在 `.private/rules-audit/claude-user-messages.md` 复核。
-- **细则必须挂到 `RULES.md` 中存在的规则**：`npm run verify:rules` 的 `details-coverage` 会校验，出现悬空规则 ID 即失败。
+- **细则必须挂到 `rule-catalog.md` 中存在的规则**：`npm run verify:rules` 的 `details-coverage` 会校验，出现悬空规则 ID 即失败。
 - 新增细则只能追加，不得改写既有条目；细则作废时标 `[已废弃]` 并注明日期，不删除。
 
 ---
@@ -151,3 +151,9 @@
 | ID | 规则 | 细则 | 证据 |
 | --- | --- | --- | --- |
 | D-93 | R-24 | 持久服务（dev server 等长驻进程）必须用系统命令启动为独立进程（Windows `Start-Process`、POSIX `nohup` / `setsid`），禁止用 agent 内置后台 shell——其受 timeout 约束会被 SIGTERM 终止；判据：进程不随 agent 会话结束而消失 | <DATE> 会话实测 |
+
+## K. 变更安全（事故教训）
+
+| ID | 规则 | 细则 | 证据 |
+| --- | --- | --- | --- |
+| D-94 | R-02 | 对应铁律 40。验证守卫的标准流程（三选一）：① 把目标文件先复制到 `tmp/` 备份，在副本上做反例验证；② 把反例行写进**新建的临时文件**，不改被测文件；③ 就地改动后用 `Edit` 精确撤销那一处，禁止整文件回滚。任何回滚类命令执行前必须先 `git stash push -u -- <file>` 或复制备份，并在回复中报备备份路径。**绝对禁止**：`git checkout -- <file>`、`git checkout <ref> -- <file>`、`git restore <file>`、`git restore --worktree`、`git reset --hard`、`git clean -fd`——它们会把文件回滚到 HEAD，抹掉会话开始时 `git status` 中已标记为 `M` 的未提交改动，且通常无法从 `.history` / `git stash` / `git fsck` / 旧构建产物恢复 | 事故教训 |

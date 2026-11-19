@@ -1,6 +1,6 @@
 <!-- RULES-POINTER v1 -->
-本仓工程规则唯一真源：`RULES.md`（30 条）+ `RULES-DETAILS.md`（82 条细则）。动手前先读；收尾前跑 `npm run verify:rules`。
-本文件不得复制 RULES.md 条文；冲突一律以 RULES.md 为准。
+本仓工程规则唯一真源位于 `.trellis/spec/guides/`：`.trellis/spec/guides/rule-catalog.md`（30 条判据）、`.trellis/spec/guides/rule-details.md`（细则）、`.trellis/spec/guides/iron-rules.md`（会话注入铁律）、`.trellis/spec/guides/rule-triggers.md`（触发索引）。动手前先读，收尾前跑 `npm run verify:rules`（用法见 `.trellis/spec/guides/rule-catalog.md`）。
+本文件只放指针、不复述真源条文；冲突以真源为准。
 
 <!-- IRON-RULE:REPORT-ALL-WRITES v1 (2026-11-11 用户铁律，禁止删除) -->
 # 铁律 0：任何配置写入与工具调用，必须全程出声（不可静默）

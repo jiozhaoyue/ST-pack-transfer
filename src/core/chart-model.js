@@ -108,12 +108,24 @@ export function toMb(bytes) {
   return n > 0 ? Math.round((n / (1024 * 1024)) * 1000) / 1000 : 0;
 }
 
-/** MB → 人类可读。 */
+/**
+ * MB → 人类可读（**唯一真源**，包卡 `.pkg-meta` 的体积就来自这里）。
+ *
+ * ⚠️ 铁律 5（数据正确性）：**禁止把非零字节显示成 0 KB**。
+ * 旧实现 `< 1 KB` 一律 `Math.round(mb * 1000)` → `0 KB`，导致：
+ *   - 真实 462 字节的包显示 `0 KB`，与真正 0 字节的空文件**无法区分**；
+ *   - 用户在 TauriTavern 里看到 `0 KB`，误判为「导入失败 / 包是空的」。
+ * 现约定：< 1 KB 一律用字节单位（含 0 → `0 B`），>= 1 KB 沿用 KB/MB/GB。
+ * @param {number} mb 以 MB 为单位的体积
+ * @returns {string}
+ */
 export function fmtMB(mb) {
   const n = Number(mb) || 0;
   if (n >= 1024) return `${(n / 1024).toFixed(1)} GB`;
   if (n >= 1) return `${Math.round(n * 10) / 10} MB`;
-  return `${Math.round(n * 1000)} KB`;
+  const bytes = n * 1024 * 1024;
+  if (bytes >= 1024) return `${Math.round(n * 1000)} KB`;
+  return `${Math.max(0, Math.round(bytes))} B`;
 }
 
 /**

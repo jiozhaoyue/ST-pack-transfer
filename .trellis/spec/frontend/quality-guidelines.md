@@ -117,6 +117,27 @@ grep -rn "trustedStaticMarkup(" src/ index.js
    - ❌ 组件层直接 `if (!confirm('确定删除吗？')) return;`
    - ✅ 走 `src/ui/host-bridge.js` 的 `confirmDialog()`（官方文档路径
      `SillyTavern.getContext().Popup.show.confirm`，不可用时静默降级）；组件经 `confirmFn` DI 接缝注入
+
+10. **同语义多实现：改了一个、UI 走另一个**（**2026-11-19 实测事故**）
+    - ❌ 同一个语义函数在两个模块各写一份，修其中一处就以为修好了。
+      实测：`fmtMB` 同时存在于 `src/core/chart-model.js` 与 `src/ui/workbench-view.js`；
+      包卡 `<span>${p.size}</span>` 的取值链是
+      `index.js` import `chart-model.js` 的 `fmtMB` → 写 `p.size` → 卡片渲染，
+      **只改 `workbench-view.js` 那一份完全不生效**，真机仍显示 `0 KB`。
+    - ✅ 修「显示值不对」类缺陷前，必须 `grep -rn "函数名"` 穷举同名实现，
+      并沿着**数据写入点**（谁生成这个字段）而非**渲染点**（谁把它放进 DOM）确认真源；
+      修完必须在真机读 DOM 文本复核，不得以单测通过代替。
+    - 后果：误判「已修复」，问题在用户侧持续存在；两份实现继续漂移，下一个维护者会踩同一坑。
+    - 判据：`grep -rn "function fmtMB" src/` 命中 >1 处时，必须写明哪一处是 UI 真源。
+      当前约定：**包卡体积真源 = `src/core/chart-model.js`**（`workbench-view.js` 那份只服务图表/统计）。
+
+11. **体积显示取整成 0**（**2026-11-19 实测事故**）
+    - ❌ `< 1 KB` 一律 `Math.round(mb * 1000) + ' KB'` ⇒ 462 字节显示 `0 KB`，
+      与真正 0 字节的空文件**无法区分**，用户误判「包已损坏 / 导入失败」。
+    - ✅ 小于 1 KB 必须用字节单位：`0 → 0 B`、`462 字节 → 462 B`；`>= 1 KB` 才用 KB/MB/GB。
+    - 后果：真实的小包与损坏的空文件在界面上同形，直接违反铁律 5（禁假 0），并误导排障方向。
+    - 判据：`test/ui-fmt-size.test.js` 覆盖 `0 / 1 / 22 / 462 / 1023 / 1024` 并断言
+      「任何非零输入不得输出 `0 KB`」，同时断言 `chart-model.js` 与 `workbench-view.js` 两份实现一致。
    - 后果：插件在酒馆里出现原生浏览器弹窗，与宿主 UI 割裂；且组件无法脱离宿主单测
    - 现役接入面：`workbench-view.js` 的 `openModal()` 与 `#confirm-dialog`（自绘 `<dialog>`）、
      `index.js` 从 `host-bridge.js` 引入的 `confirmDialog()` / `alertDialog()`。

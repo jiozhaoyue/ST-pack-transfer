@@ -26,7 +26,7 @@ alt_lang: en
 
 ## 它解决什么问题
 
-平时使用酒馆时，各家（SillyTavern、Luker、TauriTavern、PureTavern）在保存用户数据（角色卡、聊天记录、世界书、预设、背景图、扩展插件等）时，各自采用了不同的目录规则和文件结构。直接把一家导出的备份包导入另一家，通常会因为目录结构对不上而无法识别。
+平时使用酒馆时，各家（SillyTavern、Luker、TauriTavern、PureTavern）在保存用户数据（角色卡、聊天记录、世界书、预设、背景图、扩展插件等）时，各自采用了不同的目录规则和文件结构。直接把一家导出的数据包导入另一家，通常会因为目录结构对不上而无法识别。
 
 ST-pack-transfer 专门解决这个痛点：**在任意两款酒馆的数据包之间自由互转**，自动识别并重组目录，尽量帮你完整保留所有的角色、聊天与个性化设置，让你换酒馆、换设备搬家时轻松省心。
 
@@ -62,7 +62,7 @@ ST-pack-transfer 专门解决这个痛点：**在任意两款酒馆的数据包�
 | --- | --- | --- |
 | 酒馆扩展插件 | 酒馆扩展列表 →「数据包转运」→「打开面板」 | 日常在酒馆内直接备份、恢复与管理扩展 |
 | 独立网页版 | 打开在线网址或本地网页 | 纯粹做数据包格式转换与分析，无需启动酒馆 |
-| 离线单文件 HTML | 下载 `download/ST-pack-transfer-offline.html` 后双击 | 无网络、纯离线环境随身携带使用 |
+| 离线单文件 HTML | 从 [GitHub Release 下载](https://github.com/jiozhaoyue/ST-pack-transfer/releases/latest/download/ST-pack-transfer-offline.html) 后双击 | 无网络、纯离线环境随身携带使用 |
 
 ## 许可证
 

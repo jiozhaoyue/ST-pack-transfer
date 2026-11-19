@@ -22,6 +22,9 @@ coverage/
 .nyc_output/
 # file:// 单文件离线产物（构建产物，不入库；由 npm run build:offline 生成）
 dist-offline/
+# 对外下载目录同样只放构建产物：offline html 改由 GitHub Release asset 分发
+# （2026-11-19 用户裁定：不再提交进版本控制，避免每次构建 3.83 MB 膨胀 git 历史）
+download/
 # E2E 产物（trace / 截图 / 实例日志 / pid）——含实例侧真实数据风险，严禁入库（L1-MR-14）
 test-results/
 # Playwright 持久化 profile（含 Cookies / Session Storage / 缓存，严禁入库 —— L1-MR-14）

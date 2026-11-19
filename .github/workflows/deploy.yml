@@ -1,7 +1,8 @@
 name: Deploy to GitHub Pages
 
 # 仅在正式版本 tag（v*）或手动触发时部署，杜绝日常开发 push 污染线上 Pages。
-# 2026-11-17 用户裁定：发布只打 tag，不创建 GitHub Release，因此改为 tag push 触发。
+# Release 产物（offline 单文件 HTML）由独立的 release.yml 负责，本工作流只管 Pages。
+# 2026-11-19 用户裁定：tag 与 Release 同时发，offline HTML 走 Release asset，不再入库。
 on:
   push:
     tags:

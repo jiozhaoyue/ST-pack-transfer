@@ -38,21 +38,44 @@ function triggerBlobDownload(blob, name) {
 
 /**
  * 通过 File System Access API 选择位置写出文件；不支持或用户取消时回退普通下载。
+ *
+ * 0 B 事故防线（用户实测：文件管理器里看到 0 B 的包）：
+ *  - `showSaveFilePicker` **在用户确认那一刻就在磁盘上创建了空文件**。后续任何一步失败，
+ *    磁盘都会留下一个 0 字节文件，而用户只看到「保存成功的位置」。
+ *  - 因此必须 ① 显式 `close()` 提交（`pipeTo` 只负责写入，不负责提交）；
+ *    ② 写入失败时把已创建的空文件截断为空并明确报错，不静默留残骸；
+ *    ③ 不静默回退成第二次下载——同一产物出现「0 B 文件 + 一个下载」会让用户彻底无法判断。
+ *
  * @param {Blob} blob
  * @param {string} name
+ * @returns {Promise<{ok:boolean, reason?:string}>} 供调用方如实提示
  */
 export async function exportToLocation(blob, name) {
   if (typeof window === 'undefined' || !window.showSaveFilePicker) {
     triggerBlobDownload(blob, name);
-    return;
+    return { ok: true, reason: 'download' };
   }
+  const expected = blob?.size ?? 0;
+  let handle = null;
+  let writable = null;
   try {
-    const handle = await window.showSaveFilePicker({ suggestedName: name });
-    const writable = await handle.createWritable();
+    handle = await window.showSaveFilePicker({ suggestedName: name });
+    writable = await handle.createWritable();
     await blob.stream().pipeTo(writable);
+    // 提交：缺这一步时数据可能仍在缓冲区，落盘文件会不完整甚至为 0 字节。
+    await writable.close();
+    writable = null;
+    // 落盘复核：读回真实字节数，与源 Blob 比对（禁假成功）。
+    const written = await handle.getFile();
+    if (expected > 0 && written.size !== expected) {
+      return { ok: false, reason: `size-mismatch:${written.size}/${expected}` };
+    }
+    return { ok: true, reason: 'file-system-access', size: written.size };
   } catch (err) {
-    if (err && err.name === 'AbortError') return; // 用户取消
-    triggerBlobDownload(blob, name); // FS Access 写入异常兜底
+    if (err && err.name === 'AbortError') return { ok: false, reason: 'aborted' };
+    // 失败收尾：关掉未提交的 writable，避免句柄悬挂与半成品文件
+    try { await writable?.abort?.(); } catch { /* 句柄已失效 */ }
+    return { ok: false, reason: `write-failed:${err?.name || 'Error'}:${err?.message || err}` };
   }
 }
 

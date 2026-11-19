@@ -1,0 +1,81 @@
+name: Release
+
+# 每次 push v* tag 时构建单文件 HTML，创建 GitHub Release 并上传为 asset。
+#
+# 历史沿革：
+#  - 2026-11-17 曾裁定「发布只打 tag，不创建 GitHub Release」（见 deploy.yml 注释）。
+#  - 2026-11-19 用户改为：tag 与 Release 必须同时发，offline HTML 只走 Release asset，
+#    不再提交进版本控制（3.83 MB / 次提交会让 git 历史线性膨胀）。
+#  - Pages 部署仍由 deploy.yml 负责，本工作流只管 Release，两者互不干扰。
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write   # 创建 Release + 上传 asset
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false   # 已开始的发布不取消，避免留下半个 Release
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # 发版门槛（铁律 13）：测试不全绿不发版。
+      - name: Test
+        run: npm test
+
+      - name: Build offline single file
+        run: npm run build:offline
+
+      # 校验产物真实存在且非空：空产物发出去等于发布一个坏包。
+      - name: Verify offline artifact
+        run: |
+          set -euo pipefail
+          f="dist-offline/ST-pack-transfer-offline.html"
+          test -f "$f" || { echo "缺少产物：$f"; exit 1; }
+          size=$(stat -c%s "$f")
+          echo "offline html size = $size bytes"
+          test "$size" -gt 1024 || { echo "产物过小（$size bytes），疑似构建失败"; exit 1; }
+
+      # Release 已存在时用 upload --clobber 覆盖，保证重复触发幂等。
+      - name: Create or update release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          asset="dist-offline/ST-pack-transfer-offline.html"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG 已存在，覆盖 asset"
+            gh release upload "$TAG" "$asset" --clobber
+          else
+            gh release create "$TAG" "$asset" \
+              --title "$TAG" \
+              --generate-notes \
+              --latest
+          fi
+
+      - name: Summary
+        run: |
+          {
+            echo "## Release ${{ github.ref_name }}"
+            echo ""
+            echo "- 产物：\`ST-pack-transfer-offline.html\`"
+            echo "- 下载：${{ github.server_url }}/${{ github.repository }}/releases/latest/download/ST-pack-transfer-offline.html"
+          } >> "$GITHUB_STEP_SUMMARY"

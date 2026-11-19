@@ -18,8 +18,7 @@ alt_lang: en
 
 ### 单文件 HTML 的确切下载路径
 
-- 仓库内路径：`download/ST-pack-transfer-offline.html`
-- 直接下载：<https://github.com/jiozhaoyue/ST-pack-transfer/raw/main/download/ST-pack-transfer-offline.html>
+- 从 GitHub Release 下载：<https://github.com/jiozhaoyue/ST-pack-transfer/releases/latest/download/ST-pack-transfer-offline.html>
 - 在线 HTML：<https://jiozhaoyue.github.io/ST-pack-transfer/>
 
 > 根目录的 `index.html` 是开发骨架，**不能单独下载后双击使用**；它依赖开发服务器或构建后的静态服务。想要双击即用，请下载上面的单文件 HTML。

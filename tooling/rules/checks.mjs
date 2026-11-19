@@ -1,10 +1,10 @@
 /**
- * RULES.md 自动校验器 —— 规则注册表
+ * 规则目录自动校验器 —— 规则注册表
  *
  * 设计原则：
  * 1. 每条检查都是纯函数，返回 { ok, detail, items }，不修改任何文件。
- * 2. 检查 ID 与 RULES.md「校验矩阵」一一对应。
- * 3. 新规则必须同时在此登记检查，否则 RULES.md 的条数上限机制失效。
+ * 2. 检查 ID 与规则目录「校验矩阵」一一对应。
+ * 3. 新规则必须同时在此登记检查，否则规则目录的条数上限机制失效。
  */
 import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
@@ -146,7 +146,7 @@ export const checks = [
     severity: 'MUST',
     run() {
       const rulesText = readText(RULES_FILE);
-      if (!rulesText) return { ok: false, detail: 'RULES.md 不存在' };
+      if (!rulesText) return { ok: false, detail: '规则目录（rule-catalog.md）不存在' };
 
       const items = [];
       const cursorDir = path.join(ROOT, '.cursor/rules');
@@ -168,7 +168,7 @@ export const checks = [
         }
       }
 
-      // 禁止复制：RULES.md 中的长条文不得逐字出现在其它规则文件
+      // 禁止复制：规则目录中的长条文不得逐字出现在其它规则文件
       const longLines = rulesText
         .split(/\r?\n/)
         .map((s) => s.trim())
@@ -180,7 +180,7 @@ export const checks = [
         if (!text) continue;
         for (const line of longLines) {
           if (text.includes(line)) {
-            items.push({ file: rel, line: 0, text: `逐字复制了 RULES.md 条文：${line.slice(0, 60)}…` });
+            items.push({ file: rel, line: 0, text: `逐字复制了规则目录条文：${line.slice(0, 60)}…` });
             break;
           }
         }
@@ -189,6 +189,102 @@ export const checks = [
       return {
         ok: items.length === 0,
         detail: items.length === 0 ? `${targets.length} 个规则文件指针一致，无逐字复制` : `${items.length} 处不符合指针协议`,
+        items,
+      };
+    },
+  },
+
+  {
+    id: 'rule-paths-resolve',
+    rule: 'R-01',
+    title: '规则引用可达：规则文件内引用的路径必须存在（禁止陈旧/断联）',
+    severity: 'MUST',
+    run() {
+      // 扫描目标：harness 文件、规则真源四件套，以及规则目录 / 校验器目录下的文件
+      const targets = [
+        ...HARNESS_FILES,
+        RULES_FILE,
+        DETAILS_FILE,
+        IRON_FILE,
+        TRIGGERS_FILE,
+        ...walk('.trellis/spec/guides', (n) => n.endsWith('.md')),
+        ...walk('tooling/rules', (n) => /\.(mjs|cjs|js)$/.test(n)),
+      ];
+      // 去重，避免同一文件被重复报告
+      const files = [...new Set(targets)];
+
+      // 陈旧字面量：用拼接构造，避免校验器源码自身命中该判据
+      const staleLiterals = ['RULES' + '.md', 'RULES-DETAILS' + '.md'];
+      // 反引号内 token：只保留形如仓库相对路径、且带受支持扩展名的片段
+      const tokenRe = /`([^`\n]+)`/g;
+      const pathExtRe = /\.(md|mjs|cjs|js|json)$/;
+      /* 只把「明确表达路径」的 token 当路径校验，避免把裸文件名误报成断联：
+         - 含 `/` 或 `\` 的相对/绝对路径
+         - 或以仓库已知顶层目录开头（src/、tooling/、.trellis/ …）
+         裸文件名（如 `transform.js`、`delta.js`）是可读性写法，语义是「某个模块」而非路径，
+         对它做存在性判定必然大量误报，最终会让守卫本身被忽略。 */
+      const KNOWN_TOP_DIRS = [
+        'src', 'tooling', 'test', 'docs', 'scripts', 'e2e', 'fixtures', 'public', 'download',
+        'dist', 'dist-offline', 'out', 'zip', 'data-zip', 'tmp', '.trellis', '.github', '.cursor',
+      ];
+      const looksLikePath = (token) =>
+        token.includes('/') || token.includes('\\')
+        || KNOWN_TOP_DIRS.some((dir) => token === dir || token.startsWith(dir + '/'));
+      // 仅校验「规则真源自身」的指针可达性：harness 指针块与规则四件套。
+      // 其余 spec 文档里的示例路径属说明性引用，不在本检查的强制面内。
+      const strictFiles = new Set([...HARNESS_FILES, RULES_FILE, DETAILS_FILE, IRON_FILE, TRIGGERS_FILE]);
+      let checked = 0;
+
+      const items = [];
+      for (const rel of files) {
+        const text = readText(rel);
+        if (text === null || isBinary(text)) continue;
+        const absFile = path.join(ROOT, rel);
+
+        // 额外硬判：文件内出现陈旧的旧规则文件名，且仓库根无同名文件 → 陈旧路径引用
+        text.split(/\r?\n/).forEach((line, i) => {
+          for (const lit of staleLiterals) {
+            if (line.includes(lit) && !existsSync(path.join(ROOT, lit))) {
+              items.push({ file: rel, line: i + 1, text: `陈旧路径引用：${lit}（仓库根无同名文件）` });
+            }
+          }
+        });
+
+        // 路径可达性：仅对指针/真源文件执行；先按仓库根解析，再按当前文件目录解析
+        if (!strictFiles.has(rel)) continue;
+        let m;
+        tokenRe.lastIndex = 0;
+        while ((m = tokenRe.exec(text)) !== null) {
+          const token = m[1];
+          if (!pathExtRe.test(token)) continue;
+          if (/[\s*…<>|]/.test(token)) continue;
+          if (/^(http|~|\$)/.test(token)) continue;
+          // 陈旧字面量由上面的硬判统一报告，避免同一处被重复计数
+          if (staleLiterals.includes(token)) continue;
+          // 裸文件名不是路径引用，跳过（避免误报）
+          if (!looksLikePath(token)) continue;
+          checked += 1;
+          /* 解析基准（按顺序尝试，任一命中即视为可达）：
+             ① 仓库根 —— `src/core/x.js` 这类全仓相对路径
+             ② 当前文件所在目录 —— 同目录内的相对引用
+             ③ `.trellis/spec/` —— `guides/foo.md` / `frontend/bar.md` 是 spec 内的简写，
+                在 rule-triggers.md 等索引类文档里大量使用；漏掉这一基准会产生整片误报，
+                误报多了守卫就会被忽略，反而失去意义。 */
+          const candidates = [
+            path.join(ROOT, token),
+            path.resolve(path.dirname(absFile), token),
+            path.join(ROOT, '.trellis/spec', token),
+          ];
+          if (!candidates.some((p) => existsSync(p))) {
+            const line = text.slice(0, m.index).split(/\r?\n/).length;
+            items.push({ file: rel, line, text: `路径断联：${token}` });
+          }
+        }
+      }
+
+      return {
+        ok: items.length === 0,
+        detail: `扫描 ${files.length} 个文件（硬校验 ${strictFiles.size} 个指针/真源文件，校验 ${checked} 条路径引用），发现 ${items.length} 处断联`,
         items,
       };
     },
@@ -511,8 +607,8 @@ export const checks = [
     run() {
       const details = readText(DETAILS_FILE);
       const rules = readText(RULES_FILE);
-      if (details === null) return { ok: false, detail: 'RULES-DETAILS.md 不存在' };
-      if (rules === null) return { ok: false, detail: 'RULES.md 不存在' };
+      if (details === null) return { ok: false, detail: '细则文件（rule-details.md）不存在' };
+      if (rules === null) return { ok: false, detail: '规则目录（rule-catalog.md）不存在' };
 
       const defined = new Set([...rules.matchAll(/^###\s+(R-\d+)/gm)].map((m) => m[1]));
       const items = [];
@@ -550,7 +646,7 @@ export const checks = [
     severity: 'MUST',
     run() {
       const rules = readText(RULES_FILE);
-      if (rules === null) return { ok: false, detail: 'RULES.md 不存在' };
+      if (rules === null) return { ok: false, detail: '规则目录（rule-catalog.md）不存在' };
       const required = ['100ms', '10s'];
       const missing = required.filter((n) => !rules.includes(n));
       return {

@@ -1,6 +1,6 @@
 <!-- RULES-POINTER v1 -->
-本仓工程规则唯一真源：`RULES.md`（30 条）+ `RULES-DETAILS.md`（82 条细则）。动手前先读；收尾前跑 `npm run verify:rules`。
-本文件不得复制 RULES.md 条文；冲突一律以 RULES.md 为准。
+本仓工程规则唯一真源位于 `.trellis/spec/guides/`：`.trellis/spec/guides/rule-catalog.md`（30 条判据）、`.trellis/spec/guides/rule-details.md`（细则）、`.trellis/spec/guides/iron-rules.md`（会话注入铁律）、`.trellis/spec/guides/rule-triggers.md`（触发索引）。动手前先读，收尾前跑 `npm run verify:rules`（用法见 `.trellis/spec/guides/rule-catalog.md`）。
+本文件只放指针、不复述真源条文；冲突以真源为准。
 
 <!-- IRON-RULE:REPORT-ALL-WRITES v1 (2026-11-11 用户铁律，禁止删除) -->
 # 铁律 0：任何配置写入与工具调用，必须全程出声（不可静默）
@@ -78,7 +78,7 @@
 
 ## 规范入口
 
-- `.trellis/spec/tavern-dev/index.md`
+- `.trellis/spec/guides/rule-catalog.md`（规则判据）与 `.trellis/spec/frontend/index.md` / `.trellis/spec/backend/index.md`（分层规范索引）
 
 ## 技能策略
 
@@ -89,3 +89,28 @@
 （本仓自有内容，同步器保留；无则留空。）
 
 <!-- TAVERN-RULES:END -->
+
+<!-- AGY-SWARM-PROTOCOL:START v1 (2026-11-18 用户明令·AGY专属协议) -->
+## AGY 专属多智能体协同与模型隔离协议 (AGY-ONLY)
+
+> 本协议仅供 Google Antigravity (AGY) harness 读取与执行；与其他 agent harness 严格隔离。
+> 真源规范遵循 `.trellis/spec/guides/subagent-collaboration.md`。
+
+### 1. 免费轻量模型强硬绑定 (MUST)
+- AGY 内派生多智能体时，必须显式绑定平台免费轻量模型：`model: "agb-b0fb137c-high"`（Display Name: `opencodego/hy4-flash-free (High)`）。
+- 派生前查验 `swarm(action="models", all=true)`，严禁调用未授权的付费大模型。
+
+### 2. 身份分立与红队交叉找茬机制 (MUST)
+- **主代理（Coordinator）职责**：专职全局调度、流程编排、以及**多模态分块截图深度兜底审查**；非必要不下场编写细节业务逻辑。
+- **子代理必须身份分明**：
+  1. `auditor`（审计专员）：全量普查相关代码与界面清单，禁止空泛遍历。
+  2. `packmod` / 功能专员：负责专项功能或弹窗重构实施。
+  3. `reporter` / 结果专员：负责报告、日志与结果反馈界面的优化。
+  4. `nitpicker`（红队质检员）：专门反向挑刺，审查破坏性场景、极端小屏溢出、全局样式污染、内存与超时风险，对其他专员方案进行交叉证伪。
+- 严禁单一代理自说自话，重大改动必须经过红队找茬交叉验证。
+
+### 3. 宿主与独立 Web 扩展更新二分法 (MUST)
+- **宿主环境**：能用宿主就用宿主，一律经 `host-bridge.js` 调用宿主原生扩展安装/更新端点。
+- **独立 Web 模式**：扩展更新与补全必须走内置纯前端 Git 抓取链路（`src/core/repo-files.js` 的 `downloadRepoFiles` 递归树拉取），严禁在 Web 模式假死或要求用户自装环境。
+- **弹窗短名红线**：操作按钮严守 G-16 规范，严禁长名按钮（如“清单转 Git 拉取打包”必须精简为“拉取清单”等 4 字以内极简文案），辅助说明收敛至 tooltip。
+<!-- AGY-SWARM-PROTOCOL:END -->

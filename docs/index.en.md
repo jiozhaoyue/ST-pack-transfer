@@ -63,7 +63,7 @@ ST-pack-transfer converts packs between any two taverns, recognizes and rebuilds
 | --- | --- | --- |
 | Tavern extension | Tavern extension list → "Data Pack Transfer" → "Open panel" | Daily backup, restore, and extension management inside a tavern |
 | Standalone web app | Open the online URL or a local page | Pure conversion and analysis without starting a tavern |
-| Offline single file | Download `download/ST-pack-transfer-offline.html` and double-click | Air-gapped or portable use |
+| Offline single file | Download from [GitHub Release](https://github.com/jiozhaoyue/ST-pack-transfer/releases/latest/download/ST-pack-transfer-offline.html) and double-click | Air-gapped or portable use |
 
 ## License
 

@@ -1,8 +1,8 @@
 # CLAUDE.md
 
 <!-- RULES-POINTER v1 -->
-本仓工程规则唯一真源：`RULES.md`（30 条）+ `RULES-DETAILS.md`（82 条细则）。动手前先读；收尾前跑 `npm run verify:rules`。
-本文件不得复制 RULES.md 条文；冲突一律以 RULES.md 为准。
+本仓工程规则唯一真源位于 `.trellis/spec/guides/`：`.trellis/spec/guides/rule-catalog.md`（30 条判据）、`.trellis/spec/guides/rule-details.md`（细则）、`.trellis/spec/guides/iron-rules.md`（会话注入铁律）、`.trellis/spec/guides/rule-triggers.md`（触发索引）。动手前先读，收尾前跑 `npm run verify:rules`（用法见 `.trellis/spec/guides/rule-catalog.md`）。
+本文件只放指针、不复述真源条文；冲突以真源为准。
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
@@ -93,12 +93,12 @@ npm run gen-fixtures              # 重新生成测试固件 fixtures/
     - **PT 有**一方扩展「PureTavern 数据管理」→ `#pure-tavern-data-management-entry` → `dialog#pure-tavern-data-management-dialog` → `#ptdm-export`；且 PT **没有** `/api/users/backup`，它走 `POST /api/backups/archive/export`（`{moduleIds, includeSecrets}`）。
     - 曾凭「TT 是 ST 派生」+ 一次 grep 就断言 TT/PT「无原生入口」，被用户当面否决。
     - 调研顺序：宿主 `docs/**`（含子目录）→ 一方扩展的 `manifest.json` / `settings.html` → 运行实例 DOM 取证；**禁止**用 grep 源码代替调研。
-    - 注意 TT 的 `docs/API/Migration.md` 是**「从 SillyTavern 扩展适配到 TauriTavern」指南**，不是数据迁移文档。
+    - 注意 TauriTavern 实例仓里的 docs/API/Migration.md（宿主侧文件，不在本仓）是**「从 SillyTavern 扩展适配到 TauriTavern」指南**，不是数据迁移文档。
     - 事实表见 `.trellis/spec/frontend/host-capabilities.md` 末节。
 
 ## Trellis 任务流
 
-本项目用 Trellis 管理任务。当前任务 `python ./.trellis/scripts/task.py current`；工作流 `.trellis/workflow.md`；分层规范 `.trellis/spec/backend/`（core）与 `.trellis/spec/frontend/`（ui）。更全的项目规则与统一开发规则见 [AGENTS.md](./AGENTS.md)。
+本项目用 Trellis 管理任务。当前任务 `python ./.trellis/scripts/task.py current`；分层规范 `.trellis/spec/backend/`（core）与 `.trellis/spec/frontend/`（ui）。更全的项目规则与统一开发规则见 [AGENTS.md](./AGENTS.md)。
 
 <!-- TAVERN-RULES:START v3.0.0 -->
 <!-- 本块由 tavern-harness/scripts/modules/rules_sync.py 自动生成，请勿手动编辑 -->
@@ -161,7 +161,7 @@ npm run gen-fixtures              # 重新生成测试固件 fixtures/
 
 ## 规范入口
 
-- `.trellis/spec/tavern-dev/index.md`
+- `.trellis/spec/guides/rule-catalog.md`（规则判据）与 `.trellis/spec/frontend/index.md` / `.trellis/spec/backend/index.md`（分层规范索引）
 
 ## 技能策略
 
@@ -178,7 +178,7 @@ npm run gen-fixtures              # 重新生成测试固件 fixtures/
 1. **文档先行 / 禁止直接读源码理解功能**（MUST）：任何功能理解先查
    `docs/DEVELOPER-GUIDE.md`、`.trellis/spec/`、`mini-trellis mem recall`。文档不足时**先补文档**，
    使「只读文档即可知道怎么改」；只有进入编辑阶段才允许读目标源码片段，读完把知识回流到文档。
-2. **计划先落盘**（MUST）：多项改动先写 `docs/PLAN-2026-11-05.md`（目标 / 判据 / 改点 / 依赖 / 分工），
+2. **计划先落盘**（MUST）：多项改动先写当前计划文件（`docs/PLAN-<日期>-<主题>.md`，目标 / 判据 / 改点 / 依赖 / 分工），
    执行中实时更新状态与证据，禁止凭记忆批量补记。
 3. **规则注入门禁**（MUST）：`.claude/hooks/session-start.py` 每次会话启动注入 `## 铁律`；
    `user-prompt-submit.py` **每 5 条用户消息注入一次**；`search-gate.py` 作为 `PreToolUse`

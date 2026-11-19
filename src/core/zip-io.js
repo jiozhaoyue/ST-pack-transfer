@@ -150,6 +150,16 @@ export const zipIo = {
             crc32: entry.crc32 ?? null,
             compressionMethod: entry.compressionMethod,
             isDirectory: false,
+            // 体检（inspect）专用透传：只读中央目录即可拿到的结构字段。
+            // 这些字段对既有调用方（convert / plan / detect）完全无感，纯加性。
+            encrypted: entry.encrypted ?? false,
+            zipCrypto: entry.zipCrypto ?? false,
+            zip64: entry.zip64 ?? false,
+            bitFlag: entry.bitFlag ?? null,
+            rawBitFlag: entry.rawBitFlag ?? null,
+            filenameUTF8: entry.filenameUTF8 ?? false,
+            diskNumberStart: entry.diskNumberStart ?? 0,
+            offset: entry.offset ?? null,
             openStream: async () => {
               const { readable, writable } = new TransformStream({}, { highWaterMark: 16 });
               /**

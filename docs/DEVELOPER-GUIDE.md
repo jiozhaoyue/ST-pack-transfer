@@ -22,9 +22,9 @@ translation: pending
 
 ### 单文件 HTML 的确切下载位置
 
-- **从仓库直接下载**：`download/ST-pack-transfer-offline.html`
-- **直接下载链接**：`https://github.com/jiozhaoyue/ST-pack-transfer/raw/main/download/ST-pack-transfer-offline.html`
+- **从 GitHub Release 下载**：`https://github.com/jiozhaoyue/ST-pack-transfer/releases/latest/download/ST-pack-transfer-offline.html`
 - **在线 HTML（无需下载）**：`https://jiozhaoyue.github.io/ST-pack-transfer/`
+- 说明：offline HTML 不再提交进版本控制，每次打 tag 时由 `release.yml` 构建并附到 Release。
 
 根目录的 `index.html` 是开发骨架，**不能单独下载后双击运行**；它需要 Vite 开发服务器或构建后的静态服务器。单文件 HTML 才是双击即用的形态。
 
@@ -88,8 +88,8 @@ npm run qa:static        # 静态守卫串跑
 
 `npm run build:offline` 会生成：
 
-- `dist-offline/ST-pack-transfer-offline.html`
-- `download/ST-pack-transfer-offline.html`（对外下载路径）
+- `dist-offline/ST-pack-transfer-offline.html`（本地构建产物，不入库）
+- `download/ST-pack-transfer-offline.html`（本地副本，同样不入库，仅 Release 分发）
 
 单文件 HTML 必须保持 `file://` 可双击运行：脚本为 IIFE、Worker 强制主线程降级、字体与样式内联、零外部资源。
 
@@ -160,6 +160,15 @@ npm run qa:static        # 静态守卫串跑
 - `unknowns`：读不到体积的条目，界面必须显示 `?` 或区间。
 
 界面不得再散落压缩比常量；新增类目、分卷、扩展模式或引擎载体时，只扩展模型与测试。
+
+#### 体积显示口径（唯一真源）
+
+- **包卡体积**统一由 `src/core/chart-model.js` 的 `fmtMB` 生成：`index.js` 导入后写入 `p.size`，
+  卡片直接渲染该字符串。`src/ui/workbench-view.js` 内的同名 `fmtMB` 只服务图表与统计，
+  **改包卡显示必须改 `chart-model.js`**（2026-11-19 实测事故：只改前者真机仍是 `0 KB`）。
+- 小于 1 KB 一律用字节单位：`0 → 0 B`、`462 字节 → 462 B`；`>= 1 KB` 才用 KB/MB/GB。
+  禁止把非零字节取整成 `0 KB`——那会与真正 0 字节的空文件无法区分（铁律 5 禁假 0）。
+- 回归守卫：`npx vitest run test/ui-fmt-size.test.js`（同时覆盖两份实现）。
 
 ### 分卷判定口径（同源化）
 

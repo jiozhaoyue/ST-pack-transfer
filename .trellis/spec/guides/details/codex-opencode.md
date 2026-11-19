@@ -1,6 +1,6 @@
 # F2 · Codex / OpenCode 源真人输入提取与新增细则
 
-审计对象：`RULES.md`（R-01~R-30）+ `RULES-DETAILS.md`（D-01~D-82）。
+审计对象：当时的红线规则真源（历史文件名已停用，现位于 `.trellis/spec/guides/rule-catalog.md`，R-01~R-30）+ 当时的技术细则清单（历史文件名已停用，现位于 `.trellis/spec/guides/rule-details.md`，D-01~D-82）。
 本文件只做两件事：给出本轮两源的真实命中统计；给出**既有 82 条未覆盖**的可判定技术细则。
 
 - 中间件：`.private/rules-audit/F2-raw.json`（82 条，逐条含 source / session / time / 原文）

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { logger, LOG_LEVELS } from '../src/core/logger.js';
+import { logger, LOG_LEVELS, redact } from '../src/core/logger.js';
 
 describe('Logger Core System', () => {
   beforeEach(() => {
@@ -76,5 +76,79 @@ describe('Logger Core System', () => {
     expect(text).toContain('Start process');
     expect(text).toContain('Careful here');
     expect(text).toContain('Detail:');
+  });
+
+  describe('增强导出与脱敏', () => {
+    it('Error detail 导出后包含 stack', () => {
+      const err = new Error('boom');
+      logger.error('failed', err);
+      const text = logger.exportText();
+      expect(text).toContain('"name": "Error"');
+      expect(text).toContain('"message": "boom"');
+      expect(text).toContain('"stack":');
+    });
+
+    it('循环引用不抛错且含 [Circular]', () => {
+      const obj = { a: 1 };
+      obj.self = obj;
+      logger.warn('circular', obj);
+      let text;
+      expect(() => { text = logger.exportText(); }).not.toThrow();
+      expect(text).toContain('[Circular]');
+    });
+
+    it('Blob 导出为 kind:blob 并含 size/type', () => {
+      const blob = new Blob(['hello'], { type: 'text/plain' });
+      logger.info('blob detail', blob);
+      const text = logger.exportText();
+      expect(text).toContain('"kind": "blob"');
+      expect(text).toContain('"size": 5');
+      expect(text).toContain('"type": "text/plain"');
+    });
+
+    it('时间戳含日期 YYYY-MM-DD HH:MM:SS.mmm', () => {
+      logger.info('timestamped');
+      const entry = logger.getEntries()[0];
+      expect(entry.timestamp).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}$/);
+    });
+
+    it('exportText 默认脱敏，exportRaw 保留原文', () => {
+      logger.info('token leak', { url: 'https://user:pass@example.com/?token=abc123' });
+      const safe = logger.exportText();
+      const raw = logger.exportRaw();
+      expect(safe).not.toContain('user:pass');
+      expect(safe).toContain('[REDACTED]');
+      expect(raw).toContain('user:pass');
+      expect(logger.exportRedacted()).toBe(safe);
+    });
+
+    it('redact 覆盖各类令牌格式', () => {
+      expect(redact('https://user:pass@host/x')).toBe('https://[REDACTED]@host/x');
+      expect(redact(['pat ghp_','abcdefghijklmnopqrstuvwxyz1234567890 end'].join(''))).toContain('[REDACTED]');
+      expect(redact(['pat ghp_','ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'].join(''))).not.toContain('ghp_');
+      expect(redact(['pat github_pat_','11ABCDEFG0abcdefghijklmnop'].join(''))).not.toContain('github_pat_');
+      expect(redact(['pat gho_','abcdefghijklmnopqrstuvwxyz'].join(''))).not.toContain('gho_');
+      expect(redact(['pat ghu_','abcdefghijklmnopqrstuvwxyz'].join(''))).not.toContain('ghu_');
+      expect(redact(['pat ghs_','abcdefghijklmnopqrstuvwxyz'].join(''))).not.toContain('ghs_');
+      expect(redact(['glpat-','abcdefghijklmnopqrst'].join(''))).not.toContain('glpat-');
+      expect(redact(['sk-','abcdefghijklmnopqrstuvwx'].join(''))).not.toContain('sk-');
+      expect(redact(['xoxb-','1234567890-abcdefghijklmnop'].join(''))).not.toContain('xoxb-');
+      expect(redact(['AKIA','IOSFODNN7EXAMPLE'].join(''))).not.toContain('AKIA');
+      expect(redact('Authorization: Bearer abc.def.ghi')).toContain('Bearer [REDACTED]');
+      expect(redact('Basic dXNlcjpwYXNz')).toContain('Basic [REDACTED]');
+      expect(redact('/api?access_token=secret123&x=1')).toContain('access_token=[REDACTED]');
+      expect(redact('/api?api_key=secret123')).toContain('api_key=[REDACTED]');
+      expect(redact('/api?password=hunter2')).toContain('password=[REDACTED]');
+      expect(redact('C:\\Users\\Alice\\AppData')).toContain('C:\\Users\\[USER]');
+      expect(redact('/home/alice/project')).toBe('/[USER]/project');
+      expect(redact('/Users/bob/project')).toBe('/[USER]/project');
+    });
+
+    it('redact 不打码包体积、错误类型、HTTP 状态', () => {
+      expect(redact('package size 12.3 MB, 462 B')).toBe('package size 12.3 MB, 462 B');
+      expect(redact('Error: TypeError at line 5')).toBe('Error: TypeError at line 5');
+      expect(redact('HTTP 404 and status 500')).toBe('HTTP 404 and status 500');
+      expect(redact('host: luker, version 0.6.0')).toBe('host: luker, version 0.6.0');
+    });
   });
 });
