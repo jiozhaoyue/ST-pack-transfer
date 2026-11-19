@@ -34,8 +34,14 @@ export async function getAuthorityClient() {
       displayName: '数据包转运',
       version: '1.0.0',
       installType: 'local',
+      /* 最小权限：只申请真正消费的能力。
+         - storage.kv：断点 checkpoint 与 blob 清单
+         - storage.blob：大包分块暂存（4MB/块）
+         `fs.private` 曾被声明但全仓零消费（2026-11-19 审计），已移除——
+         申请不用的权限属于无谓的权限暴露，违背最小权限原则。
+         `sql.private` / `http.fetch` / `jobs.background` 有价值但当前未接入，
+         接入时再一并声明。 */
       declaredPermissions: {
-        fs: { private: true },
         storage: { kv: true, blob: true },
       },
     });
