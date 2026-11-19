@@ -122,18 +122,29 @@ describe('Logger Core System', () => {
       expect(logger.exportRedacted()).toBe(safe);
     });
 
+    /**
+     * 令牌样例**必须用拼接构造**，不得写成完整字面量。
+     *
+     * 原因（2026-11-19 实测）：写成完整字面量时，GitHub Push Protection 会把
+     * `test/logger.test.js` 判为「含 Slack API Token」并**拒绝推送**（GH013）——
+     * 它按格式匹配，不区分真实凭据与测试合成串。
+     * 拼接后源码里不出现完整令牌形态，扫描器不命中，而 `redact()` 收到的仍是
+     * 完整格式的输入，脱敏断言强度不变。
+     */
+    const tok = (...parts) => parts.join('');
+
     it('redact 覆盖各类令牌格式', () => {
       expect(redact('https://user:pass@host/x')).toBe('https://[REDACTED]@host/x');
-      expect(redact(['pat ghp_','abcdefghijklmnopqrstuvwxyz1234567890 end'].join(''))).toContain('[REDACTED]');
-      expect(redact(['pat ghp_','ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'].join(''))).not.toContain('ghp_');
-      expect(redact(['pat github_pat_','11ABCDEFG0abcdefghijklmnop'].join(''))).not.toContain('github_pat_');
-      expect(redact(['pat gho_','abcdefghijklmnopqrstuvwxyz'].join(''))).not.toContain('gho_');
-      expect(redact(['pat ghu_','abcdefghijklmnopqrstuvwxyz'].join(''))).not.toContain('ghu_');
-      expect(redact(['pat ghs_','abcdefghijklmnopqrstuvwxyz'].join(''))).not.toContain('ghs_');
-      expect(redact(['glpat-','abcdefghijklmnopqrst'].join(''))).not.toContain('glpat-');
-      expect(redact(['sk-','abcdefghijklmnopqrstuvwx'].join(''))).not.toContain('sk-');
-      expect(redact(['xoxb-','1234567890-abcdefghijklmnop'].join(''))).not.toContain('xoxb-');
-      expect(redact(['AKIA','IOSFODNN7EXAMPLE'].join(''))).not.toContain('AKIA');
+      expect(redact(tok('pat ghp_', 'abcdefghijklmnopqrstuvwxyz1234567890 end'))).toContain('[REDACTED]');
+      expect(redact(tok('pat ghp_', 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'))).not.toContain('ghp_');
+      expect(redact(tok('pat github_pat_', '11ABCDEFG0abcdefghijklmnop'))).not.toContain('github_pat_');
+      expect(redact(tok('pat gho_', 'abcdefghijklmnopqrstuvwxyz'))).not.toContain('gho_');
+      expect(redact(tok('pat ghu_', 'abcdefghijklmnopqrstuvwxyz'))).not.toContain('ghu_');
+      expect(redact(tok('pat ghs_', 'abcdefghijklmnopqrstuvwxyz'))).not.toContain('ghs_');
+      expect(redact(tok('glpat-', 'abcdefghijklmnopqrst'))).not.toContain('glpat-');
+      expect(redact(tok('sk-', 'abcdefghijklmnopqrstuvwx'))).not.toContain('sk-');
+      expect(redact(tok('xoxb-', '1234567890-abcdefghijklmnop'))).not.toContain('xoxb-');
+      expect(redact(tok('AKIA', 'IOSFODNN7EXAMPLE'))).not.toContain('AKIA');
       expect(redact('Authorization: Bearer abc.def.ghi')).toContain('Bearer [REDACTED]');
       expect(redact('Basic dXNlcjpwYXNz')).toContain('Basic [REDACTED]');
       expect(redact('/api?access_token=secret123&x=1')).toContain('access_token=[REDACTED]');
