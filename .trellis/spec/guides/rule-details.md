@@ -123,6 +123,7 @@
 | D-78 | R-20 | 自动备份支持增量；从宿主拉取与传 WebDAV 可分别选择全量（独立新包）或增量；加密为可选项 | 93ea4cd9 |
 | D-79 | R-26 | luker 账户改版后，注入按钮位置与样式必须适配当版原生账户 UI；取消"宿主数据"下拉项 | ab6e096e |
 | D-80 | R-19 | 拉取最新版插件必须呈现新界面，不得仍是旧界面（缓存/版本一致性） | c1382a59 |
+| D-95 | R-20 | 对应铁律 41「纯前端绝对优先」。【纯前端实现清单】IndexedDB（包存储）、OPFS（大包）、内存 Blob、Blob URL 下载，是唯一必需路径。【后端增强清单】Authority 已接 storage.kv / storage.blob；未接 trivium.private / fs.private / sql.private / http.fetch / jobs.background / events.stream 六项，均只是可选增强。【接入判据】必须先有纯前端实现且测试通过，再叠加增强层；适配器不可用时必须返回 null/false（如 getAuthorityClient/createCheckpointAdapter/putArtifact），调用方无需分支即可保持完整功能与一致行为。【禁止模式】禁止在首屏渲染或主流程 await 链里调用后端；禁止把用户可见功能（导出/导入/转换/体检/问题报告/日志）做成「必须装后端才能用」的唯一实现；禁止降级时弹错误窗。后端调用一律 fire-and-forget 或显式 try/catch 静默降级。判据：`npm run check:frontend-first` 退出码 0 | 用户明令 |
 
 ## H. 频繁出现但已废弃的判断
 
