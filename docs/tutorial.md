@@ -11,35 +11,58 @@ alt_lang: en
 
 ## 界面预览
 
-以下截图全部来自教程演示模式，展示真实界面与模拟数据（不含任何用户聊天内容）：
+以下截图全部来自教程演示模式，展示真实界面与模拟数据（不含任何用户聊天内容）。其余功能页（安装、转换、扩展、传输、存储）就近配有各自界面的截图，本页集中展示日志、队列、设置与手机端演示画面。
 
-![教程目标选择](assets/shots/desktop-01-tutorial-goal.png)
-![教程分步指引](assets/shots/desktop-02-tutorial-step.png)
-![演示工作台](assets/shots/desktop-03-workbench-demo.png)
-![导出区](assets/shots/desktop-04-export-area.png)
-![扩展管理](assets/shots/desktop-05-extension-manager.png)
-![扩展打包](assets/shots/desktop-06-extension-pack.png)
-![局域网传输](assets/shots/desktop-07-transfer-lan.png)
-![云端仓库](assets/shots/desktop-08-transfer-cloud.png)
-![WebDAV](assets/shots/desktop-09-transfer-webdav.png)
-![存储审查](assets/shots/desktop-10-storage-inspector.png)
-![localStorage 审查](assets/shots/desktop-11-storage-localstorage.png)
-![日志与任务队列](assets/shots/desktop-12-log-view.png)
-![任务队列半展开](assets/shots/desktop-13-task-queue.png)
-![设置](assets/shots/desktop-14-settings.png)
-![更新日志](assets/shots/desktop-15-changelog.png)
+### 日志与任务队列
+
+<figure class="shot-figure">
+  <img src="assets/shots/desktop-12-log-view.png" alt="桌面端日志界面" width="1440" height="900" loading="lazy">
+  <figcaption>桌面端日志视图</figcaption>
+</figure>
+
+<figure class="shot-figure">
+  <img src="assets/shots/desktop-13-task-queue.png" alt="桌面端任务队列半展开界面" width="1440" height="900" loading="lazy">
+  <figcaption>桌面端任务队列（半展开）</figcaption>
+</figure>
+
+### 设置与更新日志
+
+<figure class="shot-figure">
+  <img src="assets/shots/desktop-14-settings.png" alt="设置界面" width="1440" height="900" loading="lazy">
+  <figcaption>设置面板</figcaption>
+</figure>
+
+<figure class="shot-figure">
+  <img src="assets/shots/desktop-15-changelog.png" alt="更新日志界面" width="1440" height="900" loading="lazy">
+  <figcaption>更新日志</figcaption>
+</figure>
 
 ### 手机端（390×844）
 
-![手机教程目标](assets/shots/mobile-01-tutorial-goal.png)
-![手机教程分步](assets/shots/mobile-02-tutorial-step.png)
-![手机工作台](assets/shots/mobile-03-workbench-demo.png)
-![手机扩展管理](assets/shots/mobile-04-extension-manager.png)
-![手机包内单选](assets/shots/mobile-05-extension-pack.png)
-![手机迁移备份](assets/shots/mobile-06-transfer.png)
-![手机导出区](assets/shots/mobile-07-export-area.png)
-![手机任务队列半展开](assets/shots/mobile-08-task-queue.png)
-![手机日志全展开](assets/shots/mobile-09-log-view.png)
+<figure class="shot-figure">
+  <img src="assets/shots/mobile-01-tutorial-goal.png" alt="手机教程目标选择" width="390" height="844" loading="lazy">
+  <figcaption>手机教程目标选择</figcaption>
+</figure>
+
+<figure class="shot-figure">
+  <img src="assets/shots/mobile-02-tutorial-step.png" alt="手机教程分步指引" width="390" height="844" loading="lazy">
+  <figcaption>手机教程分步指引</figcaption>
+</figure>
+
+<figure class="shot-figure">
+  <img src="assets/shots/mobile-03-workbench-demo.png" alt="手机演示工作台" width="390" height="844" loading="lazy">
+  <figcaption>手机演示工作台</figcaption>
+</figure>
+
+<figure class="shot-figure">
+  <img src="assets/shots/mobile-08-task-queue.png" alt="手机任务队列半展开" width="390" height="844" loading="lazy">
+  <figcaption>手机任务队列（半展开）</figcaption>
+</figure>
+
+<figure class="shot-figure">
+  <img src="assets/shots/mobile-09-log-view.png" alt="手机日志全展开" width="390" height="844" loading="lazy">
+  <figcaption>手机日志（全展开）</figcaption>
+</figure>
 
 ## 如何开启
 

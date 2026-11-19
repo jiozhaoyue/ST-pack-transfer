@@ -165,7 +165,7 @@ npm run qa:static        # 静态守卫串跑
 
 - **包卡体积**统一由 `src/core/chart-model.js` 的 `fmtMB` 生成：`index.js` 导入后写入 `p.size`，
   卡片直接渲染该字符串。`src/ui/workbench-view.js` 内的同名 `fmtMB` 只服务图表与统计，
-  **改包卡显示必须改 `chart-model.js`**（2026-11-19 实测事故：只改前者真机仍是 `0 KB`）。
+  **改包卡显示必须改 `chart-model.js`**（曾有实测事故：只改前者真机仍是 `0 KB`）。
 - 小于 1 KB 一律用字节单位：`0 → 0 B`、`462 字节 → 462 B`；`>= 1 KB` 才用 KB/MB/GB。
   禁止把非零字节取整成 `0 KB`——那会与真正 0 字节的空文件无法区分（铁律 5 禁假 0）。
 - 回归守卫：`npx vitest run test/ui-fmt-size.test.js`（同时覆盖两份实现）。

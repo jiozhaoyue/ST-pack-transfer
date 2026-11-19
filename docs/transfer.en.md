@@ -10,6 +10,26 @@ alt_lang: zh-CN
 
 Open **Migration & backup** from the view switch at the top of the panel. Select the packages you want to transfer or back up in the package list on the left.
 
+<figure class="shot-figure">
+  <img src="assets/shots/desktop-07-transfer-lan.png" alt="Direct LAN transfer interface" width="1440" height="900" loading="lazy">
+  <figcaption>LAN transfer: scan a code for a peer-to-peer link</figcaption>
+</figure>
+
+<figure class="shot-figure">
+  <img src="assets/shots/desktop-08-transfer-cloud.png" alt="Cloud S3-compatible storage backup configuration" width="1440" height="900" loading="lazy">
+  <figcaption>Cloud backup: S3-compatible object storage</figcaption>
+</figure>
+
+<figure class="shot-figure">
+  <img src="assets/shots/desktop-09-transfer-webdav.png" alt="WebDAV backup configuration" width="1440" height="900" loading="lazy">
+  <figcaption>WebDAV backup: cloud drives and private NAS</figcaption>
+</figure>
+
+<figure class="shot-figure">
+  <img src="assets/shots/mobile-06-transfer.png" alt="Mobile migration and backup interface" width="390" height="844" loading="lazy">
+  <figcaption>Mobile migration and backup entry</figcaption>
+</figure>
+
 ## Direct LAN transfer
 
 - **Scan and connect**: if the phone and computer are on the same Wi-Fi/LAN, scanning the QR code establishes a direct peer-to-peer connection. Scanning opens a full-screen viewfinder: the framing box tells you whether the code is aligned, and a successful scan connects automatically.

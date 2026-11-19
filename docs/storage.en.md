@@ -14,6 +14,16 @@ See how much space the current browser's local storage and the tavern server use
 
 The workbench header shows two storage quotas: **Browser** and **Host**. Click either row to open the inspector; the panel can also switch between sources.
 
+<figure class="shot-figure">
+  <img src="assets/shots/desktop-10-storage-inspector.png" alt="Storage inspector panel and chart" width="1440" height="900" loading="lazy">
+  <figcaption>Inspector: quota bar, share legend, and detail list on one screen</figcaption>
+</figure>
+
+<figure class="shot-figure">
+  <img src="assets/shots/desktop-11-storage-localstorage.png" alt="localStorage key usage breakdown" width="1440" height="900" loading="lazy">
+  <figcaption>localStorage: usage by key</figcaption>
+</figure>
+
 ## What you can inspect
 
 Use the breadcrumb navigation to drill down:

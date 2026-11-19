@@ -9,6 +9,26 @@ alt_lang: en
 
 功能入口：在面板顶部的切换栏中点击「迁移与备份」，即可打开专属面板。在左侧数据包列表中勾选你想要传输或备份的数据包即可开始操作。
 
+<figure class="shot-figure">
+  <img src="assets/shots/desktop-07-transfer-lan.png" alt="局域网面对面互传界面" width="1440" height="900" loading="lazy">
+  <figcaption>局域网互传：扫码建立点对点直连</figcaption>
+</figure>
+
+<figure class="shot-figure">
+  <img src="assets/shots/desktop-08-transfer-cloud.png" alt="云端 S3 兼容对象存储备份配置界面" width="1440" height="900" loading="lazy">
+  <figcaption>云端备份：S3 兼容对象存储配置</figcaption>
+</figure>
+
+<figure class="shot-figure">
+  <img src="assets/shots/desktop-09-transfer-webdav.png" alt="WebDAV 备份配置界面" width="1440" height="900" loading="lazy">
+  <figcaption>WebDAV 备份：网盘与私有 NAS</figcaption>
+</figure>
+
+<figure class="shot-figure">
+  <img src="assets/shots/mobile-06-transfer.png" alt="手机端迁移备份界面" width="390" height="844" loading="lazy">
+  <figcaption>手机端迁移与备份入口</figcaption>
+</figure>
+
 ## 局域网面对面互传
 
 - **扫码即连**：只要手机和电脑连接在同一个 Wi-Fi 或局域网下，扫码即可直接建立点对点直连，开始传输数据包；扫码使用全屏取景器，识别框会提示是否对准了本工具的二维码，识别成功自动进入连接；

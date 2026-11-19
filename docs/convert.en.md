@@ -18,6 +18,11 @@ Convert data packs between SillyTavern, Luker, TauriTavern, and PureTavern—whe
 4. **Generate**: click **Generate export package** at the bottom.
 5. **Collect and save**: switch to the **Export area** to download, keep in the workspace, or remove the result.
 
+<figure class="shot-figure">
+  <img src="assets/shots/desktop-03-workbench-demo.png" alt="Conversion workbench with storage chart and package list" width="1440" height="900" loading="lazy">
+  <figcaption>Workbench: pick content on the left, packages on the right</figcaption>
+</figure>
+
 > Note: the **Generate export package** button becomes available after at least one package is selected.
 
 ## Selectable categories
@@ -59,6 +64,16 @@ If your cloud tavern limits upload size, set a split size in the settings (MB, 3
 ## Export area
 
 Generated packages are collected in the **Export area** instead of downloading automatically. Download or move them to the local workspace whenever you are ready.
+
+<figure class="shot-figure">
+  <img src="assets/shots/desktop-04-export-area.png" alt="Desktop export area list" width="1440" height="900" loading="lazy">
+  <figcaption>Desktop export area: download, save, or remove generated packages</figcaption>
+</figure>
+
+<figure class="shot-figure">
+  <img src="assets/shots/mobile-07-export-area.png" alt="Mobile export area list" width="390" height="844" loading="lazy">
+  <figcaption>Mobile export area: the same responsive layout</figcaption>
+</figure>
 
 ## Related reading
 

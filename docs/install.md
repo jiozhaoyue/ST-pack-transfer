@@ -7,6 +7,20 @@ alt_lang: en
 
 # 安装与部署
 
+## 界面预览
+
+初次安装打开后的教程引导，会带你在模拟数据上熟悉界面：
+
+<figure class="shot-figure">
+  <img src="assets/shots/desktop-01-tutorial-goal.png" alt="首次打开的教程目标选择界面" width="1440" height="900" loading="lazy">
+  <figcaption>教程目标选择：挑选想体验的演练功能</figcaption>
+</figure>
+
+<figure class="shot-figure">
+  <img src="assets/shots/desktop-02-tutorial-step.png" alt="教程分步操作指引界面" width="1440" height="900" loading="lazy">
+  <figcaption>分步指引：系统逐步高亮当前操作</figcaption>
+</figure>
+
 ## 一、先选运行形态
 
 | 形态 | 怎么用 | 适合场景 | 宿主 / 浏览器要求 |

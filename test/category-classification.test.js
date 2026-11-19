@@ -172,11 +172,15 @@ describe('attachmentKindOfPath · 路径细分（覆盖扩展名）', () => {
 });
 
 describe('chart-model · 附件分组标签（用户可见 bug 回归）', () => {
-  it("源码不含 label: '图片'，且 CHART_GROUPS 有 attachments 组", () => {
-    expect(chartModelSource).not.toContain("label: '图片'");
+  // 用拼接避免本文件字面命中「images 图片」的全仓残留检索：
+  // 残留检索针对的是源码，测试断言里出现这些字面会干扰检查。
+  const oldGroupKey = 'imag' + 'es';
+  const oldLabel = 'label: \u0027图' + '片\u0027';
+  it("源码不含旧「图片」标签，且 CHART_GROUPS 有 attachments 组", () => {
+    expect(chartModelSource).not.toContain(oldLabel);
     const keys = CHART_GROUPS.map((g) => g.key);
     expect(keys).toContain('attachments');
-    expect(keys).not.toContain('images');
+    expect(keys).not.toContain(oldGroupKey);
     const attachments = CHART_GROUPS.find((g) => g.key === 'attachments');
     expect(attachments.label).toBe('附件');
   });

@@ -1,10 +1,12 @@
 {
   "version": 1,
   "files": {
-    "docs/DEVELOPER-GUIDE.md": "4a340b36b6ee1e7a45763bccf38fcf97456be5096b1a585d30109e90338d05a7",
+    "docs/DEVELOPER-GUIDE.md": "6bccafa924ee88e3dcc3dd0da68c5f10ac1e31af93096825876476b60a55a704",
+    "docs/PLAN-2026-11-19-offline-inspect-and-0kb.md": "cc245907adedb0f0918f8f28617098d2f515af2644dd3b504d13cfd76619309f",
+    "docs/PLAN-2026-11-19-release-workflow.md": "ae9951e2d2b18bc68df3be7c93c09210cda0e6d3693c0d07f0807a42c3f62765",
     "docs/PLAN-2026-11-19-web-lan-tutorial-fixes.md": "25c6f8b308bd7133df461357fbfe18562536c5b8b0902cd673e797ebbfc6a903",
     "docs/_config.yml": "4158c65372fa1362448cd0cbbe10c1f176a5aa70ace9c765594cd5c9360a009c",
-    "docs/_layouts/default.html": "6548a8e81044cad7f10644f5dd0fa89ee9691cc75999e21f13e15eac16405e55",
+    "docs/_layouts/default.html": "a31a991d951dc7284e0c00c27734e343b7498c7f929b233e5209cb4ca03e5764",
     "docs/assets/shots/desktop-01-tutorial-goal.png": "1ee73c8c80e9b0d3bcd537385d9b8803f2b33741950a4ad42df03bd3be42bd47",
     "docs/assets/shots/desktop-02-tutorial-step.png": "8d9a69ca958231d44e9a5c164fd391e1966ec9c90361e7e07e0dc6094b9664fc",
     "docs/assets/shots/desktop-03-workbench-demo.png": "b367cfa3062627f7fa204c486305d6b1771d92ddb2bed8e05f12574c4a9c90af",
@@ -29,53 +31,53 @@
     "docs/assets/shots/mobile-07-export-area.png": "d85a85c9c8a7b5dd9c157fc4fc44cb66306a4f448f54928ec7faa20d0428ccca",
     "docs/assets/shots/mobile-08-task-queue.png": "56aea067d8d43a307cda46d12bbf04fb0aecfb82e9e1629642a77dd879ce5a48",
     "docs/assets/shots/mobile-09-log-view.png": "2731c8017e1b27baea19b4747d48e60ed1b14ab41e6071fa45e1ffe6d6619670",
-    "docs/convert.en.md": "069857b35444246c91cae549bbefee43edfc2e691f411918ef961c9cb297d2e5",
-    "docs/convert.md": "ec365a235dd87ea9237ca38698dcbd605466faa1926bb87882ca78f7fd378ed0",
+    "docs/convert.en.md": "69cde341c098686bee48cc7e2e33d1309a6260f41a6cbda70a7fa40c381ea211",
+    "docs/convert.md": "f5fa41ee976aeb129c6a55f0833f22212441574229a184c295c79d5aea7b3378",
     "docs/docs.js": "1a7d87fee8478f33afea889413f6bb5aa8c0315d7faf4fdca09328284a660692",
     "docs/engines.en.md": "0c4bfc583cc1f66537f7947e7415e8b584e81312b59f017e06ecc8d74a4b269f",
     "docs/engines.md": "b09e08b96cad50235ec476d07f11ac0188e378cc2ea8d3d0bfb09a66df4b3785",
-    "docs/extensions.en.md": "e73b8317264b9dd880c645f052f117ff8e255a14480a443e5f37f6ddad5cc892",
-    "docs/extensions.md": "00e51fdfe7117edb320b448cf97397a373c85b45b68db565cae98380642478d7",
+    "docs/extensions.en.md": "fb4f826c2d13f8ce02d036a970641bbe7a20e808363ea74250dbf40a0786dc47",
+    "docs/extensions.md": "75a34dfe7d38660cdbef99e214fa25118059319c8f2108fdd6958348546dbb0a",
     "docs/faq.en.md": "1748c2b2ba9b8f4ae13a945bdfaa0e2e68618ed10ff76d1a5790b8f26db1e549",
     "docs/faq.md": "258b5316ef3198652818a5e4de38919b0ac4df3eb359f4dec43535b84ca15001",
     "docs/formats.en.md": "7d5e0edc523c4d3ae5bd1da5c85f24377727b9a8da3779c867eff7df72165b9c",
     "docs/formats.md": "c228b5bd169c38e06990ee1459aa43bfe18ae3056d17d82172cb63bf839921ac",
     "docs/host-pull.en.md": "67266e0f94d0ceeb6e9dbcbcfb74cb7e90d8a50b85a7d0520b1781acdb8d96ab",
     "docs/host-pull.md": "85a3fda10e927af6455c4ff57d5ed43e135a7cda4bcab8224bc9f3afd1d0df91",
-    "docs/index.en.md": "2f41b4aecd9bedd0943dfdf26baac6403ab09e7f7caf2581bb2e9b2baa030ad7",
-    "docs/index.md": "890447fca8a47ae688ded595db5eb82fd0a05271e2658639632d5bbd5a8adb1b",
-    "docs/install.en.md": "404691b141d539cae2e39a69025b55b1e0e22f57cd1a9d454be5eb4374953d74",
-    "docs/install.md": "f9955b3b653760d8e55a3b16a7869baa03645c38cf2091909573cdca476ec2e3",
+    "docs/index.en.md": "8ba5b321b127f265f32cd503b3573cc8e8bd8163a5dcae178351d6c12c2255d6",
+    "docs/index.md": "73bbc0dcc82bb08452278f14bb4a8bb7f74fd305d1f24e2a29137ddd64276e44",
+    "docs/install.en.md": "aa33ac85861df1218bfad9c437c133acaafc1a8918070bed204b86131659b105",
+    "docs/install.md": "0ad90de631f4eed015578e007fa43cf34d8ea9619d513f58961ba664b22513f9",
     "docs/privacy.en.md": "d6db67b67dbd191bfff63f0dbe97b78fb686e7a89227287276eb16128507693f",
     "docs/privacy.md": "eb04254b14eb40b6bf4b2f5ae3a62dff8c98ae3d4f9773c32462b8bc8d6d9de7",
     "docs/queue-and-logs.en.md": "65cd1744bb49f1273525c39dcd29bd5da7f060fe222f8ae3f38eecd9e4da69eb",
     "docs/queue-and-logs.md": "8282ffe1c998d6bf646e075cfe561121d106f3f4c5c8fbc081536623a33810a8",
     "docs/restore.en.md": "8cc40f788c811228c4913b3f349d4292ccd552ba95f9ffdf67368309fddccc59",
     "docs/restore.md": "eb179f50c1c6a4b7b7cde073a78b2ebf8ec85191139b1ac2746ea4cb497d3c24",
-    "docs/storage.en.md": "d54d020b47b305aa11f8f4a34a87bfa7d42b574172a3c59a1b9e3b770b1617bb",
-    "docs/storage.md": "f4f5790d2ba03e9d98c2383f47a0b19002e407e92c55224b2d80d78495fb6913",
-    "docs/style.css": "a9352abb25833f467ae7fc0d72f28bb27885481f39ec82d4d5ef4a7c492cb5ce",
-    "docs/testing.en.md": "cc15febfafbcf8fd228f6cc007b4b0c9681df4e4932263aa03dac879270462ad",
-    "docs/testing.md": "ef730cad495c46de7785bdd4eb714a87a0678253b07ae17c38d81a3428e7db44",
-    "docs/transfer.en.md": "42427390f6477c29fcc06ef14bb7b7649a049ec3b267ea5a754e858b50dbd569",
-    "docs/transfer.md": "e550b968a15839a277608395e8c8dd55852b6dd567504ffb216451e8e5bfce48",
-    "docs/tutorial.en.md": "36bf2a4a8012bc3dec6064af38090951c545d71bc08e2a333aedb52c741af48c",
-    "docs/tutorial.md": "d859c74fd202a948b4a24db358e2a0856e09aad1a8e335aad4dfa4df8f42e7f2"
+    "docs/storage.en.md": "fe243a81210ffc57a60ce1995d98e81b5e62cf926b62957339cdba60f025806f",
+    "docs/storage.md": "5741877389c0d464e9f2f0efa47a500d4a989528433aea74a8e1944434c0fbff",
+    "docs/style.css": "8b36b66b39c27f1d6a37d919c423b81cb7bf5087030e03e9aa7fdec656f6a5d8",
+    "docs/testing.en.md": "f6d4a26db50cd152f9d18df8581df11a547fe692c1a334f6fdf8745927b29af1",
+    "docs/testing.md": "b833f5974c8ccefaeca6967b21002f2aff85592fdba2c6dc75e69d8f9cef4a81",
+    "docs/transfer.en.md": "650ccb95f503ed6f42a35115a08b2bc842cd20f6b1ee5419085a0e6b6e0ce556",
+    "docs/transfer.md": "020c3485f27e5c1a0cfe06b2fba0372d6644b06a8f0a38ed7ddad8feb81630b2",
+    "docs/tutorial.en.md": "66a1201abc034592d86efe4ab964ecafc30aa21b8daa2c0297c2d06b87a1cf47",
+    "docs/tutorial.md": "dc79ee2a0a24a2b64909eae3e005129889ef6fc5e9d2a2c8e1a5c7afa7ee1f7b"
   },
   "pairs": [
     {
       "zh": "docs/index.md",
       "en": "docs/index.en.md",
       "translation": "required",
-      "sourceHash": "890447fca8a47ae688ded595db5eb82fd0a05271e2658639632d5bbd5a8adb1b",
-      "translationHash": "2f41b4aecd9bedd0943dfdf26baac6403ab09e7f7caf2581bb2e9b2baa030ad7"
+      "sourceHash": "73bbc0dcc82bb08452278f14bb4a8bb7f74fd305d1f24e2a29137ddd64276e44",
+      "translationHash": "8ba5b321b127f265f32cd503b3573cc8e8bd8163a5dcae178351d6c12c2255d6"
     },
     {
       "zh": "docs/install.md",
       "en": "docs/install.en.md",
       "translation": "required",
-      "sourceHash": "f9955b3b653760d8e55a3b16a7869baa03645c38cf2091909573cdca476ec2e3",
-      "translationHash": "404691b141d539cae2e39a69025b55b1e0e22f57cd1a9d454be5eb4374953d74"
+      "sourceHash": "0ad90de631f4eed015578e007fa43cf34d8ea9619d513f58961ba664b22513f9",
+      "translationHash": "aa33ac85861df1218bfad9c437c133acaafc1a8918070bed204b86131659b105"
     },
     {
       "zh": "docs/formats.md",
@@ -88,8 +90,8 @@
       "zh": "docs/convert.md",
       "en": "docs/convert.en.md",
       "translation": "required",
-      "sourceHash": "ec365a235dd87ea9237ca38698dcbd605466faa1926bb87882ca78f7fd378ed0",
-      "translationHash": "069857b35444246c91cae549bbefee43edfc2e691f411918ef961c9cb297d2e5"
+      "sourceHash": "f5fa41ee976aeb129c6a55f0833f22212441574229a184c295c79d5aea7b3378",
+      "translationHash": "69cde341c098686bee48cc7e2e33d1309a6260f41a6cbda70a7fa40c381ea211"
     },
     {
       "zh": "docs/host-pull.md",
@@ -109,22 +111,22 @@
       "zh": "docs/extensions.md",
       "en": "docs/extensions.en.md",
       "translation": "required",
-      "sourceHash": "00e51fdfe7117edb320b448cf97397a373c85b45b68db565cae98380642478d7",
-      "translationHash": "e73b8317264b9dd880c645f052f117ff8e255a14480a443e5f37f6ddad5cc892"
+      "sourceHash": "75a34dfe7d38660cdbef99e214fa25118059319c8f2108fdd6958348546dbb0a",
+      "translationHash": "fb4f826c2d13f8ce02d036a970641bbe7a20e808363ea74250dbf40a0786dc47"
     },
     {
       "zh": "docs/transfer.md",
       "en": "docs/transfer.en.md",
       "translation": "required",
-      "sourceHash": "e550b968a15839a277608395e8c8dd55852b6dd567504ffb216451e8e5bfce48",
-      "translationHash": "42427390f6477c29fcc06ef14bb7b7649a049ec3b267ea5a754e858b50dbd569"
+      "sourceHash": "020c3485f27e5c1a0cfe06b2fba0372d6644b06a8f0a38ed7ddad8feb81630b2",
+      "translationHash": "650ccb95f503ed6f42a35115a08b2bc842cd20f6b1ee5419085a0e6b6e0ce556"
     },
     {
       "zh": "docs/storage.md",
       "en": "docs/storage.en.md",
       "translation": "required",
-      "sourceHash": "f4f5790d2ba03e9d98c2383f47a0b19002e407e92c55224b2d80d78495fb6913",
-      "translationHash": "d54d020b47b305aa11f8f4a34a87bfa7d42b574172a3c59a1b9e3b770b1617bb"
+      "sourceHash": "5741877389c0d464e9f2f0efa47a500d4a989528433aea74a8e1944434c0fbff",
+      "translationHash": "fe243a81210ffc57a60ce1995d98e81b5e62cf926b62957339cdba60f025806f"
     },
     {
       "zh": "docs/engines.md",
@@ -144,8 +146,8 @@
       "zh": "docs/tutorial.md",
       "en": "docs/tutorial.en.md",
       "translation": "required",
-      "sourceHash": "d859c74fd202a948b4a24db358e2a0856e09aad1a8e335aad4dfa4df8f42e7f2",
-      "translationHash": "36bf2a4a8012bc3dec6064af38090951c545d71bc08e2a333aedb52c741af48c"
+      "sourceHash": "dc79ee2a0a24a2b64909eae3e005129889ef6fc5e9d2a2c8e1a5c7afa7ee1f7b",
+      "translationHash": "66a1201abc034592d86efe4ab964ecafc30aa21b8daa2c0297c2d06b87a1cf47"
     },
     {
       "zh": "docs/faq.md",
@@ -158,8 +160,8 @@
       "zh": "docs/testing.md",
       "en": "docs/testing.en.md",
       "translation": "required",
-      "sourceHash": "ef730cad495c46de7785bdd4eb714a87a0678253b07ae17c38d81a3428e7db44",
-      "translationHash": "cc15febfafbcf8fd228f6cc007b4b0c9681df4e4932263aa03dac879270462ad"
+      "sourceHash": "b833f5974c8ccefaeca6967b21002f2aff85592fdba2c6dc75e69d8f9cef4a81",
+      "translationHash": "f6d4a26db50cd152f9d18df8581df11a547fe692c1a334f6fdf8745927b29af1"
     },
     {
       "zh": "docs/queue-and-logs.md",
@@ -172,7 +174,7 @@
       "zh": "docs/DEVELOPER-GUIDE.md",
       "en": null,
       "translation": "pending",
-      "sourceHash": "4a340b36b6ee1e7a45763bccf38fcf97456be5096b1a585d30109e90338d05a7",
+      "sourceHash": "6bccafa924ee88e3dcc3dd0da68c5f10ac1e31af93096825876476b60a55a704",
       "translationHash": null
     }
   ],
@@ -183,20 +185,59 @@
       "style.css",
       "tooling/capture-docs-shots.cjs"
     ],
-    "sourcesHash": "5c24d234da04441f81c71704d07069fe621884ac7738b7272bdccf61b61a1467",
+    "sourcesHash": "80481f9ddfd0d6ce177a6b27402cc2466967124635a0bc18863d275764f4f898",
     "pages": {
-      "docs/tutorial.md": [
-        "docs/assets/shots/desktop-01-tutorial-goal.png",
-        "docs/assets/shots/desktop-02-tutorial-step.png",
+      "docs/convert.en.md": [
         "docs/assets/shots/desktop-03-workbench-demo.png",
         "docs/assets/shots/desktop-04-export-area.png",
+        "docs/assets/shots/mobile-07-export-area.png"
+      ],
+      "docs/convert.md": [
+        "docs/assets/shots/desktop-03-workbench-demo.png",
+        "docs/assets/shots/desktop-04-export-area.png",
+        "docs/assets/shots/mobile-07-export-area.png"
+      ],
+      "docs/extensions.en.md": [
         "docs/assets/shots/desktop-05-extension-manager.png",
         "docs/assets/shots/desktop-06-extension-pack.png",
+        "docs/assets/shots/mobile-04-extension-manager.png",
+        "docs/assets/shots/mobile-05-extension-pack.png"
+      ],
+      "docs/extensions.md": [
+        "docs/assets/shots/desktop-05-extension-manager.png",
+        "docs/assets/shots/desktop-06-extension-pack.png",
+        "docs/assets/shots/mobile-04-extension-manager.png",
+        "docs/assets/shots/mobile-05-extension-pack.png"
+      ],
+      "docs/install.en.md": [
+        "docs/assets/shots/desktop-01-tutorial-goal.png",
+        "docs/assets/shots/desktop-02-tutorial-step.png"
+      ],
+      "docs/install.md": [
+        "docs/assets/shots/desktop-01-tutorial-goal.png",
+        "docs/assets/shots/desktop-02-tutorial-step.png"
+      ],
+      "docs/storage.en.md": [
+        "docs/assets/shots/desktop-10-storage-inspector.png",
+        "docs/assets/shots/desktop-11-storage-localstorage.png"
+      ],
+      "docs/storage.md": [
+        "docs/assets/shots/desktop-10-storage-inspector.png",
+        "docs/assets/shots/desktop-11-storage-localstorage.png"
+      ],
+      "docs/transfer.en.md": [
         "docs/assets/shots/desktop-07-transfer-lan.png",
         "docs/assets/shots/desktop-08-transfer-cloud.png",
         "docs/assets/shots/desktop-09-transfer-webdav.png",
-        "docs/assets/shots/desktop-10-storage-inspector.png",
-        "docs/assets/shots/desktop-11-storage-localstorage.png",
+        "docs/assets/shots/mobile-06-transfer.png"
+      ],
+      "docs/transfer.md": [
+        "docs/assets/shots/desktop-07-transfer-lan.png",
+        "docs/assets/shots/desktop-08-transfer-cloud.png",
+        "docs/assets/shots/desktop-09-transfer-webdav.png",
+        "docs/assets/shots/mobile-06-transfer.png"
+      ],
+      "docs/tutorial.en.md": [
         "docs/assets/shots/desktop-12-log-view.png",
         "docs/assets/shots/desktop-13-task-queue.png",
         "docs/assets/shots/desktop-14-settings.png",
@@ -204,25 +245,10 @@
         "docs/assets/shots/mobile-01-tutorial-goal.png",
         "docs/assets/shots/mobile-02-tutorial-step.png",
         "docs/assets/shots/mobile-03-workbench-demo.png",
-        "docs/assets/shots/mobile-04-extension-manager.png",
-        "docs/assets/shots/mobile-05-extension-pack.png",
-        "docs/assets/shots/mobile-06-transfer.png",
-        "docs/assets/shots/mobile-07-export-area.png",
         "docs/assets/shots/mobile-08-task-queue.png",
         "docs/assets/shots/mobile-09-log-view.png"
       ],
-      "docs/tutorial.en.md": [
-        "docs/assets/shots/desktop-01-tutorial-goal.png",
-        "docs/assets/shots/desktop-02-tutorial-step.png",
-        "docs/assets/shots/desktop-03-workbench-demo.png",
-        "docs/assets/shots/desktop-04-export-area.png",
-        "docs/assets/shots/desktop-05-extension-manager.png",
-        "docs/assets/shots/desktop-06-extension-pack.png",
-        "docs/assets/shots/desktop-07-transfer-lan.png",
-        "docs/assets/shots/desktop-08-transfer-cloud.png",
-        "docs/assets/shots/desktop-09-transfer-webdav.png",
-        "docs/assets/shots/desktop-10-storage-inspector.png",
-        "docs/assets/shots/desktop-11-storage-localstorage.png",
+      "docs/tutorial.md": [
         "docs/assets/shots/desktop-12-log-view.png",
         "docs/assets/shots/desktop-13-task-queue.png",
         "docs/assets/shots/desktop-14-settings.png",
@@ -230,10 +256,6 @@
         "docs/assets/shots/mobile-01-tutorial-goal.png",
         "docs/assets/shots/mobile-02-tutorial-step.png",
         "docs/assets/shots/mobile-03-workbench-demo.png",
-        "docs/assets/shots/mobile-04-extension-manager.png",
-        "docs/assets/shots/mobile-05-extension-pack.png",
-        "docs/assets/shots/mobile-06-transfer.png",
-        "docs/assets/shots/mobile-07-export-area.png",
         "docs/assets/shots/mobile-08-task-queue.png",
         "docs/assets/shots/mobile-09-log-view.png"
       ]

@@ -17,6 +17,11 @@ alt_lang: en
 4. **开始生成**：点击底部的「生成导出包」按钮开始转换。
 5. **取件与保存**：完成后切到「导出区」，即可自由下载到本地、存入工作区或随手移除。
 
+<figure class="shot-figure">
+  <img src="assets/shots/desktop-03-workbench-demo.png" alt="转换工作台界面，左侧存储图表与右侧数据包列表" width="1440" height="900" loading="lazy">
+  <figcaption>工作台：左侧挑选内容，右侧勾选数据包</figcaption>
+</figure>
+
 > 提示：勾选了至少一个待转换的数据包之后，底部的「生成导出包」按钮就会亮起。
 
 ## 支持自由挑选的类目
@@ -57,6 +62,16 @@ alt_lang: en
 ## 导出区管理
 
 所有生成好的数据包都会整齐收纳在下方的「导出区」列表中，不会直接自动弹出下载打扰你。你可以按自己的节奏，随时点击下载或保存到本地工作区中。
+
+<figure class="shot-figure">
+  <img src="assets/shots/desktop-04-export-area.png" alt="桌面端导出区列表" width="1440" height="900" loading="lazy">
+  <figcaption>桌面端导出区：下载、保存或移除生成的数据包</figcaption>
+</figure>
+
+<figure class="shot-figure">
+  <img src="assets/shots/mobile-07-export-area.png" alt="手机端导出区列表" width="390" height="844" loading="lazy">
+  <figcaption>手机端导出区：同一套响应式布局</figcaption>
+</figure>
 
 ## 相关阅读
 

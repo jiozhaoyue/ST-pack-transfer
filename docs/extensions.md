@@ -17,6 +17,26 @@ alt_lang: en
 | **开发者** | 配置 Git 账号、OAuth 登录、获取访问令牌指引，以及开发者高级开关 |
 | **扩展打包** | 针对当前选中的数据包，专门挑选需要随包打包的扩展插件 |
 
+<figure class="shot-figure">
+  <img src="assets/shots/desktop-05-extension-manager.png" alt="桌面端扩展管理界面" width="1440" height="900" loading="lazy">
+  <figcaption>扩展管理：宿主扩展、开发者与打包三个分区</figcaption>
+</figure>
+
+<figure class="shot-figure">
+  <img src="assets/shots/mobile-04-extension-manager.png" alt="手机端扩展管理界面" width="390" height="844" loading="lazy">
+  <figcaption>手机端扩展管理：与桌面端一致的语义</figcaption>
+</figure>
+
+<figure class="shot-figure">
+  <img src="assets/shots/desktop-06-extension-pack.png" alt="桌面端扩展打包选择界面" width="1440" height="900" loading="lazy">
+  <figcaption>扩展打包：按包挑选完整 / 清单</figcaption>
+</figure>
+
+<figure class="shot-figure">
+  <img src="assets/shots/mobile-05-extension-pack.png" alt="手机端扩展打包选择界面" width="390" height="844" loading="lazy">
+  <figcaption>手机端包内扩展的单选状态</figcaption>
+</figure>
+
 ## 界面一致性与滚动规范
 
 为了让桌面和手机上的操作体验完全一致，扩展管理页遵守以下约定：

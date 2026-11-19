@@ -13,6 +13,16 @@ alt_lang: en
 
 在工作台顶部清晰展示了两项存储配额：**浏览器** 与 **宿主**。点击任意一行即可展开审查面板，面板内部也支持随时切换查看来源。
 
+<figure class="shot-figure">
+  <img src="assets/shots/desktop-10-storage-inspector.png" alt="存储审查面板与存储图表" width="1440" height="900" loading="lazy">
+  <figcaption>存储审查：配额进度条、占比图例与详情列表同屏</figcaption>
+</figure>
+
+<figure class="shot-figure">
+  <img src="assets/shots/desktop-11-storage-localstorage.png" alt="localStorage 键值占用明细" width="1440" height="900" loading="lazy">
+  <figcaption>localStorage：按键值查看占用明细</figcaption>
+</figure>
+
 ## 可以查看的内容
 
 通过直观的面包屑导航，你可以逐层查看各存储类型的详细占用：

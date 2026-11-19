@@ -47,8 +47,6 @@ const SHOT_SOURCES = Object.freeze([
   'tooling/capture-docs-shots.cjs',
 ]);
 
-const SHOT_PAGES = Object.freeze(['docs/tutorial.md', 'docs/tutorial.en.md']);
-
 function sha256(buffer) {
   return createHash('sha256').update(buffer).digest('hex');
 }
@@ -108,14 +106,21 @@ function extractShotRefs(markdown) {
   for (const match of markdown.matchAll(/!\[[^\]]*\]\((assets\/shots\/[^)\s]+)\)/g)) {
     refs.add(`${SHOT_PREFIX}${match[1].slice('assets/shots/'.length)}`);
   }
+  /* 配图按 <figure><img src="assets/shots/..."> 书写，同样计为引用。 */
+  for (const match of markdown.matchAll(/<img\b[^>]*\bsrc="(assets\/shots\/[^"]+)"/g)) {
+    refs.add(`${SHOT_PREFIX}${match[1].slice('assets/shots/'.length)}`);
+  }
   return [...refs].sort();
 }
 
+/** 截图可能出现在任意 .md 中：跟踪全部页面的 assets/shots/ 引用，而非仅 tutorial 两页。 */
 async function pageShotRefs() {
   const out = {};
-  for (const page of SHOT_PAGES) {
+  const docsFiles = await listDocsFiles();
+  for (const page of docsFiles.filter((rel) => rel.endsWith('.md'))) {
     const text = await readFile(path.join(ROOT, page), 'utf8').catch(() => '');
-    out[page] = extractShotRefs(text);
+    const refs = extractShotRefs(text);
+    if (refs.length) out[page] = refs;
   }
   return out;
 }

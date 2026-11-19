@@ -48,8 +48,8 @@ describe('size-model · 压缩档位与类目', () => {
     expect(balanced.predictedBytes).toBeGreaterThan(maximum.predictedBytes);
   });
 
-  it('已压缩类目（图片/原生/备份）的压缩收益明显低于文本类目', () => {
-    expect(compressionRatio('images', 9)).toBeGreaterThan(compressionRatio('chats', 9));
+  it('已压缩类目（附件/原生/备份）的压缩收益明显低于文本类目', () => {
+    expect(compressionRatio('attachments', 9)).toBeGreaterThan(compressionRatio('chats', 9));
     expect(compressionRatio('native', 9)).toBeGreaterThan(compressionRatio('lorebooks', 9));
     expect(compressionRatio('backups', 9)).toBeGreaterThan(compressionRatio('presets', 9));
   });
@@ -65,7 +65,7 @@ describe('size-model · ZIP 开销与分卷', () => {
   });
 
   it('分卷会重复中央目录并增加卷数', () => {
-    const entries = [entry('chats', 40), entry('images', 40), entry('lorebooks', 40)];
+    const entries = [entry('chats', 40), entry('attachments', 40), entry('lorebooks', 40)];
     const single = estimateSize({ entries, options: { compression: 0 } });
     const split = estimateSize({ entries, options: { compression: 0, splitMb: 32 } });
 

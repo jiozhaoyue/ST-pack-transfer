@@ -78,7 +78,7 @@ const DEMO_GROUPS = Object.freeze([
     ],
   },
   {
-    key: 'images',
+    key: 'attachments',
     files: [
       { path: 'User Avatars/seraphina.png', category: 'assets', w: 0.35 },
       { path: 'thumbnails/seraphina.png', category: 'assets', w: 0.15 },
@@ -103,10 +103,16 @@ const DEMO_GROUPS = Object.freeze([
   {
     key: 'extensions',
     files: [
-      { path: 'extensions/third-party/ST-BgLoader/manifest.json', category: 'extensions', w: 0.08 },
-      { path: 'extensions/third-party/ST-BgLoader/index.js', category: 'extensions', w: 0.62 },
-      { path: 'extensions/third-party/ST-zip-converter/manifest.json', category: 'extensions', w: 0.05 },
-      { path: 'extensions/third-party/ST-zip-converter/index.js', category: 'extensions', w: 0.25 },
+      { path: 'extensions/third-party/ST-pack-transfer/manifest.json', category: 'extensions', w: 0.04 },
+      { path: 'extensions/third-party/ST-pack-transfer/index.js', category: 'extensions', w: 0.36 },
+      { path: 'extensions/third-party/ST-BgLoader/manifest.json', category: 'extensions', w: 0.04 },
+      { path: 'extensions/third-party/ST-BgLoader/index.js', category: 'extensions', w: 0.26 },
+      { path: 'extensions/third-party/ST-chatfile-improve/manifest.json', category: 'extensions', w: 0.03 },
+      { path: 'extensions/third-party/ST-chatfile-improve/index.js', category: 'extensions', w: 0.12 },
+      { path: 'extensions/third-party/ST-msg-btn-mgr/manifest.json', category: 'extensions', w: 0.03 },
+      { path: 'extensions/third-party/ST-msg-btn-mgr/index.js', category: 'extensions', w: 0.06 },
+      { path: 'extensions/third-party/ST-PanelReset/manifest.json', category: 'extensions', w: 0.02 },
+      { path: 'extensions/third-party/ST-PanelReset/index.js', category: 'extensions', w: 0.04 },
     ],
   },
   {

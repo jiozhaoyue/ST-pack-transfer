@@ -16,14 +16,14 @@ import { mirrorArtifact } from '../storage/authority-store.js';
 import { escapeHtml, trustedStaticMarkup } from './escape.js';
 import { t } from '../i18n/index.js';
 
-function formatBytes(bytes) {
+export function formatBytes(bytes) {
   if (!bytes || bytes <= 0) return '0 B';
   const units = ['B', 'KB', 'MB', 'GB'];
   const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
   return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${units[i]}`;
 }
 
-function triggerBlobDownload(blob, name) {
+export function triggerBlobDownload(blob, name) {
   // Node/Vitest 降级：无 DOM 时跳过浏览器下载动作（状态机路径仍被单测覆盖）
   if (typeof document === 'undefined') return;
   const url = URL.createObjectURL(blob);

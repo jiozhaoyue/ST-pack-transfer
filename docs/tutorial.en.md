@@ -12,35 +12,58 @@ A built-in sandbox that walks you through transfer and backup operations on simu
 
 ## Screenshots
 
-All screenshots come from tutorial demo mode and show the real interface with simulated data (no user chats are included):
+All screenshots come from tutorial demo mode and show the real interface with simulated data (no user chats are included). The other feature pages (install, convert, extensions, transfer, storage) carry screenshots of their own screens; this page concentrates on logs, queue, settings, and the mobile demo views.
 
-![Tutorial goal picker](assets/shots/desktop-01-tutorial-goal.png)
-![Tutorial step guidance](assets/shots/desktop-02-tutorial-step.png)
-![Demo workbench](assets/shots/desktop-03-workbench-demo.png)
-![Export area](assets/shots/desktop-04-export-area.png)
-![Extension manager](assets/shots/desktop-05-extension-manager.png)
-![Extension packing](assets/shots/desktop-06-extension-pack.png)
-![LAN transfer](assets/shots/desktop-07-transfer-lan.png)
-![Cloud repository](assets/shots/desktop-08-transfer-cloud.png)
-![WebDAV](assets/shots/desktop-09-transfer-webdav.png)
-![Storage inspector](assets/shots/desktop-10-storage-inspector.png)
-![localStorage inspector](assets/shots/desktop-11-storage-localstorage.png)
-![Logs and task queue](assets/shots/desktop-12-log-view.png)
-![Half-expanded task queue](assets/shots/desktop-13-task-queue.png)
-![Settings](assets/shots/desktop-14-settings.png)
-![Changelog](assets/shots/desktop-15-changelog.png)
+### Logs and task queue
+
+<figure class="shot-figure">
+  <img src="assets/shots/desktop-12-log-view.png" alt="Desktop log view" width="1440" height="900" loading="lazy">
+  <figcaption>Desktop log view</figcaption>
+</figure>
+
+<figure class="shot-figure">
+  <img src="assets/shots/desktop-13-task-queue.png" alt="Desktop half-expanded task queue" width="1440" height="900" loading="lazy">
+  <figcaption>Desktop task queue (half-expanded)</figcaption>
+</figure>
+
+### Settings and changelog
+
+<figure class="shot-figure">
+  <img src="assets/shots/desktop-14-settings.png" alt="Settings panel" width="1440" height="900" loading="lazy">
+  <figcaption>Settings panel</figcaption>
+</figure>
+
+<figure class="shot-figure">
+  <img src="assets/shots/desktop-15-changelog.png" alt="Changelog view" width="1440" height="900" loading="lazy">
+  <figcaption>Changelog</figcaption>
+</figure>
 
 ### Mobile (390×844)
 
-![Mobile tutorial goals](assets/shots/mobile-01-tutorial-goal.png)
-![Mobile tutorial step](assets/shots/mobile-02-tutorial-step.png)
-![Mobile workbench](assets/shots/mobile-03-workbench-demo.png)
-![Mobile extension manager](assets/shots/mobile-04-extension-manager.png)
-![Mobile package selection](assets/shots/mobile-05-extension-pack.png)
-![Mobile transfer](assets/shots/mobile-06-transfer.png)
-![Mobile export area](assets/shots/mobile-07-export-area.png)
-![Mobile half-expanded queue](assets/shots/mobile-08-task-queue.png)
-![Mobile full log view](assets/shots/mobile-09-log-view.png)
+<figure class="shot-figure">
+  <img src="assets/shots/mobile-01-tutorial-goal.png" alt="Mobile tutorial goals" width="390" height="844" loading="lazy">
+  <figcaption>Mobile tutorial goal picker</figcaption>
+</figure>
+
+<figure class="shot-figure">
+  <img src="assets/shots/mobile-02-tutorial-step.png" alt="Mobile tutorial step" width="390" height="844" loading="lazy">
+  <figcaption>Mobile step guidance</figcaption>
+</figure>
+
+<figure class="shot-figure">
+  <img src="assets/shots/mobile-03-workbench-demo.png" alt="Mobile demo workbench" width="390" height="844" loading="lazy">
+  <figcaption>Mobile demo workbench</figcaption>
+</figure>
+
+<figure class="shot-figure">
+  <img src="assets/shots/mobile-08-task-queue.png" alt="Mobile half-expanded queue" width="390" height="844" loading="lazy">
+  <figcaption>Mobile task queue (half-expanded)</figcaption>
+</figure>
+
+<figure class="shot-figure">
+  <img src="assets/shots/mobile-09-log-view.png" alt="Mobile full log view" width="390" height="844" loading="lazy">
+  <figcaption>Mobile log view (full)</figcaption>
+</figure>
 
 ## How to open it
 

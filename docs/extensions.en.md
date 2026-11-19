@@ -18,6 +18,26 @@ Open it from the view switch at the top of the left panel: switch between **Stor
 | **Developer** | Git accounts, OAuth login, token guidance, and advanced developer switches |
 | **Extension packing** | Choose which extensions travel with the currently selected package |
 
+<figure class="shot-figure">
+  <img src="assets/shots/desktop-05-extension-manager.png" alt="Desktop extension manager interface" width="1440" height="900" loading="lazy">
+  <figcaption>Extension manager: host, developer, and packing sections</figcaption>
+</figure>
+
+<figure class="shot-figure">
+  <img src="assets/shots/mobile-04-extension-manager.png" alt="Mobile extension manager interface" width="390" height="844" loading="lazy">
+  <figcaption>Mobile extension manager: the same semantics as desktop</figcaption>
+</figure>
+
+<figure class="shot-figure">
+  <img src="assets/shots/desktop-06-extension-pack.png" alt="Desktop extension packing selection" width="1440" height="900" loading="lazy">
+  <figcaption>Packing: choose Full / Manifest per package</figcaption>
+</figure>
+
+<figure class="shot-figure">
+  <img src="assets/shots/mobile-05-extension-pack.png" alt="Mobile extension packing selection" width="390" height="844" loading="lazy">
+  <figcaption>Mobile per-package extension selection</figcaption>
+</figure>
+
 ## Interface consistency and scrolling
 
 To keep desktop and mobile behavior identical, the extension manager follows these rules:

@@ -43,8 +43,44 @@
       </div>
     </div>
   </header>
+
+  {% assign slugs = "install,formats,convert,host-pull,restore,extensions,transfer,storage,engines,tutorial,queue-and-logs,testing,privacy,faq,DEVELOPER-GUIDE" | split: "," %}
+  {% assign zh_labels = "安装,格式,转换,拉取,恢复,扩展,传输,存储,引擎,教程,队列日志,测试,隐私,常见问题,开发者" | split: "," %}
+  {% assign en_labels = "Install,Formats,Convert,Pull,Restore,Extensions,Transfer,Storage,Engines,Tutorial,Queue & logs,Testing,Privacy,FAQ,Developer" | split: "," %}
+  {% assign is_en = page.lang == 'en' %}
+  {% assign suffix = '' %}{% if is_en %}{% assign suffix = '.en' %}{% endif %}
+
   <main class="wrap page">
-    {{ content }}
+    <div class="docs-shell">
+      <input type="checkbox" id="nav-toggle" class="nav-toggle" aria-hidden="true" tabindex="-1">
+      <label for="nav-toggle" class="nav-toggle-label">☰ {% if is_en %}Menu{% else %}目录{% endif %}</label>
+
+      <aside class="sidebar" aria-label="{% if is_en %}Docs sidebar{% else %}文档侧边栏{% endif %}">
+        <nav class="side-nav">
+          {% for i in (0..14) %}
+            {% if i == 0 %}<p class="side-group-title">{% if is_en %}Getting started{% else %}入门指南{% endif %}</p>{% endif %}
+            {% if i == 2 %}<p class="side-group-title">{% if is_en %}Core features{% else %}核心功能{% endif %}</p>{% endif %}
+            {% if i == 11 %}<p class="side-group-title">{% if is_en %}Reference{% else %}参考信息{% endif %}</p>{% endif %}
+            {% assign s = slugs[i] %}
+            {% if is_en %}{% assign label = en_labels[i] %}{% else %}{% assign label = zh_labels[i] %}{% endif %}
+            {% assign active = '' %}{% if page.url contains s %}{% assign active = ' active' %}{% endif %}
+            {% assign link_suffix = suffix %}{% if s == 'DEVELOPER-GUIDE' %}{% assign link_suffix = '' %}{% endif %}
+            <a class="side-link{{ active }}" href="{{ s }}{{ link_suffix }}.html" data-idx="{{ i }}">{{ label }}</a>
+          {% endfor %}
+        </nav>
+      </aside>
+
+      <article class="doc-body">
+        {{ content }}
+      </article>
+
+      <aside class="toc-wrap" aria-label="{% if is_en %}On this page{% else %}本页目录{% endif %}">
+        <div class="toc-title">{% if is_en %}On this page{% else %}本页目录{% endif %}</div>
+        <nav id="doc-toc" class="toc"></nav>
+      </aside>
+
+      <nav class="doc-pager" aria-label="{% if is_en %}Page navigation{% else %}翻页导航{% endif %}" id="doc-pager"></nav>
+    </div>
   </main>
   <footer class="site-footer">
     <div class="wrap footer-inner">
@@ -53,5 +89,76 @@
     </div>
   </footer>
   <script src="docs.js"></script>
+  <script>
+    (() => {
+      const isEn = document.documentElement.lang === 'en';
+      const sideLinks = [...document.querySelectorAll('.side-link')];
+      const here = location.pathname.split('/').pop() || 'index.html';
+
+      /* 当前页高亮 + 上/下一页：完全由侧边栏顺序推导，不依赖 Liquid 作用域。 */
+      let curIdx = -1;
+      sideLinks.forEach((link, i) => {
+        link.classList.remove('active');
+        if (link.getAttribute('href') === here) { curIdx = i; link.classList.add('active'); }
+      });
+      const pager = document.getElementById('doc-pager');
+      if (pager && curIdx >= 0) {
+        const mk = (i, cls, prefix) => {
+          const link = sideLinks[i];
+          if (!link) return;
+          const a = document.createElement('a');
+          a.className = cls;
+          a.href = link.getAttribute('href');
+          a.textContent = prefix + '：' + link.textContent.trim();
+          pager.appendChild(a);
+        };
+        mk(curIdx - 1, 'pager-prev', isEn ? '← Previous' : '← 上一篇');
+        mk(curIdx + 1, 'pager-next', isEn ? 'Next →' : '下一篇 →');
+      }
+
+      /* 页内目录：从正文 h2/h3 生成锚点，滚动时高亮当前小节。 */
+      const body = document.querySelector('.doc-body');
+      const toc = document.getElementById('doc-toc');
+      if (body && toc) {
+        const heads = [...body.querySelectorAll('h2, h3')];
+        heads.forEach((h, i) => {
+          if (!h.id) h.id = 'sec-' + i;
+          const a = document.createElement('a');
+          a.href = '#' + h.id;
+          a.textContent = h.textContent.trim();
+          a.className = h.tagName.toLowerCase() === 'h3' ? 'toc-lvl-3' : 'toc-lvl-2';
+          toc.appendChild(a);
+        });
+        const links = [...toc.children];
+        if (links.length && 'IntersectionObserver' in window) {
+          const observer = new IntersectionObserver((entries) => {
+            for (const entry of entries) {
+              if (!entry.isIntersecting) continue;
+              links.forEach((link) => link.classList.toggle('active', link.hash === '#' + entry.target.id));
+            }
+          }, { rootMargin: '-84px 0px -70% 0px' });
+          heads.forEach((h) => observer.observe(h));
+        }
+      }
+
+      /* 截图点击放大：原生 <dialog>，零依赖。 */
+      const dialog = document.createElement('dialog');
+      dialog.className = 'lightbox';
+      dialog.innerHTML = '<button type="button" class="lb-close" aria-label="close">×</button><img alt="">';
+      document.body.appendChild(dialog);
+      const big = dialog.querySelector('img');
+      document.querySelectorAll('.doc-body img').forEach((img) => {
+        img.classList.add('shot-zoom');
+        img.addEventListener('click', () => {
+          big.src = img.currentSrc || img.src;
+          big.alt = img.alt || '';
+          dialog.showModal();
+        });
+      });
+      dialog.addEventListener('click', (event) => {
+        if (event.target === dialog || event.target.classList.contains('lb-close')) dialog.close();
+      });
+    })();
+  </script>
 </body>
 </html>

@@ -6809,7 +6809,7 @@ let inspectPanel = null;
 function showInspectReport(report){
   const html=renderInspectReport(report);
   openModal(t('inspect.title'),'',[html],[
-    {label:t('modal.close'),primary:true,onClick:()=>closeModal()},
+    {label:t('inspect.close'),primary:true,onClick:()=>closeModal()},
   ]);
 }
 

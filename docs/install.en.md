@@ -8,6 +8,20 @@ alt_lang: zh-CN
 
 # Installation & deployment
 
+## Interface preview
+
+On first launch, the tutorial walks you through the interface on simulated data:
+
+<figure class="shot-figure">
+  <img src="assets/shots/desktop-01-tutorial-goal.png" alt="Tutorial goal picker shown on first launch" width="1440" height="900" loading="lazy">
+  <figcaption>Goal picker: choose the feature to practice</figcaption>
+</figure>
+
+<figure class="shot-figure">
+  <img src="assets/shots/desktop-02-tutorial-step.png" alt="Step-by-step tutorial guidance" width="1440" height="900" loading="lazy">
+  <figcaption>Step guidance: the current action is highlighted</figcaption>
+</figure>
+
 ## 1. Choose a runtime form first
 
 | Form | How to use it | Best for | Host / browser requirement |

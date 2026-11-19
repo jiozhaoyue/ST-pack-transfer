@@ -44,8 +44,8 @@ describe('教程占位树 = 真实 buildChartTree 结构', () => {
     }
   }
 
-  it('四宿主都包含真实一级组：聊天/角色/世界书/图片/预设/扩展/私有/备份/缓存/向量/原生', () => {
-    const required = ['chats', 'characters', 'lorebooks', 'images', 'presets', 'extensions', 'private', 'backups', 'cache', 'vectors', 'native'];
+  it('四宿主都包含真实一级组：聊天/角色/世界书/附件/预设/扩展/私有/备份/缓存/向量/原生', () => {
+    const required = ['chats', 'characters', 'lorebooks', 'attachments', 'presets', 'extensions', 'private', 'backups', 'cache', 'vectors', 'native'];
     for (const host of HOSTS) {
       const ids = groupIds(demoTree(1000, host, 'fs'));
       for (const key of required) expect(ids).toContain(`group:${key}`);
