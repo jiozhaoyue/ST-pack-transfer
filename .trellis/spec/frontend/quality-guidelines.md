@@ -297,6 +297,57 @@ Host Native Dialog Adapter 第 7 节）。
 **`resumedCount` 这个字段全仓从不存在**（真正断言的是 `report.totals.resumed`）
 —— 用例名说错字段 = 假事实（`P-3` 同形）。**字段名也要当场取证，别照抄旧注释。**
 
+## 三方库引入规范（全域，2026-11-19 用户明令）
+
+用户原话：
+
+> 本仓不要多造轮子，一定要多用好用的别人的东西，而不是单独替换某个自写的为 3 方库，
+> 是全域的，是重要规则，并且应当整个项目完全规范，三方库也遵循本仓
+
+**判据不是「有没有自写」，而是「自写的是不是通用能力」。**
+
+### 一、先分类，再决定
+
+| 类别 | 例子 | 处置 |
+| --- | --- | --- |
+| **A 业务逻辑** | 包结构路由、宿主差异、转换规则、体积模型 | **必须自写**，换库即失去本仓语义 |
+| **B 通用算法** | inflate、CRC32、varint、hex/base64、深拷贝、diff、MIME 猜测 | **应换库或仓内去重** |
+| **C 通用格式解析** | ZIP / tar / gzip / JSON5 / CSV / YAML | **应换库**（本仓 ZIP 已用 `zip.js`） |
+| **D 浏览器 API 封装** | IndexedDB / OPFS / Clipboard | 薄封装可留；复杂逻辑用 `idb` 等 |
+| **E UI 工具** | 拖拽排序、浮层定位、虚拟滚动 | 视复杂度用 `sortablejs` / `floating-ui` |
+
+### 二、必须满足的硬约束
+
+1. **本地 vendor**：库文件放 `src/vendor/`，不得运行时拉 CDN（G-13）。
+2. **不要求用户构建**：用户安装路径只有「填一个 Git URL」（D-07）。
+3. **许可可兼容**：MIT / Apache-2.0 / BSD 可接受；GPL 系需单独裁定。
+4. **体积进预算**：新增 vendor 前给出 min+gzip 体积，并说明对插件安装体积的影响。
+5. **版本锁定 + 来源登记**：记录包名、版本、下载来源、许可文件。
+6. **既有 vendor 勿升级改动**：`src/vendor/` 现存文件（zip.js / fzstd / jsqr / qrcode-generator / sqljs）保持原样，除非单独授权。
+
+### 三、何时**不**引入
+
+以下情况自写反而合理，不要为了「用库」而引库：
+
+- 库体积远超本仓整体预算（例：`isomorphic-git` 解包 5.1 MB，本仓插件安装约 4.2 MB）；
+- 库的数据源模型与本仓冲突（例：`isomorphic-git` 基于 FS，本仓是「内存 zip 流、不落盘、不执行 git」）；
+- 库已停维护（例：`js-git` 约 10 年未更新）；
+- 只要几十行就能覆盖且逻辑稳定（例：CRC32、hex 编解码）——此时优先**仓内去重**，而非新增依赖。
+
+### 四、当前审计结论（2026-11-19 全域审计）
+
+| 项 | 结论 |
+| --- | --- |
+| ZIP / Zstd / 二维码 / SQLite | 已 vendor 复用，合规 |
+| 全仓手写 inflate/deflate | **零**（用原生 `DecompressionStream`） |
+| 手写 MIME 猜测 / CSV / YAML / JSON5 / tar / 事件总线 / diff / 深拷贝 | **零** |
+| `git-local.js` 的 packfile 解析（约 189 行） | **受约束豁免**：无适配的轻量库，大库超预算且架构不兼容 |
+| `zip-append.js` CRC32（约 25 行） | 建议**仓内去重**，不必引 `crc-32` |
+| hex/base64 散落 5 处 | 建议收敛为 `src/core/codec.js` |
+| `s3-client.js` SigV4（约 90 行） | `aws4fetch` 可用但需改 fetch 注入模型，暂缓 |
+
+**净判断**：本仓复用已较克制；最高收益动作是**仓内去重**，不是引入新库。
+
 ## Pre-Development Checklist
 
 改 `src/ui/`、`index.html` 或 `style.css` 之前：

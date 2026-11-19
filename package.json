@@ -51,6 +51,7 @@
     "check:download-html": "node tooling/check-download-html.mjs",
     "check:ext-responsive": "node scripts/ui-verify-ext-responsive-cdp.cjs",
     "verify:rules": "node tooling/rules/run.mjs",
+    "check:tavern-block": "node tooling/rules/run.mjs --only=tavern-block-integrity",
     "check:rule-paths": "node tooling/rules/run.mjs --only=rule-paths-resolve",
     "verify:all": "npm run verify:rules && npm test && npm run check:checkbox-centering",
     "docs:verify": "node tooling/docs-sync.mjs --verify",

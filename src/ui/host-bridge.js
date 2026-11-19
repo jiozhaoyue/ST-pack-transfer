@@ -795,14 +795,49 @@ async function postJsonBounded(url, body, label) {
 }
 
 /**
+ * 从 ST 上下文**同步**读取当前用户名（零网络，0ms）。
+ *
+ * 事实基线（2026-11-19 真机 CDP 实测，TT 2.4.0）：
+ *  - TauriTavern 是**单用户桌面应用**，`/api/users/me` 返回
+ *    `404 {"error":"Unsupported endpoint: /api/users/me"}`；
+ *    `/api/users/list`、`/api/settings/get` 同样 404。
+ *  - 但 `SillyTavern.getContext().name1` **同步可得**（实测 `"User"`），
+ *    四个宿主（含 TT / PT）都提供该字段。
+ *
+ * 因此身份识别必须先走同步路径，避免把「端点不存在」错当成「正在读取」而无限重试。
+ *
+ * @returns {{ok:true, handle:string, name:string, admin:boolean, source:'context'} | null}
+ */
+function readIdentityFromContext() {
+  try {
+    const ctx = typeof window !== 'undefined'
+      ? (window.SillyTavern?.getContext?.() || window.__TAURITAVERN__?.api?.context)
+      : null;
+    if (!ctx) return null;
+    const name = String(ctx.name1 || ctx.handle || '').trim();
+    if (!name) return null;
+    return { ok: true, handle: name, name, admin: ctx.admin === true, source: 'context' };
+  } catch {
+    return null;
+  }
+}
+
+/**
  * 当前登录用户身份（管理员识别的**唯一**判据是宿主返回的 `admin` 布尔）。
  *
- * `GET /api/users/me` 的响应里 `admin` 是宿主事实；插件不按用户昵称或平台猜管理员。
- * 非插件宿主 / 未登录 / 读不到 ⇒ `ok:false`，调用方不显示管理员专属分区。
+ * 读取顺序（2026-11-19 用户裁定：身份必须在 0.1s 内读到，TT/PT 不该有压力）：
+ *  ① **同步**读 ST 上下文 `name1` —— 零网络、0ms，四宿主通用；
+ *  ② 同步拿不到才退回 `GET /api/users/me`（ST / Luker 有此端点，TT / PT 没有）。
  *
- * @returns {Promise<{ok:boolean, handle?:string, name?:string, admin?:boolean, status?:number, reason?:string}>}
+ * 插件不按用户昵称或平台猜管理员；`admin` 只认宿主返回的布尔 true。
+ *
+ * @returns {Promise<{ok:boolean, handle?:string, name?:string, admin?:boolean, status?:number, reason?:string, source?:string}>}
  */
 export async function readHostIdentity() {
+  // ① 同步路径优先：TT / PT 没有 /api/users/me，只能从这里拿。
+  const fromCtx = readIdentityFromContext();
+  if (fromCtx) return fromCtx;
+
   if (typeof fetch !== 'function') return { ok: false, reason: 'no-fetch' };
   if (typeof window !== 'undefined' && !detectHost().isPlugin) return { ok: false, reason: 'standalone-web' };
   const res = await getJsonBounded('/api/users/me', '读取当前用户身份');
@@ -817,6 +852,7 @@ export async function readHostIdentity() {
     ok: true,
     handle: String(res.data.handle || ''),
     name: String(res.data.name || ''),
+    source: 'api',
     /* 只认布尔 true；字符串 "false"/缺省一律按非管理员处理。 */
     admin: res.data.admin === true,
   };

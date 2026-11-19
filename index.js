@@ -8,6 +8,7 @@
 import { runConversionTask, runPlanTask } from './src/core/worker-client.js';
 import { logger } from './src/core/logger.js';
 import { zipIo, readZipEntryManifest } from './src/core/zip-io.js';
+import { inspectPackage } from './src/core/inspect.js';
 import { splitArchiveEntries } from './src/core/splitter.js';
 import { mergeConvertedBlobs } from './src/core/merge-packages.js';
 import {
@@ -2177,22 +2178,38 @@ async function main(root) {
     let currentOffset = 0;
     const PAGE_SIZE = 15;
 
-    function renderRows(items) {
+    /**
+     * 渲染更新日志行。
+     *
+     * SHA 列折叠（2026-11-19 用户实测：日期右侧出现贯穿整屏的竖直空白带）：
+     * 内置发布清单 fallback 的条目 `sha` 为空（`changelog.js` 两处），三列网格里
+     * 58px 的 SHA 列恒定空白。**按整页判定**而非逐行折叠——逐行折叠会让说明列
+     * 左右错位，比空白更难读。判据：本页全部条目都没有 SHA 时整体降为两列。
+     */
+    function renderRows(items, { showSha = true } = {}) {
       return items.map((entry) => {
         const tags = Array.isArray(entry.tags) && entry.tags.length
           ? entry.tags
           : (entry.release ? [`v${entry.release}`] : []);
         const isRelease = tags.length > 0;
+        const hasSha = Boolean(showSha && entry.sha);
         return '<div class="changelog-row' + (isRelease ? ' is-release' : '') + '"'
-          + ' data-changelog-release="' + (isRelease ? '1' : '0') + '">'
+          + ' data-changelog-release="' + (isRelease ? '1' : '0') + '"'
+          + ' data-sha="' + (hasSha ? '1' : '0') + '">'
           + '<span class="changelog-date">' + escapeText(entry.date || '') + '</span>'
-          + (entry.sha ? '<code class="changelog-sha">' + escapeText(entry.sha) + '</code>'
+          + (hasSha
+            ? '<code class="changelog-sha">' + escapeText(entry.sha) + '</code>'
             : '<span class="changelog-sha is-empty" aria-hidden="true"></span>')
           + '<span class="changelog-msg">'
           + (isRelease ? '<span class="changelog-tag">🏷 ' + escapeText(tags.join(' / ')) + '</span>' : '')
           + escapeText(entry.subject || '') + '</span>'
           + '</div>';
       }).join('');
+    }
+
+    /** 本页是否存在任何带 SHA 的条目：决定是否保留 SHA 列（避免整列空白）。 */
+    function pageHasSha(items) {
+      return (items || []).some((entry) => Boolean(entry && entry.sha));
     }
 
     function buildHeaderHtml() {
@@ -2217,7 +2234,7 @@ async function main(root) {
     currentOffset = initialResult.items.length;
 
     const listHtml = '<div class="changelog-list" id="changelog-list-container">'
-      + (renderRows(initialResult.items) || '<div class="ext-note">' + escapeText(t('log.empty')) + '</div>')
+      + (renderRows(initialResult.items, { showSha: pageHasSha(activeCommits) }) || '<div class="ext-note">' + escapeText(t('log.empty')) + '</div>')
       + '</div>';
     const moreBtnHtml = '<div id="changelog-more-area" style="text-align:center;margin-top:8px;' + (initialResult.hasMore ? '' : 'display:none') + '">'
       + '<button type="button" class="btn" id="changelog-load-more" style="font-size:11px;padding:3px 14px">'
@@ -2274,7 +2291,7 @@ async function main(root) {
       const listEl = document.getElementById('changelog-list-container');
       if (listEl) {
         // dom-injection-guard:allow (renderRows outputs escaped commit data)
-        listEl.innerHTML = renderRows(paged.items) || ('<div class="ext-note">' + escapeText(t('log.empty')) + '</div>');
+        listEl.innerHTML = renderRows(paged.items, { showSha: pageHasSha(activeCommits) }) || ('<div class="ext-note">' + escapeText(t('log.empty')) + '</div>');
       }
       const moreArea = document.getElementById('changelog-more-area');
       if (moreArea) moreArea.style.display = paged.hasMore ? '' : 'none';
@@ -2333,7 +2350,7 @@ async function main(root) {
       const listEl = document.getElementById('changelog-list-container');
       if (listEl && paged.items.length) {
         // dom-injection-guard:allow (renderRows outputs escaped commit data)
-        listEl.insertAdjacentHTML('beforeend', renderRows(paged.items));
+        listEl.insertAdjacentHTML('beforeend', renderRows(paged.items, { showSha: pageHasSha(activeCommits) }));
       }
       const moreArea = document.getElementById('changelog-more-area');
       if (moreArea) moreArea.style.display = paged.hasMore ? '' : 'none';
@@ -2536,6 +2553,25 @@ async function main(root) {
         return browserStorageProvider.fetch(path);
       },
       uploadRequest: () => root.querySelector('#file-input')?.click(),
+      /**
+       * 体检（用户裁定入口）：包卡按钮 → blobOf(pkg) → inspectPackage → 模态。
+       * 外部文件 → 独立 input，不调用 saveFile、不入库。
+       */
+      inspectPackage: async (id) => {
+        const pkg = pkgById(id);
+        if (!pkg) return;
+        const blob = await blobOf(pkg);
+        if (!blob) { view.toast(t('inspect.readFailed')); return; }
+        const targetLayout = targetCodeOf(view.getState().target);
+        try {
+          const report = await inspectPackage(blob, { targetLayout });
+          view.showInspectReport(report);
+        } catch (err) {
+          logger.error(`${t('inspect.readFailed')}: ${err?.message || err}`);
+          view.toast(t('inspect.readFailed'));
+        }
+      },
+      inspectFile: () => root.querySelector('#file-input-inspect')?.click(),
       uploadPrivate,
       privateFiles: {
         list: () => loadPrivateFiles(),
@@ -2633,6 +2669,25 @@ async function main(root) {
     const files = [...(event.target.files || [])];
     event.target.value = '';
     await importFiles(files);
+  });
+
+  /* 外部文件体检：只读本地 zip，绝不入库（不调用 saveFile / importFiles）。 */
+  root.querySelector('#file-input-inspect')?.addEventListener('change', async (event) => {
+    const file = (event.target.files || [])[0] || null;
+    event.target.value = '';
+    if (!file) return;
+    const panel = view.getInspectPanel?.();
+    panel?.setBusy?.();
+    try {
+      const targetLayout = targetCodeOf(view.getState().target);
+      const report = await inspectPackage(file, { targetLayout });
+      view.showInspectReport(report);
+      panel?.render?.(report);
+    } catch (err) {
+      logger.error(`${t('inspect.readFailed')}: ${err?.message || err}`);
+      panel?.setError?.(t('inspect.readFailed'));
+      view.toast(t('inspect.readFailed'));
+    }
   });
 
   for (const target of [root, root.querySelector('#chart-card')]) {

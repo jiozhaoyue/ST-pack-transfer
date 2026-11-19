@@ -62,6 +62,7 @@ import {
 import { createGitRemote } from './git-remote.js';
 import { gitSiteIcon } from './git-icons.js';
 import { hasKey, t } from '../i18n/index.js';
+import { mountInspectPanel, renderInspectReport } from './inspect-view.js';
 import { logger } from '../core/logger.js';
 import { loadSettings, saveSettings } from './settings-store.js';
 import { normalizeUpdateInterval, updatePolicyOf, updateBackoffDelay, applyWebTheme } from './settings-panel.js';
@@ -2398,6 +2399,7 @@ function pkgCard(p, opts){
         ? '<div class="pkg-actions">'+opts.pendingActions+'</div>'
         : (p.zone==='export'?'':'<div class="pkg-actions">'
             +'<button data-pkgact="delete" data-id="'+p.id+'" title="'+t('pkg.delete')+'">'+svg('archive','tree-ico')+'</button>'
+            +'<button data-pkgact="inspect" data-id="'+p.id+'" title="'+t('inspect.button')+'">'+svg('clip','tree-ico')+'</button>'
           +'</div>'))
     +'</div>';
 }
@@ -6801,6 +6803,16 @@ function openSettingsView(html,{onSave,onClose,onAction}={}){
 
 /* ── 确认浮层（原生 dialog 顶层；签名沿用原弹窗，调用方零改动） ── */
 function confirmDialogEl(){ return document.getElementById('confirm-dialog'); }
+/** 体检面板句柄：bind() 时挂载，showInspectReport 复用同一范式。 */
+let inspectPanel = null;
+/** 把体检结论用模态承载（复用 openModal 范式）。 */
+function showInspectReport(report){
+  const html=renderInspectReport(report);
+  openModal(t('inspect.title'),'',[html],[
+    {label:t('modal.close'),primary:true,onClick:()=>closeModal()},
+  ]);
+}
+
 function openModal(title,desc,extraHtml,actions,opts={}){
   const dlg=confirmDialogEl();
   if(!dlg) return;
@@ -8247,6 +8259,8 @@ function bind(){
       const kind=act.dataset.pkgact;
       if(kind==='delete'){
         state.selectedPkgs=new Set([id]); doDeleteSelected();
+      }else if(kind==='inspect'){
+        actions.inspectPackage?.(id);
       }else if(kind==='download'){
         log('INFO',t('toast.downloaded',{name:pkg.name})); toast(t('toast.downloadStarted'));
       }else if(kind==='upload'){
@@ -8395,6 +8409,12 @@ function bind(){
   document.getElementById('log-close').addEventListener('click',backToWorkbench);
   document.getElementById('help-close').addEventListener('click',closeHelp);
   document.getElementById('modal-close').addEventListener('click',closeModal);
+  /* 体检面板：外部文件入口（不入库）。选文件动作交给控制器发起。 */
+  inspectPanel = mountInspectPanel({
+    container: document.getElementById('inspect-panel'),
+    onPickFile: () => actions.inspectFile?.(),
+  });
+  document.getElementById('btn-inspect')?.addEventListener('click',()=>actions.inspectFile?.());
   const dlg=confirmDialogEl();
   if(dlg){
     dlg.addEventListener('click',e=>{ if(e.target===dlg) closeModal(); });
@@ -9038,6 +9058,8 @@ void refreshHostIdentity();
     pushLog(level, msg, extra) { log(String(level || 'INFO').toUpperCase(), msg, extra); },
     openModal,
     closeModal,
+    showInspectReport,
+    getInspectPanel() { return inspectPanel; },
     openSettingsView,
     showPane,
     backToWorkbench,

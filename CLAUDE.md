@@ -161,7 +161,7 @@ npm run gen-fixtures              # 重新生成测试固件 fixtures/
 
 ## 规范入口
 
-- `.trellis/spec/guides/rule-catalog.md`（规则判据）与 `.trellis/spec/frontend/index.md` / `.trellis/spec/backend/index.md`（分层规范索引）
+- `.trellis/spec/tavern-dev/index.md`
 
 ## 技能策略
 
@@ -170,6 +170,9 @@ npm run gen-fixtures              # 重新生成测试固件 fixtures/
 
 ## 项目覆盖
 （本仓自有内容，同步器保留；无则留空。）
+
+- 规范入口覆盖：基石「规范入口」指向的 spec 根在本仓未随基石同步落地；本仓实际分层规范索引为
+  `.trellis/spec/frontend/index.md` / `.trellis/spec/backend/index.md`，规则判据为 `.trellis/spec/guides/rule-catalog.md`。
 
 <!-- TAVERN-RULES:END -->
 

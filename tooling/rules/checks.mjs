@@ -8,6 +8,7 @@
  */
 import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -189,6 +190,83 @@ export const checks = [
       return {
         ok: items.length === 0,
         detail: items.length === 0 ? `${targets.length} 个规则文件指针一致，无逐字复制` : `${items.length} 处不符合指针协议`,
+        items,
+      };
+    },
+  },
+
+  {
+    id: 'tavern-block-integrity',
+    rule: 'R-01',
+    title: '基石规则块完整性：声明哈希必须与正文一致（禁止静默漂移）',
+    severity: 'MUST',
+    run() {
+      const files = ['AGENTS.md', 'CLAUDE.md', 'GEMINI.md'];
+      const START = '<!-- TAVERN-RULES:START';
+      const END = '<!-- TAVERN-RULES:END -->';
+      const HASH_RE = /内容哈希:\s*sha256:([0-9a-f]{64})/;
+      // 与 tavern-harness/scripts/modules/rules_sync.py 的 norm()+sha() 完全一致：
+      // norm = text.replace("\r\n","\n")；sha = sha256(norm(text).encode("utf-8")).hexdigest()
+      const sha = (text) => createHash('sha256').update(text.replace(/\r\n/g, '\n')).digest('hex');
+
+      const items = [];
+      const bodies = new Map();
+
+      for (const rel of files) {
+        const text = readText(rel);
+        if (text === null) {
+          items.push({ file: rel, line: 0, text: '文件不存在' });
+          continue;
+        }
+        const s = text.indexOf(START);
+        const e = text.indexOf(END, s);
+        if (s < 0 || e < 0) {
+          items.push({ file: rel, line: 0, text: '缺少 TAVERN-RULES 块边界' });
+          continue;
+        }
+        const lines = text.slice(s, e).split('\n');
+        const hi = lines.findIndex((l) => HASH_RE.test(l));
+        if (hi < 0) {
+          items.push({ file: rel, line: 0, text: '块内缺少声明哈希' });
+          continue;
+        }
+        const declared = HASH_RE.exec(lines[hi])[1];
+        const oi = lines.findIndex((l, i) => i > hi && /^##\s*项目覆盖\s*$/.test(l.trim()));
+        if (oi < 0) {
+          items.push({ file: rel, line: 0, text: '块内缺少「项目覆盖」节' });
+          continue;
+        }
+        // 正文范围：声明哈希行之后 → 「项目覆盖」标题之前的末尾空行之前，
+        // 与 render_body() 的 "\n".join(lines) 加尾部换行一致。
+        const body = lines.slice(hi + 1, oi - 1).join('\n') + '\n';
+        bodies.set(rel, body);
+        const actual = sha(body);
+        if (declared !== actual) {
+          items.push({
+            file: rel,
+            line: text.slice(0, s).split('\n').length + hi,
+            text: '声明哈希与实际正文不符',
+          });
+        }
+      }
+
+      // 三份文件的「规则正文」必须一致（防止只改了一个）
+      const present = [...bodies.values()];
+      if (present.length > 1) {
+        const first = present[0];
+        for (const [rel, body] of bodies) {
+          if (body !== first) {
+            items.push({ file: rel, line: 0, text: '规则正文与其它 harness 文件不一致' });
+          }
+        }
+      }
+
+      return {
+        ok: items.length === 0,
+        detail:
+          items.length === 0
+            ? `${files.length} 份 harness 规则块声明哈希与正文一致，且正文互相同步`
+            : `${items.length} 处基石规则块完整性异常`,
         items,
       };
     },
