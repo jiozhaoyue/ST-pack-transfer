@@ -20,16 +20,40 @@ const KV_CHECKPOINT_PREFIX = 'task-checkpoint:';
 let testClient = undefined;
 
 /**
- * 探测并初始化 Authority client（结果缓存）
+ * SDK init 的结果缓存（**真正生效的缓存**）。
+ *
+ * 审计发现（2026-11-19）：本函数注释一直写「结果缓存」，但实现没有缓存——
+ * 每次调用都重新 `sdk.init()`。`putArtifact` 按 4MB 分块上传时会为每块调用一次，
+ * 大包会产生上百次重复 init。现补齐缓存。
+ *
+ * 缓存语义：`undefined` = 未探测；`null` = 已探测且不可用（**不重试**）；
+ * 其它 = 已初始化的 client。探测失败即固化，避免每次调用都走一遍失败路径。
+ */
+let cachedClient;
+
+/** @private 测试专用：清空缓存（配合 __setAuthorityClientForTest） */
+export function __resetAuthorityCacheForTest() {
+  cachedClient = undefined;
+}
+
+/**
+ * 探测并初始化 Authority client（**结果缓存**）。
+ *
+ * 缓存语义见 `cachedClient` 注释：一旦探测完成（无论成功或失败）就固化，
+ * 不再重复 init。这保证大包分块上传时不会为每块重新走一遍 init。
  * @returns {Promise<object|null>} client 或 null（未安装/未授权/初始化失败）
  */
 export async function getAuthorityClient() {
   if (testClient !== undefined) return testClient;
+  if (cachedClient !== undefined) return cachedClient;
   if (typeof window === 'undefined' || typeof document === 'undefined') return null;
   const sdk = window.STAuthority && window.STAuthority.AuthoritySDK;
-  if (!sdk) return null;
+  if (!sdk) {
+    cachedClient = null;   // 固化「无 SDK」，避免每次调用重复探测
+    return null;
+  }
   try {
-    return await sdk.init({
+    cachedClient = await sdk.init({
       extensionId: 'third-party/ST-pack-transfer',
       displayName: '数据包转运',
       version: '1.0.0',
@@ -45,8 +69,10 @@ export async function getAuthorityClient() {
         storage: { kv: true, blob: true },
       },
     });
+    return cachedClient;
   } catch (err) {
     console.warn('[authority-store] Authority 初始化失败，降级为本地存储:', err);
+    cachedClient = null;   // 固化失败，不重试——纯前端路径必须无感
     return null;
   }
 }

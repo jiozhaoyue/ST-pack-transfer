@@ -846,4 +846,148 @@ export const checks = [
       };
     },
   },
+
+  {
+    id: 'frontend-first',
+    rule: 'R-20',
+    title: '纯前端绝对优先：后端引用必有降级保护，不得进首屏 await 链，不得为唯一实现',
+    severity: 'MUST',
+    run() {
+      /* 铁律 41 / R-20 / D-95：主路径必须纯前端闭环，后端（Authority SDK 及未来其它后端）
+         只能是可选增强。四条判据：
+           1) 扫描 src/** 与 index.js 的 window.STAuthority / authority-store 引用点；
+           2) 每个引用点所在函数/文件须有降级保护（return null/false/undefined、catch、?.、
+              或 isAuthorityAvailable 守卫）；
+           3) index.js 顶层（模块根）await 链不得出现 authority 调用；
+           4) 导出函数体不得「只有 authority 调用、无本地回退分支」。 */
+
+      const files = [
+        ...walk('src', (n) => /\.(js|mjs|cjs)$/.test(n)),
+        'index.js',
+      ].filter((rel) => {
+        const text = readText(rel);
+        return text !== null && !isBinary(text);
+      });
+
+      // 真正的后端引用：访问 SDK 全局，或在 import / import() 的模块说明符里指向 authority-store。
+      // 日志标签（console.warn('[authority-store] …')）只是字符串，不算引用。
+      const sdkUseRe = /window\s*\.\s*STAuthority/;
+      const moduleSpecRe = /(?:from\s*|import\s*\()\s*['"][^'"]*authority-store[^'"]*['"]/;
+      const isRef = (line) => sdkUseRe.test(line) || moduleSpecRe.test(line);
+
+      // 降级保护标记：出现在引用所在函数体 / 整个文件即视为受保护。
+      const protectionRes = [
+        /\breturn\s+(?:null|false|undefined)\b/,
+        /\bcatch\b/,
+        /\?\./,
+        /\bisAuthorityAvailable\b/,
+      ];
+      const hasProtection = (text) => protectionRes.some((re) => re.test(text));
+
+      const stripLine = (raw) => raw
+        .replace(/`(?:[^`\\]|\\.)*`/g, '``')
+        .replace(/"(?:[^"\\]|\\.)*"/g, '""')
+        .replace(/'(?:[^'\\]|\\.)*'/g, "''")
+        .replace(/\/\/.*$/, '');
+
+      // 每行记录「进入该行前」仍处于打开状态的 { 的起始行号栈。
+      function snapshots(lines) {
+        const stack = [];
+        const snap = [];
+        lines.forEach((raw, i) => {
+          snap[i] = stack.slice();
+          const code = stripLine(raw);
+          for (const ch of code) {
+            if (ch === '{') stack.push(i);
+            else if (ch === '}') stack.pop();
+          }
+        });
+        return snap;
+      }
+
+      const CONTROL = /^\s*(?:if|for|while|switch|catch|try|else|with)\b/;
+      const isFuncLine = (txt) => (txt.includes('=>') || /\bfunction\b/.test(txt)) && !CONTROL.test(txt);
+
+      function matchingClose(lines, startIdx) {
+        let depth = 0;
+        for (let i = startIdx; i < lines.length; i++) {
+          const code = stripLine(lines[i]);
+          for (const ch of code) {
+            if (ch === '{') depth += 1;
+            else if (ch === '}') {
+              depth -= 1;
+              if (depth === 0) return i;
+            }
+          }
+        }
+        return lines.length - 1;
+      }
+
+      /** 引用所在函数体文本；找不到函数边界时回退到整个文件（两种范围都被判据 2 允许）。 */
+      function scopeText(lines, snap, idx) {
+        const opens = snap[idx] || [];
+        for (let j = opens.length - 1; j >= 0; j -= 1) {
+          if (isFuncLine(lines[opens[j]])) {
+            const end = matchingClose(lines, opens[j]);
+            return lines.slice(opens[j], end + 1).join('\n');
+          }
+        }
+        return lines.join('\n');
+      }
+
+      const items = [];
+      let refCount = 0;
+      let protectedCount = 0;
+
+      // 判据 1 + 2：引用点计数与降级保护。
+      for (const rel of files) {
+        const lines = readText(rel).split(/\r?\n/);
+        const snap = snapshots(lines);
+        lines.forEach((raw, i) => {
+          if (!isRef(raw)) return;
+          refCount += 1;
+          if (hasProtection(scopeText(lines, snap, i))) {
+            protectedCount += 1;
+          } else {
+            items.push({ file: rel, line: i + 1, text: `后端引用缺少降级保护：${raw.trim().slice(0, 120)}` });
+          }
+        });
+      }
+
+      // 判据 3：index.js 顶层 await 链不得出现 authority 调用。
+      if (existsSync(path.join(ROOT, 'index.js'))) {
+        const lines = readText('index.js').split(/\r?\n/);
+        const snap = snapshots(lines);
+        lines.forEach((raw, i) => {
+          if (!isRef(raw) || !/\bawait\b/.test(raw)) return;
+          if ((snap[i] || []).length <= 1) {
+            items.push({ file: 'index.js', line: i + 1, text: `首屏顶层 await 链出现后端调用：${raw.trim().slice(0, 120)}` });
+          }
+        });
+      }
+
+      // 判据 4：导出函数不得「只有 authority 调用、无本地回退分支」。
+      const exportedFuncRe = /export\s+(?:async\s+)?function\s+[A-Za-z_$][\w$]*/;
+      const authorityCallRe = /getAuthorityClient\s*\(|client\s*\.\s*storage\s*\./;
+      const localFallbackRe = /\breturn\s+(?:null|false|undefined)\b|memoryAdapter|saveFile|createObjectURL|\bopfs\b|indexedDB|\bcatch\b|\bgetFile\b/;
+      for (const rel of files) {
+        const lines = readText(rel).split(/\r?\n/);
+        const snap = snapshots(lines);
+        lines.forEach((raw, i) => {
+          if (!exportedFuncRe.test(raw)) return;
+          const body = scopeText(lines, snap, i);
+          if (authorityCallRe.test(body) && !localFallbackRe.test(body)) {
+            items.push({ file: rel, line: i + 1, text: '导出函数只有 authority 调用、无本地回退分支' });
+          }
+        });
+      }
+
+      const missing = refCount - protectedCount;
+      return {
+        ok: items.length === 0,
+        detail: `扫描 ${refCount} 个引用点，${protectedCount} 个有降级保护，${missing} 个缺失；首屏顶层 await / 唯一实现违规已并入 items`,
+        items,
+      };
+    },
+  },
 ];
