@@ -1,6 +1,7 @@
 import { describe, expect, it, beforeEach, afterEach } from 'vitest';
 import {
   detectHost, verifyHostPlatform, hostLayoutCode, hostSelectionCapability, describeHostFetchPlan,
+  getHostContext, hostHasStorageEngines,
 } from '../src/ui/host-bridge.js';
 
 // 模拟浏览器全局环境的可写快照
@@ -319,6 +320,37 @@ describe('describeHostFetchPlan 拉取前预览（R-A5 纯函数）', () => {
       describeHostFetchPlan('st', sel(3)),
     ]) {
       expect(text).not.toMatch(/[（）()；;：:]/);
+    }
+  });
+});
+
+describe('getHostContext 宿主上下文正规出口（D-01：业务层只读这里）', () => {
+  afterEach(() => {
+    setGlobal('SillyTavern', undefined);
+  });
+
+  it('SillyTavern.getContext 存在 → 返回其 ctx', () => {
+    const ctx = { version: '1.2.3' };
+    setGlobal('SillyTavern', { getContext: () => ctx });
+    expect(getHostContext()).toBe(ctx);
+  });
+
+  it('无宿主 / 无 getContext → 返回 null（语义等价旧直读回退分支）', () => {
+    setGlobal('SillyTavern', undefined);
+    expect(getHostContext()).toBe(null);
+    setGlobal('SillyTavern', {});
+    expect(getHostContext()).toBe(null);
+  });
+});
+
+describe('hostHasStorageEngines 宿主多存储后端能力旗标', () => {
+  it('仅 luker 提供多后端（fs/postgres/mysql/sqlite）', () => {
+    expect(hostHasStorageEngines('luker')).toBe(true);
+  });
+
+  it('st / tt / pt / standalone / 空值 均为 false', () => {
+    for (const p of ['st', 'tt', 'pt', 'standalone', '', undefined]) {
+      expect(hostHasStorageEngines(p)).toBe(false);
     }
   });
 });

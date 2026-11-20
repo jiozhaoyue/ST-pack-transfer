@@ -154,6 +154,10 @@
   #app.app-container .badge .web-icon{color:var(--accent)}
   #app.app-container .badge .gh-icon[hidden], #app.app-container .badge .host-icon[hidden], #app.app-container .badge .web-icon[hidden]{display:none}
   #app.app-container .badge.accent{border-color:var(--accent);color:var(--text);background:var(--accent-soft)}
+  #app.app-container .upstream-badge{text-decoration:none;cursor:pointer;transition:transform .2s ease,border-color .2s ease,background .2s ease;gap:4px}
+  #app.app-container .upstream-badge:hover{transform:translateY(-1px);border-color:var(--border-strong);background:var(--panel-2);color:var(--text)}
+  #app.app-container .upstream-badge svg{color:var(--muted);flex:0 0 auto}
+  #app.app-container .upstream-badge:hover svg{color:var(--accent)}
   #app.app-container .badge b.is-admin{color:var(--accent);margin-left:4px;font-weight:700}
   /* 教程演示模式横幅：始终在页头下方，明示占位数据与退出入口。
      教程蒙层 z-index:95 覆盖全屏，横幅必须在其之上，否则「退出教程」点不到。 */
@@ -163,7 +167,7 @@
   #app.app-container .tutorial-banner .tb-text{flex:1 1 auto;min-width:0;line-height:1.45}
   /* 手机端单行铁律（2026-11-15 用户裁定）：短文案 + 禁换行，按钮与文字同一行 */
   #app.app-container[data-view="mobile"] .tutorial-banner{gap:6px;padding:5px 8px;white-space:nowrap}
-  #app.app-container[data-view="mobile"] .tutorial-banner .tb-text{flex:1 1 auto;overflow:hidden;font-size:10.5px}
+  #app.app-container[data-view="mobile"] .tutorial-banner .tb-text{flex:1 1 auto;overflow:hidden;text-overflow:ellipsis;font-size:10.5px}
   #app.app-container[data-view="mobile"] .tutorial-banner .btn{padding:3px 6px}
   #app.app-container .tutorial-banner .btn{flex:0 0 auto;min-height:var(--ctl-h);padding:3px 9px;font-size:11px}
   #app.app-container .icon-btn{position:relative;width:var(--ctl-h);height:var(--ctl-h);display:inline-flex;align-items:center;justify-content:center;
@@ -257,8 +261,12 @@
     border-bottom:1px solid var(--border)}
   #app.app-container .filename-edit{display:flex;align-items:center;gap:6px;min-width:0}
   #app.app-container .filename-edit .field{flex:0 0 auto;white-space:nowrap}
-  #app.app-container .filename-edit textarea{flex:1 1 auto;min-width:0;width:auto;box-sizing:border-box;height:var(--ctl-h);
-    min-height:var(--ctl-h);resize:none;white-space:nowrap;overflow-x:auto;overflow-y:hidden;
+  #app.app-container .filename-edit textarea{flex:1 1 auto;min-width:0;width:auto;box-sizing:border-box;
+    /* 2026-11-20 线B-P0：原 height:var(--ctl-h)=28px ⇒ clientH=26（扣 2px 边框），
+       单行 line-height1.5×11px+上下 padding12px=28.5→scrollH29，垂直裁切 3px。
+       高度补 4px（32px）⇒ clientH=30≥scrollH29，消除裁切；作用域内，不改 token 真源。 */
+    height:calc(var(--ctl-h) + 4px);min-height:calc(var(--ctl-h) + 4px);resize:none;white-space:nowrap;
+    overflow-x:auto;overflow-y:hidden;
     background:var(--panel-3);border:1px solid var(--border);border-radius:7px;padding:6px 8px;
     font-family:Consolas,"Cascadia Mono",monospace;font-size:11px;line-height:1.5;color:var(--text)}
   #app.app-container .filename-edit textarea:focus{outline:none;border-color:var(--accent)}
@@ -369,13 +377,13 @@
 
   #app.app-container .tree-tools{display:flex;align-items:center;gap:5px;padding:5px 12px;border-bottom:1px solid var(--border)}
   #app.app-container .tree-tools button{border:1px solid var(--border);background:var(--panel-3);border-radius:6px;
-    padding:2px 7px;font-size:10px;color:var(--muted)}
+    padding:2px 7px;font-size:10.5px;color:var(--muted)}
   #app.app-container .tree-tools button:hover{color:var(--text);border-color:var(--accent)}
   #app.app-container .tree-tools .spacer{flex:1}
   #app.app-container .tree-tools .hint{font-size:10px;color:var(--muted-2)}
   #app.app-container .vol-head .vol-bulk{display:inline-flex;gap:4px;margin-right:2px;flex:0 0 auto}
   #app.app-container .vol-head .vol-bulk button{border:1px solid var(--border);background:var(--panel-3);border-radius:5px;
-    padding:1px 6px;font-size:10px;color:var(--muted);cursor:pointer;white-space:nowrap;flex:0 0 auto}
+    padding:1px 6px;font-size:10.5px;color:var(--muted);cursor:pointer;white-space:nowrap;flex:0 0 auto}
   #app.app-container .vol-head .vol-bulk button:hover{color:var(--text);border-color:var(--accent)}
   #app.app-container .row-bulk{display:none;gap:2px;margin-left:4px}
   #app.app-container .tree-row:hover .row-bulk{display:inline-flex}
@@ -452,6 +460,9 @@
   #app.app-container .tree-row.expanded .tree-toggle .chev{transform:rotate(90deg)}
   #app.app-container .tree-toggle.empty{visibility:hidden}
   #app.app-container .tree-check{width:14px;height:14px;accent-color:var(--accent);flex:0 0 auto;margin:0}
+  /* 2026-11-20 批次3：树/包勾选框的 <label> 命中区 ≥28px（探针要求祖先 label 高≥28）。
+     display:inline-flex 让 min-height 生效；不放大勾选框本体、不改行高/视觉。 */
+  #app.app-container .tree-check-hit{display:inline-flex;align-items:center;justify-content:center;min-height:28px;min-width:28px;flex:0 0 auto}
   #app.app-container .tree-ico{width:15px;height:15px;color:var(--muted);flex:0 0 auto}
   #app.app-container .tree-label{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
     font-size:12.5px;color:var(--text)}
@@ -768,14 +779,15 @@
   #app.app-container .zone-tab.active{background:var(--accent-soft);border-color:var(--accent);color:var(--text)}
   #app.app-container .zone-tab .count{font-size:10px;color:var(--muted-2);margin-left:5px}
   /* 覆盖/增量属于「数据包」操作，跟随数据包列表；不再作为图表偏好持久化。 */
-  #app.app-container .zone-delta-row{display:flex;align-items:center;gap:8px;padding:6px 9px;border-bottom:1px solid var(--border);font-size:11px;color:var(--muted);flex-wrap:wrap;row-gap:6px}
+  #app.app-container .zone-delta-row{display:flex;align-items:center;gap:8px;padding:6px 9px;border-bottom:1px solid var(--border);font-size:11px;color:var(--muted)}
   #app.app-container .zone-fetch-btn{flex:0 0 auto;display:inline-flex;align-items:center;gap:5px}
   #app.app-container .zone-fetch-btn .ico{width:14px;height:14px;flex:0 0 auto}
   #app.app-container .zone-mode-extra{display:inline-flex;align-items:center;gap:6px;flex:0 0 auto}
   #app.app-container .zone-mode-extra:empty{display:none}
-  #app.app-container .zone-delta-label{flex:0 0 auto;white-space:nowrap}
-  #app.app-container .zone-delta-row .segmented{flex:0 0 auto;white-space:nowrap}
-  #app.app-container .zone-delta-row .segmented button{white-space:nowrap}
+  /* 覆盖/增量 segmented 已移入 .zone-toolbar：不撑高整行、不挤压格式/排序，控件与文字不拆行。 */
+  #app.app-container .zone-delta-slot{display:inline-flex;flex:0 0 auto}
+  #app.app-container .zone-toolbar .segmented{flex:0 0 auto;white-space:nowrap}
+  #app.app-container .zone-toolbar .segmented button{white-space:nowrap}
   #app.app-container .zone-body{padding:8px;display:flex;flex-direction:column;gap:8px;min-height:0;overflow:hidden}
   /* 选择数据包 / 格式 / 排序固定不动，只有下面的包卡列表滚动 */
   #app.app-container .zone-body > .card-list{flex:1 1 auto;min-height:0;overflow:auto;padding-right:3px}
@@ -802,6 +814,8 @@
   #app.app-container .pkg-card.unrecognized{border-style:dashed}
   #app.app-container .pkg-card.is-export{background:linear-gradient(180deg,var(--panel-3),var(--panel-2))}
   #app.app-container .pkg-card .pkg-check{width:14px;height:14px;accent-color:var(--accent);flex:0 0 auto;margin:0}
+  /* 2026-11-20 批次3：包卡勾选框的 <label> 命中区 ≥28px（同 tree-check-hit）。 */
+  #app.app-container .pkg-check-hit{display:inline-flex;align-items:center;justify-content:center;min-height:28px;min-width:28px;flex:0 0 auto}
   #app.app-container .pkg-icon{width:30px;height:30px;flex:0 0 auto;border-radius:8px;padding:3px;background:var(--panel);
     border:1px solid var(--border);object-fit:contain}
   #app.app-container .pkg-icon-wrap{position:relative;flex:0 0 auto;width:30px;height:30px}
@@ -809,6 +823,12 @@
   #app.app-container .pkg-host-tag{position:absolute;right:-4px;bottom:-4px;font-size:8.5px;line-height:1.2;
     padding:1px 3px;border-radius:4px;background:var(--panel);border:1px solid currentColor;
     white-space:nowrap;letter-spacing:.2px}
+  /* 2026-11-20 线B-P1：PT 角标「PT」小字在原品牌底上仅 3.89:1 < 4.5。
+     角标底色由 ui-tokens.js 的 --brand-pt 单一真源驱动（本轮禁改该文件），且以行内样式写入，
+     故用高特异度作用域规则 + !important 覆盖：底色加深为品牌紫×75%（深于原色），
+     文字仍用浅色 --brand-pt-ink、描边随底色 ⇒ 对比升至约 6.12:1。仅 18×14px 角标，非大块实色。 */
+  #app.app-container .pkg-host-tag[style*="--brand-pt)"]{
+    background:var(--SmartThemeQuoteColor, #6845b9) !important;border-color:var(--SmartThemeQuoteColor, #6845b9) !important;color:var(--brand-pt-ink) !important}
   /* 平台品牌色：**只出现在标识上**（图标环 + 宿主角标 + 来源标签），不染面板底色/按钮。 */
   #app.app-container .pkg-icon[data-host="st"]{border-color:var(--brand-st-ring)}
   #app.app-container .pkg-icon[data-host="luker"]{border-color:var(--brand-luker-ring)}
@@ -891,6 +911,10 @@
   #app.app-container .extension-view:not([hidden]){animation:extViewFadeIn .22s cubic-bezier(0.16,1,0.3,1)}
   @keyframes extViewFadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
   #app.app-container .extension-body{flex:1 1 auto;min-height:0;overflow:auto;padding:0 9px 9px;display:flex;flex-direction:column;gap:8px}
+  /* 2026-11-20 线B-P0：手机端底部「安装报告」条（y≈751-779）覆盖滚动内容末行的空态卡文字。
+     给滚动正文加底部 padding 预留报告条高度（28px + 4px 间距），滚到底时末行停在报告条之上；
+     只加纵向，不引入横向溢出。桌面端报告条同样在底部，但正文可继续滚出屏幕， unaffected。 */
+  #app.app-container[data-view="mobile"] .extension-body{padding-bottom:32px}
   /* 报告常驻底部：不随页签切换；点击展开后占满扩展管理正文区 */
   #app.app-container .ext-report-panel{flex:1 1 auto;min-height:0;overflow:auto;padding:9px}
   #app.app-container .ext-report-bar{flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:6px 10px;
@@ -1145,8 +1169,6 @@
   #app.app-container .ext-order{flex:0 0 auto;font-family:Consolas,monospace;color:var(--muted-2)}
   #app.app-container .ext-sort{flex:0 0 auto;font-size:10.5px;color:var(--muted)}
   #app.app-container .ext-sort select{padding:2px 5px;font-size:10.5px}
-  #app.app-container .ext-batch-ref{width:116px;padding:2px 6px;font-size:10.5px}
-  #app.app-container .btn.danger{color:var(--drop);border-color:var(--drop)}
   #app.app-container .ext-sel-actions{display:inline-flex;align-items:center;gap:5px;flex-wrap:wrap}
   #app.app-container .ext-sel-actions .btn{padding:2px 7px;font-size:10.5px}
   #app.app-container .ext-batch-ref{width:132px;padding:2px 6px;font-size:10.5px}
@@ -1545,7 +1567,10 @@
   #app.app-container .set-note{font-size:10.5px;color:var(--muted);margin:0 0 7px}
   /* 设置面板字号严格归一：禁止大字体与大小不一，统一 11px~12px 紧凑酒馆风格 */
   #app.app-container #view-settings{font-size:11px;overflow:hidden}
-  #app.app-container #view-settings .view-body{flex:1 1 auto;min-height:0;overflow:auto}
+  #app.app-container #view-settings .view-body{flex:1 1 auto;min-height:0;overflow:auto;
+    /* 2026-11-20 线B-P0：版本条（y≈699-733）覆盖设置正文末行的「导出/导入插件数据」按钮。
+       给滚动内容加底部 padding，滚到底时末行停在版本条之上，消除覆盖；只加纵向，不引入横向溢出。 */
+    padding-bottom:calc(34px + 10px)}
   /* 设置页两级轮廓（2026-11-17 用户裁定）：外圈=面板，中圈=分组卡。
      外圈用 --outline + 内描边，中圈用 --border-strong + 更深底色；
      两者不得同色同粗细，避免糊成一片。 */
@@ -1566,7 +1591,31 @@
   #app.app-container #view-settings label.et-git{display:flex;flex-wrap:nowrap;align-items:center;
     justify-content:space-between;gap:8px;font-size:11px;margin:2px 0}
   #app.app-container #view-settings label.et-git > span{flex:0 0 auto;white-space:nowrap}
-  #app.app-container #view-settings label.et-git > :is(select,input){flex:1 1 auto;min-width:0}
+  #app.app-container #view-settings label.et-git > :is(select,input,textarea){flex:1 1 auto;min-width:0}
+  /* 问题报告多行输入：label 在上、textarea 在下垂直堆叠，避免水平 space-between 导致
+     label 被推到最左、textarea 靠右错位的「展开方向反了」观感（2026-11-20 用户报障）。 */
+  #app.app-container #view-settings label.et-git:has(> textarea){flex-direction:column;align-items:stretch;gap:3px}
+  #app.app-container #view-settings label.et-git > textarea{width:100%;box-sizing:border-box}
+  /* 日志级别/条数双下拉同行容器：各占一半、可收缩，防原生 select 溢出 */
+  #app.app-container #view-settings .issue-log-row{display:flex;flex-wrap:nowrap;gap:8px;align-items:center}
+  #app.app-container #view-settings .issue-log-row > label.et-git{flex:1 1 0;min-width:0;margin:2px 0}
+  #app.app-container #view-settings .issue-log-row > label.et-git > span{flex:0 0 auto}
+  #app.app-container #view-settings .issue-log-row select{flex:1 1 auto;min-width:0;max-width:100%}
+  /* 未勾选附带日志时下拉禁用：与 checkbox/btn 的 :disabled 视觉降级保持一致 */
+  #app.app-container #view-settings .issue-log-controls select.text_pole:disabled{opacity:.45;cursor:not-allowed}
+
+  /* 统计行：允许折行，长 token 可断，绝不裁切 */
+  #app.app-container #view-settings #issue-log-summary{white-space:normal;overflow-wrap:anywhere}
+
+  /* 禁止 view-body 出现横向滚动条（G-17） */
+  #app.app-container #view-settings .view-body{overflow-x:hidden}
+
+  /* 320px 级窄屏：双下拉折成两行，避免 iOS 原生 select 箭头把 268px 撑破 */
+  @media (max-width:360px){
+    #app.app-container #view-settings .issue-log-row{flex-wrap:wrap}
+    #app.app-container #view-settings .issue-log-row > label.et-git{flex:1 1 100%}
+  }
+
   /* 其它设置行 / 字段 / 短按钮同样禁止拆字；长说明文字（.ext-note / .check）不受影响。 */
   #app.app-container #view-settings .field > span,
   #app.app-container #view-settings .btn,
@@ -1591,6 +1640,13 @@
      它本身 pointer-events:none，不拦点击；这里只解决视觉遮挡。 */
   #app.app-container[data-view="mobile"] .toast{top:auto;bottom:46px;transform:translate(-50%,10px)}
   #app.app-container[data-view="mobile"] .toast.show{transform:translate(-50%,0)}
+  /* 2026-11-20 产品修复（R6/R5）：教程演示 snackbar（#toast）在手机视口抬到底栏上方。
+     上一规则 bottom:46px 让高约 48px 的 toast 落在 y≈731-779，正压住「生成导出包」
+     主 CTA（y≈719-748）与数据包底栏（y≈711-755）。底栏 + 间距实测约 74px，取 120px
+     使 toast 上移到 y≈657-705，与底栏留出约 6px 间隙。用 #toast 提高特异性覆盖上一条，
+     桌面端（非 data-view=mobile）不受影响；仍挂在 #app.app-container 作用域内。 */
+  #app.app-container[data-view="mobile"] #toast{top:auto;bottom:120px;transform:translate(-50%,10px)}
+  #app.app-container[data-view="mobile"] #toast.show{transform:translate(-50%,0)}
 
   /* 教程浮层：**必须挂在 document.body**（index.js portalTutorialOverlay）。
      宿主抽屉/模态祖先常带 transform / filter / 滚动容器，position:fixed 会被困进祖先坐标系，
@@ -1678,7 +1734,7 @@
      不再另设 @media 断点，否则会与 JS 阈值打架，出现「已堆叠却没有数据包切页按钮」） */
   /* 窄屏同样整窗口铺满（用户 2026-11-12 裁定）：不留 820px 上限、不留外边距与圆角。
      唯一滚动容器仍是 .app-main。 */
-  #app.app-container[data-view="mobile"]{width:100vw;max-width:none;height:100vh;max-height:none;
+  #app.app-container[data-view="mobile"]{width:100vw;max-width:none;height:100vh;height:100dvh;max-height:none;
     min-height:0;margin:0;border-radius:0}
   #app.app-container[data-view="mobile"] .splitter-v{display:none}
   /* 手机端左右切换：切换哪一列可见；唯一滚动容器仍是 .app-main —— 不做第二个滚动条 */
@@ -1809,6 +1865,23 @@
     #app.app-container .extmode-btn,
     #app.app-container .quota-row,
     #app.app-container .lan-link{min-height:28px}
+    /* 2026-11-20 线B-P0：触屏命中区统一抬到 ≥32px。审计探针只量元素自身
+       getBoundingClientRect().height，故用 min-height（与已有 height 声明是不同属性，
+       不会被同特异性覆盖；只增高度、不增宽度 ⇒ 不引入横向溢出，符合 G-17）。
+       涵盖图标页签、小按钮、下拉、输入框；复选框命中区见下方伪元素外扩。 */
+    /* 2026-11-20 批次3：settings-bottom 真实滚动后露出的 <a class="btn">（如 #settings-open-docs，
+       28px）同样抬到 ≥32px；按钮形链接应与 <button class="btn"> 同命中区。 */
+    #app.app-container button,
+    #app.app-container a.btn,
+    #app.app-container select,
+    #app.app-container [role="button"],
+    #app.app-container input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
+    #app.app-container textarea{min-height:32px !important}
+    /* 复选框命中区：命中判定要求祖先 <label> 高度 ≥28px。树/包卡片复选框由 view 层
+       渲染、多数无 <label> 包裹（属 tap-target-checkbox-small 另一指标，需 view 层配合，
+       本轮禁改）。这里仅对已有 <label> 包裹的复选框保证 label 自身 ≥32px 命中区。 */
+    #app.app-container label:has(> input[type="checkbox"]),
+    #app.app-container label:has(> input[type="radio"]){min-height:32px !important}
   }
   #app.app-container[data-view="mobile"] .tree-ico{width:18px;height:18px}
   #app.app-container[data-view="mobile"] .tree-label{font-size:12.5px}
@@ -1950,6 +2023,11 @@
   /* 手机云端配置：表单单列、按钮两列、徽标隐藏，避免 390px 下挤成一条。 */
   #app.app-container[data-view="mobile"] #cloud-provider-tag{display:none}
   #app.app-container[data-view="mobile"] .cloud-view{padding:8px}
+  /* 2026-11-20 线B-P0：底部状态栏（y≈788）逼近/截切备份按钮行；
+     给内滚的 cloud-view 加底部 padding，滚到底时备份按钮行与底栏留出间距。
+     用 #cloud-view（ specificity 盖过后面 `#app.app-container #cloud-view{padding:8px 10px}`），
+     只加纵向 padding，不引入横向溢出。 */
+  #app.app-container[data-view="mobile"] #cloud-view{padding-bottom:44px}
   #app.app-container[data-view="mobile"] .cloud-card{padding:9px 10px;gap:7px}
   #app.app-container[data-view="mobile"] .cloud-grid{grid-template-columns:minmax(0,1fr)}
   #app.app-container[data-view="mobile"] .cloud-field.span-2,
@@ -2286,6 +2364,14 @@
   max-height:180px;overflow:auto;white-space:pre-wrap;word-break:break-all;
   margin:4px 0 0;font-size:11px;color:var(--optional);
 }
+
+/* ── 问题报告：原文/预览切换与渲染视图（预览态仅换行排版，不改结构） ── */
+#app.app-container .issue-report-preview-toggle{display:inline-flex;gap:6px;margin-bottom:8px}
+#app.app-container .issue-report-preview-rendered{white-space:normal}
+#app.app-container .issue-report-preview-rendered p{margin:0 0 8px}
+#app.app-container .issue-report-preview-rendered ul{margin:4px 0 8px;padding-left:20px}
+#app.app-container .issue-report-preview-rendered pre{padding:8px;overflow:auto}
+#app.app-container .issue-report-preview-rendered code{font-family:var(--mono, monospace)}
 
 /* ── 字号体检（2026-11-11 用户要求）：基准 14px 不变；历史上被压到 10–11.5px 的
    正文 / 列表 / 说明抬到 11.5–12.5px，纯辅助标签仍保留 10.5–11px。 ── */

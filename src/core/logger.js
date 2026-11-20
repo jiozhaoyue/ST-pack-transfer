@@ -69,11 +69,102 @@ export function redact(text) {
   out = out.replace(/\b(Bearer|Basic)\s+\S+/gi, '$1 [REDACTED]');
   // 6. 查询参数令牌：保留 ? / & 分隔符与参数名
   out = out.replace(/([?&])(access_token|token|api_key|apikey|password|secret)=[^&\s]+/gi, '$1$2=[REDACTED]');
+  // 6b. 查询参数令牌扩展白名单（P1 加固）：refresh_token/id_token/client_secret/sig/signature/accesskey。
+  //     独立追加，规则 6 原正则与其 6 个参数名的行为完全不变（只做追加）。
+  out = out.replace(/([?&])(refresh_token|id_token|client_secret|sig|signature|accesskey)=[^&\s]+/gi, '$1$2=[REDACTED]');
   // 7. Windows 用户目录：保留盘符，替换用户名
   out = out.replace(/\b([A-Za-z]:\\Users\\)[^\\\s]+/g, '$1[USER]');
   // 8. POSIX 用户目录
   out = out.replace(/\/(?:home|Users)\/[^/\s]+/g, '/[USER]');
+  // 9. OAuth client_secret=<值>（保留参数名，替换值）
+  out = out.replace(/\bclient_secret\s*=\s*[^\s&"']+/gi, 'client_secret=[REDACTED]');
+  // 10. password / passwd / secret / pwd 赋值：
+  //     - 空格冒号式 `password: Sup3rSecret`（含中文冒号 `password：xxx`）
+  //     - JSON 形态 `"password": "Sup3rSecret"`（冒号后带引号与空白）
+  //     - 等号式 `password=xxx`（非 URL 查询参数式，查询式已由规则 6 覆盖）
+  out = out.replace(/\b(password|passwd|pwd|secret)"?\s*[:：]\s*"?[^\s"'},;]+"?/gi, '$1: [REDACTED]');
+  out = out.replace(/\b(password|passwd|pwd)\s*=\s*[^\s&"']+/gi, '$1=[REDACTED]');
+  // 10b. 单引号赋值密码（P1 加固）：规则 10 的 [^\s"'},;]+ 排除单引号，
+  //      遇到 password: 'xxx' 时字符类在起始 ' 处即停止，整段不匹配而漏网。
+  //      独立追加一条兼容单引号闭合的规则，不改变规则 10 原正则。
+  out = out.replace(/\b(password|passwd|pwd|secret)\s*[:：]\s*'([^'\n]*)'/gi, '$1: [REDACTED]');
+  out = out.replace(/\b(password|passwd|pwd)\s*=\s*'([^'\n]*)'/gi, '$1=[REDACTED]');
+  // 11. POSIX /root/ 与 /var/ 下的用户路径：保留前缀，替换其后第一段用户目录名
+  out = out.replace(/\/(root|var)\/(?:[^/\s]+)/g, '/$1/[USER]');
+  // 12. 常见邮箱地址
+  out = out.replace(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g, '[EMAIL]');
+  // 13. Google API Key（P1 加固）：AIza 前缀 + 35 位字母数字/下划线/连字符
+  out = out.replace(/\bAIza[0-9A-Za-z_-]{35}\b/g, '[REDACTED]');
+  // 14. HuggingFace token（P1 加固）：hf_ 前缀 + ≥30 位字母数字
+  out = out.replace(/\bhf_[A-Za-z0-9]{30,}\b/g, '[REDACTED]');
   return out;
+}
+
+/**
+ * detail 键名黑名单脱敏（P1 双保险）。
+ * 递归遍历对象/数组，把命中秘密键名的值折叠为 '[REDACTED]'。
+ * 与 redact() 的分工：redact() 只处理字符串（值形态匹配），本函数只处理对象键值（键名匹配），
+ * 两者叠加覆盖「JSON.stringify 后原样进入报告」的 detail 对象。
+ *
+ * 匹配策略：先把 camelCase / snake_case 键名拆成小写词，再用**精确词集合**匹配，
+ * 避免误伤 keyboard / monkey 这类仅含 `key` 子串的正常单词（`key` 必须独立成词才命中）。
+ * 循环引用用 WeakSet 检测，嵌套超过 MAX_DEPTH 返回 '[DEEP]' 防爆栈。
+ */
+const SCRUB_CORE_WORDS = new Set([
+  'token', 'secret', 'password', 'passwd', 'pwd',
+  'credential', 'credentials', 'authorization', 'cookie', 'apikey',
+]);
+
+/** 明确非秘密的组合词：整体命中时不因含 key 子串而误伤。 */
+const SCRUB_SAFE_KEYS = new Set(['keyboard', 'monkey', 'keycode', 'keystroke', 'keyname', 'keypath']);
+
+const SCRUB_MAX_DEPTH = 8;
+
+export function scrubDetailKeys(value, seen = new WeakSet(), depth = 0) {
+  if (value === null || value === undefined) return value;
+  if (depth > SCRUB_MAX_DEPTH) return '[DEEP]';
+
+  const t = typeof value;
+  // 原始值不在本函数职责内（redact() 负责字符串）；直接透传。
+  if (t !== 'object') return value;
+
+  // 循环引用检测：复用调用方传入的 seen，递归时同一对象再次出现即折叠。
+  if (seen.has(value)) return '[Circular]';
+  seen.add(value);
+  try {
+    if (Array.isArray(value)) {
+      return value.map((item) => scrubDetailKeys(item, seen, depth + 1));
+    }
+    const out = {};
+    for (const key of Object.keys(value)) {
+      const child = value[key];
+      if (isSecretKey(key)) {
+        // 只对对象键值折叠：数组/子对象也折叠成标量占位符，避免秘密藏在嵌套结构里。
+        out[key] = '[REDACTED]';
+      } else {
+        out[key] = scrubDetailKeys(child, seen, depth + 1);
+      }
+    }
+    return out;
+  } finally {
+    seen.delete(value);
+  }
+}
+
+/** 键名是否为秘密载体：拆 camelCase/snake_case 后按精确核心词命中，避免模糊子串误伤。 */
+function isSecretKey(key) {
+  const normalized = String(key);
+  if (SCRUB_SAFE_KEYS.has(normalized.toLowerCase())) return false;
+  // 先在原始大小写上拆 camelCase 边界，再统一小写并按非字母数字切分（_ - 空格）。
+  const words = normalized
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean);
+  if (words.some((w) => SCRUB_CORE_WORDS.has(w))) return true;
+  // 'key' 独立成词即命中（api_key / google_api_key / secretAccessKey 等）。
+  // keyboard / monkey / keyName / keyPath 因拆不出独立 key 词或被白名单放行，天然不命中。
+  return words.includes('key');
 }
 
 /**
@@ -171,9 +262,12 @@ function buildExportText(applyRedact) {
     let line = `[${e.timestamp}] [${String(e.level).padEnd(7)}] #${e.id} ${e.message} (t=${e.timeMs})`;
     if (e.detail !== null && e.detail !== undefined) {
       const normalized = safeDetail(e.detail);
+      // P1 双保险：JSON.stringify 之前按键名黑名单递归折叠秘密值，
+      // 避免 detail 对象里的 token / password / api_key 等原样进入报告文本。
+      const scrubbed = scrubDetailKeys(normalized);
       let detailStr;
       try {
-        detailStr = JSON.stringify(normalized, null, 2);
+        detailStr = JSON.stringify(scrubbed, null, 2);
       } catch (err) {
         detailStr = JSON.stringify({ unserializable: String(err) });
       }

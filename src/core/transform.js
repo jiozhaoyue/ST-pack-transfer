@@ -9,6 +9,11 @@ import { logger } from './logger.js';
 import { CATEGORIES, categoryOfHubPath, isBackupChatOrSnapshot } from './inspect.js';
 import { isTavernBuiltinAsset } from './builtin-assets.js';
 import {
+  shouldDropForSanitizedShare,
+  sanitizeSettingsJson,
+  generateWatermarkData,
+} from './sanitize-share.js';
+import {
   buildExtensionManifest,
   buildOfficialIndex,
   deriveExtensionEntry,
@@ -122,9 +127,10 @@ const FIXED_TIMESTAMP = '2020-01-01T00:00:00.000Z';
  * @param {object} [options]
  * @param {boolean} [options.keepDevFiles] 是否保留开发与构建文件
  * @param {boolean} [options.keepAll] 是否保留所有内容
+ * @param {boolean} [options.isExtensionPkg] 是否扩展包路径（.git/node_modules 交还各自策略门）
  * @returns {boolean}
  */
-export function isJunkOrDevFile(hubPath, { keepDevFiles = false, keepAll = false } = {}) {
+export function isJunkOrDevFile(hubPath, { keepDevFiles = false, keepAll = false, isExtensionPkg = false } = {}) {
   if (keepAll) return false;
 
   const fileName = hubPath.slice(hubPath.lastIndexOf('/') + 1);
@@ -144,9 +150,10 @@ export function isJunkOrDevFile(hubPath, { keepDevFiles = false, keepAll = false
   // 2. 开发与构建冗余（当 !keepDevFiles 时剔除）
   if (!keepDevFiles) {
     // 依赖目录与测试目录
+    // node_modules：扩展包内可能是随包发布的运行期依赖（如 src/iframe/node_modules/log.js），
+    //   默认丢弃会破坏扩展功能 ⇒ 扩展路径豁免，非扩展路径行为不变。
     if (
-      hubPath.includes('/node_modules/')
-      || hubPath.startsWith('node_modules/')
+      (!isExtensionPkg && (hubPath.includes('/node_modules/') || hubPath.startsWith('node_modules/')))
       || hubPath.includes('/test/')
       || hubPath.includes('/tests/')
       || hubPath.includes('/__tests__/')
@@ -179,11 +186,15 @@ export function isJunkOrDevFile(hubPath, { keepDevFiles = false, keepAll = false
       return true;
     }
 
-    // Git 运行时冗余 (logs/、hooks/、refs/original/)
+    // Git 运行时冗余 (logs/、hooks/、refs/original/)。
+    // 扩展包内路径豁免：.git/** 的去留整体交还 gitMode 策略门（KEEP 全留 / MINIMAL 按最小集 /
+    // STRIP 全去），避免「KEEP=全留」语义被此处先手清洗击穿；非扩展路径行为不变。
     if (
-      hubPath.includes('/.git/logs/')
-      || hubPath.includes('/.git/hooks/')
-      || hubPath.includes('/.git/refs/original/')
+      !isExtensionPkg && (
+        hubPath.includes('/.git/logs/')
+        || hubPath.includes('/.git/hooks/')
+        || hubPath.includes('/.git/refs/original/')
+      )
     ) {
       return true;
     }
@@ -324,6 +335,7 @@ export async function convert(sourcePath, targetPath, {
   engine = '',
   engineHandle = '',
   sqliteInit = null,
+  sanitizeShare = false,
 } = {}) {
   if (!target || !Object.values(TARGETS).includes(target)) {
     throw new Error(`convert: target 必须是 ${Object.values(TARGETS).join('|')} 之一`);
@@ -573,7 +585,13 @@ export async function convert(sourcePath, targetPath, {
       }
 
       // 垃圾文件与构建冗余过滤（清理开发垃圾、构建脚本与临时缓存）
-      if (isJunkOrDevFile(routed.hubPath, { keepDevFiles, keepAll })) {
+      // 扩展包路径传 isExtensionPkg：.git/** 与 node_modules/** 交还各自策略门，
+      // 其余设计内清洗（tsconfig/vite.config/babel.config/.map/test/ 等）维持不变。
+      if (isJunkOrDevFile(routed.hubPath, {
+        keepDevFiles,
+        keepAll,
+        isExtensionPkg: routed.kind === 'extension-pkg',
+      })) {
         entry.skip();
         report.dropped(routed.hubPath, '开发/构建冗余或系统临时文件(安全清洗)');
         continue;
@@ -610,6 +628,16 @@ export async function convert(sourcePath, targetPath, {
         }
       }
 
+      // 个人脱敏分发模式过滤 (sanitizeShare: 物理剔除角色卡与凭据，放行聊天记录)
+      if (sanitizeShare) {
+        const shareVerdict = shouldDropForSanitizedShare(routed.hubPath);
+        if (shareVerdict.drop) {
+          entry.skip();
+          report.dropped(routed.hubPath, `个人脱敏分发排除: ${shareVerdict.reason}`);
+          continue;
+        }
+      }
+
       // 元数据条目:体积小、内容被解析使用,走缓冲
       if (routed.kind === 'manifest') {
         context.manifest = parseJsonSafe(await entry.read());
@@ -619,8 +647,11 @@ export async function convert(sourcePath, targetPath, {
         continue;
       }
       if (routed.kind === 'extension-source') {
-        const record = parseJsonSafe(await entry.read());
-        context.extensionSources.set(routed.source.name, { ...routed.source, record });
+        // 字节保真：parseJsonSafe 解析出 record 供清单合成使用，同时保留原始字节，
+        // 让「源里已有记录」的条目在写出时原样带回（避免 4 空格缩进被重序列化成 2 空格）。
+        const raw = await entry.read();
+        const record = parseJsonSafe(raw);
+        context.extensionSources.set(routed.source.name, { ...routed.source, record, raw });
         continue;
       }
 
@@ -866,6 +897,18 @@ export async function convert(sourcePath, targetPath, {
       }
 
       const outPath = targetEntryPath(routed.hubPath, target, routed.extScope);
+      if (sanitizeShare && routed.hubPath === 'settings.json') {
+        const rawBytes = await entry.read();
+        const rawText = rawBytes ? (typeof rawBytes === 'string' ? rawBytes : new TextDecoder('utf-8').decode(rawBytes)) : '{}';
+        const sanitizedJson = sanitizeSettingsJson(rawText);
+        const buf = new TextEncoder().encode(sanitizedJson);
+        if (!dryRun) await writer.add(outPath, buf);
+        report.copied(routed.hubPath, buf.byteLength);
+        if (typeof onEntryDone === 'function' && entry.crc32 != null) {
+          onEntryDone(entry.fileName, entry.crc32);
+        }
+        continue;
+      }
       if (!dryRun) writer.addLazy(outPath, lazyOpen(entry), entry.uncompressedSize);
       report.copied(routed.hubPath, entry.uncompressedSize);
       if (typeof onEntryDone === 'function' && entry.crc32 != null) {
@@ -884,6 +927,7 @@ export async function convert(sourcePath, targetPath, {
       extensionFullNames: [...fullExtSet],
       gitMode: resolvedGitMode,
       dryRun,
+      sanitizeShare,
     });
     // Store 直存统计汇入报告（zip-io 按扩展名分流 level 0 的条目）
     if (!dryRun && typeof writer.getStoreStats === 'function') {
@@ -1161,6 +1205,7 @@ async function emitSynthesized(writer, report, context, target, selection, {
   extensionFullNames = [],
   gitMode = GIT_MODES.KEEP,
   dryRun = false,
+  sanitizeShare = false,
 } = {}) {
   const manifestExtSet = new Set(
     (Array.isArray(extensionManifestNames) ? extensionManifestNames : [])
@@ -1338,7 +1383,9 @@ async function emitSynthesized(writer, report, context, target, selection, {
 
   if ((target === TARGETS.PT || target === TARGETS.TT) && (!selection || selection.extensions !== false)) {
     for (const [path, value] of buildExtensionSources(context, report, target)) {
-      await writer.add(path, encodeJson(value));
+      // 源里已有记录 → 原样写回原始字节（保缩进/字段顺序），仅合成条目走 2 空格 encodeJson。
+      const bytes = value.fromSource ? value.bytes : encodeJson(value.record);
+      await writer.add(path, bytes);
       report.synthesized(path);
     }
   }
@@ -1353,6 +1400,15 @@ async function emitSynthesized(writer, report, context, target, selection, {
     }));
     report.synthesized('_convert/meta.json');
   }
+
+  if (sanitizeShare) {
+    const wmBytes = encodeJson(generateWatermarkData(target));
+    const wmPath = target === TARGETS.TT || target === TARGETS.PT
+      ? 'data/default-user/_watermark.json'
+      : '_watermark.json';
+    if (!dryRun) await writer.add(wmPath, wmBytes);
+    report.synthesized(wmPath);
+  }
 }
 
 /**
@@ -1363,8 +1419,15 @@ async function emitSynthesized(writer, report, context, target, selection, {
 function buildExtensionSources(context, report, target) {
   const output = new Map();
 
-  for (const { scope, fileName, record } of context.extensionSources.values()) {
-    if (record) output.set(`data/_tauritavern/extension-sources/${scope}/${fileName}`, record);
+  for (const { scope, fileName, record, raw } of context.extensionSources.values()) {
+    if (record) {
+      // 源里已有记录 → 原样保留：带出原始字节，emitSynthesized 据此直接 writer.add(raw)。
+      output.set(`data/_tauritavern/extension-sources/${scope}/${fileName}`, {
+        fromSource: true,
+        bytes: raw,
+        record,
+      });
+    }
   }
 
   const allNames = new Set([
@@ -1384,9 +1447,12 @@ function buildExtensionSources(context, report, target) {
 
     if (/^https:\/\//iu.test(homePage)) {
       output.set(`data/_tauritavern/extension-sources/${scope}/${folderName}.json`, {
-        remote_url: homePage,
-        reference: gitMeta.branch || '',
-        installed_commit: gitMeta.commit || '',
+        fromSource: false,
+        record: {
+          remote_url: homePage,
+          reference: gitMeta.branch || '',
+          installed_commit: gitMeta.commit || '',
+        },
       });
     } else {
       report.warn(

@@ -74,7 +74,7 @@ The local port is configured in one place: `LOCAL_PORT` in `vite.config.js` (def
 
 The plugin has no server of its own and never sends credentials to third parties.
 
-By default they are stored in the server `settings.json`, visible to permitted users; you can switch to browser-only storage, which is lost when the cache is cleared.
+By default stored only in this browser's localStorage; can be switched to server `settings.json` in Settings.
 
 Credentials are only needed for external services; every other feature works without them.
 

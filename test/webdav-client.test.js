@@ -269,6 +269,19 @@ describe('webdav-client 协议与降级', () => {
     expect(classifyDavError(0, new Error('Failed to fetch'))).toBe('cors-blocked');
   });
 
+  it('PUT 423 返回 locked 分类，不抛未分类异常、不整体失败', async () => {
+    expect(classifyDavError(423)).toBe('locked');
+    const client = createWebdavClient({
+      config: { baseUrl: 'https://dav.example.com' },
+      fetchImpl: mockFetch(() => response('', { status: 423 })),
+    });
+    // request() 内 try/catch：423 走分类返回而非抛异常；
+    // await 能正常解析即证明「不抛未分类异常、不整体失败」。
+    const result = await client.putObject('a.zip', new Uint8Array([1]));
+    expect(result).toMatchObject({ ok: false, status: 423, code: 'locked' });
+    expect(result.message).toBe('http-423');
+  });
+
   it('HEAD 解析大小 / ETag / 修改时间', async () => {
     const client = createWebdavClient({
       config: { baseUrl: 'https://dav.example.com' },

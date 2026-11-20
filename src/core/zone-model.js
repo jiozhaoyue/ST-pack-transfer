@@ -4,6 +4,8 @@
  * 视图只负责按这里的结果渲染；测试锁这里。**禁止**在视图里另写一套判断规则。
  */
 
+import { ORIGINS } from '../storage/db.js';
+
 export const ZONES = Object.freeze({ IMPORT: 'import', EXPORT: 'export' });
 
 /** 每个分区的动作全集（声明序即渲染序）。 */
@@ -65,7 +67,7 @@ export function copyBackRecord(pkg, { now = Date.now(), random = Math.random } =
     id,
     name: pkg?.name || '',
     role: 'source',
-    origin: 'export-copy',
+    origin: ORIGINS.EXPORT_COPY,
     ...(layout ? { layout } : {}),
     metadata: { copiedFrom: pkg?.id || null },
   };

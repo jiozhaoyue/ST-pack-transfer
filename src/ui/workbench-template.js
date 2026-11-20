@@ -467,10 +467,8 @@ export function getWorkbenchHtml() {
           <div class="zone-side-panel" id="zone-side-zone">
             <div class="zone-delta-row" id="zone-mode-row">
               <button type="button" class="btn zone-fetch-btn" id="btn-fetch"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M7 18a4 4 0 0 1 0-8 5 5 0 0 1 9.6-1.4A3.5 3.5 0 0 1 18 18z"/></svg><span data-i18n="action.fetch"></span></button>
-              <button type="button" class="btn zone-fetch-btn" id="btn-inspect" data-i18n="inspect.pick"></button>
               <span class="zone-mode-extra" id="zone-mode-extra"></span>
-              <span class="zone-delta-label" data-i18n="chart.deltaLabel"></span>
-              <div class="segmented" id="delta-toggle" data-i18n-title="chart.overwrite">
+              <div class="segmented" id="delta-toggle" data-i18n-title="chart.deltaLabel">
                 <button class="seg-btn active" data-delta="overwrite" data-i18n="chart.overwrite"></button>
                 <button class="seg-btn" data-delta="incremental" data-i18n="chart.incremental"></button>
               </div>
@@ -604,6 +602,5 @@ export function getWorkbenchHtml() {
 </div>
 
 <div class="toast" id="toast"></div>
-<input type="file" id="file-input" accept=".zip" multiple hidden>
-<input type="file" id="file-input-inspect" accept=".zip" hidden>`;
+<input type="file" id="file-input" accept=".zip" multiple hidden>`;
 }

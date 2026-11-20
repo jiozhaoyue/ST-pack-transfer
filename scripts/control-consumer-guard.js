@@ -102,8 +102,6 @@ export const CONTROL_CONSUMERS = Object.freeze({
   'group:.seg-btn': 'src/ui/workbench-view.js — 事件委托',
   'group:.log-level-btn': 'src/ui/workbench-view.js — 事件委托',
   'file-input': 'index.js — change 读取上传的 zip',
-  'file-input-inspect': 'index.js — change 读取本地 zip 体检，不入库（不调用 saveFile）',
-  'btn-inspect': 'src/ui/workbench-view.js — 点击调 actions.inspectFile（外部文件体检入口）',
   'workbench-progress': 'src/ui/workbench-view.js — 点击/回车进入日志视图（renderLog + showPane(log)）',
   'lan-btn-generate': 'src/ui/workbench-view.js — 调 actions.lan.generate（读取已勾选导入包）',
   'lan-send-code': 'src/ui/workbench-view.js — 展示取件码 / 复制',

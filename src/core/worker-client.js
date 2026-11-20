@@ -106,6 +106,8 @@ export async function runPlanTask({ source, target, options = {} }) {
       worker.removeEventListener('message', handler);
       worker.removeEventListener('error', onWorkerError);
       worker.removeEventListener('messageerror', onWorkerError);
+      // 与 runConversionTask（:310）对齐：先回收损坏/加载失败的线程，再置空引用。
+      try { worker.terminate(); } catch { /* 已终止 */ }
       if (workerInstance === worker) workerInstance = null;
       reject(new Error('[worker-client] Worker 加载失败（脚本 404 / CSP 拦截 / 模块解析错误）'));
     };

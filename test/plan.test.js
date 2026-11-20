@@ -72,4 +72,22 @@ describe('完全扫描与转换动作预测引擎 (generatePlan)', () => {
     // 输出预期文件数应扣除这些条目
     expect(plan.expectedOutputFiles).toBeLessThan(plan.totalSourceFiles);
   });
+
+  it('TT 源含 tauritavern-settings.json + ST 目标 + 默认选项：规划为 ROUTE 且落到 _compat/tt/（P2 规划漂移）', async () => {
+    const sourceBlob = await createFixtureBlob([
+      ...ttEntries(),
+      ['data/default-user/tauritavern-settings.json', Buffer.from('{"lanSync":true}', 'utf8')],
+    ]);
+    // 默认选项：includeCache/includeBackups/includeAppPrivate/keepAll 全为 false
+    const plan = await generatePlan(sourceBlob, 'st');
+
+    const appPrivate = plan.categories[SPECIAL_CATEGORIES.APP_PRIVATE].items
+      .find((item) => item.hubPath === 'tauritavern-settings.json');
+    expect(appPrivate).toBeDefined();
+    // 不再因默认选项报 DROP；与 transform 产物一致：ROUTE 到 _compat/tt/ 沙箱。
+    expect(appPrivate.action).toBe(ACTIONS.ROUTE);
+    expect(appPrivate.rawAction).toBe(ACTIONS.ROUTE);
+    expect(appPrivate.targetPath).toBe('_compat/tt/tauritavern-settings.json');
+    expect(appPrivate.selected).toBe(true);
+  });
 });

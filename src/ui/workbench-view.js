@@ -2464,7 +2464,10 @@ function renderZones(){
     + '<option value="name"' + (state.sort === 'name' ? ' selected' : '') + '>' + t('sort.name') + '</option>'
     + '<option value="size"' + (state.sort === 'size' ? ' selected' : '') + '>' + t('sort.size') + '</option>'
     + '</select></label>';
-  const toolbarHtml = '<div class="zone-toolbar">' + hostFilterHtml() + zoneSelButtons + '<span class="spacer"></span>' + sortBlock + '</div>';
+  /* 覆盖/增量 segmented 与「格式 / 选择 / 排序」同一行。
+     用占位 slot，渲染后把模板里的静态 #delta-toggle 节点 appendChild 进来（移动，id 唯一），
+     这样保留静态节点的 i18n 扫描与 bind() 一次性绑定，只在导出页签显示。 */
+  const toolbarHtml = '<div class="zone-toolbar">' + hostFilterHtml() + '<span class="zone-delta-slot"></span>' + zoneSelButtons + '<span class="spacer"></span>' + sortBlock + '</div>';
 
   if(state.zone==='import'){
     html+='<div class="dropzone" id="dropzone"><span class="big">'+t('zones.dropTitle')+'</span>'+t('zones.dropHint')+'</div>' + toolbarHtml;
@@ -2480,7 +2483,18 @@ function renderZones(){
     const queue=state.pendingExports||[];
     if(queue.length) html+='<div class="card-list" id="pending-cards">'+queue.map((it,i)=>pendingCardHtml(it,i)).join('')+'</div>';
   }
+  /* 覆盖/增量 segmented 从模板静态节点移动到动态工具栏：
+     先抓住节点引用并移出 body（body.innerHTML 只重建 zone-body，不含模板里的 zone-delta-row），
+     渲染后再 append 进新工具栏的 slot，节点对象不变 → bind() 绑定与 i18n 均保留，id 唯一。 */
+  const deltaToggle=document.getElementById('delta-toggle');
+  if(deltaToggle && deltaToggle.parentNode) deltaToggle.parentNode.removeChild(deltaToggle);
   body.innerHTML=html;
+  const deltaSlot=body.querySelector('.zone-delta-slot');
+  if(deltaSlot && deltaToggle){
+    deltaToggle.hidden = state.zone!=='export';
+    deltaToggle.querySelectorAll('button[data-delta]').forEach(b=>b.classList.toggle('active',b.dataset.delta===state.delta));
+    deltaSlot.appendChild(deltaToggle);
+  }
   if(prevScrollTop > 0){
     body.scrollTop = prevScrollTop;
     requestAnimationFrame(()=>{ if(body) body.scrollTop = prevScrollTop; });
@@ -2529,7 +2543,10 @@ function renderZoneModeRow(){
       : '';
     extra.querySelector('#btn-library-export')?.addEventListener('click',()=>actions.libraryExport?.());
   }
-  document.querySelectorAll('.zone-delta-label, #delta-toggle').forEach(el=>{ el.hidden = state.zone!=='export'; });
+  /* 覆盖/增量已移入动态工具栏，显隐由 renderZones() 的 toolbarHtml 按 state.zone 控制。
+     此处仅作兜底：若某态下节点是由旧模板缓存产生，仍同步一次，null 安全。 */
+  const deltaToggle=document.getElementById('delta-toggle');
+  if(deltaToggle) deltaToggle.hidden = state.zone!=='export';
 }
 
 /* ── Git 可视化（只读；数据包列「数据包 / Git」页签互换） ──
@@ -8439,16 +8456,10 @@ function bind(){
   document.getElementById('log-close').addEventListener('click',backToWorkbench);
   document.getElementById('help-close').addEventListener('click',closeHelp);
   document.getElementById('modal-close').addEventListener('click',closeModal);
-  /* 体检面板：外部文件入口（不入库）。选文件动作交给控制器发起。 */
+  /* 体检面板：只展示包卡体检结果，外部文件入口已移除。 */
   inspectPanel = mountInspectPanel({
     container: document.getElementById('inspect-panel'),
-    onPickFile: () => actions.inspectFile?.(),
   });
-  /* 2026-11-20 批次3：两个「选择文件」入口补区域上下文（aria-only，不新增 i18n 键）。
-     按钮本体分别在 workbench-template.js / inspect-view.js（本轮禁改），故在此按既有拼法赋值。 */
-  document.getElementById('btn-inspect')?.setAttribute('aria-label',t('zones.title')+' '+t('inspect.pick'));
-  document.querySelector('#inspect-panel [data-inspect-pick]')?.setAttribute('aria-label',t('inspect.title')+' '+t('inspect.pick'));
-  document.getElementById('btn-inspect')?.addEventListener('click',()=>actions.inspectFile?.());
   const dlg=confirmDialogEl();
   if(dlg){
     dlg.addEventListener('click',e=>{ if(e.target===dlg) closeModal(); });

@@ -6,6 +6,7 @@
  * 非法 JSON / 隐私模式 / Node 环境一律静默回落默认值，绝不阻塞主路径。
  */
 import { SETTINGS_DEFAULTS, normalizeSettings } from './settings-panel.js';
+import { getHostContext } from './host-bridge.js';
 
 export const SETTINGS_STORAGE_KEY = 'st-pack-transfer:settings';
 export const EXTENSION_SETTINGS_KEY = 'ST-pack-transfer';
@@ -14,15 +15,6 @@ export const EXTENSION_SETTINGS_ALT_KEY = 'st-pack-transfer';
 function storage() {
   try {
     return typeof localStorage !== 'undefined' ? localStorage : null;
-  } catch {
-    return null;
-  }
-}
-
-function getHostContext() {
-  try {
-    const st = globalThis.SillyTavern;
-    return st && typeof st.getContext === 'function' ? st.getContext() : null;
   } catch {
     return null;
   }

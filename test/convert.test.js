@@ -362,31 +362,40 @@ describe('轻量清单模式 (Manifest-Only Mode - 防 408 超时)', () => {
 });
 
 describe('开发垃圾与构建冗余深度清洗 (Clean Packaging)', () => {
-  it('默认过滤 node_modules, webpack.config, *.map, test/ 与 git 运行时冗余', async () => {
+  it('默认过滤 webpack.config/tsconfig/*.map/test/ 与系统垃圾；扩展包内 node_modules 与 .git/** 保留', async () => {
     const entriesWithJunk = [
       ...stEntries(),
       ['extensions/test-extension/webpack.config.js', Buffer.from('module.exports = {}', 'utf8')],
       ['extensions/test-extension/tsconfig.json', Buffer.from('{}', 'utf8')],
       ['extensions/test-extension/dist/bundle.js.map', Buffer.from('{}', 'utf8')],
+      // A 修复：扩展包内 node_modules 与 .git/** 不再被 junk 清洗，交还各自策略门
       ['extensions/test-extension/node_modules/dep/index.js', Buffer.from('// dep', 'utf8')],
-      ['extensions/test-extension/test/unit.spec.js', Buffer.from('// test', 'utf8')],
       ['extensions/test-extension/.git/logs/HEAD', Buffer.from('log', 'utf8')],
+      ['extensions/test-extension/test/unit.spec.js', Buffer.from('// test', 'utf8')],
       ['extensions/test-extension/.DS_Store', Buffer.from('junk', 'utf8')],
+      // 非扩展路径：node_modules 仍按既有规则清洗（反向断言，防清洗逻辑死掉）
+      ['node_modules/dep/index.js', Buffer.from('// root dep', 'utf8')],
     ];
 
     const { files, report } = await runConvert(entriesWithJunk, TARGETS.L);
     expect(files.has('extensions/test-extension/index.js')).toBe(true);
+    // 设计内清洗（扩展路径不变）
     expect(files.has('extensions/test-extension/webpack.config.js')).toBe(false);
     expect(files.has('extensions/test-extension/tsconfig.json')).toBe(false);
     expect(files.has('extensions/test-extension/dist/bundle.js.map')).toBe(false);
-    expect(files.has('extensions/test-extension/node_modules/dep/index.js')).toBe(false);
     expect(files.has('extensions/test-extension/test/unit.spec.js')).toBe(false);
-    expect(files.has('extensions/test-extension/.git/logs/HEAD')).toBe(false);
     expect(files.has('extensions/test-extension/.DS_Store')).toBe(false);
+    // A 契约：扩展包内 node_modules/** 与 .git/** 保留
+    expect(files.has('extensions/test-extension/node_modules/dep/index.js')).toBe(true);
+    expect(files.has('extensions/test-extension/.git/logs/HEAD')).toBe(true);
+    // 反向断言：非扩展路径 node_modules 仍被清洗
+    expect(files.has('node_modules/dep/index.js')).toBe(false);
 
     const dropped = report.toJSON().dropped.map((d) => d.path);
     expect(dropped.some((p) => p.includes('webpack.config.js'))).toBe(true);
-    expect(dropped.some((p) => p.includes('node_modules'))).toBe(true);
+    // 报告列出的是非扩展路径的 node_modules（扩展那份不再进 dropped）
+    expect(dropped.some((p) => p === 'node_modules/dep/index.js')).toBe(true);
+    expect(dropped.some((p) => p.includes('extensions/test-extension/node_modules'))).toBe(false);
   });
 
   it('keepDevFiles: true 时保留构建配置与源码映射', async () => {

@@ -275,7 +275,11 @@ export async function generatePlan(source, target, {
       } else if (pruneBuiltinAssets && isTavernBuiltinAsset(routed.hubPath)) {
         action = ACTIONS.DROP;
         reason = '酒馆原生固定资产(默认背景/主题/预设)，已智能剔除';
-      } else if (isJunkOrDevFile(routed.hubPath, { keepDevFiles, keepAll })) {
+      } else if (isJunkOrDevFile(routed.hubPath, {
+        keepDevFiles,
+        keepAll,
+        isExtensionPkg: routed.kind === 'extension-pkg',
+      })) {
         action = ACTIONS.DROP;
         reason = '开发/构建冗余或系统临时文件(安全清洗)';
       } else if (extensionMode === EXTENSION_MODES.MANIFEST && routed.kind === 'extension-pkg') {
@@ -322,7 +326,14 @@ export async function generatePlan(source, target, {
           reason = '备份聊天记录与快照(默认不包含)';
         }
       } else if (category === SPECIAL_CATEGORIES.APP_PRIVATE) {
-        if (target === TARGETS.TT || keepAll || includeAppPrivate) {
+        // D3 对齐 transform.js:661-666：tauritavern-settings.json 在任意非 TT 目标下
+        // 都被强制 COPY 到 _compat/tt/ 沙箱（与 keepAll/includeAppPrivate 缺省无关）。
+        // 预测侧不能因默认选项把它报成 DROP，否则与产物漂移。targetEntryPath 给出正确落点。
+        if (target !== TARGETS.TT && routed.hubPath === 'tauritavern-settings.json') {
+          targetPath = targetEntryPath(routed.hubPath, target);
+          action = ACTIONS.ROUTE;
+          reason = 'TT 应用私有设置跨宿主回带至 _compat/tt/ 沙箱';
+        } else if (target === TARGETS.TT || keepAll || includeAppPrivate) {
           targetPath = target === TARGETS.TT ? entry.fileName : routed.hubPath;
           action = targetPath === entry.fileName ? ACTIONS.COPY : ACTIONS.ROUTE;
           reason = '应用级私有配置';

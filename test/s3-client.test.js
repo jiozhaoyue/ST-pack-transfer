@@ -90,6 +90,17 @@ describe('SigV4 签名', () => {
     });
     expect(out.canonicalRequest.split('\n')[2]).toBe('list-type=2&prefix=packs');
   });
+
+  it('canonicalUri 不二次编码：含中文与空格的 key 签名路径与实发 URL 的 pathname 完全一致', async () => {
+    // 复现 P1：new URL 的 pathname 已编码一次；旧实现再过 encodePath 会得 %2520。
+    const realUrl = new URL('https://b.s3.example.com/mybucket/我的 Pack.zip').toString();
+    const out = await signRequest({ ...base, url: realUrl });
+    const canonicalUri = out.canonicalRequest.split('\n')[1];
+    // canonical steps 的 canonicalUri 必须等于实发 URL 的 pathname，不能出现 %25 二次编码。
+    expect(canonicalUri).toBe(new URL(realUrl).pathname);
+    expect(canonicalUri).not.toContain('%25');
+    expect(canonicalUri).toContain(encodeURIComponent('我的 Pack.zip'));
+  });
 });
 
 describe('ListObjectsV2 XML 解析', () => {

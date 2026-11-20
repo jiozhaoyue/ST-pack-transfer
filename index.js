@@ -56,7 +56,7 @@ import { exportLibraryToPack, importRestoredChatsIntoLibrary } from './src/ui/ch
 import { mountLanTransferPanel } from './src/ui/lan-transfer-panel.js';
 import { createBrowserStorageProvider } from './src/ui/storage-inspector-browser.js';
 import { qr } from './src/ui/qr.js';
-import { buildSettingsHtml, readSettings, applyWebTheme, readGithubToken, writeGithubToken } from './src/ui/settings-panel.js';
+import { buildSettingsHtml, readSettings, applyWebTheme, readGithubToken, writeGithubToken, renderMarkdownSafe, normalizeIssueLogParams, ISSUE_LEVEL_TO_REPORT } from './src/ui/settings-panel.js';
 import { collectReportEnv, buildReportMarkdown, previewRedacted, submitToGitHub } from './src/ui/issue-report.js';
 import { buildPluginData, applyPluginData, isPluginData, downloadPluginData } from './src/ui/plugin-data.js';
 import { loadSettings, saveSettings } from './src/ui/settings-store.js';
@@ -2400,6 +2400,9 @@ async function main(root) {
       includeLogs: (typeof logsEl?.checked === 'boolean')
         ? logsEl.checked
         : (settings.issueIncludeLogs !== false),
+      /* 日志级别/条数：读下拉原始语义值，映射交由 composeIssueReport 与面板统计同源处理。 */
+      logLevel: val('issueLogLevel'),
+      logCount: val('issueLogCount'),
       token: typeof tokenEl?.value === 'string' ? tokenEl.value.trim() : readGithubToken(),
     };
   }
@@ -2412,14 +2415,44 @@ async function main(root) {
     } catch (err) {
       throw new Error(t('issue.collectFailed', { msg: err?.message || String(err) }));
     }
+    /* 与设置面板统计同源：级别/条数经同一归一化 + 映射表透传，保证预览/提交与统计一致。 */
+    const p = normalizeIssueLogParams(form.logLevel, form.logCount);
     return buildReportMarkdown({
       env,
       userInput: { title: form.title, description: form.description, steps: form.steps },
       includeLogs: form.includeLogs,
+      logLevel: ISSUE_LEVEL_TO_REPORT[p.level],
+      logCount: p.count,
     });
   }
 
-  /** 预览：openModal 承载全文预览，逐字转义后再注入（DOM 注入安全）。 */
+  /** 预览模式模块级状态：同一会话内记住用户上次选的是原文还是渲染预览。 */
+  let issuePreviewMode = 'raw';
+
+  /** 依据当前模式生成预览正文 HTML；原文走逐字转义，预览走安全 Markdown 子集。 */
+  function issuePreviewBody(safe) {
+    const rendered = issuePreviewMode === 'rendered';
+    const cls = rendered ? 'issue-report-preview issue-report-preview-rendered' : 'issue-report-preview';
+    const body = rendered ? renderMarkdownSafe(safe) : escapeHtml(safe);
+    const tag = rendered ? 'div' : 'pre';
+    return trustedStaticMarkup('<' + tag + ' class="' + cls + '">' + body + '</' + tag + '>');
+  }
+
+  /** 生成原文 / 预览切换按钮组；当前模式带 accent 高亮。 */
+  function issuePreviewToggle() {
+    const rawCls = issuePreviewMode === 'raw' ? 'btn accent' : 'btn';
+    const renderedCls = issuePreviewMode === 'rendered' ? 'btn accent' : 'btn';
+    return trustedStaticMarkup(
+      '<div class="issue-report-preview-toggle">'
+      + '<button type="button" class="' + rawCls + '" data-issue-preview-mode="raw">'
+      + escapeHtml(t('issue.previewRaw')) + '</button>'
+      + '<button type="button" class="' + renderedCls + '" data-issue-preview-mode="rendered">'
+      + escapeHtml(t('issue.previewRendered')) + '</button>'
+      + '</div>'
+    );
+  }
+
+  /** 预览：openModal 承载全文预览，支持原文 / 渲染切换；逐字转义或安全渲染后再注入。 */
   async function previewIssueReport(body) {
     const form = readIssueForm(body);
     if (!form.title) { view.toast(t('issue.missingTitle')); return; }
@@ -2430,11 +2463,26 @@ async function main(root) {
     view.openModal(
       t('issue.previewTitle'),
       t('issue.privacyWarning'),
-      '<pre class="issue-report-preview">' + escapeHtml(safe) + '</pre>',
+      [issuePreviewToggle(), '<div id="issue-preview-body">' + issuePreviewBody(safe) + '</div>'],
       [
         { label: t('modal.close'), primary: true, onClick: () => view.closeModal?.() },
       ],
     );
+    /* 切换按钮绑定：在 openModal 注入 #modal-extra 后立即挂 click，切换仅重绘正文。 */
+    document.querySelectorAll('[data-issue-preview-mode]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const mode = btn.getAttribute('data-issue-preview-mode');
+        if (mode !== 'raw' && mode !== 'rendered') return;
+        issuePreviewMode = mode;
+        const host = document.getElementById('issue-preview-body');
+        // dom-injection-guard:allow 正文经 issuePreviewBody 内 escapeHtml / 安全渲染器逐段转义，且报告已 previewRedacted 脱敏
+        if (host) host.innerHTML = issuePreviewBody(safe);
+        document.querySelectorAll('[data-issue-preview-mode]').forEach((b) => {
+          const active = b.getAttribute('data-issue-preview-mode') === mode;
+          b.className = active ? 'btn accent' : 'btn';
+        });
+      });
+    });
   }
 
   /** 提交：二次确认 + 全文预览可见 + 隐私警示；失败 toast 如实报错。 */
@@ -2692,7 +2740,6 @@ async function main(root) {
           view.toast(t('inspect.readFailed'));
         }
       },
-      inspectFile: () => root.querySelector('#file-input-inspect')?.click(),
       uploadPrivate,
       privateFiles: {
         list: () => loadPrivateFiles(),
@@ -2796,31 +2843,6 @@ async function main(root) {
     const files = [...(event.target.files || [])];
     event.target.value = '';
     await importFiles(files);
-  });
-
-  /* 外部文件体检：只读本地 zip，绝不入库（不调用 saveFile / importFiles）。 */
-  root.querySelector('#file-input-inspect')?.addEventListener('change', async (event) => {
-    const file = (event.target.files || [])[0] || null;
-    event.target.value = '';
-    if (!file) return;
-    const panel = view.getInspectPanel?.();
-    panel?.setBusy?.();
-    try {
-      const targetLayout = targetCodeOf(view.getState().target);
-      const report = await inspectPackage(file, { targetLayout });
-      view.showInspectReport(report);
-      panel?.render?.(report);
-      try {
-        void mountInspectModal({
-          getReport: () => report,
-          onClose: () => { try { view.closeInspectReport?.(); } catch { /* 忽略 */ } },
-        }).then(h => { if (h) inspectMountHandle = h; }).catch(() => {});
-      } catch (err) { console.warn('[vue-mount] inspect modal mount skipped:', err?.message || err); }
-    } catch (err) {
-      logger.error(`${t('inspect.readFailed')}: ${err?.message || err}`);
-      panel?.setError?.(t('inspect.readFailed'));
-      view.toast(t('inspect.readFailed'));
-    }
   });
 
   for (const target of [root, root.querySelector('#chart-card')]) {

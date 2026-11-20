@@ -1,7 +1,7 @@
 {
   "version": 1,
   "files": {
-    "docs/DEVELOPER-GUIDE.md": "0c0ac58680f68ceef90a02d413c12f675837818c169eaf1610f2f2fd8c777595",
+    "docs/DEVELOPER-GUIDE.md": "183f6df9597267e52aed5cf796e28187869732c6f6bdcae0cfab3bb174a9685c",
     "docs/PLAN-2026-11-19-offline-inspect-and-0kb.md": "abd1ecb299c0eddeadd443509690ffec406db6e193d97ace1bb972cc83074148",
     "docs/PLAN-2026-11-19-release-workflow.md": "ae9951e2d2b18bc68df3be7c93c09210cda0e6d3693c0d07f0807a42c3f62765",
     "docs/PLAN-2026-11-19-web-lan-tutorial-fixes.md": "25c6f8b308bd7133df461357fbfe18562536c5b8b0902cd673e797ebbfc6a903",
@@ -181,7 +181,7 @@
       "zh": "docs/DEVELOPER-GUIDE.md",
       "en": null,
       "translation": "pending",
-      "sourceHash": "0c0ac58680f68ceef90a02d413c12f675837818c169eaf1610f2f2fd8c777595",
+      "sourceHash": "183f6df9597267e52aed5cf796e28187869732c6f6bdcae0cfab3bb174a9685c",
       "translationHash": null
     }
   ],
@@ -192,7 +192,7 @@
       "style.css",
       "tooling/capture-docs-shots.cjs"
     ],
-    "sourcesHash": "c32b5c00c5567f37ea0f2c80e70c804b3c30a9e0a7882d244ffa8f056123be27",
+    "sourcesHash": "90f76e37e4a64d7b28711c18e24e9f466fcd915d7b1ab183ce2c9f7a8c28ccf3",
     "pages": {
       "docs/convert.en.md": [
         "docs/assets/shots/desktop-03-workbench-demo.png",

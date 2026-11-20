@@ -8,6 +8,11 @@ function fakeRoot(values) {
   return {
     querySelector(selector) {
       const matchSetting = /data-setting="([^"]+)"/.exec(selector);
+      // 新接线键不在老 fixture 里：返回 null 表示控件不存在，保持默认值。
+      const ISSUE_KEYS = new Set([
+        'issueTitle', 'issueDescription', 'issueSteps', 'issueIncludeLogs',
+      ]);
+      if (matchSetting && ISSUE_KEYS.has(matchSetting[1])) return null;
       if (matchSetting) return { checked: !!values[matchSetting[1]] };
       return null;
     },
@@ -17,11 +22,17 @@ function fakeRoot(values) {
 describe('settings-panel 设置面板', () => {
   it('包含基础提示开关与导出清理项（打包选项不在设置页）', () => {
     const html = buildSettingsHtml(SETTINGS_DEFAULTS);
-    // 9 个行为开关 + 设置→数据 的 2 个凭据勾选（includeCreds / includeOauth）
-    expect((html.match(/type="checkbox"/g) || []).length).toBe(12);
+    // 16 个开关构成：行为组 5 个 + 导出生命周期组 5 个（含脱敏通知）+ 日志 1 个 + 数据凭据 2 个 + 问题报告 3 个（issuePrereqDocs / issuePrereqSearch / issueIncludeLogs）
+    expect((html.match(/type="checkbox"/g) || []).length).toBe(16);
     expect(html).toContain('data-setting="deleteAfterExport"');
     expect(html).toContain('data-setting="logMaxEntries"');
     expect(html).toContain('data-setting="nativePullNotice"');
+    expect(html).toContain('data-group="issue"');
+    expect(html).toContain('data-action="issue-preview"');
+    expect(html).toContain('data-action="issue-submit"');
+    // 令牌已不在设置面板手填：改由账号只读下拉展示（issueAccount），令牌在开发者设置配置。
+    expect(html).toContain('data-setting="issueAccount"');
+    expect(html).not.toContain('data-setting="githubToken"');
     // 自动更新已搬到宿主页每条扩展，设置页不再有相关开关
     expect(html).not.toContain('data-setting="devMode"');
     expect(html).not.toContain('data-setting="gitAutoUpdate"');

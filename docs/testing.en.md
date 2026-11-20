@@ -30,7 +30,7 @@ This page only describes checks that end users can perform themselves. Back up r
 1. Install from the repository URL in the tavern extension manager and refresh.
 2. Open the **Data Pack Transfer** panel.
 3. Check that the host badge matches the current tavern.
-4. Try **Pull from current host** and confirm the current user's packages or category counts appear.
+4. Try **Pull from host** and confirm the current user's packages or category counts appear.
 5. Switch the target platform, generate an export, and download it.
 
 **Expected**: the panel does not cover the tavern's native UI; host identity, version, and capabilities are reported truthfully; unsupported host capabilities never pretend to succeed.
@@ -62,7 +62,7 @@ This page only describes checks that end users can perform themselves. Back up r
 
 **Goal**: confirm Full / Manifest / Both modes behave as documented.
 
-1. Pick a public remote extension and pack it in **Full**, **Manifest**, and **Both** modes.
+1. Pick a public remote extension and pack it in **Full**, **Manifest**, and **Both** (Both = both buttons lit at the same time) modes.
 2. Check that Full contains the extension files; Manifest contains only the manifest entry and required metadata; Both contains both.
 3. Install into the target tavern and confirm the version and source are correct.
 4. Make a recoverable local change, then install or update again and confirm self-healing completes.

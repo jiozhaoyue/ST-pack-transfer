@@ -56,18 +56,16 @@ export function renderInspectReport(report) {
 }
 
 /**
- * 把外部文件体检面板挂到容器。
- * @param {{container: Element, onPickFile: Function}} opts
+ * 把体检结果面板挂到容器（仅展示结果，不再提供外部文件选择入口）。
+ * onPickFile 已废弃：外部文件体检整条链已移除，参数保留仅为兼容既有调用方。
+ * @param {{container: Element, onPickFile?: Function}} opts
  * @returns {{setBusy: Function, render: Function, setError: Function}|null}
  */
 export function mountInspectPanel({ container, onPickFile } = {}) {
+  void onPickFile; // 已废弃，保留形参避免调用方报错
   if (!container) return null;
   container.hidden = false;
-  container.innerHTML = `<div class="ext-note">${escapeHtml(t('inspect.pickHint'))}</div>`
-    + `<button type="button" class="btn" data-inspect-pick>${escapeHtml(t('inspect.pick'))}</button>`
-    + `<div data-inspect-result></div>`;
-  const pick = container.querySelector('[data-inspect-pick]');
-  if (pick) pick.addEventListener('click', () => { if (typeof onPickFile === 'function') onPickFile(); });
+  container.innerHTML = `<div data-inspect-result></div>`;
   const resultBox = container.querySelector('[data-inspect-result]');
   return {
     setBusy() {

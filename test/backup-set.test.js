@@ -212,5 +212,7 @@ describe('backup-set 执行器', () => {
       target, setBase: 'sets/default', snapshotKey: index.latest,
     });
     expect(restored).toMatchObject({ ok: false, code: 'object-missing' });
+    // 不返回半个包：失败结果不带任何 ZIP 字节载荷。
+    expect(restored.blob).toBeUndefined();
   });
 });

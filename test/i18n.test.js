@@ -10,11 +10,18 @@ describe('i18n 键与插值', () => {
   });
 
   it('没有空文案', () => {
+    // 纯布局分隔符（如换行）trim 后为空，属于有意值，不算空文案。
+    const whitespaceSeparators = new Set(['queue.listSep']);
     for (const locale of ['zh-CN', 'en-US']) {
       const dict = localeOf(locale);
       for (const [key, value] of Object.entries(dict)) {
         expect(typeof value, key).toBe('string');
-        expect(value.trim().length, key).toBeGreaterThan(0);
+        if (value.trim().length === 0) {
+          // 空值只允许出现在纯布局分隔符键上。
+          expect(whitespaceSeparators.has(key), key).toBe(true);
+        } else {
+          expect(value.trim().length, key).toBeGreaterThan(0);
+        }
       }
     }
   });

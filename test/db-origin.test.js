@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { ORIGINS } from '../src/storage/db.js';
 
 // migrateRoleToOrigin / normalizeRecord 是模块私有逻辑的映射规则，
@@ -58,5 +58,73 @@ describe('role→origin 迁移映射规则', () => {
   it('空 metadata 或无 role → upload 兜底', () => {
     expect(migrateRoleToOrigin({ role: 'source' })).toBe(ORIGINS.UPLOAD);
     expect(migrateRoleToOrigin({})).toBe(ORIGINS.UPLOAD);
+  });
+});
+
+// saveFile 的 origin 越界门禁（P2）：非法值回落 migrateRoleToOrigin 并 logger.warn 一次。
+describe('saveFile origin 枚举校验', () => {
+  const g = globalThis;
+  const savedWindow = g.window;
+  let stored;
+  let warnSpy;
+
+  beforeEach(async () => {
+    stored = [];
+    const store = {
+      put: (rec) => {
+        stored.push({ ...rec });
+        const putReq = {};
+        queueMicrotask(() => { if (putReq.onsuccess) putReq.onsuccess(); });
+        return putReq;
+      },
+    };
+    const db = {
+      transaction: () => ({
+        objectStore: () => store,
+      }),
+    };
+    const openRequest = { result: db, error: null };
+    const fakeIDB = {
+      open: () => {
+        queueMicrotask(() => {
+          if (openRequest.onsuccess) openRequest.onsuccess({ target: { result: db } });
+        });
+        return openRequest;
+      },
+    };
+    g.window = { indexedDB: fakeIDB };
+    vi.resetModules();
+    const { logger } = await import('../src/core/logger.js');
+    logger.clear();
+    warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    if (warnSpy) warnSpy.mockRestore();
+    if (savedWindow === undefined) delete g.window;
+    else g.window = savedWindow;
+    vi.resetModules();
+  });
+
+  it('合法 origin 原样落库，不告警', async () => {
+    const { saveFile } = await import('../src/storage/db.js');
+    await saveFile({ id: 'a', name: 'a.zip', origin: ORIGINS.HOST_EXPORT, blob: new Blob([]) });
+    expect(stored[0].origin).toBe(ORIGINS.HOST_EXPORT);
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it('非法 origin（如 demo）回落 migrateRoleToOrigin 并 warn 一次', async () => {
+    const { saveFile } = await import('../src/storage/db.js');
+    await saveFile({ id: 'b', name: 'b.zip', origin: 'demo', role: 'source', blob: new Blob([]) });
+    expect(stored[0].origin).toBe(ORIGINS.UPLOAD);
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(warnSpy.mock.calls[0].join(' ')).toContain('demo');
+  });
+
+  it('未传 origin 时按 role 推断且 warn 次数为零', async () => {
+    const { saveFile } = await import('../src/storage/db.js');
+    await saveFile({ id: 'c', name: 'c.zip', role: 'output', blob: new Blob([]) });
+    expect(stored[0].origin).toBe(ORIGINS.CONVERTED);
+    expect(warnSpy).not.toHaveBeenCalled();
   });
 });

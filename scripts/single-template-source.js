@@ -58,7 +58,6 @@ export const REQUIRED_TEMPLATE_IDS = [
   'count-import',
   'delta-toggle',
   'file-input',
-  'file-input-inspect',
   'filename-preview',
   'filename-template',
   'help-body',

@@ -136,12 +136,15 @@ describe('transfer-runner 逐片加密（可选）', () => {
     await uploader.upload({ blob: blobOf(bytes), name: 'e.zip' });
 
     const noPass = createTransferRunner({ target, chunkSize: MB });
-    expect(await noPass.download({ name: 'e.zip' }))
-      .toMatchObject({ ok: false, code: 'passphrase-required' });
+    const noPassResult = await noPass.download({ name: 'e.zip' });
+    expect(noPassResult).toMatchObject({ ok: false, code: 'passphrase-required' });
+    // 不返回半包：失败结果不带任何字节载荷。
+    expect(noPassResult.bytes).toBeUndefined();
 
     const wrong = createTransferRunner({ target, chunkSize: MB, passphrase: 'bad' });
-    expect(await wrong.download({ name: 'e.zip' }))
-      .toMatchObject({ ok: false, code: 'bad-passphrase' });
+    const wrongResult = await wrong.download({ name: 'e.zip' });
+    expect(wrongResult).toMatchObject({ ok: false, code: 'bad-passphrase' });
+    expect(wrongResult.bytes).toBeUndefined();
   });
 
   it('同内容重传仍零字节，并沿用原 salt 保证旧分片可解', async () => {
@@ -196,5 +199,23 @@ describe('transfer-runner 逐片加密（可选）', () => {
     const down = await createTransferRunner({ target, chunkSize: MB, passphrase: 'pw' })
       .download({ name: 'e.zip' });
     expect(Buffer.from(down.bytes).equals(Buffer.from(bytes))).toBe(true);
+  });
+
+  it('本地脱敏检测门禁：未脱敏条目上传时直接硬阻断，绝不向 target 发送数据', async () => {
+    const target = fakeTarget();
+    const runner = createTransferRunner({ target, chunkSize: MB });
+    const result = await runner.upload({
+      blob: blobOf(sampleBytes(100)),
+      name: 'leak.zip',
+      entriesForGuard: [
+        { path: 'chats/talk.jsonl' },
+        { path: 'characters/eva.png' }, // 触发门禁拦截
+      ],
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.code).toBe('sensitive-guard-blocked');
+    expect(result.reason).toContain('发现角色卡条目');
+    expect(target.store.size).toBe(0); // 绝对未向远端写入任何字节
   });
 });

@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { logger, LOG_LEVELS, redact } from '../src/core/logger.js';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { logger, LOG_LEVELS, redact, scrubDetailKeys } from '../src/core/logger.js';
 
 describe('Logger Core System', () => {
   beforeEach(() => {
@@ -113,13 +113,23 @@ describe('Logger Core System', () => {
     });
 
     it('exportText 默认脱敏，exportRaw 保留原文', () => {
-      logger.info('token leak', { url: 'https://user:pass@example.com/?token=abc123' });
-      const safe = logger.exportText();
-      const raw = logger.exportRaw();
-      expect(safe).not.toContain('user:pass');
-      expect(safe).toContain('[REDACTED]');
-      expect(raw).toContain('user:pass');
-      expect(logger.exportRedacted()).toBe(safe);
+      // 确定性：exportText 与 exportRedacted 各自都会经 environmentHeader() →
+      // formatTime() → new Date() 生成 `ExportedAt:` 头；若两次调用跨 1ms，
+      // 整串 toBe 比较会偶发失败（实测 .343 vs .344）。冻结时钟后两次导出头一致，
+      // 断言强度不变（仍比较完整导出文本），仅消除时间抖动。
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-11-20T01:00:00.000Z'));
+      try {
+        logger.info('token leak', { url: 'https://user:pass@example.com/?token=abc123' });
+        const safe = logger.exportText();
+        const raw = logger.exportRaw();
+        expect(safe).not.toContain('user:pass');
+        expect(safe).toContain('[REDACTED]');
+        expect(raw).toContain('user:pass');
+        expect(logger.exportRedacted()).toBe(safe);
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     /**
@@ -160,6 +170,134 @@ describe('Logger Core System', () => {
       expect(redact('Error: TypeError at line 5')).toBe('Error: TypeError at line 5');
       expect(redact('HTTP 404 and status 500')).toBe('HTTP 404 and status 500');
       expect(redact('host: luker, version 0.6.0')).toBe('host: luker, version 0.6.0');
+    });
+
+    it('redact 覆盖 client_secret / password / POSIX 用户路径 / 邮箱（P2 脱敏缺口）', () => {
+      expect(redact('client_secret=abc123xyz')).not.toContain('abc123xyz');
+      expect(redact('client_secret=abc123xyz')).toContain('client_secret=[REDACTED]');
+      expect(redact('password: Sup3rSecret')).not.toContain('Sup3rSecret');
+      expect(redact('password: Sup3rSecret')).toContain('password: [REDACTED]');
+      // JSON 形态与中文冒号
+      expect(redact('"password": "Sup3rSecret"')).not.toContain('Sup3rSecret');
+      expect(redact('password：Sup3rSecret')).not.toContain('Sup3rSecret');
+      // POSIX /root/ 与 /var/ 用户路径
+      expect(redact('/root/.ssh/id_rsa')).not.toContain('/root/.ssh/id_rsa');
+      expect(redact('/root/.ssh/id_rsa')).toContain('/root/[USER]');
+      expect(redact('/var/jenkins_home/secret')).not.toContain('jenkins_home');
+      // 常见邮箱
+      expect(redact('contact me at alice@example.com now')).not.toContain('alice@example.com');
+      expect(redact('alice@example.com')).toContain('[EMAIL]');
+    });
+
+    describe('P1 脱敏加固：redact 新增规则', () => {
+      it('redact 覆盖 Google API Key（AIza + 35 位）', () => {
+        const key = tok('AIza', 'A'.repeat(35));
+        expect(redact(key)).toBe('[REDACTED]');
+        expect(redact('key=' + key)).toContain('[REDACTED]');
+      });
+
+      it('redact 覆盖 HuggingFace token（hf_ + ≥30 位）', () => {
+        const key = tok('hf_', 'abcdefghijklmnopqrstuvwxyz1234');
+        expect(redact(key)).toBe('[REDACTED]');
+      });
+
+      it('redact 覆盖 ?refresh_token= / id_token / client_secret 等查询参数', () => {
+        expect(redact('/api?refresh_token=SECRET')).toContain('refresh_token=[REDACTED]');
+        expect(redact('/api?id_token=SECRET')).toContain('id_token=[REDACTED]');
+        expect(redact('/api?client_secret=SECRET')).toContain('client_secret=[REDACTED]');
+        expect(redact('/api?signature=SECRET&x=1')).toContain('signature=[REDACTED]');
+        expect(redact('/api?accesskey=SECRET')).toContain('accesskey=[REDACTED]');
+        expect(redact('/api?refresh_token=SECRET')).not.toContain('SECRET');
+      });
+
+      it('redact 覆盖单引号密码 password: \'xxx\' / passwd=\'xxx\'', () => {
+        expect(redact("password: 'Sup3rSecret123'")).toContain('password: [REDACTED]');
+        expect(redact("password: 'Sup3rSecret123'")).not.toContain('Sup3rSecret123');
+        expect(redact("passwd='hunter2'")).toContain('passwd=[REDACTED]');
+        expect(redact("passwd='hunter2'")).not.toContain('hunter2');
+      });
+    });
+
+    describe('P1 脱敏加固：scrubDetailKeys 键名黑名单', () => {
+      it('折叠 6 类漏网键值（按敏感键名）', () => {
+        const input = {
+          api_key: 'abc123SECRETtokenXYZ',
+          password: 'Sup3rSecret123',
+          google_api_key: tok('AIza', 'A'.repeat(35)),
+          hf_token: tok('hf_', 'abcdefghijklmnopqrstuvwxyz'),
+          refresh_token: 'SECRET',
+          token: 'abc123XYZ',
+        };
+        const out = scrubDetailKeys(input);
+        for (const value of Object.values(out)) expect(value).toBe('[REDACTED]');
+      });
+
+      it('3 层嵌套对象里的 token 键被折叠', () => {
+        const out = scrubDetailKeys({
+          level1: { level2: { access_token: 'SECRET', keep: 'visible' } },
+        });
+        expect(out.level1.level2.access_token).toBe('[REDACTED]');
+        expect(out.level1.level2.keep).toBe('visible');
+      });
+
+      it('数组内的对象秘密键同样被折叠', () => {
+        const out = scrubDetailKeys([{ client_secret: 'SECRET' }, { ok: 1 }]);
+        expect(out[0].client_secret).toBe('[REDACTED]');
+        expect(out[1].ok).toBe(1);
+      });
+
+      it('camelCase / 多种黑名单键名均命中', () => {
+        const out = scrubDetailKeys({
+          accessToken: 'a', refreshToken: 'b', secretAccessKey: 'c',
+          customSecret: 'd', apiKey: 'e', apikey: 'f', key: 'g',
+          passwd: 'h', pwd: 'i', credentials: 'j', authorization: 'k',
+          cookie: 'l', 'set-cookie': 'm',
+        });
+        for (const value of Object.values(out)) expect(value).toBe('[REDACTED]');
+      });
+
+      it('循环引用不抛错、不死循环', () => {
+        const obj = { token: 'SECRET', name: 'root' };
+        obj.self = obj;
+        let out;
+        expect(() => { out = scrubDetailKeys(obj); }).not.toThrow();
+        expect(out.token).toBe('[REDACTED]');
+        expect(out.self).toBe('[Circular]');
+      });
+
+      it('depth 超 8 层返回 [DEEP]', () => {
+        let deep = { token: 'SECRET' };
+        const root = { a: deep };
+        let cursor = root;
+        for (let i = 0; i < 10; i++) {
+          cursor.next = { v: i };
+          cursor = cursor.next;
+        }
+        const out = scrubDetailKeys(root);
+        expect(JSON.stringify(out)).toContain('[DEEP]');
+      });
+
+      it('不误伤 keyboard / monkey 等含 key 子串的正常单词', () => {
+        const out = scrubDetailKeys({ keyboard: 'K', monkey: 'M', keyName: 'N', keyPath: 'P' });
+        expect(out.keyboard).toBe('K');
+        expect(out.monkey).toBe('M');
+        expect(out.keyName).toBe('N');
+        expect(out.keyPath).toBe('P');
+      });
+
+      it('字符串原样透传（不改变 redact 行为）', () => {
+        expect(scrubDetailKeys('password: abc')).toBe('password: abc');
+      });
+
+      it('exportText 走 scrubDetailKeys：detail 对象秘密键被折叠', () => {
+        logger.warn('leak', { token: 'SECRET', password: ' Sup3r ', keep: 'visible' });
+        const text = logger.exportText();
+        expect(text).toContain('"token": "[REDACTED]"');
+        expect(text).toContain('password: [REDACTED]');
+        expect(text).toContain('"keep": "visible"');
+        expect(text).not.toContain('SECRET');
+        expect(text).not.toContain('Sup3r');
+      });
     });
   });
 });

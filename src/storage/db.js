@@ -9,6 +9,7 @@
 
 import { SESSION_SCHEMA_VERSION } from '../core/migration-session.js';
 import { opfsReadFile, opfsRemove, opfsClearDir } from './opfs-files.js';
+import { logger } from '../core/logger.js';
 
 const DB_NAME = 'st_zip_converter_db';
 const DB_VERSION = 2;
@@ -44,6 +45,9 @@ export const ORIGINS = Object.freeze({
   CLOUD_RESTORE: 'cloud-restore',
   VAULT: 'vault',
 });
+
+/** ORIGINS 枚举的全部合法取值（saveFile 入参门禁用）。 */
+const VALID_ORIGINS = new Set(Object.values(ORIGINS));
 
 /**
  * v1 role → v2 origin 迁移映射
@@ -225,6 +229,17 @@ export async function saveFile({
 }) {
   if (!isStorageSupported()) return null;
   const fileId = id || `${role}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  // origin 越界门禁：只接受 ORIGINS 枚举值；非法值（如 workbench-view 的 'demo'）
+  // 回落按 role 推断并告警一次，避免任意字符串污染单列表来源分类。
+  let resolvedOrigin = origin;
+  if (resolvedOrigin !== undefined && resolvedOrigin !== null && resolvedOrigin !== '') {
+    if (!VALID_ORIGINS.has(resolvedOrigin)) {
+      logger.warn(`[db] saveFile 收到非法 origin=${String(resolvedOrigin)}，回落 migrateRoleToOrigin({ role })`);
+      resolvedOrigin = migrateRoleToOrigin({ role, metadata });
+    }
+  } else {
+    resolvedOrigin = migrateRoleToOrigin({ role, metadata });
+  }
   const record = {
     id: fileId,
     name,
@@ -232,7 +247,7 @@ export async function saveFile({
     blob: opfsName ? null : blob,
     layout: layout || 'unknown',
     role,
-    origin: origin || migrateRoleToOrigin({ role, metadata }),
+    origin: resolvedOrigin,
     group,
     metadata,
     createdAt: Date.now(),

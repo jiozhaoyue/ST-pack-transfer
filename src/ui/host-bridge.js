@@ -400,9 +400,12 @@ const HOST_DIALOG_TITLE = '数据包转运';
  * 读取宿主上下文对象（`SillyTavern.getContext()`）。
  * ST 与 Luker 均暴露该全局（Luker `script.js` 亦暴露 `SillyTavern`），
  * 独立态、宿主脚本未就绪或调用抛错时返回 null。
+ *
+ * 这是读取宿主上下文的**唯一正规出口**（D-01）：业务层（issue-report / settings-store）
+ * 只读这里返回的 ctx，不得自行直读 `globalThis.SillyTavern`。
  * @returns {object|null}
  */
-function getHostContext() {
+export function getHostContext() {
   try {
     const st = globalThis.SillyTavern;
     return st && typeof st.getContext === 'function' ? st.getContext() : null;
@@ -1281,6 +1284,15 @@ export const USER_FILE_MAX_BYTES = 500 * 1024 * 1024;
 
 export function userFilesSupported(platform) {
   return platform === 'st' || platform === 'luker';
+}
+
+/**
+ * 宿主是否提供三种可切换存储后端（fs/postgres/mysql/sqlite）。
+ * 事实（workbench-view 既有判据）：仅 Luker 有这些后端，其余宿主只有单一文件系统存储。
+ * 业务层据此显示/隐藏引擎选择器、切换引擎，不自行按宿主码分支（D-01）。
+ */
+export function hostHasStorageEngines(platform) {
+  return platform === 'luker';
 }
 
 /** 宿主 `validateAssetFileName` 只接受 `[a-zA-Z0-9._-]`；越界字符替换为下划线。 */
@@ -3075,6 +3087,15 @@ function watchHostDom(injectFn) {
     }, INJECT_DEBOUNCE_MS);
   });
   injectionObserver.observe(document.body, { childList: true, subtree: true });
+}
+
+/* 单页常驻下不会被调用，供 HMR / 测试 / 未来卸载路径使用：断开宿主 DOM observer 并清空watchers。 */
+export function stopHostDomWatch() {
+  if (injectionObserver) {
+    injectionObserver.disconnect();
+    injectionObserver = null;
+  }
+  injectionWatchers.clear();
 }
 
 /**

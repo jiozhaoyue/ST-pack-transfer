@@ -1,4 +1,5 @@
 import { defineConfig } from 'vite';
+import vue from '@vitejs/plugin-vue';
 import { execSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 
@@ -36,6 +37,7 @@ const LOCAL_PORT = Number(process.env.PORT) || 3040;
 
 export default defineConfig({
   base: './',
+  plugins: [vue()],
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
     __APP_COMMIT__: JSON.stringify(commit),

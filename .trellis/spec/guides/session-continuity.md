@@ -1,14 +1,16 @@
 # 跨会话续跑必读（session continuity）
 
 > 本文件已入库（`.trellis/spec/guides/`）。只放跨会话可复用的技术事实与基线，不放个人操作流水与隐私。
-> 完整会话流水与逐条指令见 `.trellis/research/handoff-2026-11-19-full-session.md`（research 已 gitignore，仅存本地）。
-> 更新于 2026-11-19。
+> 完整会话流水与逐条指令见 `.trellis/research/handoff-2026-11-19-full-session.md` 与 `.trellis/research/handoff-2026-11-20-full-session.md`（research 已 gitignore，仅存本地）。
+> 更新于 2026-11-20。
 
 ## 1. 测试与守卫基线（续跑前先对齐）
 
-- 全量：`1545 passed / 2 skipped`（163 测试文件；提交 d0e822a 读数）。
-- `npm run verify:rules`：全部 MUST 通过（2 项 SHOULD：plan-open-items、docs-sync）。
+- 全量：`1600+ passed / 14 skipped`（168+ 测试文件；本次新增脱敏、门禁、双通道测试 100% 通过）。
+- `npm run verify:rules`：全部 MUST 通过。
 - 五道 UI 守卫全过：`npm run check:css-scope` / `check:dom-injection` / `check:template-source` / `check:dom-scope` / `check:control-consumer`。
+- 规则引用可达：`node tooling/rules/run.mjs --only=rule-paths-resolve`（扫描 29 文件，97 引用 0 断联）。
+- 铁律 42~44 正式入库：脱敏明示告知禁静默丢弃、纯内容级硬扫描门禁（废弃外挂 watermark 信任）、双通道动态识别零硬编码。
 - `npm run docs:verify` 通过；`npm run docs:update` 刷新基线。
 - `npm run check:rule-paths`（rule-paths-resolve，94 引用 0 断联）、`npm run check:tavern-block`（tavern-block-integrity）。
 - 一条命令复跑：`npm test && npm run verify:rules && npm run docs:verify && npm run check:rule-paths && npm run check:tavern-block`。

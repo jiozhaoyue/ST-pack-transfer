@@ -11,13 +11,20 @@ node scripts/run-e2e-instances.cjs --skip-restart   # 实例已在跑，直接�
 node scripts/run-e2e-instances.cjs --only dev-st,tt-cdp
 ```
 
-矩阵行：`dev-st(8001, smoke+matrix+vault)`、`dev-luker(8003, smoke+matrix+vault)`、
-`dev-pt(8899, pt-load+vault，persistent context 天然 headed)`、`tt-cdp(9223, CDP 加载冒烟+仓冒烟)`。
+矩阵行：`dev-st(8001, smoke+matrix)`、`dev-luker(8003, smoke+matrix)`、
+`dev-pt(8899, pt-load，persistent context 天然 headed)`、`tt-cdp(9223, CDP 加载冒烟)`。
+（原各行的 `+vault` / `+仓冒烟` 已随 vault 功能下线移除，见下节。）
 产物：`test-results/instances/<host>-<date>.md` + `summary-*.md` + tt 截图。
 
-## 仓（vault）行：判据与三条前置
+## 仓（vault）行：判据与三条前置 —— 已下线（历史留档，不再执行）
 
-仓 spec（`e2e/specs/vault.e2e.cjs`；TT 走 `e2e/lib/tt-cdp.cjs` 的 `ttVaultSmoke`）验的是
+> **状态（2026-11-20 核实）：vault 功能已整体下线**（删除提交 `eef3fca feat(chart): 多包合并模式
+> + 私有配置容器与传云上传`，2026-10-27 的 UI 重写）。`src/storage/vault-store.js` 已从 HEAD 删除，
+> `e2e/specs/vault.e2e.cjs` 不存在，`e2e/lib/legacy-vault.e2e.cjs` 头注标注「已停用·2026-10-27」，
+> `tt-cdp.cjs` 的 `ttVaultSmoke` 亦已删除。**以下整节判据仅为历史留档，当前不执行**；
+> 矩阵不再包含 vault / 仓冒烟行。保留供追溯与将来若恢复仓功能时参考。
+
+仓 spec（历史：`e2e/specs/vault.e2e.cjs`；TT 走 `ttVaultSmoke`，二者均已删除）验的是
 **双后端全链路**：仓模块可见 → 后端徽标 → 存入 → **UI 恰好 1 行且后端真值恰好 1 条** →
 导出字节一致 → 删除后 UI 与后端双归零 → 零本插件报错。
 
@@ -39,8 +46,9 @@ node scripts/run-e2e-instances.cjs --only dev-st,tt-cdp
 - **冷启动期间页面会自行导航** ⇒ `evaluate` 抛 `Execution context was destroyed`，
   整轮因此异常退出。所有 CDP 取值包一层 `retryOnNav`（只重试导航类错误，不吞真断言失败）。
 
-**截图纪律**：TT 的模态不铺满全屏，整页截图会带进**真实聊天内容**（P-11 高敏）⇒
-`ttVaultSmoke` 用元素截图（`#st-converter-modal-overlay`）；截图前先点掉宿主自己的浮层
+**截图纪律（历史 vault 判据留档；vault 下线后 TT 仅 `ttCdpSmoke`，默认不截图）**：
+TT 的模态不铺满全屏，整页截图会带进**真实聊天内容**（P-11 高敏）⇒
+历史上的 `ttVaultSmoke`（已删除）用元素截图（`#st-converter-modal-overlay`）；截图前先点掉宿主自己的浮层
 （「后端错误」toast 是扩展版本检查走 GitHub 失败的背景噪声；ChatFilesys「不入库」提示）。
 
 ## 七条实测铁律（2026-10-25 全部踩过）

@@ -54,11 +54,14 @@ describe('SillyTavern 标准插件工程结构 (ST-pack-transfer)', () => {
     }
     const { buildSettingsHtml } = await import('../src/ui/settings-panel.js');
     const settingsHtml = buildSettingsHtml({});
-    // 9 个行为开关（deleteAfterExport / autoDeleteBackupPacks / trafficPrompt / nativePullNotice /
-    // autoTutorial / clearLogOnLoad / clearPackagesOnLoad / autoRefreshAfterUpload / confirmDiscardChartPrefs）
-    // + 设置→数据 的 2 个凭据勾选（includeCreds / includeOauth）。
+    // 16 个开关构成：
+    // - 行为组 5 个（trafficPrompt / nativePullNotice / autoTutorial / showChangelogOnUpdate / confirmDiscardChartPrefs）
+    // - 导出生命周期 5 个（autoRefreshAfterUpload / deleteAfterExport / autoDeleteBackupPacks / notifySanitizeDetails / clearPackagesOnLoad）
+    // - 日志 1 个（clearLogOnLoad）
+    // - 数据与凭据 2 个（includeCreds / includeOauth）
+    // - 问题报告 3 个（issuePrereqDocs / issuePrereqSearch / issueIncludeLogs）
     // 自动更新已搬到宿主页每条扩展，设置页不再有相关开关。
-    expect((settingsHtml.match(/type="checkbox"/g) || []).length).toBe(12);
+    expect((settingsHtml.match(/type="checkbox"/g) || []).length).toBe(16);
     expect(settingsHtml).not.toMatch(/扩展包|backups|派生缓存|清理/i);
 
     // 反向断言：index.html 不得出现这些业务节点（防回归成两份副本）

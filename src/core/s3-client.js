@@ -75,7 +75,10 @@ export async function signRequest({
   now = new Date(),
 }) {
   const u = new URL(url);
-  const canonicalUri = encodePath(u.pathname || '/');
+  // new URL 的 pathname 已是百分号编码形态（如 `/mybucket/Alice%20Pack.zip`），
+  // SigV4 的 canonicalUri 必须直接用它；再过 encodePath 会二次编码成 `%2520`，
+  // 与实发 URL（:154 只对原始 key 编码一次）不一致 ⇒ 403 SignatureDoesNotMatch。
+  const canonicalUri = u.pathname || '/';
   const query = [...u.searchParams.entries()]
     .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
     .map(([k, v]) => `${encodeSegment(k)}=${encodeSegment(v)}`)

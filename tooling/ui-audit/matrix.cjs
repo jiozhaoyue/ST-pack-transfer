@@ -338,6 +338,46 @@ async function main() {
     await page.waitForTimeout(700);
 
     const seq = { n: 0 };
+    /* 2026-11-20 批次3：bottom 态滚真实滚动容器，而非 .app-main。
+       实测结构：settings→#settings-body、extension→#extension-body（小视口可滚）、
+       log→#log-body；桌面 .app-main 多为 overflow:hidden，滚它无效（主态/bottom 帧逐像素相同）。
+       传入候选选择器列表，只滚「可见且 overflowY 可滚且内容溢出」的首个真实容器；
+       若该视图确无独立滚动容器，回退 .app-main / scrollingElement 并如实返回空列表。 */
+    const scrollViewBottom = (selectors) => page.evaluate((sels) => {
+      const isVisible = (el) => {
+        for (let p = el; p; p = p.parentElement) {
+          if (p.hasAttribute && p.hasAttribute('hidden')) return false;
+          const ps = getComputedStyle(p);
+          if (ps.display === 'none' || ps.visibility === 'hidden') return false;
+        }
+        const r = el.getBoundingClientRect();
+        return r.width > 0 && r.height > 0;
+      };
+      const scrolled = [];
+      for (const sel of sels) {
+        const el = document.querySelector(sel);
+        if (!el || !isVisible(el)) continue;
+        const s = getComputedStyle(el);
+        if ((s.overflowY === 'auto' || s.overflowY === 'scroll') && el.scrollHeight > el.clientHeight + 4) {
+          const before = el.scrollTop;
+          el.scrollTop = el.scrollHeight;
+          scrolled.push({ sel, before, after: el.scrollTop, scrollH: el.scrollHeight, clientH: el.clientHeight });
+        }
+      }
+      if (!scrolled.length) {
+        const main = document.querySelector('#app .app-main') || document.scrollingElement;
+        if (main) { main.scrollTop = main.scrollHeight; scrolled.push({ sel: 'app-main-fallback', scrollH: main.scrollHeight, clientH: main.clientHeight }); }
+      }
+      return scrolled;
+    }, selectors);
+    const scrollViewTop = (selectors) => page.evaluate((sels) => {
+      for (const sel of sels) {
+        const el = document.querySelector(sel);
+        if (el && el.scrollTop) el.scrollTop = 0;
+      }
+      const main = document.querySelector('#app .app-main') || document.scrollingElement;
+      if (main) main.scrollTop = 0;
+    }, selectors);
     const stateResults = async (state) => {
       const p = await page.evaluate(probeInPage).catch((e) => ({ error: String(e) }));
       results.push({
@@ -417,19 +457,13 @@ async function main() {
           }
         }
       }
-      // 扩展视图：滚到底再拍
+      // 扩展视图：滚到底再拍（真实容器 #extension-body，见工具函数注释）
       if (id === 'extension') {
-        await page.evaluate(() => {
-          const main = document.querySelector('#app .app-main') || document.scrollingElement;
-          if (main) main.scrollTop = main.scrollHeight;
-        });
+        await scrollViewBottom(['#extension-body', '#app .app-main']);
         await page.waitForTimeout(350);
         await shoot(page, dir, seq, '22-extension-bottom');
         await stateResults('extension-bottom');
-        await page.evaluate(() => {
-          const main = document.querySelector('#app .app-main') || document.scrollingElement;
-          if (main) main.scrollTop = 0;
-        });
+        await scrollViewTop(['#extension-body']);
       }
     }
 
@@ -448,17 +482,15 @@ async function main() {
       const slug = /日志|log/i.test(`${b.id} ${b.label}`) ? 'log' : 'settings';
       await shoot(page, dir, seq, `30-${slug}`);
       await stateResults(slug);
-      await page.evaluate(() => {
-        const main = document.querySelector('#app .app-main') || document.scrollingElement;
-        if (main) main.scrollTop = main.scrollHeight;
-      });
+      // 真实滚动容器：settings→#settings-body，log→#log-body（见工具函数注释）
+      const bottomSel = slug === 'log'
+        ? ['#log-body', '#app .app-main']
+        : ['#settings-body', '#app .app-main'];
+      await scrollViewBottom(bottomSel);
       await page.waitForTimeout(300);
       await shoot(page, dir, seq, `31-${slug}-bottom`);
       await stateResults(`${slug}-bottom`);
-      await page.evaluate(() => {
-        const main = document.querySelector('#app .app-main') || document.scrollingElement;
-        if (main) main.scrollTop = 0;
-      });
+      await scrollViewTop(bottomSel);
     }
 
     // 5. 手机唯一滚动容器核验已进 probe.scrollers

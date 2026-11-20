@@ -58,7 +58,7 @@ translation: pending
 | 路径 | 职责 |
 | --- | --- |
 | `index.html` | 独立 Web 的空骨架，只提供 `#app` 容器 |
-| `index.js` | 根控制器：宿主嗅探、动作绑定、启动 |
+| `index.js` | 根控制器：宿主嗅探、动作绑定、启动；预览正文支持原文／渲染切换，切换只重绘正文 |
 | `src/core/` | 纯逻辑核心：转换、检测、计划、分卷、差量、体积模型、引擎桥、脱敏分发与上传门禁 (`sanitize-share.js`)、双通道上游解析 (`upstream-resolver.js`)、五层体检 (`inspect.js`)、教程占位树 (`demo-tree.js`，扁平清单经真实 `buildChartTree()` 生成) |
 | `src/ui/` | 有 DOM 的界面层：模板、视图、宿主桥、待导出区、设置、体检视图、问题报告、传输面板；`vue/` 为渐进式迁移组件（`InspectModal.vue` 体检弹窗、`store.js` 响应式状态出口） |
 | `src/storage/` | IndexedDB 封装 |
@@ -72,15 +72,19 @@ translation: pending
 
 `src/ui/` 下与本轮改动相关的四个模块：
 
-- `src/ui/issue-report.js`：环境采集与报告生成模块，在本地采集环境信息并脱敏后生成 Markdown，提供本地预览、直达 GitHub 新 Issue 链接与携带自备凭据的 API 提交两条出口。
+- `src/ui/issue-report.js`：环境采集与报告生成模块，在本地采集环境信息并脱敏后生成 Markdown；新增 GitHub Issue Forms YAML 模板的同步与解析（本地 yml 优先、本仓 raw 次之、内置最小模板兜底），按模板 body 动态组装正文；前置勾选满足判定与缺失清单；双通道动态解析本仓与上游坐标（不做硬编码），据此生成议题搜索页链接与文档仓库链接；报告预览支持原文与渲染两种模式，原文逐字转义、渲染走安全 Markdown 子集。日志级别聚合由纯函数 `filterEntriesByMinLevel()` 完成：logger 的 `getEntries()` 是精确等值过滤而非「≥」，因此级别聚合必须自行比较；比较依据 `ISSUE_LEVEL_ORDER`（DEBUG:10／INFO:20／SUCCESS:20／WARN:30／ERROR:40），`info` 档显式包含 SUCCESS，避免与 INFO 同优先级的成功类审计条目被静默丢弃。GitHub 新 Issue 出口改用 `buildGitHubNewIssueUrlSafe()`，URL 超过 `MAX_ISSUE_URL_LENGTH`（8000）时返回 `{ok:false, reason:'too-long', suggestion:'copy-markdown'}`，由调用方提示改用复制，不再静默产出不可用链接。
 - `src/ui/settings-store.js`：设置持久化模块，在浏览器 localStorage 与宿主 `settings.json` 之间同步设置，按凭据各自存放位置剥离仅浏览器的敏感项；读取或写入失败时静默回落默认值，不阻塞主路径。
 - `src/ui/vue/InspectModal.vue`：A~E 五层体检结果弹窗，按层展示结论并给出总体判定；接收 `isOpen` / `report` / `title`，在报告合格且带文件时允许存入工作区，向外发出 `close` 与 `save-to-workspace`。
 - `src/ui/vue/store.js`：Vue 3 响应式状态中心，以 `reactive` 集中管理包、选中项、当前分区与弹窗等状态，用 `computed` 派生视图数据，并通过具名函数收敛状态变更（单向数据流）。
 - `src/ui/vue/mount.js`：体检弹窗的渐进式挂载适配器，用 `createApp` + `h()` 渲染 Vue 组件；Vue 不可用或容器缺失时返回 `null` 静默降级，绝不影响主路径。
-- `src/ui/settings-panel.js`：设置面板渲染与交互模块，问题报告组经 `[data-issue-action]` 事件委托提供复制报告 / 导出 MD / 新建 Issue 三个出口，剪贴板失败降级 textarea + execCommand。
+- `src/ui/settings-panel.js`：设置面板渲染与交互模块；问题报告表单含模板下拉与按模板生成的动态字段、平台与账号只读下拉（令牌始终取本机专用存储，不随账号切换）、日志实时统计与附带勾选、两项强制前置确认勾选、原文／渲染切换按钮组，以及本仓与上游双线跳转按钮（坐标缺失时置灰并提示未提供）；owner/repo 输入框已移除，仅保留隐藏兼容字段；仍经 `[data-issue-action]` 事件委托提供复制报告／导出 MD／新建 Issue 三个出口。问题报告的附带日志新增级别与条数两个下拉：`SETTINGS_DEFAULTS` 默认 `issueLogLevel:'warn'`、`issueLogCount:'100'`（安全最小化），白名单限定 level 为 all/debug/info/warn/error、count 为 50/100/200/500/all；两下拉带 `aria-describedby="issue-log-summary"`，统计行 `#issue-log-summary` 用 `role="status"` 播报、并有独立调试提示行 `#issue-log-debug-hint`。下拉的禁用态与统计文案由纯函数 `applyIssueLogControlsState(includeLogs, level, count)` 计算并返回 `{disabled, summaryText, debugHintText}`，避免散落的状态判断；无匹配日志时文案用 `issue.logEmptyAtLevel`（无括号的「暂无{level}日志」）。new-issue 出口按 `buildGitHubNewIssueUrlSafe()` 的三种 reason（too-long／no-coords／ok）分流处理。
 - `syncPackagesFromState`（`src/ui/vue/store.js` + `index.js` 三处调用）：包列表从命令式状态单向同步进 Vue 响应式 store，全部 fire-and-forget 且吞异常，绝不阻塞主路径。
 - `scripts/i18n-guard.js`：UI 中文硬编码守卫；扫描 `.js` 与 `.vue`，`stripVueNonText()` 剥离 `<style>` 与注释后再检测，避免 SFC 样式与注释误报。
 - `scripts/control-consumer-guard.js`：控件消费点守卫；只覆盖 `src/ui/workbench-template.js` 静态模板，运行时字符串拼装控件（如设置面板按钮）不在其范围，文件头已注明该边界。
+- `src/ui/inspect-view.js`：体检结果展示模块。**体检外部文件独立入口已移除**——体检只跟随包卡（点包卡看报告），不再从设置或工具栏单独选择本地文件；`mountInspectPanel` 的 `onPickFile` 形参与容器保留仅为兼容既有调用方。
+- `src/core/logger.js`：日志采集与脱敏核心。新增 `scrubDetailKeys(value)` 做键名级脱敏，递归折叠命中敏感键名（token／secret／password／api_key／credential／cookie 等）的值，带循环引用保护与 8 层深度上限；`redact()` 在原有 12 条规则之外追加 4 条：查询参数扩展、单引号密码、Google API Key、HuggingFace 凭据。
+
+本仓规则真源位于 `.trellis/spec/guides/` 四件套：`rule-catalog.md` 为 30 条判据，`rule-details.md` 为 95 条细则，`iron-rules.md` 为 45 条注入铁律，`rule-triggers.md` 为触发索引。四者条数口径不同但各自生效，引用时需指明是哪一份。
 
 核心层不得依赖 DOM；界面层不得反向持有宿主判断。平台差异集中在宿主桥接层。
 

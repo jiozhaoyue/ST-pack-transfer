@@ -187,6 +187,8 @@ describe('gitMode=keep（默认，零行为变化）', () => {
       `${EXT_ROOT}/.git/HEAD`,
       `${EXT_ROOT}/.git/config`,
       `${EXT_ROOT}/.git/description`,
+      // A 修复：扩展 .git/** 交还 gitMode，KEEP 下 hooks/*.sample 也保留
+      `${EXT_ROOT}/.git/hooks/pre-commit.sample`,
       `${EXT_ROOT}/.git/index`,
       `${EXT_ROOT}/.git/objects/ab/cdef0123456789abcdef0123456789abcdef01`,
       `${EXT_ROOT}/.git/objects/pack/pack-deadbeef.pack`,
@@ -365,30 +367,31 @@ describe('gitMode 与 extensionMode=manifest 的联动', () => {
 
 describe('plan-preview 的 gitMode 预测', () => {
   const extItems = (plan) => plan.categories.extensions.items;
-  /** 受 gitMode 管辖的 .git 条目。 */
+  /** 受 gitMode 管辖的 .git 条目。A 修复后 hooks/logs 也在此列（不再由 junk 清洗先手丢弃）。 */
   const managedGitItems = (plan) => extItems(plan).filter((i) => i.hubPath.includes('/.git/'));
-  /** 由**既有 junk 清洗**先手丢弃的 .git 条目（hooks/logs）——gitMode 不得改变它们的理由。 */
-  const junkGitItems = (plan) => extItems(plan)
+  /** 扩展 .git/hooks、.git/logs 条目——A 修复后随 .git/** 交还 gitMode 策略门。 */
+  const hooksLogsItems = (plan) => extItems(plan)
     .filter((i) => i.hubPath.includes('/.git/hooks/') || i.hubPath.includes('/.git/logs/'));
 
-  it('keep：.git 条目按原动作预测，且无 .keep 合成项；junk 清洗维持原判', async () => {
+  it('keep：全部 .git 条目（含 hooks/logs）保留，无 .keep 合成项', async () => {
     const plan = await generatePlan(await planBlob(allEntries()), TARGETS.ST, {
       extensionMode: 'full',
     });
-    const managed = managedGitItems(plan).filter((i) => !junkGitItems(plan).includes(i));
+    const managed = managedGitItems(plan);
     expect(managed.length).toBeGreaterThan(0);
     expect(managed.every((i) => i.action !== ACTIONS.DROP)).toBe(true);
-    // .git/hooks/* 一直由 isJunkOrDevFile 清洗，与 gitMode 无关——这条是防回归断言
-    expect(junkGitItems(plan).every((i) => i.reason.includes('安全清洗'))).toBe(true);
+    // A 修复：hooks/logs 不再被 isJunkOrDevFile 先手清洗，而是随 .git/** 交还 gitMode（KEEP 全留）
+    expect(hooksLogsItems(plan).length).toBeGreaterThan(0);
+    expect(hooksLogsItems(plan).every((i) => i.action !== ACTIONS.DROP)).toBe(true);
     expect(plan.synthesizedItems.some((s) => s.targetPath.endsWith('/.git/objects/.keep'))).toBe(false);
   });
 
-  it('strip：受管辖的 .git 条目全部预测为 DROP，且理由为 strip 文案', async () => {
+  it('strip：受管辖的 .git 条目（含 hooks/logs）全部预测为 DROP，且理由为 strip 文案', async () => {
     const plan = await generatePlan(await planBlob(allEntries()), TARGETS.ST, {
       extensionMode: 'full',
       gitMode: GIT_MODES.STRIP,
     });
-    const managed = managedGitItems(plan).filter((i) => !junkGitItems(plan).includes(i));
+    const managed = managedGitItems(plan);
     expect(managed.length).toBeGreaterThan(0);
     expect(managed.every((i) => i.action === ACTIONS.DROP)).toBe(true);
     expect(managed.every((i) => i.reason.includes('gitMode=strip'))).toBe(true);

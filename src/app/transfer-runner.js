@@ -28,6 +28,7 @@ import {
   hexToBytes,
   randomBytes,
 } from '../core/s3-crypto.js';
+import { preUploadGuard } from '../core/sanitize-share.js';
 
 function toHex(buffer) {
   return [...new Uint8Array(buffer)].map((b) => b.toString(16).padStart(2, '0')).join('');
@@ -112,10 +113,19 @@ export function createTransferRunner({
     return present;
   }
 
-  async function upload({ blob, name, sha256 = '', contentType = 'application/zip', entryCount = null } = {}) {
+  async function upload({ blob, name, sha256 = '', contentType = 'application/zip', entryCount = null, entriesForGuard = null } = {}) {
     if (!target?.ready) return { ok: false, code: 'not-configured' };
     if (!blob || typeof blob.slice !== 'function') return { ok: false, code: 'bad-input' };
     if (aborted()) return { ok: false, code: 'aborted' };
+
+    // 本地脱敏检测门禁：未通过检查直接硬阻断上传，绝不向外网发送数据
+    if (Array.isArray(entriesForGuard)) {
+      try {
+        preUploadGuard(entriesForGuard);
+      } catch (guardErr) {
+        return { ok: false, code: 'sensitive-guard-blocked', reason: guardErr.message };
+      }
+    }
 
     const size = Number(blob.size) || 0;
     const chunks = planChunks(size, chunkSize);

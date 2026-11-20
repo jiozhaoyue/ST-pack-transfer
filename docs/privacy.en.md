@@ -44,7 +44,7 @@ In **Settings → Privacy** each credential type can be stored independently:
 
 - **Local-only processing**: unpacking, cleaning, and rebuilding packages happen in your browser; no third-party relay server is involved.
 - **Controlled network requests**: the only outbound requests are Git repository status checks you trigger in extension management, or cloud backups you configure yourself.
-- **Masked everywhere**: token and secret values are masked in input echoes, logs, and downloaded reports (for example `ghp_…3456`), so screenshots and shared logs do not leak them.
+- **Masked exports and reports**: Tokens and secrets in exported logs and issue reports are masked by the unified redaction layer; the live log panel shows raw text, inputs are password-masked.
 
 ## Pulling private repositories
 
