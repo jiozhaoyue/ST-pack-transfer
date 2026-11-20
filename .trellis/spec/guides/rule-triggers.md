@@ -70,6 +70,7 @@
 | 计划 / PRD / 任务 | `guides/iron-rules.md` 第 2 条 | 2 |
 | 检索 / 造轮子 | `guides/code-reuse-thinking-guide.md` | 3 |
 | 后端 / Authority / 服务端 / 增强 / 降级 / 适配器 | guides/iron-rules.md（铁律 41）+ guides/rule-details.md D-95 + rule-catalog.md R-20 | 41 |
+| zcode / 会话铁律 / 猜测 / 臆测 / 精确探测 / 10 秒 / hy4 / 子代理并发 / 看板 / 串联 / 全层同步 | `guides/iron-rules.md` 第 45 条 | 45 |
 
 ## 七、使用方式
 

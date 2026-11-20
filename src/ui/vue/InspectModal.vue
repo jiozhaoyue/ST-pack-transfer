@@ -1,0 +1,272 @@
+<template>
+  <div v-if="isOpen" class="inspect-modal-overlay" @click.self="handleClose">
+    <div class="inspect-modal-card" role="dialog" aria-modal="true">
+      <header class="modal-header">
+        <div class="modal-title-wrap">
+          <span class="icon">🩺</span>
+          <h3 class="modal-title">{{ title || '数据包体检报告' }}</h3>
+        </div>
+        <button type="button" class="close-btn" @click="handleClose" aria-label="关闭">×</button>
+      </header>
+
+      <div class="modal-body">
+        <!-- 总体结论横幅 -->
+        <div :class="['verdict-banner', verdictStatus]">
+          <span class="verdict-icon">{{ verdictStatus === 'pass' ? '✓' : '⚠' }}</span>
+          <span class="verdict-text">{{ report?.verdict || '正在分析数据包结构...' }}</span>
+        </div>
+
+        <!-- A~E 五层分级展示 -->
+        <div class="layers-list">
+          <section class="layer-item" v-for="(layer, key) in layers" :key="key">
+            <header class="layer-head">
+              <span class="layer-badge">{{ layer.code }}</span>
+              <span class="layer-name">{{ layer.name }}</span>
+              <span :class="['layer-status', layer.ok ? 'ok' : 'warn']">
+                {{ layer.ok ? '正常' : '异常' }}
+              </span>
+            </header>
+            <div class="layer-content">
+              <p class="layer-desc">{{ layer.summary }}</p>
+              <ul v-if="layer.details?.length" class="layer-details">
+                <li v-for="(item, idx) in layer.details" :key="idx">{{ item }}</li>
+              </ul>
+            </div>
+          </section>
+        </div>
+      </div>
+
+      <footer class="modal-footer">
+        <button type="button" class="btn btn-secondary" @click="handleClose">关闭</button>
+        <!-- 高价值新特性：体检合格后一键存入工作区 -->
+        <button
+          v-if="canSaveToWorkspace"
+          type="button"
+          class="btn btn-primary save-btn"
+          @click="handleSaveToWorkspace"
+        >
+          存入工作区
+        </button>
+      </footer>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { computed } from 'vue';
+
+const props = defineProps({
+  isOpen: { type: Boolean, default: false },
+  report: { type: Object, default: () => null },
+  title: { type: String, default: '' },
+});
+
+const emit = defineEmits(['close', 'save-to-workspace']);
+
+const verdictStatus = computed(() => {
+  return props.report?.ok ? 'pass' : 'warn';
+});
+
+const canSaveToWorkspace = computed(() => {
+  return props.report?.blob && props.report?.ok;
+});
+
+const layers = computed(() => {
+  const r = props.report || {};
+  return {
+    layerA: { code: 'A', name: '文件字节', ok: !r.emptyFile && !r.truncated, summary: r.layerA?.summary || '文件头与基础签名检测' },
+    layerB: { code: 'B', name: 'ZIP 结构', ok: !r.corruptZip, summary: r.layerB?.summary || '中央目录及 EOCD 校验' },
+    layerC: { code: 'C', name: '条目画像', ok: true, summary: `条目总数: ${r.entryCount || 0}，空条目: ${r.zeroByteCount || 0}` },
+    layerD: { code: 'D', name: '语义识别', ok: !!r.layout, summary: `检测宿主布局: ${r.layout || '未识别'}` },
+    layerE: { code: 'E', name: '可转换性', ok: r.convertible ?? true, summary: r.convertible ? '满足转换要求' : '部分资源需丢弃' },
+  };
+});
+
+function handleClose() {
+  emit('close');
+}
+
+function handleSaveToWorkspace() {
+  if (props.report?.blob) {
+    emit('save-to-workspace', props.report);
+  }
+}
+</script>
+
+<style scoped>
+.inspect-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  padding: 16px;
+}
+
+.inspect-modal-card {
+  width: 100%;
+  max-width: 620px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--SmartThemeBodyColor, #1a1a1a);
+  border: 1px solid var(--SmartThemeBorderColor, #333);
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+  color: var(--SmartThemeQuoteColor, #e0e0e0);
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--SmartThemeBorderColor, #333);
+}
+
+.modal-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.modal-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.close-btn {
+  background: transparent;
+  border: none;
+  font-size: 20px;
+  color: #888;
+  cursor: pointer;
+}
+
+.close-btn:hover {
+  color: #fff;
+}
+
+.modal-body {
+  padding: 16px 18px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.verdict-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.verdict-banner.pass {
+  background: rgba(76, 175, 80, 0.15);
+  border: 1px solid rgba(76, 175, 80, 0.4);
+  color: #81c784;
+}
+
+.verdict-banner.warn {
+  background: rgba(255, 152, 0, 0.15);
+  border: 1px solid rgba(255, 152, 0, 0.4);
+  color: #ffb74d;
+}
+
+.layers-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.layer-item {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.layer-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.layer-badge {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: bold;
+}
+
+.layer-name {
+  font-size: 13px;
+  font-weight: 600;
+  flex: 1;
+}
+
+.layer-status {
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.layer-status.ok {
+  color: #81c784;
+  background: rgba(76, 175, 80, 0.1);
+}
+
+.layer-status.warn {
+  color: #ffb74d;
+  background: rgba(255, 152, 0, 0.1);
+}
+
+.layer-desc {
+  margin: 0;
+  font-size: 12px;
+  color: #aaa;
+}
+
+.modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 12px 18px;
+  border-top: 1px solid var(--SmartThemeBorderColor, #333);
+}
+
+.btn {
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.btn-secondary {
+  background: rgba(255, 255, 255, 0.08);
+  color: #ccc;
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.btn-primary {
+  background: #e53935;
+  color: #fff;
+}
+
+.btn-primary:hover {
+  background: #f44336;
+}
+</style>

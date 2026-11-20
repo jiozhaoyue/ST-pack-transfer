@@ -59,8 +59,8 @@ translation: pending
 | --- | --- |
 | `index.html` | 独立 Web 的空骨架，只提供 `#app` 容器 |
 | `index.js` | 根控制器：宿主嗅探、动作绑定、启动 |
-| `src/core/` | 纯逻辑核心：转换、检测、计划、分卷、差量、体积模型、引擎桥 |
-| `src/ui/` | 有 DOM 的界面层：模板、视图、宿主桥、待导出区、设置、传输面板 |
+| `src/core/` | 纯逻辑核心：转换、检测、计划、分卷、差量、体积模型、引擎桥、脱敏分发与上传门禁 (`sanitize-share.js`)、双通道上游解析 (`upstream-resolver.js`)、五层体检 (`inspect.js`)、教程占位树 (`demo-tree.js`，扁平清单经真实 `buildChartTree()` 生成) |
+| `src/ui/` | 有 DOM 的界面层：模板、视图、宿主桥、待导出区、设置、体检视图、问题报告、传输面板；`vue/` 为渐进式迁移组件（`InspectModal.vue` 体检弹窗、`store.js` 响应式状态出口） |
 | `src/storage/` | IndexedDB 封装 |
 | `src/data/` | 目标平台、UI 令牌、演示数据等可读配置 |
 | `src/vendor/` | 本地依赖副本，勿升级改动 |

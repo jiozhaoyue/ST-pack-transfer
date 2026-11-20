@@ -144,6 +144,12 @@ Managed by mini-trellis. Edits outside this block are preserved.
 10. **教程结构被动镜像真实**（MUST，2026-11-17 用户明令）：教程占位包树必须由
     `src/core/demo-tree.js` 的扁平清单交给真实 `buildChartTree()` 生成，禁止手写分组树；
     仍然不得读取真实包、不得塞真实实例包。结构变化由真实分组规则被动带动，不靠人工同步。
+11. **zcode 会话全程铁律生效**（MUST，用户明令）：在 zcode 环境工作时，`iron-rules.md` 第 45 条
+    （zcode 会话全程铁律）**在每一次会话、全部时段**生效——不限于 agy，不限于任何单一宿主或单一项目。完整条文见
+    `.trellis/spec/guides/iron-rules.md` 第 45 条；zcode 全局副本见 `~/.zcode/AGENTS.md` 第 12 节。
+    要点：绝对禁止猜测（按名字精确探测）、单命令 10 秒硬死线、全程出声、
+    子代理单轮全并发且模型只能是 `new-provider/opencodego/hy4-flash-free$enabled`、
+    禁止看板中转、规则变更三层同步（全局 / 本仓 iron-rules / 本文件）。
 
 # 项目概览 (ST-pack-transfer)
 
@@ -158,14 +164,14 @@ SillyTavern / Luker / TauriTavern / PureTavern 数据包互转工具，三形态
 - `src/ui/` — UI 模块（可 DOM）：`workbench-template.js`（HTML 模板唯一来源，`getWorkbenchHtml()` 无参数）、`workbench-view.js`（视图渲染：图表 / 选择树 / 配额 / 设置视图）、`host-bridge.js`（宿主嗅探/CSRF/备份拉取/恢复/扩展安装器，**含 `hostLayoutCode()`：宿主平台 luker→l 映射，宿主导出 target 必须经它归一**）、`export-queue.js`（产物待导出区）、`lan-transfer-panel.js`、`settings-panel.js`、`chat-store-bridge.js` / `chat-store-inject.js`（聊天库唯一接缝）、`qr.js`、`escape.js`；根 `index.js` 是根控制器
 - `src/storage/db.js` — IndexedDB 封装（DB_VERSION 2，files store 带 `origin` 字段：upload/host-export/converted/delta/split-part）
 - `src/vendor/` — zip.js / fzstd 本地副本，勿升级改动
-- `test/` — Vitest（**已纳入版本控制**，见 `.gitignore` 注记「测试目录按用户最新要求不再忽略」；`npm test` 当前 1414 passed / 2 skipped）
+- `test/` — Vitest（**已纳入版本控制**，见 `.gitignore` 注记「测试目录按用户最新要求不再忽略」；`npm test` 当前 1568 passed / 0 skipped，165 files，2026-11-20 全量回归实测）
 - `docs/superpowers/specs/` 与 `docs/superpowers/plans/` — 设计规格与实施计划；`docs/research/` — Luker 机制研究报告
 - `.trellis/` — Trellis 任务系统（见上方 TRELLIS 块）
 
 ## 常用命令
 
 ```bash
-npm test          # Vitest 全量（当前 1414 passed / 2 skipped；test/ 已纳入版本控制）
+npm test          # Vitest 全量（当前 1568 passed / 0 skipped，165 files，2026-11-20 实测；test/ 已纳入版本控制）
 npx vitest run test/xxx.test.js   # 单文件
 npm run build     # vite build --base=./
 npm run dev       # vite 开发服务器（独立模式手测）
