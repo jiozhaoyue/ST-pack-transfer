@@ -125,11 +125,27 @@ function handleSaveToWorkspace() {
 .inspect-modal-overlay {
   position: fixed;
   inset: 0;
-  z-index: 1000;
+  /* 层叠：须高于工作台模态 #st-converter-modal-overlay 的 10000（style.css:2146），
+     且低于教程浮层 #st-pt-tutorial-overlay 的 2147483000（style.css:1674）。 */
+  z-index: 10050;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.7);
+  /* 配色令牌分层：语义判定色固定（pass=绿 / warn=橙），不绑宿主随机色相令牌；
+     结构色（面板底 / 遮罩 / 描边）仍继承 --SmartTheme* 回退。
+     本浮层挂在 body 直系节点、非 #app 后代，故不依赖 style.css 的派生令牌。 */
+  --im-scrim: var(--SmartThemeShadowColor, rgba(0, 0, 0, 0.7));
+  --im-success-line: rgba(76, 175, 80, 0.4);
+  --im-success-tint: rgba(76, 175, 80, 0.15);
+  --im-success-soft: rgba(76, 175, 80, 0.1);
+  --im-warn-line: rgba(255, 152, 0, 0.4);
+  --im-warn-tint: rgba(255, 152, 0, 0.15);
+  --im-warn-soft: rgba(255, 152, 0, 0.1);
+  --im-surface-2: var(--SmartThemeBodyColorInverted, rgba(255, 255, 255, 0.02));
+  --im-surface-8: var(--SmartThemeBodyColorInverted, rgba(255, 255, 255, 0.08));
+  --im-surface-10: var(--SmartThemeBodyColorInverted, rgba(255, 255, 255, 0.1));
+  --im-surface-12: var(--SmartThemeBodyColorInverted, rgba(255, 255, 255, 0.12));
+  background: var(--im-scrim);
   backdrop-filter: blur(4px);
   padding: 16px;
 }
@@ -143,7 +159,7 @@ function handleSaveToWorkspace() {
   background: var(--SmartThemeBodyColor, #1a1a1a);
   border: 1px solid var(--SmartThemeBorderColor, #333);
   border-radius: 12px;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 12px 32px var(--SmartThemeShadowColor, rgba(0, 0, 0, 0.5));
   overflow: hidden;
   color: var(--SmartThemeQuoteColor, #e0e0e0);
 }
@@ -199,14 +215,14 @@ function handleSaveToWorkspace() {
 }
 
 .verdict-banner.pass {
-  background: rgba(76, 175, 80, 0.15);
-  border: 1px solid rgba(76, 175, 80, 0.4);
+  background: var(--im-success-tint);
+  border: 1px solid var(--im-success-line);
   color: var(--SmartThemeEmColor, #81c784);
 }
 
 .verdict-banner.warn {
-  background: rgba(255, 152, 0, 0.15);
-  border: 1px solid rgba(255, 152, 0, 0.4);
+  background: var(--im-warn-tint);
+  border: 1px solid var(--im-warn-line);
   color: var(--SmartThemeQuoteColor, #ffb74d);
 }
 
@@ -217,10 +233,10 @@ function handleSaveToWorkspace() {
 }
 
 .layer-item {
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--im-surface-8);
   border-radius: 8px;
   padding: 10px 12px;
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--im-surface-2);
 }
 
 .layer-head {
@@ -231,7 +247,7 @@ function handleSaveToWorkspace() {
 }
 
 .layer-badge {
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--im-surface-10);
   padding: 2px 6px;
   border-radius: 4px;
   font-size: 11px;
@@ -252,12 +268,12 @@ function handleSaveToWorkspace() {
 
 .layer-status.ok {
   color: var(--SmartThemeEmColor, #81c784);
-  background: rgba(76, 175, 80, 0.1);
+  background: var(--im-success-soft);
 }
 
 .layer-status.warn {
   color: var(--SmartThemeQuoteColor, #ffb74d);
-  background: rgba(255, 152, 0, 0.1);
+  background: var(--im-warn-soft);
 }
 
 .layer-desc {
@@ -284,9 +300,9 @@ function handleSaveToWorkspace() {
 }
 
 .btn-secondary {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--im-surface-8);
   color: var(--SmartThemeBodyColor, #ccc);
-  border-color: rgba(255, 255, 255, 0.12);
+  border-color: var(--im-surface-12);
 }
 
 .btn-primary {

@@ -4,7 +4,8 @@
  * 核心机制（依蜂群推演与规范）：
  * 1. 通道一（当前本仓）：动态识别当前运行实例（从 Git origin、宿主 extension-sources 或 window.location 推导）；
  * 2. 通道二（官方上游）：动态收束至原始根仓库（优先通过 GitHub API source 动态反查，离线时通过 Git 历史根/元数据回退）；
- * 3. 零代码硬编码：代码中不硬写死业务 URL，全部通过动态解析与派生链图谱推导；
+ * 3. upstream 坐标支持 remote/API 动态溯源，解析失败时回落内置默认仓（offline-default），
+ *    provenance 字段如实区分「动态溯源」与「内置默认兜底」两种来源（见第 4 条与 G-34）；
  * 4. 离线静默降级（D-03/G-34）：离线或无法识别时如实输出 'unavailable'，绝不阻塞主路径。
  */
 
@@ -147,7 +148,9 @@ export async function resolveUpstreamChannels(options = {}) {
         // 如果是 Fork，GitHub 自动在 source 字段提供最顶层最早上游根
         if (data.fork && data.source && data.source.html_url) {
           upstreamResult = parseGitHubUrl(data.source.html_url);
-          provenance = 'github-api-lineage';
+          // 仅当 source 真实解析成功才算动态溯源；解析失败（null）交由第 4 步托底为 offline-default，
+          // 不得让 provenance 虚假停留在 'github-api-lineage'（G-34）。
+          if (upstreamResult) provenance = 'github-api-lineage';
         } else if (!data.fork) {
           // 当前本身就是根仓
           upstreamResult = detectedCurrent;
@@ -155,8 +158,8 @@ export async function resolveUpstreamChannels(options = {}) {
         }
       }
     } catch (err) {
-      // 离线/网络故障时静默降级，不阻断
-      logger.info(`[upstream-resolver] GitHub API 动态溯源离线降级: ${err?.message || err}`);
+      // 离线/网络故障时降级但不静默：WARN 级别在默认阈值下可见（R-30），不阻断主路径
+      logger.warn(`[upstream-resolver] GitHub API 动态溯源离线降级: ${err?.message || err}`);
     } finally {
       // 外层兜底：异常早于内层 try 建立定时器对照时，保证不遗留定时器
       if (timeoutId !== null) {
@@ -167,6 +170,7 @@ export async function resolveUpstreamChannels(options = {}) {
   }
 
   // 4. 离线/无网络时的权威托底通道（锁定官方最早上游根）
+  //    provenance = 'offline-default' 如实标注：坐标来自内置默认仓，而非任何动态溯源结果（G-34）。
   if (!upstreamResult) {
     upstreamResult = {
       owner: DEFAULT_ROOT_OWNER,
@@ -175,6 +179,7 @@ export async function resolveUpstreamChannels(options = {}) {
       docsUrl: `https://${DEFAULT_ROOT_OWNER}.github.io/${DEFAULT_ROOT_REPO}/`,
       issuesUrl: `https://github.com/${DEFAULT_ROOT_OWNER}/${DEFAULT_ROOT_REPO}/issues`,
     };
+    provenance = 'offline-default';
   }
 
   const isFork = (detectedCurrent.owner.toLowerCase() !== upstreamResult.owner.toLowerCase())

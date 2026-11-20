@@ -1610,10 +1610,13 @@
   /* 禁止 view-body 出现横向滚动条（G-17） */
   #app.app-container #view-settings .view-body{overflow-x:hidden}
 
-  /* 320px 级窄屏：双下拉折成两行，避免 iOS 原生 select 箭头把 268px 撑破 */
-  @media (max-width:360px){
+  /* 375/390px 目标机窄屏：双下拉折成两行，避免 iOS 原生 select 箭头把容器撑破（R-13/G-17）。
+     断点从 360px 抬到 390px，覆盖 360<宽度≤375 的原有空档（375/390 目标机不再撑破）。 */
+  @media (max-width:390px){
     #app.app-container #view-settings .issue-log-row{flex-wrap:wrap}
     #app.app-container #view-settings .issue-log-row > label.et-git{flex:1 1 100%}
+    /* 折行后每行 select 仍可收缩，min-width:0 防原生箭头撑破（不新增裸选择器）。 */
+    #app.app-container #view-settings .issue-log-row select{min-width:0;max-width:100%}
   }
 
   /* 其它设置行 / 字段 / 短按钮同样禁止拆字；长说明文字（.ext-note / .check）不受影响。 */

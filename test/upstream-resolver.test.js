@@ -130,7 +130,7 @@ describe('Upstream Channels Resolver Suite', () => {
       expect(result.provenance).toBe('git-upstream-remote');
     });
 
-    it('网络故障/离线时静默降级为官方托底，不抛错且标记正确', async () => {
+    it('网络故障/离线时降级为官方托底，不抛错且 provenance 如实标记 offline-default', async () => {
       const failingFetch = async () => {
         throw new Error('Network offline');
       };
@@ -141,8 +141,31 @@ describe('Upstream Channels Resolver Suite', () => {
       });
 
       expect(result.current.owner).toBe('offline-user');
+      // 内置默认仓坐标（非动态溯源）
       expect(result.upstream.owner).toBe('jiozhaoyue');
+      expect(result.upstream.repo).toBe('ST-pack-transfer');
       expect(result.isFork).toBe(true);
+      // 解析失败路径不得虚假标记 github-api-lineage（G-34）
+      expect(result.provenance).toBe('offline-default');
+    });
+
+    it('API 返回非法 source URL（parseGitHubUrl 为 null）时 provenance 为 offline-default', async () => {
+      const badSourceFetch = async () => ({
+        ok: true,
+        json: async () => ({
+          fork: true,
+          source: { html_url: 'https://gitlab.com/not-github/repo' },
+        }),
+      });
+
+      const result = await resolveUpstreamChannels({
+        currentRemoteUrl: 'https://github.com/someone/ST-pack-transfer.git',
+        fetchFn: badSourceFetch,
+      });
+
+      expect(result.upstream.owner).toBe('jiozhaoyue');
+      expect(result.upstream.repo).toBe('ST-pack-transfer');
+      expect(result.provenance).toBe('offline-default');
     });
   });
 });

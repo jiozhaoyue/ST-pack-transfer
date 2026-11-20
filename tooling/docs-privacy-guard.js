@@ -106,6 +106,15 @@ function ignoredInDocs() {
 const IGNORED = ignoredInDocs();
 const skipped = [];
 
+/**
+ * 文件级白名单：HANDOFF 交接文档虽属内部交接产物，但按用户 2026-11 要求入库，
+ * 文件名含"交接"语义而非对外隐私内容，故按文件名放行，不进日期 / 本机路径等内容检查。
+ */
+const FILE_ALLOWLIST = [
+  /^docs\/HANDOFF-[^/]+\.md$/i,
+];
+const allowlisted = [];
+
 /** 目录整体被忽略时，git 只列目录里的文件，故按前缀判断。 */
 function isIgnoredDir(rel) {
   const prefix = `${rel}/`;
@@ -126,6 +135,10 @@ function walk(dir, prefix = 'docs') {
   for (const entry of entries) {
     const rel = `${prefix}/${entry.name}`;
     const full = join(dir, entry.name);
+    if (FILE_ALLOWLIST.some((re) => re.test(rel))) {
+      allowlisted.push(rel);
+      continue;
+    }
     if (entry.isDirectory()) {
       if (FORBIDDEN_NAMES.some((re) => re.test(entry.name))) {
         if (isIgnoredDir(rel)) {
@@ -181,6 +194,10 @@ if (hits.length) {
 }
 
 console.log(`docs 隐私守卫通过：${topEntries.length} 个公开条目，无日期 / Trellis / 本机路径 / 凭据内容`);
+if (allowlisted.length) {
+  console.log(`按文件白名单放行 ${allowlisted.length} 项（HANDOFF 交接文档，按用户要求入库）：`);
+  for (const item of allowlisted) console.log(`  - ${item}`);
+}
 if (skipped.length) {
   console.log(`按 .gitignore 跳过 ${skipped.length} 项（不进 Pages 检出树）：`);
   for (const item of skipped) console.log(`  - ${item}`);

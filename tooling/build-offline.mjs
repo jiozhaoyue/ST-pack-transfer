@@ -21,6 +21,7 @@ import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { build } from 'vite';
+import vue from '@vitejs/plugin-vue';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const OUT_DIR = 'dist-offline';
@@ -73,9 +74,18 @@ async function main() {
     base: './',
     logLevel: 'warn',
     publicDir: false,
+    // configFile:false 会跳过 vite.config.js，必须在显式配置里注册同一插件，
+    // 否则 .vue SFC 被当纯 JS 解析（RollupError: Expression expected）。
+    plugins: [vue()],
     define: {
       __ST_ZIP_OFFLINE__: 'true',
       'globalThis.__ST_ZIP_OFFLINE__': 'true',
+      // 浏览器无 process：Vue esm-bundler 产物含大量 process.env.NODE_ENV 引用，
+      // 必须在此显式替换，否则离线包运行时 ReferenceError: process is not defined 整页白屏
+      // （2026-11-21 实证：306 处未替换导致 file:// 白屏，主构建 vite.config.js 不受影响）。
+      // 此为全局文本替换：仅影响本离线浏览器包；主构建走 vite.config.js 不受影响；
+      // 新增依赖若依赖 NODE_ENV 分支（如 process.env.NODE_ENV !== 'production'）需在此复核。
+      'process.env.NODE_ENV': JSON.stringify('production'),
     },
     resolve: {
       alias: [

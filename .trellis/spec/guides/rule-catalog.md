@@ -2,13 +2,13 @@
 
 **版本** v1.1.0 ｜ **生效** <DATE> ｜ **条数** 30 / 上限 30
 
-配套文件：**`rule-details.md`**（82 条技术细则，逐条挂到下列规则并附原文证据）。
+配套文件：**`rule-details.md`**（95 条技术细则，逐条挂到下列规则并附原文证据）。
 
 本文件是本仓全部 agent（Claude Code / Codex / Cursor / Gemini / Copilot / OpenCode / zcode / agy / WorkBuddy 等）的**唯一规则真源**。
 
 **阅读顺序（三条前置）**
 
-1. 动手前先读本文件，24 条一次读完，不超过 3 分钟。
+1. 动手前先读本文件，30 条一次读完，不超过 3 分钟。
 2. 其它规则文件（`AGENTS.md` / `CLAUDE.md` / `GEMINI.md` / `.cursor/rules/*.mdc` / `.github/copilot-instructions.md`）**只放指针，不放条文**。
 3. 声称完成前跑 `npm run verify:rules`；失败即未完成。
 
@@ -325,7 +325,7 @@ web / 手机 / 竖屏三种形态下：功能按钮必须全部显示、不得�
 
 自动覆盖 16 / 30 条。人工条目在 PR 描述里必须写明复核方式。
 
-**细则**：`rule-details.md` 共 82 条（D-01~D-82），每条必须挂到上表中存在的规则 ID；出现悬空 ID 时 `details-coverage` 失败。
+**细则**：`rule-details.md` 共 95 条（D-01~D-95），每条必须挂到上表中存在的规则 ID；出现悬空 ID 时 `details-coverage` 失败。
 
 ---
 

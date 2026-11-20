@@ -23,6 +23,27 @@ describe('宿主直装守卫 · 只能在打包器里成立的写法', () => {
     expect(v[0].reason).toContain('裸包名');
   });
 
+  it('src/ui/vue/ 下的 vue 裸包名豁免（vite 构建产物专用，宿主直装由 mount.js 静默降级）', () => {
+    // 真实 store.js 的导入形态：具名导入 'vue'
+    expect(checkBundlerOnly("import { reactive, computed, ref } from 'vue';\n", 'src/ui/vue/store.js')).toEqual([]);
+    expect(checkBundlerOnly("import { createApp } from 'vue';\n", 'src/ui/vue/mount.js')).toEqual([]);
+  });
+
+  it('反向断言：src/ui/vue/ 之外或其他裸包名仍一律拦截', () => {
+    // 目录不对：即使 spec 是 'vue' 也不放行
+    const outside = checkBundlerOnly("import { reactive } from 'vue';\n", 'src/core/store.js');
+    expect(outside).toHaveLength(1);
+    expect(outside[0].reason).toContain('裸包名');
+    // spec 不对：即使在 src/ui/vue/ 目录下，其他裸包名仍拦截
+    const otherPkg = checkBundlerOnly("import _ from 'lodash';\n", 'src/ui/vue/helper.js');
+    expect(otherPkg).toHaveLength(1);
+    expect(otherPkg[0].reason).toContain('裸包名');
+    // 典型反向：src/core/xxx.js 里 import 'lodash' 仍 FAIL
+    const coreLodash = checkBundlerOnly("import 'lodash';\n", 'src/core/xxx.js');
+    expect(coreLodash).toHaveLength(1);
+    expect(coreLodash[0].reason).toContain('裸包名');
+  });
+
   it('Vite 专有语法被拦', () => {
     expect(checkBundlerOnly("import a from './a.js?raw';\n")).toHaveLength(1);
     expect(checkBundlerOnly('const x = import.meta.env.MODE;\n')).toHaveLength(1);

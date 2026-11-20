@@ -1,4 +1,5 @@
-import { readFile } from 'node:fs/promises';
+import { readFile, readdir } from 'node:fs/promises';
+import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import postcss from 'postcss';
 
@@ -150,10 +151,125 @@ export function checkCssScope(css, file = '<css>') {
   return violations;
 }
 
+/**
+ * 递归收集目录下所有 `.vue` 文件（按路径排序，保证报告稳定）。
+ * 目录不存在返回空数组——守卫不应因目标目录缺失而崩溃。
+ */
+async function collectVueFiles(dir) {
+  let entries;
+  try {
+    entries = await readdir(dir, { withFileTypes: true });
+  } catch (error) {
+    if (error?.code === 'ENOENT') return [];
+    throw error;
+  }
+
+  const files = [];
+  for (const entry of entries) {
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) files.push(...await collectVueFiles(full));
+    else if (entry.isFile() && entry.name.endsWith('.vue')) files.push(full);
+  }
+  return files.sort();
+}
+
+/** 解析 `<style …>…</style>` 块，`scoped` 取自开始标签的属性串 */
+function extractStyleBlocks(vueSource) {
+  const blocks = [];
+  const re = /<style\b([^>]*)>([\s\S]*?)<\/style\s*>/gi;
+  let match;
+  while ((match = re.exec(vueSource)) !== null) {
+    blocks.push({ scoped: /\bscoped\b/.test(match[1]), css: match[2] });
+  }
+  return blocks;
+}
+
+/**
+ * 扫描 `src/ui/vue/**\/*.vue` 的 `<style>` 块（铁律 7 的 Vue scoped 盲区补防）。
+ *
+ * 判定三条：
+ * ① `scoped` 块：选择器由 Vue 注入的 data-v 属性物理隔离，视为合法（不要求挂四根），
+ *    但计入 `totalSelectors` 以便报告可观测。
+ * ② 非 `scoped` 块：按铁律 7 判定——必须挂四根之一，否则报错（防未来写全局样式绕过）。
+ * ③ 目录/文件不存在：返回空结果，不抛错。
+ */
+export async function checkVueScopes(vueDir) {
+  const result = { scannedFiles: [], totalSelectors: 0, violations: [] };
+  const files = await collectVueFiles(vueDir);
+
+  for (const file of files) {
+    const label = relative(process.cwd(), file).replace(/\\/g, '/') || file;
+    const source = await readFile(file, 'utf8');
+    const blocks = extractStyleBlocks(source);
+    let fileSelectors = 0;
+
+    for (const block of blocks) {
+      let root;
+      try {
+        root = postcss.parse(block.css, { from: label });
+      } catch (error) {
+        result.violations.push({
+          file: label,
+          line: error.line ?? 1,
+          column: error.column ?? 1,
+          selector: '<CSS 语法>',
+          message: `解析失败：${error.reason ?? error.message}`,
+        });
+        continue;
+      }
+
+      root.walkRules((rule) => {
+        if (insideKeyframes(rule)) return;
+        for (const selector of splitSelectors(rule.selector)) {
+          if (!selector.trim()) continue;
+          fileSelectors += 1;
+          if (block.scoped) continue; // ① data-v 隔离，合法
+          result.violations.push(...checkCssScopeOnRule(selector, rule, label)); // ②
+        }
+      });
+    }
+
+    result.scannedFiles.push({ file: label, scoped: blocks.some((b) => b.scoped), selectors: fileSelectors });
+    result.totalSelectors += fileSelectors;
+  }
+
+  return result;
+}
+
+/** 对单个选择器套用铁律 7（供非 scoped Vue 块复用，文案与 checkCssScope 完全一致） */
+function checkCssScopeOnRule(normalized, rule, file) {
+  const out = [];
+  const subject = subjectOf(normalized);
+  if (GLOBAL_SUBJECT.test(subject)) {
+    out.push({
+      file,
+      line: rule.source?.start?.line ?? 1,
+      column: rule.source?.start?.column ?? 1,
+      selector: normalized,
+      message: '样式主体不得是 body/html/:root/*（本文件与插件态共用，会落到宿主页面）',
+    });
+    return out;
+  }
+  if (!hasAllowedRoot(normalized)) {
+    out.push({
+      file,
+      line: rule.source?.start?.line ?? 1,
+      column: rule.source?.start?.column ?? 1,
+      selector: normalized,
+      message: '选择器必须以 #app.app-container / #st-converter-modal-overlay / #wb-detail-overlay / #st-pt-tutorial-overlay 为作用域根',
+    });
+  }
+  return out;
+}
+
 async function main() {
   const file = fileURLToPath(new URL('../style.css', import.meta.url));
   const css = await readFile(file, 'utf8');
   const violations = checkCssScope(css, 'style.css');
+
+  const vueDir = fileURLToPath(new URL('../src/ui/vue', import.meta.url));
+  const vue = await checkVueScopes(vueDir);
+  violations.push(...vue.violations);
 
   if (violations.length) {
     for (const item of violations) {
@@ -164,6 +280,11 @@ async function main() {
   }
 
   console.log('CSS 作用域检查通过：style.css');
+  console.log(`Vue <style> 作用域检查通过：${vue.scannedFiles.length} 个文件，${vue.totalSelectors} 个选择器`);
+  for (const item of vue.scannedFiles) {
+    const kind = item.scoped ? 'scoped(data-v 隔离)' : '非 scoped';
+    console.log(`  - ${item.file}: ${item.selectors} 个选择器 [${kind}]`);
+  }
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {

@@ -1,19 +1,22 @@
 {
   "version": 1,
   "files": {
-    "docs/DEVELOPER-GUIDE.md": "183f6df9597267e52aed5cf796e28187869732c6f6bdcae0cfab3bb174a9685c",
+    "docs/DEVELOPER-GUIDE.md": "ee0902c24cf4eaa630ed17fe24ce89338e62619de549e3d926de7a2bc4f7d102",
+    "docs/HANDOFF-2026-11-21-quality-pass.md": "585920349c26e27d42785120b098de36846174c3be8203550f4fe9c35e7acd22",
+    "docs/HANDOFF-2026-11-21.md": "0a44fb5ffc7d874be138aca3f83a1032c39b612eb20295af47c15e1a442896bd",
     "docs/PLAN-2026-11-19-offline-inspect-and-0kb.md": "abd1ecb299c0eddeadd443509690ffec406db6e193d97ace1bb972cc83074148",
     "docs/PLAN-2026-11-19-release-workflow.md": "ae9951e2d2b18bc68df3be7c93c09210cda0e6d3693c0d07f0807a42c3f62765",
     "docs/PLAN-2026-11-19-web-lan-tutorial-fixes.md": "25c6f8b308bd7133df461357fbfe18562536c5b8b0902cd673e797ebbfc6a903",
-    "docs/PLAN-2026-11-20-ui-refactor-and-feature-expansion.md": "5b1c0e7e1c3e44752e3d57fefa5a17a24160239133dc165c8cbbef4e59f3e612",
+    "docs/PLAN-2026-11-20-ui-refactor-and-feature-expansion.md": "60be2fd580c36805a2cc7461c2de389da69147fe50e3efb2764970b059ec46ce",
+    "docs/PLAN-2026-11-21-fulltest-fourhost-main-consolidation.md": "1db28046a41419331e7f4169c30101b7c6667653040b58579f5e96f58272346a",
     "docs/_config.yml": "4158c65372fa1362448cd0cbbe10c1f176a5aa70ace9c765594cd5c9360a009c",
     "docs/_layouts/default.html": "a31a991d951dc7284e0c00c27734e343b7498c7f929b233e5209cb4ca03e5764",
-    "docs/assets/review-shots/01-desktop-tutorial-overlay-clean.png": "744ec87d89e49eaaaea0c6a0eb40a02d2c661de803dc7f632c902a62bdfac216",
-    "docs/assets/review-shots/02-desktop-zone-single-header.png": "653fecb1bb1c65d457ae938cca73b9ad09d30487f44dee786b52569084f824c0",
+    "docs/assets/review-shots/01-desktop-tutorial-overlay-clean.png": "ff0c326a0e60ed72312d0ff94ca49d443ece095741c4c439258a62b82d043ff2",
+    "docs/assets/review-shots/02-desktop-zone-single-header.png": "fe74fb190a2055d97f842876993e06e3b89d1c629e3b448df2f97bb4d993a16b",
     "docs/assets/review-shots/03-desktop-ext-package-single-line.png": "e8ea7f933b5415f9d5fd2fd4a812be34ff6958c409671e1d4468363161ddf838",
-    "docs/assets/review-shots/04-desktop-workbench-full.png": "ebd388ff0ffb6e7a4bc36705744eba3b65f657241889323e072b3d8ca88bc7bb",
+    "docs/assets/review-shots/04-desktop-workbench-full.png": "abfbef0b3a8a758a43d5cba3af70cb70a4b3c93ce83e1af91948a54bb53cf1b5",
     "docs/assets/review-shots/05-mobile-ext-package-responsive.png": "fe5dbb0661b43caf03769cc92158d621a7f88f93492d1c502f0d757b8042dcb4",
-    "docs/assets/review-shots/06-mobile-zone-drawer.png": "31c218a248e82b3ffd4ea8cdde0f0e6363ec9532b99319c26ecd120fc314f98a",
+    "docs/assets/review-shots/06-mobile-zone-drawer.png": "f95c15d40e6a5534575ad5cc554ecedcfea1aa252eccfd002f28d974fa72f349",
     "docs/assets/shots/desktop-01-tutorial-goal.png": "1ee73c8c80e9b0d3bcd537385d9b8803f2b33741950a4ad42df03bd3be42bd47",
     "docs/assets/shots/desktop-02-tutorial-step.png": "8d9a69ca958231d44e9a5c164fd391e1966ec9c90361e7e07e0dc6094b9664fc",
     "docs/assets/shots/desktop-03-workbench-demo.png": "b367cfa3062627f7fa204c486305d6b1771d92ddb2bed8e05f12574c4a9c90af",
@@ -55,8 +58,8 @@
     "docs/index.md": "73bbc0dcc82bb08452278f14bb4a8bb7f74fd305d1f24e2a29137ddd64276e44",
     "docs/install.en.md": "aa33ac85861df1218bfad9c437c133acaafc1a8918070bed204b86131659b105",
     "docs/install.md": "0ad90de631f4eed015578e007fa43cf34d8ea9619d513f58961ba664b22513f9",
-    "docs/privacy.en.md": "901e42e488c50f335db696086122b6aaea3aff0d42b7d63e0cb207d92b98b799",
-    "docs/privacy.md": "504ee34dbb2f719249686ed57c149ddd456af1f4c65179421a22a8bf60b8618b",
+    "docs/privacy.en.md": "9f4fd2566f5ed8a0eeb84a0fc9249b2450917379bad9efec93b0420029bff564",
+    "docs/privacy.md": "c8a9530f22f4f1a5ea3849166aa708a748050b63b872c311cc20d069d6e54709",
     "docs/queue-and-logs.en.md": "65cd1744bb49f1273525c39dcd29bd5da7f060fe222f8ae3f38eecd9e4da69eb",
     "docs/queue-and-logs.md": "8282ffe1c998d6bf646e075cfe561121d106f3f4c5c8fbc081536623a33810a8",
     "docs/restore.en.md": "8cc40f788c811228c4913b3f349d4292ccd552ba95f9ffdf67368309fddccc59",
@@ -146,8 +149,8 @@
       "zh": "docs/privacy.md",
       "en": "docs/privacy.en.md",
       "translation": "required",
-      "sourceHash": "504ee34dbb2f719249686ed57c149ddd456af1f4c65179421a22a8bf60b8618b",
-      "translationHash": "901e42e488c50f335db696086122b6aaea3aff0d42b7d63e0cb207d92b98b799"
+      "sourceHash": "c8a9530f22f4f1a5ea3849166aa708a748050b63b872c311cc20d069d6e54709",
+      "translationHash": "9f4fd2566f5ed8a0eeb84a0fc9249b2450917379bad9efec93b0420029bff564"
     },
     {
       "zh": "docs/tutorial.md",
@@ -181,7 +184,7 @@
       "zh": "docs/DEVELOPER-GUIDE.md",
       "en": null,
       "translation": "pending",
-      "sourceHash": "183f6df9597267e52aed5cf796e28187869732c6f6bdcae0cfab3bb174a9685c",
+      "sourceHash": "ee0902c24cf4eaa630ed17fe24ce89338e62619de549e3d926de7a2bc4f7d102",
       "translationHash": null
     }
   ],
@@ -192,7 +195,7 @@
       "style.css",
       "tooling/capture-docs-shots.cjs"
     ],
-    "sourcesHash": "90f76e37e4a64d7b28711c18e24e9f466fcd915d7b1ab183ce2c9f7a8c28ccf3",
+    "sourcesHash": "095b982e8fbd31106ae02fcdd4575fb0fe3d179f95ad419b9f3c99e91753dfed",
     "pages": {
       "docs/convert.en.md": [
         "docs/assets/shots/desktop-03-workbench-demo.png",

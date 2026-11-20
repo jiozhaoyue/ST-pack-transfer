@@ -597,13 +597,51 @@ export function renderMarkdownSafe(md) {
     inCode = false;
   };
 
-  for (const line of lines) {
+  /* 表格识别（红队 P2）：环境信息为 2 列 | 项 | 值 | 表格，分隔行形如 | --- | --- |。
+     单元格一律经 renderInline→escapeHtml 转义，安全面与其余分支完全一致。 */
+  const isTableDivider = (row) => /^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$/.test(row);
+  /* splitCells 与上游 mdCell 的转义约定对齐：单元格内的 | 被写成 \|，
+     故只按未转义的 | 切列，再把 \| 还原成 |，避免 th/td 数量错配。 */
+  const splitCells = (row) => row.trim().replace(/^\|/, '').replace(/\|$/, '')
+    .split(/(?<!\\)\|/).map((c) => c.trim().replace(/\\\|/g, '|'));
+  const isTableStart = (arr, i) => {
+    const first = (arr[i] || '').trim();
+    const second = (arr[i + 1] || '').trim();
+    return first.startsWith('|') && second.startsWith('|') && isTableDivider(second);
+  };
+  const renderTable = (arr, i) => {
+    const header = splitCells(arr[i]);
+    const bodyRows = [];
+    let j = i + 2; // 跳过表头 + 分隔行
+    for (; j < arr.length && arr[j].trim().startsWith('|'); j += 1) {
+      if (isTableDivider(arr[j])) continue;
+      bodyRows.push(splitCells(arr[j]));
+    }
+    const headHtml = header.map((c) => '<th>' + renderInline(c) + '</th>').join('');
+    const bodyHtml = bodyRows.map((cells) =>
+      '<tr>' + cells.map((c) => '<td>' + renderInline(c) + '</td>').join('') + '</tr>').join('');
+    return {
+      html: '<table><thead><tr>' + headHtml + '</tr></thead><tbody>' + bodyHtml + '</tbody></table>',
+      next: j,
+    };
+  };
+
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i];
     if (line.startsWith(BT + BT + BT)) {
       if (inCode) flushCode();
       else { flushList(); inCode = true; }
       continue;
     }
     if (inCode) { codeBuf.push(line); continue; }
+
+    if (isTableStart(lines, i)) {
+      flushList();
+      const table = renderTable(lines, i);
+      out.push(table.html);
+      i = table.next - 1; // for 循环 i+=1 后指向下一未消费行
+      continue;
+    }
 
     const heading = /^(#{1,6})\s+(.*)$/.exec(line);
     if (heading) {
@@ -725,6 +763,7 @@ export function buildSettingsHtml(settings = {}) {
      issue 令牌始终来自本机专用 localStorage（readGithubToken），不存在按账号取令牌的通路。 */
   const githubAccounts = s.gitAccounts.filter((a) => a.site === SITES.GITHUB);
   let accountOptions = '';
+  let accountEmptyTitle = '';
   if (githubAccounts.length) {
     /* 选中项由持久化的 s.issueAccount 决定，缺省取第一个账号作为只读展示。 */
     accountOptions = githubAccounts.map((a) =>
@@ -736,6 +775,7 @@ export function buildSettingsHtml(settings = {}) {
     accountOptions = '<option value="token" selected>' + escapeHtml(t('issue.accountConfigured')) + '</option>';
   } else {
     accountOptions = '<option value="" disabled selected>' + escapeHtml(t('issue.accountEmpty')) + '</option>';
+    accountEmptyTitle = escapeHtml(t('issue.accountEmptyTitle'));
   }
 
   /* Issue 模板：同步自本仓 .github/ISSUE_TEMPLATE（或 raw/内置降级）。
@@ -786,7 +826,7 @@ export function buildSettingsHtml(settings = {}) {
     + '<option value="github"' + (s.issuePlatform === 'github' ? ' selected' : '') + '>'
     + t('issue.platformGitHub') + '</option>'
     + '</select></label>'
-    + '<label class="et-git" style="margin-top:6px"><span>' + t('issue.account') + '</span>'
+    + '<label class="et-git" style="margin-top:6px"' + (accountEmptyTitle ? ' title="' + accountEmptyTitle + '"' : '') + '><span>' + t('issue.account') + '</span>'
     + '<select class="text_pole" data-setting="issueAccount" disabled>' + accountOptions + '</select></label>'
     /* 令牌不在本面板手填：真实配置处在「扩展管理 → 开发者 → Git 账号」，此处仅提示指向（复用已有 key）。 */
     + '<div class="ext-note">' + t('issue.tokenCreateHint') + '</div>'
@@ -827,15 +867,18 @@ export function buildSettingsHtml(settings = {}) {
     + escapeHtml(issueLogDebugHintText(s.issueLogLevel)) + '</div>'
     + '<div class="ext-row" style="margin-top:8px">'
       + '<button type="button" class="btn" data-action="issue-preview">' + t('issue.preview') + '</button>'
-      + '<button type="button" class="btn danger" data-action="issue-submit" id="issue-submit-btn">'
+      + '<button type="button" class="btn danger" data-action="issue-submit" id="issue-submit-btn"'
+      + ' title="' + escapeHtml(t('issue.submitTitle')) + '">'
       + t('issue.submit') + '</button>'
     + '</div>'
     + '<div class="ext-row" style="margin-top:6px">'
       + '<button type="button" class="menu_button" id="issue-copy-report" data-issue-action="copy">'
       + t('settings.issueCopy') + '</button>'
-      + '<button type="button" class="menu_button" id="issue-export-md" data-issue-action="export-md">'
+      + '<button type="button" class="menu_button" id="issue-export-md" data-issue-action="export-md"'
+      + ' title="' + escapeHtml(t('settings.issueExportMdTitle')) + '">'
       + t('settings.issueExportMd') + '</button>'
-      + '<button type="button" class="menu_button" id="issue-new-issue" data-issue-action="new-issue">'
+      + '<button type="button" class="menu_button" id="issue-new-issue" data-issue-action="new-issue"'
+      + ' title="' + escapeHtml(t('settings.issueNewIssueTitle')) + '">'
       + t('settings.issueNewIssue') + '</button>'
     + '</div>'
     /* 两条线跳转按钮：坐标动态取，取不到置灰 + 提示未提供。 */

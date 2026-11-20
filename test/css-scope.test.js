@@ -1,6 +1,9 @@
-import { readFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { checkCssScope } from '../scripts/css-scope.js';
+import { checkCssScope, checkVueScopes } from '../scripts/css-scope.js';
 
 describe('CSS 宿主作用域守卫', () => {
   it('允许本插件自有根容器（含独立态 marker 与模态覆盖层）', () => {
@@ -99,5 +102,69 @@ describe('CSS 宿主作用域守卫', () => {
     // 2026-10-15：插件态改挂全屏模态后，`.st-converter-drawer-app` 前缀已从 style.css 消失，
     // 该根也不再在白名单里——反向断言把它钉住，防「抽屉态」以任何形式回流。
     expect(css).not.toContain('.st-converter-drawer-app');
+  });
+});
+
+describe('Vue <style> 作用域守卫', () => {
+  /** 在临时目录写若干 .vue 文件，跑守卫后总是清理 */
+  async function withVueFiles(files, fn) {
+    const dir = await mkdtemp(join(tmpdir(), 'css-scope-vue-'));
+    try {
+      for (const [name, content] of Object.entries(files)) {
+        await writeFile(join(dir, name), content, 'utf8');
+      }
+      return await fn(dir);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  }
+
+  it('scoped 块视为 data-v 隔离合法：不要求挂四根，但计入选择器计数', async () => {
+    await withVueFiles({
+      'Overlay.vue': `<template><div class="overlay"/></template>\n<style scoped>\n.overlay { color: red; }\n.card .title { font-weight: bold; }\n</style>\n`,
+    }, async (dir) => {
+      const result = await checkVueScopes(dir);
+
+      expect(result.violations).toEqual([]);
+      expect(result.totalSelectors).toBe(2);
+      expect(result.scannedFiles).toHaveLength(1);
+      expect(result.scannedFiles[0]).toMatchObject({ selectors: 2, scoped: true });
+      expect(result.scannedFiles[0].file).toMatch(/Overlay\.vue$/);
+    });
+  });
+
+  it('非 scoped 块未挂四根时按铁律 7 报错', async () => {
+    await withVueFiles({
+      'Global.vue': `<style>\n.overlay { color: red; }\nbody { margin: 0; }\n#app.app-container .safe { color: blue; }\n</style>\n`,
+    }, async (dir) => {
+      const result = await checkVueScopes(dir);
+
+      expect(result.violations).toHaveLength(2);
+      expect(result.violations.map((v) => v.selector)).toEqual(['.overlay', 'body']);
+      expect(result.violations[0].file).toMatch(/Global\.vue$/);
+      expect(result.violations[0].message).toMatch(/作用域根/);
+      expect(result.violations[1].message).toMatch(/body\/html\/:root/);
+      // 挂了四根的那条仍计入总数，只是不违规
+      expect(result.totalSelectors).toBe(3);
+      expect(result.scannedFiles[0]).toMatchObject({ selectors: 3, scoped: false });
+    });
+  });
+
+  it('.vue 目录/文件不存在时不炸，返回空结果', async () => {
+    const missing = join(tmpdir(), `css-scope-vue-missing-${Date.now()}-${Math.random()}`);
+    const result = await checkVueScopes(missing);
+
+    expect(result).toEqual({ scannedFiles: [], totalSelectors: 0, violations: [] });
+  });
+
+  it('仓库现状：src/ui/vue 下 InspectModal.vue 为 scoped，全绿且可计数', async () => {
+    const result = await checkVueScopes(fileURLToPath(new URL('../src/ui/vue', import.meta.url)));
+
+    expect(result.violations).toEqual([]);
+    expect(result.scannedFiles.length).toBeGreaterThanOrEqual(1);
+    expect(result.totalSelectors).toBeGreaterThan(0);
+    const inspect = result.scannedFiles.find((f) => f.file.endsWith('InspectModal.vue'));
+    expect(inspect).toMatchObject({ scoped: true });
+    expect(inspect.selectors).toBeGreaterThan(0);
   });
 });

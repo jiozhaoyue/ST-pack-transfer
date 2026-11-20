@@ -9,7 +9,7 @@
  */
 
 import { APP_VERSION } from '../core/app-version.js';
-import { logger, redact } from '../core/logger.js';
+import { logger, redact, scrubDetailKeys } from '../core/logger.js';
 import { HOST_CAPABILITIES, capabilityState } from '../core/host-capabilities.js';
 import { detectHost, getHostContext } from './host-bridge.js';
 import { getStorageUsage, isStorageSupported } from '../storage/db.js';
@@ -79,6 +79,27 @@ function mdCell(value) {
   return String(value).replace(/\r?\n/g, ' ').replace(/\|/g, '\\|');
 }
 
+/** VULN-07：转义日志文本内部的三重反引号，避免闭合 Markdown 代码块、溢出至正文。 */
+function escapeCodeFence(text) {
+  return String(text ?? '').replace(/```/g, '\\`\\`\\`');
+}
+
+/**
+ * VULN-03：页面地址脱敏。
+ * file:// 协议只保留文件名，目录全部抹掉 → file:///[LOCAL]/<basename>；
+ * http(s) 及其它协议沿用原行为（去 query / hash，避免 token、userinfo、跟踪参数入报告）。
+ */
+function redactPageUrl(href) {
+  const clean = String(href ?? '').split('?')[0].split('#')[0];
+  if (/^file:\/\//i.test(clean)) {
+    const segments = clean.replace(/^file:\/\//i, '').split(/[\\/]/).filter(Boolean);
+    let base = segments.length ? segments[segments.length - 1] : '';
+    try { base = decodeURIComponent(base); } catch { /* 解码失败保留原始段 */ }
+    return `file:///[LOCAL]/${base || 'index.html'}`;
+  }
+  return clean;
+}
+
 /** 读取宿主版本（本地、同步），没有可靠来源就返回 unavailable。 */
 function readHostVersion() {
   try {
@@ -143,8 +164,8 @@ export async function collectReportEnv() {
   try {
     if (typeof location !== 'undefined') {
       const href = location.href || '';
-      // 去掉 query / hash，避免把 token、userinfo、跟踪参数带进报告。
-      pageUrl = present(href.split('?')[0].split('#')[0], UNAVAILABLE);
+      // 去掉 query / hash；file:// 进一步只保留文件名，抹掉全部本地目录（VULN-03）。
+      pageUrl = present(redactPageUrl(href), UNAVAILABLE);
     }
   } catch { /* 保持 unavailable */ }
 
@@ -259,6 +280,55 @@ export function filterEntriesByMinLevel(entries, minLevel) {
   return list.filter((e) => (ISSUE_LEVEL_ORDER[String(e?.level ?? '').toUpperCase()] || 0) >= threshold);
 }
 
+/**
+ * VULN-08：等价于 logger.js 内部 safeDetail 的安全序列化。
+ * logger.js 未导出 safeDetail（仅导出 redact / scrubDetailKeys / logger），
+ * 且 logger.js 不在本写手可改范围，故在此实现等价逻辑：Error 必带 name/message/stack（可选 cause），
+ * Blob/ArrayBuffer 提取元信息，循环引用折叠，序列化失败降级——确保堆栈与 message 不丢。
+ */
+function safeSerializeDetail(detail, seen = new WeakSet()) {
+  if (detail === undefined || detail === null) return null;
+  if (detail instanceof Error) {
+    // P1-1：与 logger.js safeDetail 一致——cause 自引用（e.cause = e）递归前先做循环检测，
+    // 避免 RangeError 爆栈后堆栈与 message 丢失。
+    if (seen.has(detail)) return '[Circular]';
+    seen.add(detail);
+    try {
+      const out = { name: detail.name, message: detail.message, stack: detail.stack };
+      if ('cause' in detail && detail.cause !== undefined) out.cause = safeSerializeDetail(detail.cause, seen);
+      return out;
+    } finally {
+      seen.delete(detail);
+    }
+  }
+  if (typeof Blob !== 'undefined' && detail instanceof Blob) {
+    const out = { kind: 'blob', size: detail.size, type: detail.type };
+    if (typeof File !== 'undefined' && detail instanceof File && detail.name) out.name = detail.name;
+    return out;
+  }
+  if (typeof ArrayBuffer !== 'undefined'
+    && (detail instanceof ArrayBuffer || ArrayBuffer.isView(detail))) {
+    return { kind: 'bytes', byteLength: detail.byteLength };
+  }
+  const t = typeof detail;
+  if (t === 'string' || t === 'number' || t === 'boolean') return detail;
+  if (t === 'bigint') return String(detail) + 'n';
+  if (t === 'symbol') return String(detail);
+  if (t === 'function') return `[Function ${detail.name || 'anonymous'}]`;
+  if (seen.has(detail)) return '[Circular]';
+  seen.add(detail);
+  try {
+    if (Array.isArray(detail)) return detail.map((item) => safeSerializeDetail(item, seen));
+    const out = {};
+    for (const key of Object.keys(detail)) out[key] = safeSerializeDetail(detail[key], seen);
+    return out;
+  } catch (err) {
+    return { unserializable: String(err) };
+  } finally {
+    seen.delete(detail);
+  }
+}
+
 /** 从内存日志缓冲取最近 N 条并格式化；全部经过 safeRedact 由调用方兜底。 */
 function collectLogText(logLevel, logCount) {
   try {
@@ -273,7 +343,10 @@ function collectLogText(logLevel, logCount) {
       let line = `[${entry.timestamp}] [${entry.level}] ${entry.message}`;
       if (entry.detail !== null && entry.detail !== undefined) {
         let detail = '';
-        try { detail = JSON.stringify(entry.detail); } catch { detail = '[unserializable]'; }
+        try {
+          // VULN-08：先安全序列化（Error 保 stack/message），再按键名黑名单折叠秘密值。
+          detail = JSON.stringify(scrubDetailKeys(safeSerializeDetail(entry.detail)));
+        } catch { detail = '[unserializable]'; }
         line += ` detail=${detail || 'null'}`;
       }
       return line;
@@ -304,7 +377,7 @@ export function buildReportMarkdown({ env, userInput, includeLogs = true, logLev
   lines.push('');
 
   if (includeLogs) {
-    lines.push('## 日志', '```text', safeRedact(collectLogText(logLevel, logCount)) || UNAVAILABLE, '```', '');
+    lines.push('## 日志', '```text', escapeCodeFence(safeRedact(collectLogText(logLevel, logCount))) || UNAVAILABLE, '```', '');
   }
 
   return `${lines.join('\n').trimEnd()}\n`;
@@ -394,7 +467,7 @@ export function issueChannelAvailable(coords, key = 'current') {
   const channel = coords?.[key];
   const provenance = coords?.provenance;
   return !!(channel && channel.owner && channel.repo
-    && provenance && provenance !== 'local-default');
+    && provenance && provenance !== 'local-default' && provenance !== 'offline-default');
 }
 
 /**
@@ -781,7 +854,7 @@ export function buildIssueTemplateBody(template, values = {}, context = {}) {
   lines.push('');
 
   if (context.envText) {
-    lines.push('### 环境信息', '', '```text', safeRedact(context.envText), '```', '');
+    lines.push('### 环境信息', '', '```text', escapeCodeFence(safeRedact(context.envText)), '```', '');
   }
   return `${lines.join('\n').trimEnd()}\n`;
 }

@@ -45,6 +45,8 @@ In **Settings → Privacy** each credential type can be stored independently:
 - **Local-only processing**: unpacking, cleaning, and rebuilding packages happen in your browser; no third-party relay server is involved.
 - **Controlled network requests**: the only outbound requests are Git repository status checks you trigger in extension management, or cloud backups you configure yourself.
 - **Masked exports and reports**: Tokens and secrets in exported logs and issue reports are masked by the unified redaction layer; the live log panel shows raw text, inputs are password-masked.
+- **Deep masking of sensitive fields**: logs and reports recursively fold values under sensitive keys such as token, secret, password, api_key, credential and cookie — nested data is covered up to eight levels — while non-sensitive fields such as keyboard layouts stay intact.
+- **Broader credential coverage**: redaction now also recognizes secrets in query parameters, passwords written in single quotes, Google API keys starting with `AIzaSy`, and HuggingFace tokens starting with `hf_`; all are masked before export and never leave with your report.
 
 ## Pulling private repositories
 

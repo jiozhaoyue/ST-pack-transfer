@@ -28,6 +28,7 @@ All screenshots come from the tutorial demo mode and contain no real data.
 - **Transfer and backup**: LAN peer transfer, S3 and WebDAV
 - **Storage inspector**: usage by category, drill down level by level
 - **Pending export area**: every artifact lands in a queue, nothing downloads automatically
+- **Issue reports**: one-click, sanitized environment reports you can copy to the clipboard or export as local Markdown — with key-level redaction that folds token/secret/password values; no repository URL to fill in, platform and account picked from dropdowns; attached logs are level- and count-selectable with a safe-minimum default and a clear notice of what is collected; over-long content or a URL past the 8000-character guard falls back to copy; preview toggles between raw and rendered views; form fields follow the GitHub issue template; two required checkboxes must be confirmed before submitting; one-click links to issue lists and docs for both this repo and the upstream.
 
 ## Installation
 

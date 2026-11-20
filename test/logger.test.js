@@ -97,6 +97,18 @@ describe('Logger Core System', () => {
       expect(text).toContain('[Circular]');
     });
 
+    it('Error cause 自引用不抛 RangeError，且 message/stack 保留（P1-1）', () => {
+      const err = new Error('self-boom');
+      err.cause = err;
+      logger.error('self-cause', err);
+      let text;
+      expect(() => { text = logger.exportText(); }).not.toThrow();
+      expect(text).toContain('"message": "self-boom"');
+      expect(text).toContain('"stack":');
+      expect(text).toContain('[Circular]');
+      expect(text).not.toContain('[unserializable]');
+    });
+
     it('Blob 导出为 kind:blob 并含 size/type', () => {
       const blob = new Blob(['hello'], { type: 'text/plain' });
       logger.info('blob detail', blob);
@@ -201,6 +213,44 @@ describe('Logger Core System', () => {
         expect(redact(key)).toBe('[REDACTED]');
       });
 
+      it('redact 覆盖 JWT 三段式与 PEM 私钥头（不误伤普通句点文本）', () => {
+        // JWT 拼接构造，避免源码出现完整令牌形态（沿用 tok 约定，防 Push Protection）。
+        const jwt = tok(
+          'eyJhbGciOiJIUzI1NiJ9.',
+          'eyJzdWIiOiIxMjM0NTY3ODkwIn0.',
+          'dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR6U',
+        );
+        expect(redact(jwt)).toContain('[REDACTED]');
+        expect(redact(jwt)).not.toContain('eyJhbGciOi');
+        expect(redact('-----BEGIN RSA PRIVATE KEY-----abc')).toContain('[REDACTED]');
+        expect(redact('-----BEGIN OPENSSH PRIVATE KEY-----abc')).toContain('[REDACTED]');
+        // 普通句点缩写 / 小数不受 JWT 规则影响。
+        expect(redact('section 3.1415 ends.')).toBe('section 3.1415 ends.');
+      });
+
+      it('redact 覆盖 ENCRYPTED 私钥头、多行 PEM 整块与无 END 单行（P0-1）', () => {
+        // ① PKCS#8 加密私钥标准头必须被掩掉。
+        expect(redact('-----BEGIN ENCRYPTED PRIVATE KEY-----SUPERSECRET')).toContain('[REDACTED]');
+        expect(redact('-----BEGIN ENCRYPTED PRIVATE KEY-----SUPERSECRET')).not.toContain('SUPERSECRET');
+        // ② 多行 PEM：BEGIN + Base64 主体 + END 整块掩蔽，主体不得泄露。
+        const multi = [
+          '-----BEGIN PRIVATE KEY-----',
+          'BASE64SECRETBODYLINE',
+          '-----END PRIVATE KEY-----',
+        ].join('\n');
+        const outMulti = redact('prefix\n' + multi + '\nsuffix');
+        expect(outMulti).toContain('[REDACTED]');
+        expect(outMulti).not.toContain('BASE64SECRETBODYLINE');
+        expect(outMulti).not.toContain('END PRIVATE KEY');
+        expect(outMulti).toContain('prefix');
+        expect(outMulti).toContain('suffix');
+        // RSA 加密多行块同样整块掩蔽。
+        const rsa = '-----BEGIN RSA PRIVATE KEY-----\nMIIBODY\n-----END RSA PRIVATE KEY-----';
+        expect(redact(rsa)).not.toContain('MIIBODY');
+        // ③ 无 END 的单行头退化为掩头行至行尾（不影响其后其它行文本）。
+        expect(redact('-----BEGIN EC PRIVATE KEY-----LEAK')).toBe('[REDACTED]');
+      });
+
       it('redact 覆盖 ?refresh_token= / id_token / client_secret 等查询参数', () => {
         expect(redact('/api?refresh_token=SECRET')).toContain('refresh_token=[REDACTED]');
         expect(redact('/api?id_token=SECRET')).toContain('id_token=[REDACTED]');
@@ -297,6 +347,40 @@ describe('Logger Core System', () => {
         expect(text).toContain('"keep": "visible"');
         expect(text).not.toContain('SECRET');
         expect(text).not.toContain('Sup3r');
+      });
+    });
+
+    describe('路径脱敏加固：VULN-01 / VULN-02', () => {
+      // 反斜杠用 charCode 构造，避免源码出现本机绝对路径字面量（铁律 35）。
+      const B = String.fromCharCode(92);
+
+      it('redact 掩蔽 JSON 序列化后的双反斜杠 Windows 路径', () => {
+        // 运行时是单反斜杠的正常路径；JSON.stringify 后呈字面双反斜杠。
+        const rawPath = 'C:' + B + 'Users' + B + 'Alice' + B + 'AppData';
+        const json = JSON.stringify({ path: rawPath });
+        expect(json).toContain('C:' + B + B + 'Users');
+        const out = redact(json);
+        expect(out).not.toContain('Alice');
+        expect(out).toContain('C:' + B + B + 'Users' + B + B + '[USER]');
+      });
+
+      it('redact 含空格用户名整段掩蔽（Windows）', () => {
+        const input = 'C:' + B + 'Users' + B + 'John Doe' + B + 'AppData';
+        const out = redact(input);
+        expect(out).toBe('C:' + B + 'Users' + B + '[USER]' + B + 'AppData');
+        expect(out).not.toContain('John');
+        expect(out).not.toContain('Doe');
+      });
+
+      it('redact 含空格用户名整段掩蔽（POSIX）', () => {
+        expect(redact('/home/John Doe/project')).toBe('/[USER]/project');
+        expect(redact('/Users/Mary Jane/project')).toBe('/[USER]/project');
+      });
+
+      it('redact 不误伤非路径文本', () => {
+        const plain = 'C drive has a Users folder; Alice likes it';
+        expect(redact(plain)).toBe(plain);
+        expect(redact('Users can be many people')).toBe('Users can be many people');
       });
     });
   });

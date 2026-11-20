@@ -3,8 +3,8 @@ description: 静默写入与无文本输出的铁律（用户 2026-11-11 强制�
 alwaysApply: true
 ---
 <!-- RULES-POINTER v1 -->
-本仓工程规则唯一真源：`RULES.md`（30 条）+ `RULES-DETAILS.md`（82 条细则）。动手前先读；收尾前跑 `npm run verify:rules`。
-本文件不得复制 RULES.md 条文；冲突一律以 RULES.md 为准。
+本仓工程规则唯一真源位于 `.trellis/spec/guides/`：`rule-catalog.md`（30 条判据）、`rule-details.md`（95 条细则）、`iron-rules.md`（45 条铁律）。动手前先读，收尾前跑 `npm run verify:rules`（用法见 rule-catalog.md）。
+本文件只放指针、不得复制真源条文；冲突一律以真源为准。
 
 <!-- IRON-RULE:REPORT-ALL-WRITES v1 (2026-11-11 用户铁律，禁止删除) -->
 # 铁律 0：任何配置写入与工具调用，必须全程出声（不可静默）

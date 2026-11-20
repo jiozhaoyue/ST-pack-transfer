@@ -83,7 +83,7 @@ function lineOf(code, index) {
 const IMPORT_RE = /\bimport\s+(?:[^;'"]*?\s+from\s+)?(['"])([^'"]+)\1/g;
 const EXPORT_FROM_RE = /\bexport\s+(?:\*|\{[^}]*\})\s+from\s+(['"])([^'"]+)\1/g;
 
-function classify(spec, statement) {
+function classify(spec, statement, file = '') {
   if (spec.startsWith('node:')) return '静态导入 node 内置模块：浏览器不解析 `node:`，插件会整图加载失败';
   if (/\?(raw|url|inline|worker|init|config)\b/.test(spec)) return 'Vite 专有查询后缀：宿主直装时按普通 URL 请求，拿不到期望内容';
   if (/^[./]/.test(spec)) {
@@ -93,6 +93,10 @@ function classify(spec, statement) {
     return null;
   }
   if (/^(https?:|data:|blob:)/.test(spec)) return null;
+  // Vue 3 仅存在于 vite 构建产物；宿主直装源码模式下由 src/ui/vue/mount.js 特性检测动态导入失败静默降级（D-03 纯前端主路径闭环），故豁免。
+  // 豁免范围严格限定 src/ui/vue/ 目录下的裸包名 'vue'；新增裸包名仍一律拦截。
+  // 先 normalize 再判前缀，防止 `src/ui/vue/../../core/evil.js` 这类 .. 构造路径绕过豁免（当前调用源为 walk 相对路径，实际不可达，属纵深加固）。
+  if (spec === 'vue' && /^src\/ui\/vue\//.test(path.posix.normalize(file.replace(/\\/g, '/')))) return null;
   return '裸包名导入：浏览器不会解析 node_modules；请使用 `src/vendor/` 本地副本或相对路径';
 }
 
@@ -111,7 +115,7 @@ export function checkBundlerOnly(code, file = '<inline>') {
       if (inside[m.index]) continue;
       const spec = m[2];
       const statement = code.slice(m.index, m.index + 200);
-      const reason = classify(spec, statement);
+      const reason = classify(spec, statement, file);
       if (reason) violations.push({ line: lineOf(code, m.index), spec, reason, file });
     }
   };

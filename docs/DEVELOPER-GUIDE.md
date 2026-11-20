@@ -84,7 +84,7 @@ translation: pending
 - `src/ui/inspect-view.js`：体检结果展示模块。**体检外部文件独立入口已移除**——体检只跟随包卡（点包卡看报告），不再从设置或工具栏单独选择本地文件；`mountInspectPanel` 的 `onPickFile` 形参与容器保留仅为兼容既有调用方。
 - `src/core/logger.js`：日志采集与脱敏核心。新增 `scrubDetailKeys(value)` 做键名级脱敏，递归折叠命中敏感键名（token／secret／password／api_key／credential／cookie 等）的值，带循环引用保护与 8 层深度上限；`redact()` 在原有 12 条规则之外追加 4 条：查询参数扩展、单引号密码、Google API Key、HuggingFace 凭据。
 
-本仓规则真源位于 `.trellis/spec/guides/` 四件套：`rule-catalog.md` 为 30 条判据，`rule-details.md` 为 95 条细则，`iron-rules.md` 为 45 条注入铁律，`rule-triggers.md` 为触发索引。四者条数口径不同但各自生效，引用时需指明是哪一份。
+本仓的开发者规范由四份文件构成：`rule-catalog.md` 为 30 条判据，`rule-details.md` 为 95 条细则，`iron-rules.md` 为 45 条注入铁律，`rule-triggers.md` 为触发索引。四者条数口径不同但各自生效，引用时需指明是哪一份。
 
 核心层不得依赖 DOM；界面层不得反向持有宿主判断。平台差异集中在宿主桥接层。
 
@@ -151,6 +151,8 @@ npm run qa:static        # 静态守卫串跑
 - 本机 WebDAV 服务器：`npm run cloud:serve:webdav`（同上）。
 - 客户端契约测试：`npm run test:local-cloud`（真实 HTTP + Range/multipart/PROPFIND）。
 - 核心云全流程：`npm run e2e:cloud-core`（真实数据包 → 上传 → 下载 → sha256）。
+- 四宿主实例 E2E 编排：`npm run e2e:instances`（`node scripts/run-e2e-instances.cjs`），
+  覆盖 SillyTavern / Luker / TauriTavern / PureTavern 四端实例的端到端流程。
 - 实例成对启动：`npm run e2e:instance-pair -- dev-st dev-luker`；
   **同一时刻最多两个实例**，退出时校验端口释放。
 - Luker ↔ TT 保真回归：`npm run test:luker-tt`（固定夹具）、`npm run e2e:luker-tt`（含真实大包）；

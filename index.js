@@ -56,8 +56,8 @@ import { exportLibraryToPack, importRestoredChatsIntoLibrary } from './src/ui/ch
 import { mountLanTransferPanel } from './src/ui/lan-transfer-panel.js';
 import { createBrowserStorageProvider } from './src/ui/storage-inspector-browser.js';
 import { qr } from './src/ui/qr.js';
-import { buildSettingsHtml, readSettings, applyWebTheme, readGithubToken, writeGithubToken, renderMarkdownSafe, normalizeIssueLogParams, ISSUE_LEVEL_TO_REPORT } from './src/ui/settings-panel.js';
-import { collectReportEnv, buildReportMarkdown, previewRedacted, submitToGitHub } from './src/ui/issue-report.js';
+import { buildSettingsHtml, readSettings, applyWebTheme, readGithubToken, writeGithubToken, renderMarkdownSafe, normalizeIssueLogParams, ISSUE_LEVEL_TO_REPORT, disposeSettingsPanel } from './src/ui/settings-panel.js';
+import { collectReportEnv, buildReportMarkdown, previewRedacted, submitToGitHub, issuePrereqsMet } from './src/ui/issue-report.js';
 import { buildPluginData, applyPluginData, isPluginData, downloadPluginData } from './src/ui/plugin-data.js';
 import { loadSettings, saveSettings } from './src/ui/settings-store.js';
 import { applyI18n } from './src/i18n/dom.js';
@@ -2389,7 +2389,10 @@ async function main(root) {
       const el = body?.querySelector?.('[data-setting="' + key + '"]');
       return el && typeof el.value === 'string' ? el.value.trim() : '';
     };
-    const tokenEl = body?.querySelector?.('#issue-token');
+    const checked = (key) => {
+      const el = body?.querySelector?.('[data-setting="' + key + '"]');
+      return !!el && el.checked === true;
+    };
     const logsEl = body?.querySelector?.('[data-setting="issueIncludeLogs"]');
     return {
       title: val('issueTitle'),
@@ -2397,13 +2400,16 @@ async function main(root) {
       steps: val('issueSteps'),
       owner: val('issueOwner'),
       repo: val('issueRepo'),
+      /* 强制前置勾选：与设置面板 refreshIssuePrereqs 同一选择器、同一取值，供提交路径兜底校验。 */
+      prereqs: { docs: checked('issuePrereqDocs'), search: checked('issuePrereqSearch') },
       includeLogs: (typeof logsEl?.checked === 'boolean')
         ? logsEl.checked
         : (settings.issueIncludeLogs !== false),
       /* 日志级别/条数：读下拉原始语义值，映射交由 composeIssueReport 与面板统计同源处理。 */
       logLevel: val('issueLogLevel'),
       logCount: val('issueLogCount'),
-      token: typeof tokenEl?.value === 'string' ? tokenEl.value.trim() : readGithubToken(),
+      /* #issue-token 节点已从 DOM 删除：令牌只走 readGithubToken() 专用 localStorage 回退。 */
+      token: readGithubToken(),
     };
   }
 
@@ -2417,13 +2423,15 @@ async function main(root) {
     }
     /* 与设置面板统计同源：级别/条数经同一归一化 + 映射表透传，保证预览/提交与统计一致。 */
     const p = normalizeIssueLogParams(form.logLevel, form.logCount);
-    return buildReportMarkdown({
+    const md = buildReportMarkdown({
       env,
       userInput: { title: form.title, description: form.description, steps: form.steps },
       includeLogs: form.includeLogs,
       logLevel: ISSUE_LEVEL_TO_REPORT[p.level],
       logCount: p.count,
     });
+    /* 预览与提交同源单一出口（铁律 5）：只在此处脱敏一次，两条路径都消费 safe。 */
+    return previewRedacted(md);
   }
 
   /** 预览模式模块级状态：同一会话内记住用户上次选的是原文还是渲染预览。 */
@@ -2456,10 +2464,9 @@ async function main(root) {
   async function previewIssueReport(body) {
     const form = readIssueForm(body);
     if (!form.title) { view.toast(t('issue.missingTitle')); return; }
-    let md;
-    try { md = await composeIssueReport(form); }
+    let safe;
+    try { safe = await composeIssueReport(form); }
     catch (err) { view.toast(err?.message || t('issue.collectFailed')); return; }
-    const safe = previewRedacted(md);
     view.openModal(
       t('issue.previewTitle'),
       t('issue.privacyWarning'),
@@ -2491,10 +2498,11 @@ async function main(root) {
     if (!form.title) { view.toast(t('issue.missingTitle')); return; }
     if (!form.owner || !form.repo) { view.toast(t('issue.missingOwnerRepo')); return; }
     if (!form.token) { view.toast(t('issue.missingToken')); return; }
-    let md;
-    try { md = await composeIssueReport(form); }
+    /* 提交路径服务端兜底：不依赖前端 disabled，勾选未满足时明确拒绝（G-20 失败不静默）。 */
+    if (!issuePrereqsMet(form.prereqs)) { view.toast(t('issue.prereqRequired')); return; }
+    let safe;
+    try { safe = await composeIssueReport(form); }
     catch (err) { view.toast(err?.message || t('issue.collectFailed')); return; }
-    const safe = previewRedacted(md);
     const preview = '<pre class="issue-report-preview">' + escapeHtml(safe) + '</pre>';
     const doSubmit = async () => {
       /* 令牌只在确认后写专用 localStorage，绝不进 settings / settings.json。 */
@@ -2504,7 +2512,7 @@ async function main(root) {
           owner: form.owner,
           repo: form.repo,
           title: form.title,
-          body: md,
+          body: safe,
           token: form.token,
         });
         view.closeModal?.();
@@ -2529,9 +2537,8 @@ async function main(root) {
       onSave: (body) => {
         /* base 传入当前设置：只覆盖对话框里存在的控件，Git 账号 / 安装登记等原样保留。 */
         Object.assign(settings, readSettings(body, settings));
-        /* token 铁律：PAT 只写专用 localStorage，绝不进入 settings / settings.json。 */
-        const tokenEl = body?.querySelector?.('#issue-token');
-        if (tokenEl && typeof tokenEl.value === 'string') writeGithubToken(tokenEl.value);
+        /* token 铁律：PAT 只写专用 localStorage，绝不进入 settings / settings.json。
+           令牌不在本面板手填（#issue-token 已删），由 doSubmit 在提交确认时写专用存储。 */
         saveSettings(settings);
         logger.setLevel(settings.logLevel || 'warn');
         view.applySettings?.(settings);
@@ -2728,13 +2735,20 @@ async function main(root) {
         const targetLayout = targetCodeOf(view.getState().target);
         try {
           const report = await inspectPackage(blob, { targetLayout });
-          view.showInspectReport(report);
+          // Vue 模态为主路径；原生 dialog 仅作为 Vue 不可用时的降级兜底（两态互斥，禁止双弹）。
+          let handle = null;
           try {
-            void mountInspectModal({
+            // mountInspectModal 为异步：拿到句柄才算 Vue 真挂载成功，null/异常即降级。
+            handle = await mountInspectModal({
               getReport: () => report,
               onClose: () => { try { view.closeInspectReport?.(); } catch { /* 忽略 */ } },
-            }).then(h => { if (h) inspectMountHandle = h; }).catch(() => {});
+            });
           } catch (err) { console.warn('[vue-mount] inspect modal mount skipped:', err?.message || err); }
+          if (handle) {
+            inspectMountHandle = handle;
+          } else {
+            view.showInspectReport(report);
+          }
         } catch (err) {
           logger.error(`${t('inspect.readFailed')}: ${err?.message || err}`);
           view.toast(t('inspect.readFailed'));
@@ -2925,7 +2939,7 @@ async function main(root) {
 }
 
 /* 单页常驻下不会被调用，供 HMR / 测试 / 未来卸载路径使用：清理全部长生命周期资源。
-   三个 dispose 必须联动，否则只清定时器、视图 observer 与宿主 DOM observer 仍然存活。 */
+   四个 dispose 必须联动，否则只清定时器、视图 observer、宿主 DOM observer 与设置面板委托监听仍然存活。 */
 export function disposeMain() {
   if (quotaTimer) { clearInterval(quotaTimer); quotaTimer = null; }
   if (onVisibilityChange && typeof document !== 'undefined') {
@@ -2935,6 +2949,7 @@ export function disposeMain() {
   try { destroyViewObservers?.(); } catch { /* 忽略 */ }
   try { stopHostDomWatch?.(); } catch { /* 忽略 */ }
   try { inspectMountHandle?.unmount?.(); inspectMountHandle = null; } catch { /* 忽略 */ }
+  try { disposeSettingsPanel?.(); } catch { /* 忽略 */ }
 }
 
 /**

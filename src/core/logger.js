@@ -73,9 +73,11 @@ export function redact(text) {
   //     独立追加，规则 6 原正则与其 6 个参数名的行为完全不变（只做追加）。
   out = out.replace(/([?&])(refresh_token|id_token|client_secret|sig|signature|accesskey)=[^&\s]+/gi, '$1$2=[REDACTED]');
   // 7. Windows 用户目录：保留盘符，替换用户名
-  out = out.replace(/\b([A-Za-z]:\\Users\\)[^\\\s]+/g, '$1[USER]');
-  // 8. POSIX 用户目录
-  out = out.replace(/\/(?:home|Users)\/[^/\s]+/g, '/[USER]');
+  //    VULN-01/02 加固：分隔符兼容单反斜杠 \ 与 JSON 序列化后的双反斜杠 \\（含 / 形态）；
+  //    用户名字符集排除路径分隔、引号与换行，使含空格的用户名整体掩掉而非在空格处断开。
+  out = out.replace(/\b([A-Za-z]:[\\/]{1,2}Users[\\/]{1,2})[^\\/"\n\r]+/g, '$1[USER]');
+  // 8. POSIX 用户目录（VULN-02 加固：用户名段允许空格，止于 / 或行尾/引号）
+  out = out.replace(/\/(?:home|Users)\/[^/"\n\r]+/g, '/[USER]');
   // 9. OAuth client_secret=<值>（保留参数名，替换值）
   out = out.replace(/\bclient_secret\s*=\s*[^\s&"']+/gi, 'client_secret=[REDACTED]');
   // 10. password / passwd / secret / pwd 赋值：
@@ -97,6 +99,17 @@ export function redact(text) {
   out = out.replace(/\bAIza[0-9A-Za-z_-]{35}\b/g, '[REDACTED]');
   // 14. HuggingFace token（P1 加固）：hf_ 前缀 + ≥30 位字母数字
   out = out.replace(/\bhf_[A-Za-z0-9]{30,}\b/g, '[REDACTED]');
+  // 15. JWT 三段式（P1 加固）：eyJ 开头的 base64url 头 . 载荷 . 签名，三段各 ≥8 字符且限 base64url 字符集；
+  //     要求 eyJ 前缀 + 三段结构，普通句子中的句点缩写（如 section 3.1415 ends.）不会误伤。
+  out = out.replace(/\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b/g, '[REDACTED]');
+  // 16. PEM 私钥（P0-1 加固）：与 sanitize-share containsCredential 的 PEM 检测同源。
+  //     前缀覆盖 PKCS#8 加密私钥标准头 `-----BEGIN ENCRYPTED PRIVATE KEY-----` 及 RSA/EC/DSA/OPENSSH/PGP、PRIVATE KEY BLOCK。
+  //     存在配对 END 行时用惰性量词把 BEGIN→END 整块（含 Base64 主体）一并掩蔽；
+  //     无 END 的单行场景退化为只掩头行至行尾。非捕获组 + 惰性量词控制回溯。
+  out = out.replace(
+    /-----BEGIN (?:ENCRYPTED |RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY(?: BLOCK)?-----(?:[\s\S]*?-----END [A-Z ]*PRIVATE KEY(?: BLOCK)?-----[\r\n]*|[^\n]*)/g,
+    '[REDACTED]',
+  );
   return out;
 }
 
@@ -178,11 +191,19 @@ function safeDetail(detail, seen = new WeakSet()) {
   if (detail === undefined || detail === null) return null;
 
   if (detail instanceof Error) {
-    const out = { name: detail.name, message: detail.message, stack: detail.stack };
-    if ('cause' in detail && detail.cause !== undefined) {
-      out.cause = safeDetail(detail.cause, seen);
+    // P1-1：Error 也可能被 cause 自引用（e.cause = e），递归前必须先做循环检测，
+    // 否则 RangeError 爆栈后被外层 catch 降级为 [unserializable]，message/stack 全丢。
+    if (seen.has(detail)) return '[Circular]';
+    seen.add(detail);
+    try {
+      const out = { name: detail.name, message: detail.message, stack: detail.stack };
+      if ('cause' in detail && detail.cause !== undefined) {
+        out.cause = safeDetail(detail.cause, seen);
+      }
+      return out;
+    } finally {
+      seen.delete(detail);
     }
-    return out;
   }
 
   if (typeof Blob !== 'undefined' && detail instanceof Blob) {
