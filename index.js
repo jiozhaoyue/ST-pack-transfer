@@ -16,9 +16,11 @@ import {
 } from './src/storage/db.js';
 import { buildChartTree, fmtMB, splitLimitOf } from './src/core/chart-model.js';
 import { DEFAULT_FILENAME_TEMPLATE, TARGET_PLATFORMS, resolveFilename, namedBlob } from './src/core/naming.js';
-import { trustedStaticMarkup } from './src/ui/escape.js';
+import { trustedStaticMarkup, escapeHtml } from './src/ui/escape.js';
 import { getWorkbenchHtml } from './src/ui/workbench-template.js';
-import { createWorkbenchView } from './src/ui/workbench-view.js';
+import { createWorkbenchView, destroyViewObservers } from './src/ui/workbench-view.js';
+import { mountInspectModal } from './src/ui/vue/mount.js';
+import { syncPackagesFromState } from './src/ui/vue/store.js';
 import {
   detectHost, hostLayoutCode, fetchHostBackup, FULL_SELECTION,
   restoreToHost, restoreToLuker,
@@ -35,6 +37,7 @@ import {
   serverPluginUpdate, serverPluginDelete, serverPluginInstallDeps, serverPluginInstall,
   updateExtensionViaHost, setExtensionManifestSink,
   opfsTmpHandle, opfsHandleToFile, opfsTmpCleanup,
+  stopHostDomWatch,
 } from './src/ui/host-bridge.js';
 import { packPrivateContainer } from './src/core/private-container.js';
 import { prunePackageExtensions } from './src/core/ext-prune.js';
@@ -53,7 +56,8 @@ import { exportLibraryToPack, importRestoredChatsIntoLibrary } from './src/ui/ch
 import { mountLanTransferPanel } from './src/ui/lan-transfer-panel.js';
 import { createBrowserStorageProvider } from './src/ui/storage-inspector-browser.js';
 import { qr } from './src/ui/qr.js';
-import { buildSettingsHtml, readSettings, applyWebTheme } from './src/ui/settings-panel.js';
+import { buildSettingsHtml, readSettings, applyWebTheme, readGithubToken, writeGithubToken } from './src/ui/settings-panel.js';
+import { collectReportEnv, buildReportMarkdown, previewRedacted, submitToGitHub } from './src/ui/issue-report.js';
 import { buildPluginData, applyPluginData, isPluginData, downloadPluginData } from './src/ui/plugin-data.js';
 import { loadSettings, saveSettings } from './src/ui/settings-store.js';
 import { applyI18n } from './src/i18n/dom.js';
@@ -105,6 +109,9 @@ let modalRefreshHook = null;
 let nativePullHook = null;
 /** 在途拉取的取消器；宿主原生导出开始时中止插件自己的请求（宿主优先）。 */
 let activePullAbort = null;
+/** 配额定时刷新句柄与可见性回调引用；单页常驻下不主动销毁，供 HMR / 测试 / 未来卸载路径回收。 */
+let quotaTimer = null;
+let onVisibilityChange = null;
 
 /**
  * 教程浮层必须直接挂到 `document.body`。
@@ -378,15 +385,22 @@ async function main(root) {
   }
 
   async function syncPackages() {
-    if (!isStorageSupported()) { state.packages = []; view.setPackages([]); return; }
+    if (!isStorageSupported()) {
+      state.packages = [];
+      view.setPackages([]);
+      try { syncPackagesFromState(state.packages); } catch (err) { console.warn('[vue-store] package sync skipped:', err?.message || err); }
+      return;
+    }
     try {
       const records = await listStoredFiles();
       state.packages = records.filter((r) => Object.hasOwn(ORIGIN_ZONE, r.origin)).map(toPackage);
       view.setPackages(state.packages);
+      try { syncPackagesFromState(state.packages); } catch (err) { console.warn('[vue-store] package sync skipped:', err?.message || err); }
     } catch (err) {
       logger.warn(t('log.workspaceReadFailed', { msg: err.message }));
       state.packages = [];
       view.setPackages([]);
+      try { syncPackagesFromState(state.packages); } catch (err) { console.warn('[vue-store] package sync skipped:', err?.message || err); }
     }
     void refreshStorageQuota();
   }
@@ -605,6 +619,7 @@ async function main(root) {
   }
 
   async function importFiles(files, { remote = false } = {}) {
+    if (view.isTutorialMode?.()) { view.toast(t('settings.dataImportTutorial')); return 0; }
     logger.debug(`[import] received ${files?.length || 0} file(s) remote=${!!remote}: ${(files || []).map((f) => f?.name).filter(Boolean).join(', ')}`);
     const list = [...(files || [])];
     if (!list.length) return;
@@ -2366,19 +2381,117 @@ async function main(root) {
     setTimeout(() => openChangelog({ auto: true }), 450);
   }
 
+  /** 读取当前设置弹窗里的「问题报告」字段（token 从专用 localStorage 读，不进 settings）。 */
+  function readIssueForm(body) {
+    const val = (key) => {
+      const el = body?.querySelector?.('[data-setting="' + key + '"]');
+      return el && typeof el.value === 'string' ? el.value.trim() : '';
+    };
+    const tokenEl = body?.querySelector?.('#issue-token');
+    const logsEl = body?.querySelector?.('[data-setting="issueIncludeLogs"]');
+    return {
+      title: val('issueTitle'),
+      description: val('issueDescription'),
+      steps: val('issueSteps'),
+      owner: val('issueOwner'),
+      repo: val('issueRepo'),
+      includeLogs: (typeof logsEl?.checked === 'boolean')
+        ? logsEl.checked
+        : (settings.issueIncludeLogs !== false),
+      token: typeof tokenEl?.value === 'string' ? tokenEl.value.trim() : readGithubToken(),
+    };
+  }
+
+  /** 采集 + 组装脱敏报告全文；失败抛可读错误（G-34 不静默）。 */
+  async function composeIssueReport(form) {
+    let env;
+    try {
+      env = await collectReportEnv();
+    } catch (err) {
+      throw new Error(t('issue.collectFailed', { msg: err?.message || String(err) }));
+    }
+    return buildReportMarkdown({
+      env,
+      userInput: { title: form.title, description: form.description, steps: form.steps },
+      includeLogs: form.includeLogs,
+    });
+  }
+
+  /** 预览：openModal 承载全文预览，逐字转义后再注入（DOM 注入安全）。 */
+  async function previewIssueReport(body) {
+    const form = readIssueForm(body);
+    if (!form.title) { view.toast(t('issue.missingTitle')); return; }
+    let md;
+    try { md = await composeIssueReport(form); }
+    catch (err) { view.toast(err?.message || t('issue.collectFailed')); return; }
+    const safe = previewRedacted(md);
+    view.openModal(
+      t('issue.previewTitle'),
+      t('issue.privacyWarning'),
+      '<pre class="issue-report-preview">' + escapeHtml(safe) + '</pre>',
+      [
+        { label: t('modal.close'), primary: true, onClick: () => view.closeModal?.() },
+      ],
+    );
+  }
+
+  /** 提交：二次确认 + 全文预览可见 + 隐私警示；失败 toast 如实报错。 */
+  async function submitIssueReport(body) {
+    const form = readIssueForm(body);
+    if (!form.title) { view.toast(t('issue.missingTitle')); return; }
+    if (!form.owner || !form.repo) { view.toast(t('issue.missingOwnerRepo')); return; }
+    if (!form.token) { view.toast(t('issue.missingToken')); return; }
+    let md;
+    try { md = await composeIssueReport(form); }
+    catch (err) { view.toast(err?.message || t('issue.collectFailed')); return; }
+    const safe = previewRedacted(md);
+    const preview = '<pre class="issue-report-preview">' + escapeHtml(safe) + '</pre>';
+    const doSubmit = async () => {
+      /* 令牌只在确认后写专用 localStorage，绝不进 settings / settings.json。 */
+      if (typeof form.token === 'string' && form.token) writeGithubToken(form.token);
+      try {
+        const result = await submitToGitHub({
+          owner: form.owner,
+          repo: form.repo,
+          title: form.title,
+          body: md,
+          token: form.token,
+        });
+        view.closeModal?.();
+        view.toast(t('issue.submitSuccess', { url: result?.html_url || '' }));
+      } catch (err) {
+        view.toast(t('issue.submitFailed', { msg: err?.message || String(err) }));
+      }
+    };
+    view.openModal(
+      t('issue.confirmTitle'),
+      t('issue.confirmDesc') + ' · ' + t('issue.privacyWarning'),
+      [preview, '<div class="ext-note">' + t('issue.tokenStorageHint') + '</div>'],
+      [
+        { label: t('modal.cancel'), onClick: () => view.closeModal?.() },
+        { label: t('issue.confirmSubmit'), primary: true, onClick: () => { void doSubmit(); } },
+      ],
+    );
+  }
+
   function openSettings() {
     view.openSettingsView(buildSettingsHtml(settings), {
       onSave: (body) => {
         /* base 传入当前设置：只覆盖对话框里存在的控件，Git 账号 / 安装登记等原样保留。 */
         Object.assign(settings, readSettings(body, settings));
+        /* token 铁律：PAT 只写专用 localStorage，绝不进入 settings / settings.json。 */
+        const tokenEl = body?.querySelector?.('#issue-token');
+        if (tokenEl && typeof tokenEl.value === 'string') writeGithubToken(tokenEl.value);
         saveSettings(settings);
         logger.setLevel(settings.logLevel || 'warn');
         view.applySettings?.(settings);
         view.backToWorkbench();
         view.toast(t('settings.saved'));
       },
-      onAction: async (name) => {
+      onAction: async (name, el) => {
         if (name === 'changelog') { openChangelog({ auto: false }); return; }
+        if (name === 'issue-preview') { await previewIssueReport(el?.closest?.('#settings-body') || document); return; }
+        if (name === 'issue-submit') { await submitIssueReport(el?.closest?.('#settings-body') || document); return; }
         if (name === 'plugin-export') {
           const includeCredentials = !!document.querySelector('#set-include-creds')?.checked;
           const includeOAuth = includeCredentials && !!document.querySelector('#set-include-oauth')?.checked;
@@ -2566,6 +2679,12 @@ async function main(root) {
         try {
           const report = await inspectPackage(blob, { targetLayout });
           view.showInspectReport(report);
+          try {
+            void mountInspectModal({
+              getReport: () => report,
+              onClose: () => { try { view.closeInspectReport?.(); } catch { /* 忽略 */ } },
+            });
+          } catch (err) { console.warn('[vue-mount] inspect modal mount skipped:', err?.message || err); }
         } catch (err) {
           logger.error(`${t('inspect.readFailed')}: ${err?.message || err}`);
           view.toast(t('inspect.readFailed'));
@@ -2607,7 +2726,13 @@ async function main(root) {
         const active = state.packages.find((p) => view.getState().source?.pkgId === p.id);
         if (active) ensurePlan(active.id, name).then(() => view.setActivePackage(active.id));
       },
-      onTutorialExit: () => { void loadRealData(); maybeShowChangelog(); },
+      onTutorialExit: async () => {
+        await loadRealData();
+        await syncPackages();
+        const active = state.packages.find((p) => p.zone === 'import') || state.packages[0];
+        if (active) view.setActivePackage(active.id);
+        maybeShowChangelog();
+      },
       close: () => {
         const overlay = document.getElementById('st-converter-modal-overlay');
         if (overlay) overlay.style.display = 'none';
@@ -2683,6 +2808,12 @@ async function main(root) {
       const report = await inspectPackage(file, { targetLayout });
       view.showInspectReport(report);
       panel?.render?.(report);
+      try {
+        void mountInspectModal({
+          getReport: () => report,
+          onClose: () => { try { view.closeInspectReport?.(); } catch { /* 忽略 */ } },
+        });
+      } catch (err) { console.warn('[vue-mount] inspect modal mount skipped:', err?.message || err); }
     } catch (err) {
       logger.error(`${t('inspect.readFailed')}: ${err?.message || err}`);
       panel?.setError?.(t('inspect.readFailed'));
@@ -2761,11 +2892,24 @@ async function main(root) {
   }
   if (typeof document !== 'undefined') {
     // 读数必须随数据变化：操作后由 syncPackages 触发，另有低频兜底刷新。
-    setInterval(() => { if (!document.hidden) refreshStorageQuota(); }, 15000);
-    document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshStorageQuota(); });
+    quotaTimer = setInterval(() => { if (!document.hidden) refreshStorageQuota(); }, 15000);
+    onVisibilityChange = () => { if (!document.hidden) refreshStorageQuota(); };
+    document.addEventListener('visibilitychange', onVisibilityChange);
   }
   view.setProgress(0, t('progress.ready'));
   logger.info(t('log.workbenchReady', { host: host.isPlugin ? t('header.plugin', { host: HOST_LABEL[host.platform] || t('host.fallback') }) : t('header.web') }));
+}
+
+/* 单页常驻下不会被调用，供 HMR / 测试 / 未来卸载路径使用：清理全部长生命周期资源。
+   三个 dispose 必须联动，否则只清定时器、视图 observer 与宿主 DOM observer 仍然存活。 */
+export function disposeMain() {
+  if (quotaTimer) { clearInterval(quotaTimer); quotaTimer = null; }
+  if (onVisibilityChange && typeof document !== 'undefined') {
+    document.removeEventListener('visibilitychange', onVisibilityChange);
+    onVisibilityChange = null;
+  }
+  try { destroyViewObservers?.(); } catch { /* 忽略 */ }
+  try { stopHostDomWatch?.(); } catch { /* 忽略 */ }
 }
 
 /**

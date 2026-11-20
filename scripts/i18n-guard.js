@@ -18,6 +18,7 @@ export const SCAN_FILES = Object.freeze([
   'src/ui/lan-transfer-panel.js',
   'src/ui/export-queue.js',
   'src/ui/qr.js',
+  'src/ui/vue/InspectModal.vue',
 ]);
 
 const CJK = /[一-鿿]/;
@@ -110,10 +111,32 @@ export function findCjkLiterals(source) {
   return out;
 }
 
+/**
+ * 剥离 .vue 里不参与文案校验的区域：<style> 块与 <!-- --> 注释。
+ * 用等长空格替换非换行字符，保持行号与原文一致，便于精准报错。
+ * @param {string} source
+ * @returns {string}
+ */
+export function stripVueNonText(source) {
+  const blank = (m) => m.replace(/[^\n]/g, ' ');
+  return source
+    .replace(/<!--[\s\S]*?-->/g, blank)
+    .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, blank);
+}
+
 export async function checkI18n(files = SCAN_FILES) {
   const violations = [];
   for (const rel of files) {
     const source = await readFile(path.join(ROOT, rel), 'utf8');
+    if (rel.endsWith('.vue')) {
+      const text = stripVueNonText(source);
+      text.split('\n').forEach((line, idx) => {
+        if (CJK.test(line)) {
+          violations.push({ file: rel, line: idx + 1, text: line.trim() });
+        }
+      });
+      continue;
+    }
     for (const item of findCjkLiterals(source)) {
       violations.push({ file: rel, line: item.line, text: item.text });
     }

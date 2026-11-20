@@ -27,6 +27,7 @@ const ALLOWED_ROOTS = [
   /^#app\.app-container(?=$|[\s>+~.#:[\]])/,
   /^#st-converter-modal-overlay(?=$|[\s>+~.#:[\]])/,
   /^#wb-detail-overlay(?=$|[\s>+~.#:[\]])/,
+  // 第 4 根 #st-pt-tutorial-overlay 为教程浮层，需同步登记到 iron-rules.md 铁律 7
   /^#st-pt-tutorial-overlay(?=$|[\s>+~.#:[\]])/,
 ];
 
@@ -140,7 +141,7 @@ export function checkCssScope(css, file = '<css>') {
           line: rule.source?.start?.line ?? 1,
           column: rule.source?.start?.column ?? 1,
           selector: normalized,
-          message: '选择器必须以 .app-container / .st-converter-drawer-app / #st-converter-modal-overlay / #wb-detail-overlay 为作用域根',
+          message: '选择器必须以 #app.app-container / #st-converter-modal-overlay / #wb-detail-overlay / #st-pt-tutorial-overlay 为作用域根',
         });
       }
     }

@@ -84,3 +84,21 @@ export function closeInspectModal() {
   store.inspectModalOpen = false;
   store.inspectReport = null;
 }
+
+/**
+ * 从命令式 workbench-view 的真实包列表同步进响应式 store。
+ * 元素形如 { id, name, zone, size }；字段缺失时给安全默认值。
+ * 仅覆盖 packages 四字段，不触碰选中集、激活 id 等其它状态。
+ */
+export function syncPackagesFromState(list) {
+  const source = Array.isArray(list) ? list : [];
+  store.packages = source.map((p) => {
+    const item = p && typeof p === 'object' ? p : {};
+    return {
+      id: item.id ?? '',
+      name: item.name ?? '',
+      zone: item.zone === 'export' ? 'export' : 'import',
+      size: item.size ?? '',
+    };
+  });
+}

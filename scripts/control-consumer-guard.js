@@ -13,6 +13,8 @@
  * 声明表写错也能通过。它是「提醒有人必须想过这件事」的机制，不是「控件一定有消费点」的证明。
  *
  * 违规时退出码 1，输出 `文件:行号`（沿用 css-scope.js / dom-injection-guard.js 约定）。
+ *
+ * 本守卫仅覆盖 src/ui/workbench-template.js 的静态模板；settings-panel.js 等运行时字符串拼装的控件不在覆盖范围（那类控件走各自的 data-* 委托处理）。
  */
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';

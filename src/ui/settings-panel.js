@@ -10,6 +10,12 @@ import { normalizeAccounts } from '../core/git-accounts.js';
 import { escapeHtml } from './escape.js';
 import { APP_VERSION, APP_COMMIT } from '../core/app-version.js';
 import { resolveDocsTarget } from '../core/docs-site.js';
+import {
+  collectReportEnv,
+  buildReportMarkdown,
+  previewRedacted,
+  buildGitHubNewIssueUrl,
+} from './issue-report.js';
 
 /** 设置默认值。新增项必须同步 zh-CN / en-US 文案与测试。 */
 export const SETTINGS_DEFAULTS = Object.freeze({
@@ -87,6 +93,22 @@ export const SETTINGS_DEFAULTS = Object.freeze({
   autoUpdateFailureBackoff: 2,
   autoUpdateFailureBackoffMaxSec: 3600,
   autoUpdateNotifyTimeoutSec: 8,
+  /** 问题报告：目标 GitHub 仓库所有者 / 仓库名（随普通设置持久化）。 */
+  issueOwner: '',
+  issueRepo: '',
+  /** 问题报告用户输入：标题 / 问题描述 / 复现步骤（对应 buildReportMarkdown.userInput）。 */
+  issueTitle: '',
+  issueDescription: '',
+  issueSteps: '',
+  /** 问题报告是否附带脱敏日志。 */
+  issueIncludeLogs: true,
+  /** 导出脱敏包时是否明示被剔除与清洗的明细列表（角色卡/凭据/配置）；默认开启，可在设置中关闭 */
+  notifySanitizeDetails: true,
+  /**
+   * GitHub PAT：刻意不进入持久化 settings 对象——normalizeSettings 永不接收它。
+   * 真实令牌只由 index.js 写入专用 localStorage 键，绝不随 extension_settings 落 settings.json。
+   */
+  githubToken: '',
 });
 
 export const SETTING_KEYS = Object.freeze(Object.keys(SETTINGS_DEFAULTS));
@@ -323,6 +345,16 @@ export function normalizeSettings(input) {
     if (input.extSort === 'custom' || input.extSort === 'name' || input.extSort === 'version' || input.extSort === 'source') {
       out.extSort = input.extSort;
     }
+    /* 问题报告：仓库坐标与日志开关。githubToken 仅作类型归一，真实令牌由 index.js
+       存专用 localStorage 键，绝不进持久化 settings（避免落服务端 settings.json）。 */
+    if (typeof input.issueOwner === 'string') out.issueOwner = input.issueOwner.trim();
+    if (typeof input.issueRepo === 'string') out.issueRepo = input.issueRepo.trim();
+    if (typeof input.issueTitle === 'string') out.issueTitle = input.issueTitle.trim();
+    if (typeof input.issueDescription === 'string') out.issueDescription = input.issueDescription.trim();
+    if (typeof input.issueSteps === 'string') out.issueSteps = input.issueSteps.trim();
+    if (typeof input.issueIncludeLogs === 'boolean') out.issueIncludeLogs = input.issueIncludeLogs;
+    if (typeof input.notifySanitizeDetails === 'boolean') out.notifySanitizeDetails = input.notifySanitizeDetails;
+    if (typeof input.githubToken === 'string') out.githubToken = input.githubToken.trim();
   }
   return out;
 }
@@ -335,6 +367,7 @@ function setting(id, key, label, checked) {
 export function buildSettingsHtml(settings = {}) {
   const s = normalizeSettings(settings);
   ensureDocsSyncWired();
+  ensureIssueReportWired();
   const group = (key, title, body, open) => '<details class="set-group" data-group="' + key + '"' + (open ? ' open' : '') + '>'
     + '<summary class="set-group-head">' + title + '</summary>'
     + '<div class="set-group-body">' + body + '</div></details>';
@@ -359,6 +392,7 @@ export function buildSettingsHtml(settings = {}) {
     + '<div class="settings-subhead">'+t('settings.exportLifecycle')+'</div>'
     + setting('set-delete-after-export', 'deleteAfterExport', t('settings.deleteAfterExport'), s.deleteAfterExport)
     + setting('set-auto-delete-backup', 'autoDeleteBackupPacks', t('settings.autoDeleteBackupPacks'), s.autoDeleteBackupPacks)
+    + setting('set-notify-sanitize', 'notifySanitizeDetails', t('settings.notifySanitizeDetails'), s.notifySanitizeDetails)
     + '<div class="settings-subhead">'+t('settings.exportStartup')+'</div>'
     + setting('set-clear-packages', 'clearPackagesOnLoad', t('settings.clearPackagesOnLoad'), s.clearPackagesOnLoad);
 
@@ -414,12 +448,47 @@ export function buildSettingsHtml(settings = {}) {
     + escapeHtml(docsTarget.base) + '" target="_blank" rel="noopener noreferrer" style="text-decoration:none"'
     + ' title="' + escapeHtml(docsOpenLabel) + '">' + t('settings.openDocs') + '</a></div>';
 
+  const issueGroup = '<label class="et-git"><span>' + t('issue.title') + '</span>'
+    + '<input class="text_pole" type="text" data-setting="issueTitle" placeholder="' + t('issue.titlePlaceholder')
+    + '" value="' + escapeHtml(s.issueTitle || '') + '"></label>'
+    + '<label class="et-git" style="margin-top:6px"><span>' + t('issue.description') + '</span>'
+    + '<textarea class="text_pole" rows="3" data-setting="issueDescription" placeholder="'
+    + t('issue.descriptionPlaceholder') + '">' + escapeHtml(s.issueDescription || '') + '</textarea></label>'
+    + '<label class="et-git" style="margin-top:6px"><span>' + t('issue.steps') + '</span>'
+    + '<textarea class="text_pole" rows="3" data-setting="issueSteps" placeholder="'
+    + t('issue.stepsPlaceholder') + '">' + escapeHtml(s.issueSteps || '') + '</textarea></label>'
+    + '<label class="et-git" style="margin-top:6px"><span>' + t('issue.owner') + '</span>'
+    + '<input class="text_pole" type="text" data-setting="issueOwner" placeholder="' + t('issue.ownerPlaceholder')
+    + '" value="' + escapeHtml(s.issueOwner || '') + '"></label>'
+    + '<label class="et-git" style="margin-top:6px"><span>' + t('issue.repo') + '</span>'
+    + '<input class="text_pole" type="text" data-setting="issueRepo" placeholder="' + t('issue.repoPlaceholder')
+    + '" value="' + escapeHtml(s.issueRepo || '') + '"></label>'
+    + '<label class="et-git" style="margin-top:6px"><span>' + t('issue.token') + '</span>'
+    + '<input class="text_pole" type="password" id="issue-token" autocomplete="off"'
+    + ' placeholder="' + t('issue.tokenPlaceholder') + '" value="' + escapeHtml(readGithubToken()) + '"></label>'
+    + '<div class="ext-note">' + t('issue.tokenStorageHint') + '</div>'
+    + setting('set-issue-include-logs', 'issueIncludeLogs', t('issue.includeLogs'), s.issueIncludeLogs)
+    + '<div class="ext-row" style="margin-top:8px">'
+      + '<button type="button" class="btn" data-action="issue-preview">' + t('issue.preview') + '</button>'
+      + '<button type="button" class="btn danger" data-action="issue-submit">' + t('issue.submit') + '</button>'
+    + '</div>'
+    + '<div class="ext-row" style="margin-top:6px">'
+      + '<button type="button" class="menu_button" id="issue-copy-report" data-issue-action="copy">'
+      + t('settings.issueCopy') + '</button>'
+      + '<button type="button" class="menu_button" id="issue-export-md" data-issue-action="export-md">'
+      + t('settings.issueExportMd') + '</button>'
+      + '<button type="button" class="menu_button" id="issue-new-issue" data-issue-action="new-issue">'
+      + t('settings.issueNewIssue') + '</button>'
+    + '</div>'
+    + '<div class="ext-note">' + t('issue.helpHint') + '</div>';
+
   return '<div class="settings-grid">'
     + group('behavior', t('settings.groupBehavior'), tips, true)
     + group('data', t('settings.groupDataCred'), dataCredGroup, true)
     + group('export', t('settings.groupExport'), exportGroup, true)
     + group('net', t('settings.groupNet'), netGroup, false)
     + group('log', t('settings.groupLog'), logging, false)
+    + group('issue', t('issue.group'), issueGroup, false)
     + '</div>';
 }
 
@@ -491,7 +560,65 @@ export function readSettings(root, base = SETTINGS_DEFAULTS) {
     applyWebTheme(out.webTheme);
   }
 
+  /* 问题报告：仓库坐标与日志开关随普通设置持久化。
+     githubToken 刻意不读回：它由 index.js 存专用 localStorage 键，
+     若进入 out 会被 saveSettings() 双写到宿主 settings.json（违反 token 铁律）。 */
+  const issueOwnerEl = root.querySelector?.('[data-setting="issueOwner"]');
+  if (issueOwnerEl && typeof issueOwnerEl.value === 'string') out.issueOwner = issueOwnerEl.value.trim();
+  const issueRepoEl = root.querySelector?.('[data-setting="issueRepo"]');
+  if (issueRepoEl && typeof issueRepoEl.value === 'string') out.issueRepo = issueRepoEl.value.trim();
+  const issueTitleEl = root.querySelector?.('[data-setting="issueTitle"]');
+  if (issueTitleEl && typeof issueTitleEl.value === 'string') out.issueTitle = issueTitleEl.value.trim();
+  const issueDescEl = root.querySelector?.('[data-setting="issueDescription"]');
+  if (issueDescEl && typeof issueDescEl.value === 'string') out.issueDescription = issueDescEl.value.trim();
+  const issueStepsEl = root.querySelector?.('[data-setting="issueSteps"]');
+  if (issueStepsEl && typeof issueStepsEl.value === 'string') out.issueSteps = issueStepsEl.value.trim();
+  const issueLogsEl = root.querySelector?.('[data-setting="issueIncludeLogs"]');
+  if (issueLogsEl && typeof issueLogsEl.checked === 'boolean') out.issueIncludeLogs = issueLogsEl.checked;
+
   return normalizeSettings(out);
+}
+
+/** GitHub PAT 专用 localStorage 键：与持久化 settings 分离，绝不进 settings.json。 */
+export const GITHUB_TOKEN_STORAGE_KEY = 'st-pack-transfer:github-token';
+
+function tokenStorage() {
+  try {
+    return typeof localStorage !== 'undefined' ? localStorage : null;
+  } catch {
+    return null;
+  }
+}
+
+/** 读取本机 GitHub PAT；无存储 / 隐私模式一律返回空串。 */
+export function readGithubToken() {
+  const s = tokenStorage();
+  if (!s) return '';
+  try {
+    const raw = s.getItem(GITHUB_TOKEN_STORAGE_KEY);
+    return typeof raw === 'string' ? raw.trim() : '';
+  } catch {
+    return '';
+  }
+}
+
+/** 仅写本机 localStorage；令牌永不进入 extension_settings / settings.json。 */
+export function writeGithubToken(token) {
+  const s = tokenStorage();
+  if (!s) return false;
+  try {
+    const value = typeof token === 'string' ? token.trim() : '';
+    if (value) s.setItem(GITHUB_TOKEN_STORAGE_KEY, value);
+    else s.removeItem(GITHUB_TOKEN_STORAGE_KEY);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** 清空本机 GitHub PAT。 */
+export function clearGithubToken() {
+  return writeGithubToken('');
 }
 
 /**
@@ -558,4 +685,140 @@ function ensureDocsSyncWired() {
   document.addEventListener('input', onInput, true);
   document.addEventListener('change', onInput, true);
   document.addEventListener('click', onClick, true);
+}
+
+/** 问题报告按钮委托只注册一次；模块导入本身无副作用（Node 测试无 document）。 */
+let issueReportWired = false;
+
+/** 读取设置弹窗里的问题报告字段与日志开关；未渲染时返回确定默认值。 */
+function readIssueReportForm(body) {
+  const val = (key) => {
+    const el = body?.querySelector?.('[data-setting="' + key + '"]');
+    return el && typeof el.value === 'string' ? el.value.trim() : '';
+  };
+  const logsEl = body?.querySelector?.('[data-setting="issueIncludeLogs"]');
+  return {
+    title: val('issueTitle'),
+    description: val('issueDescription'),
+    steps: val('issueSteps'),
+    owner: val('issueOwner'),
+    repo: val('issueRepo'),
+    includeLogs: typeof logsEl?.checked === 'boolean' ? logsEl.checked : true,
+  };
+}
+
+/** 采集环境并组装脱敏报告全文；includeLogs 由当前勾选状态透传。 */
+async function composeIssueReportText(body) {
+  const form = readIssueReportForm(body);
+  const env = await collectReportEnv();
+  const text = previewRedacted(buildReportMarkdown({
+    env,
+    userInput: { title: form.title, description: form.description, steps: form.steps },
+    includeLogs: form.includeLogs,
+  }));
+  return { form, text };
+}
+
+/** 写剪贴板：优先异步 API，失败降级 textarea + execCommand。 */
+function legacyCopy(text) {
+  if (typeof document === 'undefined') return false;
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    // dom-scope:allow 剪贴板降级临时 textarea 须在 body 内才能 select，用完立即 remove
+    document.body.appendChild(ta);
+    ta.select();
+    const ok = document.execCommand('copy');
+    ta.remove();
+    return ok;
+  } catch {
+    return false;
+  }
+}
+
+function writeClipboard(text) {
+  try {
+    if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+      return Promise.resolve(navigator.clipboard.writeText(text)).then(
+        () => true,
+        () => legacyCopy(text),
+      );
+    }
+  } catch { /* 无剪贴板 API，走降级 */ }
+  return Promise.resolve(legacyCopy(text));
+}
+
+/** 用 Blob 下载 Markdown 产物；objectURL 随后释放，避免内存泄露。 */
+function downloadMarkdown(text) {
+  if (typeof document === 'undefined' || typeof URL?.createObjectURL !== 'function') return;
+  const blob = new Blob([text], { type: 'text/markdown;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'issue-report.md';
+  // dom-scope:allow 下载 a 元素须在文档内才能触发 click，触发后立即 remove
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  // 释放时机不能是 0ms：Safari/Firefox 尚未消费该 URL 就失效会导致下载失败。与仓内其它下载点一致用 60s。
+  setTimeout(() => { try { URL.revokeObjectURL(url); } catch { /* 忽略 */ } }, 60000);
+}
+
+/** 在按钮上短暂闪现提示文案，文案全部来自 i18n。 */
+function flashLabel(btn, msg) {
+  if (!btn || typeof btn.textContent !== 'string') return;
+  const original = btn.textContent;
+  btn.textContent = msg;
+  setTimeout(() => { btn.textContent = original; }, 1500);
+}
+
+/**
+ * 惰性注册问题报告按钮的委托监听。
+ *
+ * 用独立的 data-issue-action 属性，避开 index.js 的 data-action 路由；
+ * 这样三个按钮的事件由本模块自包含处理，不改动根控制器。
+ */
+function ensureIssueReportWired() {
+  if (issueReportWired) return;
+  if (typeof document === 'undefined' || typeof document.addEventListener !== 'function') return;
+  issueReportWired = true;
+
+  const onClick = (ev) => {
+    const btn = ev.target?.closest?.('[data-issue-action]');
+    if (!btn) return;
+    const action = btn.getAttribute('data-issue-action');
+    const body = btn.closest('#settings-body') || document;
+
+    composeIssueReportText(body).then(({ form, text }) => {
+      if (action === 'copy') {
+        writeClipboard(text).then((ok) => {
+          flashLabel(btn, t(ok ? 'settings.issueCopyOk' : 'settings.issueCopyFail'));
+        });
+        return;
+      }
+      if (action === 'export-md') {
+        downloadMarkdown(text);
+        return;
+      }
+      if (action === 'new-issue') {
+        if (typeof window === 'undefined' || typeof window.open !== 'function') return;
+        const url = buildGitHubNewIssueUrl({
+          owner: form.owner || undefined,
+          repo: form.repo || undefined,
+          title: form.title,
+          body: text,
+        });
+        const opened = window.open(url, '_blank', 'noopener');
+        // 弹窗被浏览器拦截时 window.open 返回 null，必须告知用户而不是静默失败。
+        if (!opened) flashLabel(btn, t('settings.issuePopupBlocked'));
+      }
+    }).catch(() => {
+      flashLabel(btn, t('settings.issueCopyFail'));
+    });
+  };
+
+  document.addEventListener('click', onClick, false);
 }

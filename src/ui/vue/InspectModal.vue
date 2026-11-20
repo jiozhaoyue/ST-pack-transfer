@@ -4,16 +4,16 @@
       <header class="modal-header">
         <div class="modal-title-wrap">
           <span class="icon">🩺</span>
-          <h3 class="modal-title">{{ title || '数据包体检报告' }}</h3>
+          <h3 class="modal-title">{{ title || t('inspect.reportTitle') }}</h3>
         </div>
-        <button type="button" class="close-btn" @click="handleClose" aria-label="关闭">×</button>
+        <button type="button" class="close-btn" @click="handleClose" :aria-label="t('inspect.close')">×</button>
       </header>
 
       <div class="modal-body">
         <!-- 总体结论横幅 -->
         <div :class="['verdict-banner', verdictStatus]">
           <span class="verdict-icon">{{ verdictStatus === 'pass' ? '✓' : '⚠' }}</span>
-          <span class="verdict-text">{{ report?.verdict || '正在分析数据包结构...' }}</span>
+          <span class="verdict-text">{{ report?.verdict || t('inspect.analyzing') }}</span>
         </div>
 
         <!-- A~E 五层分级展示 -->
@@ -23,7 +23,7 @@
               <span class="layer-badge">{{ layer.code }}</span>
               <span class="layer-name">{{ layer.name }}</span>
               <span :class="['layer-status', layer.ok ? 'ok' : 'warn']">
-                {{ layer.ok ? '正常' : '异常' }}
+                {{ t(layer.ok ? 'inspect.severity.ok' : 'inspect.severity.warn') }}
               </span>
             </header>
             <div class="layer-content">
@@ -37,15 +37,15 @@
       </div>
 
       <footer class="modal-footer">
-        <button type="button" class="btn btn-secondary" @click="handleClose">关闭</button>
-        <!-- 高价值新特性：体检合格后一键存入工作区 -->
+        <button type="button" class="btn btn-secondary" @click="handleClose">{{ t('inspect.close') }}</button>
+        <!-- Save to workspace after a passing inspection -->
         <button
           v-if="canSaveToWorkspace"
           type="button"
           class="btn btn-primary save-btn"
           @click="handleSaveToWorkspace"
         >
-          存入工作区
+          {{ t('pending.stash') }}
         </button>
       </footer>
     </div>
@@ -54,6 +54,7 @@
 
 <script setup>
 import { computed } from 'vue';
+import { t } from '../../i18n/index.js';
 
 const props = defineProps({
   isOpen: { type: Boolean, default: false },
@@ -74,11 +75,38 @@ const canSaveToWorkspace = computed(() => {
 const layers = computed(() => {
   const r = props.report || {};
   return {
-    layerA: { code: 'A', name: '文件字节', ok: !r.emptyFile && !r.truncated, summary: r.layerA?.summary || '文件头与基础签名检测' },
-    layerB: { code: 'B', name: 'ZIP 结构', ok: !r.corruptZip, summary: r.layerB?.summary || '中央目录及 EOCD 校验' },
-    layerC: { code: 'C', name: '条目画像', ok: true, summary: `条目总数: ${r.entryCount || 0}，空条目: ${r.zeroByteCount || 0}` },
-    layerD: { code: 'D', name: '语义识别', ok: !!r.layout, summary: `检测宿主布局: ${r.layout || '未识别'}` },
-    layerE: { code: 'E', name: '可转换性', ok: r.convertible ?? true, summary: r.convertible ? '满足转换要求' : '部分资源需丢弃' },
+    layerA: {
+      code: 'A',
+      name: t('inspect.layer.bytes'),
+      ok: !r.emptyFile && !r.truncated,
+      summary: r.layerA?.summary || t('inspect.layerA.summary'),
+    },
+    layerB: {
+      code: 'B',
+      name: t('inspect.layer.zip'),
+      ok: !r.corruptZip,
+      summary: r.layerB?.summary || t('inspect.layerB.summary'),
+    },
+    layerC: {
+      code: 'C',
+      name: t('inspect.layer.entries'),
+      ok: true,
+      summary: t('inspect.layerC.summary', { total: r.entryCount || 0, empty: r.zeroByteCount || 0 }),
+    },
+    layerD: {
+      code: 'D',
+      name: t('inspect.layer.semantic'),
+      ok: !!r.layout,
+      summary: t('inspect.layerD.summary', { layout: r.layout || t('inspect.layoutUnknown') }),
+    },
+    layerE: {
+      code: 'E',
+      name: t('inspect.layer.convertible'),
+      ok: r.convertible ?? true,
+      summary: r.convertible
+        ? t('inspect.layerE.ok')
+        : t('inspect.layerE.partial'),
+    },
   };
 });
 
@@ -144,12 +172,12 @@ function handleSaveToWorkspace() {
   background: transparent;
   border: none;
   font-size: 20px;
-  color: #888;
+  color: var(--SmartThemeQuoteColor, #888);
   cursor: pointer;
 }
 
 .close-btn:hover {
-  color: #fff;
+  color: var(--SmartThemeEmColor, #fff);
 }
 
 .modal-body {
@@ -173,13 +201,13 @@ function handleSaveToWorkspace() {
 .verdict-banner.pass {
   background: rgba(76, 175, 80, 0.15);
   border: 1px solid rgba(76, 175, 80, 0.4);
-  color: #81c784;
+  color: var(--SmartThemeEmColor, #81c784);
 }
 
 .verdict-banner.warn {
   background: rgba(255, 152, 0, 0.15);
   border: 1px solid rgba(255, 152, 0, 0.4);
-  color: #ffb74d;
+  color: var(--SmartThemeQuoteColor, #ffb74d);
 }
 
 .layers-list {
@@ -223,19 +251,19 @@ function handleSaveToWorkspace() {
 }
 
 .layer-status.ok {
-  color: #81c784;
+  color: var(--SmartThemeEmColor, #81c784);
   background: rgba(76, 175, 80, 0.1);
 }
 
 .layer-status.warn {
-  color: #ffb74d;
+  color: var(--SmartThemeQuoteColor, #ffb74d);
   background: rgba(255, 152, 0, 0.1);
 }
 
 .layer-desc {
   margin: 0;
   font-size: 12px;
-  color: #aaa;
+  color: var(--SmartThemeQuoteColor, #aaa);
 }
 
 .modal-footer {
@@ -257,16 +285,16 @@ function handleSaveToWorkspace() {
 
 .btn-secondary {
   background: rgba(255, 255, 255, 0.08);
-  color: #ccc;
+  color: var(--SmartThemeBodyColor, #ccc);
   border-color: rgba(255, 255, 255, 0.12);
 }
 
 .btn-primary {
-  background: #e53935;
-  color: #fff;
+  background: var(--SmartThemeQuoteColor, #e53935);
+  color: var(--SmartThemeBodyColor, #fff);
 }
 
 .btn-primary:hover {
-  background: #f44336;
+  background: var(--SmartThemeQuoteColor, #f44336);
 }
 </style>

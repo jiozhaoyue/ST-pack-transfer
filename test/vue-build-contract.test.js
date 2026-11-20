@@ -54,12 +54,20 @@ describe('Vue 3 响应式 Store 契约', () => {
 });
 
 describe('Vue 3 SFC 与构建基座契约', () => {
-  it('InspectModal.vue 包含 Scoped CSS 与高价值「存入工作区」动作', async () => {
+  it('InspectModal.vue 包含 Scoped CSS 与 i18n 化的「存入工作区」动作', async () => {
     const sfc = await read('src/ui/vue/InspectModal.vue');
     expect(sfc).toContain('<style scoped>');
     expect(sfc).toContain('handleSaveToWorkspace');
-    expect(sfc).toContain('存入工作区');
+    expect(sfc).toContain("t('pending.stash')");
     expect(sfc).toContain('verdict-banner');
+  });
+
+  it('InspectModal.vue 的 template+script 区不含中文字符', async () => {
+    const sfc = await read('src/ui/vue/InspectModal.vue');
+    const text = sfc
+      .replace(/<!--[\s\S]*?-->/g, '')
+      .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, '');
+    expect(/[\u4e00-\u9fa5]/.test(text)).toBe(false);
   });
 
   it('vite.config.js 包含 @vitejs/plugin-vue 插件配置', async () => {

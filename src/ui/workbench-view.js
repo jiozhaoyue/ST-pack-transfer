@@ -64,6 +64,7 @@ import { gitSiteIcon } from './git-icons.js';
 import { hasKey, t } from '../i18n/index.js';
 import { mountInspectPanel, renderInspectReport } from './inspect-view.js';
 import { logger } from '../core/logger.js';
+import { userFilesSupported, hostHasStorageEngines } from './host-bridge.js';
 import { loadSettings, saveSettings } from './settings-store.js';
 import { normalizeUpdateInterval, updatePolicyOf, updateBackoffDelay, applyWebTheme } from './settings-panel.js';
 import { loadChartPrefs, saveChartPrefs, normalizeChartPrefs } from './chart-prefs.js';
@@ -74,6 +75,17 @@ import { TARGET_PLATFORMS } from '../data/target-platforms.js';
 import { TARGET_AUTO, resolveAutoTarget, targetHostOf, targetNameOfHost } from '../core/naming.js';
 import { TARGET_UI, brandTokensOf } from '../data/target-ui.js';
 import { applyUiTokens } from '../data/ui-tokens.js';
+
+/* 视图层 observer 引用：单页常驻下不主动销毁，供 HMR / 测试 / 未来卸载路径回收。 */
+let chartTightRO = null, chartTightMO = null, switchDensityRO = null;
+
+/* 单页常驻下不会被调用，供 HMR / 测试 / 未来卸载路径使用：断开全部视图 observer 并置空。
+   必须是顶层导出：放在 createWorkbenchView 函数体内会触发 SyntaxError: Unexpected token 'export'。 */
+export function destroyViewObservers(){
+  if(chartTightRO){ chartTightRO.disconnect(); chartTightRO=null; }
+  if(chartTightMO){ chartTightMO.disconnect(); chartTightMO=null; }
+  if(switchDensityRO){ switchDensityRO.disconnect(); switchDensityRO=null; }
+}
 
 /**
  * 教程锚点纯几何：用 overlay 自身矩形做基准，兼容宿主容器的 transform。
@@ -247,7 +259,7 @@ function packageNodes(pkg){
   annotateChatLinks(nodes, t('link.unmatched'));
   applyIncompatibleDefault(nodes);
   /* 私有件「传云」只在 ST/Luker 有原生 files 接口时出现；宿主树没有源包字节，故不标。 */
-  const canUpload = state.mode!=='web' && (state.host==='st' || state.host==='luker');
+  const canUpload = state.mode!=='web' && userFilesSupported(state.host);
   if(canUpload){
     walk(nodes,(n)=>{ if(n.leaf && n.privateConfig) n.uploadable=true; });
   }
@@ -605,7 +617,7 @@ function setChecked(n,scope,val){
 /** Luker 宿主：选中包后自动把目标存储引擎切到该包声明的源引擎。
  *  用户 2026-11-17 裁定：不得停留在「跟随源包」或旧选择。 */
 function autoEngineForPackage(pkg){
-  if(state.host!=='luker' || !pkg) return;
+  if(!hostHasStorageEngines(state.host) || !pkg) return;
   const kind=String(pkg.sourceEngine||'');
   if(!['fs','postgres','mysql','sqlite'].includes(kind)) return;
   if(state.engine===kind) return;
@@ -1084,9 +1096,9 @@ function renderTargetPicker(){
       app.style.setProperty('--accent-line', `color-mix(in srgb, ${bt.ring} 62%, transparent)`);
     }
   }
-  /* 存储引擎只对 Luker 目标开放：其他宿主没有这三种后端，显示出来只会误导。 */
+  /* 存储引擎只对具备多后端的宿主开放：其他宿主没有这三种后端，显示出来只会误导。 */
   const engineField=document.getElementById('engine-field');
-  if(engineField) engineField.hidden = cur.host !== 'luker';
+  if(engineField) engineField.hidden = !hostHasStorageEngines(cur.host);
   const engineSelect=document.getElementById('target-engine');
   if(engineSelect) engineSelect.value = state.engine;
   /* 「跟随来源」条目复用现有 picker 类，零新增 CSS：
@@ -1441,14 +1453,20 @@ function extModeButtonsHtml(names, labelScope){
   if(!list.length) return '';
   const current=extensionPackModeSummary(list, extModeOf);
   const payload=escapeHtml(JSON.stringify(list));
-  const btn=(mode,on,label)=>'<button type="button" class="extmode-btn'
+  const btn=(mode,on,label)=>{
+    /* 2026-11-20 批次3：清单/完整按钮按所在扩展组补上下文（aria-only，动作词元复用现有 label）。
+       list 为扩展名数组，取首项作区域上下文；不新增 i18n 键、无中文字面量。 */
+    const scopeName=list[0];
+    const aria=(scopeName?scopeName+' ':'')+label;
+    return '<button type="button" class="extmode-btn'
     +(on?' is-on':'')
     +'" data-extpackmode="'+mode+'" data-extpacknames="'+payload+'"'
     +' aria-pressed="'+(on?'true':'false')+'"'
-    +' title="'+label+'" aria-label="'+label+'">'
+    +' title="'+label+'" aria-label="'+escapeHtml(aria)+'">'
     +'<span class="em-sym" aria-hidden="true">'+(mode===EXT_PACK_MODES.FULL?t('extension.fullSym'):t('extension.manifestSym'))+'</span>'
     +'<span class="em-txt">'+label+'</span>'
     +'</button>';
+  };
   return '<span class="tree-extmode" data-extmodescope="'+escapeHtml(labelScope||'ext')+'">'
     +btn(EXT_PACK_MODES.FULL,current.full,t('extension.full'))
     +btn(EXT_PACK_MODES.MANIFEST,current.manifest,t('extension.manifest'))
@@ -1503,13 +1521,18 @@ function renderTreeRows(nodes,depth,scope,readonly,tools,totalMb,drill,colorMap,
       ? (inMax
         ? '<button class="tree-toggle vol-drill" data-voldrill="'+idE+'" aria-label="'+t('chart.drill')+'" title="'+t('chart.drill')+'">'
           +'<svg class="chev" viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5l7 7-7 7"/></svg></button>'
-        : '<button class="tree-toggle" data-node="'+idE+'" aria-label="'+t('chart.expand')+'">'
+        /* 2026-11-20 线B-P1：aria-label 带上下文（区域名 + 展开或收起），消除 11 个同名折叠箭头。
+           动态生成按钮不走 data-i18n-aria（那是静态模板机制），改用拼接现有 t() 词元；
+           两份字典本轮禁改，故不新增键。labE 已转义，可直接进属性。 */
+        : '<button class="tree-toggle" data-node="'+idE+'" aria-label="'+labE+' '+t('chart.expand')+'">'
           +'<svg class="chev" viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5l7 7-7 7"/></svg></button>')
       : '<button class="tree-toggle empty" aria-hidden="true"></button>';
     out+='<div class="tree-row'+(expanded?' expanded':'')+'" data-id="'+idE+'" style="--depth:'+depth+'">'
       +'<span class="tree-main">'
       +toggleHtml
-      +'<input class="tree-check" type="checkbox" data-check="'+idE+'"'+(checked?' checked':'')+(indeterminate?' data-ind="1"':'')+(readonly?' disabled':'')+'>'
+      /* 2026-11-20 批次3：树行勾选框包 <label>，使探针 ancestor-label 命中区 ≥28px
+         （tree/pkg 两类行专用，不改其它结构）。事件委托读 input.dataset.check 不变。 */
+      +'<label class="tree-check-hit"><input class="tree-check" type="checkbox" data-check="'+idE+'"'+(checked?' checked':'')+(indeterminate?' data-ind="1"':'')+(readonly?' disabled':'')+'></label>'
       +(depth===0 && colorCls ? '<span class="tree-dot '+colorCls+'" aria-hidden="true"></span>' : '')
       +svg(n.icon,'tree-ico')
       +'<span class="tree-label'+(inMax&&hasKids?' is-drill':'')+'"'+(inMax&&hasKids?' data-voldrill="'+idE+'"':'')+' title="'+labE+'">'+labE+(n.badge?'<span class="sub">'+badgeE+'</span>':'')+(n.note?'<span class="sub">'+noteE+'</span>':'')+(nodePrivateIncompatible(n)?'<span class="sub is-incompat" title="'+t('private.incompatibleHint')+'">'+t('private.incompatible')+'</span>':'')+'</span>'
@@ -1765,13 +1788,18 @@ function chartCardHtml(o, place){
       +'</button>'
       +(o.totalText?'<span class="vol-total">'+o.totalText+'</span>':'')
       +(dis || o.readonly ? '' : '<span class="vol-bulk">'
-        +'<button data-treeall="1">'+t('chart.selectAll')+'</button>'
-        +'<button data-treenone="1">'+t('chart.selectNone')+'</button>'
-        +'<button data-treeinvert="1">'+t('chart.invert')+'</button>'
+        /* 2026-11-20 批次3：卷头批量按钮补「卷号 + 动作」上下文（aria-only，不新增 i18n 键）。
+           idxText 为本卡包序号显示串、volText 为卷号，均来自既有 t() 词元。 */
+        +'<button data-treeall="1" aria-label="'+escapeHtml((o.idxText||'')+' '+t('chart.selectAll'))+'">'+t('chart.selectAll')+'</button>'
+        +'<button data-treenone="1" aria-label="'+escapeHtml((o.idxText||'')+' '+t('chart.selectNone'))+'">'+t('chart.selectNone')+'</button>'
+        +'<button data-treeinvert="1" aria-label="'+escapeHtml((o.idxText||'')+' '+t('chart.invert'))+'">'+t('chart.invert')+'</button>'
       +'</span>')
       +(o.pkgId?'<button class="group-close" data-closegroup="'+o.pkgId+'" aria-label="'+t('chart.closeGroup')+'">×</button>':'')
       +'<button class="vol-max" data-volmax="'+o.key+'" title="'+(maxed?t('chart.restore'):t('chart.maximize'))+'" aria-label="'+(maxed?t('chart.restore'):t('chart.maximize'))+'">'+(maxed?'⤡':'⤢')+'</button>'
-      +'<button class="vol-collapse" data-voltoggle="'+o.key+'" aria-label="'+t('chart.expand')+'">'
+      /* 2026-11-20 线B-P1：折叠箭头 aria-label 带包名/卷号上下文，消除同名。
+         idxText/volText 是本卡已有的显示串（含包序号与卷号，来自 t() 词元），
+         已可作上下文；用 escapeHtml 转义后进属性，不新增 i18n 键、无中文字面量。 */
+      +'<button class="vol-collapse" data-voltoggle="'+o.key+'" aria-label="'+escapeHtml((o.idxText||'')+(o.volText?' '+o.volText:''))+' '+t('chart.expand')+'">'
       +'<svg class="chev" viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5l7 7-7 7"/></svg></button>'
     +'</div>'
     +(maxed ? volBreadcrumbHtml(o) : '')
@@ -1806,7 +1834,7 @@ function extensionToolsHtml(pkg, assetPkgs, { scope, nodes } = {}){
       +'<span class="et-label">'+t('extension.uncheckedLabel')+'</span>'
       +'<div class="segmented et-mode">'
         +'<button class="seg-btn'+(state.extUncheckedMode!=='manifest'?' active':'')+'" data-extunchecked="none">'+t('extension.uncheckedKeep')+'</button>'
-        +'<button class="seg-btn'+(state.extUncheckedMode==='manifest'?' active':'')+'" data-extunchecked="manifest">'+t('extension.manifest')+'</button>'
+        +'<button class="seg-btn'+(state.extUncheckedMode==='manifest'?' active':'')+'" data-extunchecked="manifest" aria-label="'+escapeHtml(t('extension.uncheckedLabel')+' '+t('extension.manifest'))+'">'+t('extension.manifest')+'</button>'
       +'</div>'
       +'</div>';
   }
@@ -1829,7 +1857,7 @@ function extensionToolsHtml(pkg, assetPkgs, { scope, nodes } = {}){
 
 /* ── 云端私有件（user/files）：宿主无列表端点，条目来自本地上传登记 ── */
 function userFilesAvailable(){
-  return state.mode!=='web' && (state.host==='st' || state.host==='luker');
+  return state.mode!=='web' && userFilesSupported(state.host);
 }
 function privateFilesHtml(){
   if(!userFilesAvailable()) return '';
@@ -2389,7 +2417,8 @@ function pkgCard(p, opts){
         /* 待导出项不可勾选：用与 .pkg-check 等宽的透明占位保持与真实卡完全对齐，
            但仍复用既有 .pkg-check 尺寸规则，不再新建 .pkg-check-spacer 素材。 */
         ? '<span class="pkg-check-slot" aria-hidden="true"></span>'
-        : '<input class="pkg-check" type="checkbox" data-pkgcheck="'+p.id+'"'+(state.selectedPkgs.has(p.id)?' checked':'')+' title="'+t('zones.checkboxActionTip')+'" aria-label="'+t('zones.checkboxActionTip')+'">')
+        /* 2026-11-20 批次3：包卡勾选框包 <label>，使探针 ancestor-label 命中区 ≥28px。 */
+        : '<label class="pkg-check-hit"><input class="pkg-check" type="checkbox" data-pkgcheck="'+p.id+'"'+(state.selectedPkgs.has(p.id)?' checked':'')+' title="'+t('zones.checkboxActionTip')+'" aria-label="'+t('zones.checkboxActionTip')+'"></label>')
     +icon
     +'<div class="pkg-info">'
     +'<div class="pkg-name"><span class="pkg-name-txt" data-fullname="'+encodeURIComponent(p.name)+'" title="'+escapeHtml(p.name)+'">'+escapeHtml(p.name)+'</span></div>'
@@ -2426,9 +2455,9 @@ function renderZones(){
       + '</div>';
   }
   const zoneSelButtons = '<div class="ext-sel-group zone-sel-group" title="' + t('zones.selGroupTitle') + '">'
-    + '<button type="button" class="btn icon" data-pkgall title="' + t('extmgr.selectAll') + '" aria-label="' + t('extmgr.selectAll') + '"><i class="fa-solid fa-check-double"></i></button>'
-    + '<button type="button" class="btn icon" data-pkginvert title="' + t('extmgr.invert') + '" aria-label="' + t('extmgr.invert') + '"><i class="fa-solid fa-shuffle"></i></button>'
-    + '<button type="button" class="btn icon" data-pkgnone title="' + t('extmgr.selectNone') + '" aria-label="' + t('extmgr.selectNone') + '"><i class="fa-solid fa-xmark"></i></button>'
+    + '<button type="button" class="btn icon" data-pkgall title="' + t('extmgr.selectAll') + '" aria-label="' + escapeHtml(t('zones.title')+' '+t('extmgr.selectAll')) + '"><i class="fa-solid fa-check-double"></i></button>'
+    + '<button type="button" class="btn icon" data-pkginvert title="' + t('extmgr.invert') + '" aria-label="' + escapeHtml(t('zones.title')+' '+t('extmgr.invert')) + '"><i class="fa-solid fa-shuffle"></i></button>'
+    + '<button type="button" class="btn icon" data-pkgnone title="' + t('extmgr.selectNone') + '" aria-label="' + escapeHtml(t('zones.title')+' '+t('extmgr.selectNone')) + '"><i class="fa-solid fa-xmark"></i></button>'
     + '</div>';
   const sortBlock = '<label class="zone-sort-label">' + t('sort.label') + ' <select id="sort-select">'
     + '<option value="time-desc"' + (state.sort === 'time-desc' ? ' selected' : '') + '>' + t('sort.timeDesc') + '</option>'
@@ -5142,8 +5171,9 @@ async function renderExtInstalled(body){
     : '';
 
   const sortOptions=[['custom','extmgr.sortCustom'],['order','extmgr.sortOrder'],['name','extmgr.sortName'],['version','extmgr.sortVersion'],['source','extmgr.sortSource']];
-  const iconBtn=(attr,icon,label,extra)=>'<button type="button" class="btn icon'+(extra?' '+extra:'')+'" '+attr
-    +' title="'+label+'" aria-label="'+label+'"><i class="fa-solid '+icon+'"></i></button>';
+  /* ariaLabel 可选：区域上下文覆盖默认 aria-label（批次3，消除与包卡全选等同名）。 */
+  const iconBtn=(attr,icon,label,extra,ariaLabel)=>'<button type="button" class="btn icon'+(extra?' '+extra:'')+'" '+attr
+    +' title="'+label+'" aria-label="'+(ariaLabel||label)+'"><i class="fa-solid '+icon+'"></i></button>';
 
   /* 统一顶部吸顶操作工具栏：宿主与数据包各自适配动作 */
   const showBatchRef = !!loadSettings().gitRefInstallOn;
@@ -5208,9 +5238,9 @@ async function renderExtInstalled(body){
         +'<span class="ext-list-count">'+t('extmgr.listCount',{n:countTotal})+'</span>'
         +'<span class="ext-state" id="extmgr-sel-count">'+t('extmgr.selectedN',{n:0,total:countTotal})+'</span>'
         +'<div class="ext-sel-group">'
-          +iconBtn('data-extall','fa-check-double',t('extmgr.selectAll'))
-          +iconBtn('data-extinvert','fa-shuffle',t('extmgr.invert'))
-          +iconBtn('data-extnone','fa-xmark',t('extmgr.selectNone'))
+          +iconBtn('data-extall','fa-check-double',t('extmgr.selectAll'),'',t('extension.label')+' '+t('extmgr.selectAll'))
+          +iconBtn('data-extinvert','fa-shuffle',t('extmgr.invert'),'',t('extension.label')+' '+t('extmgr.invert'))
+          +iconBtn('data-extnone','fa-xmark',t('extmgr.selectNone'),'',t('extension.label')+' '+t('extmgr.selectNone'))
         +'</div>'
       +'</div>'
       +'<div class="ext-unified-actions">'
@@ -5230,9 +5260,9 @@ async function renderExtInstalled(body){
             +'<span class="ext-list-count">'+t('extmgr.listCount',{n:countTotal})+'</span>'
             +'<span class="ext-state" id="extmgr-sel-count">'+t('extmgr.selectedN',{n:0,total:countTotal})+'</span>'
             +'<div class="ext-sel-group">'
-              +iconBtn('data-extall','fa-check-double',t('extmgr.selectAll'))
-              +iconBtn('data-extinvert','fa-shuffle',t('extmgr.invert'))
-              +iconBtn('data-extnone','fa-xmark',t('extmgr.selectNone'))
+              +iconBtn('data-extall','fa-check-double',t('extmgr.selectAll'),'',t('extension.label')+' '+t('extmgr.selectAll'))
+              +iconBtn('data-extinvert','fa-shuffle',t('extmgr.invert'),'',t('extension.label')+' '+t('extmgr.invert'))
+              +iconBtn('data-extnone','fa-xmark',t('extmgr.selectNone'),'',t('extension.label')+' '+t('extmgr.selectNone'))
             +'</div>'
           +'</div>'
           +'<div class="ext-unified-actions">'
@@ -8414,6 +8444,10 @@ function bind(){
     container: document.getElementById('inspect-panel'),
     onPickFile: () => actions.inspectFile?.(),
   });
+  /* 2026-11-20 批次3：两个「选择文件」入口补区域上下文（aria-only，不新增 i18n 键）。
+     按钮本体分别在 workbench-template.js / inspect-view.js（本轮禁改），故在此按既有拼法赋值。 */
+  document.getElementById('btn-inspect')?.setAttribute('aria-label',t('zones.title')+' '+t('inspect.pick'));
+  document.querySelector('#inspect-panel [data-inspect-pick]')?.setAttribute('aria-label',t('inspect.title')+' '+t('inspect.pick'));
   document.getElementById('btn-inspect')?.addEventListener('click',()=>actions.inspectFile?.());
   const dlg=confirmDialogEl();
   if(dlg){
@@ -8434,7 +8468,8 @@ function bind(){
   });
   document.getElementById('log-export').addEventListener('click',exportLog);
   document.getElementById('log-copy').addEventListener('click',()=>{
-    navigator.clipboard?.writeText(logText()).then(()=>toast(t('toast.logCopied'))).catch(()=>toast(t('toast.copyFailed')));
+    const content = typeof logger.exportText === 'function' ? logger.exportText() : logText();
+    navigator.clipboard?.writeText(content).then(()=>toast(t('toast.logCopied'))).catch(()=>toast(t('toast.copyFailed')));
   });
 
   document.getElementById('tutorial-skip').addEventListener('click',hideTutorialOverlay);
@@ -8607,11 +8642,17 @@ function initChartTight(){
     });
   };
   const schedule=()=>{ if(!raf) raf=requestAnimationFrame(apply); };
-  const ro=new ResizeObserver(schedule);
-  const observe=()=>stack.querySelectorAll('.vol-card').forEach(c=>ro.observe(c));
+  /* 幂等守卫：重复调用时先断开旧 observer，避免累积监听。 */
+  if(chartTightRO) chartTightRO.disconnect();
+  if(chartTightMO) chartTightMO.disconnect();
+  chartTightRO=new ResizeObserver(schedule);
+  /* 闭包内先判空：destroyViewObservers 可能已把 chartTightRO 置 null，
+     此时排队中的 rAF / MO 回调若继续 observe 会抛 Cannot read properties of null。 */
+  const observe=()=>{ if(!chartTightRO) return; stack.querySelectorAll('.vol-card').forEach(c=>chartTightRO.observe(c)); };
   observe();
   if(typeof MutationObserver!=='undefined'){
-    new MutationObserver(observe).observe(stack,{ childList:true, subtree:true });
+    chartTightMO=new MutationObserver(observe);
+    chartTightMO.observe(stack,{ childList:true, subtree:true });
   }
   schedule();
 }
@@ -8619,8 +8660,10 @@ function initChartTight(){
 /* ── 视图切换行密度：容器变窄时立刻退化为纯图标（绝不换行） ── */
 function initSwitchDensity(){
   if(typeof ResizeObserver==='undefined') return;
-  const ro=new ResizeObserver(scheduleSwitchDensity);
-  document.querySelectorAll('[data-view-switch]').forEach(host=>ro.observe(host));
+  /* 幂等守卫：重复调用时先断开旧 observer，避免累积监听。 */
+  if(switchDensityRO) switchDensityRO.disconnect();
+  switchDensityRO=new ResizeObserver((...args)=>{ if(!switchDensityRO) return; scheduleSwitchDensity(...args); });
+  document.querySelectorAll('[data-view-switch]').forEach(host=>switchDensityRO.observe(host));
 }
 
 /* 页头徽标要显示「宿主图标 + 当前用户名」，不是宿主名，更不退化成匿名态：

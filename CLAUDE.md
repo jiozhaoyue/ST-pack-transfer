@@ -74,7 +74,7 @@ npm run gen-fixtures              # 重新生成测试固件 fixtures/
 
 ## 踩过的坑（违反即返工）
 
-1. **CSS 作用域铁律**：`style.css` 所有规则必须挂在 `#app.app-container`（独立态与模态态统一根）或自有覆盖层 id（`#st-converter-modal-overlay` / `#wb-detail-overlay`）之下；`.st-converter-drawer-app` 已随抽屉注入删除（2026-10-15），出现即为陈旧描述。裸选择器（`.menu_button`/`.inline-drawer` 等酒馆全站类）会污染宿主全站 UI——2026-09 实测发生并修复，严禁回归。配色一律继承宿主 `--SmartTheme*` 变量 + `var(..., 回退值)`，禁止硬编码金色系。
+1. **CSS 作用域铁律**：`style.css` 所有规则必须挂在 `#app.app-container`（独立态与模态态统一根）或自有覆盖层 id（`#st-converter-modal-overlay` / `#wb-detail-overlay` / `#st-pt-tutorial-overlay`）之下；第四个根 `#st-pt-tutorial-overlay` 为教程浮层法定根，与 `scripts/css-scope.js` 白名单逐字对齐，新增覆盖层根必须同时改 `.trellis/spec/guides/iron-rules.md` 第 7 条与该白名单。`.st-converter-drawer-app` 已随抽屉注入删除（2026-10-15），出现即为陈旧描述。裸选择器（`.menu_button`/`.inline-drawer` 等酒馆全站类）会污染宿主全站 UI——2026-09 实测发生并修复，严禁回归。配色一律继承宿主 `--SmartTheme*` 变量 + `var(..., 回退值)`，禁止硬编码金色系。
 2. **严禁写本地酒馆实例目录**；实例更新只走 Git（`git clone`/`git pull`/原生扩展安装器）。
 3. **计划先行**：Trellis 任务 PRD 未回填不得提交代码；`implement.md` 复选框随执行实时勾选。
 4. **完成即推送**：测试绿后 `git push` 到 origin，不得只提交不推送。

@@ -70,6 +70,14 @@ translation: pending
 | `tooling/` | 构建、文档同步、静态守卫 |
 | `scripts/` | 本地实例探针与调试脚本（不随公开仓库分发） |
 
+`src/ui/` 下与本轮改动相关的四个模块：
+
+- `src/ui/issue-report.js`：环境采集与报告生成模块，在本地采集环境信息并脱敏后生成 Markdown，提供本地预览、直达 GitHub 新 Issue 链接与携带自备凭据的 API 提交两条出口。
+- `src/ui/settings-store.js`：设置持久化模块，在浏览器 localStorage 与宿主 `settings.json` 之间同步设置，按凭据各自存放位置剥离仅浏览器的敏感项；读取或写入失败时静默回落默认值，不阻塞主路径。
+- `src/ui/vue/InspectModal.vue`：A~E 五层体检结果弹窗，按层展示结论并给出总体判定；接收 `isOpen` / `report` / `title`，在报告合格且带文件时允许存入工作区，向外发出 `close` 与 `save-to-workspace`。
+- `src/ui/vue/store.js`：Vue 3 响应式状态中心，以 `reactive` 集中管理包、选中项、当前分区与弹窗等状态，用 `computed` 派生视图数据，并通过具名函数收敛状态变更（单向数据流）。
+- `src/ui/vue/mount.js`：体检弹窗的渐进式挂载适配器，用 `createApp` + `h()` 渲染 Vue 组件；Vue 不可用或容器缺失时返回 `null` 静默降级，绝不影响主路径。
+
 核心层不得依赖 DOM；界面层不得反向持有宿主判断。平台差异集中在宿主桥接层。
 
 ## 四、构建与测试
