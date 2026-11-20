@@ -112,6 +112,8 @@ let activePullAbort = null;
 /** 配额定时刷新句柄与可见性回调引用；单页常驻下不主动销毁，供 HMR / 测试 / 未来卸载路径回收。 */
 let quotaTimer = null;
 let onVisibilityChange = null;
+/** 体检模态的 Vue 挂载句柄；fire-and-forget 拿到后留存，供 disposeMain 回收。 */
+let inspectMountHandle = null;
 
 /**
  * 教程浮层必须直接挂到 `document.body`。
@@ -2683,7 +2685,7 @@ async function main(root) {
             void mountInspectModal({
               getReport: () => report,
               onClose: () => { try { view.closeInspectReport?.(); } catch { /* 忽略 */ } },
-            });
+            }).then(h => { if (h) inspectMountHandle = h; }).catch(() => {});
           } catch (err) { console.warn('[vue-mount] inspect modal mount skipped:', err?.message || err); }
         } catch (err) {
           logger.error(`${t('inspect.readFailed')}: ${err?.message || err}`);
@@ -2812,7 +2814,7 @@ async function main(root) {
         void mountInspectModal({
           getReport: () => report,
           onClose: () => { try { view.closeInspectReport?.(); } catch { /* 忽略 */ } },
-        });
+        }).then(h => { if (h) inspectMountHandle = h; }).catch(() => {});
       } catch (err) { console.warn('[vue-mount] inspect modal mount skipped:', err?.message || err); }
     } catch (err) {
       logger.error(`${t('inspect.readFailed')}: ${err?.message || err}`);
@@ -2910,6 +2912,7 @@ export function disposeMain() {
   }
   try { destroyViewObservers?.(); } catch { /* 忽略 */ }
   try { stopHostDomWatch?.(); } catch { /* 忽略 */ }
+  try { inspectMountHandle?.unmount?.(); inspectMountHandle = null; } catch { /* 忽略 */ }
 }
 
 /**

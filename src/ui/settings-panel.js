@@ -689,6 +689,8 @@ function ensureDocsSyncWired() {
 
 /** 问题报告按钮委托只注册一次；模块导入本身无副作用（Node 测试无 document）。 */
 let issueReportWired = false;
+/** 缓存委托 click 处理器，供 disposeSettingsPanel 移除；随 ensure 注册时赋值。 */
+let issueClickHandler = null;
 
 /** 读取设置弹窗里的问题报告字段与日志开关；未渲染时返回确定默认值。 */
 function readIssueReportForm(body) {
@@ -786,7 +788,7 @@ function ensureIssueReportWired() {
   if (typeof document === 'undefined' || typeof document.addEventListener !== 'function') return;
   issueReportWired = true;
 
-  const onClick = (ev) => {
+  issueClickHandler = (ev) => {
     const btn = ev.target?.closest?.('[data-issue-action]');
     if (!btn) return;
     const action = btn.getAttribute('data-issue-action');
@@ -820,5 +822,14 @@ function ensureIssueReportWired() {
     });
   };
 
-  document.addEventListener('click', onClick, false);
+  document.addEventListener('click', issueClickHandler, false);
+}
+
+/** 单页常驻下不会被调用，供 HMR / 测试 / 未来卸载路径使用：注销问题报告 click 委托并复位注册标志。 */
+export function disposeSettingsPanel() {
+  if (issueClickHandler && typeof document !== 'undefined' && typeof document.removeEventListener === 'function') {
+    document.removeEventListener('click', issueClickHandler, false);
+  }
+  issueClickHandler = null;
+  issueReportWired = false;
 }

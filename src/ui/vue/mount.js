@@ -125,7 +125,19 @@ export async function mountInspectModal(options = {}) {
       };
       return mountedHandle;
     } catch (err) {
-      warnOnce('[vue-mount] Vue unavailable or mount failed, degraded silently: ' + (err?.message || err));
+      const message = String(err?.message || err);
+      // Only expected degradations (dynamic import resolution failures) use the
+      // one-shot warning; real mount exceptions must surface on every attempt.
+      const isExpectedDegradation =
+        err?.code === 'MODULE_NOT_FOUND' ||
+        message.includes('Failed to fetch dynamically imported module') ||
+        message.includes('Cannot find module') ||
+        message.includes('Failed to resolve module specifier');
+      if (isExpectedDegradation) {
+        warnOnce('[vue-mount] Vue unavailable or import failed, degraded silently: ' + message);
+      } else {
+        try { console.warn('[vue-mount] InspectModal mount failed: ' + message); } catch { /* 忽略控制台不可用 */ }
+      }
       return null;
     } finally {
       pendingMount = null;

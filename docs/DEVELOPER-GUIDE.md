@@ -77,6 +77,10 @@ translation: pending
 - `src/ui/vue/InspectModal.vue`：A~E 五层体检结果弹窗，按层展示结论并给出总体判定；接收 `isOpen` / `report` / `title`，在报告合格且带文件时允许存入工作区，向外发出 `close` 与 `save-to-workspace`。
 - `src/ui/vue/store.js`：Vue 3 响应式状态中心，以 `reactive` 集中管理包、选中项、当前分区与弹窗等状态，用 `computed` 派生视图数据，并通过具名函数收敛状态变更（单向数据流）。
 - `src/ui/vue/mount.js`：体检弹窗的渐进式挂载适配器，用 `createApp` + `h()` 渲染 Vue 组件；Vue 不可用或容器缺失时返回 `null` 静默降级，绝不影响主路径。
+- `src/ui/settings-panel.js`：设置面板渲染与交互模块，问题报告组经 `[data-issue-action]` 事件委托提供复制报告 / 导出 MD / 新建 Issue 三个出口，剪贴板失败降级 textarea + execCommand。
+- `syncPackagesFromState`（`src/ui/vue/store.js` + `index.js` 三处调用）：包列表从命令式状态单向同步进 Vue 响应式 store，全部 fire-and-forget 且吞异常，绝不阻塞主路径。
+- `scripts/i18n-guard.js`：UI 中文硬编码守卫；扫描 `.js` 与 `.vue`，`stripVueNonText()` 剥离 `<style>` 与注释后再检测，避免 SFC 样式与注释误报。
+- `scripts/control-consumer-guard.js`：控件消费点守卫；只覆盖 `src/ui/workbench-template.js` 静态模板，运行时字符串拼装控件（如设置面板按钮）不在其范围，文件头已注明该边界。
 
 核心层不得依赖 DOM；界面层不得反向持有宿主判断。平台差异集中在宿主桥接层。
 
