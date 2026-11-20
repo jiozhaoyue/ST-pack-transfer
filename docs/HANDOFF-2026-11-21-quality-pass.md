@@ -11,8 +11,9 @@
 |---|---|
 | 分支 | `main`（唯一分支，见 T1） |
 | 会话起点 | `b5b0045`（fast-forward 合并 rules/zcode-session-iron-rules 后） |
-| 本会话改动 | 25+ 文件 / 约 +600 行（32 个子代理六轮蜂群产出，详见下） |
-| 推送 | 见本文末「提交记录」 |
+| 本会话提交 | `dd6c255`（27 文件 / +993 / -92，含 HANDOFF-quality-pass 与新测试文件） |
+| 推送 | 已推 origin/main（`b5b0045..dd6c255`） |
+| verify:rules | 全部 MUST 通过（提交后实测） |
 
 ## T1 分支归一（主人明令）
 
@@ -44,7 +45,7 @@
 ## 验证状态
 
 ```
-终版全量测试      （收尾回填：修复后终版数字）
+终版全量测试      1727 passed / 15 skipped / 0 failed（1742 用例 / 173 文件 / 363s / TEST_EXIT=0）
 守卫复跑          css-scope(含.vue 25选择器) / dom-injection / template-source / dom-scope /
                   control-consumer / i18n / copy-audit(72处告警) / ui-tokens / no-bundler / docs-privacy 全 PASS
 verify:rules      MUST 全过（tavern-block 已修；tests-tracked 提交后清零）
