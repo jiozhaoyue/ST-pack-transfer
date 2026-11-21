@@ -73,12 +73,9 @@ CLAUDE.md.bak
 /fixtures/
 
 # 运行时零引用的死代码（仅测试引用）
-/src/ui/host-icons.js
-/src/core/delta.js
-/src/core/restore-batch.js
-/src/core/migration-verification.js
-/src/ui/migration-controller.js
-/src/ui/workbench-session.js
+# 2026-11-22 发版修正：这 6 个模块的测试文件在 CI 全量跑，模块不入库则 CI 收集必崩
+# （2b14197 的「取消跟踪」与入库测试冲突）；已恢复入库，保证测试门禁口径一致。
+# host-icons.js 暂无测试引用，维持不入库。
 
 # 开发期预览页（非运行时）
 /src/ui/ui-demo.html
