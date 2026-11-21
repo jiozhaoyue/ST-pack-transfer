@@ -3,7 +3,7 @@
 // 独立校验：关键条目存在、条目集合无关键丢失、计数不减少、角色卡字节恒等、对端产物清单确定。
 // 运行：npx vitest run test/luker-tt-roundtrip.test.js
 import { describe, expect, it, beforeAll, afterAll } from 'vitest';
-import { mkdirSync, statSync } from 'node:fs';
+import { existsSync, mkdirSync, statSync } from 'node:fs';
 import { mkdtemp, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -13,6 +13,8 @@ import { detectLayout } from '../src/core/detect.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const FIXTURES = path.join(ROOT, 'fixtures');
+// fixtures zip 被 .gitignore 覆盖（零隐私铁律），CI 检出必缺：缺失时整套往返用例干净跳过。
+const HAS_FIXTURES = existsSync(path.join(FIXTURES, 'fixture-l.zip')) && existsSync(path.join(FIXTURES, 'fixture-tt.zip'));
 const RESULTS = path.join(ROOT, 'test-results');
 let tmp;
 
@@ -84,7 +86,7 @@ const CASES = [
   { id: 'fixture-tt', file: path.join(FIXTURES, 'fixture-tt.zip'), expect: 'tt', peer: 'l' },
 ];
 
-describe.each(CASES)('$id 往返保真', (c) => {
+describe.skipIf(!HAS_FIXTURES).each(CASES)('$id 往返保真', (c) => {
   let result;
 
   it('detect → convert 到对端 → convert 回来，三次 detect 均正确', async () => {

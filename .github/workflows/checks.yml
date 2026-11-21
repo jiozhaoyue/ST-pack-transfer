@@ -34,7 +34,7 @@ jobs:
       - name: Docs layout guard
         run: |
           set -e
-          allowed="_config.yml index.md install.md formats.md convert.md host-pull.md restore.md extensions.md transfer.md storage.md engines.md privacy.md tutorial.md faq.md DEVELOPER-GUIDE.md testing.md style.css docs.js queue-and-logs.md"
+          allowed="_config.yml index.md install.md formats.md convert.md host-pull.md restore.md extensions.md transfer.md storage.md engines.md privacy.md tutorial.md faq.md DEVELOPER-GUIDE.md testing.md style.css docs.js queue-and-logs.md form-factor-matrix.md issue-report.md"
           for f in docs/*; do
             if [ -d "$f" ]; then
               case "$(basename "$f")" in
@@ -45,6 +45,8 @@ jobs:
             base=$(basename "$f")
             case "$base" in
               *.en.md) continue ;;
+              # HANDOFF 交接文档按用户 2026-11 要求 -f 入库（与 docs-privacy-guard 白名单一致）
+              HANDOFF-*.md) continue ;;
             esac
             case " $allowed " in
               *" $base "*) ;;
