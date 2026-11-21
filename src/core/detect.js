@@ -88,10 +88,17 @@ export async function detectFromReader(reader, { filename = '' } = {}) {
   }
 
   // 2. 分卷包专属 _convert/split-manifest.json 判定
+  //   target = 分卷时的目标布局代码(st|l|tt|pt)，即本分卷包的实际布局；
+  //   source = 旧包遗留的源布局/平台标记，仅在 target 缺失时回退读取。
+  //   两者都取不到（或 target=pt 等无法映射）时**不得**在此返回布局，
+  //   必须落到后面的文件名启发/目录特征回退，绝不假装识别成功。
   const splitManifest = splitManifestBuffer ? parseJson(splitManifestBuffer) : null;
   if (splitManifest && typeof splitManifest === 'object') {
     if (splitManifest.handle) detectedHandle = splitManifest.handle;
-    const tgt = String(splitManifest.target || splitManifest.source || '').toLowerCase();
+    const rawTarget = (typeof splitManifest.target === 'string' && splitManifest.target.trim())
+      ? splitManifest.target
+      : splitManifest.source;
+    const tgt = (typeof rawTarget === 'string' ? rawTarget : '').trim().toLowerCase();
     if (tgt === 'l' || tgt === 'luker') {
       return { layout: LAYOUTS.L, evidence: 'split-manifest indicates Luker part', handle: detectedHandle };
     }
@@ -101,6 +108,7 @@ export async function detectFromReader(reader, { filename = '' } = {}) {
     if (tgt === 'st' || tgt === 'sillytavern') {
       return { layout: LAYOUTS.ST, evidence: 'split-manifest indicates SillyTavern part', handle: detectedHandle };
     }
+    // target=pt 或无法识别：不在此假装成功，落到下面的回退路径。
   }
 
   // 3. 文件名强特征启发（例如分卷包 Luker_default-user_part1_...）

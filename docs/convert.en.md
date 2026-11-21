@@ -55,6 +55,8 @@ Use delta merge when you want to merge a new export into an existing package wit
 
 If your cloud tavern limits upload size, set a split size in the settings (MB, 32–2048). The output is split into independently importable parts. Leave it empty to disable splitting.
 
+Each part contains a `_convert/split-manifest.json` manifest recording that part's target layout (`target`, one of st / l / tt / pt), part index and total. Layout detection uses `target` first, so split parts are recognized without renaming. Older parts without `target` fall back to filename and other heuristics; a package whose layout cannot be confirmed is rejected on restore with a prompt to convert it to the current host format first.
+
 ## Resume and task control
 
 - You can **pause, continue, or cancel** at any time.

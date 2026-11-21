@@ -6783,7 +6783,18 @@ function doGenerate(){
   const pkgs=[...state.selectedPkgs].map(id=>state.packages.find(p=>p.id===id)).filter(Boolean);
   actions.generate?.({ packages: pkgs, merge: mergeActive(pkgs), target: state.target, delta: state.delta, splitMb: state.splitMb, filenameTemplate: state.filenameTemplate });
 }
-function doUploadHost(){ actions.restore?.([...state.selectedPkgs]); }
+/** 回传单选：分卷组整组算一个（同 splitId 的 part 全带上），其余只保留一个。 */
+function restoreSelection(pkgs){
+  const byId=new Map((pkgs||[]).map(p=>[p.id,p]));
+  const first=byId.get([...state.selectedPkgs][0]) || null;
+  if(!first) return [];
+  const meta=first.metadata||{};
+  if(meta.isSplitPart && meta.splitId){
+    return (pkgs||[]).filter(p=>p?.metadata?.isSplitPart && p.metadata.splitId===meta.splitId).map(p=>p.id);
+  }
+  return [first.id];
+}
+function doUploadHost(){ actions.restore?.(restoreSelection(state.packages)); }
 function doCopyBack(){ actions.copyBack?.([...state.selectedPkgs]); }
 function doDeleteSelected(){ actions.deleteSelected?.([...state.selectedPkgs]); }
 

@@ -41,6 +41,14 @@ The plugin looks for the native backup area for the current tavern version. If t
 **The pull is slow or the network dropped.**
 The plugin supports resumable downloads. Trigger the pull again after the network recovers and it continues from the checkpoint.
 
+## Restoring (writing back)
+
+**Why did "Upload / Restore" have no effect?**
+Restoring works only inside the host plugin; the standalone page does not support it. Only Luker currently exposes a full-package restore endpoint. SillyTavern, TauriTavern, and PureTavern have no such endpoint, so the entry is disabled with a prompt to use the host's native import instead. Restore is also rejected as a whole, with a notice, when a package's layout does not match the current host, cannot be recognized, or when multiple packages are selected at once — no package is silently skipped.
+
+**Can I pass a package from tavern A straight to tavern B?**
+Conversion still supports all four taverns in any direction: pick a target platform and generate a new package. Restoring is different — writing back only accepts packages whose directory layout belongs to the same family as the current host. ST and Luker share the flat family; TT and PT share the prefixed family. A package from another family, or one with an unrecognized layout, prompts you to convert it to the current host format first. Restore writes the whole package; it does not write back only the selected categories.
+
 ## Extension management
 
 **Why can't regular users see Server-side plugins?**

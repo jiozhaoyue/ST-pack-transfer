@@ -47,6 +47,9 @@ layout: default
 | 位置 | 机制 | 三态说明 |
 | --- | --- | --- |
 | `index.js:1154/1275/1567` | `if(!host.isPlugin){ view.toast(...); return; }`，覆盖恢复 / 拉取 / 自动备份 | 酒馆扩展可用；独立 Web 与单文件 HTML 由 toast 拦截提示（渲染 + toast 拦截的正确范式） |
+| `index.js:1214/1218`（实施后新增） | 控制器层能力门禁 `hostRestoreCapability(host.platform)`：`supported=false` 时 toast + return，插件态 ST/TT/PT 直调 restore 不得穿透视图层 disabled；能力表见 `host-bridge.js:344-352`（端点实测仅 Luker 可整包恢复） | 酒馆扩展：仅 Luker 放行，ST/TT/PT 提示走宿主原生导入；独立 Web 与单文件 HTML 由上行形态门禁先行拦截，本门禁为插件态内二次守卫，不改其目标态 |
+| `index.js:1222/1232`（实施后新增） | 布局兼容拦截 `canRestoreLayout(host.platform, layout)`：按目录结构族判定（flat=st/l/luker，prefixed=tt/pt），同族放行、跨族或空/unknown 拒绝；整批任一不兼容即整体拒绝并 toast，不静默跳过单个，判据见 `restore-compat.js:53-60` | 酒馆扩展：同族直接回传，跨族提示先转换、unknown 提示无法确认；独立 Web 与单文件 HTML 形态门禁先行，此守卫仅插件态生效 |
+| `index.js:1235/1253`、`workbench-view.js:6787/6797`（实施后新增） | 恢复单选约束：视图层 `restoreSelection` 选中分卷 part 自动带同 splitId 全组；控制器层按 `splitGroupKeyOf` 判定多分组即 toast 拒绝；metadata 无 splitId 时异步读包内 `_convert/split-manifest.json` 兜底，读不到退化为单包、不假成功 | 三态同前：形态门禁先行；仅插件态生效，保证「一次只恢复一个包或一组分卷」 |
 | `host-bridge.js:845/875/1252` | API 守卫 `return {ok:false,reason:'standalone-web'}`（`readHostIdentity` / `listServerPlugins` / `getCsrfToken`） | 酒馆扩展返回真实结果；独立 Web 与单文件 HTML 返回失败原因，不假装成功 |
 | `workbench-view.js:4402/8685` | `loadServerPlugins` / `refreshHostIdentity` 行为守卫 | 保留；对应 UI 改 disabled 后点击走此拦截提示 |
 | `workbench-view.js:3832/3841` | 安装成功处理行为分流 | 保留；disabled 后 Web 分支可能成死代码，勘察清单标注「待复核」 |
@@ -62,6 +65,15 @@ disabled 的 `title` 与点击 toast 共用同一词条，需补 zh / en-US 对�
 | 扩展安装需在宿主插件内操作 | 扩展安装需在宿主插件内操作 | 门控 #5 扩展安装页脚块提示 |
 
 > 以上为勘察清单列出的三条待新增词条；每个都需补 en-US 对应。本文只记录清单事实，不代替实施。
+
+实施后新增的恢复门禁提示词条（zh 与 en-US 均已落地，见 `src/i18n/locales/zh-CN.js:1749-1755`、`src/i18n/locales/en-US.js:1742-1748`），供第二节两道新门禁与单选约束的 toast 取用：
+
+| 词条 | 中文 | 用途 |
+| --- | --- | --- |
+| `restore.unsupported.st` / `.tt` / `.pt` | ST / TT / PT 无整包恢复接口，提示走宿主原生导入 | 控制器层能力门禁 toast |
+| `restore.incompatible.needConvert` | 布局不符，请先转成当前宿主格式 | 跨族布局拒绝 |
+| `restore.incompatible.unknownLayout` | 布局无法识别，无法确认可恢复 | 空 / unknown 布局拒绝 |
+| `restore.incompatible.multiSelect` | 一次只能恢复一个包或一组分卷 | 多分组单选拒绝 |
 
 ## 四、分辨率与形态的交叉说明
 

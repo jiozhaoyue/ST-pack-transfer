@@ -147,6 +147,8 @@ npm run qa:static        # 静态守卫串跑
 
 单文件 HTML 必须保持 `file://` 可双击运行：脚本为 IIFE、Worker 强制主线程降级、字体与样式内联、零外部资源。
 
+**离线构建的生效入口只有一个**：`tooling/build-offline.mjs`（`package.json:25` 的 `build:offline` 指向此处）。白屏修复、plugin-vue（`tooling/build-offline.mjs:31` 的 import、`:86` 的 `plugins:[vue()]`）与 `NODE_ENV` define（`:95`）均以该文件为准。`scripts/build-offline.mjs` 是历史陈旧副本（末次提交 19cdd5d），全仓无实际调用，仅 `worker-factory.js:5` 与 `worker-client.js:22` 的注释提及；改动它不进入产物，勿据此判断白屏修复是否生效。
+
 ### 视觉与响应式约定
 
 - **唯一产品断点 = 860px，JS/CSS 同源**：CSS 侧真源是根 `style.css:2344` 的 `@media (max-width:860px)`，JS 侧真源是 `src/ui/workbench-view.js:788` 的 `const MOBILE_MAX_WIDTH = 860`，两者同一份数值。判定用容器实际宽度（`hostViewportWidth()` 优先取 `#app` 宽度，回退 `window.innerWidth`），因为插件模态可能比窗口窄；`<= 860px` 走手机布局，860 以下数据包区改为切页按钮而非侧栏。历史上 JS 用 640、CSS 用 860 导致 641–860px 出现「已堆叠但无切页按钮」坏态（实测），现已统一，严禁再分叉。
@@ -183,7 +185,10 @@ npm run qa:static        # 静态守卫串跑
 - **对等通道等待必须有界**：`bufferedAmount` 排空循环必须同时检查 `readyState`、取消标志与超时（`HIGH_WATER_TIMEOUT_MS`），禁止纯 `sleep` 轮询；`waitIceComplete` 到点未收全时须在提示与日志中如实标注，不得让用户拿到缺候选的码却毫无提示。
 - **待导出卡复用唯一卡范式**：待导出项走 `pkgCard(pkg, { pendingId, pendingActions })` 渲染，与真实数据包卡同一套 DOM 与素材；**禁止为待导出另造图标、伪宿主角标或自造徽标文案**（已在一次修复中删除 `pkg-check-spacer`、`data-host="file"`、手写 ZIP 角标与 `pending.badge`）。体积计算须兼容 `blob.size` 与演示态 `size/mb`。
 - **Luker 包与分卷包全特征识别**：`detect.js` 扩展识别 Luker 各类 manifest、`_convert/split-manifest.json` 分卷清单、平铺目录特征（`chats/`、`worlds/`、`groups/`、`user/`、`backgrounds/`、`extensions/`）与文件名强特征启发，杜绝 Luker 分卷包误判为「未识别包」。
-- 回归守卫：`npm test -- header-badge.test.js changelog.test.js ui-viewport-guard.test.js`。
+- **面板帮助入口契约**：每个切换视图面板头须有 `.help-btn[data-help="<key>"]` 节点（`src/ui/workbench-template.js`），`key` 对应 `workbench-view.js` 的 `HELP` 字典；点击由 `document.querySelectorAll('[data-help]')` 统一委托到 `openHelp(key)`。缺失模板节点会导致「帮助」与「教程」截图同 MD5（历史事故：transfer 视图漏节点）。帮助节点用 `<a role="button">` 承载以避开控件消费点守卫。
+- **空态大屏居中**：空态时 `.chart-stack:has(> .chart-empty-guide)` 切 `display:flex` + `justify-content:center`，消除 1600×950 下半部留白；不得依赖 `align-content` 对 block 容器生效。
+- **底部状态条对比度**：进度条次级文字（`.progress-hint` / `.app-version`）用 `var(--muted)`，禁止再叠 `opacity` 压低对比。
+- 回归守卫：`node scripts/single-template-source.js`（模板源）、`node scripts/control-consumer-guard.js`（控件消费点）、`npm test -- header-badge.test.js changelog.test.js ui-viewport-guard.test.js`。
 
 ### 本地云与实例自动化
 
@@ -366,6 +371,18 @@ npm run docs:verify
 - 两种写入策略 `merge` / `overwrite` 与 selection 彼此无关（`src/ui/host-bridge.js:1938-1954`、`:2208-2239`），`incremental` 只是 `mode` 派生；真正增量合并函数 `incrementalMergeArchives()` 未接线、无调用方（`:2936-2956`）。
 - 恢复机制的完整说明（详解 / 宿主支持矩阵 / 增量兜底原理 / 取证边界）见 `docs/restore.md`。
 
+### 回传宿主兼容门控
+
+回传（restore）前按「包布局能否直接落到宿主用户目录」做兼容拦截，结构不符必须先转换，不做部分回传。判据只看目录结构族，不判断宿主是否提供整包恢复端点。
+
+- **判据模块**：`src/core/restore-compat.js`。`canRestoreLayout(hostPlatform, layout)`（`:53`）返回 `{ok, reasonKey}`：`ok=true` 时 `reasonKey` 为空串，`ok=false` 时恒为统一 key `NEED_CONVERT_REASON='restore.incompatible.needConvert'`（`:25`）。目录结构族（`:28-43`）：flat = `st` / `l` / `luker`（zip 根摊平），prefixed = `tt` / `pt`（`data/default-user/` 前缀）；同族可回传，跨族、空串与 `unknown` 一律拒绝。`describeLayout()`（`:68`）把 `l` 归一为 `luker`，仅供文案。
+- **端点门禁与本判据分工**：宿主整包恢复端点由 `hostRestoreCapability()`（`src/ui/host-bridge.js:344-352`）判定——当前仅 `luker` 支持，ST / TT / PT 无端点。结构兼容（`ok=true`）只表示能直接落目录，不代表宿主有恢复端点；两道门禁并存，控制器先过端点门禁再过结构门禁。
+- **控制器层门禁**（`index.js` 的 `restoreSelected()`，`:1211-1259`）：① 能力门禁——`hostRestoreCapability(host.platform)` 不支持即 toast 拒绝（`:1214-1218`）；② 结构门禁——逐包取 `declaredLayout || metadata.layout` 调 `canRestoreLayout()`，任一不兼容即整批 toast 拒绝、不静默跳过单个（`:1222-1232`），空 / `unknown` 布局用 `restore.incompatible.unknownLayout` key；③ 单选门禁——多个分组即 toast 拒绝（`:1252-1253`）。
+- **视图层门禁**（`src/ui/workbench-view.js` 的 `restoreSelection()`，`:6787-6796`）：`doUploadHost()`（`:6797`）改走它。选中一个分卷 part 时自动带上同 `splitId` 的全部分卷，否则只保留一个，从选中侧保证单选语义。
+- **单选与分卷组例外**：同 `splitId` 的 part 视为一组、整组算一个包。分组键 `splitGroupKeyOf()`（`index.js:1206-1208`）按 `isSplitPart && splitId` 归组。分卷元数据缺 `splitId` 时异步读包内 `_convert/split-manifest.json` 兜底（`readSplitManifest()`，`index.js:576`），读取失败退化为单包处理、不假成功（`:1233-1250`）。
+- **分卷元数据字段**：`isSplitPart` / `splitId` / `partIndex` / `partTotal`。两处 split 循环把字段随产物带出（`index.js:1805-1810`、`:2177-2181`）；`deliverCreated()` 仅在 `isSplitPart && splitId` 同时成立时写入 metadata，取不到不写（`:1845-1852`）。分卷清单由 `splitter.js:193` 写 `target`（st|l|tt|pt），`detect.js:98-112` 据此识别布局，无 `target` 旧包走回退，不假装识别成功。
+- **文案**：三条 i18n key 双语齐备——`restore.incompatible.needConvert` / `unknownLayout` / `multiSelect`（`src/i18n/locales/zh-CN.js:1753-1755`、`en-US.js:1746-1748`）。
+
 ### 守卫工具链全表（`package.json` 的 check / verify / docs / qa 脚本）
 
 `package.json:21-67` 共 45 个脚本，其中 20+ 个守卫 / 校验 / 文档脚本用途如下。用途取自各脚本头部注释与 `tooling/qa-static.mjs` 的 `GUARDS` 清单（`qa-static.mjs:12-23`）。
@@ -381,7 +398,7 @@ npm run docs:verify
 | `check:control-consumer` | `scripts/control-consumer-guard.js` | 控件消费点守卫：防「有查找 / 有事件 / 有摘要但值从不被读取」的死控件；只覆盖静态模板，运行时拼装控件不在范围（脚本头 `:1-9`） |
 | `check:no-bundler-only` | `tooling/no-bundler-only.js` | 宿主直装守卫：禁止打包器才成立的写法（如 JSON 静态导入），插件是 git clone 直装不经打包（脚本头 `:1-9`） |
 | `check:i18n` | `scripts/i18n-guard.js` | UI 文案必须来自 `src/i18n/locales/**`，跳过注释，禁字符串字面量出现中文；宿主适配层 / core 不在范围（脚本头 `:1-6`） |
-| `check:copy` | `scripts/copy-audit.js` | 面板文案静态体检：括号说明 / 分号长句 / 合并连词只允许出现在 `?` 浮层与教程（脚本头 `:1-10`） |
+| `check:copy` | `scripts/copy-audit.js` | 面板文案静态体检：括号说明 / 分号长句 / 合并连词只允许出现在 `?` 浮层与教程；告警按 `locale:key` 合并（同一文案的 semicolon + hint-long 并列为一行），计数与真实文案条数同源（脚本头 `:1-14`） |
 | `check:ui-tokens` | `tooling/check-ui-tokens.mjs` | UI 尺寸 / 品牌色 / 图表色 / 状态色必须来自 `src/data/ui-tokens.js`，style.css 里再出现字面量即失败（脚本头 `:1-8`） |
 | `check:download-html` | `tooling/check-download-html.mjs` | 本地单文件 HTML 产物守卫：产物存在则执行全部单文件性校验，不存在则跳过不失败（CI 由 release.yml 构建，脚本头 `:1-9`） |
 

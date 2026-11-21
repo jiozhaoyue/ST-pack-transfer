@@ -1749,4 +1749,8 @@ export default {
   'restore.unsupported.st': 'SillyTavern 未提供整包恢复接口，请用宿主原生导入方式恢复',
   'restore.unsupported.tt': 'TauriTavern 无浏览器恢复接口，请用原生数据迁移人工导入',
   'restore.unsupported.pt': 'PureTavern 无服务端恢复接口，请用数据管理面板人工导入',
+  // ── 恢复兼容拦截：整批拒绝原因（严格拦截，不静默跳过） ──
+  'restore.incompatible.needConvert': '布局不符，请先转成当前宿主格式',
+  'restore.incompatible.unknownLayout': '布局无法识别，无法确认可恢复',
+  'restore.incompatible.multiSelect': '一次只能恢复一个包或一组分卷',
 };

@@ -1742,4 +1742,8 @@ export default {
   'restore.unsupported.st': 'SillyTavern has no full-package restore endpoint; import via the host native UI',
   'restore.unsupported.tt': 'TauriTavern has no browser restore endpoint; import via native data migration',
   'restore.unsupported.pt': 'PureTavern has no server restore endpoint; import via the data management panel',
+  // ── Restore compatibility gate: batch-reject reasons (strict, never silently skip) ──
+  'restore.incompatible.needConvert': 'Layout mismatch; convert to this host format first',
+  'restore.incompatible.unknownLayout': 'Layout unrecognized; restore cannot be confirmed',
+  'restore.incompatible.multiSelect': 'Restore one pack or one split group at a time',
 };

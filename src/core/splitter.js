@@ -187,6 +187,10 @@ export async function splitArchiveEntries(entries, {
       splitId,
       partIndex: currentPartIndex,
       partLabel: `Part ${currentPartIndex}`,
+      // 目标布局代码(st|l|tt|pt)，即 splitArchiveEntries 调用方传入的 target。
+      // 分卷包内条目结构 = 目标布局，detect 据此识别本包布局；写 source 会是臆造
+      // （splitter 无源布局入参），故只写 target。旧包无此字段 → detect 走回退路径。
+      target,
       thresholdMB: thresholdNum,
       thresholdBytes,
       judgedBy,

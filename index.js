@@ -10,6 +10,7 @@ import { logger } from './src/core/logger.js';
 import { zipIo, readZipEntryManifest } from './src/core/zip-io.js';
 import { inspectPackage } from './src/core/inspect.js';
 import { splitArchiveEntries } from './src/core/splitter.js';
+import { canRestoreLayout } from './src/core/restore-compat.js';
 import { mergeConvertedBlobs } from './src/core/merge-packages.js';
 import {
   ORIGINS, isStorageSupported, saveFile, getFile, deleteFile, listStoredFiles, clearStoredFiles,
@@ -24,7 +25,7 @@ import { createWorkbenchView, destroyViewObservers } from './src/ui/workbench-vi
 // 独立 Web 由 vite 打包 vue，动态 import 正常加载，InspectModal 功能不变。
 import {
   detectHost, hostLayoutCode, fetchHostBackup, FULL_SELECTION,
-  restoreToHost, restoreToLuker,
+  restoreToHost, restoreToLuker, hostRestoreCapability,
   confirmDialog, alertDialog, mountExtensionRowButton, closeHostExtensionSurface,
   mountNativeBackupButton, mountLukerBackupManagerButton, mountPtDataManagementButton,
   mountTtDataMigrationButton,
@@ -569,6 +570,28 @@ async function main(root) {
       await reader.close();
     }
     return [];
+  }
+
+  /** 读包内分卷清单（异步、失败返回 null，不假装有 splitId）。 */
+  async function readSplitManifest(blob) {
+    if (!blob) return null;
+    const reader = await zipIo.openReader(blob);
+    try {
+      for await (const entry of reader.entries()) {
+        const entryName = String(entry.fileName || '').replace(/\\/g, '/');
+        if (entryName === '_convert/split-manifest.json') {
+          const text = new TextDecoder().decode(await entry.read());
+          const data = JSON.parse(text);
+          return data && data.splitId ? data : null;
+        }
+        try { entry.skip?.(); } catch { /* 已跳过 */ }
+      }
+    } catch {
+      return null;
+    } finally {
+      await reader.close();
+    }
+    return null;
   }
 
   async function ensurePlan(pkgId, targetName = null) {
@@ -1179,10 +1202,55 @@ async function main(root) {
     return failed;
   }
 
+  /** 分卷组归属键：同 splitId 的 part 算一组（单选时视为一个包）；普通包各自独立。 */
+  function splitGroupKeyOf(p) {
+    const meta = p?.metadata || {};
+    return meta.isSplitPart && meta.splitId ? `split:${meta.splitId}` : `pkg:${p?.id}`;
+  }
+
   async function restoreSelected(ids) {
     if (!host.isPlugin) { view.toast(t('toast.pluginOnlyRestore')); return; }
+    /* 控制器层能力门禁：插件态 ST/TT/PT 直调 restore 不得穿透视图层 disabled。 */
+    const cap = hostRestoreCapability(host.platform);
+    if (!cap.supported) {
+      view.toast(cap.reasonKey ? t(cap.reasonKey) : t('restore.incompatible.needConvert'));
+      return;
+    }
     const targets = ids.map(pkgById).filter((p) => p && p.zone === 'export');
     if (!targets.length) { view.toast(t('toast.selectExportPack')); return; }
+    /* 兼容拦截：整批必须先全部兼容，任一不兼容就整体拒绝，不静默跳过单个。 */
+    for (const p of targets) {
+      const layout = p.declaredLayout || p.metadata?.layout || '';
+      const verdict = canRestoreLayout(host.platform, layout);
+      if (!verdict.ok) {
+        const reasonKey = (!layout || layout === 'unknown')
+          ? 'restore.incompatible.unknownLayout'
+          : (verdict.reasonKey || 'restore.incompatible.needConvert');
+        view.toast(t(reasonKey));
+        return;
+      }
+    }
+    /* 单选：分卷组整组算一个。metadata 无 splitId 时异步读包内清单兜底；
+       读取失败退化为单个包处理（不假成功），由分组判定拒绝多余项。 */
+    if (targets.length > 1) {
+      for (const p of targets) {
+        const meta = p.metadata || {};
+        if (meta.isSplitPart && meta.splitId) continue;
+        try {
+          const m = await readSplitManifest(await blobOf(p));
+          if (m && m.splitId) {
+            Object.assign(meta, {
+              isSplitPart: true,
+              splitId: m.splitId,
+              ...(m.partIndex != null ? { partIndex: m.partIndex } : {}),
+              ...(m.partTotal != null ? { partTotal: m.partTotal } : {}),
+            });
+          }
+        } catch { /* 读不到退化为单个包处理，不假成功 */ }
+      }
+    }
+    const groups = new Set(targets.map(splitGroupKeyOf));
+    if (groups.size > 1) { view.toast(t('restore.incompatible.multiSelect')); return; }
     if (settings.trafficPrompt) {
       const proceed = await askTraffic();
       if (!proceed) return 'aborted';
@@ -1735,7 +1803,11 @@ async function main(root) {
               filenameTemplate: filenameTemplate || DEFAULT_FILENAME_TEMPLATE,
             });
             for (const part of split.parts) {
-              created.push({ blob: part.blob, name: part.partName });
+              created.push({
+                blob: part.blob, name: part.partName,
+                isSplitPart: true, partIndex: part.partIndex,
+                partTotal: part.totalParts, splitId: split.splitId,
+              });
             }
           } finally { await reader.close(); }
         } else {
@@ -1769,11 +1841,20 @@ async function main(root) {
     if (!created.length) { view.setProgress(0, t('toast.convertFailed')); return lastCreatedIds; }
     for (const item of created) {
       const id = `out-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+      /* 分卷元数据：仅当调用侧确实带出 splitId / partIndex 时落库，取不到不假装有。 */
+      const splitMeta = item.isSplitPart && item.splitId
+        ? {
+          isSplitPart: true,
+          splitId: item.splitId,
+          ...(item.partIndex != null ? { partIndex: item.partIndex } : {}),
+          ...(item.partTotal != null ? { partTotal: item.partTotal } : {}),
+        }
+        : {};
       await saveFile({
         id,
         name: item.name, size: item.blob.size, blob: namedBlob(item.blob, item.name),
         layout, role: 'output', origin: ORIGINS.CONVERTED,
-        metadata: { convertedAt: Date.now(), ...(autoFlow ? { autoFlow: 'export' } : {}) },
+        metadata: { convertedAt: Date.now(), ...splitMeta, ...(autoFlow ? { autoFlow: 'export' } : {}) },
       });
       lastCreatedIds.push(id);
     }
@@ -2093,7 +2174,11 @@ async function main(root) {
             thresholdMB: limit, target: code, handle: 'default-user',
             filenameTemplate: filenameTemplate || DEFAULT_FILENAME_TEMPLATE,
           });
-          for (const part of split.parts) created.push({ blob: part.blob, name: part.partName });
+          for (const part of split.parts) created.push({
+            blob: part.blob, name: part.partName,
+            isSplitPart: true, partIndex: part.partIndex,
+            partTotal: part.totalParts, splitId: split.splitId,
+          });
         } finally { await reader.close(); }
       } else {
         const name = resolveFilename(filenameTemplate || DEFAULT_FILENAME_TEMPLATE, {
