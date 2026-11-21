@@ -53,6 +53,20 @@ describe('transfer-runner 分片 / 断点 / 清单', () => {
     expect(target.store.has(manifestKey('a.zip'))).toBe(true);
   });
 
+  it('首次上传跳过逐片 HEAD，断点续传仍逐片探测', async () => {
+    const target = fakeTarget();
+    let headCalls = 0;
+    const rawHead = target.head.bind(target);
+    target.head = async (key) => { headCalls += 1; return rawHead(key); };
+    const runner = createTransferRunner({ target, chunkSize: MB, concurrency: 2 });
+    await runner.upload({ blob: blobOf(sampleBytes(2 * MB + 1)), name: 'h.zip' });
+    expect(headCalls).toBe(0); // 首次上传：清单不存在，逐片 HEAD 全部跳过
+
+    headCalls = 0;
+    await runner.upload({ blob: blobOf(sampleBytes(2 * MB + 1)), name: 'h.zip' });
+    expect(headCalls).toBe(3); // 断点续传：3 个分片仍逐片探测
+  });
+
   it('再次上传全部分片命中 ⇒ 零字节上传', async () => {
     const target = fakeTarget();
     const runner = createTransferRunner({ target, chunkSize: MB, concurrency: 2 });

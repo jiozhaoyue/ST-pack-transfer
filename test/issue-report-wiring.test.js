@@ -7,6 +7,7 @@
  */
 import { describe, expect, it, beforeEach, afterEach } from 'vitest';
 import { readFile } from 'node:fs/promises';
+import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import {
   SETTINGS_DEFAULTS,
@@ -218,6 +219,40 @@ describe('issue-report 接线 · 动作路由与字典同步', () => {
     expect(code).toContain("name === 'issue-submit'");
     expect(code).toContain('submitToGitHub({');
     expect(code).toContain('writeGithubToken(');
+  });
+
+  it('提交门禁：prereq 校验先于其它校验，且二次确认文案含责任声明、每次必弹无跳过', async () => {
+    const code = await read('index.js');
+    // 限定 submitIssueReport 函数体判顺序：未勾先拦，先于标题/仓库/令牌校验。
+    const fnStart = code.indexOf('async function submitIssueReport');
+    const fnEnd = code.indexOf('function openSettings', fnStart);
+    const fn = code.slice(fnStart, fnEnd);
+    const prereqAt = fn.indexOf('issuePrereqsMet(form.prereqs)');
+    const titleAt = fn.indexOf("t('issue.missingTitle')");
+    expect(fnStart).toBeGreaterThan(-1);
+    expect(prereqAt).toBeGreaterThan(-1);
+    expect(titleAt).toBeGreaterThan(-1);
+    expect(prereqAt).toBeLessThan(titleAt);
+    // 确认模态用 t('issue.confirmBody') 作正文，且无 "never/不再提示" 类跳过开关。
+    expect(code).toContain("t('issue.confirmBody')");
+    expect(code).toContain('setIssueModalApi(');
+    expect(code).not.toMatch(/issue[Cc]onfirm[Nn]ever|skipIssueConfirm|noIssueConfirm/);
+  });
+
+  it('提交按钮不设 disabled，点击可触发拦截提示（保留语义 data 属性）', () => {
+    const code = readFileSync(ROOT + 'src/ui/settings-panel.js', 'utf8');
+    expect(code).toContain("submitBtn.setAttribute('data-prereq-met'");
+    expect(code).toContain("submitBtn.setAttribute('aria-disabled'");
+    expect(code).not.toContain('submitBtn.disabled = !met');
+  });
+
+  it('网页跳转 new-issue 走 confirmIssueSubmit 二次确认，复制/导出不拦', () => {
+    const code = readFileSync(ROOT + 'src/ui/settings-panel.js', 'utf8');
+    expect(code).toContain('confirmIssueSubmit(');
+    // 确认后才 window.open URL（网页提交也在确认链内）。
+    expect(code).toMatch(/confirmIssueSubmit\(\(\) => \{[\s\S]*?window\.open\(result\.url/);
+    // 统一确认函数每次调用 openModal，无跳过配置。
+    expect(code).toContain("t('issue.confirmBody')");
   });
 
   it('issue.* 键在 zh-CN 与 en-US 两份字典同步', () => {

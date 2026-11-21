@@ -11,6 +11,9 @@
  *
  * 根因 B：教程浮层的「跳过」只关浮层（`state.tutorialOpen=false`），
  * `tutorialMode` 仍是 true；主界面又能正常操作 ⇒ 用户以为已退出演示态。
+ * （2026-11-21 新裁定：该状态不再视为缺陷——演示态写操作已全部拦截（demoTutorialActions
+ * 门面 + persist*Config 返回 false），假成功丢数据的顾虑消除，「跳过」恢复为
+ * 只关浮层、保持演示模式；真正退出走 #btn-guide / 横幅「退出教程」→ closeTutorial()。）
  *
  * 根因 C：`#cloud-save` / `#webdav-save` 不在 `demoTutorialActions()` 包装里，
  * 其他操作会弹「演示模式」提示，唯独保存静默成功。
@@ -19,7 +22,7 @@
  *
  * 用 `test/helpers/minimal-dom.js` 的最小桩 + 自建「记录监听器」元素，
  * 真实点击 `#cloud-save` / `#webdav-save` / `#tutorial-skip`，
- * 断言 localStorage 是否真的被写、state 是否真的退出演示态。
+ * 断言 localStorage 是否真的被写、跳过是否只关浮层且保持演示态（演示态保存被拦截）。
  * 「刷新」用 `vi.resetModules()` 重新求值模块来模拟（新实例只读 localStorage）。
  *
  * 不证明：布局与视觉。像素另有守卫。
@@ -192,8 +195,8 @@ describe('非教程态：保存必须真实落盘并可刷新读回', () => {
   });
 });
 
-describe('「跳过」必须真正退出演示模式', () => {
-  it('点跳过 → tutorialMode 为 false，且 state 快照被还原', async () => {
+describe('「跳过」只关浮层保持演示模式（2026-11-21 新裁定）', () => {
+  it('点跳过 → 浮层 open class 移除，但演示模式保持、演示包不被还原', async () => {
     view.openTutorial();
     expect(view.isTutorialMode()).toBe(true);
     /* 演示态会灌入演示包，这是「已进入演示」的可观测证据。 */
@@ -201,33 +204,38 @@ describe('「跳过」必须真正退出演示模式', () => {
 
     await dom.click('tutorial-skip');
 
-    expect(view.isTutorialMode()).toBe(false);
     expect(view.getState().tutorialOpen).toBe(false);
-    /* 复用 exitTutorialMode() 的还原逻辑：真实包列表回到进入前的空列表。 */
-    expect(view.getState().packages).toHaveLength(0);
+    /* 蒙层消失（open class 被移除），但 tutorialMode 仍是 true。 */
+    expect(globalThis.document.getElementById('st-pt-tutorial-overlay').classList.contains('open')).toBe(false);
+    expect(view.isTutorialMode()).toBe(true);
+    /* 保持演示模式：演示包不被还原为空列表。 */
+    expect(view.getState().packages.length).toBeGreaterThan(0);
   });
 
-  it('跳过退出后保存 → 真正落盘（不再是假成功）', async () => {
+  it('跳过后保存 → 演示态拦截：不落盘，状态提示 demoNoSave（无假成功）', async () => {
     view.openTutorial();
     await dom.click('tutorial-skip');
-    expect(view.isTutorialMode()).toBe(false);
+    expect(view.isTutorialMode()).toBe(true);
 
     fillS3Form(dom);
     await dom.click('cloud-save');
 
-    expect(storage.has(CLOUD_KEY)).toBe(true);
-    expect(JSON.parse(storage.get(CLOUD_KEY)).bucket).toBe('my-bucket');
-    expect(view.getState().cloud.status).not.toBe(t('cloud.demoNoSave'));
+    /* 教程态 persistCloudConfig 返回 false：localStorage 一字未存。 */
+    expect(storage.has(CLOUD_KEY)).toBe(false);
+    /* 失败不静默：状态栏给出演示态专属原因（cloud.demoNoSave），不是「已保存」。 */
+    expect(view.getState().cloud.status).toBe(t('cloud.demoNoSave'));
   });
 
-  it('跳过之后仍能再次进入演示（既有交互不被破坏）', async () => {
+  it('跳过之后 banner「重新打开教程」仅重开浮层，不重复进入演示', async () => {
     view.openTutorial();
     await dom.click('tutorial-skip');
-    expect(view.isTutorialMode()).toBe(false);
+    expect(view.isTutorialMode()).toBe(true);
+    expect(view.getState().tutorialOpen).toBe(false);
 
-    /* banner「重新打开教程」与主界面 guide 按钮都走 openTutorial()。 */
+    /* banner「重新打开教程」走 openTutorial()；tutorialMode 已是 true 时不重复 enterTutorialMode。 */
     await dom.click('tutorial-banner-reopen');
     expect(view.isTutorialMode()).toBe(true);
     expect(view.getState().tutorialOpen).toBe(true);
+    expect(globalThis.document.getElementById('st-pt-tutorial-overlay').classList.contains('open')).toBe(true);
   });
 });
