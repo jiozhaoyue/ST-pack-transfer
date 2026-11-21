@@ -1,9 +1,10 @@
 {
   "version": 1,
   "files": {
-    "docs/DEVELOPER-GUIDE.md": "fe0b9f8bf90ccf4df5ef9718d64c4b42ec9bf5446b97eb90660f6950e3d0eb09",
+    "docs/DEVELOPER-GUIDE.md": "a161e35ed102c12ebba013646ec1fddec375937c56957e504d7346f6047d94fe",
     "docs/HANDOFF-2026-11-21-quality-pass.md": "a7776f26a24c91e1fcf74d3bd82e56a770e6482ea03109790cf69c8943a4913d",
     "docs/HANDOFF-2026-11-21.md": "0a44fb5ffc7d874be138aca3f83a1032c39b612eb20295af47c15e1a442896bd",
+    "docs/HANDOFF-2026-11-22.md": "ad05ef47eb0647aa1e9644900825983eed91f60553f24f1269ba74e017e4d446",
     "docs/PLAN-2026-11-19-offline-inspect-and-0kb.md": "abd1ecb299c0eddeadd443509690ffec406db6e193d97ace1bb972cc83074148",
     "docs/PLAN-2026-11-19-release-workflow.md": "ae9951e2d2b18bc68df3be7c93c09210cda0e6d3693c0d07f0807a42c3f62765",
     "docs/PLAN-2026-11-19-web-lan-tutorial-fixes.md": "25c6f8b308bd7133df461357fbfe18562536c5b8b0902cd673e797ebbfc6a903",
@@ -41,16 +42,16 @@
     "docs/assets/shots/mobile-07-export-area.png": "d85a85c9c8a7b5dd9c157fc4fc44cb66306a4f448f54928ec7faa20d0428ccca",
     "docs/assets/shots/mobile-08-task-queue.png": "56aea067d8d43a307cda46d12bbf04fb0aecfb82e9e1629642a77dd879ce5a48",
     "docs/assets/shots/mobile-09-log-view.png": "2731c8017e1b27baea19b4747d48e60ed1b14ab41e6071fa45e1ffe6d6619670",
-    "docs/convert.en.md": "69cde341c098686bee48cc7e2e33d1309a6260f41a6cbda70a7fa40c381ea211",
-    "docs/convert.md": "f5fa41ee976aeb129c6a55f0833f22212441574229a184c295c79d5aea7b3378",
+    "docs/convert.en.md": "947b788b30d4324d5a53225f4be8b9dd1444c5405d34d8aa24c2c7fbb3773509",
+    "docs/convert.md": "2890305fe919859d722b44dab92bf85427858fbcd61f04a70c5cf25223517a38",
     "docs/docs.js": "1a7d87fee8478f33afea889413f6bb5aa8c0315d7faf4fdca09328284a660692",
     "docs/engines.en.md": "0c4bfc583cc1f66537f7947e7415e8b584e81312b59f017e06ecc8d74a4b269f",
     "docs/engines.md": "b09e08b96cad50235ec476d07f11ac0188e378cc2ea8d3d0bfb09a66df4b3785",
     "docs/extensions.en.md": "fb4f826c2d13f8ce02d036a970641bbe7a20e808363ea74250dbf40a0786dc47",
     "docs/extensions.md": "75a34dfe7d38660cdbef99e214fa25118059319c8f2108fdd6958348546dbb0a",
-    "docs/faq.en.md": "37571c306732065d9e54a4cef18b040854a27dd2c5e165fc44dcd4d48066225f",
-    "docs/faq.md": "7617ec312725aed5a1f1b5cd81b0e69c59aec47ab8f21b585529eca100028650",
-    "docs/form-factor-matrix.md": "c45eee7268cc8fae3f08f3bb8763186facb0479870123762b28eb25a8a59b7de",
+    "docs/faq.en.md": "08a5ae5a821355996362dc42f3852914f05d65d97faa9ce0c975670b5d4a0274",
+    "docs/faq.md": "5ce45a1dce5ebd6d0c77f49d4e0a83dc68bd67879b32b3fd05d60b50c2ad2976",
+    "docs/form-factor-matrix.md": "1b1475937dece517f4e14f79e894b8ce3b5c5168befa3a7df3e0977ff4bed42c",
     "docs/formats.en.md": "7d5e0edc523c4d3ae5bd1da5c85f24377727b9a8da3779c867eff7df72165b9c",
     "docs/formats.md": "c228b5bd169c38e06990ee1459aa43bfe18ae3056d17d82172cb63bf839921ac",
     "docs/host-pull.en.md": "b8f22d31d8463f2ded2596ec82e52d0dfb66ca141f8ab42ca8b4747b3f021676",
@@ -65,8 +66,8 @@
     "docs/privacy.md": "e18a0d895f9e38588d819fd6bbafdfa8cf4a228bfa9f2b7b13b6b245008ae0b0",
     "docs/queue-and-logs.en.md": "65cd1744bb49f1273525c39dcd29bd5da7f060fe222f8ae3f38eecd9e4da69eb",
     "docs/queue-and-logs.md": "8282ffe1c998d6bf646e075cfe561121d106f3f4c5c8fbc081536623a33810a8",
-    "docs/restore.en.md": "9958d1dbeca6d4ac3a3bf94945e2c06c9b537913ec598eb31b11f83020d39aab",
-    "docs/restore.md": "d76508a26c6608e83067d040801a59fc474524dd2dc7ef9c203e3d1b4e201ab2",
+    "docs/restore.en.md": "793571ab507a843c298af087dcd30110f1f8cd418ea850dae5c49d518a28fff7",
+    "docs/restore.md": "ec3f1028eeaa428686eda65e3047e45ea247df995a8371b0cd6abeddd9372268",
     "docs/storage.en.md": "fe243a81210ffc57a60ce1995d98e81b5e62cf926b62957339cdba60f025806f",
     "docs/storage.md": "5741877389c0d464e9f2f0efa47a500d4a989528433aea74a8e1944434c0fbff",
     "docs/style.css": "8b36b66b39c27f1d6a37d919c423b81cb7bf5087030e03e9aa7fdec656f6a5d8",
@@ -103,8 +104,8 @@
       "zh": "docs/convert.md",
       "en": "docs/convert.en.md",
       "translation": "required",
-      "sourceHash": "f5fa41ee976aeb129c6a55f0833f22212441574229a184c295c79d5aea7b3378",
-      "translationHash": "69cde341c098686bee48cc7e2e33d1309a6260f41a6cbda70a7fa40c381ea211"
+      "sourceHash": "2890305fe919859d722b44dab92bf85427858fbcd61f04a70c5cf25223517a38",
+      "translationHash": "947b788b30d4324d5a53225f4be8b9dd1444c5405d34d8aa24c2c7fbb3773509"
     },
     {
       "zh": "docs/host-pull.md",
@@ -117,8 +118,8 @@
       "zh": "docs/restore.md",
       "en": "docs/restore.en.md",
       "translation": "required",
-      "sourceHash": "d76508a26c6608e83067d040801a59fc474524dd2dc7ef9c203e3d1b4e201ab2",
-      "translationHash": "9958d1dbeca6d4ac3a3bf94945e2c06c9b537913ec598eb31b11f83020d39aab"
+      "sourceHash": "ec3f1028eeaa428686eda65e3047e45ea247df995a8371b0cd6abeddd9372268",
+      "translationHash": "793571ab507a843c298af087dcd30110f1f8cd418ea850dae5c49d518a28fff7"
     },
     {
       "zh": "docs/extensions.md",
@@ -166,8 +167,8 @@
       "zh": "docs/faq.md",
       "en": "docs/faq.en.md",
       "translation": "required",
-      "sourceHash": "7617ec312725aed5a1f1b5cd81b0e69c59aec47ab8f21b585529eca100028650",
-      "translationHash": "37571c306732065d9e54a4cef18b040854a27dd2c5e165fc44dcd4d48066225f"
+      "sourceHash": "5ce45a1dce5ebd6d0c77f49d4e0a83dc68bd67879b32b3fd05d60b50c2ad2976",
+      "translationHash": "08a5ae5a821355996362dc42f3852914f05d65d97faa9ce0c975670b5d4a0274"
     },
     {
       "zh": "docs/testing.md",
@@ -187,7 +188,7 @@
       "zh": "docs/DEVELOPER-GUIDE.md",
       "en": null,
       "translation": "pending",
-      "sourceHash": "fe0b9f8bf90ccf4df5ef9718d64c4b42ec9bf5446b97eb90660f6950e3d0eb09",
+      "sourceHash": "a161e35ed102c12ebba013646ec1fddec375937c56957e504d7346f6047d94fe",
       "translationHash": null
     }
   ],
@@ -198,7 +199,7 @@
       "style.css",
       "tooling/capture-docs-shots.cjs"
     ],
-    "sourcesHash": "ed2d50481977da9f0bad7f7eca048c61b4fc850b290eb511d4942a026ddcf1a8",
+    "sourcesHash": "73a722a24e93d94b380850b8e27d1056c6a6934c80b58f1b89c9d2327f6f807c",
     "pages": {
       "docs/convert.en.md": [
         "docs/assets/shots/desktop-03-workbench-demo.png",
