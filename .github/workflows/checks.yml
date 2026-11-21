@@ -26,6 +26,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # 全量测试常驻每次 push / PR（用户 2026-11-22 明令：全量测试不得只在 release 才跑）。
+      # 测试问题在平时暴露，不堆积到发版；release.yml 的门禁保留作双保险。
+      - name: Full test suite
+        run: npm test
+
       - name: Host direct-load guard
         run: npm run check:no-bundler-only
 
