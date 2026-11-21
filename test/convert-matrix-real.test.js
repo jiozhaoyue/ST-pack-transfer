@@ -19,13 +19,14 @@ import { convert, TARGETS } from '../src/core/transform.js';
 const L_REAL = 'data-zip/default-user-2026-08-25-172056.zip';
 const TT_REAL = 'data-zip/tauritavern-data-20260825-100035.zip';
 const HAS_REAL = existsSync(L_REAL) && existsSync(TT_REAL);
-// fixtures/ 也被 .gitignore 覆盖（零隐私铁律）：CI checkout 必缺，缺失时兜底矩阵同样干净跳过。
-const HAS_FIXTURES = existsSync(FIX.l) && existsSync(FIX.tt);
 
 const FIX = {
   l: 'fixtures/fixture-l.zip',
   tt: 'fixtures/fixture-tt.zip',
 };
+// fixtures/ 也被 .gitignore 覆盖（零隐私铁律）：CI checkout 必缺，缺失时兜底矩阵同样干净跳过。
+// 注意必须定义在 FIX 之后（此前插在 FIX 前引发 TDZ，CI 收集即崩）。
+const HAS_FIXTURES = existsSync(FIX.l) && existsSync(FIX.tt);
 
 const EDGE_TIMEOUT = 600_000;
 

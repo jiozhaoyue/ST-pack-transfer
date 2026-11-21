@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { INSPECT_VERDICTS } from '../src/core/inspect.js';
 import { renderInspectReport } from '../src/ui/inspect-view.js';
+import { t } from '../src/i18n/index.js';
 
 /** 造一份最小 InspectReport，只覆盖渲染需要的字段。 */
 function reportOf(code, extra = {}) {
@@ -59,8 +60,9 @@ describe('renderInspectReport · 语义', () => {
 
   it('关键读数标签齐全', () => {
     const html = renderInspectReport(reportOf(INSPECT_VERDICTS.OK));
-    for (const label of ['体积', '条目数', '空条目数', '识别布局', '可转换条目']) {
-      expect(html).toContain(label);
+    // 语言无关：CI 为英文 locale，标签文案必须与渲染同源（t() 同 key），不得硬编码中文。
+    for (const key of ['inspect.size', 'inspect.entries', 'inspect.emptyEntries', 'inspect.layout', 'inspect.convertible']) {
+      expect(html).toContain(t(key));
     }
   });
 });
