@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { logger, LOG_LEVELS, redact, scrubDetailKeys } from '../src/core/logger.js';
+import { PEM_PRIVATE_KEY, PEM_PRIVATE_KEY_GLOBAL, containsPemPrivateKey } from '../src/core/credential-patterns.js';
 
 describe('Logger Core System', () => {
   beforeEach(() => {
@@ -249,6 +250,20 @@ describe('Logger Core System', () => {
         expect(redact(rsa)).not.toContain('MIIBODY');
         // ③ 无 END 的单行头退化为掩头行至行尾（不影响其后其它行文本）。
         expect(redact('-----BEGIN EC PRIVATE KEY-----LEAK')).toBe('[REDACTED]');
+      });
+
+      it('PEM 正则同源：全局版由唯一真源派生，redact 与 containsPemPrivateKey 结论一致', () => {
+        const samples = [
+          '-----BEGIN PRIVATE KEY-----\nBODY\n-----END PRIVATE KEY-----',
+          '-----BEGIN ENCRYPTED PRIVATE KEY-----SUPERSECRET',
+          '-----BEGIN OPENSSH PRIVATE KEY-----LEAK',
+          '-----BEGIN VENDORX PRIVATE KEY-----ODD',
+          'just a normal text without any key',
+        ];
+        for (const s of samples) {
+          expect(PEM_PRIVATE_KEY_GLOBAL.source).toBe(PEM_PRIVATE_KEY.source);
+          expect(redact(s) !== s).toBe(containsPemPrivateKey(s));
+        }
       });
 
       it('redact 覆盖 ?refresh_token= / id_token / client_secret 等查询参数', () => {

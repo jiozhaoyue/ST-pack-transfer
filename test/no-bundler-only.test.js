@@ -44,6 +44,51 @@ describe('宿主直装守卫 · 只能在打包器里成立的写法', () => {
     expect(coreLodash[0].reason).toContain('裸包名');
   });
 
+  it('反向断言：.. 路径构造不得绕过 vue 裸包名豁免（P2-5）', () => {
+    // 从 src/ui/vue/ 用 .. 逃到 core：归一后不在豁免目录，必须拦截
+    const escapeCore = checkBundlerOnly(
+      "import { reactive } from 'vue';\n",
+      'src/ui/vue/../../core/store.js',
+    );
+    expect(escapeCore).toHaveLength(1);
+    expect(escapeCore[0].reason).toContain('裸包名');
+
+    // 逃到上一级 src/ui/：同样不在豁免目录
+    const escapeParent = checkBundlerOnly(
+      "import { createApp } from 'vue';\n",
+      'src/ui/vue/../store.js',
+    );
+    expect(escapeParent).toHaveLength(1);
+    expect(escapeParent[0].reason).toContain('裸包名');
+
+    // 前置 .. 让路径看似藏进 vue 目录，实际归一后不在：拦截
+    const leadingDots = checkBundlerOnly(
+      "import { ref } from 'vue';\n",
+      '../../src/ui/vue/mount.js',
+    );
+    expect(leadingDots).toHaveLength(1);
+    expect(leadingDots[0].reason).toContain('裸包名');
+  });
+
+  it('反向断言：反斜杠 .. 路径构造同样不得绕过豁免（P2-5）', () => {
+    // Windows 分隔符先归一再判前缀，防止 \..\ 绕行
+    const backslashEscape = checkBundlerOnly(
+      "import { reactive } from 'vue';\n",
+      'src\\ui\\vue\\..\\..\\core\\store.js',
+    );
+    expect(backslashEscape).toHaveLength(1);
+    expect(backslashEscape[0].reason).toContain('裸包名');
+  });
+
+  it('归一后确实落在 src/ui/vue/ 的路径仍放行（P2-5 防过度拦截）', () => {
+    // src/core/../ui/vue/mount.js 归一后 = src/ui/vue/mount.js，属合法豁免
+    const normalizedIn = checkBundlerOnly(
+      "import { createApp } from 'vue';\n",
+      'src/core/../ui/vue/mount.js',
+    );
+    expect(normalizedIn).toEqual([]);
+  });
+
   it('Vite 专有语法被拦', () => {
     expect(checkBundlerOnly("import a from './a.js?raw';\n")).toHaveLength(1);
     expect(checkBundlerOnly('const x = import.meta.env.MODE;\n')).toHaveLength(1);

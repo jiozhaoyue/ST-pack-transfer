@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { auditLocale } from '../scripts/copy-audit.js';
+import { auditLocale, summarizeIssues } from '../scripts/copy-audit.js';
 
 describe('文案审查规则', () => {
   it('中文面板正文里的括号说明被标记', () => {
@@ -40,5 +40,16 @@ describe('文案审查规则', () => {
       'zones.b': '这一句文案相当长需要被检查一下',
     });
     expect(cross.filter((issue) => issue.rule === 'duplicate')).toEqual([]);
+  });
+
+  it('同一文案的多条规则合并为一行，计数与文案条数一致', () => {
+    const issues = auditLocale('zh-CN', {
+      'chart.fooHint': '前半句很长很长很长；后半句也很长很长很长很长',
+    });
+    expect(issues.length).toBeGreaterThan(1);
+    const rows = summarizeIssues(issues);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toContain('zh-CN:chart.fooHint');
+    expect(rows[0]).toMatch(/\[[^\]]*\//);
   });
 });

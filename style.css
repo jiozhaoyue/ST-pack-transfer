@@ -439,7 +439,8 @@
   #app.app-container .chart-empty-guide{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
     gap:10px;padding:16px;margin:auto;place-items:stretch;justify-self:center;
     grid-column:1/-1;width:100%;max-width:680px}
-  #app.app-container .chart-stack:has(> .chart-empty-guide){align-content:center;justify-items:center}
+  #app.app-container .chart-stack:has(> .chart-empty-guide){display:flex;flex-direction:column;
+    align-content:center;justify-content:center;align-items:stretch}
   /* 带鱼屏（≥2200px 可用宽）：空态引导放大，避免两张小卡悬在巨大空白里。 */
   @media (min-width: 2200px){
     #app.app-container .chart-empty-guide{max-width:860px;gap:14px}
@@ -1464,12 +1465,12 @@
     font-size:10px;color:var(--muted);min-width:0}
   #app.app-container .workbench-progress #progress-label{flex:1 1 auto;min-width:0;overflow:hidden;
     text-overflow:ellipsis;white-space:nowrap}
-  #app.app-container .workbench-progress .progress-hint{flex:0 0 auto;color:var(--muted-2);white-space:nowrap;
+  #app.app-container .workbench-progress .progress-hint{flex:0 0 auto;color:var(--muted);white-space:nowrap;
     text-decoration:underline dotted;text-underline-offset:2px}
   #app.app-container .workbench-progress #progress-pct{flex:0 0 auto;color:var(--text);
     font-variant-numeric:tabular-nums;white-space:nowrap}
-  #app.app-container .workbench-progress .app-version{flex:0 0 auto;font-size:9px;color:var(--muted-2);
-    opacity:.75;white-space:nowrap;font-variant-numeric:tabular-nums;letter-spacing:.2px}
+  #app.app-container .workbench-progress .app-version{flex:0 0 auto;font-size:9px;color:var(--muted);
+    white-space:nowrap;font-variant-numeric:tabular-nums;letter-spacing:.2px}
   #app.app-container[data-view="mobile"] .workbench-progress .app-version{display:none}
 
   /* 日志视图：允许自适应换行，禁止强制截断切掉清空/复制等按钮 */

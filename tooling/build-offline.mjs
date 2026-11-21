@@ -1,6 +1,13 @@
 /**
  * file:// 单文件离线产物构建（S7）。
  *
+ * 【入口声明·2026-11-22】本文件是离线构建的**唯一生效入口**：
+ * package.json:25 `build:offline` = `node tooling/build-offline.mjs`，指向此处。
+ * scripts/build-offline.mjs 是历史陈旧副本（末次提交 19cdd5d），全仓无实际调用
+ * （仅 worker-factory.js:5 与 worker-client.js:22 注释提及），仅为对照保留，
+ * 不得据此判断白屏修复是否生效。本文件已落地 plugin-vue(:31/:86) 与
+ * NODE_ENV define(:95)；白屏修复以本文件为准，勿改 scripts 副本。
+ *
  * 为什么不能直接用 `npm run build` 的产物：那个产物是 `<script type="module">`，
  * 而 `file://` 下 module 脚本必然被 CORS 拒（`public/file-protocol-notice.js` 就是
  * 为此存在的提示）——用户双击只会看到提示页，不是工作台。

@@ -4,6 +4,7 @@
  */
 
 import { APP_VERSION, APP_COMMIT } from './app-version.js';
+import { PEM_PRIVATE_KEY_GLOBAL } from './credential-patterns.js';
 
 const MAX_LOG_ENTRIES = 1000;
 
@@ -102,14 +103,12 @@ export function redact(text) {
   // 15. JWT 三段式（P1 加固）：eyJ 开头的 base64url 头 . 载荷 . 签名，三段各 ≥8 字符且限 base64url 字符集；
   //     要求 eyJ 前缀 + 三段结构，普通句子中的句点缩写（如 section 3.1415 ends.）不会误伤。
   out = out.replace(/\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b/g, '[REDACTED]');
-  // 16. PEM 私钥（P0-1 加固）：与 sanitize-share containsCredential 的 PEM 检测同源。
-  //     前缀覆盖 PKCS#8 加密私钥标准头 `-----BEGIN ENCRYPTED PRIVATE KEY-----` 及 RSA/EC/DSA/OPENSSH/PGP、PRIVATE KEY BLOCK。
-  //     存在配对 END 行时用惰性量词把 BEGIN→END 整块（含 Base64 主体）一并掩蔽；
-  //     无 END 的单行场景退化为只掩头行至行尾。非捕获组 + 惰性量词控制回溯。
-  out = out.replace(
-    /-----BEGIN (?:ENCRYPTED |RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY(?: BLOCK)?-----(?:[\s\S]*?-----END [A-Z ]*PRIVATE KEY(?: BLOCK)?-----[\r\n]*|[^\n]*)/g,
-    '[REDACTED]',
-  );
+  // 16. PEM 私钥（P0-1 加固）：正则唯一真源在 credential-patterns.js，
+  //     与 sanitize-share.containsCredential 共用同一份模式（消除历史漂移）。
+  //     前缀覆盖任意厂商扩展头（含 ENCRYPTED/RSA/EC/DSA/OPENSSH/PGP、PRIVATE KEY BLOCK）；
+  //     存在配对 END 行时惰性量词把 BEGIN→END 整块（含 Base64 主体）一并掩蔽；
+  //     无 END 的单行场景退化为只掩头行至行尾。
+  out = out.replace(PEM_PRIVATE_KEY_GLOBAL, '[REDACTED]');
   return out;
 }
 

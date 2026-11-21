@@ -173,13 +173,73 @@ async function collectVueFiles(dir) {
   return files.sort();
 }
 
-/** 解析 `<style …>…</style>` 块，`scoped` 取自开始标签的属性串 */
+/**
+ * 解析 `<style …>` 开始标签：返回属性名集合与标签结束位置。
+ *
+ * 旧实现用 `<style\b([^>]*)>` 抓属性串 + `/\bscoped\b/` 判 scoped，有两处盲区：
+ * ① 属性值含 `>`（如 `data-q="a>b"`）会把属性串提前截断；
+ * ② 属性值含 scoped 字样（如 `data-note="scoped"`）会被误判成 scoped 属性，
+ *    让本该按铁律 7 检查的全局样式被静默放行——这是真正的作用域绕过。
+ *
+ * 按字符扫描，只把「引号外、作为属性名出现」的 scoped 计入；与 subjectOf /
+ * splitSelectors 同风格，不引入新的 HTML 解析依赖（G-12）。
+ */
+function parseStyleOpenTag(source, start) {
+  const names = new Set();
+  const n = source.length;
+  let i = start + '<style'.length;
+  let ok = false;
+
+  while (i < n) {
+    while (i < n && /\s/.test(source[i])) i += 1;
+    if (i >= n) break;
+
+    const ch = source[i];
+    if (ch === '>') { ok = true; i += 1; break; }
+    if (ch === '/') { i += 1; continue; }
+
+    let name = '';
+    while (i < n && !/[\s=/>]/.test(source[i])) { name += source[i]; i += 1; }
+    if (name) names.add(name.toLowerCase());
+
+    while (i < n && /\s/.test(source[i])) i += 1;
+    if (source[i] !== '=') continue;
+
+    i += 1;
+    while (i < n && /\s/.test(source[i])) i += 1;
+    const quote = source[i];
+    if (quote === '"' || quote === "'") {
+      i += 1;
+      while (i < n && source[i] !== quote) i += 1;
+      if (i < n) i += 1;
+    } else {
+      while (i < n && !/[\s>]/.test(source[i])) i += 1;
+    }
+  }
+
+  return { names, end: i, ok };
+}
+
+/** 解析 `<style …>…</style>` 块，`scoped` 只认开始标签上的独立属性名 */
 function extractStyleBlocks(vueSource) {
   const blocks = [];
-  const re = /<style\b([^>]*)>([\s\S]*?)<\/style\s*>/gi;
+  const openRe = /<style\b/gi;
+  const closeRe = /<\/style\s*>/gi;
   let match;
-  while ((match = re.exec(vueSource)) !== null) {
-    blocks.push({ scoped: /\bscoped\b/.test(match[1]), css: match[2] });
+
+  while ((match = openRe.exec(vueSource)) !== null) {
+    const tag = parseStyleOpenTag(vueSource, match.index);
+    if (!tag.ok) break;
+
+    closeRe.lastIndex = tag.end;
+    const close = closeRe.exec(vueSource);
+    if (!close) break;
+
+    blocks.push({
+      scoped: tag.names.has('scoped'),
+      css: vueSource.slice(tag.end, close.index),
+    });
+    openRe.lastIndex = close.index + close[0].length;
   }
   return blocks;
 }

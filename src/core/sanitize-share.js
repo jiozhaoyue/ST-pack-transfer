@@ -10,6 +10,7 @@
  */
 
 import { redact } from './logger.js';
+import { containsPemPrivateKey } from './credential-patterns.js';
 
 /** settings.json 允许保留的白名单根键（仅限通用 UI/排版/无密钥常规采样预设） */
 export const SETTINGS_SAFE_WHITE_LIST = Object.freeze(new Set([
@@ -116,13 +117,12 @@ const CREDENTIAL_DIR_SEGMENTS = Object.freeze(new Set(['secrets', '.secrets']));
  * 内容级凭据检测：复用 logger.js 的 redact()（凭据打码模式的唯一真源）。
  * redact() 命中任何凭据/秘密载体都会改写文本；输出与输入不同即证明含敏感信息。
  * 这样门禁与日志脱敏共用同一套模式，不再在门禁里另抄一份正则（避免漂移）。
- * redact() 未覆盖 PEM 私钥头，单独用下面的常量补齐该载体的检测。
+ * PEM 私钥载体检测同样走共享模块 credential-patterns.js 的 containsPemPrivateKey，
+ * 与 logger.redact 的 PEM 正则严格同源（消除历史上两处正则不一致的漂移）。
  */
-const PEM_PRIVATE_KEY_HEADER_REGEX = /-----BEGIN (?:[A-Z0-9 ]+ )?PRIVATE KEY-----/;
-
 function containsCredential(content) {
   if (typeof content !== 'string' || !content) return false;
-  return redact(content) !== content || PEM_PRIVATE_KEY_HEADER_REGEX.test(content);
+  return redact(content) !== content || containsPemPrivateKey(content);
 }
 
 /**

@@ -176,14 +176,17 @@ describe('authority-store 可选适配器', () => {
   it('大 blob 分块写入并完整重组', { timeout: 30000 }, async () => {
     const client = mockClient();
     __setAuthorityClientForTest(client);
-    // 1.5MB 数据，512KB 块 → 3 块（验证跨块边界重组）
-    const bytes = new Uint8Array(1536 * 1024);
+    // 3KB 数据，1KB 块 → 3 块（验证跨块边界重组）。
+    // 原为 1.5MB / 512KB：单用例实测 ~6.2s，是 authority-store 全文件的耗时主峰，
+    // 也是全量 vitest 偶发挂起的主要嫌疑；缩到 KB 级保留「3 块跨边界重组」语义，
+    // 规避 base64 编解码与逐字节断言的 O(n) 峰值（分块逻辑仍按 chunkSize 真实执行）。
+    const bytes = new Uint8Array(3 * 1024);
     for (let i = 0; i < bytes.length; i++) bytes[i] = i & 0xff;
     const src = new Blob([bytes], { type: 'application/zip' });
 
     const progress = [];
     const res = await putArtifact('big.zip', src, {
-      chunkSize: 512 * 1024,
+      chunkSize: 1024,
       onProgress: (done, total) => progress.push([done, total]),
     });
     expect(res).toEqual({ name: 'big.zip', size: bytes.length, chunks: 3 });

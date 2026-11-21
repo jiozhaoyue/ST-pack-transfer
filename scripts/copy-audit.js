@@ -88,17 +88,39 @@ export function auditAll() {
   return Object.entries(LOCALES).flatMap(([locale, dict]) => auditLocale(locale, dict));
 }
 
+/**
+ * 收敛告警文案：同一条文案常被 semicolon + hint-long 重复命中，逐条打印会放大噪音。
+ * 按 `locale:key` 合并成一行，规则用 `/` 并列，计数回到真实文案条数（G-34 数据同源）。
+ * @param {Array<{locale:string,key:string,rule:string,text:string,other?:string}>} issues
+ * @returns {string[]} 每条形如 `zh-CN:k [semicolon/hint-long] 文本`
+ */
+export function summarizeIssues(issues) {
+  const byKey = new Map();
+  for (const issue of issues) {
+    const id = `${issue.locale}:${issue.key}`;
+    let row = byKey.get(id);
+    if (!row) {
+      row = { locale: issue.locale, key: issue.key, rules: [], text: issue.text, other: issue.other };
+      byKey.set(id, row);
+    }
+    if (!row.rules.includes(issue.rule)) row.rules.push(issue.rule);
+  }
+  return [...byKey.values()].map((row) => {
+    const other = row.other ? `（与 ${row.other} 重复）` : '';
+    return `${row.locale}:${row.key} [${row.rules.join('/')}]${other} ${String(row.text).slice(0, 60)}`;
+  });
+}
+
 function main() {
   const issues = auditAll();
   if (!issues.length) {
-    console.log('文案审查通过：面板正文无括号说明、无分号长句、无同区重复长文案');
+    console.log('文案审查通过：无括号说明 / 分号长句 / 同区重复');
     return;
   }
-  for (const issue of issues) {
-    const where = issue.other ? `（与 ${issue.other} 重复）` : '';
-    console.error(`${issue.locale}:${issue.key} [${issue.rule}]${where} ${issue.text.slice(0, 60)}`);
+  for (const line of summarizeIssues(issues)) {
+    console.error(line);
   }
-  console.error(`\n文案审查：${issues.length} 处待处理。说明性内容请移入 ? 浮层或教程。`);
+  console.error(`\n文案审查：${summarizeIssues(issues).length} 条待收敛（重复规则已按文案合并）。说明性内容请移入 ? 浮层或教程。`);
   if (process.argv.includes('--strict')) process.exitCode = 1;
 }
 

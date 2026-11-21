@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { convert, TARGETS } from '../src/core/transform.js';
 import { zipIo } from '../src/core/zip-io.js';
 import { preUploadGuard } from '../src/core/sanitize-share.js';
+import { containsPemPrivateKey } from '../src/core/credential-patterns.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
@@ -88,5 +89,12 @@ describe('End-to-End Sanitized Share Pipeline', () => {
     } finally {
       await fs.rm(tmpDir, { recursive: true, force: true });
     }
+  });
+
+  it('preUploadGuard 的 PEM 判定与共享凭证模块同源', () => {
+    const pem = '-----BEGIN VENDORX PRIVATE KEY-----\nBODY\n-----END VENDORX PRIVATE KEY-----';
+    expect(containsPemPrivateKey(pem)).toBe(true);
+    expect(() => preUploadGuard([{ path: 'chats/talk.jsonl', content: pem }]))
+      .toThrow(/发现明文 API 密钥/);
   });
 });

@@ -150,6 +150,31 @@ describe('Vue <style> 作用域守卫', () => {
     });
   });
 
+  it('属性值含 scoped 字样的非 scoped 块不得被误判放行（P2-1 作用域绕过）', async () => {
+    await withVueFiles({
+      'Sneaky.vue': `<style data-note="scoped">\n.overlay { color: red; }\nbody { margin: 0; }\n</style>\n`,
+    }, async (dir) => {
+      const result = await checkVueScopes(dir);
+
+      // 旧实现用 /\bscoped\b/ 命中属性值，会把整块当 scoped 静默放行
+      expect(result.violations).toHaveLength(2);
+      expect(result.violations.map((v) => v.selector)).toEqual(['.overlay', 'body']);
+      expect(result.scannedFiles[0]).toMatchObject({ scoped: false });
+    });
+  });
+
+  it('开始标签属性值含 > 时仍正确解析 style 块（P2-1 标签截断）', async () => {
+    await withVueFiles({
+      'QuoteGt.vue': `<template><div/></template>\n<style scoped data-q="a>b">\n.overlay { color: red; }\n</style>\n`,
+    }, async (dir) => {
+      const result = await checkVueScopes(dir);
+
+      // 旧实现 [^>]* 在属性值里的 > 处截断，css 内容会被吞进属性串导致块解析错乱
+      expect(result.violations).toEqual([]);
+      expect(result.scannedFiles[0]).toMatchObject({ scoped: true, selectors: 1 });
+    });
+  });
+
   it('.vue 目录/文件不存在时不炸，返回空结果', async () => {
     const missing = join(tmpdir(), `css-scope-vue-missing-${Date.now()}-${Math.random()}`);
     const result = await checkVueScopes(missing);

@@ -1,6 +1,13 @@
 /**
  * file:// 单文件离线产物构建（S7）。
  *
+ * 【入口声明·2026-11-22】本文件是**陈旧副本 / 死文件**，非生效入口：
+ * package.json:25 `build:offline` 指向 tooling/build-offline.mjs，而非此处；
+ * 全仓无对本文件的实际调用（仅 worker-factory.js:5 与 worker-client.js:22 注释提及）。
+ * 真正生效的是 tooling/build-offline.mjs，其已具备 plugin-vue 与 NODE_ENV define。
+ * 对本文件的任何修改都不会进入实际构建产物；白屏修复勿写在此副本，勿据此判定。
+ * 保留本文件仅为历史对照，删除需主人授权。
+ *
  * 为什么不能直接用 `npm run build` 的产物：那个产物是 `<script type="module">`，
  * 而 `file://` 下 module 脚本必然被 CORS 拒（`public/file-protocol-notice.js` 就是
  * 为此存在的提示）——用户双击只会看到提示页，不是工作台。
@@ -19,6 +26,7 @@ import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { build } from 'vite';
+import vue from '@vitejs/plugin-vue';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const OUT_DIR = 'dist-offline';
@@ -74,10 +82,18 @@ async function main() {
     logLevel: 'warn',
     // 不复制 public/（离线单文件不需要 file-protocol-notice.js，那是 HTTP 形态的说明页）
     publicDir: false,
+    // configFile:false 会跳过 vite.config.js，必须显式注册 plugin-vue：
+    // index.js:97 动态 import mount.js → mount.js:92 import InspectModal.vue，
+    // 不注册则 .vue 被当纯 JS 解析（RollupError: Expression expected）。
+    plugins: [vue()],
     // 离线标记：worker-client.js 见到它直接主线程降级
     define: {
       __ST_ZIP_OFFLINE__: 'true',
       'globalThis.__ST_ZIP_OFFLINE__': 'true',
+      // 浏览器无 process：Vue esm-bundler 产物含大量 process.env.NODE_ENV 引用，
+      // 必须显式替换，否则 file:// 运行时 ReferenceError: process is not defined 整页白屏。
+      // 与 tooling/build-offline.mjs 保持同源；主构建走 vite.config.js 不受影响。
+      'process.env.NODE_ENV': JSON.stringify('production'),
     },
     resolve: {
       alias: [

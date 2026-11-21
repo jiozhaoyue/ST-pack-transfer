@@ -125,6 +125,7 @@ export function getWorkbenchHtml() {
                 <button type="button" class="seg-btn active" data-transfer-tab="lan" data-i18n="action.lan"></button>
                 <button type="button" class="seg-btn" data-transfer-tab="cloud" data-i18n="cloud.open"></button>
               </div>
+              <a class="help-btn" role="button" tabindex="0" data-help="transfer" data-i18n-title="transfer.help" aria-label="?">?</a>
 
             </div>
           </div>
