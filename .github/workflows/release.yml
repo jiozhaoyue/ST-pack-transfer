@@ -36,9 +36,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # 发版门槛（铁律 13）：测试不全绿不发版。
-      - name: Test
-        run: npm test
+      # 全量测试不再在发版时跑（用户 2026-11-22 明令）：全量已常驻 checks.yml 每次 push/PR，
+      # tag 指向的提交必然已经过全量绿灯，发版只做构建与发布，不再重复 5 分钟全量。
 
       - name: Build offline single file
         run: npm run build:offline
