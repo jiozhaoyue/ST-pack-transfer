@@ -54,7 +54,7 @@ function grepLines(relPath, regex, opts = {}) {
     re.lastIndex = 0;
     let m;
     while ((m = re.exec(line)) !== null) {
-      out.push({ file: relPath, line: i + 1, text: line.trim().slice(0, 200), match: m[0] });
+      out.push({ file: relPath, line: i + 1, text: line.trim().slice(0, 200), raw: line, match: m[0] });
       if (!re.global) break;
     }
   });
@@ -474,6 +474,8 @@ export const checks = [
         (rel) =>
           !rel.startsWith('node_modules/') &&
           !rel.startsWith('.git/') &&
+          // .zcode/ 是 zcode 机器目录（工作流草稿/运行记录），非仓内脚本，不属本检查范围
+          !rel.startsWith('.zcode/') &&
           // 检查器自身与其描述文本不算违规
           !rel.startsWith('tooling/rules/') &&
           !rel.startsWith('scripts/rules/'),
@@ -482,7 +484,8 @@ export const checks = [
       for (const rel of targets) {
         const hits = grepLines(rel, /git\s+add\s+(-A|--all|-u|\.)(?:\s|$)/);
         for (const h of hits) {
-          if (/禁止|never|do not|don't|严禁|不得|未见|detail|检测|违规/i.test(h.text)) continue;
+          // 豁免判定用完整行（h.raw）：h.text 截断 200 字符会让超长行里靠后的「禁止」丢失，产生误报
+          if (/禁止|never|do not|don't|严禁|不得|未见|detail|检测|违规/i.test(h.raw ?? h.text)) continue;
           items.push(h);
         }
       }
