@@ -1,7 +1,7 @@
 {
   "name": "ST-pack-transfer",
   "display_name": "数据包转运",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "author": "jiozhaoyue",
   "description": "在 SillyTavern / Luker / PureTavern / TauriTavern 之间互转导出的 Zip 数据包",
   "homePage": "https://github.com/jiozhaoyue/ST-pack-transfer",
