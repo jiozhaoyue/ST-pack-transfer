@@ -38,6 +38,25 @@ On first launch, the tutorial walks you through the interface on simulated data:
 
 > The root `index.html` is a development skeleton and **cannot be downloaded and double-clicked by itself**; it needs a dev server or a built static server. Use the single-file HTML above when you want double-click behavior.
 
+### Three forms, step by step
+
+The three common forms compared by "how to open → what you see → what it is for".
+The core conversion logic is identical across forms; differences are limited to host-related features.
+
+| Form | First step to open | Interface | Host features | Best for |
+| --- | --- | --- | --- | --- |
+| Tavern extension | Extension Manager → Install from URL → refresh → expand **Data Pack Transfer** → **Open panel** | Full-screen workbench modal with Settings / Logs / Help views | Full: pull from host, restore to host, extension management, server-side storage inspector | Daily backup, restore, extension management |
+| Standalone Web | Open <https://jiozhaoyue.github.io/ST-pack-transfer/> | Workbench shown directly on the page | No host backend; pull / restore / server management disabled | Local conversion, analysis, splitting, LAN transfer |
+| Single-file HTML | Download `ST-pack-transfer-offline.html` from GitHub Release → double-click | Same workbench as Web, running over `file://` | Same as Web, no host features | Offline, no network, portable |
+
+Step by step:
+
+1. **Tavern extension**: install via repository URL, refresh, expand **Data Pack Transfer**, click **Open panel** to enter the workbench. First launch opens the tutorial demo.
+2. **Standalone Web**: open the online URL directly, no install needed; conversion, splitting, size analysis, and LAN transfer all work.
+3. **Single-file HTML**: double-click the downloaded offline file; all front-end features run directly over `file://`.
+
+> All three forms support issue reports, sanitized share, and the local redaction guard; host pull and restore are available only in the tavern extension form. See [Issue report](issue-report.en.md) and [Privacy & credentials](privacy.en.md).
+
 ## 2. Install into a tavern (recommended)
 
 Open the tavern's **Extension Manager → Install from URL** and paste:
@@ -72,6 +91,27 @@ The plugin does not guess host versions. It probes public endpoints: use what ex
 | Tauri WebView | With the host | Per host | WebView2 on Windows, WKWebView on macOS |
 
 Mobile layout is checked at 390×844; desktop at 1440×900. Mobile browsers and tavern WebViews share the same responsive rules.
+
+### Resolution behavior at a glance
+
+The layout has a single dividing line: **860px**. Wider than 860px is the desktop layout; 860px or narrower is the phone layout. On a phone, conversion and host features still work — only the arrangement changes, nothing is removed.
+
+| Scenario | Typical width | What you see |
+| --- | --- | --- |
+| Desktop | 1440px | Two columns: the package list stays in a sidebar on the left, with charts, quota, and actions on the right; header controls sit on one row |
+| Tablet / boundary | 860px | Exactly on the line, shown with the phone layout: the package area is no longer a sidebar but a "Packages / Git" tab switcher; tap a tab to switch between the list and the content |
+| Phone | 390px | Same phone layout as 860px, packed tighter vertically: list rows collapse to two lines, long names are truncated; the main content area is the single scroll container, so scrolling the page moves only that area |
+
+Two notes about the 860px boundary:
+
+- This width **counts as the phone layout**, not desktop. "Exactly 860" behaves the same as "below 860", so the boundary does not flicker.
+- The check uses the panel's actual width, not the whole window. Narrowing the panel inside the tavern switches to the phone layout even on a wide screen.
+
+Touch details (shared by phones and tavern WebViews):
+
+- Header icon buttons and the theme dropdown are all 32px tall; folding on narrow screens never pushes adjacent buttons off-screen.
+- On devices whose system pointer is touch, collapse arrows are at least 24px and compact text buttons at least 28px, for comfortable tapping.
+- Only views with their own inner scroll (transfer and extensions) scroll internally; everything else scrolls through the single main content area, so there are no competing scroll layers.
 
 ## 5. Local build and preview
 

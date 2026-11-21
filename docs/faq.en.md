@@ -52,6 +52,32 @@ Auto-update needs the extension's Git remote URL. If the extension was copied ma
 **How are cloud branches shown in the Git commit graph?**
 The locally installed commit history is drawn with full branch lanes and commit nodes. Cloud branches are shown as labels for the latest version so you can compare local progress.
 
+## Issue report
+
+**Where do I open Issue report?**
+Open the **Settings** view in the workbench and expand the **Issue report** group. See [Issue report](issue-report.en.md) for the full steps.
+
+**Will the report leak my chats or character cards?**
+No. Chats, character cards, world books and host usernames are excluded by default; all outgoing text passes through unified redaction. Logs are optional with a chosen level and count, defaulting to the safest minimum (Warn+, 100 entries).
+
+**Submit shows "Too long, copy instead". What now?**
+That is the URL length guard. Use **Copy full text** or **Export Markdown** and paste into the Issue body manually, or configure a token and submit through the API.
+
+**Why must I check "Docs reviewed" and "No duplicate found"?**
+These are two prerequisites for a public Issue that avoid duplicate reports. The submit button stays disabled until both are checked.
+
+**Where is the token stored?**
+The fine-grained PAT is stored only in this browser's `localStorage`, never in the tavern `settings.json`. It only needs Issues read/write on the target repository.
+
+**What is in a sanitized share package?**
+Personal sanitized share physically removes character cards and credential files, keeps chats (chats/*.jsonl), and cleans settings.json through an AST whitelist. See [Privacy & credentials](privacy.en.md).
+
+**Are OAuth tokens exported with extension data?**
+Not by default. **Include login credentials** is checked by default; **Include OAuth tokens** must be checked separately to export OAuth accounts.
+
+**How do I set auto-update rules?**
+Per-extension auto-update rules are set on each extension in extension management. The parent **Auto-update** is the master switch; once on, set the check interval (default 6 hours) and mode (notify only / update directly), which apply to all participating items. Extensions copied manually without Git metadata must be reinstalled through the URL to link the official repository.
+
 ## Privacy and credentials
 
 **Where are Git tokens and cloud backup accounts stored?**

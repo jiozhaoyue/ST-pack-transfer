@@ -1,14 +1,14 @@
 {
   "version": 1,
   "files": {
-    "docs/DEVELOPER-GUIDE.md": "ee0902c24cf4eaa630ed17fe24ce89338e62619de549e3d926de7a2bc4f7d102",
-    "docs/HANDOFF-2026-11-21-quality-pass.md": "585920349c26e27d42785120b098de36846174c3be8203550f4fe9c35e7acd22",
+    "docs/DEVELOPER-GUIDE.md": "fe0b9f8bf90ccf4df5ef9718d64c4b42ec9bf5446b97eb90660f6950e3d0eb09",
+    "docs/HANDOFF-2026-11-21-quality-pass.md": "a7776f26a24c91e1fcf74d3bd82e56a770e6482ea03109790cf69c8943a4913d",
     "docs/HANDOFF-2026-11-21.md": "0a44fb5ffc7d874be138aca3f83a1032c39b612eb20295af47c15e1a442896bd",
     "docs/PLAN-2026-11-19-offline-inspect-and-0kb.md": "abd1ecb299c0eddeadd443509690ffec406db6e193d97ace1bb972cc83074148",
     "docs/PLAN-2026-11-19-release-workflow.md": "ae9951e2d2b18bc68df3be7c93c09210cda0e6d3693c0d07f0807a42c3f62765",
     "docs/PLAN-2026-11-19-web-lan-tutorial-fixes.md": "25c6f8b308bd7133df461357fbfe18562536c5b8b0902cd673e797ebbfc6a903",
     "docs/PLAN-2026-11-20-ui-refactor-and-feature-expansion.md": "60be2fd580c36805a2cc7461c2de389da69147fe50e3efb2764970b059ec46ce",
-    "docs/PLAN-2026-11-21-fulltest-fourhost-main-consolidation.md": "1db28046a41419331e7f4169c30101b7c6667653040b58579f5e96f58272346a",
+    "docs/PLAN-2026-11-21-fulltest-fourhost-main-consolidation.md": "b665c5fa09cd0e2ba20572c529625eb94b3ad4cfbb9772809704a5eb0c56308c",
     "docs/_config.yml": "4158c65372fa1362448cd0cbbe10c1f176a5aa70ace9c765594cd5c9360a009c",
     "docs/_layouts/default.html": "a31a991d951dc7284e0c00c27734e343b7498c7f929b233e5209cb4ca03e5764",
     "docs/assets/review-shots/01-desktop-tutorial-overlay-clean.png": "ff0c326a0e60ed72312d0ff94ca49d443ece095741c4c439258a62b82d043ff2",
@@ -48,22 +48,25 @@
     "docs/engines.md": "b09e08b96cad50235ec476d07f11ac0188e378cc2ea8d3d0bfb09a66df4b3785",
     "docs/extensions.en.md": "fb4f826c2d13f8ce02d036a970641bbe7a20e808363ea74250dbf40a0786dc47",
     "docs/extensions.md": "75a34dfe7d38660cdbef99e214fa25118059319c8f2108fdd6958348546dbb0a",
-    "docs/faq.en.md": "1748c2b2ba9b8f4ae13a945bdfaa0e2e68618ed10ff76d1a5790b8f26db1e549",
-    "docs/faq.md": "258b5316ef3198652818a5e4de38919b0ac4df3eb359f4dec43535b84ca15001",
+    "docs/faq.en.md": "37571c306732065d9e54a4cef18b040854a27dd2c5e165fc44dcd4d48066225f",
+    "docs/faq.md": "7617ec312725aed5a1f1b5cd81b0e69c59aec47ab8f21b585529eca100028650",
+    "docs/form-factor-matrix.md": "c45eee7268cc8fae3f08f3bb8763186facb0479870123762b28eb25a8a59b7de",
     "docs/formats.en.md": "7d5e0edc523c4d3ae5bd1da5c85f24377727b9a8da3779c867eff7df72165b9c",
     "docs/formats.md": "c228b5bd169c38e06990ee1459aa43bfe18ae3056d17d82172cb63bf839921ac",
-    "docs/host-pull.en.md": "67266e0f94d0ceeb6e9dbcbcfb74cb7e90d8a50b85a7d0520b1781acdb8d96ab",
-    "docs/host-pull.md": "85a3fda10e927af6455c4ff57d5ed43e135a7cda4bcab8224bc9f3afd1d0df91",
-    "docs/index.en.md": "8ba5b321b127f265f32cd503b3573cc8e8bd8163a5dcae178351d6c12c2255d6",
-    "docs/index.md": "73bbc0dcc82bb08452278f14bb4a8bb7f74fd305d1f24e2a29137ddd64276e44",
-    "docs/install.en.md": "aa33ac85861df1218bfad9c437c133acaafc1a8918070bed204b86131659b105",
-    "docs/install.md": "0ad90de631f4eed015578e007fa43cf34d8ea9619d513f58961ba664b22513f9",
-    "docs/privacy.en.md": "9f4fd2566f5ed8a0eeb84a0fc9249b2450917379bad9efec93b0420029bff564",
-    "docs/privacy.md": "c8a9530f22f4f1a5ea3849166aa708a748050b63b872c311cc20d069d6e54709",
+    "docs/host-pull.en.md": "b8f22d31d8463f2ded2596ec82e52d0dfb66ca141f8ab42ca8b4747b3f021676",
+    "docs/host-pull.md": "2d88338e5d4555b2949fee0f13720061dec1a9891700f5d055f93f4824b1e6ac",
+    "docs/index.en.md": "94e81b998d0976446d8ec97e0a5ad199e10ba5c9df607002333b3344c9da4632",
+    "docs/index.md": "ea267cc324ab98cadf0d75bdddda25514ad279f62b3fd8bb1c285af88b43b53e",
+    "docs/install.en.md": "3c7a248b81e54055f3c45b09f25013e5dba623ed7ef3821e01c8e54daeb1bbf4",
+    "docs/install.md": "9e08a4925d0546f62c35f70d82b6cfb08a1e56bf4b7d68c580d5e0aa17a692e4",
+    "docs/issue-report.en.md": "b5f381f7449f9ddc0b3c2e5aa92a17332b329b4334804c8120b06f765b8996eb",
+    "docs/issue-report.md": "315833eb2da199aaa8f9ec4cacd6b2d3691f8bd9ddd0d1c8fc4866180baf8a0d",
+    "docs/privacy.en.md": "84d53f5cb03e230558f82bec7be8528d9cfc25af6490864ea634d26da01414e2",
+    "docs/privacy.md": "e18a0d895f9e38588d819fd6bbafdfa8cf4a228bfa9f2b7b13b6b245008ae0b0",
     "docs/queue-and-logs.en.md": "65cd1744bb49f1273525c39dcd29bd5da7f060fe222f8ae3f38eecd9e4da69eb",
     "docs/queue-and-logs.md": "8282ffe1c998d6bf646e075cfe561121d106f3f4c5c8fbc081536623a33810a8",
-    "docs/restore.en.md": "8cc40f788c811228c4913b3f349d4292ccd552ba95f9ffdf67368309fddccc59",
-    "docs/restore.md": "eb179f50c1c6a4b7b7cde073a78b2ebf8ec85191139b1ac2746ea4cb497d3c24",
+    "docs/restore.en.md": "9958d1dbeca6d4ac3a3bf94945e2c06c9b537913ec598eb31b11f83020d39aab",
+    "docs/restore.md": "d76508a26c6608e83067d040801a59fc474524dd2dc7ef9c203e3d1b4e201ab2",
     "docs/storage.en.md": "fe243a81210ffc57a60ce1995d98e81b5e62cf926b62957339cdba60f025806f",
     "docs/storage.md": "5741877389c0d464e9f2f0efa47a500d4a989528433aea74a8e1944434c0fbff",
     "docs/style.css": "8b36b66b39c27f1d6a37d919c423b81cb7bf5087030e03e9aa7fdec656f6a5d8",
@@ -79,15 +82,15 @@
       "zh": "docs/index.md",
       "en": "docs/index.en.md",
       "translation": "required",
-      "sourceHash": "73bbc0dcc82bb08452278f14bb4a8bb7f74fd305d1f24e2a29137ddd64276e44",
-      "translationHash": "8ba5b321b127f265f32cd503b3573cc8e8bd8163a5dcae178351d6c12c2255d6"
+      "sourceHash": "ea267cc324ab98cadf0d75bdddda25514ad279f62b3fd8bb1c285af88b43b53e",
+      "translationHash": "94e81b998d0976446d8ec97e0a5ad199e10ba5c9df607002333b3344c9da4632"
     },
     {
       "zh": "docs/install.md",
       "en": "docs/install.en.md",
       "translation": "required",
-      "sourceHash": "0ad90de631f4eed015578e007fa43cf34d8ea9619d513f58961ba664b22513f9",
-      "translationHash": "aa33ac85861df1218bfad9c437c133acaafc1a8918070bed204b86131659b105"
+      "sourceHash": "9e08a4925d0546f62c35f70d82b6cfb08a1e56bf4b7d68c580d5e0aa17a692e4",
+      "translationHash": "3c7a248b81e54055f3c45b09f25013e5dba623ed7ef3821e01c8e54daeb1bbf4"
     },
     {
       "zh": "docs/formats.md",
@@ -107,15 +110,15 @@
       "zh": "docs/host-pull.md",
       "en": "docs/host-pull.en.md",
       "translation": "required",
-      "sourceHash": "85a3fda10e927af6455c4ff57d5ed43e135a7cda4bcab8224bc9f3afd1d0df91",
-      "translationHash": "67266e0f94d0ceeb6e9dbcbcfb74cb7e90d8a50b85a7d0520b1781acdb8d96ab"
+      "sourceHash": "2d88338e5d4555b2949fee0f13720061dec1a9891700f5d055f93f4824b1e6ac",
+      "translationHash": "b8f22d31d8463f2ded2596ec82e52d0dfb66ca141f8ab42ca8b4747b3f021676"
     },
     {
       "zh": "docs/restore.md",
       "en": "docs/restore.en.md",
       "translation": "required",
-      "sourceHash": "eb179f50c1c6a4b7b7cde073a78b2ebf8ec85191139b1ac2746ea4cb497d3c24",
-      "translationHash": "8cc40f788c811228c4913b3f349d4292ccd552ba95f9ffdf67368309fddccc59"
+      "sourceHash": "d76508a26c6608e83067d040801a59fc474524dd2dc7ef9c203e3d1b4e201ab2",
+      "translationHash": "9958d1dbeca6d4ac3a3bf94945e2c06c9b537913ec598eb31b11f83020d39aab"
     },
     {
       "zh": "docs/extensions.md",
@@ -149,8 +152,8 @@
       "zh": "docs/privacy.md",
       "en": "docs/privacy.en.md",
       "translation": "required",
-      "sourceHash": "c8a9530f22f4f1a5ea3849166aa708a748050b63b872c311cc20d069d6e54709",
-      "translationHash": "9f4fd2566f5ed8a0eeb84a0fc9249b2450917379bad9efec93b0420029bff564"
+      "sourceHash": "e18a0d895f9e38588d819fd6bbafdfa8cf4a228bfa9f2b7b13b6b245008ae0b0",
+      "translationHash": "84d53f5cb03e230558f82bec7be8528d9cfc25af6490864ea634d26da01414e2"
     },
     {
       "zh": "docs/tutorial.md",
@@ -163,8 +166,8 @@
       "zh": "docs/faq.md",
       "en": "docs/faq.en.md",
       "translation": "required",
-      "sourceHash": "258b5316ef3198652818a5e4de38919b0ac4df3eb359f4dec43535b84ca15001",
-      "translationHash": "1748c2b2ba9b8f4ae13a945bdfaa0e2e68618ed10ff76d1a5790b8f26db1e549"
+      "sourceHash": "7617ec312725aed5a1f1b5cd81b0e69c59aec47ab8f21b585529eca100028650",
+      "translationHash": "37571c306732065d9e54a4cef18b040854a27dd2c5e165fc44dcd4d48066225f"
     },
     {
       "zh": "docs/testing.md",
@@ -184,7 +187,7 @@
       "zh": "docs/DEVELOPER-GUIDE.md",
       "en": null,
       "translation": "pending",
-      "sourceHash": "ee0902c24cf4eaa630ed17fe24ce89338e62619de549e3d926de7a2bc4f7d102",
+      "sourceHash": "fe0b9f8bf90ccf4df5ef9718d64c4b42ec9bf5446b97eb90660f6950e3d0eb09",
       "translationHash": null
     }
   ],
@@ -195,7 +198,7 @@
       "style.css",
       "tooling/capture-docs-shots.cjs"
     ],
-    "sourcesHash": "095b982e8fbd31106ae02fcdd4575fb0fe3d179f95ad419b9f3c99e91753dfed",
+    "sourcesHash": "ed2d50481977da9f0bad7f7eca048c61b4fc850b290eb511d4942a026ddcf1a8",
     "pages": {
       "docs/convert.en.md": [
         "docs/assets/shots/desktop-03-workbench-demo.png",

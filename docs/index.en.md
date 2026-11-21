@@ -49,6 +49,7 @@ ST-pack-transfer converts packs between any two taverns, recognizes and rebuilds
 - [Storage engine conversion](engines.en.md) — Luker only: file system and PG/MySQL/SQLite conversion
 - [Tutorial demo mode](tutorial.en.md) — try every feature on simulated data
 - [Task queue & logs](queue-and-logs.en.md) — queueing, pause/resume/interrupt, changelog, and full logs
+- [Issue report](issue-report.en.md) — one-click redacted environment report, log level/count, preview and submit
 
 ### Reference
 
