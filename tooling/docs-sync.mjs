@@ -11,6 +11,7 @@
 import { createHash } from 'node:crypto';
 import { readFile, writeFile, readdir, stat } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 
 const ROOT = process.cwd();
@@ -84,21 +85,16 @@ async function hashMany(relPaths) {
 }
 
 async function listDocsFiles() {
-  const out = [];
-  const walk = async (dir, prefix) => {
-    const entries = await readdir(dir, { withFileTypes: true });
-    for (const entry of entries) {
-      const rel = `${prefix}/${entry.name}`.replaceAll('\\', '/');
-      if (entry.isDirectory()) {
-        if (entry.name === '_site') continue;
-        await walk(path.join(dir, entry.name), rel);
-      } else if (entry.isFile()) {
-        out.push(rel);
-      }
-    }
-  };
-  await walk(DOCS_DIR, 'docs');
-  return out.sort();
+  // 只认 git 追踪的文件：基线必须与 CI 检出树一致。
+  // docs/PLAN-* 等被 .gitignore 覆盖的内部资料永不上传，收进基线会让 CI 检出必缺（2026-11-22 实测）。
+  const tracked = execFileSync('git', ['ls-files', '--', 'docs'], { encoding: 'utf8' })
+    .split(/\r?\n/)
+    .map((s) => s.trim().replaceAll('\\', '/'))
+    .filter((rel) => rel.startsWith('docs/') && rel.length > 'docs/'.length);
+  if (tracked.length === 0) {
+    throw new Error('git ls-files 未返回任何 docs/ 文件：确认在仓库根目录运行，且 docs/ 已入库。');
+  }
+  return tracked.sort();
 }
 
 function extractShotRefs(markdown) {

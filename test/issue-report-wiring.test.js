@@ -123,9 +123,10 @@ describe('issue-report 接线 · 面板渲染', () => {
     const html = buildSettingsHtml({});
     // 账号下拉存在，且带 disabled（令牌来自本机，不可切换账号）。
     expect(html).toMatch(/<select[^>]*data-setting="issueAccount"[^>]*disabled/);
-    // 空态：option 文案为「未配置 请到开发者设置添加令牌」，且该 option 自身 disabled。
+    // 空态：option 文案为「未配置 请到开发者设置添加令牌」（en-US 为 "Not configured"），且该 option 自身 disabled。
+    // 断言语言无关：CI 环境默认 locale 为 en-US，t() 渲染英文文案。
     expect(html).toContain(t('issue.accountEmpty'));
-    expect(html).toMatch(/<option value="" disabled selected>[^<]*未配置/);
+    expect(html).toMatch(/<option value="" disabled selected>[^<]*(?:未配置|Not configured)/);
   });
 
   it('issueAccount 有账号时 option 含该账号 label，并按 issueAccount 回显选中', () => {

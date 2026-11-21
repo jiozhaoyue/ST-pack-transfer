@@ -19,6 +19,8 @@ import { convert, TARGETS } from '../src/core/transform.js';
 const L_REAL = 'data-zip/default-user-2026-08-25-172056.zip';
 const TT_REAL = 'data-zip/tauritavern-data-20260825-100035.zip';
 const HAS_REAL = existsSync(L_REAL) && existsSync(TT_REAL);
+// fixtures/ 也被 .gitignore 覆盖（零隐私铁律）：CI checkout 必缺，缺失时兜底矩阵同样干净跳过。
+const HAS_FIXTURES = existsSync(FIX.l) && existsSync(FIX.tt);
 
 const FIX = {
   l: 'fixtures/fixture-l.zip',
@@ -262,7 +264,7 @@ describe.skipIf(!HAS_REAL)('真实包 12 边转换矩阵（data-zip/）', () => 
   registerMatrix('real', L_REAL, TT_REAL);
 });
 
-describe.skipIf(HAS_REAL)('fixture 兜底 12 边转换矩阵（真实包缺失，合成小包降级）', () => {
+describe.skipIf(HAS_REAL || !HAS_FIXTURES)('fixture 兜底 12 边转换矩阵（真实包缺失，合成小包降级）', () => {
   registerMatrix('fixture', FIX.l, FIX.tt);
 });
 
