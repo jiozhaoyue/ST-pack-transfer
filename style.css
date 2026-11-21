@@ -193,6 +193,14 @@
   #app.app-container .col-side > .zone-card{flex:1 1 auto;min-height:140px}
   /* 局域网面板与图表面板同级互斥；不再让包区让出高度 */
 
+  /* 2026-11-21 用户铁律：桌面数据包侧栏可折叠（与手机 zone 开关同能力的桌面等价态）。
+     状态源 = data-side-collapsed（与手机 data-zone-open 互相独立，跨断点互不误读）。
+     收起 = 隐藏 col-side + splitter-v、主区改单列占满（对齐下方 [data-si="1"] 单列范式）；
+     无抽屉动画，避免双栏网格插值抖动（2026-11-19 的 0fr 教训）。展开入口 = 各面板头 zone 钮。 */
+  #app.app-container[data-side-collapsed="1"] .col-side,
+  #app.app-container[data-side-collapsed="1"] .splitter-v{display:none}
+  #app.app-container[data-side-collapsed="1"] .app-main{grid-template-columns:minmax(0,1fr)}
+
   /* 拖拽分隔条：拖中间改列宽，拖右栏内改上下高度 */
   #app.app-container .splitter-v{width:8px;cursor:col-resize;align-self:stretch;display:flex;align-items:center;
     justify-content:center;touch-action:none}
@@ -219,27 +227,29 @@
   #app.app-container .help-btn:hover{color:var(--text);border-color:var(--accent);color:var(--accent)}
 
   /* 图表控制 */
-  /* 手机端转换设置：默认只留一行摘要，点按钮展开完整控件（桌面不显示摘要）。 */
-  #app.app-container .chart-mobile-summary{display:none}
-  #app.app-container[data-view="mobile"] .chart-mobile-summary{display:flex;align-items:center;gap:6px;
+  /* 转换设置收起条（2026-11-21 用户铁律：桌面与手机同款可收起）：默认只留一行摘要，
+     点按钮展开/收起完整控件（is-mobile-settings 类，初始展开）。双形态同款样式。 */
+  #app.app-container .chart-mobile-summary{display:flex;align-items:center;gap:6px;
     flex:0 0 auto;padding:6px 8px;border-bottom:1px solid var(--border);font-size:10.5px;color:var(--muted)}
-  #app.app-container[data-view="mobile"] .chart-mobile-summary .cms-text{flex:1 1 auto;min-width:0;
+  #app.app-container .chart-mobile-summary .cms-text{flex:1 1 auto;min-width:0;
     overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  #app.app-container[data-view="mobile"] .chart-mobile-summary .cms-toggle{flex:0 0 auto;min-height:30px;
+  #app.app-container .chart-mobile-summary .cms-toggle{flex:0 0 auto;min-height:30px;
     padding:4px 9px;font-size:11px}
-  #app.app-container[data-view="mobile"] .chart-mobile-summary[data-host="st"] .cms-toggle{
+  #app.app-container .chart-mobile-summary[data-host="st"] .cms-toggle{
     background:var(--brand-st-soft);border-color:var(--brand-st-ring);color:var(--brand-st-ring)}
-  #app.app-container[data-view="mobile"] .chart-mobile-summary[data-host="luker"] .cms-toggle{
+  #app.app-container .chart-mobile-summary[data-host="luker"] .cms-toggle{
     background:var(--brand-luker-soft);border-color:var(--brand-luker-ring);color:var(--brand-luker-ring)}
-  #app.app-container[data-view="mobile"] .chart-mobile-summary[data-host="tt"] .cms-toggle{
+  #app.app-container .chart-mobile-summary[data-host="tt"] .cms-toggle{
     background:var(--brand-tt-soft);border-color:var(--brand-tt-ring);color:var(--brand-tt-ring)}
-  #app.app-container[data-view="mobile"] .chart-mobile-summary[data-host="pt"] .cms-toggle{
+  #app.app-container .chart-mobile-summary[data-host="pt"] .cms-toggle{
     background:var(--brand-pt-soft);border-color:var(--brand-pt-ring);color:var(--brand-pt-ring)}
-  #app.app-container[data-view="mobile"] #chart-card:not(.is-mobile-settings) .chart-controls,
-  #app.app-container[data-view="mobile"] #chart-card:not(.is-mobile-settings) .filename-row,
-  #app.app-container[data-view="mobile"] #chart-card:not(.is-mobile-settings) .quota-head,
-  #app.app-container[data-view="mobile"] #chart-card:not(.is-mobile-settings) .legend,
-  #app.app-container[data-view="mobile"] #chart-card:not(.is-mobile-settings) .extension-tools{display:none}
+  /* 收起态隐藏五组设置区（控制行/文件名行/配额头/图例/扩展工具）——双形态通用；
+     特异性 2-2-0，高于下方 .chart-controls 通用 display:flex（1-1-0）。 */
+  #app.app-container #chart-card:not(.is-mobile-settings) .chart-controls,
+  #app.app-container #chart-card:not(.is-mobile-settings) .filename-row,
+  #app.app-container #chart-card:not(.is-mobile-settings) .quota-head,
+  #app.app-container #chart-card:not(.is-mobile-settings) .legend,
+  #app.app-container #chart-card:not(.is-mobile-settings) .extension-tools{display:none}
   #app.app-container .chart-controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:6px 10px;
     border-bottom:1px solid var(--border)}
   #app.app-container .field{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);white-space:nowrap}
@@ -1740,17 +1750,9 @@
   #app.app-container[data-view="mobile"]{width:100vw;max-width:none;height:100vh;height:100dvh;max-height:none;
     min-height:0;margin:0;border-radius:0}
   #app.app-container[data-view="mobile"] .splitter-v{display:none}
-  /* 手机端左右切换：切换哪一列可见；唯一滚动容器仍是 .app-main —— 不做第二个滚动条 */
-  #app.app-container .mobile-switch{display:none;flex-wrap:nowrap;gap:4px;padding:3px;margin:0 2px;
-    background:var(--panel-2);border:1px solid var(--border);border-radius:9px}
-  /* 手机切换行（2026-11-15 用户裁定）：**绝对禁止换行**——空间不足由 is-icon-only 降级，不折行 */
-  #app.app-container[data-view="mobile"] .mobile-switch{display:flex;position:sticky;top:0;z-index:6;
-    flex-wrap:nowrap;overflow:hidden;
-    backdrop-filter:blur(6px)}
-  #app.app-container .mobile-switch .msw{flex:1 1 auto;min-width:max-content;min-height:28px;padding:3px 8px;
-    border:1px solid transparent;border-radius:7px;background:transparent;color:var(--muted);
-    font-size:12px;white-space:nowrap}
-  #app.app-container .mobile-switch .msw.active{background:var(--panel-3);border-color:var(--border);color:var(--text)}
+  /* 手机端视图切换走页头 .view-switch（is-icon-only 降级防折行，2026-11-15 裁定）；
+     旧 .mobile-switch 页签样式已无任何 JS/模板引用，2026-11-21 清理。
+     唯一滚动容器仍是 .app-main —— 不做第二个滚动条 */
   #app.app-container[data-view="mobile"] .app-main{display:flex;flex-direction:column;gap:10px;overflow:auto}
   /* 竖排时子块一律不被压缩，否则 flex-shrink 会把下面的面板压成 2px 并被上方内容盖住。
      注意 `.col-side{display:contents}` 只改变布局树、不改变 DOM 树，
@@ -1770,11 +1772,12 @@
      其余视图（图表/数据包/日志）必须由 .app-main 承担唯一纵向滚动，否则内容不可达。 */
   #app.app-container[data-view="mobile"]:has(#transfer-view:not([hidden])) .app-main{overflow:hidden}
   /* 手机数据包列表（2026-11-16 用户裁定，五次修订＝凭圈定实锤终版）：
-     **同层、挤压、绝对禁止浮层**——文档流内（`app-main` 内 `order:-1`，切换行 `order:-2` 最上）。
+     **同层、挤压、绝对禁止浮层**——文档流内（`app-main` 内 `order:-1` 置顶，在页头切换行之下）。
      **收起＝display:none**：0fr 收拢会把 zone-card 边框压成一条悬在页头与切换行之间的细线
      （上下空白、上不到顶）——绝不允许；收起时整段不渲染。
-     展开＝grid 1fr 从上滑开（zoneDrop 动画），把下方内容挤下去；段内只装包列表
-    （zone/git 侧页签禁用，Git 可视化不在数据包列表里）。 */
+     展开＝flex 布局从上滑开（zoneDrop 动画，2026-11-19 修复后两态统一 flex），把下方内容挤下去；
+     段内只装包列表，Git 可视化面板由展开态 `#zone-side-git` 承载
+    （openGitVizFor 手机端会展开抽屉并滚动到 Git 面板，见 workbench-view.js）。 */
   #app.app-container[data-view="mobile"] .col-side{display:none}
   /* 2026-11-19 修复：展开态是 display:flex，收起态却切成 display:grid + 0fr。
      布局算法中途切换会重建盒模型，`1fr→0fr` 的插值前提不成立，实际表现是
@@ -1826,15 +1829,16 @@
   #app.app-container[data-view="mobile"] .col-side > #zone-card{
     min-height:0;overflow:hidden;
   }
-  #app.app-container[data-view="mobile"] .mobile-switch{order:-2}
   #app.app-container[data-view="mobile"] .col-chart{flex:1 1 auto;min-height:0}
   #app.app-container[data-view="mobile"] .chart-card{flex:1 1 auto;min-height:0}
   /* 2026-11-17 用户铁律：图表必须整块渲染全貌，唯一滚动条在图表外、图表容器内。
      高度链 = app-main → col-chart → chart-card → chart-stack；只有 chart-stack 滚。 */
   #app.app-container[data-view="mobile"] .chart-stack{flex:1 1 auto;min-height:0;overflow:auto;
     overscroll-behavior:contain;scrollbar-width:thin}
+  /* 2026-11-21 对齐铁律 6（图表 DOM 边相互贴着、不留空白）：手机单列 gap 收敛为 0，
+     卡片间靠 vol-card 自带 border 分隔（与桌面 chart-canvas gap:0 同款）。 */
   #app.app-container[data-view="mobile"] .chart-canvas{grid-template-columns:minmax(0,1fr) !important;
-    grid-template-rows:none !important;min-height:0 !important;height:auto !important;gap:10px}
+    grid-template-rows:none !important;min-height:0 !important;height:auto !important;gap:0}
   #app.app-container[data-view="mobile"] .chart-canvas > .vol-card{grid-column:1 !important;grid-row:auto !important;
     height:auto;min-height:0}
   #app.app-container[data-view="mobile"] .chart-split-v,
@@ -1885,14 +1889,16 @@
        本轮禁改）。这里仅对已有 <label> 包裹的复选框保证 label 自身 ≥32px 命中区。 */
     #app.app-container label:has(> input[type="checkbox"]),
     #app.app-container label:has(> input[type="radio"]){min-height:32px !important}
+    #app.app-container .tree-row .row-bulk{display:inline-flex}
   }
   #app.app-container[data-view="mobile"] .tree-ico{width:18px;height:18px}
   #app.app-container[data-view="mobile"] .tree-label{font-size:12.5px}
   #app.app-container[data-view="mobile"] .tree-size{font-size:11.5px}
   #app.app-container[data-view="mobile"] .row-bulk{gap:3px}
   #app.app-container[data-view="mobile"] .row-bulk button{min-width:32px;min-height:32px;font-size:13px}
-  /* 移动端顶部已有全选/全不选/反选；行内批量组会挤掉分类名，直接隐藏，操作不丢。 */
-  #app.app-container[data-view="mobile"] .tree-row .tree-extra .row-bulk{display:none !important}
+  /* 2026-11-21 桌面手机差异修复：恢复常显（:391 的 2026-11-15 用户裁定）。
+     旧隐藏理由「顶部已有整批批量」粒度不等价——整批/卷级批量替代不了节点级子树
+     全选/全不选/反选；手机树行名称允许换行（:1916），extra 列可容纳，不构成布局阻断。 */
   #app.app-container[data-view="mobile"] .tree-mini{min-height:32px;padding:4px 8px;font-size:11.5px}
   #app.app-container[data-view="mobile"] .tree-keepincompat input{width:18px;height:18px}
   /* 手机上「保留不兼容」整行小勾隐藏：偏好面板已有完整开关，避免把「私有配置」挤成竖排。 */
@@ -2008,20 +2014,35 @@
   #app.app-container[data-view="mobile"] .panel-title .source-chip{max-width:150px}
   #app.app-container .zone-mobile-close{display:none}
   #app.app-container[data-view="mobile"][data-zone-open="1"] .zone-mobile-close{display:inline-flex;margin-left:auto}
-  /* 手机数据包下拉：列表顶部整行「收起」条（2026-11-17 用户裁定）。
-     放在面板头之前、zone-body 之外，滚动列表时始终可见，不再被教程横幅或面板头挤掉。 */
-  #app.app-container .zone-mobile-collapse-bar{display:none}
+  /* 数据包「收起」条（2026-11-17 用户裁定；2026-11-21 用户铁律放开为双形态）。
+     放在面板头之前、zone-body 之外，滚动列表时始终可见，不再被教程横幅或面板头挤掉。
+     手机 = 仅展开态显示；桌面 = 常显（侧栏可见时提供收起入口，折叠后随 col-side 整列消失）。 */
+  #app.app-container[data-view="mobile"] .zone-mobile-collapse-bar{display:none}
   #app.app-container[data-view="mobile"][data-zone-open="1"] .zone-mobile-collapse-bar{
     display:flex;align-items:center;justify-content:space-between;gap:8px;flex:0 0 auto;
     padding:2px 8px;min-height:28px;height:28px;border-bottom:1px solid var(--border);
     background:color-mix(in srgb,var(--panel-3) 88%,transparent);box-sizing:border-box}
+  #app.app-container[data-view="desktop"] .zone-mobile-collapse-bar{
+    display:flex;align-items:center;justify-content:flex-end;gap:8px;flex:0 0 auto;
+    padding:2px 8px;min-height:28px;height:28px;border-bottom:1px solid var(--border);
+    background:color-mix(in srgb,var(--panel-3) 88%,transparent);box-sizing:border-box}
+  /* 桌面 panel-head 已有「数据包/Git」页签，收起条标题隐藏去重复，只留「收起」按钮 */
+  #app.app-container[data-view="desktop"] .zone-mobile-collapse-bar .zmcb-title{display:none}
   #app.app-container .zone-mobile-collapse-bar .zmcb-title{font-size:11.5px;font-weight:600;color:var(--text);
     min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:24px}
   #app.app-container .zone-mobile-collapse-bar .zmcb-btn{display:inline-flex;align-items:center;justify-content:center;gap:4px;
     flex:0 0 auto;min-height:22px;height:22px;padding:0 8px;font-size:11px;line-height:1;
     border:1px solid var(--border);border-radius:5px;background:var(--panel-3);color:var(--text);box-sizing:border-box}
-  /* 手机数据包下拉已有整行收起条：旧的空面板头（只剩一个 ×）整行隐藏，少一行。 */
-  #app.app-container[data-view="mobile"][data-zone-open="1"] #zone-card > .panel-head{display:none}
+  /* 2026-11-21 P1 修复（导出队列对照）：手机展开态恢复导入/导出页签入口——此前整行隐藏后
+     页签只能靠转换完成/库导出/LAN 接收的自动换页触达，用户无法手动切回导入区（功能不可达）。
+     面板头现在承载 zone-tabs 不再「空」；zone/git 侧页签仍按裁定隐藏（Git 可视化不在
+     数据包列表内）；× 收起钮与折叠条收起钮（zmcb-btn）重复，一并隐藏；页签铺满整行便于触屏。 */
+  #app.app-container[data-view="mobile"][data-zone-open="1"] #zone-card > .panel-head{display:flex}
+  #app.app-container[data-view="mobile"][data-zone-open="1"] #zone-card .zone-side-tabs{display:none}
+  #app.app-container[data-view="mobile"][data-zone-open="1"] #zone-card .zone-mobile-close{display:none}
+  #app.app-container[data-view="mobile"][data-zone-open="1"] #zone-card .panel-head .panel-actions{width:100%;margin-left:0}
+  #app.app-container[data-view="mobile"][data-zone-open="1"] #zone-card .panel-head .zone-tabs{flex:1;padding:0;border-bottom:none}
+  #app.app-container[data-view="mobile"][data-zone-open="1"] #zone-card .panel-head .zone-tab{flex:1}
   #app.app-container .zone-mobile-collapse-bar .zmcb-btn:hover{border-color:var(--accent);color:var(--accent)}
   /* 手机云端配置：表单单列、按钮两列、徽标隐藏，避免 390px 下挤成一条。 */
   #app.app-container[data-view="mobile"] #cloud-provider-tag{display:none}

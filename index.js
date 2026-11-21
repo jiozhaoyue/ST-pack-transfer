@@ -19,8 +19,9 @@ import { DEFAULT_FILENAME_TEMPLATE, TARGET_PLATFORMS, resolveFilename, namedBlob
 import { trustedStaticMarkup, escapeHtml } from './src/ui/escape.js';
 import { getWorkbenchHtml } from './src/ui/workbench-template.js';
 import { createWorkbenchView, destroyViewObservers } from './src/ui/workbench-view.js';
-import { mountInspectModal } from './src/ui/vue/mount.js';
-import { syncPackagesFromState } from './src/ui/vue/store.js';
+// Vue 模块（mount.js / store.js）改消费点动态 import：
+// 宿主页面无 import map，顶层静态解析裸 "vue" 会令 index.js 整体加载失败，扩展行注入按钮全挂。
+// 独立 Web 由 vite 打包 vue，动态 import 正常加载，InspectModal 功能不变。
 import {
   detectHost, hostLayoutCode, fetchHostBackup, FULL_SELECTION,
   restoreToHost, restoreToLuker,
@@ -56,8 +57,8 @@ import { exportLibraryToPack, importRestoredChatsIntoLibrary } from './src/ui/ch
 import { mountLanTransferPanel } from './src/ui/lan-transfer-panel.js';
 import { createBrowserStorageProvider } from './src/ui/storage-inspector-browser.js';
 import { qr } from './src/ui/qr.js';
-import { buildSettingsHtml, readSettings, applyWebTheme, readGithubToken, writeGithubToken, renderMarkdownSafe, normalizeIssueLogParams, ISSUE_LEVEL_TO_REPORT, disposeSettingsPanel } from './src/ui/settings-panel.js';
-import { collectReportEnv, buildReportMarkdown, previewRedacted, submitToGitHub, issuePrereqsMet } from './src/ui/issue-report.js';
+import { buildSettingsHtml, readSettings, applyWebTheme, readGithubToken, writeGithubToken, renderMarkdownSafe, normalizeIssueLogParams, ISSUE_LEVEL_TO_REPORT, disposeSettingsPanel, setIssueModalApi } from './src/ui/settings-panel.js';
+import { collectReportEnv, buildReportMarkdown, previewRedacted, submitToGitHub, issuePrereqsMet, issuePrereqsMissing } from './src/ui/issue-report.js';
 import { buildPluginData, applyPluginData, isPluginData, downloadPluginData } from './src/ui/plugin-data.js';
 import { loadSettings, saveSettings } from './src/ui/settings-store.js';
 import { applyI18n } from './src/i18n/dom.js';
@@ -82,6 +83,29 @@ import {
 } from './src/core/changelog.js';
 import { reportToHuman } from './src/core/report.js';
 import { TaskManager, memoryAdapter } from './src/core/task-manager.js';
+
+/**
+ * Vue 模块懒加载（宿主形态无 import map 时静默降级）：
+ * - 缓存 Promise，并发调用只触发一次动态 import；
+ * - 加载失败返回 null 并一次性 warn，绝不阻塞 index.js 主流程；
+ * - 独立 Web（vite 打包含 vue）下正常返回模块，InspectModal 功能完整保留。
+ */
+let vueModulesPromise = null;
+function loadVueModules() {
+  if (!vueModulesPromise) {
+    vueModulesPromise = Promise.all([
+      import('./src/ui/vue/mount.js'),
+      import('./src/ui/vue/store.js'),
+    ]).then(([mount, store]) => ({
+      mountInspectModal: mount.mountInspectModal,
+      syncPackagesFromState: store.syncPackagesFromState,
+    })).catch((err) => {
+      try { console.warn('[vue-lazy] Vue modules unavailable, degraded:', err?.message || err); } catch { /* 忽略 */ }
+      return { mountInspectModal: null, syncPackagesFromState: null };
+    });
+  }
+  return vueModulesPromise;
+}
 
 export {
   TASK_KINDS, TASK_PREFIX, taskKindOf, partialNameFor, hasRoomForPartial,
@@ -387,22 +411,27 @@ async function main(root) {
   }
 
   async function syncPackages() {
+    const vue = await loadVueModules();
+    const syncToStore = () => {
+      if (!vue.syncPackagesFromState) return;
+      try { vue.syncPackagesFromState(state.packages); } catch (err) { console.warn('[vue-store] package sync skipped:', err?.message || err); }
+    };
     if (!isStorageSupported()) {
       state.packages = [];
       view.setPackages([]);
-      try { syncPackagesFromState(state.packages); } catch (err) { console.warn('[vue-store] package sync skipped:', err?.message || err); }
+      syncToStore();
       return;
     }
     try {
       const records = await listStoredFiles();
       state.packages = records.filter((r) => Object.hasOwn(ORIGIN_ZONE, r.origin)).map(toPackage);
       view.setPackages(state.packages);
-      try { syncPackagesFromState(state.packages); } catch (err) { console.warn('[vue-store] package sync skipped:', err?.message || err); }
+      syncToStore();
     } catch (err) {
       logger.warn(t('log.workspaceReadFailed', { msg: err.message }));
       state.packages = [];
       view.setPackages([]);
-      try { syncPackagesFromState(state.packages); } catch (err) { console.warn('[vue-store] package sync skipped:', err?.message || err); }
+      syncToStore();
     }
     void refreshStorageQuota();
   }
@@ -1492,8 +1521,11 @@ async function main(root) {
     enqueueTask({ type: 'generate', label, run: () => executeGenerate(args) });
   }
 
-  /** 宿主拉取：排入统一队列；不支持暂停，但可中断插件侧请求。 */
+  /** 宿主拉取：排入统一队列；不支持暂停，但可中断插件侧请求。
+   *  G-34 前置守卫：非插件态无宿主可拉取，入队前直接拒绝；
+   *  杜绝队内守卫 toast 被队列「完成」toast 覆盖成假成功。 */
   function enqueueHostPull() {
+    if (!host.isPlugin) { view.toast(t('toast.webNoHost')); return Promise.resolve({ status: 'standalone' }); }
     const job = enqueueTask({
       type: 'pull',
       label: t('taskq.labelPull'),
@@ -1504,8 +1536,11 @@ async function main(root) {
     return job?.promise;
   }
 
-  /** 恢复写回：排入统一队列；批次边界可中断。 */
+  /** 恢复写回：排入统一队列；批次边界可中断。
+   *  G-34 前置守卫：恢复写回依赖宿主端点，非插件态入队前直接拒绝；
+   *  杜绝队内 pluginOnlyRestore toast 被队列「完成」toast 覆盖成假成功。 */
   function enqueueRestore(ids) {
+    if (!host.isPlugin) { view.toast(t('toast.pluginOnlyRestore')); return Promise.resolve({ status: 'standalone' }); }
     const targets = (Array.isArray(ids) ? ids : []).map(pkgById).filter((p) => p && p.zone === 'export');
     if (!targets.length) { view.toast(t('toast.selectExportPack')); return Promise.resolve({ status: 'empty' }); }
     const job = enqueueTask({
@@ -1544,6 +1579,7 @@ async function main(root) {
    * 全程只用现有能力，不引入后台 cron；失败时保留包并如实记录。
    */
   function enqueueAutoBackup(options = {}) {
+    if (!host.isPlugin) { view.toast(t('toast.webNoHost')); return Promise.resolve({ status: 'standalone' }); }
     const job = enqueueTask({
       type: 'autobackup',
       label: t('taskq.labelAutoBackup', { provider: String(options.provider || 's3').toUpperCase() }),
@@ -2495,11 +2531,15 @@ async function main(root) {
   /** 提交：二次确认 + 全文预览可见 + 隐私警示；失败 toast 如实报错。 */
   async function submitIssueReport(body) {
     const form = readIssueForm(body);
+    /* 前置勾选是提交门禁第一道：未勾直接拦截 + 提示，先于标题/仓库/令牌校验。 */
+    if (!issuePrereqsMet(form.prereqs)) {
+      const items = issuePrereqsMissing(form.prereqs).map((k) => t('issue.prereq.' + k)).join(' / ');
+      view.toast(t('issue.prereqHint', { items }));
+      return;
+    }
     if (!form.title) { view.toast(t('issue.missingTitle')); return; }
     if (!form.owner || !form.repo) { view.toast(t('issue.missingOwnerRepo')); return; }
     if (!form.token) { view.toast(t('issue.missingToken')); return; }
-    /* 提交路径服务端兜底：不依赖前端 disabled，勾选未满足时明确拒绝（G-20 失败不静默）。 */
-    if (!issuePrereqsMet(form.prereqs)) { view.toast(t('issue.prereqRequired')); return; }
     let safe;
     try { safe = await composeIssueReport(form); }
     catch (err) { view.toast(err?.message || t('issue.collectFailed')); return; }
@@ -2523,8 +2563,8 @@ async function main(root) {
     };
     view.openModal(
       t('issue.confirmTitle'),
-      t('issue.confirmDesc') + ' · ' + t('issue.privacyWarning'),
-      [preview, '<div class="ext-note">' + t('issue.tokenStorageHint') + '</div>'],
+      t('issue.confirmBody'),
+      [preview, '<div class="ext-note">' + t('issue.privacyWarning') + ' · ' + t('issue.tokenStorageHint') + '</div>'],
       [
         { label: t('modal.cancel'), onClick: () => view.closeModal?.() },
         { label: t('issue.confirmSubmit'), primary: true, onClick: () => { void doSubmit(); } },
@@ -2738,11 +2778,14 @@ async function main(root) {
           // Vue 模态为主路径；原生 dialog 仅作为 Vue 不可用时的降级兜底（两态互斥，禁止双弹）。
           let handle = null;
           try {
+            const vue = await loadVueModules();
             // mountInspectModal 为异步：拿到句柄才算 Vue 真挂载成功，null/异常即降级。
-            handle = await mountInspectModal({
-              getReport: () => report,
-              onClose: () => { try { view.closeInspectReport?.(); } catch { /* 忽略 */ } },
-            });
+            if (vue.mountInspectModal) {
+              handle = await vue.mountInspectModal({
+                getReport: () => report,
+                onClose: () => { try { view.closeInspectReport?.(); } catch { /* 忽略 */ } },
+              });
+            }
           } catch (err) { console.warn('[vue-mount] inspect modal mount skipped:', err?.message || err); }
           if (handle) {
             inspectMountHandle = handle;
@@ -2802,6 +2845,9 @@ async function main(root) {
       },
     },
   });
+
+  /* issue 网页提交二次确认复用工作台 #confirm-dialog；每次提交必弹，无跳过配置。 */
+  setIssueModalApi({ openModal: (...args) => view.openModal(...args), closeModal: () => view.closeModal?.() });
 
   conversionRunner = createConversionRunner({
     getTaskManager,

@@ -43,6 +43,15 @@ let issueCoordsCache = { current: null, upstream: null, provenance: '' };
 let issueTemplateCache = { templates: [], config: null, source: 'local', warning: '' };
 
 /**
+ * 提交二次确认模态 API：由 index.js 在 view 创建后注入工作台的 openModal/closeModal。
+ * 未注入时降级 window.confirm，保证「每次提交必弹、不可配置跳过」在任何宿主都不失效。
+ */
+let issueModalApi = null;
+export function setIssueModalApi(api) {
+  issueModalApi = api && typeof api === 'object' ? api : null;
+}
+
+/**
  * 异步初始化 issue 坐标与模板（两条线坐标全部来自 resolver，零硬编码）。
  * 在渲染设置面板前调用；失败时保持空态，UI 显示「未提供」。
  */
@@ -1122,17 +1131,22 @@ let issueTemplateChangeHandler = null;
 /** 日志联动文案写入的 debounce 定时器（避免连续切换时读屏播报堆积）；首次渲染不 debounce。 */
 let issueLogSyncTimer = null;
 
-/** 依据两项前置勾选计算提交按钮 disabled，并写出还差哪项的提示。 */
+/** 依据两项前置勾选刷新提交按钮语义与缺失提示（按钮始终可点击，拦截在提交路径统一做）。 */
 function refreshIssuePrereqs(body) {
   const docs = body?.querySelector?.('[data-setting="issuePrereqDocs"]')?.checked === true;
   const search = body?.querySelector?.('[data-setting="issuePrereqSearch"]')?.checked === true;
   const met = issuePrereqsMet({ docs, search });
   const submitBtn = body?.querySelector?.('#issue-submit-btn');
-  if (submitBtn && 'disabled' in submitBtn) submitBtn.disabled = !met;
+  // 关键：不设 disabled。禁用按钮点击不触发事件、无法提示（G-20 失败不静默）。
+  // 未勾选仅标记 data/aria 供样式，点击由 submitIssueReport 统一拦截 + toast。
+  if (submitBtn) {
+    submitBtn.setAttribute('data-prereq-met', met ? '1' : '0');
+    submitBtn.setAttribute('aria-disabled', met ? 'false' : 'true');
+  }
   const hint = body?.querySelector?.('#issue-prereq-hint');
   if (hint && typeof hint.textContent === 'string') {
     const missing = issuePrereqsMissing({ docs, search });
-    hint.textContent = missing.length ? t('issue.prereqMissing', { items: missing.map((k) => t('issue.prereq.' + k)).join(' / ') }) : '';
+    hint.textContent = missing.length ? t('issue.prereqHint', { items: missing.map((k) => t('issue.prereq.' + k)).join(' / ') }) : '';
   }
 }
 
@@ -1268,6 +1282,31 @@ function flashLabel(btn, msg) {
 }
 
 /**
+ * issue 提交统一二次确认：每次提交必弹，不可配置跳过。
+ * 有工作台 openModal 时复用 #confirm-dialog；否则降级 window.confirm。
+ * 无任何确认能力时保守不发——宁可不成，也不可无确认就提交。
+ */
+function confirmIssueSubmit(onConfirm) {
+  const body = t('issue.confirmBody');
+  const api = issueModalApi;
+  if (api && typeof api.openModal === 'function') {
+    api.openModal(
+      t('issue.confirmTitle'),
+      body,
+      [],
+      [
+        { label: t('modal.cancel'), onClick: () => { api.closeModal?.(); } },
+        { label: t('issue.confirmSubmit'), primary: true, onClick: () => { api.closeModal?.(); onConfirm(); } },
+      ],
+    );
+    return;
+  }
+  if (typeof window !== 'undefined' && typeof window.confirm === 'function') {
+    if (window.confirm(body)) onConfirm();
+  }
+}
+
+/**
  * 惰性注册问题报告按钮的委托监听。
  *
  * 用独立的 data-issue-action 属性，避开 index.js 的 data-action 路由；
@@ -1309,7 +1348,8 @@ function ensureIssueReportWired() {
       }
       if (action === 'new-issue') {
         if (!issuePrereqsMet(form.prereqs)) {
-          flashLabel(btn, t('issue.prereqRequired'));
+          const items = issuePrereqsMissing(form.prereqs).map((k) => t('issue.prereq.' + k)).join(' / ');
+          flashLabel(btn, t('issue.prereqHint', { items }));
           return;
         }
         if (typeof window === 'undefined' || typeof window.open !== 'function') return;
@@ -1346,9 +1386,12 @@ function ensureIssueReportWired() {
           }
           return;
         }
-        const opened = window.open(result.url, '_blank', 'noopener');
-        // 弹窗被浏览器拦截时 window.open 返回 null，必须告知用户而不是静默失败。
-        if (!opened) flashLabel(btn, t('settings.issuePopupBlocked'));
+        // 每次网页提交必弹二次确认，确认后才 window.open；取消则不发（无跳过配置）。
+        confirmIssueSubmit(() => {
+          const opened = window.open(result.url, '_blank', 'noopener');
+          // 弹窗被浏览器拦截时 window.open 返回 null，必须告知用户而不是静默失败。
+          if (!opened) flashLabel(btn, t('settings.issuePopupBlocked'));
+        });
       }
     }).catch(() => {
       flashLabel(btn, t('settings.issueCopyFail'));

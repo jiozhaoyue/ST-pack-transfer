@@ -37,15 +37,18 @@ const OPEN_TIMEOUT_MS = 15000;
 const ACK_INTERVAL_MS = 250;
 const ACK_THRESHOLD_BYTES = 1024 * 1024;
 /* 2026-11-18 写链合并（DESIGN-split-lan-fixes.md 设计二 3.1）：接收端攒批写盘——
-   1 MiB 或 30ms 先到先触发，批任务拼单次 write；write 调用次数 ÷16（1 MiB / 64KB），
-   链上任务从「每块一个」降到「每批一个」。pending 上界 = 1 MiB + 1 块。 */
-const BATCH_WRITE_BYTES = 1024 * 1024;
-const BATCH_WRITE_MS = 30;
-/* 2026-11-18 信用流控（设计二 3.2）：复用既有 ack 帧做 8 MiB 信用窗口——
+   4 MiB 或 8ms 先到先触发，批任务拼单次 write。
+   2026-11-21 吞吐调优第3轮：实测接收端 OPFS 写盘是端到端瓶颈（B 283ms 发完 11.3MB 后卡在 47% 等 A 1.8s），
+   批粒度 1MiB→4MiB（写调用再 ÷4）、定时器 30ms→8ms（降低尾块等待），与 256KB 分块配比 16 块/批。 */
+const BATCH_WRITE_BYTES = 4 * 1024 * 1024;
+const BATCH_WRITE_MS = 8;
+/* 2026-11-18 信用流控（设计二 3.2）：复用既有 ack 帧做信用窗口——
    发送端 `offset - lastAckedBytes ≥ 窗口` 时暂停发送，等对端 ack 推进；不新增协议帧。
    250ms 的 ack 时间条件保证窗口至少每 250ms 推进一次，无死锁；
-   快链路几乎不停顿，慢链路被对端写速自然限流。 */
-const CREDIT_WINDOW = 8 * 1024 * 1024;
+   快链路几乎不停顿，慢链路被对端写速自然限流。
+   2026-11-21 吞吐调优：原 8MiB 窗口实测撞顶后从 17.4MB/s 掉到 4–6MB/s（见 perf-lan/lan-verdict.json）；
+   放大到 32MiB，使 25MB 级文件全程无需等 ack，消除窗口抖动。 */
+const CREDIT_WINDOW = 32 * 1024 * 1024;
 /* 信用等待超时：超时=信任对端继续（用户裁定）——重置账本退回 bufferedAmount 本地门限兜底，
    不悬挂、不误杀慢对端；对端真死时 bufferedAmount 卡住 + 通道关闭走既有失败路径。 */
 const ACK_STALL_TIMEOUT_MS = 10_000;
@@ -56,8 +59,12 @@ const HIGH_WATER_TIMEOUT_MS = 30_000;
    成为接收端串行消费瓶颈（1GB 包约 16384 次重绘，实测仅 ~300KB/s）。
    进度 UI 节流到 120ms 一次；速率采样 rateSamples 不受影响，终态仍强制刷新。 */
 const UI_THROTTLE_MS = 120;
-const HIGH_WATER_MARK = CHUNK_SIZE * 64;
-const LOW_WATER_MARK = CHUNK_SIZE * 16;
+/* 发送缓冲水位（2026-11-21 吞吐调优第2轮）：
+   HIGH=8MiB / LOW=2MiB。原随 CHUNK_SIZE 放大到 16MiB 实测触到 Chrome DataChannel
+   发送队列硬上限（~16MiB），发送中抛 "RTCDataChannel send queue is full"（perf-lan-final/run-r1b.log）。
+   固定 8MiB 远离硬上限，既保留大块低调用次数，又不溢出；LOW 为 high 的 1/4 保证一次排空跨度足够。 */
+const HIGH_WATER_MARK = 8 * 1024 * 1024;
+const LOW_WATER_MARK = 2 * 1024 * 1024;
 const DISCONNECT_GRACE_MS = 8000;
 
 /** 排障日志：`localStorage.setItem('lan-debug','1')` 后刷新页面才输出。 */
@@ -550,7 +557,7 @@ export function mountLanTransferPanel({ view, getSendTargets = null, onReceive =
       if (dc.readyState !== 'open') throw new Error(t('lan.err.channelClosed'));
       /* 信用门限（对端背压）：在飞未确认字节 ≥ CREDIT_WINDOW 时暂停，等 ack 推进。
          本地 bufferedAmount 门限只反映「未发完」，对端写不动时它管不到——
-         两层独立限流（本地 4 MiB + 对端信用 8 MiB）合并成链积压的硬上界。 */
+         两层独立限流（本地 8 MiB + 对端信用 32 MiB）合并成链积压的硬上界。 */
       if (offset - lastAckedBytes >= CREDIT_WINDOW) {
         const got = await waitForCreditAck(dc, ACK_STALL_TIMEOUT_MS);
         if (!got) lastAckedBytes = offset; // 超时=信任对端继续（用户裁定）：窗口重置，退回本地门限兜底

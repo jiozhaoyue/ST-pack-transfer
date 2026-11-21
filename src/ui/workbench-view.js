@@ -64,7 +64,7 @@ import { gitSiteIcon } from './git-icons.js';
 import { hasKey, t } from '../i18n/index.js';
 import { mountInspectPanel, renderInspectReport } from './inspect-view.js';
 import { logger } from '../core/logger.js';
-import { userFilesSupported, hostHasStorageEngines } from './host-bridge.js';
+import { userFilesSupported, hostHasStorageEngines, hostRestoreCapability, getRestoreUnsupportedReason } from './host-bridge.js';
 import { loadSettings, saveSettings } from './settings-store.js';
 import { normalizeUpdateInterval, updatePolicyOf, updateBackoffDelay, applyWebTheme } from './settings-panel.js';
 import { loadChartPrefs, saveChartPrefs, normalizeChartPrefs } from './chart-prefs.js';
@@ -107,46 +107,6 @@ export function tutorialAnchor(targetRect, overlayRect, cardSize = { width: 330,
   cardLeft = Math.max(0, Math.min(cardLeft, o.width - width));
   cardTop = Math.max(0, Math.min(cardTop, o.height - cardSize.height));
   return { ring, card: { left: cardLeft, top: cardTop, width } };
-}
-
-/**
- * 教程卡片避让聚光区（用户 2026-11-17 裁定：卡片绝不能挡住正在高亮的区域）。
- * 依次尝试下 / 上 / 右 / 左；全部放不下时选重叠面积最小的位置。
- * @returns {{ring:object, card:{left:number,top:number,width:number}}}
- */
-export function tutorialCardPlacement(targetRect, overlayRect, cardSize = { width: 330, height: 180 }) {
-  const base = tutorialAnchor(targetRect, overlayRect, cardSize);
-  const o = overlayRect;
-  const width = base.card.width;
-  const height = Math.max(80, Number(cardSize.height) || 180);
-  const ring = base.ring;
-  const clamp = (v, min, max) => Math.max(min, Math.min(v, max));
-  const box = (left, top) => ({
-    left: clamp(left, 0, Math.max(0, o.width - width)),
-    top: clamp(top, 0, Math.max(0, o.height - height)),
-    width,
-    height,
-  });
-  const overlapArea = (a, b) => {
-    const w = Math.min(a.left + a.width, b.left + b.width) - Math.max(a.left, b.left);
-    const h = Math.min(a.top + a.height, b.top + b.height) - Math.max(a.top, b.top);
-    return w > 0 && h > 0 ? w * h : 0;
-  };
-  const candidates = [
-    box(ring.left, ring.top + ring.height + 10),
-    box(ring.left, ring.top - height - 10),
-    box(ring.left + ring.width + 10, ring.top),
-    box(ring.left - width - 10, ring.top),
-    box(base.card.left, base.card.top),
-  ];
-  let best = candidates[0];
-  let bestOverlap = overlapArea(best, ring);
-  for (const candidate of candidates) {
-    const area = overlapArea(candidate, ring);
-    if (area === 0) return { ring, card: candidate };
-    if (area < bestOverlap) { best = candidate; bestOverlap = area; }
-  }
-  return { ring, card: best };
 }
 
 export const EXT_SCAN_CACHE_KEY = 'st-pack-transfer:ext-scan-cache';
@@ -803,7 +763,7 @@ function syncView(){
   /* 徽标文案随宽度切换（窄态只留宿主名）：宽度变化后必须重写，否则仍显示「XX 插件」。 */
   if(prev !== state.view && document.getElementById('host-badge-text')) renderHeader();
 }
-/* 视图切换：桌面 = 存储图表 / 扩展管理（数据包列常显）；手机 = 存储图表 / 数据包 / 扩展管理。
+/* 视图切换：桌面 = 图表 / 迁移 / 扩展管理 + 数据包折叠开关；手机 = 图表 / 迁移 / 扩展管理 + 数据包下拉。
    切换按钮落在各面板自己的面板头里（图表 / 扩展管理 / 数据包），不再占用页头下的独立行。 */
 const VIEW_SWITCH_ICONS={
   chart:'<path d="M4 5h16v14H4z"/><path d="M4 10h16M9 10v9M15 10v9"/>',
@@ -817,12 +777,15 @@ function viewSwitchIcon(id){
 }
 function renderViewSwitch(){
   const mobile=state.view==='mobile';
-  /* 2026-11-15 用户裁定：手机 4 按钮，**数据包固定最右**——点它弹出下拉列表界面，不作为页切换 */
+  /* 2026-11-15 用户裁定：手机 4 按钮，**数据包固定最右**——点它弹出下拉列表界面，不作为页切换。
+     2026-11-21 用户铁律：桌面同款 4 按钮——「数据包」= 侧栏折叠开关（高亮=侧栏可见），同样不作页切换。 */
   const items=mobile
     ? [{id:'chart',label:t('view.chart')},{id:'transfer',label:t('transfer.open')},{id:'extension',label:t('view.extension')},{id:'zone',label:t('view.zone'),dropdown:true}]
-    : [{id:'chart',label:t('view.chart')},{id:'transfer',label:t('transfer.open')},{id:'extension',label:t('view.extension')}];
+    : [{id:'chart',label:t('view.chart')},{id:'transfer',label:t('transfer.open')},{id:'extension',label:t('view.extension')},{id:'zone',label:t('view.zone'),dropdown:true}];
   const active=state.transfer.open ? 'transfer' : (mobile?state.mobileView:state.mainView);
-  const zoneOpen=mobile && document.getElementById('app')?.dataset.zoneOpen==='1';
+  /* zone 钮高亮语义两形态一致 = 数据包区可见：手机=抽屉展开（zone-open），桌面=侧栏未折叠（side-collapsed 反面）。 */
+  const appEl=document.getElementById('app');
+  const zoneOpen=mobile ? appEl?.dataset.zoneOpen==='1' : appEl?.dataset.sideCollapsed!=='1';
   const html=items.map(it=>{
     const on=it.dropdown ? zoneOpen : it.id===active;
     return '<button type="button" class="view-switch-btn'+(on?' active':'')+'" data-wbview="'+it.id
@@ -930,10 +893,21 @@ function syncMainView(){
   renderViewSwitch();
 }
 
-/** 关闭手机数据包列表（同层挤压段）：先播 is-closing，动画结束再 display:none。 */
+/** 关闭数据包列：手机（同层挤压段）先播 is-closing，动画结束再 display:none；
+    桌面（2026-11-21 用户铁律）＝折叠侧栏：置 data-side-collapsed=1，无动画
+    （zmcb 收起条与 zone 钮两个入口共用本函数）。 */
 function closeMobileZonePanel(){
   const app=document.getElementById('app');
-  if(!app || app.dataset.zoneOpen!=='1') return;
+  if(!app) return;
+  if(state.view!=='mobile'){
+    if(app.dataset.sideCollapsed!=='1'){
+      app.dataset.sideCollapsed='1';
+      renderViewSwitch();
+      syncMainView();
+    }
+    return;
+  }
+  if(app.dataset.zoneOpen!=='1') return;
   const side=document.querySelector('.col-side');
   const finishClose=()=>{
     side?.classList.remove('is-closing');
@@ -1259,7 +1233,7 @@ function renderQuota(){
   const head=document.getElementById('quota-head');
   if(!head) return;
   // 两行都是「打开存储审查面板」的入口：面板里再切浏览器 / 宿主数据源。
-  const row=(label,ico,cell,emptyText,kind)=>{
+  const row=(label,ico,cell,emptyText,kind,disabled=false)=>{
     const hasReading=!!cell && typeof cell.used==='number';
     const total=hasReading && typeof cell.total==='number' ? cell.total : 0;
     const pct=hasReading && total>0 ? Math.max(0,Math.min(100,Math.round(cell.used/total*100))) : 0;
@@ -1268,7 +1242,9 @@ function renderQuota(){
     else if(total<=0) val=formatSize(cell.used)+' · '+t('quota.unknownTotal');
     else val=formatSize(cell.used)+' / '+formatSize(total)+' · '+pct+'%';
     return '<button type="button" class="quota-row'+(hasReading?'':' is-empty')+'"'
-      +' data-quota-kind="'+kind+'" title="'+escapeHtml(t('si.open'))+'">'
+      +' data-quota-kind="'+kind+'" title="'+escapeHtml(disabled?t('pluginOnlyHint'):t('si.open'))+'"'
+      +(disabled?' disabled':'')
+      +'>'
       +'<span class="q-label">'+svg(ico,'tree-ico')+label+'</span>'
       +'<span class="quota-bar"><span class="quota-fill'+(pct>85?' warn':'')+'" style="width:'+pct+'%"></span></span>'
       +'<span class="quota-val">'+val+'</span>'
@@ -1278,7 +1254,7 @@ function renderQuota(){
   const hostReadable=!!(HOSTS[state.host]||{}).readable;
   const isWeb=state.mode==='web';
   head.innerHTML = row(t('quota.browser'),'db',state.storage.browser,t('quota.browserEmpty'),'browser')
-    + (isWeb ? '' : row(t('quota.host'),'shield',hostReadable ? state.storage.host : null,t('quota.hostEmpty'),'server'));
+    + row(t('quota.host'),'shield',(!isWeb && hostReadable) ? state.storage.host : null,t('quota.hostEmpty'),'server',isWeb);
 }
 
 /* ── 存储审查面板（照 Luker storage-inspector：面包屑 / 配额 / 堆叠条 / 图例 / 列表） ── */
@@ -1326,9 +1302,19 @@ function renderStorageInspector(){
   const isWeb=state.mode==='web';
   const tabs=document.getElementById('si-source-tabs');
   if(tabs){
-    tabs.hidden=isWeb;
+    tabs.hidden=false;
     tabs.querySelectorAll('[data-si-source]').forEach((b)=>{
+      const hostOnly=b.dataset.siSource==='host' && isWeb;
       b.classList.toggle('active', b.dataset.siSource===si.source);
+      b.disabled=hostOnly;
+      if(hostOnly){
+        const hint=t('pluginOnlyHint');
+        b.setAttribute('title',hint);
+        b.setAttribute('aria-label',hint);
+      } else {
+        b.removeAttribute('title');
+        b.removeAttribute('aria-label');
+      }
     });
   }
   const data=si.data;
@@ -1860,9 +1846,11 @@ function userFilesAvailable(){
   return state.mode!=='web' && userFilesSupported(state.host);
 }
 function privateFilesHtml(){
-  if(!userFilesAvailable()) return '';
+  const available=userFilesAvailable();
   const n=state.privateFiles.length;
-  return '<button type="button" class="vol-priv" data-privfiles="open" title="'+t('priv.open')+'" aria-label="'+t('priv.open')+'">'
+  const hint=available?t('priv.open'):t('pluginOnlyHint');
+  return '<button type="button" class="vol-priv" data-privfiles="open"'
+    +(available?'':' disabled')+' title="'+escapeHtml(hint)+'" aria-label="'+escapeHtml(hint)+'">'
     +svg('cloud','ico')+(n?'<b>'+n+'</b>':'')+'</button>';
 }
 /* 组级工具条：私有件的「云端私有件」入口已上移到卡片头，不再插在类目行里。 */
@@ -2098,7 +2086,7 @@ function renderChart(){
   let html = '';
   if(!targets.length){
     const hasPkgs = (state.packages || []).length > 0;
-    const isMobile = state.view === 'mobile' || (typeof window !== 'undefined' && window.innerWidth <= 860);
+    const isMobile = state.view === 'mobile' || (typeof window !== 'undefined' && window.innerWidth <= MOBILE_MAX_WIDTH);
     const selectTipText = isMobile ? t('empty.selectPkgMobile') : t('empty.selectPkgDesktop');
     const selectTipHtml = hasPkgs
       ? '<div class="chart-empty-select-hint"><i class="fa-solid ' + (isMobile ? 'fa-arrow-down' : 'fa-arrow-right') + '"></i><span>' + escapeHtml(selectTipText) + '</span></div>'
@@ -2533,9 +2521,16 @@ function fitPackageNames(){
 /* ── 渲染：数据包模式行（导入 = 从宿主拉取；导出 = 覆盖/增量） ── */
 function renderZoneModeRow(){
   const fetchBtn=document.getElementById('btn-fetch');
-  // 2026-11-14：独立 Web（无宿主）态隐藏「从宿主拉取」——没有宿主端点可拉，
-  // 露出来只会让用户点了得到报错；宿主插件态（含 PT 的 ST 兼容宿主）照常显示。
-  if(fetchBtn) fetchBtn.hidden = state.zone!=='import' || state.mode!=='plugin';
+  /* 形态一致化：Web 下也渲染「从宿主拉取」，只是 disabled + 提示；
+     点击链路仍有 index.js 的 host.isPlugin 守卫与 toast 兜底，双保险。 */
+  if(fetchBtn){
+    fetchBtn.hidden = state.zone!=='import';
+    const webOnly=state.mode!=='plugin';
+    fetchBtn.disabled=webOnly;
+    const hint=webOnly?t('pluginOnlyHint'):t('action.fetch');
+    fetchBtn.setAttribute('title',hint);
+    fetchBtn.setAttribute('aria-label',hint);
+  }
   const extra=document.getElementById('zone-mode-extra');
   if(extra){
     extra.innerHTML = (state.zone==='import' && state.libraryExport)
@@ -2559,10 +2554,14 @@ function openGitVizFor(name){
   if(!name) return;
   state.gitViz.name=name;
   state.sideTab='git';
+  const app=document.getElementById('app');
   if(state.view==='mobile'){
-    const app=document.getElementById('app');
     if(app) app.dataset.zoneOpen='1';
     renderViewSwitch();
+    syncMainView();
+  } else if(app && app.dataset.sideCollapsed==='1'){
+    /* 桌面折叠态点版本号：先展开侧栏，否则侧栏里的 Git 页签不可见（2026-11-21 用户铁律）。 */
+    delete app.dataset.sideCollapsed;
     syncMainView();
   }
   renderZoneSide();
@@ -3090,6 +3089,25 @@ function renderActions(){
   const selectedLabel=hasSel
     ? '<span class="lbl">'+t('zones.selected',{n:state.selectedPkgs.size})+'</span>'+estHostBadge
     : '<span class="zone-hint">'+t('zones.selectHint')+'</span>';
+  /* F5 死按钮防护：恢复写回入口按宿主能力禁用并给出原因（2026-11-21 端点实测事实）。
+     - 非插件态：仅宿主形态可用（既有守卫，index.js restoreSelected 另有 toast 双保险）。
+     - 插件态 ST / TT / PT：静态能力判据不支持 ⇒ 禁用 + 原因；若已实际探测失败，
+       运行时探测原因（getRestoreUnsupportedReason，含已探测端点）优先展示。 */
+  let restoreDisabledReason = '';
+  if (state.mode !== 'plugin') {
+    restoreDisabledReason = t('pluginOnlyHint');
+  } else {
+    const cap = hostRestoreCapability(state.host);
+    if (!cap.supported) {
+      const probed = getRestoreUnsupportedReason();
+      restoreDisabledReason = probed || (cap.reasonKey ? t(cap.reasonKey) : t('restore.unsupported.st'));
+    }
+  }
+  const restoreBtn = hasSel
+    ? (restoreDisabledReason
+      ? '<button class="btn accent" id="btn-upload" disabled title="'+escapeHtml(restoreDisabledReason)+'" aria-label="'+escapeHtml(restoreDisabledReason)+'">'+svg('cloud','ico')+t('action.restore')+'</button>'
+      : '<button class="btn accent" id="btn-upload">'+svg('cloud','ico')+t('action.restore')+'</button>')
+    : '';
   if(state.zone==='import'){
     row.innerHTML=taskBtns+selectedLabel
       +(hasSel?'<button class="btn accent" id="btn-generate">'+svg('archive','ico')+t('action.generatePack')+'</button>':'')
@@ -3097,7 +3115,7 @@ function renderActions(){
   }else{
     row.innerHTML=taskBtns+selectedLabel
       +(hasSel?'<button class="btn" id="btn-download">'+svg('file','ico')+t('action.download')+'</button>':'')
-      +(hasSel?'<button class="btn accent" id="btn-upload">'+svg('cloud','ico')+t('action.restore')+'</button>':'')
+      +restoreBtn
       +(hasSel?'<button class="btn" id="btn-copyback">'+svg('folder','ico')+t('action.copyBack')+'</button>':'')
       +(hasSel?'<button class="btn" id="btn-delete-selected">'+t('zones.batchDelete')+'</button>':'');
   }
@@ -3540,8 +3558,11 @@ function syncExtInstallBlock(){
   const block=document.getElementById('extmgr-install-block');
   if(!block) return;
   const isWeb = state.mode === 'web';
-  const show = !isWeb && (state.extTab === 'host' || state.extTab === 'package') && !state.extReportOpen;
+  /* 形态一致化：Web 也渲染整块页脚，只是内部控件全部 disabled + 块级提示，
+     不再整块隐藏。报告展开 / 非 host·package 页签时才真正隐藏（属页签语义，非形态门控）。 */
+  const show = (state.extTab === 'host' || state.extTab === 'package') && !state.extReportOpen;
   block.hidden=!show;
+  block.classList.toggle('is-host-only',show && isWeb);
   const area=document.getElementById('extmgr-install-area');
   if(area) area.hidden=!state.extInstallOpen;
   const serverArea=document.getElementById('extmgr-server-area');
@@ -3565,10 +3586,27 @@ function syncExtInstallBlock(){
   const btn=document.getElementById('extmgr-install-toggle');
   if(btn){
     btn.setAttribute('aria-expanded',state.extInstallOpen?'true':'false');
+    btn.disabled=isWeb;
+    const hint=isWeb?t('extInstallHostOnly'):t('extmgr.installBlock');
+    btn.setAttribute('title',hint);
+    btn.setAttribute('aria-label',hint);
     const label=btn.querySelector('.ext-install-label');
     if(label) label.textContent=t('extmgr.installBlock');
     else btn.textContent=t('extmgr.installBlock');
     btn.classList.toggle('is-open',state.extInstallOpen);
+  }
+  /* 块级可见提示：Web 下把原 :3636 的 webInstallHint 提到页脚顶层，
+     不再只在安装区内部（安装区默认折叠时用户看不到）。 */
+  let note=block.querySelector('.ext-hostonly-note');
+  if(show && isWeb){
+    if(!note){
+      note=document.createElement('div');
+      note.className='ext-note ext-hostonly-note';
+      block.insertBefore(note,block.firstChild);
+    }
+    note.textContent=t('extInstallHostOnly')+' · '+t('extmgr.webInstallHint');
+  } else if(note){
+    note.remove();
   }
 }
 /** 凭据（开发者）页：自动更新父子块 + 账号 / 存储位置 / OAuth / 令牌指引，不含任何安装控件。 */
@@ -3611,11 +3649,13 @@ function renderExtCredentials(body){
 function renderExtInstall(body){
   /* 数据包来源模式：包内勾选的扩展在这里装进宿主。
      2026-11-15 裁定：所有安装扩展操作只允许在这个底部面板内进行，列表工具行不设安装入口。 */
+  const webLocked = state.mode === 'web';
+  const lockHint = webLocked ? ' title="'+escapeHtml(t('extInstallHostOnly'))+'"' : '';
   if(state.extSource==='package'){
     body.innerHTML='<div class="ext-install">'
       +'<div class="ext-note">'+t('extmgr.pkgInstallHint')+'</div>'
       +'<div class="ext-row ext-actions">'
-        +'<button type="button" class="btn accent" id="extmgr-pkg-install" disabled>'+t('extmgr.installToHost')+'</button>'
+        +'<button type="button" class="btn accent" id="extmgr-pkg-install" disabled'+lockHint+'>'+t('extmgr.installToHost')+'</button>'
       +'</div></div>';
     body.querySelector('#extmgr-pkg-install')?.addEventListener('click',()=>{
       const names=[...document.querySelectorAll('#extension-body [data-extsel]:checked')].map((el)=>el.dataset.extsel);
@@ -3631,29 +3671,37 @@ function renderExtInstall(body){
     return;
   }
   const rows=state.extEntries.map(entryRowHtml).join('');
+  const lock = webLocked ? ' disabled' : '';
   body.innerHTML='<div class="ext-install">'
     +'<label class="ext-label">'+t('extmgr.linksLabel')+'</label>'
-    +(state.mode==='web' ? '<div class="ext-note">'+t('extmgr.webInstallHint')+'</div>' : '')
     +'<div class="ext-note">'+t('extmgr.policyNote')+'</div>'
-    +'<textarea id="extmgr-links" class="text_pole" rows="5" placeholder="'+t('extmgr.linksPlaceholder')+'">'+escapeHtml(state.extLinksText||'')+'</textarea>'
+    +'<textarea id="extmgr-links" class="text_pole" rows="5" placeholder="'+t('extmgr.linksPlaceholder')+'"'+lock+'>'+escapeHtml(state.extLinksText||'')+'</textarea>'
     +'<div class="ext-row">'
-      +'<input type="file" id="extmgr-file" accept=".txt,.json,.jsonl" hidden>'
-      +'<button type="button" class="btn" id="extmgr-pick">'+t('extmgr.upload')+'</button>'
-      +'<button type="button" class="btn" id="extmgr-paste">'+t('extmgr.paste')+'</button>'
-      +'<label class="ext-branch-def"><span>'+t('extmgr.defaultBranch')+'</span><input id="extmgr-branch" class="text_pole" value="'+escapeHtml(state.extDefaultBranch||'')+'" placeholder="'+t('extmgr.refPlaceholder')+'"></label>'
-      +(state.extHostAdmin?'<label class="ext-branch-def" title="'+t('extmgr.installGlobalHint')+'"><input type="checkbox" id="extmgr-global"'+(state.extInstallGlobal?' checked':'')+'> <span>'+t('extmgr.installGlobal')+'</span></label>':'')
+      +'<input type="file" id="extmgr-file" accept=".txt,.json,.jsonl" hidden'+lock+'>'
+      +'<button type="button" class="btn" id="extmgr-pick"'+lock+'>'+t('extmgr.upload')+'</button>'
+      +'<button type="button" class="btn" id="extmgr-paste"'+lock+'>'+t('extmgr.paste')+'</button>'
+      +'<label class="ext-branch-def"><span>'+t('extmgr.defaultBranch')+'</span><input id="extmgr-branch" class="text_pole" value="'+escapeHtml(state.extDefaultBranch||'')+'" placeholder="'+t('extmgr.refPlaceholder')+'"'+lock+'></label>'
+      +(state.extHostAdmin?'<label class="ext-branch-def" title="'+t('extmgr.installGlobalHint')+'"><input type="checkbox" id="extmgr-global"'+(state.extInstallGlobal?' checked':'')+lock+'> <span>'+t('extmgr.installGlobal')+'</span></label>':'')
       +'<span style="flex:1"></span>'
-      +'<button type="button" class="btn" id="extmgr-parse">'+t('extmgr.parse')+'</button>'
-      +'<button type="button" class="btn accent" id="extmgr-run"'+(state.extRunning?' disabled':'')+'>'+t('extmgr.install')+'</button>'
+      +'<button type="button" class="btn" id="extmgr-parse"'+lock+'>'+t('extmgr.parse')+'</button>'
+      +'<button type="button" class="btn accent" id="extmgr-run"'+((state.extRunning||webLocked)?' disabled':'')+'>'+t('extmgr.install')+'</button>'
     +'</div>'
     +'<div class="ext-list">'+(rows||'<div class="ext-empty">'+t('extmgr.empty')+'</div>')+'</div>'
     +'<div class="ext-row ext-actions">'
-      +'<button type="button" class="btn" id="extmgr-open-log">'+t('extmgr.openLog')+'</button>'
-      +'<button type="button" class="btn" id="extmgr-export-failed">'+t('extmgr.exportFailed')+'</button>'
-      +'<button type="button" class="btn" id="extmgr-export-report">'+t('extmgr.exportReport')+'</button>'
+      +'<button type="button" class="btn" id="extmgr-open-log"'+lock+'>'+t('extmgr.openLog')+'</button>'
+      +'<button type="button" class="btn" id="extmgr-export-failed"'+lock+'>'+t('extmgr.exportFailed')+'</button>'
+      +'<button type="button" class="btn" id="extmgr-export-report"'+lock+'>'+t('extmgr.exportReport')+'</button>'
       +'<span style="flex:1"></span>'
-      +'<button type="button" class="btn" id="extmgr-clear">'+t('extmgr.clear')+'</button>'
+      +'<button type="button" class="btn" id="extmgr-clear"'+lock+'>'+t('extmgr.clear')+'</button>'
     +'</div></div>';
+  /* Web 下把整块内部（含动态 entry 行的按钮/输入/复选框）全部 disabled + 提示，
+     单一兜底，避免遗漏 renderExtInstall 未来新增的子控件。 */
+  if(webLocked){
+    body.querySelectorAll('button,input,textarea,select,[tabindex]').forEach((el)=>{
+      el.disabled=true;
+      el.setAttribute('title',t('extInstallHostOnly'));
+    });
+  }
   const ta=body.querySelector('#extmgr-links');
   ta?.addEventListener('input',()=>{ state.extLinksText=ta.value; });
   const branchEl=body.querySelector('#extmgr-branch');
@@ -4985,7 +5033,8 @@ async function renderExtInstalled(body){
   void loadServerPlugins();
 
   const isWeb = state.mode === 'web';
-  if(isWeb && state.extTab === 'host') state.extTab = 'package';
+  /* Web 强切 package 已移除：宿主页签 disabled 后用户无法进入，
+     setHost 归一化负责初始页签。isHost 仍保留 isWeb 判定作为防御性兜底。 */
   const isHost = state.extTab === 'host' && !isWeb;
   state.extSource = isHost ? 'host' : 'package';
 
@@ -5047,7 +5096,7 @@ async function renderExtInstalled(body){
   if(isHost){
     countTotal = hostList.length;
     const records=sortedInstalledRecords(installedRowRecords(), sort);
-    rowsHtml=records.map(({x,name,version})=>{
+    rowsHtml=records.map(({x,name,version},idx)=>{
       const rule=rules[name]||null;
       const isCurrentGit = state.gitViz.name === name;
       /* 远端 URL：先吃本地登记（同步），缺的由 enrichHostRemoteUrls 读宿主 .git origin 补齐缓存 */
@@ -5695,8 +5744,16 @@ function renderExtensionView(){
   if(!body) return;
   const isWeb = state.mode === 'web';
   const hostTabBtn = document.querySelector('#extmgr-tabs [data-exttab="host"]');
-  if(hostTabBtn) hostTabBtn.style.display = isWeb ? 'none' : '';
-  if(isWeb && state.extTab === 'host') state.extTab = 'package';
+  if(hostTabBtn){
+    /* 形态一致化：宿主页签始终渲染，Web 下 disabled + 提示，不再 display:none。 */
+    hostTabBtn.style.display='';
+    hostTabBtn.disabled=isWeb;
+    const hint=isWeb?t('pluginOnlyHint'):t('extmgr.tabHost');
+    hostTabBtn.setAttribute('title',hint);
+    hostTabBtn.setAttribute('aria-label',hint);
+  }
+  /* 删除 Web 强切 package：页签已 disabled，用户无法进入宿主页；
+     setHost 处的形态切换归一化负责把默认页签落到可用页。 */
 
   document.querySelectorAll('#extmgr-tabs [data-exttab]').forEach(b=>b.classList.toggle('active',b.dataset.exttab===state.extTab));
   const open=!!state.extReportOpen;
@@ -6179,7 +6236,13 @@ function renderCloud() {
   const backupSelected = document.getElementById('cloud-backup-selected');
   if (backupSelected) backupSelected.disabled = !!C.busy || state.selectedPkgs.size === 0;
   const autoBackup = document.getElementById('cloud-auto-backup');
-  if (autoBackup) autoBackup.disabled = !!C.busy || !cloudReady();
+  if (autoBackup) {
+    /* 形态一致化：Web 下自动备份灰置可见 + 提示（需宿主数据源）；
+       点击链路仍有 index.js autoBackup 的 host.isPlugin toast 守卫，双保险。 */
+    const webLock = state.mode !== 'plugin';
+    autoBackup.disabled = !!C.busy || !cloudReady() || webLock;
+    if (webLock) autoBackup.setAttribute('title', t('pluginOnlyHint'));
+  }
   /* 云端列表渲染 —— 2026-11-18 恢复：99ab40b 重构操作栏时误删了这段，
      委托监听（[data-cloud-get]/[data-cloud-restore]/[data-cloud-del*]）与四个动作函数
      一直都在，唯独没人往 #cloud-list 写行 ⇒ 备份成功但界面无列表、无恢复入口。
@@ -7024,77 +7087,37 @@ function cloneDemoState(){
   }
   return cloneDemoValue(state);
 }
-/** 教程示例扩展列表：仅限用户 jiozhaoyue 的 ST- 开头公开仓库，支持自动随 GitHub 仓库动态更新 */
-const DEFAULT_USER_ST_EXTENSIONS = Object.freeze([
-  { name:'ST-pack-transfer', manifest:{ version:'0.6.0', homePage:'https://github.com/jiozhaoyue/ST-pack-transfer' } },
-  { name:'ST-BgLoader', manifest:{ version:'1.2.0', homePage:'https://github.com/jiozhaoyue/ST-BgLoader' } },
-  { name:'ST-chatfile-improve', manifest:{ version:'1.1.0', homePage:'https://github.com/jiozhaoyue/ST-chatfile-improve' } },
-  { name:'ST-msg-btn-mgr', manifest:{ version:'1.0.0', homePage:'https://github.com/jiozhaoyue/ST-msg-btn-mgr' } },
-  { name:'ST-PanelReset', manifest:{ version:'1.0.0', homePage:'https://github.com/jiozhaoyue/ST-PanelReset' } },
-]);
-let userStReposCache = null;
-async function syncUserStRepos(){
-  if(userStReposCache) return userStReposCache;
-  try {
-    const ctrl = new AbortController();
-    const tId = setTimeout(()=>ctrl.abort(), 6000);
-    const res = await fetch('https://api.github.com/users/jiozhaoyue/repos?per_page=100&sort=updated', { signal: ctrl.signal });
-    clearTimeout(tId);
-    if(res.ok){
-      const list = await res.json();
-      if(Array.isArray(list)){
-        const repos = list
-          .filter(r => r && !r.fork && typeof r.name === 'string' && r.name.startsWith('ST-'))
-          .map(r => ({
-            name: r.name,
-            manifest: {
-              version: '1.0.0',
-              homePage: r.html_url || ('https://github.com/jiozhaoyue/' + r.name),
-            }
-          }));
-        if(repos.length > 0){
-          userStReposCache = repos;
-          return repos;
-        }
-      }
-    }
-  } catch(e) {
-    /* 离线或受限时静默降级为静态兜底列表 */
-  }
-  return DEFAULT_USER_ST_EXTENSIONS;
-}
+/* 教程扩展元数据复用 src/data/demo-extensions.js 静态清单：
+   不发 GitHub fetch、零外部网络依赖（主人 2026-11-21 定性：教程=不写真实数据的轻量模式）。 */
 
-/* 教程树由 src/core/demo-tree.js 的真实 buildChartTree 生成；此处不再维护手写树。 */
+/* 教程树由 src/core/demo-tree.js 的真实 buildChartTree 生成；此处不再维护手写树。
+   zipMb=压缩包体积，rawMb=解压后体积（约为 zip 两倍），树按 rawMb 构建。 */
+/* 单一包清单：id / 文件名 / 宿主 / zip体积 / 解压体积 / 时间 / 分区 / 引擎；
+   其余字段全部由 mk 实时派生，结构变化不靠人工同步。 */
+const DEMO_PACKAGE_SPECS = Object.freeze([
+  ['demo-st-small','st_userdata_2026-11-15.zip','st',4.2,8.9,'09:12','import'],
+  ['demo-st-normal','st_backup_2026-11-14.zip','st',128.0,246.8,'demo.timeYesterday','import'],
+  ['demo-luker-fs','luker_fs_2026-11-15.zip','luker',386.7,812.4,'08:40','import','fs'],
+  ['demo-luker-pg','luker_postgres_2026-11-13.zip','luker',742.5,1486.0,'demo.timeOlder','import','postgres'],
+  ['demo-luker-mysql','luker_mysql_2026-11-12.zip','luker',96.4,201.5,'08:35','import','mysql'],
+  ['demo-luker-sqlite','luker_sqlite_2026-11-11.zip','luker',32.4,68.9,'08:30','import','sqlite'],
+  ['demo-tt-large','tauritavern_data_2026-11-14.zip','tt',2457.6,4915.2,'demo.timeOlder','import'],
+  ['demo-pt-normal','puretavern_archive_2026-11-15.zip','pt',64.0,126.7,'07:55','import'],
+  ['demo-unknown','unknown_layout_2026-11-10.zip','unknown',18.6,37.2,'demo.timeOlder','import'],
+  ['demo-exp-st','st_export_2026-11-16.zip','st',212.8,428.6,'09:20','export'],
+  ['demo-exp-luker','luker_export_2026-11-16.zip','luker',48.0,96.4,'09:18','export','postgres'],
+  ['demo-exp-pt','puretavern_export_2026-11-16.zip','pt',8.6,17.9,'09:16','export'],
+]);
 function buildDemoPackages(){
-  const L=(k)=>t('demo.'+k);
-  /* 与真实包同形状的扩展元数据：仅限用户的 ST- 开头公开扩展，可直跳。 */
-  const demoExtensions = (userStReposCache && userStReposCache.length) ? userStReposCache : DEFAULT_USER_ST_EXTENSIONS;
-  /* zipMb = 压缩包体积（列表/下载看到的大小）；rawMb = 解压恢复到宿主后的体积。
-     两者必须不同：树按 rawMb 构建，图表压缩预估再按压缩模型算回 zipMb 附近。 */
-  const mk=(id,name,host,zipMb,rawMb,time,zone,engine='')=>({
-    id, name, host, size:fmtMB(zipMb), mb:zipMb, rawMb, uncompressedMb:rawMb, time, zone,
+  const demoExtensions = demoExtensionsData.items.map((it)=>({ name:it.name, manifest:{ version:it.version, homePage:it.url } }));
+  const mk=([id,name,host,zipMb,rawMb,time,zone,engine=''])=>({
+    id, name, host, size:fmtMB(zipMb), mb:zipMb, rawMb, uncompressedMb:rawMb,
+    time: String(time).startsWith('demo.') ? t(time) : time, zone,
     origin:'demo', unrecognized:host==='unknown', sourceEngine:engine||undefined,
-    extensions: demoExtensions.map((item)=>({
-      name:item.name, manifest:{ ...item.manifest },
-    })),
+    extensions: demoExtensions.map((item)=>({ name:item.name, manifest:{ ...item.manifest } })),
     nodes: host==='unknown' ? demoUnknownTree(rawMb) : demoTree(rawMb,host,engine),
   });
-  return [
-    /* zip 体积：一个极小（4.2 MB）+ 一个极大（2.4 GB），其余日常区间；
-       raw 体积约为 zip 的 2 倍，保证「预估压缩后 / 解压后」不再相同。 */
-    mk('demo-st-small','st_userdata_2026-11-15.zip','st',4.2,8.9,'09:12','import'),
-    mk('demo-st-normal','st_backup_2026-11-14.zip','st',128.0,246.8,L('timeYesterday'),'import'),
-    mk('demo-luker-fs','luker_fs_2026-11-15.zip','luker',386.7,812.4,'08:40','import','fs'),
-    mk('demo-luker-pg','luker_postgres_2026-11-13.zip','luker',742.5,1486.0,L('timeOlder'),'import','postgres'),
-    mk('demo-luker-mysql','luker_mysql_2026-11-12.zip','luker',96.4,201.5,'08:35','import','mysql'),
-    mk('demo-luker-sqlite','luker_sqlite_2026-11-11.zip','luker',32.4,68.9,'08:30','import','sqlite'),
-    mk('demo-tt-large','tauritavern_data_2026-11-14.zip','tt',2457.6,4915.2,L('timeOlder'),'import'),
-    mk('demo-pt-normal','puretavern_archive_2026-11-15.zip','pt',64.0,126.7,'07:55','import'),
-    mk('demo-unknown','unknown_layout_2026-11-10.zip','unknown',18.6,37.2,L('timeOlder'),'import'),
-    mk('demo-exp-st','st_export_2026-11-16.zip','st',212.8,428.6,'09:20','export'),
-    mk('demo-exp-luker','luker_export_2026-11-16.zip','luker',48.0,96.4,'09:18','export','postgres'),
-    mk('demo-exp-pt','puretavern_export_2026-11-16.zip','pt',8.6,17.9,'09:16','export'),
-  ];
+  return DEMO_PACKAGE_SPECS.map(mk);
 }
 /**
  * 演示数据的读数（包数 / 最小体积 / 最大体积）。
@@ -7114,206 +7137,67 @@ function buildDemoHostTree(){
   /* 宿主树同样走真实 buildChartTree：结构随真实分组被动变化。 */
   return demoTree(1142.4, state.host || 'st', state.engine || 'fs');
 }
-/* 演示动作：默认全部拦截（只提示）；少数动作在演示数据上做本地模拟，绝不触达真实通道。 */
+/* 演示动作适配器：默认拦截所有写操作为演示态提示，绝不触达真实通道。 */
 /**
- * 教程模式 = **脱离真实酒馆运行时的模拟酒馆**（2026-11-19 用户明令）。
+ * 教程模式 = **不写真实数据的轻量模式**（主人 2026-11-21 新定性，取代 2026-11-19「模拟酒馆」旧裁定）。
  *
- * 定位纠正：教程不是在每个按钮上弹一句「演示模式」，而是给用户一套**可以真的操作**的
- * 模拟环境——拉取、转换、生成待导出、删除、复制回、局域网互传、云端浏览、扩展安装、
- * 设置、存储审查全都能走完整流程，只是结果只落在内存里，**绝不写入真实数据或宿主**。
+ * 定位：教程不是造轮子式的完整模拟系统，而是一套极轻量的占位浏览环境——
+ * 界面用真实数据派生出的静态占位包树，用户可自由点按浏览；所有写操作统一拦截为提示，
+ * 只在内存里展示，**绝不写入真实数据、IndexedDB、OPFS、宿主或发网络请求**。
  *
- * 三条不可动摇的边界：
- *  1. 零真实 IO：不读真实数据包、不写 IndexedDB、不装扩展、不发网络请求。
- *  2. 结果可观察：每个动作都要产生**可见的状态变化**（新包、新待导出项、新日志），
- *     而不是一句 toast 了事。
+ * 三条边界：
+ *  1. 零真实 IO：不读真实数据包、不写持久化、不装扩展、不发网络请求。
+ *  2. 轻量：不在每个动作上写模拟实现，写操作统一走 demoTutorialActions 拦截门面。
  *  3. 可逆：退出教程时整份 state 快照还原。
  */
 function demoTutorialActions(real){
   const demoOnly=()=>toast(t('toast.tutorialDemoOnly'));
   const wrap={};
-  /* 默认继承真实 action 的只读数据读取能力，写操作被下面逐个覆盖成模拟实现。 */
+  /* 教程=不写真实数据的轻量模式（主人 2026-11-21 定性）：
+     写操作一律拦截为演示态提示，绝不触达真实持久化通道；只读浏览入口透传静态数据。 */
   for(const key of Object.keys(real||{})){
     wrap[key]=typeof real[key]==='function' ? demoOnly : real[key];
   }
-
-  /* ── 转换 → 真的产出待导出项 ──
-     签名与真实 actions.generate 对齐：({ packages, merge, target, delta, splitMb, filenameTemplate })。 */
-  wrap.generate=(payload={})=>{
-    const picked=Array.isArray(payload?.packages)&&payload.packages.length
-      ? payload.packages
-      : (state.packages||[]).filter(p=>state.selectedPkgs.has(p.id));
-    if(!picked.length){ toast(t('zones.selectHint')); return; }
-    const target=payload?.target||state.target||'SillyTavern';
-    const made=picked.map((p,idx)=>({
-      id:'demo-export-'+Date.now()+'-'+idx,
-      name:String(p.name||'pack').replace(/\.zip$/i,'')+'_'+String(target).toLowerCase()+'.zip',
-      mb:Math.max(0.01,Number(p.mb)||0.5),
-      size:fmtMB(Math.max(0.01,Number(p.mb)||0.5)),
-      zone:'export',
-      origin:'demo',
-      target,
-      time:new Date().toLocaleString(),
-      nodes:Array.isArray(p.nodes)?cloneDemoValue(p.nodes):[],
-    }));
-    state.pendingExports=[...(state.pendingExports||[]),...made];
-    logger.success(t('toast.tutorialGenerated',{n:made.length,target}));
-    /* 生成完自动切到导出区，否则用户看不到刚产出的东西（待导出卡片只在导出区渲染）。 */
-    state.zone='export';
-    renderZones(); renderActions();
-  };
-
-  /* ── 删除 / 复制回：真实改变列表 ── */
-  wrap.deleteSelected=(ids)=>{
-    const set=new Set(ids||[]);
-    if(!set.size){ toast(t('zones.selectHint')); return; }
-    const before=(state.packages||[]).length;
-    state.packages=state.packages.filter((p)=>!set.has(p.id));
-    state.selectedPkgs=new Set([...state.selectedPkgs].filter((id)=>!set.has(id)));
-    state.activePkgs=new Set([...state.activePkgs].filter((id)=>!set.has(id)));
-    syncSourceToActive();
-    logger.info(t('toast.tutorialDeleted',{n:before-state.packages.length}));
-    renderAll();
-  };
-  wrap.copyBack=(ids)=>{
-    const set=new Set(ids||[]);
-    if(!set.size){ toast(t('zones.selectHint')); return; }
-    const copies=state.packages.filter((p)=>set.has(p.id)).map((p)=>({
-      ...cloneDemoValue(p), id:'demo-copy-'+p.id, zone:'export', origin:'demo',
-      name:String(p.name||'pack').replace(/\.zip$/i,'')+'_copy.zip',
-    }));
-    state.packages=[...state.packages, ...copies];
-    state.selectedPkgs=new Set();
-    logger.info(t('toast.tutorialCopied',{n:copies.length}));
-    renderAll();
-  };
-  wrap.pendingRemove=(id)=>{ state.pendingExports=(state.pendingExports||[]).filter((x)=>x.id!==id); renderZones(); };
-  wrap.pendingClear=()=>{ state.pendingExports=[]; renderZones(); };
-
-  /* ── 下载 / 恢复 / 存工作区：模拟真实产物落在待导出区 ── */
-  wrap.download=(ids)=>{
-    const list=(ids||[]).length?ids:[...state.selectedPkgs];
-    if(!list.length){ toast(t('zones.selectHint')); return; }
-    state.pendingExports=[...(state.pendingExports||[]),...list.map((id,idx)=>{
-      const p=(state.packages||[]).find(x=>x.id===id);
-      return { id:'demo-dl-'+Date.now()+'-'+idx, name:String(p?.name||id)+'.zip',
-        mb:p?.mb||0.5, size:fmtMB(p?.mb||0.5), zone:'export', origin:'demo',
-        time:new Date().toLocaleString(), nodes:[] };
-    })];
-    logger.success(t('toast.tutorialDownloaded',{n:list.length}));
-    renderZones();
-  };
-  wrap.upload=()=>{ toast(t('toast.tutorialRestoreSim')); logger.info(t('toast.tutorialRestoreSim')); };
-
-  /* ── 局域网互传：走完整状态机，不碰真实网络 ── */
-  wrap.lan=Object.fromEntries(['generate','applyAnswer','acceptOffer','retry','cancel','abandon'].map((k)=>[k,(payload)=>{
-    const cur=state.lan||{};
-    state.lan={...cur,status:k==='generate'?'waiting':(k==='acceptOffer'?'accepted':(k==='cancel'||k==='abandon'?'idle':cur.status))};
-    logger.info(t('toast.tutorialLanStep',{step:k}));
-    renderLan();
-  }]));
-
-  /* ── 扩展安装：模拟成功，并把扩展并入演示包清单 ── */
-  wrap.installExtensions=async(items)=>{
-    const list=Array.isArray(items)?items:[];
-    const results=list.map((it,i)=>({ url:it?.url||'demo', status:'ok', name:'demo-ext-'+(i+1) }));
-    state.extResults=results;
-    state.extInstalled=[...(state.extInstalled||[]),...results.map((r)=>({ id:r.name, name:r.name, version:'1.0.0', sourceType:'package' }))];
-    logger.success(t('toast.tutorialInstallSim',{n:results.length}));
-    renderExtensionView();
-    return results;
-  };
+  /* 只读数据源：扩展清单走静态 demo 数据（不触发真实网络 / 宿主读取）。 */
   wrap.listHostExtensions=async()=>({ items: demoExtensionsData.items });
-
-  /* ── 设置与凭据：可打开、可改，但不落盘 ── */
-  wrap.settings=()=>{ if(typeof real?.settings==='function') return real.settings(); };
-
-  /* 关闭插件：先退出演示还原真实状态，再执行真实关闭。 */
-  wrap.close=()=>{ if(state.tutorialMode) closeTutorial(); real?.close?.(); };
-  wrap.onActivePackage=undefined;
-  wrap.onTargetChange=undefined;
+  /* 私有文件：返回空集，不读真实文件。 */
   wrap.privateFiles={
     list:()=>[],
     verify:async()=>({ ok:true, verified:{} }),
     remove:async()=>({ ok:true }),
   };
+  /* 存储审查：内存合成数据 + 真实 normalizeResponse 归一契约，零触达真实存储。 */
   wrap.storageInspector=async (source,path)=>demoStorageInspect(source,path);
+  /* 关闭插件：先退出演示还原真实状态，再执行真实关闭。 */
+  wrap.close=()=>{ if(state.tutorialMode) closeTutorial(); real?.close?.(); };
+  /* 断开跨模块回调，避免教程内点击触发真实业务逻辑。 */
+  wrap.onActivePackage=undefined;
+  wrap.onTargetChange=undefined;
   return wrap;
 }
-/* 演示用的存储审查数据：形状与真实 provider 相同、可下钻，零触达真实存储。 */
+/* 教程存储审查：从合成的类目体积实时派生，复用真实 normalizeResponse 归一形状。
+   只给根目录类目层，不提供下钻明细——教程=不写真实数据的轻量模式。 */
 function demoStorageInspect(source, pathArr){
   const path=Array.isArray(pathArr)?pathArr.map(String):[];
   const gb=DEMO_GB;
-  /* 配额读数由分类求和得出，「分类合计 = 已用」永远自洽（2026-11-16） */
-  const quotaFor=(cats)=>({ usedBytes:cats.reduce((a,c)=>a+c[2],0), quotaBytes:32*gb, over:false });
-  if(source==='host'){
-    const cats=[
-      ['chats','Chats',4.1*gb,'comment',true],
-      ['characters','Characters',1.6*gb,'user',true],
-      ['worlds','Worldbooks',0.9*gb,'book',false],
-      ['images','Images',1.2*gb,'image',true],
-      ['attachments','Attachments',0.4*gb,'paperclip',false],
-      ['presets','Presets & Settings',0.12*gb,'sliders',false],
-      ['extensions','Extensions',0.3*gb,'puzzle-piece',false],
-      ['vectors','Vector Stores',0.6*gb,'brain',false],
-      ['backups','Backups',0.2*gb,'clock-rotate-left',false],
-      ['other','Other',0.08*gb,'box',false],
-    ];
-    const quota=quotaFor(cats);
-    if(path.length===0){
-      return {
-        path:[], breadcrumbs:[{ label:'Storage', path:[] }], quota,
-        entries:cats.map(([key,label,size,icon,drill])=>({
-          key, label, icon, kind:'demo', categoryKey:key,
-          sizeBytes:size, childCount:null, countUnit:'', canDrill:drill,
-        })),
-        isLeaf:false,
-      };
-    }
-    const cat=cats.find((c)=>c[0]===path[0]);
-    const leaf=(name,size)=>({
-      key:name, label:name, icon:'folder', kind:'demo', categoryKey:path[0],
-      sizeBytes:size, childCount:null, countUnit:'', canDrill:false,
-    });
-    const entries=path.length===1
-      ? [leaf('default-user',0.9*gb),leaf('Seraphina',0.7*gb),leaf('Kirin',0.5*gb)]
-      : [leaf('chat_2026-11-01.jsonl',12*gb/1024),leaf('chat_2026-11-02.jsonl',9*gb/1024)];
-    const breadcrumbs=[{ label:'Storage', path:[] },{ label:cat?cat[1]:path[0], path:[path[0]] }];
-    if(path.length>1) breadcrumbs.push({ label:path[1], path:path.slice(0,2) });
-    return { path, breadcrumbs, quota, entries, isLeaf:path.length>1 };
-  }
-  const cats=[
-    ['localStorage','localStorage',26*1024,'hard-drive',{ count:12, unit:'keys', drill:true }],
-    ['sessionStorage','sessionStorage',6*1024,'clock',{ count:4, unit:'keys', drill:true }],
-    ['indexeddb','IndexedDB',5.2*gb,'database',{ count:2, unit:'dbs', drill:true }],
-    ['cachestorage','Cache Storage',3.1*gb,'layer-group',{ count:1, unit:'caches', drill:true }],
-  ];
-  const quota=quotaFor(cats);
-  if(path.length===0){
-    return {
-      path:[], breadcrumbs:[{ labelKey:'si.root', path:[] }], quota,
-      entries:cats.map(([key,label,size,icon,more])=>({
-        key, labelKey:'si.cat.'+key, icon, kind:'category', categoryKey:key,
-        sizeBytes:size, childCount:more.count??null, countUnit:more.unit||'', canDrill:!!more.drill,
-      })),
-      isLeaf:false,
-    };
-  }
-  const leaf=(name,size,icon)=>({
-    key:name, label:name, icon:icon||'key', kind:'demo', categoryKey:path[0],
-    sizeBytes:size, childCount:null, countUnit:'', canDrill:false,
-  });
-  const entries=path[0]==='indexeddb'
-    ? [leaf('ST-pack-transfer',4.8*gb,'database'),leaf('BrowserSync',0.4*gb,'database')]
-    : path[0]==='cachestorage'
-      ? [leaf('st-assets',3.1*gb,'file-lines')]
-      : [leaf('stpt.chartLayout',2*1024),leaf('stpt.settings',1*1024),leaf('theme',512)];
-  return {
-    path,
-    breadcrumbs:[{ labelKey:'si.root', path:[] },{ labelKey:'si.cat.'+path[0], path:[path[0]] }],
-    quota,
-    entries,
-    isLeaf:true,
-  };
+  const cats=source==='host'
+    ? [['chats','si.cat.chats',4.1*gb],['characters','si.cat.characters',1.6*gb],
+       ['worlds','si.cat.worlds',0.9*gb],['images','si.cat.images',1.2*gb],
+       ['attachments','si.cat.attachments',0.4*gb],['presets','si.cat.presets',0.12*gb],
+       ['extensions','si.cat.extensions',0.3*gb],['vectors','si.cat.vectors',0.6*gb],
+       ['backups','si.cat.backups',0.2*gb],['other','si.cat.other',0.08*gb]]
+    : [['localStorage','si.cat.localStorage',26*1024],['sessionStorage','si.cat.sessionStorage',6*1024],
+       ['indexeddb','si.cat.indexeddb',5.2*gb],['cachestorage','si.cat.cachestorage',3.1*gb]];
+  const quota={ usedBytes:cats.reduce((a,c)=>a+c[2],0), quotaBytes:32*gb, over:false };
+  const raw = path.length===0
+    ? { path:[], breadcrumbs:[{ labelKey:'si.root', path:[] }], quota,
+        entries:cats.map(([key,labelKey,sizeBytes])=>({
+          key, labelKey, icon:iconKey(key), kind:'demo', categoryKey:key,
+          sizeBytes, canDrill:false,
+        })), isLeaf:true }
+    : { path, breadcrumbs:[{ labelKey:'si.root', path:[] },{ labelKey:'si.cat.'+path[0], path:[path[0]] }],
+        quota, entries:[], isLeaf:true };
+  return normalizeResponse(raw, source);
 }
 function setTutorialBanner(on){
   const el=document.getElementById('tutorial-banner');
@@ -7323,6 +7207,9 @@ function setTutorialBanner(on){
   const txt=el.querySelector('.tb-text');
   if(txt) txt.textContent = state.view==='mobile' ? t('tutorial.modeBannerShort') : t('tutorial.modeBanner');
 }
+/* 教程写入门面（单一）：所有来自 index.js 的真实数据写入统一经此拦截，
+   actions 层 setter 不再各自读 state.tutorialMode。教程=不写真实数据的轻量模式。 */
+function tutorialWriteBlocked(){ return !!state.tutorialMode; }
 function enterTutorialMode(){
   if(state.tutorialMode) return;
   tutorialStateSnapshot=cloneDemoState();
@@ -7353,18 +7240,6 @@ function enterTutorialMode(){
   state.log=[];
   setTutorialBanner(true);
   renderAll();
-  void syncUserStRepos().then((repos)=>{
-    if(repos && state.tutorialMode){
-      for(const p of (state.packages||[])){
-        if(p.origin === 'demo'){
-          p.extensions = repos.map(item => ({ name: item.name, manifest: { ...item.manifest } }));
-        }
-      }
-      if(state.mainView === 'extension' || state.mobileView === 'extension'){
-        renderExtensionView();
-      }
-    }
-  });
 }
 function exitTutorialMode(){
   if(!state.tutorialMode) return;
@@ -7406,7 +7281,7 @@ const TUTORIAL_GOALS=[
   },
   {
     id:'restore', label:'tutorial.goal.restore', note:'tutorial.goal.restoreNote', docPage:'restore',
-    when:()=>state.mode!=='web',
+    hostOnly:true,
     steps:[
       { sel:'#dropzone', view:'zone', zone:'import', title:'tutorial.restore.pick', desc:'tutorial.restore.pickDesc' },
       { sel:'#chart-stack', view:'chart', title:'tutorial.restore.check', desc:'tutorial.restore.checkDesc' },
@@ -7417,7 +7292,7 @@ const TUTORIAL_GOALS=[
   },
   {
     id:'pull', label:'tutorial.goal.pull', note:'tutorial.goal.pullNote', docPage:'host-pull',
-    when:()=>state.mode!=='web',
+    hostOnly:true,
     steps:[
       { sel:'#btn-fetch', view:'chart', title:'tutorial.pull.entry', desc:'tutorial.pull.entryDesc' },
       { sel:'#chart-stack', view:'chart', title:'tutorial.pull.result', desc:'tutorial.pull.resultDesc' },
@@ -7510,16 +7385,16 @@ function centerTutorialCard(card, overlay){
   card.style.transform='translate(-50%,-50%)';
 }
 /**
- * 跳过 = 真正退出演示模式。
- * 2026-11-11 曾裁定「跳过 ≠ 回正常模式」，但浮层隐藏后主界面可正常操作，
- * 用户无法分辨自己仍在演示态：保存配置一字不落却被显示成成功（数据丢失）。
- * 现统一复用 exitTutorialMode()，由它还原 state 快照并恢复真实 actions。
+ * 跳过 = 只关教程浮层，保持演示模式（主人 2026-11-21 新裁定，取代 2026-11-11「跳过=退出」）。
+ * 旧裁定的顾虑「浮层隐藏后主界面可操作，保存一字不落却显示成功（假成功丢数据）」
+ * 已被演示态防线堵死：所有写操作经 demoTutorialActions 拦截为提示，persist*Config
+ * 在教程态一律返回 false，绝不触达真实通道。
+ * 真正退出演示模式的合法路径：教程开关 #btn-guide / 横幅「退出教程」→ closeTutorial()。
  */
 function hideTutorialOverlay(){
   const overlay=document.getElementById('st-pt-tutorial-overlay');
   if(overlay) overlay.classList.remove('open');
   state.tutorialOpen=false;
-  exitTutorialMode();
 }
 function openTutorial(){
   if(!state.tutorialMode) enterTutorialMode();
@@ -7567,13 +7442,17 @@ function renderTutorial(){
   if(!goal){
     title.textContent=t('tutorial.goalTitle');
     desc.textContent=t('tutorial.goalHint');
+    /* 形态一致化：宿主专属目标也渲染，Web 下 disabled + 提示，不再 filter 剔除。 */
     if(goals){
       goals.hidden=false;
-      goals.innerHTML=TUTORIAL_GOALS.filter((g)=>!g.when || g.when()).map((g)=>
-        '<button type="button" class="tut-goal" data-tutgoal="'+g.id+'">'
-        +'<span class="tg-name">'+t(g.label)+'</span>'
-        +'<span class="tg-note">'+t(g.note)+'</span></button>'
-      ).join('');
+      goals.innerHTML=TUTORIAL_GOALS.map((g)=>{
+        const locked=!!g.hostOnly && state.mode==='web';
+        const hint=locked?t('tutorialHostOnly'):t(g.note);
+        return '<button type="button" class="tut-goal" data-tutgoal="'+g.id+'"'
+          +(locked?' disabled':'')+' title="'+escapeHtml(hint)+'" aria-label="'+escapeHtml(hint)+'">'
+          +'<span class="tg-name">'+t(g.label)+'</span>'
+          +'<span class="tg-note">'+t(g.note)+'</span></button>';
+      }).join('');
     }
     if(dots) dots.innerHTML='';
     if(prev) prev.hidden=true;
@@ -7617,14 +7496,14 @@ function renderTutorial(){
   const cardWidth=Math.min(330, Math.max(120, overlayRect.width-24));
   card.style.width=cardWidth+'px';
   card.style.transform='none';
+  /* 教程聚光环跟随目标；卡片统一居中浮层（避免遮挡高亮区，无需四向避让几何）。 */
   const cardHeight=card.offsetHeight||180;
-  const anchor=tutorialCardPlacement(rect, overlayRect, { width: cardWidth, height: cardHeight });
+  const anchor=tutorialAnchor(rect, overlayRect, { width: cardWidth, height: cardHeight });
   ring.style.left=anchor.ring.left+'px';
   ring.style.top=anchor.ring.top+'px';
   ring.style.width=anchor.ring.width+'px';
   ring.style.height=anchor.ring.height+'px';
-  card.style.left=anchor.card.left+'px';
-  card.style.top=anchor.card.top+'px';
+  centerTutorialCard(card, overlay);
   ensureTutorialVisible(el);
 }
 /* 目标在滚动容器外时滚进来；只在完全不可见时执行，避免滚动回调互相触发。 */
@@ -7709,7 +7588,7 @@ function bind(){
     setTimeout(finish,170);
   });
 
-  // 视图切换：桌面 2 个（图表 / 扩展管理）+ 迁移；手机 4 个（图表 / 迁移 / 扩展管理 / 数据包下拉）。
+  // 视图切换：桌面 4 个（图表 / 迁移 / 扩展管理 / 数据包折叠开关）；手机 4 个（图表 / 迁移 / 扩展管理 / 数据包下拉）。
   // 按钮分散在三个面板头里，事件委托挂在共同祖先上。
   document.getElementById('view-workbench')?.addEventListener('click',(e)=>{
     const b=e.target.closest('[data-wbview]'); if(!b) return;
@@ -7722,19 +7601,32 @@ function bind(){
       renderTransfer(); renderLan(); renderCloud(); renderZones();
       return;
     }
-    /* 手机「数据包」＝同层挤压段开关（非页切换；2026-11-16 终版：展开/收起都有流畅动画）。
-       展开：data-zone-open=1 → CSS zoneDrop 0fr→1fr；
-       收起：先播 is-closing（1fr→0fr），animationend 后才 display:none——全程不跳变。 */
-    if(state.view==='mobile' && v==='zone'){
+    /* 「数据包」＝折叠开关（非页切换）。手机＝同层挤压段开关（2026-11-16 终版：展开/收起都有流畅动画）：
+       展开：data-zone-open=1 → CSS zoneDrop 动画；
+       收起：先播 is-closing，animationend 后才 display:none——全程不跳变。
+       桌面（2026-11-21 用户铁律）＝侧栏折叠开关：data-side-collapsed=1 隐藏 col-side+splitter-v、
+       主区改单列占满（对齐 CSS [data-si="1"] 单列范式，无抽屉动画避免双栏网格插值抖动）。 */
+    if(v==='zone'){
       const app=document.getElementById('app');
-      const opening=app?.dataset.zoneOpen!=='1';
-      if(opening){
-        app.dataset.zoneOpen='1';
-        renderViewSwitch();
-        syncMainView();
+      if(state.view==='mobile'){
+        const opening=app?.dataset.zoneOpen!=='1';
+        if(opening){
+          app.dataset.zoneOpen='1';
+          renderViewSwitch();
+          syncMainView();
+          return;
+        }
+        closeMobileZonePanel();
         return;
       }
-      closeMobileZonePanel();
+      if(!app) return;
+      if(app.dataset.sideCollapsed==='1'){
+        delete app.dataset.sideCollapsed;
+      } else {
+        app.dataset.sideCollapsed='1';
+      }
+      renderViewSwitch();
+      syncMainView();
       return;
     }
     if(state.transfer.open){ state.transfer.open=false; renderTransfer(); }
@@ -8343,7 +8235,7 @@ function bind(){
       return;
     }
     const name=e.target.closest('[data-fullname]');
-    if(name && (state.view==='mobile' || window.innerWidth<=860)){ e.stopPropagation(); showFullName(name); return; }
+    if(name && (state.view==='mobile' || window.innerWidth<=MOBILE_MAX_WIDTH)){ e.stopPropagation(); showFullName(name); return; }
     const card=e.target.closest('[data-pkg]');
     if(card && !e.target.closest('input')){
       const id=card.dataset.pkg;
@@ -8491,8 +8383,10 @@ function bind(){
   });
   document.getElementById('tutorial-goals')?.addEventListener('click',(e)=>{
     const b=e.target.closest('[data-tutgoal]'); if(!b) return;
+    if(b.disabled) return;
     const g=TUTORIAL_GOALS.find((x)=>x.id===b.dataset.tutgoal);
     if(!g) return;
+    if(g.hostOnly && state.mode==='web'){ toast(t('tutorialHostOnly')); return; }
     state.tutorialGoal=g.id; state.tutorialStep=0; renderTutorial();
   });
   document.getElementById('tutorial-prev').addEventListener('click',()=>{ if(state.tutorialStep>0){ state.tutorialStep--; renderTutorial(); } });
@@ -8953,7 +8847,7 @@ void refreshHostIdentity();
   return {
     isTutorialMode() { return !!state.tutorialMode; },
     setPackages(list) {
-      if(state.tutorialMode) return;
+      if(tutorialWriteBlocked()) return;
       const next = (list || []).map((pkg) => ({ ...pkg }));
       const fresh = next.filter((pkg) => !state.prefAppliedPkgs.has(pkg.id) && Array.isArray(pkg.nodes) && pkg.nodes.length);
       state.packages = next;
@@ -8980,6 +8874,8 @@ void refreshHostIdentity();
     setHost(hostKey, mode) {
       state.host = hostKey;
       state.mode = mode;
+      /* 形态切换时的初始页签落点归一化（非隐藏控件）：Web 默认落到可用页签；
+         宿主页签本身仍渲染 + disabled + 提示，见 renderExtensionView。 */
       if (mode === 'web' && state.extTab === 'host') state.extTab = 'package';
       state.activePkgs = new Set();
       state.source = { type: 'host', pkgId: null };
@@ -9030,11 +8926,11 @@ void refreshHostIdentity();
     },
     getLan() { return state.lan; },
     setStorage(next) {
-      if(state.tutorialMode) return;
+      if(tutorialWriteBlocked()) return;
       state.storage = { ...state.storage, ...(next || {}) };
       renderQuota();
     },
-    setLibraryExport(on) { if(state.tutorialMode) return; state.libraryExport = !!on; renderActions(); },
+    setLibraryExport(on) { if(tutorialWriteBlocked()) return; state.libraryExport = !!on; renderActions(); },
     /**
      * 拉取落库后的默认不勾选：备份快照 `backups/` 与原生资产 `user/`。
      * 只改插件侧选择状态，不触碰宿主原生界面的任何设置。
@@ -9056,12 +8952,12 @@ void refreshHostIdentity();
       });
       renderChart();
     },
-    setPrivateFiles(list) { if(state.tutorialMode) return; state.privateFiles = Array.isArray(list) ? list : []; renderChart(); },
+    setPrivateFiles(list) { if(tutorialWriteBlocked()) return; state.privateFiles = Array.isArray(list) ? list : []; renderChart(); },
     setZone(zone) { state.zone = zone; state.selectedPkgs = new Set(); state.activePkgs = new Set(); syncSourceToActive(); renderAll(); },
     /** 任务条：running / paused / null。只影响动作行的暂停·继续·中止三键。 */
-    setTask(task) { if(state.tutorialMode) return; state.task = task || null; renderActions(); },
+    setTask(task) { if(tutorialWriteBlocked()) return; state.task = task || null; renderActions(); },
     /** 本次待导出（内存队列）；空数组即隐藏整块。 */
-    setPendingExports(items) { if(state.tutorialMode) return; state.pendingExports = Array.isArray(items) ? items : []; renderZones(); },
+    setPendingExports(items) { if(tutorialWriteBlocked()) return; state.pendingExports = Array.isArray(items) ? items : []; renderZones(); },
     showReport,
     showRestoreReport,
     renderExtensionView,
@@ -9095,7 +8991,7 @@ void refreshHostIdentity();
     extLogAppend(line){ if(line) log('INFO', String(line)); },
     setExtensionResults(results){ state.extResults=Array.isArray(results)?results:[]; renderExtensionView(); },
     setActivePackage(id, { exclusive = false } = {}) {
-      if(state.tutorialMode) return;
+      if(tutorialWriteBlocked()) return;
       /* 外框框选永远是单选；exclusive 参数仅为兼容旧调用保留。 */
       state.activePkgs = id ? new Set([id]) : new Set();
       state.extSelectedPackageId = id || '';

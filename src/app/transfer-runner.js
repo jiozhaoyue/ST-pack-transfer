@@ -85,7 +85,7 @@ async function withRetry(fn, retries = 1) {
 export function createTransferRunner({
   target,
   chunkSize = DEFAULT_CHUNK_SIZE,
-  concurrency = 3,
+  concurrency = 4,
   retries = 1,
   onProgress,
   signal,
@@ -164,7 +164,9 @@ export function createTransferRunner({
       );
       if (!written.ok) return { ok: false, ...written };
     }
-    const present = await headChunks(name, chunks);
+    // 首次上传（清单不存在）时所有分片必然缺失，逐片 HEAD 是纯冗余往返，直接跳过。
+    // 仅断点续传（清单存在）才逐片探测，保证「已存在分片不重传」的正确性。
+    const present = existing ? await headChunks(name, chunks) : new Set();
     const missing = chunks.filter((chunk) => !present.has(chunk.index));
     const totalBytes = size;
     let uploadedBytes = 0;

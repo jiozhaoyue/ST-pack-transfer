@@ -25,8 +25,9 @@ export const SIGNAL_VERSION = 2;
 /** 摘要核对的体积上限：超过它只用字节数核对（SHA-256 需要整块缓冲）。 */
 export const DIGEST_MAX_BYTES = 512 * 1024 * 1024;
 
-/** DataChannel 单条消息上限保守值：Chrome 实测 `maxMessageSize` 因实现而异，64KB 稳妥。 */
-export const CHUNK_SIZE = 64 * 1024;
+/** DataChannel 单条消息块大小（2026-11-21 吞吐调优）：原 64KB 仅为兼容保守值，实测成为瓶颈。
+ *  256KB 在现代 Chrome/Firefox 的 SCTP maxMessageSize（≥256KB）内，减少 JS 层 send/await 次数 4 倍。 */
+export const CHUNK_SIZE = 256 * 1024;
 
 /** 传输阶段（与 TT 的 phase 语义对齐：阶段 + 进度）。 */
 export const TRANSFER_PHASES = Object.freeze({

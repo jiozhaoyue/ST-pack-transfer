@@ -323,6 +323,35 @@ export function hostSelectionCapability(platform) {
 }
 
 /**
+ * 宿主平台代码 → **整包恢复写回**是否可用（死按钮防护 F5 的唯一求值点）。
+ *
+ * 事实依据（2026-11-21 端点实测，见 `test-results/screenshots/restore-endpoints/`
+ * 下 st-facts.json / luker-facts.json / tt-pt-facts.json 与
+ * `test-results/screenshots/restore-luker-live/luker-restore-verdict.json`）：
+ * - `luker`：可用——`/api/users/restore-backup` 实测存在，merge / overwrite 均 HTTP 200。
+ * - `st`：不可用——两候选端点 GET 均 404（ST 路由 POST-only，状态码不构成存在性确证）；
+ *   Authority `st-restore` 增强端点实测不存在（`authorityAvailable=false`）。
+ * - `tt`：不可用——Tauri 桌面工程无浏览器/HTTP 恢复端点，恢复走原生文件命令人工导入。
+ * - `pt`：不可用——纯前端 legacy 路由，恢复走数据管理面板人工导入，无服务端写入端点。
+ *
+ * 这里返回的是**静态能力**（不发起任何请求、不做端点探测）；真实探测失败的具体原因
+ * 由 `getRestoreUnsupportedReason()` 提供，视图层优先展示后者，未探测时退回本表的 i18n key。
+ *
+ * @param {'st'|'luker'|'tt'|'pt'|string} platform detectHost() 平台代码
+ * @returns {{ supported: boolean, reasonKey: string }}
+ *   `supported` 是否支持整包恢复；`reasonKey` 不支持原因的 i18n key（支持时为空串）
+ */
+export function hostRestoreCapability(platform) {
+  const TABLE = Object.freeze({
+    luker: { supported: true, reasonKey: '' },
+    st: { supported: false, reasonKey: 'restore.unsupported.st' },
+    tt: { supported: false, reasonKey: 'restore.unsupported.tt' },
+    pt: { supported: false, reasonKey: 'restore.unsupported.pt' },
+  });
+  return TABLE[platform] || { supported: false, reasonKey: 'restore.unsupported.st' };
+}
+
+/**
  * 拉取前预览文案（R-A5 纯函数）：发起宿主拉取前给用户看的**状态读数行**。
  * 数据源零新增请求——类目数来自选择表，能力读数来自 `hostSelectionCapability` 声明表。
  * 不支持透传的宿主按端点实际行为展示全量数（FULL_SELECTION 的真值类目数），不展示用户勾选数。

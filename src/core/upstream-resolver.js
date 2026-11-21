@@ -3,7 +3,8 @@
  *
  * 核心机制（依蜂群推演与规范）：
  * 1. 通道一（当前本仓）：动态识别当前运行实例（从 Git origin、宿主 extension-sources 或 window.location 推导）；
- * 2. 通道二（官方上游）：动态收束至原始根仓库（优先通过 GitHub API source 动态反查，离线时通过 Git 历史根/元数据回退）；
+ * 2. 通道二（官方上游）：动态收束至原始根仓库（通过 GitHub API source 字段递归反查根仓，
+ *    离线或解析失败时回落内置默认仓 jiozhaoyue/ST-pack-transfer（offline-default），不读取 Git 历史）；
  * 3. upstream 坐标支持 remote/API 动态溯源，解析失败时回落内置默认仓（offline-default），
  *    provenance 字段如实区分「动态溯源」与「内置默认兜底」两种来源（见第 4 条与 G-34）；
  * 4. 离线静默降级（D-03/G-34）：离线或无法识别时如实输出 'unavailable'，绝不阻塞主路径。
