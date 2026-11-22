@@ -35,7 +35,7 @@ Use the breadcrumb navigation to drill down:
 
 ## Reading the data
 
-- Items whose exact size cannot be read because of browser security restrictions show a question mark (`?`), reflecting what was actually read.
+- Items whose exact size cannot be read because of browser security restrictions show a question mark (`?`) or "not provided", honestly reflecting what was actually read: when a value cannot be read it is labeled as such — never a fabricated 0 or an invented number.
 - If the current tavern natively supports storage inspection (for example Luker), the plugin connects to the native data source for server-side usage; other taverns show their current support level.
 - All readings reflect the current environment in real time.
 

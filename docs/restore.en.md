@@ -17,14 +17,14 @@ Bottom line first: **there are no "incremental / full" restore modes**. The "two
 | Mode | Request parameters | Write behavior | When to use |
 | --- | --- | --- | --- |
 | **Merge update** (`merge`) | `mode=merge`, `incremental=true` | Updates same-name files and keeps all other existing files | Daily sync, or partial character/chat updates |
-| **Full overwrite** (`overwrite`) | `mode=overwrite`, `incremental=false` | Rebuilds the target directories before writing (second confirmation required) | Replace the current tavern content completely and start from scratch |
+| **Full overwrite** (`overwrite`) | `mode=overwrite`, `incremental=false` | Rebuilds the target directories before writing (second confirmation required) | **Not reachable from the UI**: the main chain is fixed to merge; overwrite exists only at the endpoint layer (see the routing below) |
 
 > `mode` and `incremental` in these two rows are **the same switch expressed two ways**: `incremental` is only a boolean derivation of `mode === 'merge'` (`src/ui/host-bridge.js:2268`); it does **not** mean "restore only the checked categories".
 
 ## Restore mechanism in detail
 
 ### 1. Entry and platform routing
-From the **Upload / Restore** click, the chain is `restore:enqueueRestore` → `enqueueRestore` (`index.js:1610`) → `restoreSelected` (`index.js:1211`, guarded by `host.isPlugin`, which blocks standalone Web) → `restoreSelectedConfirmed` (`index.js:1261`). Routing then splits (`index.js:1303-1305`): **Luker** goes to `restoreToLuker(blob, {})`, an alias of `restoreToHost` (`src/ui/host-bridge.js:2962`); **ST / TT / PT** go to `restoreToHost(blob, { mode: 'merge', platform })` — note `mode` is **hardcoded to `merge`**, so overwrite is never triggered by the main chain.
+From the **Upload / Restore** click, the chain is `restore:enqueueRestore` → `enqueueRestore` (`index.js:1610`) → `restoreSelected` (`index.js:1211`, guarded by `host.isPlugin`, which blocks standalone Web) → `restoreSelectedConfirmed` (`index.js:1261`). Routing then splits (`index.js:1303-1305`): **Luker** goes to `restoreToLuker(blob, {})`, an alias of `restoreToHost` (`src/ui/host-bridge.js:2962`); **ST / TT / PT** go to `restoreToHost(blob, { mode: 'merge', platform })` — note `mode` is **hardcoded to `merge`**, so overwrite is never triggered by the main chain: the main chain is fixed to merge, overwrite is endpoint-layer only, and not reachable from the UI.
 
 ### 2. Restore compatibility gate (three checks before writing)
 
@@ -97,7 +97,7 @@ Because the write scope is always full and `incremental` is only an alias of `mo
 
 **F4 ST Authority enhanced restore channel (not implemented: endpoint absent)**: this round measured `authorityAvailable=false`; `/api/plugins/authority/host/st-restore` GET 404 (no 405 evidence), POST+TOKEN 403 (same as a random path, indistinguishable). The real probe point in source is `POST /api/plugins/authority/probe` reading the `data.stBackup` flag; the task's `st-restore` candidate does not match the code. Conclusion: **the Authority st-restore enhanced restore endpoint does not exist; pending Authority plugin development**. No probe code or enhanced channel is fabricated, avoiding dead code and false promises. If the Authority plugin later provides this endpoint, wire it per D-05 as an adapter (probe success → enhanced write, failure → silent fallback to native guidance).
 
-**F3 category-filter forward-move (already implemented, verified)**: package generation already filters entries by selection — `src/core/transform.js:624-625` calls `entry.skip()` per `selection[cat] === false` during convert generation, and the core layer's preview-planning module reflects the unchecked state. This replaces the old idea of relying on the host parsing restore selection (the host is insensitive to restore-request selection; measured with/without it both give restoredCount=1).
+**F3 category-filter forward-move (already implemented, verified)**: package generation already filters entries by selection — `src/core/transform.js:624-625` calls `entry.skip()` per `selection[cat] === false` during convert generation, and the core layer's preview-planning module reflects the unchecked state. This replaces the old idea of relying on the host parsing restore selection (the host is insensitive to restore-request selection; measured with/without it both give restoredCount=1). So "restore writes the whole package; the restore request is not filtered by your selection" (see the FAQ) does not contradict "the selection affects what gets restored": the selection acts at **generation time**, and the package body itself is already trimmed by it.
 
 > **Forensics boundary**: the endpoint criterion is overturned on the ST instance by control endpoints — `GET` 404 is a method mismatch on POST-only routes and cannot prove nonexistence; no endpoint produced 405 evidence, and POST is blocked by global CSRF. Therefore this table makes only an **observable judgment** of "no usable restore endpoint" for ST / Authority, not an absolute nonexistence claim; TT / PT are confirmed by desktop/pure-frontend form factors plus docs to have no server HTTP restore endpoint. The Luker restore success evidence comes from the 23:10 real-HTTP capture (see the verdict's `screenshotNote`; later host auto-update deleted the extension symlink, so re-runs failed — the PNG timestamps only prove host form factor).
 
@@ -125,9 +125,9 @@ If the environment changed or no valid backup is found, the plugin shows a warni
 
 ## Switching storage engines
 
-> **Forensics boundary**: as above, this description comes from this document's existing statements; this pass did not locate the "automatic cleanup of intermediate database dump files" implementation in the restore path, so it is not asserted as confirmed fact.
+> **Located**: the restore main chain calls `sanitizeEngineDumpForRestore` before every write (call site `index.js:1285`, implementation `src/core/engine-sanitize.js:62`): it recognizes engine-dump intermediate files inside the package (with the `_engine_meta.json` source marker) and strips them before writing so raw SQL dumps cannot hit the target primary keys; a pure engine-dump package is skipped entirely (`engine-only`), and the stripped files are listed in the report.
 
-When restoring between database and plain-file storage, the plugin cleans up intermediate database dump files to avoid primary-key conflicts.
+When restoring between database and plain-file storage, the plugin cleans up intermediate database dump files before writing to avoid primary-key conflicts.
 
 ## Batch restore and fault tolerance
 
@@ -135,9 +135,9 @@ When restoring between database and plain-file storage, the plugin cleans up int
 
 The following three items were located in the main chain (per-part tolerance inside a split group in `index.js:1269-1320`; progress/failure handling in `src/ui/host-bridge.js:1983-2160`):
 
-- **Per-part handling within a group**: a restore is limited to one package or one split group, but the group's parts are still processed one by one; a bad part does not block the other parts of the same group.
+- **The group is submitted as one, written part by part**: a split group is one package bin-packed into several zip parts (`src/core/splitter.js`); the UI submits all parts of the group together (`restoreSelection()` in `src/ui/workbench-view.js`) and the controller uploads them one by one. A failing part is marked in the report and later parts still upload, but the parts together form one package — **if any part fails, the restore of that package is incomplete**. There are no independent restore units unaffected by each other; afterwards you can keep the written parts or discard the successful ones from the report.
 - **Clear report**: after processing, a detailed report shows successful and skipped entries.
-- **Progress checkpoints**: progress is recorded, so a network drop or refresh can resume later.
+- **Progress is display-only**: progress is written to local storage for the UI and the result report; the record is write-only and never read back, so a network drop or refresh does **not** resume the restore — start it again instead.
 
 ## Automatic chunking for large packages
 

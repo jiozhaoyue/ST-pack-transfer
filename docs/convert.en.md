@@ -45,11 +45,12 @@ The analysis can be downloaded as a report.
 
 ## Merge and update (delta mode)
 
-Use delta merge when you want to merge a new export into an existing package without losing content that only exists in the old package:
+> Honest status: the delta capability currently exists only as a core-layer structure and is **not wired into the conversion main chain or the UI**.
 
-- New content in the new package is updated normally;
-- Content unique to the old package is preserved;
-- Duplicate or conflicting entries are handled according to your settings and recorded in the report.
+- The core layer already has `compareArchives` / `generateDeltaArchive` (`src/core/delta.js`), which can produce an incremental patch-package structure: the `_delta_manifest.json` inside records `generator` / `type` (delta-patch) / `baseArchiveName` / `stats` / `changes`;
+- The generator is currently referenced **only by tests** (`test/delta.test.js`); the conversion main chain (`generate` / `generateMerged` in `index.js`) has no delta branch, and the UI delta toggle produces no delta package;
+- The merge / apply functions for patch packages are not wired (`incrementalMergeArchives()` in `src/ui/host-bridge.js` is marked "not wired: no callers"); "conflicts handled automatically and recorded in a report" **does not exist**;
+- This section will be updated with real instructions once incremental restore lands.
 
 ## Smart split packages
 

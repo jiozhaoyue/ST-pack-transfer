@@ -99,7 +99,7 @@ Both buttons can be active at once (dual selection): carry the code and keep the
 
 - **Try anything**: select packages, run generation, simulate deletion, and open the storage inspector;
 - **Guided safety**: operations that would normally use the network or write to disk are handled by simulated data with explanatory notices;
-- **Realistic scenarios**: demo data covers all four taverns and packages from 16 MB to 4 GB.
+- **Realistic scenarios**: demo data covers all four taverns with packages of varying sizes; the range is interpolated from the demo package list (currently about 4.2 MB to 2.4 GB) instead of a hardcoded constant.
 
 ## How to exit
 

@@ -220,18 +220,21 @@ async function verify() {
     if (!docsFiles.includes(rel)) problems.push(`基线中的文件已删除：${rel}`);
   }
 
-  /* 3. 截图：UI 源变了但截图没重拍；页面引用的截图必须存在且已登记。 */
+  /* 3. 截图：每次 verify 都比对截图哈希与基线（2026-11-22 红队修复：
+     原来只在 UI 源变化时才比对，截图被改而基线未更新时漏报）；
+     UI 源变了但截图没重拍的拦截保留。页面引用的截图必须存在且已登记。 */
   const currentSourcesHash = await hashMany(manifest.screenshots?.sources || SHOT_SOURCES);
   const currentShotRefs = await pageShotRefs();
   const shotFiles = manifest.screenshots?.files || {};
+  const changedShots = [];
+  for (const [rel, hash] of Object.entries(shotFiles)) {
+    if (await hashFile(rel) !== hash) changedShots.push(rel);
+  }
+  if (changedShots.length) {
+    problems.push(`截图与基线不一致（确认后运行 npm run docs:update）：${changedShots.join('、')}`);
+  }
   if (currentSourcesHash !== manifest.screenshots?.sourcesHash) {
-    const changed = [];
-    for (const [rel, hash] of Object.entries(shotFiles)) {
-      if (await hashFile(rel) !== hash) changed.push(rel);
-    }
-    if (changed.length === 0) {
-      problems.push('UI 源已变化，但教程截图没有重拍（npm run docs:shots）');
-    }
+    problems.push('UI 源已变化，但教程截图没有重拍（npm run docs:shots）');
   }
 
   const referenced = new Set();

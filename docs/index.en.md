@@ -21,7 +21,7 @@ It is a pure front-end tool: install it as a tavern extension or open it as a st
 - **Mobile tutorial fix**: the tutorial overlay is mounted on `document.body` and uses `100dvh`, so the host's scroll container can no longer push it off-screen. Tall cards scroll internally.
 - **LAN QR fix**: the QR encoder is imported locally as an ES module instead of relying on the host's `window.qrcode`, so other extensions or CSP cannot silently break it.
 - **Continuous task queue**: queue multiple generation batches, pause/resume/interrupt running tasks, reorder queued tasks, and keep the last 200 finished tasks.
-- **Changelog and full logs**: release notes pop up after a version change (and can be disabled); the settings page shows the full commit log from oldest to newest. Logs include DEBUG and default to WARN and above.
+- **Changelog and full logs**: release notes pop up after a version change (and can be disabled); the settings page shows the full commit log from newest to oldest. Logs include DEBUG and default to WARN and above.
 - **Automatic Luker engine switch**: after selecting a package in Luker, the target storage engine switches to the engine declared by that package.
 - **More accurate size estimates**: the chart estimate now excludes `.git` entries that Git cleanup will remove.
 

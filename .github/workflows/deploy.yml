@@ -24,6 +24,31 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      # 发布门禁（2026-11-22 红队修复）：不再绕过 checks——checks.yml 每次 push（含 tag）都会跑，
+      # 必须等同一 commit 全绿才允许进入发布链。tag 与 checks 并发触发，故有界轮询等待结论。
+      - name: Gate on checks workflow (must be green)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GATE_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          deadline=$((SECONDS + 900))
+          while :; do
+            conclusion=$(gh run list --workflow=checks.yml --commit "$GATE_SHA" --limit 1 \
+              --json conclusion --jq 'if length == 0 then "no-run" else (.[0].conclusion // "running") end')
+            case "$conclusion" in
+              success)
+                echo "checks.yml 在 ${GATE_SHA} 结论 success，放行发布"; exit 0 ;;
+              failure|cancelled|timed_out|no-run)
+                echo "checks.yml 在 ${GATE_SHA} 结论 ${conclusion}，拒绝发布"; exit 1 ;;
+            esac
+            if [ "$SECONDS" -ge "$deadline" ]; then
+              echo "等待 checks.yml 结论超时（15 分钟，当前 ${conclusion}），拒绝发布"; exit 1
+            fi
+            echo "checks.yml 尚未出结论（${conclusion}），30 秒后重查"
+            sleep 30
+          done
+
       # 零历史：清掉两个环境的旧 deployment。每次发布后全仓只剩本次的两条 active。
       # 两个不同 environment（github-pages 本体 / github-pages-docs 文档站）才能各有 1 条 active。
       - name: Clear old deployments
@@ -76,7 +101,12 @@ jobs:
           # 2026-11-21 v0.7.0 起线上站内导航全 404 即此根因。
           find dist/docs -name '*.html' -type f -exec sed -i \
             -e 's|href="/ST-pack-transfer/|href="/ST-pack-transfer/docs/|g' \
-            -e 's|href="/ST-pack-transfer"|href="/ST-pack-transfer/docs/"|g' {} +
+            -e 's|href="/ST-pack-transfer"|href="/ST-pack-transfer/docs/"|g' \
+            -e "s|href='/ST-pack-transfer/|href='/ST-pack-transfer/docs/|g" \
+            -e "s|href='/ST-pack-transfer'|href='/ST-pack-transfer/docs/'|g" \
+            {} +
+          # 死链校验（2026-11-22 红队修复）：产物内站内链接目标缺失即失败，把线上 404 拦在发布前。
+          node tooling/check-docs-links.mjs dist/docs
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
@@ -118,8 +148,19 @@ jobs:
             -f state=success -f description="app: ${app_url}" -f environment_url="${app_url}" > /dev/null
 
           # 文档站：独立 environment，单独一条 active。
-          # required_contexts:[] 跳过 status check 校验——否则本 workflow 的 deploy check 尚未 success 时会 409 冲突。
-          docs_dep=$(printf '{"ref":"%s","task":"deploy","environment":"github-pages-docs","description":"docs: %s","required_contexts":[]}' \
+          # 2026-11-22 红队修复：不再用 required_contexts:[] 整体绕过——先显式校验 checks.yml
+          # 在本 commit 已 success，再把校验结果写成受控 status context（docs-deployment-gate），
+          # 并以它作为 required_contexts；GitHub 侧同样强制该 context success 才创建 deployment。
+          # （不能省略该参数：省略时 GitHub 校验全部 contexts，含本 workflow 自身的 in_progress check，必 409。）
+          conclusion=$(gh run list --workflow=checks.yml --commit "${COMMIT_SHA}" --limit 1 \
+            --json conclusion --jq 'if length == 0 then "no-run" else (.[0].conclusion // "running") end')
+          if [ "$conclusion" != "success" ]; then
+            echo "checks.yml 在 ${COMMIT_SHA} 结论 ${conclusion}，拒绝创建 docs deployment"; exit 1
+          fi
+          gh api -X POST "repos/${repo}/statuses/${COMMIT_SHA}" \
+            -f state=success -f context=docs-deployment-gate \
+            -f description="checks.yml green (verified before docs deployment)" > /dev/null
+          docs_dep=$(printf '{"ref":"%s","task":"deploy","environment":"github-pages-docs","description":"docs: %s","required_contexts":["docs-deployment-gate"]}' \
             "${COMMIT_SHA}" "${docs_url}" | gh api -X POST "repos/${repo}/deployments" --input - --jq '.id')
           gh api -X POST "repos/${repo}/deployments/${docs_dep}/statuses" \
             -f state=success -f description="docs deployed" -f environment_url="${docs_url}" > /dev/null

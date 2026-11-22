@@ -100,12 +100,12 @@ npm run gen-fixtures              # 重新生成测试固件 fixtures/
 
 本项目用 Trellis 管理任务。当前任务 `python ./.trellis/scripts/task.py current`；分层规范 `.trellis/spec/backend/`（core）与 `.trellis/spec/frontend/`（ui）。更全的项目规则与统一开发规则见 [AGENTS.md](./AGENTS.md)。
 
-<!-- TAVERN-RULES:START v3.0.0 -->
+<!-- TAVERN-RULES:START v3.1.0 -->
 <!-- 本块由 tavern-harness/scripts/modules/rules_sync.py 自动生成，请勿手动编辑 -->
-<!-- 真源: tavern-harness · registry/rules.json · 类别 dev · v3.0.0 -->
-<!-- 同步时间: 2026-11-19T12:58:50Z -->
-<!-- 内容哈希: sha256:b6c5455c7a9f3b115aa0dc7a47e21df547a63715ece8813657661a4b0e397333（仅覆盖规则正文，不含头部与项目覆盖） -->
-# 统一开发规则（v3.0.0 · 酒馆开发）
+<!-- 真源: tavern-harness · registry/rules.json · 类别 dev · v3.1.0 -->
+<!-- 同步时间: 2026-11-22T06:18:00Z -->
+<!-- 内容哈希: sha256:30ef2ce887bdcd6214dcd57a658649d58d2d5c5058bf46d41e9e77a137eb648e（仅覆盖规则正文，不含头部与项目覆盖） -->
+# 统一开发规则（v3.1.0 · 酒馆开发）
 
 > 本块由 tavern-harness 生成，请勿手改正文。
 > 规范全文在 `.trellis/spec/`；项目特例写文末「项目覆盖」。
@@ -169,6 +169,8 @@ npm run gen-fixtures              # 重新生成测试固件 fixtures/
 - **D-12** 前端性能有预算；交互反馈、首屏、拉取时间在 Dev 复测并留数字。
 - **D-13** 动手前先盘点宿主原生能力（拉取/上传/下载/扩展管理/存储/通知），原生已实现的不在插件内重造，并发时宿主优先。（来源 ST-pack-transfer/iron-rules#28）
 - **D-14** 同一作者/仓库只允许一个安装 URL；禁本地链接，一律 remote link；私有仓提示需登录。（来源 ST-pack-transfer/iron-rules#32）
+- **D-15** 主人说「基石」= ST-Delegation-of-authority 仓（Authority 后端，D:/Repo/Tavern-repo/Myfork/ST-Delegation-of-authority）；禁止猜成 tavern-harness/Harness-repo；向基石贡献走其上游 issue+PR。（来源 ST-pack-transfer 2026-11-22 主人明令）
+- **D-16** 全宿主恢复事实：ST 无整包恢复端点、纯前端插件无法恢复、原生增量仅 Luker+PT 支持、插件层四宿主全无增量恢复；所有未实现能力必须全盘写入文档，禁止只留在代码里。（来源 ST-pack-transfer 2026-11-22 审计主人明令）
 
 ## 规范入口
 

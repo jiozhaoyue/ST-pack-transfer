@@ -47,6 +47,7 @@ In **Settings → Privacy** each credential type can be stored independently:
 - **Masked exports and reports**: Tokens and secrets in exported logs and issue reports are masked by the unified redaction layer; the live log panel shows raw text, inputs are password-masked.
 - **Deep masking of sensitive fields**: logs and reports recursively fold values under sensitive keys such as token, secret, password, api_key, credential and cookie — nested data is covered up to eight levels — while non-sensitive fields such as keyboard layouts stay intact.
 - **Broader credential coverage**: redaction now also recognizes secrets in query parameters, passwords written in single quotes, Google API keys starting with `AIzaSy`, and HuggingFace tokens starting with `hf_`; all are masked before export and never leave with your report.
+- **Generic credential carriers**: redaction also recognizes three-part JWT tokens (`eyJ` prefix), PEM private-key blocks (the whole `-----BEGIN … PRIVATE KEY-----` block is masked, with the single regex source of truth in `credential-patterns.js`, shared with log redaction), generic long keys starting with `sk-`, Slack tokens like `xoxb-`, and AWS access keys starting with `AKIA` — all replaced with `[REDACTED]` before export.
 
 ## Sanitized share and pre-upload guard
 

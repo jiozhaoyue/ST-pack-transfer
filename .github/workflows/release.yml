@@ -36,6 +36,32 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # 发布门禁（2026-11-22 红队修复）：全量测试已常驻 checks.yml 每次 push（含 tag），
+      # 发布前必须确认同一 commit 的 checks 结论为 success；tag 与 checks 并发触发，
+      # 故有界轮询等待结论（上限 15 分钟），非 success 一律拒绝发布。
+      - name: Gate on checks workflow (must be green)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GATE_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          deadline=$((SECONDS + 900))
+          while :; do
+            conclusion=$(gh run list --workflow=checks.yml --commit "$GATE_SHA" --limit 1 \
+              --json conclusion --jq 'if length == 0 then "no-run" else (.[0].conclusion // "running") end')
+            case "$conclusion" in
+              success)
+                echo "checks.yml 在 ${GATE_SHA} 结论 success，放行发布"; exit 0 ;;
+              failure|cancelled|timed_out|no-run)
+                echo "checks.yml 在 ${GATE_SHA} 结论 ${conclusion}，拒绝发布"; exit 1 ;;
+            esac
+            if [ "$SECONDS" -ge "$deadline" ]; then
+              echo "等待 checks.yml 结论超时（15 分钟，当前 ${conclusion}），拒绝发布"; exit 1
+            fi
+            echo "checks.yml 尚未出结论（${conclusion}），30 秒后重查"
+            sleep 30
+          done
+
       # 全量测试不再在发版时跑（用户 2026-11-22 明令）：全量已常驻 checks.yml 每次 push/PR，
       # tag 指向的提交必然已经过全量绿灯，发版只做构建与发布，不再重复 5 分钟全量。
 

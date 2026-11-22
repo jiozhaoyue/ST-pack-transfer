@@ -43,11 +43,12 @@ alt_lang: en
 
 ## 合并与更新（差量模式）
 
-当你想要把新导出的数据合并到之前的历史数据包中，同时又不想丢失旧包里的独有内容时，可以使用差量合并：
+> 如实说明当前进度：差量能力目前只到核心层结构，**尚未接入转换主链路与界面**。
 
-- 新包中包含的最新内容会正常更新；
-- 旧包独有的历史内容会妥善保留；
-- 遇到重复或冲突的内容，会根据你的设定自动处理并记录在报告中。
+- 核心层已有 `compareArchives` / `generateDeltaArchive`（`src/core/delta.js`），可产出增量补丁包结构：包内 `_delta_manifest.json` 记录 `generator` / `type`（delta-patch）/ `baseArchiveName` / `stats` / `changes` 字段；
+- 该生成函数当前**仅有测试引用**（`test/delta.test.js`），转换主链路（`index.js` 的 `generate` / `generateMerged`）未接入差量分支，界面的差量切换不会产生差量包；
+- 补丁包的合并 / 应用函数未接线（`src/ui/host-bridge.js` 的 `incrementalMergeArchives()` 标注「未接线：当前无任何调用方」），「冲突自动处理并记录报告」**不存在**；
+- 待增量恢复功能落地后，本节会更新为可用的操作说明。
 
 ## 智能分卷包
 

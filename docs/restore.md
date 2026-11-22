@@ -16,7 +16,7 @@ alt_lang: en
 | 模式 | 请求参数 | 写入行为 | 适用场景 |
 | --- | --- | --- | --- |
 | **合并更新**（merge） | `mode=merge`，`incremental=true` | 更新同名文件，保留酒馆已有的其它文件 | 日常同步，或只更新部分角色卡与聊天 |
-| **完全覆盖**（overwrite） | `mode=overwrite`，`incremental=false` | 重建对应目录后再写入（需二次确认） | 想完全替换当前酒馆内容，从零还原 |
+| **完全覆盖**（overwrite） | `mode=overwrite`，`incremental=false` | 重建对应目录后再写入（需二次确认） | **界面当前不可达**：主链路固定 merge，overwrite 仅端点层支持（见下文入口分流） |
 
 > 这两行的 `mode` 与 `incremental` 其实是**同一个开关的两种表达**：`incremental` 只是 `mode === 'merge'` 的布尔派生（`src/ui/host-bridge.js:2268`），并不是「只恢复勾选的部分」的意思。
 
@@ -31,7 +31,7 @@ alt_lang: en
 进入 `restoreSelectedConfirmed` 后按平台分流（`index.js:1303-1305`）：
 
 - **Luker**：走 `restoreToLuker(sane.blob, {})`，它只是 `restoreToHost` 的别名（`src/ui/host-bridge.js:2962`）。
-- **ST / TT / PT**：走 `restoreToHost(sane.blob, { mode: 'merge', platform })`。注意 `mode` 被**写死为 `merge`**——「完全覆盖 overwrite」从未由主链路触发。
+- **ST / TT / PT**：走 `restoreToHost(sane.blob, { mode: 'merge', platform })`。注意 `mode` 被**写死为 `merge`**——「完全覆盖 overwrite」从未由主链路触发：**主链路固定 merge，overwrite 仅端点层支持，界面不可达**。
 
 ### 2. 回传兼容门控（回传前的三道拦截）
 
@@ -118,7 +118,7 @@ alt_lang: en
 
 **F4 ST Authority 增强恢复通道（未实施：端点不存在）**：本轮实测 `authorityAvailable=false`，`/api/plugins/authority/host/st-restore` GET 404（无 405 证据）、POST+TOKEN 403（与随机路径一致，无法区分存在性）；源码真实探测点为 `POST /api/plugins/authority/probe` 取 `data.stBackup` 标记，任务给定的 `st-restore` 候选与代码不符。结论：**Authority st-restore 增强恢复端点不存在，待 Authority 插件开发**；不臆造探测代码、不实施增强通道，避免死代码与虚假承诺。未来若 Authority 插件提供该端点，再按 D-05 取证后接入「探测成功走增强写入、失败静默回退原生指引」的适配器。
 
-**F3 类目过滤前移（已实现，验证通过）**：包生成阶段已按 selection 过滤条目——`src/core/transform.js:624-625` 在 convert 生成阶段按 `selection[cat] === false` 调用 `entry.skip()`，核心层的预览规划模块同步反映未勾选状态。这替代了依赖宿主解析 restore selection 的旧思路（宿主对恢复请求里的 selection 不敏感，实测带/不带均 restoredCount=1）。
+**F3 类目过滤前移（已实现，验证通过）**：包生成阶段已按 selection 过滤条目——`src/core/transform.js:624-625` 在 convert 生成阶段按 `selection[cat] === false` 调用 `entry.skip()`，核心层的预览规划模块同步反映未勾选状态。这替代了依赖宿主解析 restore selection 的旧思路（宿主对恢复请求里的 selection 不敏感，实测带/不带均 restoredCount=1）。因此「恢复按整包写入、恢复请求不按勾选过滤」（见常见问题解答）与「勾选影响恢复内容」并不矛盾：勾选的作用点在**生成阶段**，包体本身已按勾选裁剪。
 
 > **取证边界**：端点判据在 ST 实例被对照端点推翻——`GET` 404 是 POST-only 路由的方法不匹配，不能证明端点不存在；全部端点均无 405 证据，POST 受全局 CSRF 拦截。因此本矩阵对 ST / Authority 只作「无可用恢复端点」的**可观测判定**，不断言其绝对不存在；TT / PT 由桌面/纯前端形态与文档交叉确认无服务端 HTTP 恢复端点。Luker 恢复成功证据来自 23:10 轮次真实 HTTP 捕获（见 verdict 的 `screenshotNote`，后续宿主自动更新删除扩展符号链接导致复跑失败，PNG 时间戳仅证明宿主形态）。
 
@@ -146,9 +146,9 @@ alt_lang: en
 
 ## 跨存储模式平滑过渡
 
-> **取证边界**：同上一节，以下描述来自本文档既有陈述，本次追链未在恢复路径定位到「自动清理数据库转储中间文件」的实现代码，暂不作已确认事实。
+> **已定位实现**：恢复主链路在每次写入前调用 `sanitizeEngineDumpForRestore`（调用点 `index.js:1285`，实现 `src/core/engine-sanitize.js:62`）：识别包内引擎转储中间文件（含 `_engine_meta.json` 来源标记）并在写入前剔除，避免裸 SQL 转储撞目标主键；纯引擎转储包会被整体跳过（`engine-only`），被剔除的文件会注明在结果报告里。
 
-当你在数据库格式与普通文件格式之间切换恢复时，插件会自动清理数据库转储中间文件，避免主键冲突，让数据平滑入库。
+当你在数据库格式与普通文件格式之间切换恢复时，插件会在恢复前自动清理数据库转储中间文件，避免主键冲突，让数据平滑入库。
 
 ## 批量恢复与容错机制
 
@@ -156,9 +156,9 @@ alt_lang: en
 
 以下三项已在主链路定位到实现（批量逐包容错见 `index.js:1269-1320`，进度/失败处理见 `src/ui/host-bridge.js:1983-2160`）：
 
-- **组内逐 part 独立处理**：一次回传虽限一个包或一组分卷，但分卷组内多个 part 仍逐个处理，组内某个 part 格式有问题不影响同组其它 part 的写入；
+- **分卷组整组提交、逐 part 写入**：分卷组本质是同一个数据包按体积装箱拆出的多个 zip（`src/core/splitter.js`），回传时界面自动带上同组全部 part 一起提交（`src/ui/workbench-view.js` 的 `restoreSelection()`），控制器逐 part 上传写入。某个 part 失败只会在报告中标记该 part 并继续处理后续 part，但这些 part 共同组成同一个包的数据——**任一 part 失败，该包的恢复结果就是不完整的**，不存在「互不影响的独立恢复单元」；完成后可按报告选择保留已写入部分或丢弃成功项；
 - **清晰的结果报告**：全部处理完成后，会给出详尽的恢复报告，清楚展示成功与跳过的条目；
-- **进度安全保存**：处理进度会自动记录，即便中途遇到断网或刷新，也能接续恢复。
+- **进度仅用于展示**：处理进度会写入本地存储，用于界面展示与结果报告统计；该记录只写不读，**断网或刷新后不会自动接续恢复**，需要重新发起恢复。
 
 ## 大数据包自动分片
 

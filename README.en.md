@@ -24,11 +24,26 @@ All screenshots come from the tutorial demo mode and contain no real data.
 - **Private file preservation**: host-specific config is sealed into a sandbox on the target and unpacked on the way back
 - **Git policy**: per extension, keep full history or manifest only; chart volume accounts for stripped content
 - **Luker engine conversion**: filesystem, PostgreSQL, MySQL and SQLite
-- **Automatic backup**: scheduled pulls and snapshots, pruned to the retention you set
-- **Transfer and backup**: LAN peer transfer, S3 and WebDAV
+- **One-click auto backup**: manual trigger; automatically pulls from the host, converts and uploads to the cloud, then prunes old snapshots to the retention you set
+- **LAN transfer**: peer connections (pairing code / QR scan, persistent connection, bidirectional task queues) with a single-shot fallback mode
+- **Cloud channel**: S3 / WebDAV upload, listing and snapshot restore; credentials persist, nothing lost on reload
+- **Tutorial demo mode**: standalone placeholder data, zero real writes; "Skip" exits the demo and restores real data
 - **Storage inspector**: usage by category, drill down level by level
-- **Pending export area**: every artifact lands in a queue, nothing downloads automatically
-- **Issue reports**: one-click, sanitized environment reports you can copy to the clipboard or export as local Markdown — with key-level redaction that folds token/secret/password values; no repository URL to fill in, platform and account picked from dropdowns; attached logs are level- and count-selectable with a safe-minimum default and a clear notice of what is collected; over-long content or a URL past the 8000-character guard falls back to copy; preview toggles between raw and rendered views; form fields follow the GitHub issue template; two required checkboxes must be confirmed before submitting; one-click links to issue lists and docs for both this repo and the upstream.
+- **Pending export area**: every artifact lands in a queue, nothing downloads automatically; save into the workspace with filename-template preview
+- **Panel help**: every panel header carries a `?` help entry that opens the usage of the current view
+- **Sanitized share and upload guard**: one-click sanitized share pack (character cards physically removed, chats kept, `settings.json` cleaned via an AST whitelist); before any server upload a content-level local hard guard scans the actual ZIP entries and text — a character card or plaintext credential blocks the upload, with no external marker files
+- **Dual-channel upstream tracing**: naturally covers fork derivatives and this repo's changelog, and dynamically traces the original official upstream (jiozhaoyue) through the GitHub API source chain, falling back to the built-in default repo on parse failure — no Git history walking; dual-track issue submission and direct doc links
+- **Issue reports**: one-click, sanitized environment reports you can copy to the clipboard or export as local Markdown — with key-level redaction that folds token/secret/password values; no repository URL to fill in, platform and account picked from dropdowns; attached logs are level- and count-selectable with a safe-minimum default and a clear notice of what is collected; over-long content or a URL past the 8000-character guard falls back to copy; preview toggles between raw and rendered views; form fields follow the GitHub issue template; two required checkboxes must be confirmed before submitting; one-click links to issue lists and docs for both this repo and the upstream
+- **Restore format validation**: before restoring, each pack's format is checked against the current host; incompatible packs prompt to convert first; split packs are handled as a whole group — one pack or one split group at a time
+
+## Features that need the network
+
+Pure conversion, analysis, splitting, manifesting and LAN transfer (peer-to-peer) all work offline, with no network needed.
+
+- **Automatic network access by default**: opening the issue-report panel calls the GitHub API to trace upstream coordinates and fetch issue templates (only when missing locally); failures degrade silently without affecting the main UI.
+- **User-triggered only**: checking updates, per-extension auto update (rules required first), cloud commit log, issue submission, tutorial sample list sync, S3 / WebDAV cloud repos and OAuth authorization — each needs a manual action or configured credentials.
+
+The full list with endpoints, triggers and fallback behavior: [network functions list](test-results/network-functions-list.md).
 
 ## Installation
 

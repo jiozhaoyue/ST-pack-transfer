@@ -1,7 +1,7 @@
 {
   "version": 1,
   "files": {
-    "docs/DEVELOPER-GUIDE.md": "a161e35ed102c12ebba013646ec1fddec375937c56957e504d7346f6047d94fe",
+    "docs/DEVELOPER-GUIDE.md": "3461d806cc6d6a0a491eb8c8472d2c71e0d72be9269ad6286a1cec631aca3581",
     "docs/HANDOFF-2026-11-21-quality-pass.md": "a7776f26a24c91e1fcf74d3bd82e56a770e6482ea03109790cf69c8943a4913d",
     "docs/HANDOFF-2026-11-21.md": "0a44fb5ffc7d874be138aca3f83a1032c39b612eb20295af47c15e1a442896bd",
     "docs/HANDOFF-2026-11-22.md": "ad05ef47eb0647aa1e9644900825983eed91f60553f24f1269ba74e017e4d446",
@@ -37,56 +37,56 @@
     "docs/assets/shots/mobile-07-export-area.png": "d85a85c9c8a7b5dd9c157fc4fc44cb66306a4f448f54928ec7faa20d0428ccca",
     "docs/assets/shots/mobile-08-task-queue.png": "56aea067d8d43a307cda46d12bbf04fb0aecfb82e9e1629642a77dd879ce5a48",
     "docs/assets/shots/mobile-09-log-view.png": "2731c8017e1b27baea19b4747d48e60ed1b14ab41e6071fa45e1ffe6d6619670",
-    "docs/convert.en.md": "947b788b30d4324d5a53225f4be8b9dd1444c5405d34d8aa24c2c7fbb3773509",
-    "docs/convert.md": "2890305fe919859d722b44dab92bf85427858fbcd61f04a70c5cf25223517a38",
+    "docs/convert.en.md": "a9d153afa0f52518e83dd423ea82aea4a6c3e8e5903e5786bcacc052a7ac84d6",
+    "docs/convert.md": "49defa64627b84cae7e1ffcdf1173592a5ff3e6b7a0bb95f628b7053cc5d5123",
     "docs/docs.js": "1a7d87fee8478f33afea889413f6bb5aa8c0315d7faf4fdca09328284a660692",
     "docs/engines.en.md": "0c4bfc583cc1f66537f7947e7415e8b584e81312b59f017e06ecc8d74a4b269f",
     "docs/engines.md": "b09e08b96cad50235ec476d07f11ac0188e378cc2ea8d3d0bfb09a66df4b3785",
     "docs/extensions.en.md": "fb4f826c2d13f8ce02d036a970641bbe7a20e808363ea74250dbf40a0786dc47",
     "docs/extensions.md": "75a34dfe7d38660cdbef99e214fa25118059319c8f2108fdd6958348546dbb0a",
-    "docs/faq.en.md": "08a5ae5a821355996362dc42f3852914f05d65d97faa9ce0c975670b5d4a0274",
-    "docs/faq.md": "5ce45a1dce5ebd6d0c77f49d4e0a83dc68bd67879b32b3fd05d60b50c2ad2976",
+    "docs/faq.en.md": "10ea351ec4cff529c909ecef4f8158c70b93eddea48bd30a3b58abbac2854667",
+    "docs/faq.md": "e63d99907a3d115ce09f2c08cb7396f17d8722386fcb563ec6fa229efa3d6ff6",
     "docs/form-factor-matrix.md": "1b1475937dece517f4e14f79e894b8ce3b5c5168befa3a7df3e0977ff4bed42c",
     "docs/formats.en.md": "7d5e0edc523c4d3ae5bd1da5c85f24377727b9a8da3779c867eff7df72165b9c",
     "docs/formats.md": "c228b5bd169c38e06990ee1459aa43bfe18ae3056d17d82172cb63bf839921ac",
     "docs/host-pull.en.md": "b8f22d31d8463f2ded2596ec82e52d0dfb66ca141f8ab42ca8b4747b3f021676",
     "docs/host-pull.md": "2d88338e5d4555b2949fee0f13720061dec1a9891700f5d055f93f4824b1e6ac",
-    "docs/index.en.md": "94e81b998d0976446d8ec97e0a5ad199e10ba5c9df607002333b3344c9da4632",
-    "docs/index.md": "ea267cc324ab98cadf0d75bdddda25514ad279f62b3fd8bb1c285af88b43b53e",
-    "docs/install.en.md": "3c7a248b81e54055f3c45b09f25013e5dba623ed7ef3821e01c8e54daeb1bbf4",
-    "docs/install.md": "9e08a4925d0546f62c35f70d82b6cfb08a1e56bf4b7d68c580d5e0aa17a692e4",
+    "docs/index.en.md": "f370ed503a39ed0d465020a8be2d68f7d58e877e35a5ef874bcd6789add32b28",
+    "docs/index.md": "281681b87cc7dbb6de240ca6fd71819f4afcd6e19e580916d98fd1c340d410b6",
+    "docs/install.en.md": "b897b8a27927eb709186d47ed54127c0918818b925f672c476b9077042d0bf15",
+    "docs/install.md": "c83216dd7dcbb90d2dd8a66e680d9195ea5ae57e742dfb5157d8205142b64d12",
     "docs/issue-report.en.md": "b5f381f7449f9ddc0b3c2e5aa92a17332b329b4334804c8120b06f765b8996eb",
     "docs/issue-report.md": "315833eb2da199aaa8f9ec4cacd6b2d3691f8bd9ddd0d1c8fc4866180baf8a0d",
-    "docs/privacy.en.md": "84d53f5cb03e230558f82bec7be8528d9cfc25af6490864ea634d26da01414e2",
-    "docs/privacy.md": "e18a0d895f9e38588d819fd6bbafdfa8cf4a228bfa9f2b7b13b6b245008ae0b0",
+    "docs/privacy.en.md": "e5309fb73af63b5d6f257ec6de3de44e66f25faa6c09da60e22327fcd356865f",
+    "docs/privacy.md": "2b55b0a437e7a3223bd9623b44f914a92e379f3aaa285fd6b1d9e1039090ecb0",
     "docs/queue-and-logs.en.md": "65cd1744bb49f1273525c39dcd29bd5da7f060fe222f8ae3f38eecd9e4da69eb",
     "docs/queue-and-logs.md": "8282ffe1c998d6bf646e075cfe561121d106f3f4c5c8fbc081536623a33810a8",
-    "docs/restore.en.md": "793571ab507a843c298af087dcd30110f1f8cd418ea850dae5c49d518a28fff7",
-    "docs/restore.md": "ec3f1028eeaa428686eda65e3047e45ea247df995a8371b0cd6abeddd9372268",
-    "docs/storage.en.md": "fe243a81210ffc57a60ce1995d98e81b5e62cf926b62957339cdba60f025806f",
-    "docs/storage.md": "5741877389c0d464e9f2f0efa47a500d4a989528433aea74a8e1944434c0fbff",
+    "docs/restore.en.md": "67ec70671d5effaabfb2c47552e76defe816c0f47f5b17ce25fe5d5efd6a2238",
+    "docs/restore.md": "4cd58f9c3a5057d32e362018b7d744642367432800533db83fc17a8468c012c7",
+    "docs/storage.en.md": "b1a9b1225f687a8ffd0c82930d5679a5b851d14e3c9cfe60c4d728a50f620946",
+    "docs/storage.md": "724c03853183a3fc54a9102d57d28da878319df854727aa0f652c11f3962e18d",
     "docs/style.css": "8b36b66b39c27f1d6a37d919c423b81cb7bf5087030e03e9aa7fdec656f6a5d8",
     "docs/testing.en.md": "f0efdf5f07d57959a6338ac4e5338f7b9728b2071ff1f31c46228c75bb4ed50c",
     "docs/testing.md": "1a9c69c9fc05820631736d98a55f9efcea1f0c49d9b3fb02110950eaee9ddc71",
-    "docs/transfer.en.md": "650ccb95f503ed6f42a35115a08b2bc842cd20f6b1ee5419085a0e6b6e0ce556",
-    "docs/transfer.md": "020c3485f27e5c1a0cfe06b2fba0372d6644b06a8f0a38ed7ddad8feb81630b2",
-    "docs/tutorial.en.md": "66a1201abc034592d86efe4ab964ecafc30aa21b8daa2c0297c2d06b87a1cf47",
-    "docs/tutorial.md": "dc79ee2a0a24a2b64909eae3e005129889ef6fc5e9d2a2c8e1a5c7afa7ee1f7b"
+    "docs/transfer.en.md": "a77d403b1a1def1c22c68e1847ff5210d3f6b90cee9d5a30f8cd1e132de0c963",
+    "docs/transfer.md": "af02f2e4699e9d633812516e74502ecdda6b1e512a800bcf843955b80cdc908f",
+    "docs/tutorial.en.md": "69aaa943201be9165fb3c03cc8a454b23303d4ade25c2731be8b4a558ed0f2b2",
+    "docs/tutorial.md": "c27e29f6de36b3ae6e7dc81362fad808d1c688a920215099c4ea5f8151a1ddd0"
   },
   "pairs": [
     {
       "zh": "docs/index.md",
       "en": "docs/index.en.md",
       "translation": "required",
-      "sourceHash": "ea267cc324ab98cadf0d75bdddda25514ad279f62b3fd8bb1c285af88b43b53e",
-      "translationHash": "94e81b998d0976446d8ec97e0a5ad199e10ba5c9df607002333b3344c9da4632"
+      "sourceHash": "281681b87cc7dbb6de240ca6fd71819f4afcd6e19e580916d98fd1c340d410b6",
+      "translationHash": "f370ed503a39ed0d465020a8be2d68f7d58e877e35a5ef874bcd6789add32b28"
     },
     {
       "zh": "docs/install.md",
       "en": "docs/install.en.md",
       "translation": "required",
-      "sourceHash": "9e08a4925d0546f62c35f70d82b6cfb08a1e56bf4b7d68c580d5e0aa17a692e4",
-      "translationHash": "3c7a248b81e54055f3c45b09f25013e5dba623ed7ef3821e01c8e54daeb1bbf4"
+      "sourceHash": "c83216dd7dcbb90d2dd8a66e680d9195ea5ae57e742dfb5157d8205142b64d12",
+      "translationHash": "b897b8a27927eb709186d47ed54127c0918818b925f672c476b9077042d0bf15"
     },
     {
       "zh": "docs/formats.md",
@@ -99,8 +99,8 @@
       "zh": "docs/convert.md",
       "en": "docs/convert.en.md",
       "translation": "required",
-      "sourceHash": "2890305fe919859d722b44dab92bf85427858fbcd61f04a70c5cf25223517a38",
-      "translationHash": "947b788b30d4324d5a53225f4be8b9dd1444c5405d34d8aa24c2c7fbb3773509"
+      "sourceHash": "49defa64627b84cae7e1ffcdf1173592a5ff3e6b7a0bb95f628b7053cc5d5123",
+      "translationHash": "a9d153afa0f52518e83dd423ea82aea4a6c3e8e5903e5786bcacc052a7ac84d6"
     },
     {
       "zh": "docs/host-pull.md",
@@ -113,8 +113,8 @@
       "zh": "docs/restore.md",
       "en": "docs/restore.en.md",
       "translation": "required",
-      "sourceHash": "ec3f1028eeaa428686eda65e3047e45ea247df995a8371b0cd6abeddd9372268",
-      "translationHash": "793571ab507a843c298af087dcd30110f1f8cd418ea850dae5c49d518a28fff7"
+      "sourceHash": "4cd58f9c3a5057d32e362018b7d744642367432800533db83fc17a8468c012c7",
+      "translationHash": "67ec70671d5effaabfb2c47552e76defe816c0f47f5b17ce25fe5d5efd6a2238"
     },
     {
       "zh": "docs/extensions.md",
@@ -127,15 +127,15 @@
       "zh": "docs/transfer.md",
       "en": "docs/transfer.en.md",
       "translation": "required",
-      "sourceHash": "020c3485f27e5c1a0cfe06b2fba0372d6644b06a8f0a38ed7ddad8feb81630b2",
-      "translationHash": "650ccb95f503ed6f42a35115a08b2bc842cd20f6b1ee5419085a0e6b6e0ce556"
+      "sourceHash": "af02f2e4699e9d633812516e74502ecdda6b1e512a800bcf843955b80cdc908f",
+      "translationHash": "a77d403b1a1def1c22c68e1847ff5210d3f6b90cee9d5a30f8cd1e132de0c963"
     },
     {
       "zh": "docs/storage.md",
       "en": "docs/storage.en.md",
       "translation": "required",
-      "sourceHash": "5741877389c0d464e9f2f0efa47a500d4a989528433aea74a8e1944434c0fbff",
-      "translationHash": "fe243a81210ffc57a60ce1995d98e81b5e62cf926b62957339cdba60f025806f"
+      "sourceHash": "724c03853183a3fc54a9102d57d28da878319df854727aa0f652c11f3962e18d",
+      "translationHash": "b1a9b1225f687a8ffd0c82930d5679a5b851d14e3c9cfe60c4d728a50f620946"
     },
     {
       "zh": "docs/engines.md",
@@ -148,22 +148,22 @@
       "zh": "docs/privacy.md",
       "en": "docs/privacy.en.md",
       "translation": "required",
-      "sourceHash": "e18a0d895f9e38588d819fd6bbafdfa8cf4a228bfa9f2b7b13b6b245008ae0b0",
-      "translationHash": "84d53f5cb03e230558f82bec7be8528d9cfc25af6490864ea634d26da01414e2"
+      "sourceHash": "2b55b0a437e7a3223bd9623b44f914a92e379f3aaa285fd6b1d9e1039090ecb0",
+      "translationHash": "e5309fb73af63b5d6f257ec6de3de44e66f25faa6c09da60e22327fcd356865f"
     },
     {
       "zh": "docs/tutorial.md",
       "en": "docs/tutorial.en.md",
       "translation": "required",
-      "sourceHash": "dc79ee2a0a24a2b64909eae3e005129889ef6fc5e9d2a2c8e1a5c7afa7ee1f7b",
-      "translationHash": "66a1201abc034592d86efe4ab964ecafc30aa21b8daa2c0297c2d06b87a1cf47"
+      "sourceHash": "c27e29f6de36b3ae6e7dc81362fad808d1c688a920215099c4ea5f8151a1ddd0",
+      "translationHash": "69aaa943201be9165fb3c03cc8a454b23303d4ade25c2731be8b4a558ed0f2b2"
     },
     {
       "zh": "docs/faq.md",
       "en": "docs/faq.en.md",
       "translation": "required",
-      "sourceHash": "5ce45a1dce5ebd6d0c77f49d4e0a83dc68bd67879b32b3fd05d60b50c2ad2976",
-      "translationHash": "08a5ae5a821355996362dc42f3852914f05d65d97faa9ce0c975670b5d4a0274"
+      "sourceHash": "e63d99907a3d115ce09f2c08cb7396f17d8722386fcb563ec6fa229efa3d6ff6",
+      "translationHash": "10ea351ec4cff529c909ecef4f8158c70b93eddea48bd30a3b58abbac2854667"
     },
     {
       "zh": "docs/testing.md",
@@ -183,7 +183,7 @@
       "zh": "docs/DEVELOPER-GUIDE.md",
       "en": null,
       "translation": "pending",
-      "sourceHash": "a161e35ed102c12ebba013646ec1fddec375937c56957e504d7346f6047d94fe",
+      "sourceHash": "3461d806cc6d6a0a491eb8c8472d2c71e0d72be9269ad6286a1cec631aca3581",
       "translationHash": null
     }
   ],
@@ -194,7 +194,7 @@
       "style.css",
       "tooling/capture-docs-shots.cjs"
     ],
-    "sourcesHash": "73a722a24e93d94b380850b8e27d1056c6a6934c80b58f1b89c9d2327f6f807c",
+    "sourcesHash": "3cd17776c3d141886452807fa27f87ebd92bcd4bd72ba04efc4eeaf77f7cb20e",
     "pages": {
       "docs/convert.en.md": [
         "docs/assets/shots/desktop-03-workbench-demo.png",

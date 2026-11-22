@@ -35,6 +35,8 @@ Open **Migration & backup** from the view switch at the top of the panel. Select
 - **Scan and connect**: if the phone and computer are on the same Wi-Fi/LAN, scanning the QR code establishes a direct peer-to-peer connection. Scanning opens a full-screen viewfinder: the framing box tells you whether the code is aligned, and a successful scan connects automatically.
 - **Private and fast**: data travels directly between the two devices without an external server. Browsers cannot actively scan for nearby devices; connection info is exchanged once via QR code or copy-and-paste.
 - **Resume support**: large packages are transferred in chunks and resume automatically after network hiccups.
+- **Secure-context requirement**: the peer-to-peer link relies on browser WebRTC, available only in a **secure context** (`https` or the machine's loopback address). Opening the tavern via `http://<LAN-IP>` is not a secure context, so the browser rejects the direct connection; `probeDirectCapability` in `src/core/lan-transfer.js` reports it honestly. Use https or the loopback address on the host machine instead.
+- **Integrity-check limit**: the transfer digest is a whole-file SHA-256, but a single file over **512 MB** cannot be digested by the browser; it falls back to a byte-level check and the UI honestly marks "digest not checked" (`DIGEST_MAX_BYTES`, `src/core/lan-transfer.js`).
 
 ## Cloud backup: S3-compatible object storage
 

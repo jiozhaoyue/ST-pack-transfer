@@ -44,6 +44,7 @@
     "check:copy": "node scripts/copy-audit.js",
     "check:no-bundler-only": "node tooling/no-bundler-only.js",
     "check:docs-privacy": "node tooling/docs-privacy-guard.js",
+    "check:docs-links": "node tooling/check-docs-links.mjs",
     "check:ui-tokens": "node tooling/check-ui-tokens.mjs",
     "check:checkbox-centering": "node tooling/verify-checkbox-centering.cjs",
     "check:no-overflow": "node tooling/verify-no-overflow.cjs",

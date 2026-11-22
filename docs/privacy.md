@@ -46,6 +46,7 @@ alt_lang: en
 - **导出与报告脱敏**：导出日志与问题报告中的 Token 和密钥经统一脱敏层自动掩码；实时日志面板显示原文，输入框用密码框遮挡。
 - **敏感字段深层遮蔽**：日志与报告会按键名递归折叠 token、secret、password、api_key、credential、cookie 等敏感值，多层嵌套（至多八层）同样覆盖，键盘布局等非敏感字段则照常保留；
 - **更多凭据形态掩码**：脱敏范围已扩展识别查询参数中的密钥、单引号写法的密码、以 AIzaSy 开头的 Google API Key 与以 hf_ 开头的 HuggingFace 令牌，导出前一律掩码，不随报告外泄。
+- **通用凭据载体掩码**：掩码层还识别 JWT 三段式令牌（`eyJ` 开头）、PEM 私钥块（`-----BEGIN … PRIVATE KEY-----` 整块掩蔽，正则唯一真源在 `credential-patterns.js`，与日志脱敏同源）、`sk-` 开头的通用长密钥、`xoxb-` 等 Slack 令牌与 `AKIA` 开头的 AWS 访问键，导出前一律替换为 `[REDACTED]`。
 
 ## 脱敏分发与上传门禁
 

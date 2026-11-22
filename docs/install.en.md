@@ -38,9 +38,9 @@ On first launch, the tutorial walks you through the interface on simulated data:
 
 > The root `index.html` is a development skeleton and **cannot be downloaded and double-clicked by itself**; it needs a dev server or a built static server. Use the single-file HTML above when you want double-click behavior.
 
-### Three forms, step by step
+### Four forms, step by step
 
-The three common forms compared by "how to open → what you see → what it is for".
+The four common forms compared by "how to open → what you see → what it is for".
 The core conversion logic is identical across forms; differences are limited to host-related features.
 
 | Form | First step to open | Interface | Host features | Best for |
@@ -48,14 +48,16 @@ The core conversion logic is identical across forms; differences are limited to 
 | Tavern extension | Extension Manager → Install from URL → refresh → expand **Data Pack Transfer** → **Open panel** | Full-screen workbench modal with Settings / Logs / Help views | Full: pull from host, restore to host, extension management, server-side storage inspector | Daily backup, restore, extension management |
 | Standalone Web | Open <https://jiozhaoyue.github.io/ST-pack-transfer/> | Workbench shown directly on the page | No host backend; pull / restore / server management disabled | Local conversion, analysis, splitting, LAN transfer |
 | Single-file HTML | Download `ST-pack-transfer-offline.html` from GitHub Release → double-click | Same workbench as Web, running over `file://` | Same as Web, no host features | Offline, no network, portable |
+| Local static server | Build and open `dist/` over HTTP (e.g. `npm run preview`) | Same workbench as Standalone Web | No host backend; pull / restore / server management disabled | Self-hosting, LAN sharing |
 
 Step by step:
 
 1. **Tavern extension**: install via repository URL, refresh, expand **Data Pack Transfer**, click **Open panel** to enter the workbench. First launch opens the tutorial demo.
 2. **Standalone Web**: open the online URL directly, no install needed; conversion, splitting, size analysis, and LAN transfer all work.
 3. **Single-file HTML**: double-click the downloaded offline file; all front-end features run directly over `file://`.
+4. **Local static server**: build `dist/` and open it over HTTP from any static server, suited for self-hosting and LAN sharing; features match Standalone Web.
 
-> All three forms support issue reports, sanitized share, and the local redaction guard; host pull and restore are available only in the tavern extension form. See [Issue report](issue-report.en.md) and [Privacy & credentials](privacy.en.md).
+> All four forms support issue reports, sanitized share, and the local redaction guard; host pull and restore are available only in the tavern extension form. See [Issue report](issue-report.en.md) and [Privacy & credentials](privacy.en.md).
 
 ## 2. Install into a tavern (recommended)
 

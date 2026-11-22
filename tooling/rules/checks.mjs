@@ -128,13 +128,15 @@ const TRIGGERS_FILE = '.trellis/spec/guides/rule-triggers.md';
 
 const POINTER_MARK = 'RULES-POINTER v1';
 
+/* 凭据阈值跨守卫统一为 20 位（2026-11-22 红队修复，与 tooling/docs-privacy-guard.js 的凭据规则一致）：
+   同一形态在两个守卫里阈值不一致时，短 token 会被一个守卫放过。 */
 const SECRET_PATTERNS = [
-  [/ghp_[A-Za-z0-9]{30,}/, 'GitHub classic PAT'],
-  [/github_pat_[A-Za-z0-9_]{30,}/, 'GitHub fine-grained PAT'],
+  [/ghp_[A-Za-z0-9]{20,}/, 'GitHub classic PAT'],
+  [/github_pat_[A-Za-z0-9_]{20,}/, 'GitHub fine-grained PAT'],
   [/glpat-[A-Za-z0-9_-]{20,}/, 'GitLab PAT'],
-  [/sk-[A-Za-z0-9]{32,}/, 'OpenAI 类密钥'],
+  [/sk-[A-Za-z0-9]{20,}/, 'OpenAI 类密钥'],
   [/AKIA[0-9A-Z]{16}/, 'AWS Access Key'],
-  [/xox[baprs]-[A-Za-z0-9-]{10,}/, 'Slack Token'],
+  [/xox[baprs]-[A-Za-z0-9-]{20,}/, 'Slack Token'],
 ];
 
 /* ---------- 检查项 ---------- */
@@ -423,7 +425,10 @@ export const checks = [
           const hit = grepLines(rel, re);
           if (hit.length) items.push({ file: rel, line: hit[0].line, text: `${label} 疑似泄露` });
         }
-        const home = grepLines(rel, /[A-Za-z]:\\\\Users\\\\[A-Za-z0-9._-]+/);
+        // \\+ 同时匹配单反斜杠与双反斜杠（JSON 转义形态）的 Windows 用户目录路径。
+        // 2026-11-22 红队修复：原正则只匹配双反斜杠，单反斜杠形态漏报。
+        // 注意：本注释不得出现「盘符 + 反斜杠 + Users + 路径段」的字面示例，否则会被本守卫命中。
+        const home = grepLines(rel, /[A-Za-z]:\\+Users\\+[A-Za-z0-9._-]+/);
         if (home.length) items.push({ file: rel, line: home[0].line, text: '本地绝对路径（Windows 用户目录）' });
       }
       return {

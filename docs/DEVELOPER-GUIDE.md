@@ -304,28 +304,28 @@ npm run docs:verify
 
 | 阶段 | 入口（file:line） | 做什么 |
 | --- | --- | --- |
-| ① 上传 / 入库 | `index.js` 多处 `saveFile(...)`（如 `:509` / `:1045` / `:1736` / `:2095` / `:2663`），落到 `src/storage/db.js:226` | 原始包写入 IndexedDB `files` store，带 `origin`（ORIGINS 枚举）与 `role`；超大 blob 走串行写队列。存储不可用时返回 null，走内存降级 |
+| ① 上传 / 入库 | `index.js` 多处 `saveFile(...)`（如 `:545` / `:697` / `:1108` / `:1165` / `:1516` / `:1871` / `:2234` / `:2806`），落到 `src/storage/db.js:250` | 原始包写入 IndexedDB `files` store，带 `origin`（ORIGINS 枚举）与 `role`；超大 blob 走串行写队列。存储不可用时返回 null，走内存降级 |
 | ② 检测 detect | `detectFromReader()`（`src/core/detect.js:19`），布局枚举 `LAYOUTS`（`detect.js:3-9`） | 按 `detect.js:12-18` 的判定顺序识别源布局：`st` / `l` / `tt` / `pt-native` / `unknown`；`pt-native` 经 `pt-archive.js` 的 `createPtNativeHubReader()` 转成 hub（ST 摊平） |
-| ③ 计划 plan | `ensurePlan()`（`index.js:545`）→ 预检计划模块的 `generatePlan()`（动作枚举 `ACTIONS`）→ 引擎计划 `planEngineConversion()`（`src/core/engine-bridge.js:119`） | 零拷贝预读 zip 中央目录，逐条预测归宿（`COPY` / `ROUTE` / `MIGRATE` / `SYNTHESIZE` / `DROP` / `FILTER`）；core 只给语义 token，颜色交给 UI 层解析 |
-| ④ 转换 convert | `conversionRunner.convert(...)`（`index.js:1666`、合并模式 `:2014`）→ core `convert()`（`src/core/transform.js:307`） | 源布局规范化为 hub，再按目标逐条适配写出；逐条目读入 Buffer（峰值约等于最大单文件），不整包驻留；合成项追加在尾部并按名字排序。丢弃 / 复制 / 合成计入 `report.js` |
-| ⑤ 分卷（可选） | `splitArchiveEntries()`（`src/core/splitter.js:107`） | 传懒描述符 `{path, size, read}`，splitter 决策后才 `read()`（调用见 `index.js:1681-1699`），reader 存活期覆盖整个 split，在飞数据 ≤ 1 条目 |
+| ③ 计划 plan | `ensurePlan()`（`index.js:603`）→ 预检计划模块的 `generatePlan()`（动作枚举 `ACTIONS`）→ 引擎计划 `planEngineConversion()`（`src/core/engine-bridge.js:119`） | 零拷贝预读 zip 中央目录，逐条预测归宿（`COPY` / `ROUTE` / `MIGRATE` / `SYNTHESIZE` / `DROP` / `FILTER`）；core 只给语义 token，颜色交给 UI 层解析 |
+| ④ 转换 convert | `conversionRunner.convert(...)`（`index.js:1788`、合并模式 `:2149`）→ core `convert()`（`src/core/transform.js:325`） | 源布局规范化为 hub，再按目标逐条适配写出；逐条目读入 Buffer（峰值约等于最大单文件），不整包驻留；合成项追加在尾部并按名字排序。丢弃 / 复制 / 合成计入 `report.js` |
+| ⑤ 分卷（可选） | `splitArchiveEntries()`（`src/core/splitter.js:107`） | 传懒描述符 `{path, size, read}`，splitter 决策后才 `read()`（调用见 `index.js:1860`、`:2236`），reader 存活期覆盖整个 split，在飞数据 ≤ 1 条目 |
 | ⑥ 待导出区 → 入库 | `ExportQueue.enqueue()`（`src/ui/export-queue.js:185`）、`stash()`（`:241`）、`ensureStored()`（`:272`） | 所有产物先进待导出区，**不自动下载**；下载 / 存入工作区时才 `saveFile` 持久化（role=`output`），可用时 fire-and-forget 镜像到可选 Authority 后端（失败只告警） |
 
 三形态共用同一条 core 数据流：独立 Web 与酒馆扩展由根 `index.js` 驱动；Node / Vitest 下 `src/core/worker-client.js` 在无 `Worker` 时自动降级为主线程执行。宿主差异只进 `src/ui/host-bridge.js`，业务层不判断宿主名。
 
-### core 模块地图（实测 77 项：76 个 `.js` + `engine-adapters/` 目录）
+### core 模块地图（实测 79 项：78 个 `.js` + `engine-adapters/` 目录）
 
 按职责分七组；模块职责均来自各文件头部注释，`ls src/core/` 可核对清单。
 
 | 分组 | 模块（文件名省略 `.js` 后缀） | 职责要点 |
 | --- | --- | --- |
-| 转换与路由 | `transform` `detect` 预检计划 `splitter` `delta` `merge-packages` `naming` `extension-manifest` `extension-pack-mode` `export-modes` `git-policy` `pt-archive` | 源布局识别、hub 规范化、逐条路由与合成、分卷、差量、合并、命名、扩展清单契约、Git 目录策略（keep/minimal/strip）、PT 原生归档回 hub |
+| 转换与路由 | `transform` `detect` `plan-preview` `splitter` `delta` `merge-packages` `naming` `extension-manifest` `extension-pack-mode` `export-modes` `git-policy` `pt-archive` | 源布局识别、hub 规范化、逐条路由与合成、分卷、差量、合并、命名、扩展清单契约、Git 目录策略（keep/minimal/strip）、PT 原生归档回 hub |
 | 存储引擎 / zip / 体积 | `engine-bridge` `engine-model` `engine-registry` `engine-sanitize` `sqlite-init` `size-model` `zip-io` `zip-append` `zip-augment` `null-writer` `engine-adapters/` | 引擎互转（注入式 IO）、canonical 行模型、引擎探测与注册表、恢复前裸 SQL 净化、sql.js 惰性加载、体积模型、zip 读写适配与追加、三种引擎适配（`fs` / `jsonl-dump` / `sqlite`） |
 | 上游 / Git / 仓库 / 元信息 | `upstream-resolver` `repo-files` `ext-install-web` `ext-pack` `ext-prune` `builtin-assets` `plugin-kind` `path-safety` `git-accounts` `git-graph` `git-local` `git-oauth` `git-site` `git-url` `git-viz` `docs-site` `app-version` `changelog` | 双通道上游溯源（失败如实 `unavailable`）、仓库文件抓取、扩展装包决策与清理、宿主固定资产指纹、Git 账号 / OAuth / 站点 API / URL 归一 / 泳道可视化、远程路径安全、版本与更新日志 |
-| 迁移 / 存储审查 | `migration-evidence` `migration-plan` `migration-session` `migration-target` `migration-verification` `selection-defaults` `storage-inspector-model` `target-inventory` `zone-model` `restore-batch` `chunked-restore` | 统一迁移计划与写作门、会话强不兼容判别、目标预检与备份证据、核对证据、默认选择、审查面板纯逻辑、目标清单对齐、分区状态机、批量恢复编排、Luker 原生分片恢复 |
+| 迁移 / 存储审查 | `migration-evidence` `migration-plan` `migration-session` `migration-target` `migration-verification` `selection-defaults` `storage-inspector-model` `target-inventory` `zone-model` `restore-batch` `chunked-restore` `restore-compat` | 统一迁移计划与写作门、会话强不兼容判别、目标预检与备份证据、核对证据、默认选择、审查面板纯逻辑、目标清单对齐、分区状态机、批量恢复编排、Luker 原生分片恢复、回传结构兼容门控 |
 | 云与传输 | `s3-client` `s3-crypto` `webdav-client` `transfer-plan` `transfer-target` `transfer-prune` `net-proxy` `lan-transfer` `backup-set` `private-container` | S3（SigV4）/ WebDAV 客户端（注入 fetch）、分片与断点台账、统一传输目标、快照保留修剪、可选 CORS 代理、局域网互传纯逻辑、内容寻址备份集、私有配置容器 |
 | 任务与日志 | `task-manager` `task-queue-controls` `worker-client` `worker-factory` `converter-worker` `logger` `report` `stage-timings` `pack-inject` | 长任务状态机、队列行控件判定、Worker 有界等待与唯一构造点、协作式暂停、结构化日志与脱敏、转换报告账本、异步阶段计时、聊天补包决策 |
-| 检视 / 图表 / 能力 / 脱敏 | `inspect` `sanitize-share` `asset-list` `demo-tree` `chart-model` `host-capabilities` | 五层体检与类目判定、脱敏分发与上传门禁、资产列表契约、教程占位树（不读真实包）、包卡体积 `fmtMB` 真源、宿主能力显式声明表 |
+| 检视 / 图表 / 能力 / 脱敏 | `inspect` `sanitize-share` `credential-patterns` `asset-list` `demo-tree` `chart-model` `host-capabilities` | 五层体检与类目判定、脱敏分发与上传门禁、凭据检测正则唯一真源（PEM）、资产列表契约、教程占位树（不读真实包）、包卡体积 `fmtMB` 真源、宿主能力显式声明表 |
 
 ### 转换目标路由（TARGETS 四目标与 `targetEntryPath`）
 
@@ -368,14 +368,14 @@ npm run docs:verify
 - 本矩阵**只覆盖** `assetList` / `accountWindow` / `storagePage` / `serverTransfer` 四项（`host-capabilities.js:12-21`），**不含** backup / restore / selection 能力位。恢复能力**不进这张表**，而由 `host-bridge` 运行时探测三态 `unknown` / `available` / `unsupported`（`src/ui/host-bridge.js:101-108`，结果记入 `restoreCapability`）。
 - **selection 透传是独立声明表** `BACKUP_SELECTION_SUPPORT`（`src/ui/host-bridge.js:300-305`）：`st=false` / `luker=true` / `tt=false` / `pt=false`，唯一求值点 `hostSelectionCapability()`（`:316-323`）。此表**只作用于导出 / 拉取阶段的 `/api/users/backup`**，不作用于恢复；恢复链路的 `selection` 恒为 `FULL_SELECTION`（`:2245` / `:2139`），与用户勾选无关。
 - **恢复端点候选表** `RESTORE_ENDPOINT_CANDIDATES`（`src/ui/host-bridge.js:93-96`）只列 `luker` / `st` 两键：`luker=['/api/users/restore-backup','/api/users/restore']`，`st=['/api/users/restore','/api/users/restore-backup']`；`tt` / `pt` 无条目，回退 ST 候选（`:179`）。ST 1.19 两端点实测均 404→无整包恢复能力；Luker `/restore` 404、`/restore-backup` 存在（`:88-91`）。
-- 两种写入策略 `merge` / `overwrite` 与 selection 彼此无关（`src/ui/host-bridge.js:1938-1954`、`:2208-2239`），`incremental` 只是 `mode` 派生；真正增量合并函数 `incrementalMergeArchives()` 未接线、无调用方（`:2936-2956`）。
+- 两种写入策略 `merge` / `overwrite` 与 selection 彼此无关（`src/ui/host-bridge.js:2308-2372` 一段内按 `mode` 判定），`incremental` 只是 `mode` 派生（`:2331`）；真正增量合并函数 `incrementalMergeArchives()` 未接线、无调用方（`:3048`）。
 - 恢复机制的完整说明（详解 / 宿主支持矩阵 / 增量兜底原理 / 取证边界）见 `docs/restore.md`。
 
 ### 回传宿主兼容门控
 
 回传（restore）前按「包布局能否直接落到宿主用户目录」做兼容拦截，结构不符必须先转换，不做部分回传。判据只看目录结构族，不判断宿主是否提供整包恢复端点。
 
-- **判据模块**：`src/core/restore-compat.js`。`canRestoreLayout(hostPlatform, layout)`（`:53`）返回 `{ok, reasonKey}`：`ok=true` 时 `reasonKey` 为空串，`ok=false` 时恒为统一 key `NEED_CONVERT_REASON='restore.incompatible.needConvert'`（`:25`）。目录结构族（`:28-43`）：flat = `st` / `l` / `luker`（zip 根摊平），prefixed = `tt` / `pt`（`data/default-user/` 前缀）；同族可回传，跨族、空串与 `unknown` 一律拒绝。`describeLayout()`（`:68`）把 `l` 归一为 `luker`，仅供文案。
+- **判据模块**：`src/core/restore-compat.js`。`canRestoreLayout(hostPlatform, layout)`（`:55`）返回 `{ok, reasonKey}`：`ok=true` 时 `reasonKey` 为空串，`ok=false` 时恒为统一 key `NEED_CONVERT_REASON='restore.incompatible.needConvert'`（`:25`）。目录结构族（`:30-45`）：flat = `st` / `l` / `luker`（zip 根摊平），prefixed = `tt` / `pt`（`data/default-user/` 前缀）；同族可回传，跨族、空串与 `unknown` 一律拒绝。`describeLayout()`（`:70`）把 `l` 归一为 `luker`，仅供文案。
 - **端点门禁与本判据分工**：宿主整包恢复端点由 `hostRestoreCapability()`（`src/ui/host-bridge.js:344-352`）判定——当前仅 `luker` 支持，ST / TT / PT 无端点。结构兼容（`ok=true`）只表示能直接落目录，不代表宿主有恢复端点；两道门禁并存，控制器先过端点门禁再过结构门禁。
 - **控制器层门禁**（`index.js` 的 `restoreSelected()`，`:1211-1259`）：① 能力门禁——`hostRestoreCapability(host.platform)` 不支持即 toast 拒绝（`:1214-1218`）；② 结构门禁——逐包取 `declaredLayout || metadata.layout` 调 `canRestoreLayout()`，任一不兼容即整批 toast 拒绝、不静默跳过单个（`:1222-1232`），空 / `unknown` 布局用 `restore.incompatible.unknownLayout` key；③ 单选门禁——多个分组即 toast 拒绝（`:1252-1253`）。
 - **视图层门禁**（`src/ui/workbench-view.js` 的 `restoreSelection()`，`:6787-6796`）：`doUploadHost()`（`:6797`）改走它。选中一个分卷 part 时自动带上同 `splitId` 的全部分卷，否则只保留一个，从选中侧保证单选语义。
@@ -462,9 +462,9 @@ npm run docs:verify
 
 | 工作流 | 触发（file:line） | 职责 |
 | --- | --- | --- |
-| `release.yml`（`Release`） | push `v*` tag 或手动（`release.yml:10-14`） | 打 tag 时跑 `npm test` 发版门槛（`:39-41`）→ `npm run build:offline`（`:43-44`）→ 校验产物存在且 >1024 字节（`:46-54`）→ 创建 / 覆盖 GitHub Release 并上传 offline HTML asset（`:56-72`，Release 已存在用 `gh release upload --clobber` 保证幂等）。offline HTML **只走 Release asset，不入库**（3.83 MB / 次提交会让 git 历史线性膨胀，`:5-9`） |
+| `release.yml`（`Release`） | push `v*` tag 或手动（`release.yml:10-14`） | **不跑 `npm test`**：全量测试已常驻 `checks.yml` 每次 push / PR，tag 指向的提交必然已经过全量绿灯（`release.yml:39-40` 注释明示），发版只构建 + 发布——`npm run build:offline`（`:42-43`）→ 校验产物存在且 >1024 字节（`:46-53`）→ 创建 / 覆盖 GitHub Release 并上传 offline HTML asset（`:56-71`，Release 已存在用 `gh release upload --clobber` 保证幂等）。offline HTML **只走 Release asset，不入库**（3.83 MB / 次提交会让 git 历史线性膨胀，`:5-9`） |
 | `deploy.yml`（`Deploy to GitHub Pages`） | push `v*` tag 或手动（`deploy.yml:6-10`） | 只管两个云端 Page：插件 Web 根页 `/` 与文档站 `/docs/`（同站共存，`deploy.yml:62-74`），发布前跑 `check:docs-privacy` + `docs:verify`，并清历史 deployment 只留本次两条 active（`:27-39`、`:96-122`） |
-| `checks.yml`（`host-direct checks`） | push / PR（`checks.yml:6-9`） | 拦「只能在打包器里成立」的写法：跑 `check:no-bundler-only`、docs 布局 / 隐私 / 同步 / UI tokens / download HTML 守卫与 sanity build（`checks.yml:29-69`） |
+| `checks.yml`（`host-direct checks`） | push / PR（`checks.yml:6-8`） | **全量测试常驻每次 push / PR**（`npm test`，`checks.yml:31-32`，用户明令）+ 拦「只能在打包器里成立」的写法：跑 `check:no-bundler-only`、docs 布局 / 隐私 / 同步 / UI tokens / download HTML 守卫与 sanity build（`checks.yml:34-76`） |
 
 **发版步骤（真源：上述 workflows + 第四章「两个云端 Page 与部署」）**：
 

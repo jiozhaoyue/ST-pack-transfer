@@ -43,7 +43,9 @@ const CONTENT_RULES = [
   },
   {
     id: 'Trellis / 内部流程',
-    re: /(\.trellis\b|\bTrellis\b|\bHANDOFF-|\bPLAN-|superpowers|\bPRD\b|\.spec\/)/gi,
+    // PLAN- 仅在「PLAN-数字」形态命中（PLAN-2026-… 计划文档引用），
+    // 避免误伤合法模块名 plan-preview（2026-11-22 质量会战实测误报）。
+    re: /(\.trellis\b|\bTrellis\b|\bHANDOFF-|PLAN-(?=[0-9])|superpowers|\bPRD\b|\.spec\/)/gi,
     message: 'Trellis、计划、交接、研究或内部规范引用',
   },
   {
@@ -72,6 +74,13 @@ const CONTENT_RULES = [
     message: '真实凭据形态',
   },
 ];
+
+/**
+ * 白名单文件（HANDOFF 交接文档）只保留永不放行的凭据 / 密钥规则（2026-11-22 红队修复）：
+ * 日期、Trellis 引用、本机路径等是交接文档的正常语义，按文件名放行；
+ * 但真实凭据形态无论藏在哪个文件都不得进入公开检出树，白名单不豁免。
+ */
+const CREDENTIAL_RULE_IDS = new Set(['凭据']);
 
 const hits = [];
 
@@ -135,11 +144,12 @@ function walk(dir, prefix = 'docs') {
   for (const entry of entries) {
     const rel = `${prefix}/${entry.name}`;
     const full = join(dir, entry.name);
-    if (FILE_ALLOWLIST.some((re) => re.test(rel))) {
+    // 白名单文件（HANDOFF）：文件名规则与 gitignore 跳过放行，但内容检查不整体跳过——
+    // 仍扫描凭据 / 密钥规则（2026-11-22 红队修复，见 CREDENTIAL_RULE_IDS）。
+    const allowlistedFile = !entry.isDirectory() && FILE_ALLOWLIST.some((re) => re.test(rel));
+    if (allowlistedFile) {
       allowlisted.push(rel);
-      continue;
-    }
-    if (entry.isDirectory()) {
+    } else if (entry.isDirectory()) {
       if (FORBIDDEN_NAMES.some((re) => re.test(entry.name))) {
         if (isIgnoredDir(rel)) {
           skipped.push(`${rel}/`);
@@ -150,28 +160,33 @@ function walk(dir, prefix = 'docs') {
       }
       walk(full, rel);
       continue;
-    }
-    if (FORBIDDEN_NAMES.some((re) => re.test(entry.name))) {
-      if (IGNORED.has(rel)) {
-        skipped.push(rel);
+    } else {
+      if (FORBIDDEN_NAMES.some((re) => re.test(entry.name))) {
+        if (IGNORED.has(rel)) {
+          skipped.push(rel);
+          continue;
+        }
+        hits.push(`${rel} —— 文件名命中内部资料规则`);
         continue;
       }
-      hits.push(`${rel} —— 文件名命中内部资料规则`);
-      continue;
     }
     if (!TEXT_EXT.has(extname(entry.name).toLowerCase())) continue;
-    if (IGNORED.has(rel)) {
+    if (!allowlistedFile && IGNORED.has(rel)) {
       skipped.push(rel);
       continue;
     }
     const text = readFileSync(full, 'utf8');
     const lines = text.split(/\r?\n/);
+    const rules = allowlistedFile ? CONTENT_RULES.filter((rule) => CREDENTIAL_RULE_IDS.has(rule.id)) : CONTENT_RULES;
     for (let i = 0; i < lines.length; i += 1) {
-      for (const rule of CONTENT_RULES) {
+      for (const rule of rules) {
         rule.re.lastIndex = 0;
-        const match = rule.re.exec(lines[i]);
-        if (!match) continue;
-        hits.push(`${rel}:${i + 1} —— ${rule.message}：${match[0]}`);
+        let match;
+        // while 循环抓同一行的多处违规，不再只报第一处（2026-11-22 红队修复）。
+        while ((match = rule.re.exec(lines[i])) !== null) {
+          hits.push(`${rel}:${i + 1} —— ${rule.message}：${match[0]}`);
+          if (match[0].length === 0) rule.re.lastIndex += 1; // 防零宽匹配死循环
+        }
       }
     }
   }
