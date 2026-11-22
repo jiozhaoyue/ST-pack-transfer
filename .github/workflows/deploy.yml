@@ -27,6 +27,7 @@ jobs:
       - name: Gate on checks workflow (must be green)
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}   # 本步骤在 checkout 之前，gh 必须显式给仓库，否则 not a git repository
           GATE_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
@@ -134,6 +135,7 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}   # deploy job 无 checkout，gh run list 必须显式给仓库
           PAGE_URL: ${{ steps.deployment.outputs.page_url }}
           COMMIT_SHA: ${{ github.sha }}
         run: |
