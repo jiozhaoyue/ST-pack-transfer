@@ -100,12 +100,12 @@ npm run gen-fixtures              # 重新生成测试固件 fixtures/
 
 本项目用 Trellis 管理任务。当前任务 `python ./.trellis/scripts/task.py current`；分层规范 `.trellis/spec/backend/`（core）与 `.trellis/spec/frontend/`（ui）。更全的项目规则与统一开发规则见 [AGENTS.md](./AGENTS.md)。
 
-<!-- TAVERN-RULES:START v3.3.0 -->
+<!-- TAVERN-RULES:START v3.4.0 -->
 <!-- 本块由 tavern-harness/scripts/modules/rules_sync.py 自动生成，请勿手动编辑 -->
-<!-- 真源: tavern-harness · registry/rules.json · 类别 dev · v3.3.0 -->
-<!-- 同步时间: 2026-11-22T06:53:44Z -->
-<!-- 内容哈希: sha256:146b8fa6a6a7bd2089331692d71abd86e95f7a80a328eb4439866a48d0a0d335（仅覆盖规则正文，不含头部与项目覆盖） -->
-# 统一开发规则（v3.3.0 · 酒馆开发）
+<!-- 真源: tavern-harness · registry/rules.json · 类别 dev · v3.4.0 -->
+<!-- 同步时间: 2026-11-22T06:55:00Z -->
+<!-- 内容哈希: sha256:cd90792b808374380f800dd2107def284239ed772c15ac1ea16d841959a745e7（仅覆盖规则正文，不含头部与项目覆盖） -->
+# 统一开发规则（v3.4.0 · 酒馆开发）
 
 > 本块由 tavern-harness 生成，请勿手改正文。
 > 规范全文在 `.trellis/spec/`；项目特例写文末「项目覆盖」。
@@ -171,7 +171,7 @@ npm run gen-fixtures              # 重新生成测试固件 fixtures/
 - **D-14** 同一作者/仓库只允许一个安装 URL；禁本地链接，一律 remote link；私有仓提示需登录。（来源 ST-pack-transfer/iron-rules#32）
 - **D-15** 主人说「基石」= ST-Delegation-of-authority 仓（Authority 后端，D:/Repo/Tavern-repo/Myfork/ST-Delegation-of-authority）；禁止猜成 tavern-harness/Harness-repo；向基石贡献走其上游 issue+PR。（来源 ST-pack-transfer 2026-11-22 主人明令）
 - **D-16** 全宿主恢复事实：ST 无整包恢复端点、纯前端插件无法恢复、原生增量仅 Luker+PT 支持、插件层四宿主全无增量恢复；所有未实现能力必须全盘写入文档，禁止只留在代码里。（来源 ST-pack-transfer 2026-11-22 审计主人明令）
-- **D-17** 发现即修复到底，禁止遗留：审计/挖掘发现的问题必须当场修复闭环，严禁标「遗留/待裁定」结案；测试断言旧行为的对齐、死文件归档、守卫误报、基线刷新一律当场处理；修复引入回归必须修到全量全绿才算完成。（来源 ST-pack-transfer 2026-11-22 质量会战主人明令）
+- **D-17** 发现即修复到底，禁止遗留（行为+输出双层面）：①行为层——发现的问题必须当场修复闭环，任何未完成项、任何停止都不被允许，一律当场完成或当场派发实施工作流闭环；②输出层——汇报/文档/档案/提交信息严禁出现「遗留、待办、未完成、待裁定、TBD、暂停、挂起、后续再」及近似语义字眼，跨阶段工程只能表述为「下一阶段实施（已规划/已派发）」；③修复引入回归必须修到全量全绿才算完成。（来源 ST-pack-transfer 2026-11-22 主人明令，永久遵守）
 - **D-18** CI 部署策略：所有 action 每一次推送都重跑重部署并留下记录（Pages 部署 cancel-in-progress 必须为 false）；只有 release（v* tag）时才打 tag、分发 offline HTML、清理历史并置 active deployment。（来源 ST-pack-transfer 2026-11-22 主人明令）
 
 ## 规范入口
