@@ -114,6 +114,8 @@ export function classifyItemCategory(hubPath, kind, extScope) {
  * @param {boolean} [options.includeBackups]
  * @param {boolean} [options.includeAppPrivate]
  * @param {boolean} [options.keepAll]
+ * @param {string} [options.filename] 源包文件名（可选）。detectFromReader 可据此从文件名判定宿主布局。
+ *   未传时保持原行为（仅靠条目内容检测）——多数调用方只有路径没有单独文件名，故保持可选。
  * @returns {Promise<object>}
  */
 export async function generatePlan(source, target, {
@@ -128,12 +130,13 @@ export async function generatePlan(source, target, {
   gitMode = GIT_MODES.KEEP,
   keepDevFiles = false,
   pruneBuiltinAssets = false,
+  filename = '',
 } = {}) {
   const resolvedGitMode = normalizeGitMode(gitMode);
   const detector = await io.openReader(source);
   let detection;
   try {
-    detection = await detectFromReader(detector);
+    detection = await detectFromReader(detector, { filename });
   } finally {
     await detector.close();
   }

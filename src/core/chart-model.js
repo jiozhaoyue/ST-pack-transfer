@@ -97,7 +97,7 @@ function suggestOf(groupKey, item) {
 
 /** 去掉一级前缀后的展示路径。 */
 function relPathOf(path) {
-  const p = String(path || '');
+  const p = String(path || '').replace(/\\/g, '/');
   const idx = p.indexOf('/');
   return idx >= 0 ? p.slice(idx + 1) : p;
 }

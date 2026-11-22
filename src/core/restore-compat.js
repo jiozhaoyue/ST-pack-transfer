@@ -25,22 +25,24 @@
 export const NEED_CONVERT_REASON = 'restore.incompatible.needConvert';
 
 /** 宿主平台码 → 用户目录结构族。'l' 与 'luker' 等价。 */
-const HOST_DIR_FAMILY = Object.freeze({
+// 用 null 原型字典：普通对象字面量的 'constructor' / 'toString' 等原型链键会被
+// `foo[key]` 命中（返回函数），导致 canRestoreLayout('constructor', 'constructor') 误判 ok:true。
+const HOST_DIR_FAMILY = Object.freeze(Object.assign(Object.create(null), {
   st: 'flat',
   luker: 'flat',
   l: 'flat',
   tt: 'prefixed',
   pt: 'prefixed',
-});
+}));
 
 /** 布局码 → 目录结构族。空串 / unknown 不入表，一律拒绝。'l' 与 'luker' 等价。 */
-const LAYOUT_FAMILY = Object.freeze({
+const LAYOUT_FAMILY = Object.freeze(Object.assign(Object.create(null), {
   st: 'flat',
   l: 'flat',
   luker: 'flat',
   tt: 'prefixed',
   pt: 'prefixed',
-});
+}));
 
 /**
  * 布局能否直接回传到宿主（按目录结构族判定）。
@@ -51,8 +53,8 @@ const LAYOUT_FAMILY = Object.freeze({
  *   ok=false 时 reasonKey 为统一 i18n key
  */
 export function canRestoreLayout(hostPlatform, layout) {
-  const hostFamily = HOST_DIR_FAMILY[String(hostPlatform)];
-  const layoutFamily = LAYOUT_FAMILY[String(layout)];
+  const hostFamily = HOST_DIR_FAMILY[String(hostPlatform).toLowerCase()];
+  const layoutFamily = LAYOUT_FAMILY[String(layout).toLowerCase()];
   const ok = Boolean(hostFamily) && Boolean(layoutFamily) && hostFamily === layoutFamily;
   return ok
     ? { ok: true, reasonKey: '' }
@@ -66,7 +68,7 @@ export function canRestoreLayout(hostPlatform, layout) {
  * @returns {string} 文案用名称
  */
 export function describeLayout(layout) {
-  const LABEL_OVERRIDE = Object.freeze({ l: 'luker' });
+  const LABEL_OVERRIDE = Object.freeze(Object.assign(Object.create(null), { l: 'luker' }));
   const key = String(layout);
   return LABEL_OVERRIDE[key] || key;
 }

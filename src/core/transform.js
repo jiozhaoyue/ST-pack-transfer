@@ -203,7 +203,15 @@ export function isJunkOrDevFile(hubPath, { keepDevFiles = false, keepAll = false
   return false;
 }
 
-const INSTALL_MD = `# 手动导入说明(ST 目标)
+/**
+ * ST 手动导入说明：凭据是否随包分发取决于 selection.secrets。
+ * 用户显式关闭 secrets 时不得再写「secrets.json 已包含在本包内」，否则说明与实际产物不符。
+ */
+function buildInstallMd(includeSecrets) {
+  const secretLine = includeSecrets === false
+    ? '本包不含 secrets.json（凭据已按勾选排除）。如需密钥，请在目标宿主单独配置。'
+    : 'secrets.json 已包含在本包内(会覆盖现有密钥)。';
+  return `# 手动导入说明(ST 目标)
 
 SillyTavern 没有整包导入功能。把本压缩包解压后,将其中所有文件与目录
 (除 _convert/ 外)覆盖到 SillyTavern 的用户数据目录:
@@ -211,8 +219,9 @@ SillyTavern 没有整包导入功能。把本压缩包解压后,将其中所有�
 - 默认单用户安装:  <SillyTavern>/data/default-user/
 - 多用户:           <SillyTavern>/data/<你的用户句柄>/
 
-覆盖前请先备份原目录。secrets.json 已包含在本包内(会覆盖现有密钥)。
+覆盖前请先备份原目录。${secretLine}
 `;
+}
 
 const L_SELECTION = Object.freeze({
   settings: true,
@@ -239,7 +248,7 @@ const L_SELECTION = Object.freeze({
  *      布局变了名字空间就变，半成品的名字会整批成为孤儿；
  *   ② 对应源条目的 `crc32` 与半成品记录的**全等**（源未变）。
  *
- * @returns {Promise<{ok: boolean, reason?: string, mapped?: Map<string, number>}>}
+ * @returns {Promise<{ok: boolean, reason?: string, mapped?: Map<string, number[]>}>}
  */
 async function verifyPartialSameSource({ io, sourcePath, partialEntries, target, layout }) {
   if (!Array.isArray(partialEntries) || partialEntries.length === 0) {
@@ -258,7 +267,13 @@ async function verifyPartialSameSource({ io, sourcePath, partialEntries, target,
       if (entry.isDirectory || entry.crc32 == null) continue;
       const routedForOut = routeSource(entry.fileName, layout);
       const outPath = targetEntryPath(routedForOut.hubPath, target, routedForOut.extScope);
-      if (want.has(outPath)) seen.set(outPath, entry.crc32);
+      if (want.has(outPath)) {
+        // 多个源条目可能路由到同一 outPath（同名去重/平铺）；收集全部 crc，
+        // 不能 set 覆盖成最后一个——否则先写出那个源条目的 crc 会被漏掉。
+        const list = seen.get(outPath) || [];
+        list.push(entry.crc32);
+        seen.set(outPath, list);
+      }
       entry.skip();
     }
     if (seen.size !== want.size) {
@@ -267,8 +282,11 @@ async function verifyPartialSameSource({ io, sourcePath, partialEntries, target,
         reason: `半成品有 ${want.size - seen.size} 条无法对应到当前源条目（源包已更换或目标布局不同）`,
       };
     }
-    for (const [name, crc] of seen) {
-      if (want.get(name) !== crc) {
+    for (const [name, wantCrc] of want) {
+      const crcs = seen.get(name) || [];
+      // 同源要求严格：同一 outPath 对应的**每一个**源条目 crc 都必须与半成品记录一致。
+      // 任一不匹配即拒绝搬运（宁可完整重做，也不冒陈旧条目混进产物的风险）。
+      if (crcs.length === 0 || crcs.some((crc) => crc !== wantCrc)) {
         return { ok: false, reason: `条目 ${name} 的内容与源不一致（源包已变更）` };
       }
     }
@@ -369,6 +387,13 @@ export async function convert(sourcePath, targetPath, {
   const checkAbort = () => {
     if (signal?.aborted) {
       throw new DOMException('转换任务已被中止/暂停', 'AbortError');
+    }
+  };
+  // 每个源条目「处理完」（含跳过/被合成消费/写出）都回调一次，供 TaskManager 更新断点清单。
+  // 集中在此，避免各 continue 分支遗漏；无 crc 的条目不回传（下游无法登记）。
+  const noteEntryDone = (entry) => {
+    if (typeof onEntryDone === 'function' && entry?.crc32 != null) {
+      onEntryDone(entry.fileName, entry.crc32);
     }
   };
 
@@ -540,6 +565,10 @@ export async function convert(sourcePath, targetPath, {
         onProgress(processedEntries, totalEntries, entry.fileName, entry.crc32 ?? null);
       }
       checkAbort();
+      // 统一在此登记「源条目已处理完」：循环体内各 continue（跳过/合成消费/直通）
+      // 都会先走 finally 再进入下一轮，覆盖所有分支，无需逐个补回调。
+      // checkAbort 在 try 之外 ⇒ 中止（AbortError）不会把未写出的条目误记为完成。
+      try {
       if (entry.isDirectory) {
         entry.skip();
         continue;
@@ -621,7 +650,13 @@ export async function convert(sourcePath, targetPath, {
         const cat = (routed.kind === 'extension-pkg' && routed.extScope === 'global')
           ? CATEGORIES.GLOBAL_EXTENSIONS
           : categoryOfHubPath(routed.hubPath);
-        if (cat && (selection[cat] === false || (cat === 'extensions' && selection.extensions === false))) {
+        // 兼容旧版/别名：worlds / avatars 是 lorebooks / assets 的历史别名。
+        // 主循环必须与 emitSynthesized 的 L_SELECTION 合并同样识别，否则用户按别名
+        // 关掉世界书/头像，manifest 里是 false，条目却仍被打进产物（自相矛盾）。
+        const catOff = (key) => selection[key] === false
+          || (key === CATEGORIES.LOREBOOKS && selection.worlds === false)
+          || (key === CATEGORIES.ASSETS && selection.avatars === false);
+        if (cat && (catOff(cat) || (cat === 'extensions' && selection.extensions === false))) {
           entry.skip();
           report.filtered(routed.hubPath, cat);
           continue;
@@ -898,21 +933,25 @@ export async function convert(sourcePath, targetPath, {
 
       const outPath = targetEntryPath(routed.hubPath, target, routed.extScope);
       if (sanitizeShare && routed.hubPath === 'settings.json') {
-        const rawBytes = await entry.read();
-        const rawText = rawBytes ? (typeof rawBytes === 'string' ? rawBytes : new TextDecoder('utf-8').decode(rawBytes)) : '{}';
+        // dryRun 只产出报告、不写产物：无需解压读取数据流（settings.json 可能很大）。
+        // 用空对象占位，字节统计仍是 sanitize 后的确定性结果。
+        let rawText = '{}';
+        if (!dryRun) {
+          const rawBytes = await entry.read();
+          rawText = rawBytes
+            ? (typeof rawBytes === 'string' ? rawBytes : new TextDecoder('utf-8').decode(rawBytes))
+            : '{}';
+        }
         const sanitizedJson = sanitizeSettingsJson(rawText);
         const buf = new TextEncoder().encode(sanitizedJson);
         if (!dryRun) await writer.add(outPath, buf);
         report.copied(routed.hubPath, buf.byteLength);
-        if (typeof onEntryDone === 'function' && entry.crc32 != null) {
-          onEntryDone(entry.fileName, entry.crc32);
-        }
         continue;
       }
       if (!dryRun) writer.addLazy(outPath, lazyOpen(entry), entry.uncompressedSize);
       report.copied(routed.hubPath, entry.uncompressedSize);
-      if (typeof onEntryDone === 'function' && entry.crc32 != null) {
-        onEntryDone(entry.fileName, entry.crc32);
+      } finally {
+        noteEntryDone(entry);
       }
     }
 
@@ -952,7 +991,12 @@ export async function convert(sourcePath, targetPath, {
         logger.warn('[convert] 中止时的半成品收尾失败（续传将重做整包）:', closeErr);
       }
     } else {
-      await writer.abort();
+      // abort() 自身也可能抛（writer 已损坏/已关闭）；不能让它掩盖真正的转换失败。
+      try {
+        await writer.abort();
+      } catch (abortErr) {
+        logger.warn('[convert] writer.abort() 收尾失败（原始失败继续上抛）:', abortErr);
+      }
     }
     throw error;
   } finally {
@@ -1391,7 +1435,7 @@ async function emitSynthesized(writer, report, context, target, selection, {
   }
 
   if (target === TARGETS.ST) {
-    await writer.add('_convert/INSTALL.md', encodeText(INSTALL_MD));
+    await writer.add('_convert/INSTALL.md', encodeText(buildInstallMd(selection?.secrets)));
     report.synthesized('_convert/INSTALL.md');
     await writer.add('_convert/meta.json', encodeJson({
       converter: 'tavern-convert',

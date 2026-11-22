@@ -29,69 +29,74 @@ import { logger } from './logger.js';
  * }>}
  */
 export async function compareArchives(baseArchive, targetArchive) {
-  const baseReader = await zipIo.openReader(baseArchive);
-  const targetReader = await zipIo.openReader(targetArchive);
+  let baseReader = null;
+  let targetReader = null;
+  try {
+    baseReader = await zipIo.openReader(baseArchive);
+    targetReader = await zipIo.openReader(targetArchive);
 
-  const baseMap = new Map();
-  for await (const entry of baseReader.entries()) {
-    baseMap.set(entry.fileName, {
-      fileName: entry.fileName,
-      uncompressedSize: entry.uncompressedSize ?? 0,
-      crc32: entry.crc32,
-    });
-    entry.skip();
-  }
+    const baseMap = new Map();
+    for await (const entry of baseReader.entries()) {
+      baseMap.set(entry.fileName, {
+        fileName: entry.fileName,
+        uncompressedSize: entry.uncompressedSize ?? 0,
+        crc32: entry.crc32,
+      });
+      entry.skip();
+    }
 
-  const added = [];
-  const modified = [];
-  const unchanged = [];
-  const targetMap = new Map();
+    const added = [];
+    const modified = [];
+    const unchanged = [];
+    const targetMap = new Map();
 
-  for await (const entry of targetReader.entries()) {
-    const info = {
-      fileName: entry.fileName,
-      uncompressedSize: entry.uncompressedSize ?? 0,
-      crc32: entry.crc32,
-    };
-    targetMap.set(entry.fileName, info);
+    for await (const entry of targetReader.entries()) {
+      const info = {
+        fileName: entry.fileName,
+        uncompressedSize: entry.uncompressedSize ?? 0,
+        crc32: entry.crc32,
+      };
+      targetMap.set(entry.fileName, info);
 
-    const baseEntry = baseMap.get(entry.fileName);
-    if (!baseEntry) {
-      added.push(info);
-    } else {
-      const isSizeDiff = baseEntry.uncompressedSize !== info.uncompressedSize;
-      const isCrcDiff = (baseEntry.crc32 !== undefined && info.crc32 !== undefined)
-        ? baseEntry.crc32 !== info.crc32
-        : false;
-
-      if (isSizeDiff || isCrcDiff) {
-        modified.push(info);
+      const baseEntry = baseMap.get(entry.fileName);
+      if (!baseEntry) {
+        added.push(info);
       } else {
-        unchanged.push(info);
+        const isSizeDiff = baseEntry.uncompressedSize !== info.uncompressedSize;
+        const isCrcDiff = (baseEntry.crc32 !== undefined && info.crc32 !== undefined)
+          ? baseEntry.crc32 !== info.crc32
+          : false;
+
+        if (isSizeDiff || isCrcDiff) {
+          modified.push(info);
+        } else {
+          unchanged.push(info);
+        }
+      }
+      entry.skip();
+    }
+
+    // 统计在基准包中存在但在当前包中已不存在的条目
+    const deleted = [];
+    for (const baseName of baseMap.keys()) {
+      if (!targetMap.has(baseName)) {
+        deleted.push(baseName);
       }
     }
-    entry.skip();
+
+    return {
+      added,
+      modified,
+      unchanged,
+      deleted,
+      baseMap,
+      targetMap,
+    };
+  } finally {
+    // 异常路径也必须释放 reader；单个 close 失败不掩盖原始错误。
+    if (targetReader) { try { await targetReader.close(); } catch { /* 忽略关闭异常 */ } }
+    if (baseReader) { try { await baseReader.close(); } catch { /* 忽略关闭异常 */ } }
   }
-
-  // 统计在基准包中存在但在当前包中已不存在的条目
-  const deleted = [];
-  for (const baseName of baseMap.keys()) {
-    if (!targetMap.has(baseName)) {
-      deleted.push(baseName);
-    }
-  }
-
-  await baseReader.close();
-  await targetReader.close();
-
-  return {
-    added,
-    modified,
-    unchanged,
-    deleted,
-    baseMap,
-    targetMap,
-  };
 }
 
 /**
@@ -127,65 +132,78 @@ export async function generateDeltaArchive(baseArchive, targetArchive, options =
   logger.info(`比对结果: 新增 ${diff.added.length} 项，修改 ${diff.modified.length} 项，保持不变 ${diff.unchanged.length} 项`);
 
   const writerTarget = new zip.BlobWriter('application/zip');
-  const writer = await zipIo.createWriter(writerTarget, { level });
+  let writer = null;
+  let targetReader = null;
+  let completed = false;
+  try {
+    writer = await zipIo.createWriter(writerTarget, { level });
 
-  // 重新打开 targetReader 读取需要写入的实际文件数据
-  const targetReader = await zipIo.openReader(targetArchive);
-  let processed = 0;
+    // 重新打开 targetReader 读取需要写入的实际文件数据
+    targetReader = await zipIo.openReader(targetArchive);
+    let processed = 0;
 
-  for await (const entry of targetReader.entries()) {
-    if (changeMap.has(entry.fileName)) {
-      const data = await entry.read();
-      await writer.add(entry.fileName, data);
-      processed++;
-      if (onProgress) {
-        onProgress(processed, totalChanges, entry.fileName);
+    for await (const entry of targetReader.entries()) {
+      if (changeMap.has(entry.fileName)) {
+        const data = await entry.read();
+        await writer.add(entry.fileName, data);
+        processed++;
+        if (onProgress) {
+          onProgress(processed, totalChanges, entry.fileName);
+        }
+      } else {
+        entry.skip();
       }
-    } else {
-      entry.skip();
+    }
+
+    await targetReader.close();
+    targetReader = null;
+
+    // 注入轻量增量清单 _delta_manifest.json
+    const manifest = {
+      generator: 'ST-pack-transfer',
+      type: 'delta-patch',
+      version: '1.0.0',
+      createdAt: new Date().toISOString(),
+      baseArchiveName: baseName,
+      stats: {
+        addedCount: diff.added.length,
+        modifiedCount: diff.modified.length,
+        unchangedCount: diff.unchanged.length,
+        deletedCount: diff.deleted.length,
+        totalChanges,
+      },
+      changes: {
+        added: diff.added.map((e) => e.fileName),
+        modified: diff.modified.map((e) => e.fileName),
+        deleted: diff.deleted,
+      },
+    };
+
+    const manifestBytes = new TextEncoder().encode(JSON.stringify(manifest, null, 2));
+    await writer.add('_delta_manifest.json', manifestBytes);
+
+    await writer.close();
+    const deltaBlob = await writerTarget.getData();
+
+    logger.success(`纯增量补丁包生成完成: 包含 ${totalChanges} 项变更，补丁体积: ${(deltaBlob.size / 1024).toFixed(1)} KB`);
+
+    completed = true;
+    return {
+      deltaBlob,
+      stats: {
+        addedCount: diff.added.length,
+        modifiedCount: diff.modified.length,
+        unchangedCount: diff.unchanged.length,
+        deletedCount: diff.deleted.length,
+        totalChanges,
+      },
+      manifest,
+    };
+  } finally {
+    // 仅异常路径兜底释放：正常路径已在 try 内按原周期关闭，避免二次 close 破坏产物。
+    if (!completed) {
+      if (targetReader) { try { await targetReader.close(); } catch { /* 忽略关闭异常 */ } }
+      if (writer) { try { await writer.close(); } catch { /* 忽略关闭异常 */ } }
     }
   }
-
-  await targetReader.close();
-
-  // 注入轻量增量清单 _delta_manifest.json
-  const manifest = {
-    generator: 'ST-pack-transfer',
-    type: 'delta-patch',
-    version: '1.0.0',
-    createdAt: new Date().toISOString(),
-    baseArchiveName: baseName,
-    stats: {
-      addedCount: diff.added.length,
-      modifiedCount: diff.modified.length,
-      unchangedCount: diff.unchanged.length,
-      deletedCount: diff.deleted.length,
-      totalChanges,
-    },
-    changes: {
-      added: diff.added.map((e) => e.fileName),
-      modified: diff.modified.map((e) => e.fileName),
-      deleted: diff.deleted,
-    },
-  };
-
-  const manifestBytes = new TextEncoder().encode(JSON.stringify(manifest, null, 2));
-  await writer.add('_delta_manifest.json', manifestBytes);
-
-  await writer.close();
-  const deltaBlob = await writerTarget.getData();
-
-  logger.success(`纯增量补丁包生成完成: 包含 ${totalChanges} 项变更，补丁体积: ${(deltaBlob.size / 1024).toFixed(1)} KB`);
-
-  return {
-    deltaBlob,
-    stats: {
-      addedCount: diff.added.length,
-      modifiedCount: diff.modified.length,
-      unchangedCount: diff.unchanged.length,
-      deletedCount: diff.deleted.length,
-      totalChanges,
-    },
-    manifest,
-  };
 }

@@ -149,10 +149,12 @@ export async function splitArchiveEntries(entries, {
      封卷后另有**事后守卫**：blob.size 超过阈值且卷内 >1 条目 ⇒ isOversized=true 如实标注。 */
   let judgedBy = 'written-bytes';
   /* 观测窗口内的最大压缩膨胀系数（delta/uncompressed）：0 = 尚无观测；有观测后取
-     「观测最大值」，estRatio 夹取窗口 [0.05, 1.05]（下限防高可压内容低估、上限
+     「观测最大值」，estRatio 夹取窗口 [0.002, 1.05]（下限防高可压内容低估、上限
      容纳不可压数据 deflate 的轻微膨胀）。**不能**用 Math.max(1, x) 起步：那会让
      系数永不下降，高可压内容的贡献估计恒为未压缩体积，预算制形同虚设
-     （2026-11-18 首轮实现实测踩中）。 */
+     （2026-11-18 首轮实现实测踩中）。无观测时 estRatio 取下限 0.002：极小值使
+     首条目的贡献估计近似 0，不至于因「还没观测」就高估而提前封卷——观测到真实
+     系数后立刻被 Math.max 抬升到实测值。 */
   let observedMaxRatio = 0;
   let currentPartEstimatedBytes = 0; // 回退路径（getWritten 不可用）的未压缩累计——旧判定语义
   /* 中央目录预留：**增量维护**（push 条目时累加）——首轮实现是「每条目全量重算
@@ -244,8 +246,10 @@ export async function splitArchiveEntries(entries, {
     /* 回退分支（written<0）当前不可达：splitter 恒自建 BlobWriter（必被包装）；
        保留是为防御 zip-io 形态变化（如未来传入文件路径形态的调用方）——勿删。 */
     if (written < 0 && judgedBy === 'written-bytes') judgedBy = 'uncompressed-estimate';
-    /* 上限 1.05：不可压数据 deflate 有轻微膨胀（实测 ~1.003），夹在 1.0 会低估贡献。 */
-    const estRatio = Math.min(1.05, Math.max(0.05, observedMaxRatio));
+    /* 上限 1.05：不可压数据 deflate 有轻微膨胀（实测 ~1.003），夹在 1.0 会低估贡献。
+       下限 0.002：无观测/极高可压内容时避免用 0 直接把贡献归零，又足够小以不提前封卷；
+       依据是把「完全可压」内容的膨胀系数量级定在千分之几（zip deflate 对长重复串的实测）。 */
+    const estRatio = Math.min(1.05, Math.max(0.002, observedMaxRatio));
     // 下一条目贡献估计：同源 = 未压缩 × 观测膨胀系数 + LFH/extra/数据描述符余量；
     // 回退 = 未压缩原值（旧行为）
     const estContribution = written >= 0 ? preSize * estRatio + 120 : preSize;

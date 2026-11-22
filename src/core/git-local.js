@@ -14,6 +14,8 @@
 const TEXT = new TextDecoder('utf-8', { fatal: false });
 const MAX_PACK_BYTES = 48 * 1024 * 1024;
 const MAX_COMMIT_OBJECTS = 5000;
+/** delta 展开结果的硬上限：防御恶意/损坏 delta 声明超大 resultSize 直接 new Uint8Array 打爆内存。 */
+const MAX_DELTA_RESULT_BYTES = 512 * 1024 * 1024;
 
 function normalizePath(value) {
   return String(value || '').replace(/\\/g, '/');
@@ -175,6 +177,10 @@ function applyDelta(base, delta) {
   const baseSize = readDeltaVarint(delta, state);
   const resultSize = readDeltaVarint(delta, state);
   if (baseSize === null || resultSize === null || baseSize !== base.length) return null;
+  // 结果体积上限：以「硬上限」与「base 的 4 倍」中更小者为准，超限即拒绝，
+  // 不让损坏/恶意 delta 用声明的巨大 resultSize 分配数 GB 数组打爆内存。
+  const cap = Math.min(MAX_DELTA_RESULT_BYTES, Math.max(base.length, 1) * 4);
+  if (!Number.isFinite(resultSize) || resultSize < 0 || resultSize > cap) return null;
   const out = new Uint8Array(resultSize);
   let outPos = 0;
   while (state.pos < delta.length) {
@@ -182,13 +188,37 @@ function applyDelta(base, delta) {
     if (command & 0x80) {
       let offset = 0;
       let size = 0;
-      if (command & 0x01) offset |= delta[state.pos++];
-      if (command & 0x02) offset |= delta[state.pos++] << 8;
-      if (command & 0x04) offset |= delta[state.pos++] << 16;
-      if (command & 0x08) offset |= delta[state.pos++] << 24;
-      if (command & 0x10) size |= delta[state.pos++];
-      if (command & 0x20) size |= delta[state.pos++] << 8;
-      if (command & 0x40) size |= delta[state.pos++] << 16;
+      // ⚠️ `<<24` 在最高位为 1 时会产生负数（如 0xFF<<24 === -16777216），
+      // 导致 >8MB 的 blob 偏移算错。用分段加法（乘 2^n）保持无符号累加，
+      // 并对每字节做越界检查，避免 delta 截断时 state.pos 越界读出 undefined。
+      if (command & 0x01) {
+        if (state.pos >= delta.length) return null;
+        offset += delta[state.pos++];
+      }
+      if (command & 0x02) {
+        if (state.pos >= delta.length) return null;
+        offset += delta[state.pos++] * 0x100;
+      }
+      if (command & 0x04) {
+        if (state.pos >= delta.length) return null;
+        offset += delta[state.pos++] * 0x10000;
+      }
+      if (command & 0x08) {
+        if (state.pos >= delta.length) return null;
+        offset += delta[state.pos++] * 0x1000000;
+      }
+      if (command & 0x10) {
+        if (state.pos >= delta.length) return null;
+        size += delta[state.pos++];
+      }
+      if (command & 0x20) {
+        if (state.pos >= delta.length) return null;
+        size += delta[state.pos++] * 0x100;
+      }
+      if (command & 0x40) {
+        if (state.pos >= delta.length) return null;
+        size += delta[state.pos++] * 0x10000;
+      }
       if (size === 0) size = 0x10000;
       if (offset + size > base.length || outPos + size > out.length) return null;
       out.set(base.subarray(offset, offset + size), outPos);
@@ -369,8 +399,14 @@ export async function readGitHistoryFromEntries(entries, {
     if (!raw) continue;
     const inflated = await inflateZlib(raw);
     const object = parseLooseObject(inflated);
-    if (object?.type === 'commit' && commits.size < MAX_COMMIT_OBJECTS) {
-      commits.set(sha, parseCommit(sha, object.data));
+    if (object?.type === 'commit') {
+      if (commits.size < MAX_COMMIT_OBJECTS) {
+        commits.set(sha, parseCommit(sha, object.data));
+      } else {
+        // 与 pack 循环一致：超出上限的 commit 必须标记 truncated，
+        // 绝不静默跳过让 UI 误以为读到了全部提交（数据正确性优先）。
+        truncated = true;
+      }
     }
     if (!entry.uncompressedSize) continue;
   }

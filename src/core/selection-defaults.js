@@ -85,7 +85,7 @@ export const DEFAULT_SELECTION = Object.freeze({
  */
 export function buildEndpointSelection() {
   return Object.freeze(
-    Object.fromEntries(STANDARD_SELECTION_KEYS.map((key) => [key, true])),
+    Object.fromEntries(STANDARD_SELECTION_KEYS.map((key) => [key, DEFAULT_SELECTION[key] === true])),
   );
 }
 

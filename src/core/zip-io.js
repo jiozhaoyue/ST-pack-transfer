@@ -288,9 +288,11 @@ export const zipIo = {
       return wrapped;
     }
 
-    /** 登记一个**已受理、可能仍在排队**的条目（不占背压窗口，但 `close()` 要等它）。 */
-    function enqueue(promise) {
+    /** 登记一个**已受理、可能仍在排队**的条目（不占背压窗口，但 `close()` 要等它）。
+     *  附带条目名：`close()` 汇总失败时必须能报出**究竟哪个条目写坏了**，绝不吞成假完整包。 */
+    function enqueue(promise, name = '(未命名条目)') {
       const wrapped = promise.finally(() => pending.delete(wrapped));
+      wrapped.__entryName = name;
       pending.add(wrapped);
       return wrapped;
     }
@@ -367,7 +369,7 @@ export const zipIo = {
           } finally {
             releaseGate(isFirst);
           }
-        })());
+        })(), name);
       },
 
       /**
@@ -383,22 +385,50 @@ export const zipIo = {
         noteStore(name, byteSize);
         const isFirst = claimFirst();
         return enqueue((async () => {
+          let writable = null;
+          let addPromise = null;
           try {
             await acquireWriteTurn(isFirst);
-            const { readable, writable } = new TransformStream({}, { highWaterMark: 16 });
-            const addPromise = writer.add(name, readable, { level: entryLevel });
-            openFn((err, source) => {
-              if (err) {
-                writable.abort(err);
-                return;
-              }
-              source.pipeTo(writable).catch((err) => writable.abort(err));
-            });
+            const stream = new TransformStream({}, { highWaterMark: 16 });
+            writable = stream.writable;
+            addPromise = writer.add(name, stream.readable, { level: entryLevel });
+            /**
+             * openFn 的三条失败路径都必须落到同一个收口：abort writable ⇒
+             * readable 以错误结束 ⇒ `writer.add` 的 addPromise 拒绝。
+             * 绝不让它悬挂成「条目永远写不完」的假完整包（实测 addPromise 永不 settle）。
+             */
+            const fail = (err) => {
+              try { writable.abort(err); } catch { /* 已关闭则忽略 */ }
+            };
+            try {
+              openFn((err, source) => {
+                if (err) { fail(err); return; }
+                if (!source) {
+                  fail(new Error(`addLazy(${name}): openFn 未提供数据源`));
+                  return;
+                }
+                try {
+                  source.pipeTo(writable).catch(fail);
+                } catch (pipeErr) {
+                  fail(pipeErr);
+                }
+              });
+            } catch (openErr) {
+              fail(openErr);
+            }
             await track(addPromise);
+          } catch (err) {
+            // openFn 同步抛错时 addPromise 可能尚未被 await：主动 abort 防悬挂，
+            // 并显式接住其拒绝，避免未处理拒绝杀死进程；错误仍向外抛由 close() 汇总。
+            if (writable) {
+              try { writable.abort(err); } catch { /* 忽略 */ }
+            }
+            if (addPromise) await addPromise.catch(() => {});
+            throw err;
           } finally {
             releaseGate(isFirst);
           }
-        })());
+        })(), name);
       },
 
       /**
@@ -475,7 +505,21 @@ export const zipIo = {
       async close() {
         // 收齐**全部**未完成条目（含仍在排队的）再关闭 —— 只等 `inflight` 会漏掉排队者，
         // 产出「少了条目却看着完整」的包。收齐后中央目录才完整。
-        await Promise.allSettled([...pending]);
+        // ⚠️ 绝不吞 rejected：任何条目写坏都必须**聚合失败条目名后抛错**，
+        // 否则 writer.close() 会产出一个「看着完整、实则缺条目」的假完整包。
+        const tasks = [...pending];
+        const settled = await Promise.allSettled(tasks);
+        const failed = [];
+        settled.forEach((item, index) => {
+          if (item.status === 'rejected') {
+            const name = tasks[index].__entryName || '(未命名条目)';
+            const reason = item.reason?.message || item.reason;
+            failed.push(`${name}: ${reason}`);
+          }
+        });
+        if (failed.length) {
+          throw new Error(`zip 写入失败（${failed.length} 个条目）：\n${failed.join('\n')}`);
+        }
         const result = await writer.close();
         if (isFilePath) {
           const fs = await import('node:fs/promises');

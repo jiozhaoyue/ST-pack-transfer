@@ -37,7 +37,7 @@ export const SETTINGS_SAFE_WHITE_LIST = Object.freeze(new Set([
 ]));
 
 /** 敏感键名正则：命中一律置空或删除（添加词边界防止误伤 author 等正常字段） */
-const SENSITIVE_KEY_REGEX = /(api[_-]?key|secret|token|password|passwd|\bauth\b|credential|endpoint|reverse_proxy|custom_url|webhook|user_name|your_name)/i;
+const SENSITIVE_KEY_REGEX = /(api[_-]?key|secret|token|password|passwd|\bauth\b|authorization|credential|cookie|session|private[_-]?key|endpoint|reverse_proxy|custom_url|webhook|user_name|your_name)/i;
 
 /**
  * 递归清洗 JSON 对象中的敏感信息
@@ -121,16 +121,25 @@ const CREDENTIAL_DIR_SEGMENTS = Object.freeze(new Set(['secrets', '.secrets']));
  * 与 logger.redact 的 PEM 正则严格同源（消除历史上两处正则不一致的漂移）。
  */
 function containsCredential(content) {
-  if (typeof content !== 'string' || !content) return false;
-  return redact(content) !== content || containsPemPrivateKey(content);
+  if (content === null || content === undefined) return false;
+  let text = content;
+  if (typeof content !== 'string') {
+    // 对象/数组等结构化内容先序列化再扫描，避免凭据藏在对象里被直接放行
+    // 无法序列化（如循环引用）时抛错由门禁冒泡为硬阻断，保持 fail-closed
+    text = JSON.stringify(content);
+    if (typeof text !== 'string') return false;
+  }
+  if (!text) return false;
+  return redact(text) !== text || containsPemPrivateKey(text);
 }
 
 /**
  * .env 族文件名判据：`.env` 后要么结束、要么接 `.` + 任意后缀。
  * 覆盖 .env / .env.local / x.env.local / app.env.production（构建工具真实会加载的形态），
  * 同时不命中 .environment.md / .env-example 这类仅前缀相似的普通文档/模板。
+ * 负向前瞻排除 .env.example / .env.example.local 这类公开样例（不含真实密钥，误杀会阻断正常分发）。
  */
-const ENV_FAMILY_BASENAME_REGEX = /^.*\.env(\..+)?$|^.*\.envrc$/;
+const ENV_FAMILY_BASENAME_REGEX = /^.*\.env(?!\.example(?:$|\.))(\..+)?$|^.*\.envrc$/;
 
 /**
  * 归一化包内路径：反斜杠转 POSIX、小写、去除首尾斜杠与冗余 `./` / 重复斜杠。
@@ -140,7 +149,15 @@ const ENV_FAMILY_BASENAME_REGEX = /^.*\.env(\..+)?$|^.*\.envrc$/;
  */
 export function normalizeSharePath(hubPath) {
   if (typeof hubPath !== 'string') return '';
-  let p = hubPath.replace(/\\/g, '/').trim().toLowerCase();
+  let source = hubPath;
+  try {
+    // 先解码百分号编码路径（如 %63haracters/alice.png），防止编码绕过目录判据
+    // 解码失败（非法转义）时保留原值继续判据，避免因异常而 fail-open 放行
+    source = decodeURIComponent(source);
+  } catch {
+    source = hubPath;
+  }
+  let p = source.replace(/\\/g, '/').trim().toLowerCase();
   while (p.startsWith('./')) p = p.slice(2);
   p = p.replace(/^\/+/, '').replace(/\/+$/, '');
   return p.replace(/\/{2,}/g, '/');
@@ -162,6 +179,12 @@ export function classifySanitizedSharePath(hubPath) {
 
   // 1. 绝对剔除角色卡（PNG tEXt/JSON 均不放行，防侵权二传）：任意层级的 characters 整段
   if (segments.includes('characters')) {
+    return { drop: true, reason: SHARE_DROP_REASON.CHARACTER };
+  }
+
+  // 1b. 根目录散落的角色卡 PNG：无目录层级且文件名含 char/card 关键词时保守判定。
+  //     仅限根目录（segments.length === 1），避免误杀 chats/preset 等目录下的普通配图。
+  if (segments.length === 1 && base.endsWith('.png') && /(char|card)/i.test(base)) {
     return { drop: true, reason: SHARE_DROP_REASON.CHARACTER };
   }
 

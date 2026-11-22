@@ -121,7 +121,10 @@ export function isFsEnginePath(relPath, { presetFolders = Object.values(PRESET_D
 
 function chatFileOf(row) {
   if (row.is_group) return `group chats/${row.group_id || row.name}.jsonl`;
-  return `chats/${row.char_dir || ''}/${row.name}.jsonl`;
+  // char_dir 为空（如群聊成员记录）时写 `chats/name.jsonl`，不留空的中段目录——
+  // 否则 `chats//name.jsonl` 经 zip 归一化读回成 `chats/name.jsonl`，路径不闭合。
+  if (!row.char_dir) return `chats/${row.name}.jsonl`;
+  return `chats/${row.char_dir}/${row.name}.jsonl`;
 }
 
 function chatFileContent(doc) {
@@ -132,16 +135,21 @@ function chatFileContent(doc) {
   return `${lines.join('\n')}\n`;
 }
 
-function splitChatFile(text) {
-  const lines = String(text).split('\n').filter((line) => line.length > 0);
-  if (!lines.length) return null;
-  try {
-    const header = JSON.parse(lines[0]);
-    const body = lines.slice(1).map((line) => JSON.parse(line));
-    return { header, body };
-  } catch {
-    return null;
+function splitChatFile(text, onWarn) {
+  const parsed = [];
+  for (const raw of String(text).split('\n')) {
+    // 兼容 CRLF：逐行 trim 删掉行尾 \r 与空白，空行跳过。
+    const line = raw.trim();
+    if (!line) continue;
+    try {
+      parsed.push(JSON.parse(line));
+    } catch {
+      onWarn?.(`聊天文件存在坏行，已跳过：${line.slice(0, 80)}`);
+    }
   }
+  if (!parsed.length) return null;
+  // 第一条有效行是 header，其余为消息体；坏行已逐条告警跳过，不再整条丢弃。
+  return { header: parsed[0], body: parsed.slice(1) };
 }
 
 function numOr(value, fallback) {
@@ -196,9 +204,9 @@ export function rowToFsEntry(table, row) {
  *
  * @param {string} name 相对用户根的路径
  * @param {string} text 文本内容（二进制条目不喂进来）
- * @param {{ handle: string, updatedAt?: number }} ctx
+ * @param {{ handle: string, updatedAt?: number, onWarn?: (msg:string)=>void }} ctx
  */
-export function fsEntryToRow(name, text, { handle, updatedAt = 0 } = {}) {
+export function fsEntryToRow(name, text, { handle, updatedAt = 0, onWarn } = {}) {
   const p = String(name || '');
   const stamp = numOr(updatedAt, 0);
 
@@ -269,7 +277,7 @@ export function fsEntryToRow(name, text, { handle, updatedAt = 0 } = {}) {
     if (p.endsWith('.jsonl')) {
       const identity = chatIdentityOf(p);
       if (!identity) return null;
-      const doc = splitChatFile(text);
+      const doc = splitChatFile(text, onWarn);
       if (!doc) return null;
       const createdAt = numOr(doc.header?.create_date, stamp);
       return {
@@ -300,6 +308,12 @@ function chatIdentityOf(relPath) {
   if (relPath.startsWith('chats/')) {
     const rest = relPath.slice('chats/'.length);
     const segments = rest.split('/');
+    // 空 char_dir 写成 `chats/name.jsonl`（1 段）；非空为 `chats/<dir>/<name>.jsonl`（2 段）。
+    if (segments.length === 1) {
+      if (!segments[0].endsWith('.jsonl')) return null;
+      const name = segments[0].slice(0, -'.jsonl'.length);
+      return name ? { charDir: '', name, isGroup: false, groupId: '' } : null;
+    }
     if (segments.length !== 2 || !segments[1].endsWith('.jsonl')) return null;
     const name = segments[1].slice(0, -'.jsonl'.length);
     if (!segments[0] || !name) return null;

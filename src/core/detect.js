@@ -40,7 +40,9 @@ export async function detectFromReader(reader, { filename = '' } = {}) {
       if (!detectedHandle) detectedHandle = 'default-user';
     } else if (name.startsWith('data/')) {
       const match = name.match(/^data\/([^/]+)\//);
-      if (match && match[1] && match[1] !== '_tauritavern' && match[1] !== 'extensions') {
+      // logs/cache 是宿主系统目录，不是用户数据根；误判成 handle 会让 TT 布局判定失真。
+      const NON_USER_DATA_DIRS = ['_tauritavern', 'extensions', 'logs', 'cache'];
+      if (match && match[1] && !NON_USER_DATA_DIRS.includes(match[1])) {
         hasDataRoot = true;
         if (!detectedHandle) detectedHandle = match[1];
       }
@@ -138,7 +140,9 @@ const JSON_DECODER = new TextDecoder();
 
 function parseJson(data) {
   try {
-    return JSON.parse(JSON_DECODER.decode(data));
+    // 去掉可能存在的 UTF-8 BOM（U+FEFF），否则 JSON.parse 会报首字符非法。
+    const text = JSON_DECODER.decode(data).replace(/^\uFEFF/, '');
+    return JSON.parse(text);
   } catch {
     return null;
   }

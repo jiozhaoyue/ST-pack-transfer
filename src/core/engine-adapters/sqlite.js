@@ -118,10 +118,13 @@ function normalizeCell(col, value) {
  * @returns {{ counts: Record<string,number>, handle: string }}
  */
 export function readSqlite({ SQL, bytes, onRow, onWarn, handle = '' } = {}) {
-  const db = new SQL.Database(bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes));
   const counts = Object.fromEntries(DUMP_TABLES.map((t) => [t.name, 0]));
   let dbHandle = handle;
+  const failedTables = [];
+  let db;
+  // 构造 SQL.Database 也可能抛错（字节非法 / wasm 未就绪），纳入 try 由 finally 统一收口。
   try {
+    db = new SQL.Database(bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes));
     const version = Number(db.exec('PRAGMA user_version')[0]?.values?.[0]?.[0] ?? 0);
     if (version !== SCHEMA_VERSION) {
       onWarn?.(`SQLite user_version=${version}，上游当前 schemaVersion=${SCHEMA_VERSION}`);
@@ -131,6 +134,8 @@ export function readSqlite({ SQL, bytes, onRow, onWarn, handle = '' } = {}) {
       try {
         result = db.exec(`SELECT ${table.cols.join(', ')} FROM ${table.name}`);
       } catch (error) {
+        // 表缺失/列不匹配：计 0 并告警，收集失败表后统一汇总，不中断其余表读取。
+        failedTables.push(table.name);
         onWarn?.(`SQLite 表 ${table.name} 读取失败：${error.message}`);
         continue;
       }
@@ -140,13 +145,20 @@ export function readSqlite({ SQL, bytes, onRow, onWarn, handle = '' } = {}) {
         const row = {};
         columns.forEach((col, i) => { row[col] = normalizeCell(col, cells[i]); });
         if (!dbHandle && row.handle) dbHandle = String(row.handle);
-        if (dbHandle && row.handle && String(row.handle) !== dbHandle) continue;
+        if (dbHandle && row.handle && String(row.handle) !== dbHandle) {
+          onWarn?.(`SQLite 表 ${table.name} 存在不匹配 handle 的行（${row.handle}），已跳过`);
+          continue;
+        }
         onRow?.(table.name, row);
         counts[table.name] += 1;
       }
     }
+    if (failedTables.length) {
+      onWarn?.(`SQLite 共有 ${failedTables.length} 张表读取失败，已跳过：${failedTables.join('、')}`);
+    }
   } finally {
-    db.close();
+    // 构造失败时 db 未赋值，判空后再 close，避免二次异常掩盖原始错误。
+    if (db) db.close();
   }
   return { counts, handle: dbHandle };
 }

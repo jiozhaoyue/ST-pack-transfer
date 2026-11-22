@@ -19,7 +19,13 @@ describe('git-policy · 与体积预测共用', () => {
       expect(isGitMinimalKept(p)).toBe(true);
       expect(isGitEntryDropped(p, GIT_MODES.MINIMAL)).toBe(false);
     }
-    for (const p of ['.git/objects/pack/a.pack', '.git/logs/HEAD', '.git/packed-refs']) {
+    // packed-refs 属分支指针载体（git gc 后 refs/heads 可被打包进 packed-refs），
+    // 丢失会让接收方失去在线更新能力，必须随 minimal 保留（2026-11-22 修复裁定）。
+    for (const p of ['.git/packed-refs']) {
+      expect(isGitMinimalKept(p)).toBe(true);
+      expect(isGitEntryDropped(p, GIT_MODES.MINIMAL)).toBe(false);
+    }
+    for (const p of ['.git/objects/pack/a.pack', '.git/logs/HEAD']) {
       expect(isGitEntryDropped(p, GIT_MODES.MINIMAL)).toBe(true);
     }
   });

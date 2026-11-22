@@ -14,7 +14,8 @@ export function normalizeGitMode(value) {
 
 /** `relPath`（相对扩展根）是否属于 `.git` 目录。注意 `.gitkeep` 不算。 */
 export function isGitEntry(relPath) {
-  return relPath === '.git' || relPath.startsWith('.git/');
+  const p = String(relPath || '').toLowerCase();
+  return p === '.git' || p.startsWith('.git/');
 }
 
 /**
@@ -23,10 +24,12 @@ export function isGitEntry(relPath) {
  * 其余（含 `objects/pack/*.pack` 全部对象存储）一律剔除。
  */
 export function isGitMinimalKept(relPath) {
-  return relPath === '.git/config'
-    || relPath === '.git/HEAD'
-    || relPath === '.git/index'
-    || relPath.startsWith('.git/refs/heads/');
+  const p = String(relPath || '').toLowerCase();
+  return p === '.git/config'
+    || p === '.git/head'
+    || p === '.git/index'
+    || p === '.git/packed-refs'
+    || p.startsWith('.git/refs/heads/');
 }
 
 /** 该 `.git` 条目在给定 gitMode 下是否会被剔除（keep 恒 false）。 */
@@ -39,7 +42,9 @@ export function isGitEntryDropped(relPath, gitMode) {
 
 /** 因 gitMode 剔除条目时的上报文案（两档各自写明代价）。 */
 export function gitDropReason(gitMode) {
-  return gitMode === GIT_MODES.STRIP
+  const mode = normalizeGitMode(gitMode);
+  if (mode === GIT_MODES.KEEP) return 'gitMode=keep：原样保留全部 .git 条目，不剔除任何内容';
+  return mode === GIT_MODES.STRIP
     ? 'gitMode=strip：剔除扩展 Git 历史（接收方需重新 git clone 才能在线更新）'
     : 'gitMode=minimal：仅保留 Git 识别与更新所需最小集，剔除对象存储';
 }
