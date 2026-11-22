@@ -22,7 +22,6 @@ export const SCAN_FILES = Object.freeze([
   'src/ui/git-icons.js',
   'src/ui/git-remote.js',
   'src/ui/host-bridge.js',
-  'src/ui/host-icons.js',
   'src/ui/inspect-view.js',
   'src/ui/issue-report.js',
   'src/ui/lan-transfer-panel.js',

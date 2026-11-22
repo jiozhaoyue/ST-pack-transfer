@@ -64,7 +64,7 @@ import { gitSiteIcon } from './git-icons.js';
 import { hasKey, t } from '../i18n/index.js';
 import { mountInspectPanel, renderInspectReport } from './inspect-view.js';
 import { logger } from '../core/logger.js';
-import { userFilesSupported, hostHasStorageEngines, hostRestoreCapability, getRestoreUnsupportedReason } from './host-bridge.js';
+import { userFilesSupported, hostHasStorageEngines, hostRestoreCapability, getRestoreUnsupportedReason, FULL_SELECTION } from './host-bridge.js';
 import { loadSettings, saveSettings } from './settings-store.js';
 import { normalizeUpdateInterval, updatePolicyOf, updateBackoffDelay, applyWebTheme } from './settings-panel.js';
 import { loadChartPrefs, saveChartPrefs, normalizeChartPrefs } from './chart-prefs.js';
@@ -6901,18 +6901,63 @@ function doGenerate(){
   const pkgs=[...state.selectedPkgs].map(id=>state.packages.find(p=>p.id===id)).filter(Boolean);
   actions.generate?.({ packages: pkgs, merge: mergeActive(pkgs), target: state.target, delta: state.delta, splitMb: state.splitMb, filenameTemplate: state.filenameTemplate });
 }
+/** Luker 恢复请求可带的标准类目十键（host-bridge FULL_SELECTION 的键）。 */
+const RESTORE_SELECTION_KEYS = Object.freeze([
+  'settings', 'characters', 'chats', 'lorebooks', 'presets',
+  'secrets', 'assets', 'extensions', 'globalExtensions', 'vectors',
+]);
+/** 包 nodes 类目 → Luker selection 键（私有配置等无对应端点键的类目不映射）。 */
+const NODE_CATEGORY_TO_SELECTION = Object.freeze({
+  settings: 'settings', characters: 'characters', chats: 'chats',
+  lorebooks: 'lorebooks', presets: 'presets', secrets: 'secrets',
+  assets: 'assets', extensions: 'extensions', globalExtensions: 'globalExtensions',
+  vectors: 'vectors',
+});
+/** 从包记录 manifest.selection 读取类目；返回 null 表示该包无可用 manifest 信息。 */
+function selectionFromManifest(pkg){
+  const raw = pkg?.manifest?.selection ?? pkg?.metadata?.manifest?.selection ?? pkg?.metadata?.selection;
+  if(!raw || typeof raw!=='object') return null;
+  const picked = RESTORE_SELECTION_KEYS.filter((key)=>raw[key]===true);
+  return picked.length ? Object.fromEntries(picked.map((key)=>[key,true])) : null;
+}
+/** 从包 nodes 的实际类目派生 selection（「按包内容」语义）。 */
+function selectionFromNodes(pkg){
+  const found = new Set();
+  const visit=(list)=>{
+    for(const node of list||[]){
+      const key = NODE_CATEGORY_TO_SELECTION[node?.category];
+      if(key) found.add(key);
+      if(node?.children?.length) visit(node.children);
+    }
+  };
+  visit(pkg?.nodes);
+  return found.size ? Object.fromEntries([...found].map((key)=>[key,true])) : null;
+}
+/** 单个包的恢复类目：manifest 优先，nodes 兜底，均无则回退全量。 */
+function selectionOfPackage(pkg){
+  return selectionFromManifest(pkg) || selectionFromNodes(pkg) || { ...FULL_SELECTION };
+}
 /** 回传单选：分卷组整组算一个（同 splitId 的 part 全带上），其余只保留一个。 */
 function restoreSelection(pkgs){
   const byId=new Map((pkgs||[]).map(p=>[p.id,p]));
   const first=byId.get([...state.selectedPkgs][0]) || null;
-  if(!first) return [];
+  if(!first) return { ids: [], selection: null };
+  let ids;
   const meta=first.metadata||{};
   if(meta.isSplitPart && meta.splitId){
-    return (pkgs||[]).filter(p=>p?.metadata?.isSplitPart && p.metadata.splitId===meta.splitId).map(p=>p.id);
-  }
-  return [first.id];
+    ids=(pkgs||[]).filter(p=>p?.metadata?.isSplitPart && p.metadata.splitId===meta.splitId).map(p=>p.id);
+  } else ids=[first.id];
+  const chosen=ids.map((id)=>byId.get(id)).filter(Boolean);
+  const perPackage=chosen.map(selectionOfPackage);
+  const merged={};
+  for(const sel of perPackage) for(const key of RESTORE_SELECTION_KEYS) if(sel[key]) merged[key]=true;
+  const selection=Object.keys(merged).length ? merged : null;
+  /* 根控制器经 pkgById 拿到的是这些包对象的同一引用：把 selection 挂上去，
+     使恢复链路即便只接 ids 也能取到「按包内容」的类目，不靠全局状态。 */
+  for(const pkg of chosen) if(pkg) pkg.restoreSelection=selection;
+  return { ids, selection };
 }
-function doUploadHost(){ actions.restore?.(restoreSelection(state.packages)); }
+function doUploadHost(){ const { ids, selection } = restoreSelection(state.packages); actions.restore?.(ids, selection); }
 function doCopyBack(){ actions.copyBack?.([...state.selectedPkgs]); }
 function doDeleteSelected(){ actions.deleteSelected?.([...state.selectedPkgs]); }
 

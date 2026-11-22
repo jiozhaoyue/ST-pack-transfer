@@ -43,12 +43,13 @@ alt_lang: en
 
 ## 合并与更新（差量模式）
 
-> 如实说明当前进度：差量能力目前只到核心层结构，**尚未接入转换主链路与界面**。
+在「数据包」页签右侧的「恢复模式」中选择**增量**，再点击「生成导出包」，即可生成 `.delta.zip` **增量补丁包**，而不是完整数据包。该能力已接入转换主链路，单包生成与多包合并两条路径都支持（增量不与分卷叠加）。
 
-- 核心层已有 `compareArchives` / `generateDeltaArchive`（`src/core/delta.js`），可产出增量补丁包结构：包内 `_delta_manifest.json` 记录 `generator` / `type`（delta-patch）/ `baseArchiveName` / `stats` / `changes` 字段；
-- 该生成函数当前**仅有测试引用**（`test/delta.test.js`），转换主链路（`index.js` 的 `generate` / `generateMerged`）未接入差量分支，界面的差量切换不会产生差量包；
-- 补丁包的合并 / 应用函数未接线（`src/ui/host-bridge.js` 的 `incrementalMergeArchives()` 标注「未接线：当前无任何调用方」），「冲突自动处理并记录报告」**不存在**；
-- 待增量恢复功能落地后，本节会更新为可用的操作说明。
+- **补丁内容**：包内 `_delta_manifest.json` 记录 `generator`（`ST-pack-transfer`）、`type`（`delta-patch`）、`baseArchiveName`（基准包名），以及 `stats`（`addedCount` / `modifiedCount` / `deletedCount` 等统计）与 `changes`（按 `added` / `modified` / `deleted` 三类列出的变更条目）。
+- **基准包**：取同一目标布局下最近一次生成并入库的**完整**转换产物作基准（排除补丁包自身）。核心层 `compareArchives` / `generateDeltaArchive`（`src/core/delta.js`）逐条比对，只把新增与修改的条目写进补丁，并记录删除项。
+- **无基准降级**：若同目标下找不到任何完整产物，增量导出会**自动降级为完整包**并提示「未找到同目标基准包，增量导出已降级为完整包」，绝不静默产出空补丁。
+- **入库标记**：补丁产物入库时自动归为「增量补丁」来源（`ORIGINS.DELTA`），在导出区以「增量补丁」标识显示，便于与普通完整包区分；转换报告同时并入新增 / 修改 / 删除计数与补丁体积。
+- **恢复配合**：增量补丁包需在恢复侧与基准包合并后写入，详见 [恢复写回酒馆](restore.md) 的「增量补丁包的恢复（Luker 自动合并）」。
 
 ## 智能分卷包
 

@@ -26,6 +26,7 @@ import { createWorkbenchView, destroyViewObservers } from './src/ui/workbench-vi
 import {
   detectHost, hostLayoutCode, fetchHostBackup, FULL_SELECTION,
   restoreToHost, restoreToLuker, hostRestoreCapability,
+  detectDeltaArchive, incrementalMergeArchives,
   confirmDialog, alertDialog, mountExtensionRowButton, closeHostExtensionSurface,
   mountNativeBackupButton, mountLukerBackupManagerButton, mountPtDataManagementButton,
   mountTtDataMigrationButton,
@@ -67,6 +68,7 @@ import { getLocale, onLocaleChange, setLocale, t } from './src/i18n/index.js';
 import { probeChatStore } from './src/ui/chat-store-bridge.js';
 import { mountDebugProbe } from './src/app/task-runtime.js';
 import { createConversionRunner, readPausedMarker, clearPausedMarker } from './src/app/conversion-runner.js';
+import { generateDeltaArchive } from './src/core/delta.js';
 import { beginHostPull, beginNativePull } from './src/app/pull-entry.js';
 import { buildAssetList, summarizeExtensions } from './src/core/asset-list.js';
 import { deriveExtensionEntry, normalizeManifestEntries } from './src/core/extension-manifest.js';
@@ -1336,17 +1338,66 @@ async function main(root) {
             row.note = t('restore.engineStripped', { files: sane.stripped.join(', ') });
             logger.warn(row.note);
           }
+          // 增量补丁包探测：Luker 宿主走「基准包 + 补丁合并」，其余宿主跳过并提示。
+          const DELTA_HOST_UNSUPPORTED = t('restore.deltaNeedLuker');
+          const DELTA_NO_BASE = t('restore.deltaNoBase');
+          const DELTA_MERGE_FAILED = t('restore.deltaMergeFailed');
+          const deltaManifest = await detectDeltaArchive(sane.blob);
+          let uploadBlob = sane.blob;
+          if (deltaManifest) {
+            if (host.platform !== 'luker') {
+              row.status = 'skipped';
+              row.message = DELTA_HOST_UNSUPPORTED;
+              view.toast(DELTA_HOST_UNSUPPORTED);
+              logger.warn(row.message);
+              results.push(row);
+              record.done = i + 1;
+              persistRestoreProgress(record);
+              continue;
+            }
+            // 基准包 = 同 target 最新入库的完整包：排除 delta 来源与当前包自身。
+            const targetLayout = String(pkg.declaredLayout || '');
+            const candidates = (await listStoredFiles())
+              .filter((r) => r.id !== pkg.id && r.origin !== ORIGINS.DELTA
+                && (!targetLayout || r.layout === targetLayout))
+              .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+            let baseBlob = null;
+            for (const candidate of candidates) {
+              const rec = await getFile(candidate.id);
+              if (rec?.blob) { baseBlob = rec.blob; break; }
+            }
+            if (baseBlob) {
+              try {
+                const merged = await incrementalMergeArchives(baseBlob, sane.blob, {
+                  onProgress: (done, total) => {
+                    if (total > 0) view.setProgress(Math.round((i / targets.length) * 90) + 5 + Math.round((done / total) * 3), t('progress.restoring'));
+                  },
+                });
+                uploadBlob = merged.resultBlob;
+                row.note = t('restore.deltaApplied', { n: merged.updatedCount });
+                logger.info(row.note);
+              } catch (mergeErr) {
+                const msg = `${DELTA_MERGE_FAILED}：${mergeErr?.message || String(mergeErr)}`;
+                view.toast(msg);
+                logger.warn(msg);
+              }
+            } else {
+              view.toast(DELTA_NO_BASE);
+              row.note = DELTA_NO_BASE;
+              logger.warn(DELTA_NO_BASE);
+            }
+          }
           const result = host.platform === 'luker'
-            ? await restoreToLuker(sane.blob, {})
-            : await restoreToHost(sane.blob, { mode: 'merge', platform: host.platform });
+            ? await restoreToLuker(uploadBlob, {})
+            : await restoreToHost(uploadBlob, { mode: 'merge', platform: host.platform });
           if (result && result.nothingRestored) throw new Error(t('error.nothingRestored'));
-          try { await importRestoredChatsIntoLibrary(sane.blob); } catch { /* 纯库模式可选 */ }
+          try { await importRestoredChatsIntoLibrary(uploadBlob); } catch { /* 纯库模式可选 */ }
           row.status = 'ok';
           logger.info(t('log.restored', { name: pkg.name }));
           try {
             const m = (pkg.extManifest && pkg.extManifest.length)
               ? pkg.extManifest
-              : await readPackageExtensionManifest(sane.blob).catch(() => []);
+              : await readPackageExtensionManifest(uploadBlob).catch(() => []);
             if (Array.isArray(m) && m.length) restoredManifests.push(...m);
           } catch { /* 清单读取容错 */ }
         } catch (err) {
@@ -1806,17 +1857,69 @@ async function main(root) {
     return 'done';
   }
 
+  /**
+   * 增量导出：取同目标布局上一份已入库的完整转换产物作基准，生成条目级差量补丁。
+   * 无基准返回 null，由调用方降级为完整包并提示。
+   * @returns {Promise<{deltaBlob:Blob, baseName:string, stats:object, name:string}|null>}
+   */
+  async function buildDeltaFor(targetBlob, name, code) {
+    const candidates = state.packages
+      .filter((pkg) => pkg.originCode === ORIGINS.CONVERTED
+        && !pkg.metadata?.isDelta && !pkg.metadata?.deltaBase
+        && (pkg.declaredLayout || pkg.layout) === code)
+      .sort((a, b) => (Number(b.ts) || 0) - (Number(a.ts) || 0));
+    for (const base of candidates) {
+      const baseBlob = await blobOf(base);
+      if (!baseBlob) continue;
+      const baseName = base.name || 'base.zip';
+      try {
+        view.setProgress(93, t('generate.deltaBuilding'));
+        const { deltaBlob, stats } = await generateDeltaArchive(baseBlob, targetBlob, {
+          baseName,
+          onProgress: (done, total) => {
+            view.setProgress(93 + (total > 0 ? Math.round((done / total) * 5) : 0), t('generate.deltaBuilding'));
+          },
+        });
+        return {
+          deltaBlob,
+          baseName,
+          stats,
+          name: name.replace(/\.zip$/i, '') + '.delta.zip',
+        };
+      } catch (err) {
+        logger.warn(`[delta] 基准 ${baseName} 生成补丁失败，尝试下一份：${err?.message || err}`);
+      }
+    }
+    return null;
+  }
+
+  /** 增量补丁统计并入报告，供 showReport / 下载报告消费。 */
+  function withDeltaStats(report, delta) {
+    if (!delta) return report;
+    const stats = delta.stats || {};
+    const deltaStats = {
+      addedCount: stats.addedCount || 0,
+      modifiedCount: stats.modifiedCount || 0,
+      deletedCount: stats.deletedCount || 0,
+      patchSize: delta.deltaBlob?.size || 0,
+      deltaBase: delta.baseName,
+    };
+    if (!report || typeof report !== 'object') return { delta: deltaStats };
+    return { ...report, delta: deltaStats };
+  }
+
   /** 真正执行一次生成；返回 `done|paused|aborted|empty`，失败抛错由队列记 failed。 */
-  async function executeGenerate({ packages, merge = false, target, splitMb, filenameTemplate, autoFlow = false }) {
+  async function executeGenerate({ packages, merge = false, target, splitMb, filenameTemplate, autoFlow = false, delta = 'overwrite' }) {
     if (!packages?.length) { view.toast(t('toast.selectExportFirst')); return 'empty'; }
     if (merge && packages.length >= 2) {
-      return generateMerged({ packages, target, splitMb, filenameTemplate });
+      return generateMerged({ packages, target, splitMb, filenameTemplate, autoFlow, delta });
     }
     state.busy = true;
     const code = targetCodeOf(target);
     const limit = splitLimitOf(splitMb);
     const created = [];
     const reports = [];
+    const deltaResults = [];
     try {
       for (const pkg of packages) {
         const blob = await blobOf(pkg);
@@ -1840,6 +1943,28 @@ async function main(root) {
         if (outcome.report) reports.push(outcome.report);
         const resultBlob = outcome.resultBlob;
         if (!resultBlob) continue;
+        /* 增量导出：只认「覆盖/增量」开关为增量，且不与分卷叠加（补丁包本身即轻量）。
+           无同目标基准时降级为完整包并 toast 说明，绝不静默产出假补丁。 */
+        if (delta === 'incremental' && !limit) {
+          const name = resolveFilename(filenameTemplate || DEFAULT_FILENAME_TEMPLATE, {
+            sourceName: pkg.name, target: code, handle: 'default-user',
+            part: 'part1', category: 'all', mode: 'single',
+          });
+          const deltaResult = await buildDeltaFor(resultBlob, name, code);
+          if (deltaResult) {
+            created.push({
+              blob: deltaResult.deltaBlob, name: deltaResult.name,
+              isDelta: true, deltaBase: deltaResult.baseName, deltaStats: deltaResult.stats,
+            });
+            deltaResults.push(deltaResult);
+            logger.info(`[增量] ${pkg.name} → 补丁 ${deltaResult.name}（新增 ${deltaResult.stats.addedCount} / 修改 ${deltaResult.stats.modifiedCount} / 删除 ${deltaResult.stats.deletedCount}）`);
+          } else {
+            created.push({ blob: resultBlob, name });
+            view.toast(t('generate.deltaNoBase'));
+            logger.warn(`[增量] ${pkg.name} 无同目标基准，降级为完整包`);
+          }
+          continue;
+        }
         if (limit) {
           /* 2026-11-18（分卷内存修复 · 设计稿 4.3）：改**懒描述符**——不再把整个转换产物
              逐条解压进 entries 数组（GB 级包峰值 ≈ 2× 未压缩体积，浏览器可 OOM）。
@@ -1879,7 +2004,10 @@ async function main(root) {
         logger.info(t('log.converted', { name: pkg.name }));
       }
       await deliverCreated(created, code, { autoFlow });
-      if (reports.length) view.showReport(reports[reports.length - 1]);
+      if (reports.length || deltaResults.length) {
+        const report = withDeltaStats(reports[reports.length - 1], deltaResults[deltaResults.length - 1]);
+        view.showReport(report);
+      }
       return 'done';
     } catch (err) {
       logger.error(t('log.convertFailed', { msg: err.message }));
@@ -1909,11 +2037,20 @@ async function main(root) {
           ...(item.partTotal != null ? { partTotal: item.partTotal } : {}),
         }
         : {};
+      const deltaMeta = item.isDelta
+        ? { isDelta: true, ...(item.deltaBase ? { deltaBase: item.deltaBase } : {}) }
+        : {};
       await saveFile({
         id,
         name: item.name, size: item.blob.size, blob: namedBlob(item.blob, item.name),
-        layout, role: 'output', origin: ORIGINS.CONVERTED,
-        metadata: { convertedAt: Date.now(), ...splitMeta, ...(autoFlow ? { autoFlow: 'export' } : {}) },
+        layout, role: 'output',
+        /* 增量产物不显式传 origin：由 db.js migrateRoleToOrigin 读 metadata.isDelta 自动归 ORIGINS.DELTA，
+           待导出区据此显示「增量补丁」。普通产物维持显式 CONVERTED。 */
+        ...(item.isDelta ? {} : { origin: ORIGINS.CONVERTED }),
+        metadata: {
+          convertedAt: Date.now(), ...splitMeta, ...deltaMeta,
+          ...(autoFlow ? { autoFlow: 'export' } : {}),
+        },
       });
       lastCreatedIds.push(id);
     }
@@ -2176,7 +2313,7 @@ async function main(root) {
    * 合并模式：各包先按合并树里自己的勾选转换，再把产物合并成一个包。
    * 同名路径直接停止（用户 2026-10-27 裁定）。
    */
-  async function generateMerged({ packages, target, splitMb, filenameTemplate, autoFlow = false }) {
+  async function generateMerged({ packages, target, splitMb, filenameTemplate, autoFlow = false, delta = 'overwrite' }) {
     const code = targetCodeOf(target);
     const limit = splitLimitOf(splitMb);
     const plan = view.getMergedPlan(packages);
@@ -2185,6 +2322,7 @@ async function main(root) {
     const compression = Number.isFinite(rawCompression) ? rawCompression : 5;
     const blobs = [];
     const reports = [];
+    const deltaResults = [];
     try {
       for (const pkg of packages) {
         const blob = await blobOf(pkg);
@@ -2248,11 +2386,30 @@ async function main(root) {
           sourceName: 'merged', target: code, handle: 'default-user',
           part: 'part1', category: 'all', mode: 'single',
         });
-        created.push({ blob: merged.blob, name });
+        if (delta === 'incremental') {
+          const deltaResult = await buildDeltaFor(merged.blob, name, code);
+          if (deltaResult) {
+            created.push({
+              blob: deltaResult.deltaBlob, name: deltaResult.name,
+              isDelta: true, deltaBase: deltaResult.baseName, deltaStats: deltaResult.stats,
+            });
+            deltaResults.push(deltaResult);
+            logger.info(`[增量] 合并包 → 补丁 ${deltaResult.name}（新增 ${deltaResult.stats.addedCount} / 修改 ${deltaResult.stats.modifiedCount} / 删除 ${deltaResult.stats.deletedCount}）`);
+          } else {
+            created.push({ blob: merged.blob, name });
+            view.toast(t('generate.deltaNoBase'));
+            logger.warn('[增量] 合并包无同目标基准，降级为完整包');
+          }
+        } else {
+          created.push({ blob: merged.blob, name });
+        }
       }
       logger.info(t('log.mergeDone', { n: packages.length, files: merged.fileCount }));
       await deliverCreated(created, code, { autoFlow });
-      if (reports.length) view.showReport(reports[reports.length - 1]);
+      if (reports.length || deltaResults.length) {
+        const report = withDeltaStats(reports[reports.length - 1], deltaResults[deltaResults.length - 1]);
+        view.showReport(report);
+      }
       return 'done';
     } catch (err) {
       logger.error(t('log.convertFailed', { msg: err.message }));

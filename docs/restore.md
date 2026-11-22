@@ -69,9 +69,9 @@ alt_lang: en
 
 ### 5. 写入范围：为什么「勾选类目」不影响恢复
 
-整包 FormData 里的 `selection` 恒为 `FULL_SELECTION`（`src/ui/host-bridge.js:2274`），分片 body 里的 `selection` 也是同一个值（`:2168`）。`FULL_SELECTION` 来自 `buildEndpointSelection()`（`src/ui/host-bridge.js:282`、`src/core/selection-defaults.js:86`），只含 10 个标准类目且**全部为 true**。
+整包 FormData 与分片 body 的 `selection` 字段在**无外部传入**时回退为 `FULL_SELECTION`（`src/ui/host-bridge.js:2274` / `:2168`）。`FULL_SELECTION` 来自 `buildEndpointSelection()`（`src/ui/host-bridge.js:282`、`src/core/selection-defaults.js:86`），只含 10 个标准类目且**全部为 true**。
 
-也就是说：**用户勾选从未透传到恢复请求**。取证注释明确写着「包内 `manifest.json` 的 selection 不被宿主解析（09-01 取证）」；而对照实验又表明宿主对 selection 差异不敏感——带/不带 selection 都是 `restoredCount: 1`（早期 Dev Luker 实验）。真正决定恢复内容的，是**包体里的条目本身**。
+恢复侧现已从包内清单构造类目勾选并随请求透传：视图层 `restoreSelection()`（`src/ui/workbench-view.js:6941-6958`）按包内 `manifest.selection`（无则按 nodes 类目）得出 `selection` 并随恢复请求传出，Luker 宿主支持透传。但取证表明：包内 `manifest.json` 的 selection **不被宿主解析**（09-01 取证），且宿主对 selection 差异不敏感——带/不带 selection 都是 `restoredCount: 1`（早期 Dev Luker 实验）。因此**真正决定恢复内容的，仍是包体里的条目本身**；勾选的作用点在生成阶段的类目过滤（见下方 F3）。
 
 ### 6. 端点解析与能力降级
 
@@ -82,11 +82,16 @@ alt_lang: en
 
 **候选表里没有平台键时（TT / PT）会回退到 ST 候选**（`:179`）；只在 404 / 405 时换下一个端点；全部失败则把 `restoreCapability` 置为 `'unsupported'` 并抛出 `RESTORE_UNSUPPORTED`。
 
-### 7. 没有可退缩的「增量恢复」路径
+### 7. 增量补丁包的恢复（Luker 自动合并）
 
-由于写入范围恒为全量、`incremental` 只是 `mode` 别名，**代码里并不存在「只恢复勾选部分」的增量恢复路径**。真正的增量合并函数 `incrementalMergeArchives()`（`src/ui/host-bridge.js:2985`）被明确标注「未接线：当前无任何调用方」——它本该接的是 J 区曾有过的「增量合并」复选框，而该复选框经取证确认**从不生效**且已移除。
+增量补丁包（`.delta.zip`）来自转换侧的「恢复模式 → 增量」，包内含 `_delta_manifest.json`。恢复这类包时，主链路在写入前会**自动探测该清单并走合并分支**（探测函数 `detectDeltaArchive()`；合并函数 `incrementalMergeArchives()` 已接线，由 `restoreSelectedConfirmed()` 调用）：
 
-因此结论很硬：**任何宿主只要整包恢复端点不可用，就完全无法恢复，没有增量路径可以退缩。** 新增的回传兼容门控（第 2 节）与单选/分卷约束（第 3 节）只是**拦截前置**：在写入前挡下不兼容、多选的请求，并不会因此生成「部分恢复 / 增量恢复」能力。被门控拦下的请求，唯一出路仍是先整体转换到当前宿主布局再重试。
+- **自动探测**：写入前读取包内 `_delta_manifest.json`；读到的即为增量补丁包，走下面的合并流程；读不到则按普通整包恢复。
+- **Luker：基准包 + 补丁合并**：取同目标布局最近入库的**完整产物**作基准（排除补丁包自身与增量来源），用 `incrementalMergeArchives()` 把补丁的 `added` / `modified` / `deleted` 变更合并进基准，得到完整包后再调用 `restoreToLuker()` 写入；报告注明「已合并 N 项增量变更」。
+- **无基准降级**：找不到同目标基准包时，提示「未找到同目标基准包，增量包按整包直接恢复」，把补丁当整包直接写入，不静默造空合并。合并过程抛错时同样提示并降级为整包写入。
+- **非 Luker 宿主如实跳过**：ST / TT / PT 没有可用的编程写入端点，无法完成「基准包 + 补丁」合并，恢复增量包时该包被标记跳过并提示改用宿主原生导入。能力门禁的能力表（`hostRestoreCapability()`，`src/ui/host-bridge.js:344-352`）中 TT / PT 的 `reasonKey` 为 `restore.unsupported.ttDelta` / `restore.unsupported.ptDelta`（`src/i18n/locales/zh-CN.js:1758-1759`），文案明确「请用宿主原生数据迁移 / 数据管理面板导入本插件的增量包」；ST 的 `reasonKey` 为 `restore.unsupported.st`，提示改用宿主原生导入。
+
+需要澄清的是：这里的「增量」是**补丁包合并恢复**（把补丁变更合进基准包后整包写入），与第 1 节 `mode=merge` 的 `incremental` 别名不是一回事；它也不提供「只恢复勾选类目」的部分写入——写入范围仍是合并后的整包。回传兼容门控（第 2 节）与单选/分卷约束（第 3 节）依旧是**拦截前置**，不因增量补丁包而放宽。
 
 ## 宿主支持矩阵
 
@@ -126,7 +131,7 @@ alt_lang: en
 
 这里说清一个容易被误解的点：**「类目过滤兜底」与「恢复能力」是两件事**。
 
-- `selection` 只作用于**导出 / 拉取阶段**的类目筛选；恢复链路的 `selection` 恒为 `FULL_SELECTION`（`src/ui/host-bridge.js:2274` / `:2168`），与用户勾选无关。
+- `selection` 既作用于**导出 / 拉取阶段**的类目筛选，恢复侧也会从包内清单构造并透传（支持透传的宿主为 Luker，见第 5 节）；但包内 `manifest.json` 的 selection 不被宿主解析，宿主对 selection 差异不敏感，真正决定恢复内容的仍是包体条目本身。
 - 恢复请求**技术上能带过滤后的 payload**：分片侧的 `buildRestoreBody` 有 `selection` 形参（`src/core/chunked-restore.js:52`），整包 FormData 也 append 了 `selection`（`src/ui/host-bridge.js:2274`）。但实测宿主对 selection 差异不敏感（带/不带均 `restoredCount: 1`），包内 `manifest.json` 的 selection 也不被宿主解析；**真正决定恢复内容的是包体条目本身**。
 - 因此，把类目过滤从「恢复请求」移到「插件内（导出 / 包生成阶段）」在技术上正确且已具备落点：在生成包体时按 selection 过滤条目（`src/core/selection-defaults.js:42` 的 `SPECIAL_SELECTION_FLAGS`、`src/core/transform.js:624-625` 的按类目 `entry.skip()`），替代依赖宿主解析 restore selection。
 - **兜底的边界**：插件内过滤兜底只作用于导出阶段，**解决不了「全宿主支持两种恢复模式」的根本障碍**——ST 1.19 两个恢复端点均 404，没有整包写入端点，过滤兜底无法凭空造出写入能力。

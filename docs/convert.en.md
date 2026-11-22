@@ -45,12 +45,13 @@ The analysis can be downloaded as a report.
 
 ## Merge and update (delta mode)
 
-> Honest status: the delta capability currently exists only as a core-layer structure and is **not wired into the conversion main chain or the UI**.
+Pick **Incremental** in **Restore mode** on the right of the **Package** tab, then click **Generate export package** to produce a `.delta.zip` **incremental patch package** instead of a full package. This is wired into the conversion main chain — both single-package generation and multi-package merging support it (incremental is not combined with splitting).
 
-- The core layer already has `compareArchives` / `generateDeltaArchive` (`src/core/delta.js`), which can produce an incremental patch-package structure: the `_delta_manifest.json` inside records `generator` / `type` (delta-patch) / `baseArchiveName` / `stats` / `changes`;
-- The generator is currently referenced **only by tests** (`test/delta.test.js`); the conversion main chain (`generate` / `generateMerged` in `index.js`) has no delta branch, and the UI delta toggle produces no delta package;
-- The merge / apply functions for patch packages are not wired (`incrementalMergeArchives()` in `src/ui/host-bridge.js` is marked "not wired: no callers"); "conflicts handled automatically and recorded in a report" **does not exist**;
-- This section will be updated with real instructions once incremental restore lands.
+- **Patch contents**: the `_delta_manifest.json` inside records `generator` (`ST-pack-transfer`), `type` (`delta-patch`), `baseArchiveName` (the baseline package name), plus `stats` (`addedCount` / `modifiedCount` / `deletedCount`, etc.) and `changes` (entries grouped into `added` / `modified` / `deleted`).
+- **Baseline package**: the most recent **full** conversion output of the same target layout is used as the baseline (the patch itself is excluded). The core layer's `compareArchives` / `generateDeltaArchive` (`src/core/delta.js`) compares entry by entry and writes only added and modified entries into the patch, recording deletions as well.
+- **No baseline fallback**: if no full output exists for the target, incremental export **falls back to a full package** with the message "No baseline package for this target; incremental export fell back to a full package" — it never silently produces an empty patch.
+- **Storage marking**: patch outputs are auto-labeled with the "Incremental patch" origin (`ORIGINS.DELTA`) and shown as **Incremental patch** in the export area, easy to tell apart from ordinary full packages. The conversion report also includes added / modified / deleted counts and the patch size.
+- **Restore**: an incremental patch must be merged with its baseline on the restore side — see "Incremental patch restore (automatic merge on Luker)" in [Restore to host](restore.en.md).
 
 ## Smart split packages
 

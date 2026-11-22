@@ -345,8 +345,8 @@ export function hostRestoreCapability(platform) {
   const TABLE = Object.freeze({
     luker: { supported: true, reasonKey: '' },
     st: { supported: false, reasonKey: 'restore.unsupported.st' },
-    tt: { supported: false, reasonKey: 'restore.unsupported.tt' },
-    pt: { supported: false, reasonKey: 'restore.unsupported.pt' },
+    tt: { supported: false, reasonKey: 'restore.unsupported.ttDelta' },
+    pt: { supported: false, reasonKey: 'restore.unsupported.ptDelta' },
   });
   return TABLE[platform] || { supported: false, reasonKey: 'restore.unsupported.st' };
 }
@@ -2036,7 +2036,7 @@ export async function fetchHostInventory({ platform, signal = null, onPhase = nu
  * @returns {Promise<object>} 宿主持久化的响应体；响应体不可解析时为
  *   `{ success: false, unconfirmed: true, reason }`
  */
-export async function restoreToHost(zipBlob, { mode = 'merge', platform = 'st', signal, timeoutMs = UPLOAD_TIMEOUT_MS } = {}) {
+export async function restoreToHost(zipBlob, { mode = 'merge', platform = 'st', selection = null, signal, timeoutMs = UPLOAD_TIMEOUT_MS } = {}) {
   if (restoreInFlight) {
     throw new Error('已有恢复任务正在进行，请等待其完成后再试');
   }
@@ -2051,7 +2051,7 @@ export async function restoreToHost(zipBlob, { mode = 'merge', platform = 'st', 
   }
   try {
     return await restoreToHostInner(zipBlob, {
-      mode, platform, signal: controller.signal, timeoutMs,
+      mode, platform, selection, signal: controller.signal, timeoutMs,
     });
   } finally {
     if (signal) signal.removeEventListener('abort', onExternalAbort);
@@ -2106,7 +2106,7 @@ async function restoreHttpError(response, label) {
  *
  * @returns {Promise<{supported:false}|{supported:true,result:object}>}
  */
-async function tryLukerChunkedRestore(zipBlob, { mode, handle, token, signal, timeoutMs }) {
+async function tryLukerChunkedRestore(zipBlob, { mode, handle, token, signal, timeoutMs, selection }) {
   const size = Number(zipBlob?.size) || 0;
   if (!size) return { supported: false };
   const headers = token ? { 'X-CSRF-Token': token } : {};
@@ -2228,7 +2228,7 @@ async function tryLukerChunkedRestore(zipBlob, { mode, handle, token, signal, ti
       method: 'POST',
       credentials: 'same-origin',
       headers: jsonHeaders,
-      body: buildRestoreBody({ uploadId, handle, mode, selection: FULL_SELECTION }),
+      body: buildRestoreBody({ uploadId, handle, mode, selection: (selection && Object.keys(selection).length) ? selection : FULL_SELECTION }),
     }, { timeoutMs: timeoutMs || 0, signal, label: '恢复数据包至宿主' });
     if (!restored.ok) throw await restoreHttpError(restored, '恢复数据包至宿主');
     const result = await readJsonBounded(restored, { timeoutMs: RESTORE_ASSEMBLE_TIMEOUT_MS, signal, label: '读取恢复结果' });
@@ -2297,7 +2297,7 @@ async function maybeOpenExtensionInstaller(zipBlob) {
 }
 
 /** `restoreToHost` 的实现体（互斥标志由外层 `try/finally` 保证复位）。 */
-async function restoreToHostInner(zipBlob, { mode, platform, signal, timeoutMs }) {
+async function restoreToHostInner(zipBlob, { mode, platform, selection, signal, timeoutMs }) {
   // 已判定本宿主无整包恢复能力（全部候选 404/405）：直接拒绝，不再重复探测，
   // 也不让调用方把「宿主没这个能力」误读成「恢复失败」（R1.6 死按钮规则）。
   if (restoreCapability === 'unsupported') {
@@ -2311,7 +2311,7 @@ async function restoreToHostInner(zipBlob, { mode, platform, signal, timeoutMs }
   // Luker / ST 优先试原生 8 MiB 分片：云酒馆经 Cloudflare 代理，单请求体上限 100 MB，
   // 整包一次 POST 必失败。分片端点不存在（旧版或未实现该协议的宿主）才回退整包 FormData。
   if (platform === 'luker' || platform === 'st') {
-    const chunked = await tryLukerChunkedRestore(zipBlob, { mode, handle, token, signal, timeoutMs });
+    const chunked = await tryLukerChunkedRestore(zipBlob, { mode, handle, token, signal, timeoutMs, selection });
     if (chunked.supported) {
       restoreCapability = 'available';
       restoreEndpointHit = '/api/users/restore-backup';
@@ -2334,7 +2334,7 @@ async function restoreToHostInner(zipBlob, { mode, platform, signal, timeoutMs }
   // 故这不是「修 bug」而是**把语义显式化**：与宿主自身 UI（Luker `public/scripts/user.js`）
   // 及同类扩展 Atria 的 payload 一致，避免依赖未文档化的缺省行为。
   // 注：包内 `manifest.json` 的 selection **不被宿主解析**（09-01 取证），类目选择只能来自请求。
-  formData.append('selection', JSON.stringify(FULL_SELECTION));
+  formData.append('selection', JSON.stringify((selection && Object.keys(selection).length) ? selection : FULL_SELECTION));
 
   // 端点按平台候选序解析，仅 404/405 回退（见 postRestoreWithFallback 的硬约束）
   const response = await postRestoreWithFallback(formData, {
@@ -3027,15 +3027,14 @@ export async function restoreToLuker(zipBlob, options = {}) {
 }
 
 /**
- * ⚠ **未接线**：当前**无任何调用方**。
+ * ✅ **已接线（restore delta 分支）**：由 `index.js` 的 `restoreSelectedConfirmed` 在恢复 Luker 增量包时调用。
  *
- * 本函数是 J 区曾有过的「增量合并」复选框本该接的实现。该复选框经 2026-09-25 全仓取证
- * 确认**从不生效**（其 `.checked` 无任何读取点；全仓亦无泛读复选框的代码与状态持久化），
- * 已于任务 `09-25-transfer-pack-optimize` 移除，消除「勾了却没反应」的误导，
- * 同时避免它与「差量补丁」及恢复写入的 `mode: 'merge'` 三者撞名。
+ * 接线语义：以「基准包 + 本函数合并」得到完整包，再走常规 `restoreToHost` 上传，写入 `mode: 'merge'`。
+ * 基准包缺失时由调用方降级为整包直传并 toast 告知；合并类目与同名取舍沿用本函数既有规则
+ * （同名取增量包版本，基准独有项保留，增量新增项追加）。
  *
- * **若要上线「把入包合并进基准包」的能力**：从这里接线，但需先与用户确定语义
- * （合并哪些类目、同名条目如何取舍、与「差量补丁」的关系），**不要直接复活那个开关**。
+ * 历史背景：此前 J 区的「增量合并」复选框经 2026-09-25 全仓取证确认从不生效，已移除；
+ * 本次接线不复活该开关，仅在恢复侧对含 `_delta_manifest.json` 的包按需合并。
  *
  * 对两个 Zip 数据包执行增量合并 (Incremental Archive Merge)
  * 尤其适合 TauriTavern / SillyTavern 数据包的差量累加与历史补丁融合
@@ -3107,6 +3106,36 @@ export async function incrementalMergeArchives(baseArchive, incomingArchive, { o
     preservedCount,
     totalCount,
   };
+}
+
+/**
+ * 探测增量补丁包：读取 ZIP 内 `_delta_manifest.json` 并返回解析后的清单，非增量包返回 null。
+ * 仅解压命中的单一清单条目，其余条目跳过，避免整包解压开销。
+ * @param {Blob|File|string} blob 待探测的数据包
+ * @returns {Promise<object|null>} 增量清单对象，或 null（非增量包 / 读取失败）
+ */
+export async function detectDeltaArchive(blob) {
+  if (!blob) return null;
+  const DELTA_MANIFEST = '_delta_manifest.json';
+  let reader = null;
+  try {
+    reader = await zipIo.openReader(blob);
+    for await (const entry of reader.entries()) {
+      if (entry.fileName !== DELTA_MANIFEST) {
+        entry.skip?.();
+        continue;
+      }
+      const bytes = await entry.read();
+      const text = typeof bytes === 'string' ? bytes : new TextDecoder().decode(bytes);
+      const manifest = JSON.parse(text);
+      return manifest && typeof manifest === 'object' ? manifest : null;
+    }
+    return null;
+  } catch {
+    return null;
+  } finally {
+    if (reader) { try { await reader.close(); } catch { /* 忽略关闭异常 */ } }
+  }
 }
 
 /**
