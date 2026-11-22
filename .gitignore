@@ -9,7 +9,10 @@ yarn-error.log*
 
 # 真实数据样本与本地大文件 (严禁入库)
 *.zip
-!fixtures/*.zip
+!fixtures/fixture-st.zip
+!fixtures/fixture-l.zip
+!fixtures/fixture-pt.zip
+!fixtures/fixture-tt.zip
 data-zip/
 data-*/
 samples/
@@ -70,12 +73,15 @@ CLAUDE.md.bak
 # 注：测试目录（/test/）按用户最新要求不再忽略
 /e2e/
 /scripts/
-/fixtures/
+# fixtures/ 不做目录级忽略：目录级忽略会让上方 !fixtures/fixture-*.zip 白名单失效
+# （git 不进被忽略目录扫描）；小 fixture zip（2-4KB）已白名单入库供 CI golden 回归，
+# 24MB 的 fixture-st-large.zip 由全局 *.zip 规则拦住不入库。
 
 # 运行时零引用的死代码（仅测试引用）
 # 2026-11-22 发版修正：这 6 个模块的测试文件在 CI 全量跑，模块不入库则 CI 收集必崩
 # （2b14197 的「取消跟踪」与入库测试冲突）；已恢复入库，保证测试门禁口径一致。
-# host-icons.js 暂无测试引用，维持不入库。
+# host-icons.js：零引用死模块，2026-11-22 质量会战按 D-17 归档至
+# .private/backup/host-icons-2026-11-22/（本地私有，不入库），仓库内不再保留。
 
 # 开发期预览页（非运行时）
 /src/ui/ui-demo.html
