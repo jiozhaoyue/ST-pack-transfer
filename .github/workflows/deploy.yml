@@ -71,6 +71,12 @@ jobs:
         run: |
           mkdir -p dist/docs
           cp -r _site_docs/. dist/docs/
+          # 死链修复（2026-11-22）：jekyll-relative-links 按站点根 baseurl（/ST-pack-transfer）
+          # 生成绝对链接，但文档部署在 /docs/ 子路径下——全部绝对 href 补 /docs/ 前缀。
+          # 2026-11-21 v0.7.0 起线上站内导航全 404 即此根因。
+          find dist/docs -name '*.html' -type f -exec sed -i \
+            -e 's|href="/ST-pack-transfer/|href="/ST-pack-transfer/docs/|g' \
+            -e 's|href="/ST-pack-transfer"|href="/ST-pack-transfer/docs/"|g' {} +
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
