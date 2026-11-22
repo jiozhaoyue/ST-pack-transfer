@@ -29,6 +29,13 @@ import {
   randomBytes,
 } from '../core/s3-crypto.js';
 import { preUploadGuard } from '../core/sanitize-share.js';
+import { logger } from '../core/logger.js';
+
+/**
+ * 加密封装开销：SPT1(4) + salt(16) + iv(12) + GCM tag(16) = 48 字节，
+ * 与 `src/core/s3-crypto.js` 的 encryptWithKey 输出格式逐字节对齐。
+ */
+const ENCRYPTION_OVERHEAD = 4 + 16 + 12 + 16;
 
 function toHex(buffer) {
   return [...new Uint8Array(buffer)].map((b) => b.toString(16).padStart(2, '0')).join('');
@@ -104,13 +111,35 @@ export function createTransferRunner({
     }
   }
 
-  async function headChunks(name, chunks) {
-    const present = new Set();
+  /**
+   * 逐片 HEAD 探测已存在的分片，并校验远端尺寸 / etag 是否与本地计划一致。
+   * 只有 head.ok 且尺寸、etag 都吻合才算可复用；尺寸不符说明是陈旧或损坏分片，
+   * 必须当作缺失重传，否则断点续传会把错误字节拼进产物。
+   * @returns {{present:number[],mismatches:number[]}} 纯 JSON（可序列化），调用方据此构造 Set 与统计
+   */
+  async function headChunks(name, chunks, { encrypted = false } = {}) {
+    const present = [];
+    const mismatches = [];
     await pool(chunks, concurrency, async (chunk) => {
       const head = await target.head(chunkKey(name, chunk.index));
-      if (head?.ok) present.add(chunk.index);
+      if (!head?.ok) return;
+      // head 有 size 就校验：加密分片远端存的是密文 = 明文 + 48 字节封装开销，故按密文长度比对。
+      if (head.size != null && Number.isFinite(Number(head.size))) {
+        const expected = encrypted ? chunk.size + ENCRYPTION_OVERHEAD : chunk.size;
+        if (Number(head.size) !== expected) {
+          mismatches.push(chunk.index);
+          logger?.warn?.(`[transfer] 分片 ${chunk.index} 尺寸不符（远端 ${head.size}，期望 ${expected}），判为缺失重传`);
+          return;
+        }
+      }
+      // 双方都有 etag 时比较：尺寸相同但内容指纹不同同样是陈旧分片，不得复用。
+      if (chunk.etag && head.etag && String(chunk.etag) !== String(head.etag)) {
+        mismatches.push(chunk.index);
+        return;
+      }
+      present.push(chunk.index);
     });
-    return present;
+    return { present, mismatches };
   }
 
   async function upload({ blob, name, sha256 = '', contentType = 'application/zip', entryCount = null, entriesForGuard = null } = {}) {
@@ -166,7 +195,12 @@ export function createTransferRunner({
     }
     // 首次上传（清单不存在）时所有分片必然缺失，逐片 HEAD 是纯冗余往返，直接跳过。
     // 仅断点续传（清单存在）才逐片探测，保证「已存在分片不重传」的正确性。
-    const present = existing ? await headChunks(name, chunks) : new Set();
+    // 探测结果还要过尺寸 / etag 校验：陈旧或损坏的分片判为缺失并重新上传。
+    const headResult = existing
+      ? await headChunks(name, chunks, { encrypted })
+      : { present: [], mismatches: [] };
+    const present = new Set(headResult.present);
+    const mismatched = new Set(headResult.mismatches);
     const missing = chunks.filter((chunk) => !present.has(chunk.index));
     const totalBytes = size;
     let uploadedBytes = 0;
@@ -193,6 +227,7 @@ export function createTransferRunner({
         totalChunks: chunks.length,
         uploadedChunks: 0,
         skippedChunks: present.size,
+        mismatchedChunks: [...mismatched],
         uploadedBytes: 0,
         totalBytes,
       };
@@ -254,6 +289,7 @@ export function createTransferRunner({
       totalChunks: chunks.length,
       uploadedChunks,
       skippedChunks: present.size,
+      mismatchedChunks: [...mismatched],
       uploadedBytes,
       totalBytes,
     };

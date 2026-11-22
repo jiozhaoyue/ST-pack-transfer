@@ -81,7 +81,7 @@ describe('pull-entry 拉取入口顺序契约', () => {
     expect(result).toEqual({ busy: true });
   });
 
-  it('原生按钮拉取：先警告，再读勾选，再关面板，最后拉取', async () => {
+  it('原生按钮拉取：先警告，再读勾选，忙检查在关面板前，最后拉取', async () => {
     const events = [];
     const result = await beginNativePull({
       trafficPrompt: true,
@@ -92,7 +92,8 @@ describe('pull-entry 拉取入口顺序契约', () => {
       notifyBusy: () => events.push('busy'),
       pull: async (selection) => { events.push(`pull:${selection.characters}`); },
     });
-    expect(events).toEqual(['traffic', 'read', 'close', 'busy-check', 'pull:true']);
+    // busy 检查必须在 close 之前：避免「关了面板却没拉」的半途状态（2026-11-22 修复裁定）
+    expect(events).toEqual(['traffic', 'read', 'busy-check', 'close', 'pull:true']);
     expect(result).toEqual({ pulled: true });
   });
 

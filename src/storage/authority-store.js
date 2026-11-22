@@ -85,6 +85,9 @@ export function __setAuthorityClientForTest(client) {
 /** @returns {boolean} Authority 是否可用（同步粗探，最终以 getAuthorityClient 为准） */
 export function isAuthorityAvailable() {
   if (testClient !== undefined) return testClient !== null;
+  // 已探测过就复用缓存结论（null = 探测后确认不可用）：避免每次调用重复 init 或误判。
+  // 缓存语义与 getAuthorityClient 一致：undefined = 未探测，null = 已探测不可用。
+  if (cachedClient !== undefined) return cachedClient !== null;
   return typeof window !== 'undefined'
     && !!(window.STAuthority && window.STAuthority.AuthoritySDK);
 }
@@ -102,6 +105,17 @@ export function isAuthorityAvailable() {
 
 /** Authority KV 单值上限：core `crates/authority-core/src/constants.rs` 的 `MAX_KV_VALUE_BYTES` */
 const KV_VALUE_LIMIT = 128 * 1024;
+
+/**
+ * 按 UTF-8 字节数计量——服务端限额是字节，不是 JS 字符串 length。
+ * 中文/emoji 一个字符占 3~4 字节，用 `json.length` 会严重低估、把超限数据误判为可写，
+ * 到服务端才 400。TextEncoder 在浏览器与 Node 18+ 均可用（本仓 Node 环境已具备）。
+ * @param {string} str
+ * @returns {number} UTF-8 字节数
+ */
+function utf8ByteLength(str) {
+  return new TextEncoder().encode(str).length;
+}
 
 async function kvSet(client, key, value) {
   await client.storage.kv.set(key, value);
@@ -139,21 +153,31 @@ function slimCheckpoint(manifest) {
   return out;
 }
 
-/** 把清单序列化到 Authority KV；超上限时按上述理由精简，仍超则**跳过持久化**并留日志 */
+/**
+ * 把清单序列化到 Authority KV；超上限时按上述理由精简，仍超限则**抛错**。
+ *
+ * 2026-11-22 修正：旧实现超限静默 return，让 adapter.save 假装成功，上层
+ * task-manager 的 catch 永远收不到失败信号（假成功）。现在改为抛错说明原因，
+ * 由 task-manager 既有 catch（onCheckpoint / setPauseCheckpoint / pause 三处）
+ * 兜底降级——后端失败被真实感知，内存断点仍保留，主路径不炸。
+ */
 async function kvSetCheckpoint(client, key, manifest) {
   const json = JSON.stringify(manifest);
-  if (json && json.length > KV_VALUE_LIMIT) {
-    const slimJson = JSON.stringify(slimCheckpoint(manifest));
-    if (slimJson && slimJson.length <= KV_VALUE_LIMIT) {
-      console.warn(`[authority-store] 断点清单 ${json.length} B 超 Authority KV 上限 ${KV_VALUE_LIMIT} B`
-        + ` ⇒ 剥掉条目台账后存 ${slimJson.length} B（续传仍由半成品字节判定，不漏条目）`);
-      await kvSet(client, key, slimCheckpoint(manifest));
+  const bytes = json ? utf8ByteLength(json) : 0;
+  if (bytes > KV_VALUE_LIMIT) {
+    const slim = slimCheckpoint(manifest);
+    const slimJson = JSON.stringify(slim);
+    const slimBytes = slimJson ? utf8ByteLength(slimJson) : 0;
+    if (slimBytes <= KV_VALUE_LIMIT) {
+      console.warn(`[authority-store] 断点清单 ${bytes} B（UTF-8）超 Authority KV 上限 ${KV_VALUE_LIMIT} B`
+        + ` ⇒ 剥掉条目台账后存 ${slimBytes} B（续传仍由半成品字节判定，不漏条目）`);
+      await kvSet(client, key, slim);
       return;
     }
-    // 精简后仍超 ⇒ 不写（写也必被 400 拒），内存断点保留；**必须留痕**，否则是静默降级
-    console.warn(`[authority-store] 断点清单 ${json.length} B 精简后仍超 Authority KV 上限`
-      + ` ⇒ 本次跳过 Authority 持久化（内存断点仍可用于本会话续传）`);
-    return;
+    // 精简后仍超 ⇒ 写也必被 400 拒：明确抛错而非静默跳过，让 adapter.save 的调用方感知失败
+    const err = new Error(`断点清单 UTF-8 ${bytes} B，精简后仍 ${slimBytes} B，超 Authority KV 上限 ${KV_VALUE_LIMIT} B，无法持久化`);
+    console.warn(`[authority-store] ${err.message} ⇒ 抛出由调用方降级处理（内存断点仍可用于本会话续传）`);
+    throw err;
   }
   await kvSet(client, key, manifest);
 }
@@ -249,7 +273,10 @@ async function deleteParts(client, parts) {
     try {
       // ⚠️ 位置参数：`blob.delete(id)`（不是 `delete({id, name})`）—— 同 KV 的签名坑
       await client.storage.blob.delete(part.id);
-    } catch { /* 单块删除失败不阻断 */ }
+    } catch (err) {
+      // 单块删除失败不阻断整体清理，但必须留痕（孤儿块排查依据）
+      console.warn(`[authority-store] 删除分块失败（不阻断）: ${part.id}`, err);
+    }
   }
 }
 

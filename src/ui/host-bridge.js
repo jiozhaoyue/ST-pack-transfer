@@ -470,8 +470,8 @@ export async function confirmDialog(message) {
   if (typeof window !== 'undefined' && typeof window.confirm === 'function') {
     return window.confirm(message);
   }
-  // 无任何确认手段（纯 Node 环境）：不阻断调用方
-  return true;
+  // 无任何确认手段（纯 Node 环境）：拒绝破坏性操作（无确认能力即不授权）
+  return false;
 }
 
 /**
@@ -1360,7 +1360,7 @@ export async function uploadUserFile(name, blob, { platform = null, signal } = {
     const response = await fetchWithTimeout(USER_FILES_ENDPOINTS.upload, {
       method: 'POST',
       credentials: 'same-origin',
-      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': token },
+      headers: { 'Content-Type': 'application/json', ...(token ? { 'X-CSRF-Token': token } : {}) },
       body: JSON.stringify({ name: safe, data: await blobToRawBase64(blob) }),
       signal,
     }, { timeoutMs: UPLOAD_TIMEOUT_MS, signal, label: '上传到 user/files' });
@@ -1384,7 +1384,7 @@ export async function deleteUserFile(filePath, { platform = null, signal } = {})
     const response = await fetchWithTimeout(USER_FILES_ENDPOINTS.delete, {
       method: 'POST',
       credentials: 'same-origin',
-      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': token },
+      headers: { 'Content-Type': 'application/json', ...(token ? { 'X-CSRF-Token': token } : {}) },
       body: JSON.stringify({ path: filePath }),
       signal,
     }, { timeoutMs: SHORT_FETCH_TIMEOUT_MS, signal, label: '删除 user/files 文件' });
@@ -1408,7 +1408,7 @@ export async function verifyUserFiles(urls, { platform = null, signal } = {}) {
     const response = await fetchWithTimeout(USER_FILES_ENDPOINTS.verify, {
       method: 'POST',
       credentials: 'same-origin',
-      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': token },
+      headers: { 'Content-Type': 'application/json', ...(token ? { 'X-CSRF-Token': token } : {}) },
       body: JSON.stringify({ urls: list }),
       signal,
     }, { timeoutMs: SHORT_FETCH_TIMEOUT_MS, signal, label: '校验 user/files 文件' });
@@ -1594,13 +1594,32 @@ export async function fetchHostBackup(platform, selection = null, {
   timings?.begin(STAGE_LABELS.HOST_GENERATE);
 
   // 续传：优先 Range 从断点接（追加写 OPFS 半成品）
-  const resumeBytes = Math.max(0, resumeCheckpoint?.receivedBytes || 0);
-  const resumeOpfsName = resumeCheckpoint?.opfsName || null;
-  const useRangeResume = resumeBytes > 0 && supportsOpfs() && Boolean(resumeOpfsName);
+  let resumeBytes = Math.max(0, resumeCheckpoint?.receivedBytes || 0);
+  let resumeOpfsName = resumeCheckpoint?.opfsName || null;
+  let useRangeResume = resumeBytes > 0 && supportsOpfs() && Boolean(resumeOpfsName);
+
+  // 断点自洽校验（失败即弃续传、从头拉，避免拼出损坏包）：
+  // ① receivedBytes 必须小于断点记录的总长度（等于/超过=已下完或数据错乱）；
+  // ② OPFS 半成品实际大小必须精确等于 receivedBytes（被截断/多写都不可续）。
+  if (useRangeResume) {
+    const declaredTotal = Number(resumeCheckpoint.totalBytes) || 0;
+    let partialSize = -1;
+    try {
+      const partialHandle = await opfsTmpHandle(resumeOpfsName, false, 'fetch-tmp', { quiet: true });
+      if (partialHandle) partialSize = (await partialHandle.getFile()).size;
+    } catch { /* 读不到半成品即视为不可用 */ }
+    if (!(declaredTotal > 0) || resumeBytes >= declaredTotal || partialSize !== resumeBytes) {
+      logger.warn(`续传断点校验失败（已收 ${resumeBytes} / 声明 ${declaredTotal} / 半成品实际 ${partialSize}），弃续传并整包重拉`);
+      await opfsTmpCleanup(resumeOpfsName);
+      useRangeResume = false;
+      resumeBytes = 0;
+      resumeOpfsName = null;
+    }
+  }
 
   const headers = {
     'Content-Type': 'application/json',
-    'X-CSRF-Token': token,
+    ...(token ? { 'X-CSRF-Token': token } : {}),
   };
   if (useRangeResume) headers.Range = `bytes=${resumeBytes}-`;
 
@@ -1661,17 +1680,30 @@ export async function fetchHostBackup(platform, selection = null, {
 
   let appendFromByte = 0;
   let opfsName = '';
-  if (useRangeResume) {
-    if (response.status === 206) {
+  if (useRangeResume && response.status === 206) {
+    // 206 必须自证续传起点：Content-Range 形如 "bytes <start>-<end>/<total>"，
+    // 起点若与 resumeBytes 不符（端点误解/多段/错位），续传会拼出损坏包 ⇒ 弃续传从头拉。
+    const contentRange = response.headers.get('Content-Range')
+      || response.headers.get('content-range') || '';
+    const match = /^bytes\s+(\d+)-/i.exec(contentRange.trim());
+    const rangeStart = match ? Number(match[1]) : -1;
+    if (rangeStart === resumeBytes) {
       // Range 续传成立：追加到既有半成品
       opfsName = resumeOpfsName;
       appendFromByte = resumeBytes;
       logger.info(`宿主支持 Range 续传，从断点 ${formatBytes(resumeBytes)} 处继续接收`);
     } else {
-      // 非 206：端点不支持（Luker archiver 动态流大概率不支持）→ 整包重拉
-      logger.warn('宿主端点不支持 Range 续传（响应非 206），半成品作废，整包重拉');
+      logger.warn(`206 Content-Range 起点 ${rangeStart} 与断点 ${resumeBytes} 不符，弃续传整包重拉`);
       await opfsTmpCleanup(resumeOpfsName);
+      useRangeResume = false;
+      resumeBytes = 0;
     }
+  } else if (useRangeResume) {
+    // 非 206：端点不支持（Luker archiver 动态流大概率不支持）→ 整包重拉
+    logger.warn('宿主端点不支持 Range 续传（响应非 206），半成品作废，整包重拉');
+    await opfsTmpCleanup(resumeOpfsName);
+    useRangeResume = false;
+    resumeBytes = 0;
   }
 
   // 流式读取：宿主生成耗时体现在 TTFB，传输耗时体现为 body 逐块到达
@@ -1695,8 +1727,20 @@ export async function fetchHostBackup(platform, selection = null, {
   }
 
   let blob = null;
-  const writable = opfsHandle ? await opfsHandle.createWritable() : null;
-  if (writable && appendFromByte === 0) {
+  // 续传追加：必须以 keepExistingData 打开，否则 createWritable() 默认清空文件，
+  // 断点前的字节会丢失（仓内 zip-append.js 同款模式）。
+  const writable = opfsHandle
+    ? await opfsHandle.createWritable({ keepExistingData: appendFromByte > 0 })
+    : null;
+  if (writable && appendFromByte > 0) {
+    // 定位到断点再写：后续 write 从此处追加，不覆盖半成品头部
+    if (typeof writable.seek === 'function') {
+      await writable.seek(appendFromByte);
+    } else {
+      // 无 seek 的兼容回退：写零长度块定位（部分实现支持 {at}）
+      await writable.write(new Uint8Array(0), { at: appendFromByte });
+    }
+  } else if (writable) {
     // 全新拉取：清空既有同名半成品（Range 追加路径保留内容）
     await writable.truncate(0);
   }
@@ -1822,6 +1866,15 @@ export async function fetchHostBackup(platform, selection = null, {
       timings?.end(STAGE_LABELS.TRANSFER);
       if (writable) {
         // 罕见：response.body 不可流式但 OPFS 可用——落盘后统一走句柄路径
+        // 续传时确保从断点追加（创建 writable 处已 seek，这里再显式定位兜底，
+        // 兼容实现差异）：seek 优先，退化为空写 + {at} 定位，绝不覆盖头部。
+        if (appendFromByte > 0) {
+          if (typeof writable.seek === 'function') {
+            await writable.seek(appendFromByte);
+          } else {
+            await writable.write(new Uint8Array(0), { at: appendFromByte });
+          }
+        }
         await writable.write(blob);
         await writable.close();
         const file = await opfsHandle.getFile();
@@ -1871,7 +1924,7 @@ export async function fetchPtBackup(options = {}, { onPhase, signal } = {}) {
   const response = await fetch('/api/backups/archive/export', {
     method: 'POST',
     credentials: 'same-origin',
-    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': token },
+    headers: { 'Content-Type': 'application/json', ...(token ? { 'X-CSRF-Token': token } : {}) },
     body: JSON.stringify({
       moduleIds: Array.isArray(options.moduleIds) ? options.moduleIds : [],
       includeSecrets: Boolean(options.includeSecrets),
@@ -1895,7 +1948,10 @@ export async function fetchPtBackup(options = {}, { onPhase, signal } = {}) {
   let windowStart = performance.now();
   let bps = 0;
   for (;;) {
-    const { done, value } = await reader.read();
+    const { done, value } = await readStreamChunkBounded(reader, {
+      timeoutMs: DOWNLOAD_STALL_TIMEOUT_MS,
+      label: '接收 PT 归档',
+    });
     if (done) break;
     chunks.push(value);
     received += value.length;
@@ -2124,7 +2180,8 @@ async function tryLukerChunkedRestore(zipBlob, { mode, handle, token, signal, ti
           uploadId = next.uploadId;
           cursor = 0;
           uploaded = 0;
-          chunkSize = RESTORE_UPLOAD_CHUNK_SIZE;
+          // 会话重建不重置 chunkSize：保留此前因 413 已减半的分片大小，
+          // 否则新会话首片又用 8MiB 必然再次被拒，陷入 413↔404 循环。
           attempt = 0;
           break;
         }
@@ -2159,7 +2216,13 @@ async function tryLukerChunkedRestore(zipBlob, { mode, handle, token, signal, ti
       body: '{}',
     }, { timeoutMs: RESTORE_ASSEMBLE_TIMEOUT_MS, signal, label: '组装分片' });
     if (!assembled.ok) throw await restoreHttpError(assembled, '组装分片');
-    await readJsonBounded(assembled, { timeoutMs: RESTORE_ASSEMBLE_TIMEOUT_MS, signal, label: '读取组装结果' });
+    const assembledInfo = await readJsonBounded(assembled, { timeoutMs: RESTORE_ASSEMBLE_TIMEOUT_MS, signal, label: '读取组装结果' });
+    // 组装体必须与源包等长：少片/截断时 finalize 仍可能 200，
+    // 不校验就会把残缺包写进宿主。size 不符一律抛错阻断恢复。
+    const assembledSize = Number(assembledInfo?.size);
+    if (assembledSize !== size) {
+      throw new Error(`分片组装大小不符：宿主返回 ${assembledSize} 字节，源包 ${size} 字节，已阻断恢复`);
+    }
 
     const restored = await fetchWithTimeout('/api/users/restore-backup', {
       method: 'POST',
@@ -3080,8 +3143,11 @@ export function setupDrawerToggles(root) {
  * 共享 MutationObserver：替代每函数独立 setInterval 轮询。
  * 所有注入回调幂等（先查自身产物是否存在），宿主动态渲染/重渲染面板时
  * 由 DOM 变更触发重试（同时覆盖 TT 管理面板重渲染等自愈场景）。
+ *
+ * 用 Map 以 mount key 去重：同一 mount 被重复调用（HMR/重复初始化）时
+ * 覆盖旧回调而非追加，避免同一注入点堆积多个 watcher。
  */
-const injectionWatchers = new Set();
+const injectionWatchers = new Map();
 let injectionObserver = null;
 const INJECT_DEBOUNCE_MS = 200;
 
@@ -3096,10 +3162,11 @@ function runInjectionWatchers() {
 /**
  * 注册一个幂等注入回调：立即尝试一次，之后宿主 DOM 任何变更时去抖重试
  * @param {() => void} injectFn 幂等注入函数（内部自行判断锚点/产物是否存在）
+ * @param {string} [key] 去重键（mount 函数名）；缺省用函数自身，重复调用同名 mount 会覆盖
  */
-function watchHostDom(injectFn) {
+function watchHostDom(injectFn, key = injectFn) {
   if (typeof document === 'undefined') return;
-  injectionWatchers.add(injectFn);
+  injectionWatchers.set(key, injectFn);
   if (document.readyState === 'loading' || !document.body) {
     document.addEventListener('DOMContentLoaded', () => injectFn(), { once: true });
   } else {
@@ -3115,7 +3182,7 @@ function watchHostDom(injectFn) {
       runInjectionWatchers();
     }, INJECT_DEBOUNCE_MS);
   });
-  injectionObserver.observe(document.body, { childList: true, subtree: true });
+  injectionObserver.observe(document.body, { childList: true, subtree: true, attributes: true });
 }
 
 /* 单页常驻下不会被调用，供 HMR / 测试 / 未来卸载路径使用：断开宿主 DOM observer 并清空watchers。 */
@@ -3191,8 +3258,13 @@ export function mountExtensionRowButton(onOpen) {
       document.getElementById('extensions_settings2'),
     ].filter(Boolean);
     targets.forEach((target) => {
-      // 幂等：宿主重渲染会让标记随节点消失，observer 自动重注
-      if (document.getElementById('st-pack-transfer-container') || target.querySelector('[data-st-pack-transfer-injected="1"]')) return;
+      // 幂等：按**当前锚点**局部判重，两个设置抽屉（extensions_settings /
+      // extensions_settings2）各自注入一份。全局 getElementById 只作兜底——
+      // 仅当已注入的容器确实位于本 target 内才跳过，避免第一个抽屉的存在
+      // 挡住第二个抽屉的注入（宿主两者并存时的回归）。
+      const localInjected = target.querySelector('[data-st-pack-transfer-injected="1"]');
+      const globalContainer = document.getElementById('st-pack-transfer-container');
+      if (localInjected || (globalContainer && target.contains(globalContainer))) return;
 
       const container = document.createElement('div');
       container.id = 'st-pack-transfer-container';
@@ -3233,7 +3305,7 @@ export function mountExtensionRowButton(onOpen) {
     });
   };
 
-  watchHostDom(addBtn);
+  watchHostDom(addBtn, 'mountExtensionRowButton');
 }
 
 /**
@@ -3627,13 +3699,16 @@ export function mountNativeBackupButton(onPull) {
 
   const addBtn = () => {
     // 多锚点：账号弹层（userProfile）与管理面板（admin，每用户行一个）都有 .userBackupButton
-    document.querySelectorAll('.userBackupButton').forEach((anchor) => {
+    document.querySelectorAll('.userBackupButton').forEach((anchor, i) => {
       if (!anchor.parentElement) return;
-      // 幂等：兄弟位已注入则跳过（弹层重渲染后标记随节点消失，observer 自动重注）
+      // 幂等：按**本锚点的兄弟位**判重（局部），不用全局 getElementById——
+      // 多个锚点共存时全局唯一 id 会挡住其余锚点的注入。
       if (anchor.nextElementSibling?.dataset?.stZipInjected === '1') return;
 
+      // 多锚点按钮 id 唯一化（BTN_ID-0 / -1 …），避免重复 id 破坏 DOM 语义。
+      const anchorBtnId = `${BTN_ID}-${i}`;
       const pullBtn = makeHostButton({
-        id: BTN_ID,
+        id: anchorBtnId,
         icon: 'fa-right-left',
         label: '从宿主拉取',
         title: '从宿主拉取数据包（按原生界面的类目勾选）',
@@ -3645,7 +3720,7 @@ export function mountNativeBackupButton(onPull) {
     });
   };
 
-  watchHostDom(addBtn);
+  watchHostDom(addBtn, 'mountNativeBackupButton');
 }
 
 /**
@@ -3725,7 +3800,7 @@ export function mountLukerBackupManagerButton(onPull) {
     row.insertBefore(btn, row.firstChild);
   };
 
-  watchHostDom(addBtn);
+  watchHostDom(addBtn, 'mountLukerBackupManagerButton');
 }
 
 /**
@@ -3755,7 +3830,7 @@ export function mountTtDataMigrationButton(onPull) {
     toolbar.insertBefore(btn, nativeExport);
   };
 
-  watchHostDom(addBtn);
+  watchHostDom(addBtn, 'mountTtDataMigrationButton');
 }
 
 /**
@@ -3785,5 +3860,5 @@ export function mountPtDataManagementButton(onPull) {
     toolbar.insertBefore(btn, nativeExport);
   };
 
-  watchHostDom(addBtn);
+  watchHostDom(addBtn, 'mountPtDataManagementButton');
 }

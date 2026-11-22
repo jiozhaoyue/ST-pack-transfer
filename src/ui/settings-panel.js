@@ -5,6 +5,7 @@
  * 属于图表选择面，不得回到这里。
  */
 import { t } from '../i18n/index.js';
+import { detectHost } from './host-bridge.js';
 import { brandTokensOf } from '../data/target-ui.js';
 import { normalizeAccounts } from '../core/git-accounts.js';
 import { SITES } from '../core/git-url.js';
@@ -281,6 +282,8 @@ export const TAVERN_THEMES = Object.freeze({
 });
 
 export function applyWebTheme(themeKey) {
+  // 宿主态：主题由宿主控制，禁止写宿主 CSS 变量（D-02），仅独立 Web 生效
+  try { if (detectHost()?.isPlugin === true) return; } catch { /* 探测失败按独立态处理 */ }
   const theme = TAVERN_THEMES[themeKey] || TAVERN_THEMES['Dark Lite'];
   if (typeof document === 'undefined') return;
   const root = document.documentElement;
@@ -1080,6 +1083,9 @@ function syncDocsLink(input, link, warn) {
 
 /** 文档站控件的事件委托只注册一次；模块导入本身无副作用（Node 测试无 document）。 */
 let docsSyncWired = false;
+/** 缓存文档站委托处理器引用，供 disposeSettingsPanel 移除（避免匿名监听泄漏）。 */
+let docsInputHandler = null;
+let docsClickHandler = null;
 
 /**
  * 惰性注册文档站控件的委托监听。
@@ -1100,7 +1106,7 @@ function ensureDocsSyncWired() {
     return { input, link, warn: node.closest('#settings-body').querySelector('[data-docs-invalid]') };
   };
 
-  const onInput = (ev) => {
+  docsInputHandler = (ev) => {
     const el = ev.target;
     if (!el || el.getAttribute?.('data-setting') !== 'docsBaseUrl') return;
     const parts = resolveParts(el);
@@ -1108,16 +1114,16 @@ function ensureDocsSyncWired() {
   };
 
   /* 草稿恢复（applySettingsDraft）直接写 value、不触发事件，故点击前再兜一次。 */
-  const onClick = (ev) => {
+  docsClickHandler = (ev) => {
     const link = ev.target?.closest?.('#settings-open-docs');
     if (!link) return;
     const parts = resolveParts(link);
     if (parts) syncDocsLink(parts.input, parts.link, parts.warn);
   };
 
-  document.addEventListener('input', onInput, true);
-  document.addEventListener('change', onInput, true);
-  document.addEventListener('click', onClick, true);
+  document.addEventListener('input', docsInputHandler, true);
+  document.addEventListener('change', docsInputHandler, true);
+  document.addEventListener('click', docsClickHandler, true);
 }
 
 /** 问题报告按钮委托只注册一次；模块导入本身无副作用（Node 测试无 document）。 */
@@ -1273,12 +1279,19 @@ function downloadMarkdown(text) {
   setTimeout(() => { try { URL.revokeObjectURL(url); } catch { /* 忽略 */ } }, 60000);
 }
 
-/** 在按钮上短暂闪现提示文案，文案全部来自 i18n。 */
+/** 用按钮自身的 timer 句柄做互斥，避免连续闪烁时旧 timer 提前还原文案。 */
+const flashTimers = new WeakMap();
 function flashLabel(btn, msg) {
   if (!btn || typeof btn.textContent !== 'string') return;
+  const prev = flashTimers.get(btn);
+  if (prev && typeof clearTimeout === 'function') clearTimeout(prev);
   const original = btn.textContent;
   btn.textContent = msg;
-  setTimeout(() => { btn.textContent = original; }, 1500);
+  const timer = setTimeout(() => {
+    btn.textContent = original;
+    flashTimers.delete(btn);
+  }, 1500);
+  flashTimers.set(btn, timer);
 }
 
 /**
@@ -1485,14 +1498,16 @@ function ensureIssueReportWired() {
 
 /** 单页常驻下不会被调用，供 HMR / 测试 / 未来卸载路径使用：注销问题报告 click 委托并复位注册标志。 */
 export function disposeSettingsPanel() {
-  if (issueClickHandler && typeof document !== 'undefined' && typeof document.removeEventListener === 'function') {
-    document.removeEventListener('click', issueClickHandler, false);
-  }
-  if (issueLogChangeHandler && typeof document !== 'undefined' && typeof document.removeEventListener === 'function') {
-    document.removeEventListener('change', issueLogChangeHandler, false);
-  }
-  if (issueTemplateChangeHandler && typeof document !== 'undefined' && typeof document.removeEventListener === 'function') {
-    document.removeEventListener('change', issueTemplateChangeHandler, false);
+  if (typeof document !== 'undefined' && typeof document.removeEventListener === 'function') {
+    if (issueClickHandler) document.removeEventListener('click', issueClickHandler, false);
+    if (issueLogChangeHandler) document.removeEventListener('change', issueLogChangeHandler, false);
+    if (issueTemplateChangeHandler) document.removeEventListener('change', issueTemplateChangeHandler, false);
+    // 文档站委托监听（捕获阶段）一并移除，避免 HMR / 测试卸载后残留
+    if (docsInputHandler) {
+      document.removeEventListener('input', docsInputHandler, true);
+      document.removeEventListener('change', docsInputHandler, true);
+    }
+    if (docsClickHandler) document.removeEventListener('click', docsClickHandler, true);
   }
   if (issueLogSyncTimer !== null && typeof clearTimeout === 'function') {
     clearTimeout(issueLogSyncTimer);
@@ -1502,4 +1517,7 @@ export function disposeSettingsPanel() {
   issueLogChangeHandler = null;
   issueTemplateChangeHandler = null;
   issueReportWired = false;
+  docsInputHandler = null;
+  docsClickHandler = null;
+  docsSyncWired = false;
 }

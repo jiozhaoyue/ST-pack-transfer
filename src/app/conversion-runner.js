@@ -209,7 +209,9 @@ export function createConversionRunner({
             partialOpfsName: name,
             target,
             partialEntries,
-            totalEntries: totalBytes,
+            // totalEntries 与 task-runtime 同源：是条目数（doneEntries.size / manifest 条数），不是字节数。
+            // 曾误填 totalBytes（字节），续传的「数目不符」失效检测据此误判，故改用真实条目数。
+            totalEntries: Array.isArray(partialEntries) ? partialEntries.length : 0,
             sourcePkgId: pkg?.id || '',
             sourceName: label,
           }),

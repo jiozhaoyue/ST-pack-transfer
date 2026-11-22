@@ -149,18 +149,36 @@ export function probeChatStore() {
  * 有界等待一个可能永不 settle 的调用。
  * @param {Promise<any>} promise
  * @param {number} timeoutMs
+ * @param {AbortSignal} [signal] 外部中止信号；aborted 时立即以 AbortError 拒绝
  * @returns {Promise<any|symbol>} 超时返回 `TIMED_OUT`
  */
-async function withTimeout(promise, timeoutMs) {
+async function withTimeout(promise, timeoutMs, signal) {
+  // 已中止：不再发起等待，立即拒绝（与调用方 signal?.aborted 前置检查形成双保险）
+  if (signal?.aborted) {
+    const err = new Error('aborted');
+    err.name = 'AbortError';
+    throw err;
+  }
   let timer = null;
+  let onAbort = null;
+  const abortPromise = new Promise((_, reject) => {
+    onAbort = () => {
+      const err = new Error('aborted');
+      err.name = 'AbortError';
+      reject(err);
+    };
+    try { signal?.addEventListener('abort', onAbort, { once: true }); } catch { /* signal 形状异常时忽略 */ }
+  });
   try {
     return await Promise.race([
       promise,
+      abortPromise,
       new Promise((resolve) => { timer = setTimeout(() => resolve(TIMED_OUT), timeoutMs); }),
     ]);
   } finally {
     // 必须清掉：否则一个 8s 的定时器会把 Node 测试进程钉在事件循环里
     if (timer !== null) clearTimeout(timer);
+    try { if (signal && onAbort) signal.removeEventListener('abort', onAbort); } catch { /* 忽略 */ }
   }
 }
 
@@ -180,10 +198,16 @@ export async function listLibraryChats({ timeoutMs = DEFAULT_LIST_TIMEOUT_MS, si
 
   const { api } = resolveApi();
   try {
-    const res = await withTimeout(Promise.resolve().then(() => api.listChats()), timeoutMs);
+    const res = await withTimeout(Promise.resolve().then(() => api.listChats()), timeoutMs, signal);
     if (res === TIMED_OUT) {
       note('listChats 超时', 'warn', `聊天库 listChats 超时（${timeoutMs}ms），本次按「不可用」处理`);
       return { ok: false, chats: [], reason: `timeout(${timeoutMs}ms)` };
+    }
+    // 外部失败形状 {ok:false, reason}：透传原因，不当成空列表假成功
+    if (res && typeof res === 'object' && res.ok === false) {
+      const reason = res.reason || 'unknown';
+      note(reason, 'warn', `聊天库 listChats 返回失败：${reason}`);
+      return { ok: false, chats: [], reason };
     }
     const chats = Array.isArray(res) ? res : (Array.isArray(res?.chats) ? res.chats : []);
     state.lastListCount = chats.length;
@@ -220,11 +244,18 @@ export async function readLibraryChatAsJsonl(ref, {
   const { api } = resolveApi();
   try {
     const arg = { avatarUrl: ref?.avatarUrl ?? null, fileName: fileName.trim() };
-    const res = await withTimeout(Promise.resolve().then(() => api.exportChat(arg)), timeoutMs);
+    const res = await withTimeout(Promise.resolve().then(() => api.exportChat(arg)), timeoutMs, signal);
     if (res === TIMED_OUT) {
       state.lastExportFailed += 1;
       note('exportChat 超时', 'warn', `聊天库导出「${fileName}」超时（${timeoutMs}ms），跳过该条`);
       return { ok: false, text: '', reason: `timeout(${timeoutMs}ms)` };
+    }
+    // 外部失败形状 {ok:false, reason}：透传原因，不误判为空内容
+    if (res && typeof res === 'object' && res.ok === false) {
+      const reason = res.reason || 'unknown';
+      state.lastExportFailed += 1;
+      note(reason, 'warn', `聊天库导出「${fileName}」返回失败：${reason}`);
+      return { ok: false, text: '', reason };
     }
     const text = typeof res === 'string' ? res : (typeof res?.jsonl === 'string' ? res.jsonl : '');
     if (!text) {
@@ -290,13 +321,15 @@ export async function importChatsToLibrary(items, {
           sourceLabel: item.sourceLabel || 'ST-pack-transfer',
         })),
         timeoutMs,
+        signal,
       );
       if (res === TIMED_OUT) {
         failed.push({ fileName, reason: `timeout(${timeoutMs}ms)` });
-      } else if (res && res.ok === false) {
-        failed.push({ fileName, reason: res.reason || 'unknown' });
-      } else {
+      } else if (res && res.ok === true) {
         imported += 1;
+      } else {
+        // 严格判定：只有显式 ok===true 才算成功；{ok:false,reason} / undefined / 其它形状一律失败
+        failed.push({ fileName, reason: (res && res.reason) || 'unknown' });
       }
     } catch (err) {
       failed.push({ fileName, reason: err?.message || String(err) });

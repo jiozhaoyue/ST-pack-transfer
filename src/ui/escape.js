@@ -36,7 +36,18 @@ export function escapeHtml(value) {
  * @returns {boolean}
  */
 export function isSafeHttpUrl(value) {
-  return typeof value === 'string' && /^https?:\/\//i.test(value.trim());
+  if (typeof value !== 'string') return false;
+  const trimmed = value.trim();
+  if (!trimmed) return false;
+  // 拒绝控制字符：换行/回车/制表符可伪装成合法 URL 前缀后注入第二行协议，
+  // 例如 'https://a.com\njavascript:x' 用 ^https?:// 前缀匹配会误判为安全。
+  if (/[\u0000-\u001F\u007F]/.test(value)) return false;
+  try {
+    const { protocol } = new URL(trimmed);
+    return protocol === 'http:' || protocol === 'https:';
+  } catch {
+    return false;
+  }
 }
 
 /**

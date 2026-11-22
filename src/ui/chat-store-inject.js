@@ -356,10 +356,23 @@ export async function importRestoredChatsIntoLibrary(zipBlob, {
     let done = 0;
     for (const item of picked) {
       if (signal?.aborted) { result.skipped = 'aborted'; return result; }
-      // eslint-disable-next-line no-await-in-loop —— 逐条是刻意的：单条可能很大，且要能随时中止
-      const bytes = await item.read();
+      // 单条「读 + 解码」失败（损坏条目 / 非 UTF-8）只记失败并跳过，不阻断其余条目
+      let jsonl;
+      try {
+        // eslint-disable-next-line no-await-in-loop —— 逐条是刻意的：单条可能很大，且要能随时中止
+        const bytes = await item.read();
+        jsonl = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+      } catch (err) {
+        const reason = `read/decode 失败: ${err?.message || String(err)}`;
+        logger.warn(`聊天库还原入库：跳过「${item.fileName}」——${reason}`);
+        result.failed.push({ fileName: item.fileName, reason });
+        done += 1;
+        onProgress?.(done, picked.length, item.fileName);
+        continue;
+      }
+      // eslint-disable-next-line no-await-in-loop —— 逐条是刻意的：库写入有锁与快照语义
       const one = await importChatsToLibrary(
-        [{ fileName: item.fileName, jsonl: new TextDecoder('utf-8').decode(bytes) }],
+        [{ fileName: item.fileName, jsonl }],
         { signal },
       );
       result.imported += one.imported;

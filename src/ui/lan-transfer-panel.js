@@ -262,12 +262,14 @@ async function waitIceComplete(pc) {
   return pc.iceGatheringState === 'complete';
 }
 
-/** 给任意 promise 加上限——超时抛错，调用方据此报失败。 */
+/** 给任意 promise 加上限——超时抛错，调用方据此报失败。
+ *  无论原 promise 先 settle 还是先超时，都清掉另一个 timer，避免无谓挂起。 */
 function withTimeout(promise, ms, label) {
-  return Promise.race([
-    promise,
-    new Promise((_, reject) => setTimeout(() => reject(new Error(t('lan.timeout', { label }))), ms)),
-  ]);
+  let timer = null;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(t('lan.timeout', { label }))), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
 
 /** 时长文案：单位由 i18n 决定；核心 `formatDuration` 保持与 UI 无关的中文实现。 */
@@ -303,6 +305,7 @@ export function mountLanTransferPanel({ view, getSendTargets = null, onReceive =
   let pendingOffer = null;
   let writeChain = Promise.resolve();
   let doneWaiter = null;
+  let doneWaitTimer = null; // 等待对端确认的超时句柄，需在 settle 的各路径清理
   let cancelRequested = false;
   let rateSamples = [];
   /** 接收端 ack 节流账本（已落写字节的 ack 基准）。与发送端信用账本分开——同一页面可同时收发。 */
@@ -368,6 +371,7 @@ export function mountLanTransferPanel({ view, getSendTargets = null, onReceive =
     if (doneWaiter) {
       const cb = doneWaiter;
       doneWaiter = null;
+      if (doneWaitTimer) { clearTimeout(doneWaitTimer); doneWaitTimer = null; }
       cb(false, t('lan.err.sessionClosed'));
     }
     // abort/失败/页隐藏：丢弃攒批 pending（尚未写盘的数据，校验必然失败，方向正确）。
@@ -465,8 +469,8 @@ export function mountLanTransferPanel({ view, getSendTargets = null, onReceive =
       let msg = null;
       try { msg = JSON.parse(event.data); } catch { return; }
       if (msg.t === 'ack') { lastAckedBytes = Number(msg.bytes) || 0; return; }
-      if (msg.t === 'ok' && doneWaiter) { const cb = doneWaiter; doneWaiter = null; cb(true, ''); return; }
-      if (msg.t === 'err' && doneWaiter) { const cb = doneWaiter; doneWaiter = null; cb(false, msg.message || t('lan.err.peerVerifyFailed')); }
+      if (msg.t === 'ok' && doneWaiter) { const cb = doneWaiter; doneWaiter = null; if (doneWaitTimer) { clearTimeout(doneWaitTimer); doneWaitTimer = null; } cb(true, ''); return; }
+      if (msg.t === 'err' && doneWaiter) { const cb = doneWaiter; doneWaiter = null; if (doneWaitTimer) { clearTimeout(doneWaitTimer); doneWaitTimer = null; } cb(false, msg.message || t('lan.err.peerVerifyFailed')); }
     };
   }
 
@@ -592,12 +596,14 @@ export function mountLanTransferPanel({ view, getSendTargets = null, onReceive =
     const waitMs = Math.max(30_000, 5_000 + (total / (1024 * 1024)) * 2_000);
     const confirmed = await new Promise((resolve) => {
       doneWaiter = (success, message) => resolve({ success, message });
-      setTimeout(() => {
+      doneWaitTimer = setTimeout(() => {
         if (!doneWaiter) return;
         doneWaiter = null;
+        doneWaitTimer = null;
         resolve({ success: false, message: t('lan.err.verifyTimeout') });
       }, waitMs);
     });
+    if (doneWaitTimer) { clearTimeout(doneWaitTimer); doneWaitTimer = null; }
     if (!confirmed.success) throw new Error(confirmed.message || t('lan.err.peerNotConfirmed'));
 
     finishSend(digest ? t('lan.detail.digestMatch') : t('lan.detail.sizeOnly'));
@@ -726,7 +732,6 @@ export function mountLanTransferPanel({ view, getSendTargets = null, onReceive =
 
     try { machine.finish(); } catch { /* 已终态 */ }
     recvState = 'done';
-    partials.delete(current.fileId);
     setRecv({
       offer: '', code: '',
       phase: verdict.digestChecked ? t('lan.phase.receivedMatch') : t('lan.phase.receivedSize'),
@@ -738,13 +743,15 @@ export function mountLanTransferPanel({ view, getSendTargets = null, onReceive =
 
     try {
       if (typeof onReceive === 'function') await onReceive(blob, current.name);
+      // 仅在入库成功后才清理半成品：失败时保留 .part 与 partials，供重试续传。
+      partials.delete(current.fileId);
+      void discardPartial(current.fileId);
       setRecv({ detail: `${formatBytes(blob.size)}${verdict.digestChecked ? ` · ${t('lan.detail.digestMatch')}` : ''}`, busy: false });
       log('INFO', t('lan.log.recvDone', { name: current.name }));
     } catch (err) {
       setRecv({ phase: t('lan.phase.storeFailed'), detail: err.message, busy: false });
       log('ERROR', t('lan.log.storeFailed', { msg: err.message }));
     }
-    void discardPartial(current.fileId);
   }
 
   const handleReceiverControl = (text, dc) => {
@@ -978,8 +985,12 @@ export function mountLanTransferPanel({ view, getSendTargets = null, onReceive =
 
     dc.onerror = (err) => {
       /* 2026-11-19：原先只有 dbg()，而 dbg 仅在 localStorage lan-debug=1 时输出，
-         生产环境通道错误完全不可见（静默失败）。现在同时入日志与界面提示。 */
+         生产环境通道错误完全不可见（静默失败）。现在同时入日志与界面提示。
+         与 onclose 对齐：停心跳、置失败态、刷新 UI，避免错误后仍显示在线。 */
       dbg('peer dc error', err);
+      stopPeerPing();
+      peerManager.setConnState(PEER_CONN_STATES.FAILED);
+      syncPeerUi();
       log('ERROR', t('lan.err.channelError'));
       toast(t('lan.err.channelError'));
     };
@@ -1082,6 +1093,8 @@ export function mountLanTransferPanel({ view, getSendTargets = null, onReceive =
       log('INFO', t('lan.log.codeGenerated'));
       if (!iceDone) log('WARN', t('lan.err.iceIncomplete'));
     } catch (err) {
+      // 生成失败时清理已建但可能半开的对等连接，避免残留 pc/dc。
+      peerDisconnect();
       log('ERROR', t('lan.log.generateFailed', { msg: err.message }));
       toast(t('lan.log.generateFailed', { msg: err.message }));
     }
@@ -1128,6 +1141,8 @@ export function mountLanTransferPanel({ view, getSendTargets = null, onReceive =
         throw new Error(t('lan.err.badCode'));
       }
     } catch (err) {
+      // 连接失败时清理已建但可能半开的对等连接，避免残留 pc/dc。
+      peerDisconnect();
       log('ERROR', t('lan.log.connectFailed', { msg: err.message }));
       toast(t('lan.log.connectFailed', { msg: err.message }));
     }
@@ -1216,6 +1231,7 @@ export function mountLanTransferPanel({ view, getSendTargets = null, onReceive =
      且入队时读 pkg.sizeBytes / pkg.blob，而目标是 File（只有 .size）⇒ 双重错配。
      现在 await 后直接以 File 为准，入队与 pumpPeerQueue 的 slice 语义一致。 */
   async function peerSend() {
+    if (!capability.direct) { toast(capability.reason); return; }
     const targets = getSendTargets ? await getSendTargets() : [];
     if (!targets.length) {
       toast(t('lan.toast.selectPacksToSend'));

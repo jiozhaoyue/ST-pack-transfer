@@ -13,7 +13,7 @@
         <!-- 总体结论横幅 -->
         <div :class="['verdict-banner', verdictStatus]">
           <span class="verdict-icon">{{ verdictStatus === 'pass' ? '✓' : '⚠' }}</span>
-          <span class="verdict-text">{{ report?.verdict || t('inspect.analyzing') }}</span>
+          <span class="verdict-text">{{ verdictText }}</span>
         </div>
 
         <!-- A~E 五层分级展示 -->
@@ -60,16 +60,26 @@ const props = defineProps({
   isOpen: { type: Boolean, default: false },
   report: { type: Object, default: () => null },
   title: { type: String, default: '' },
+  onSaveToWorkspace: { type: Function, default: null },
 });
 
 const emit = defineEmits(['close', 'save-to-workspace']);
 
 const verdictStatus = computed(() => {
+  if (props.report?.verdict?.severity === 'ok') return 'pass';
   return props.report?.ok ? 'pass' : 'warn';
 });
 
+const verdictText = computed(() => {
+  const verdict = props.report?.verdict;
+  if (!verdict) return t('inspect.analyzing');
+  const key = 'inspect.verdict.' + verdict.key;
+  const label = t(key);
+  return label && label !== key ? label : (verdict.code || t('inspect.analyzing'));
+});
+
 const canSaveToWorkspace = computed(() => {
-  return props.report?.blob && props.report?.ok;
+  return typeof props.onSaveToWorkspace === 'function' && props.report?.ok === true;
 });
 
 const layers = computed(() => {
@@ -78,34 +88,41 @@ const layers = computed(() => {
     layerA: {
       code: 'A',
       name: t('inspect.layer.bytes'),
-      ok: !r.emptyFile && !r.truncated,
-      summary: r.layerA?.summary || t('inspect.layerA.summary'),
+      ok: (r.bytes?.size || 0) > 0,
+      summary: t('inspect.layerA.summary'),
     },
     layerB: {
       code: 'B',
       name: t('inspect.layer.zip'),
-      ok: !r.corruptZip,
-      summary: r.layerB?.summary || t('inspect.layerB.summary'),
+      ok: r.zip?.centralDirOk === true,
+      summary: t('inspect.layerB.summary'),
     },
     layerC: {
       code: 'C',
       name: t('inspect.layer.entries'),
       ok: true,
-      summary: t('inspect.layerC.summary', { total: r.entryCount || 0, empty: r.zeroByteCount || 0 }),
+      summary: t('inspect.layerC.summary', {
+        total: r.zip?.entryCount || 0,
+        empty: r.entries?.zeroByteCount || 0,
+      }),
     },
     layerD: {
       code: 'D',
       name: t('inspect.layer.semantic'),
-      ok: !!r.layout,
-      summary: t('inspect.layerD.summary', { layout: r.layout || t('inspect.layoutUnknown') }),
+      ok: !!r.layout?.detected && r.layout.detected !== 'unknown',
+      summary: t('inspect.layerD.summary', {
+        layout: r.layout?.detected || t('inspect.layoutUnknown'),
+      }),
     },
     layerE: {
       code: 'E',
       name: t('inspect.layer.convertible'),
-      ok: r.convertible ?? true,
-      summary: r.convertible
-        ? t('inspect.layerE.ok')
-        : t('inspect.layerE.partial'),
+      ok: r.convertible
+        ? r.convertible.planOk !== false && (r.convertible.selectedEntries || 0) > 0
+        : true,
+      summary: t(r.convertible?.planOk === false ? 'inspect.layerE.partial' : 'inspect.layerE.ok', {
+        selected: r.convertible?.selectedEntries || 0,
+      }),
     },
   };
 });
@@ -115,9 +132,8 @@ function handleClose() {
 }
 
 function handleSaveToWorkspace() {
-  if (props.report?.blob) {
-    emit('save-to-workspace', props.report);
-  }
+  if (!canSaveToWorkspace.value) return;
+  emit('save-to-workspace', props.report);
 }
 </script>
 

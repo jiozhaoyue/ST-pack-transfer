@@ -222,7 +222,11 @@ export async function runConversionTask({ source, target, options = {}, onProgre
 
     const cleanup = () => {
       if (pauseTimer) { clearTimeout(pauseTimer); pauseTimer = null; }
+      // 三类监听都要摘：只摘 message 会留下 error/messageerror 的悬空回调，
+      // 后续 worker 加载失败时误触已 settle 任务的那份闭包。
       worker.removeEventListener('message', handler);
+      worker.removeEventListener('error', onWorkerError);
+      worker.removeEventListener('messageerror', onWorkerError);
       options.signal?.removeEventListener?.('abort', onAbort);
     };
 
@@ -236,8 +240,10 @@ export async function runConversionTask({ source, target, options = {}, onProgre
       cleanup();
       try { worker.terminate(); } catch { /* 已终止 */ }
       // terminate 后该实例不可再用；置空让下一次任务重建，
-      // 否则暂停过一次后所有后续任务都向死 worker postMessage 而永久挂起
-      workerInstance = null;
+      // 否则暂停过一次后所有后续任务都向死 worker postMessage 而永久挂起。
+      // 仅当实例仍是本任务的那一个才置空：若已被别的任务替换（onWorkerError 先回收并新建），
+      // 绝不能把新实例误清掉。
+      if (workerInstance === worker) workerInstance = null;
       if (partial && typeof onPaused === 'function') {
         try {
           await onPaused(partial);

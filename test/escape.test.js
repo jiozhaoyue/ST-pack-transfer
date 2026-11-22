@@ -60,6 +60,13 @@ describe('isSafeHttpUrl', () => {
     expect(isSafeHttpUrl(123)).toBe(false);
     expect(isSafeHttpUrl('')).toBe(false);
   });
+
+  it('拒绝内嵌控制字符的换行绕过（URL 解析器会剥离换行导致误判）', () => {
+    expect(isSafeHttpUrl('https://a.com\njavascript:x')).toBe(false);
+    expect(isSafeHttpUrl('https://a.com\rjavascript:x')).toBe(false);
+    expect(isSafeHttpUrl('https://a.com\tjavascript:x')).toBe(false);
+    expect(isSafeHttpUrl('https://ok.com\nhttps://evil.com')).toBe(false);
+  });
 });
 
 describe('trustedStaticMarkup', () => {

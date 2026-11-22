@@ -41,7 +41,8 @@ const CHECKPOINT_EVERY_MS = 2000;
  * @property {string} label
  * @property {'running'|'paused'|'aborted'|'done'|'failed'} state
  * @property {boolean} resumable
- * @property {AbortController} controller
+ * @property {number} generation 执行代次：start / resume 各 +1；在途回调捕获创建时代次，代次不符即丢弃
+ * @property {AbortController|null} controller 结束态置空（保留记录但不持引用）
  * @property {number} receivedBytes
  * @property {number} totalBytes
  * @property {object|null} checkpoint 最近一次断点清单
@@ -67,6 +68,9 @@ export const memoryAdapter = () => {
 /** adapter.load 在清单不存在时返回 null（所有实现统一此约定） */
 export const ADAPTER_NULL = null;
 
+/** 历史记录上限（与 docs/index.md「最近 200 条结束任务保留展示」对齐）。 */
+const TASK_HISTORY_LIMIT = 200;
+
 export class TaskManager {
   /**
    * @param {object} [adapter] 持久化 adapter（默认内存实现，浏览器侧传 OPFS 实现）
@@ -75,6 +79,24 @@ export class TaskManager {
     this.adapter = adapter;
     /** @type {Map<string, TaskRecord>} */
     this.tasks = new Map();
+  }
+
+  /** 结束态记录保留最近 TASK_HISTORY_LIMIT 条，多余的按注册先后淘汰。 */
+  pruneTaskHistory() {
+    let finished = 0;
+    for (const t of this.tasks.values()) {
+      if (t.state === TASK_STATES.DONE || t.state === TASK_STATES.ABORTED || t.state === TASK_STATES.FAILED) {
+        finished += 1;
+      }
+    }
+    if (finished <= TASK_HISTORY_LIMIT) return;
+    for (const [id, t] of this.tasks) {
+      if (finished <= TASK_HISTORY_LIMIT) break;
+      if (t.state === TASK_STATES.DONE || t.state === TASK_STATES.ABORTED || t.state === TASK_STATES.FAILED) {
+        this.tasks.delete(id);
+        finished -= 1;
+      }
+    }
   }
 
   /**
@@ -91,11 +113,15 @@ export class TaskManager {
       throw new Error(`TaskManager: 任务 ${id} 已在运行`);
     }
     const controller = new AbortController();
+    // 每次启动（含续传重跑）推进一代：旧执行体的在途回调捕获的是旧 generation，写盘前被丢弃。
+    const generation = (this.tasks.get(id)?.generation || 0) + 1;
+    this.pruneTaskHistory();
     this.tasks.set(id, {
       id,
       label,
       state: TASK_STATES.RUNNING,
       resumable,
+      generation,
       controller,
       receivedBytes: 0,
       totalBytes,
@@ -112,7 +138,8 @@ export class TaskManager {
        */
       onCheckpoint: async (manifest, opts = {}) => {
         const task = this.tasks.get(id);
-        if (!task || task.state !== TASK_STATES.RUNNING) return;
+        // 代次隔离：暂停后续传重跑会起新代，旧执行体的在途回调即使拿到同一 id 也不得覆盖新断点。
+        if (!task || task.state !== TASK_STATES.RUNNING || task.generation !== generation) return;
         if (typeof opts.bytes === 'number') task.receivedBytes = opts.bytes;
         task.checkpoint = manifest;
         task._dirtyEntries += 1;
@@ -148,7 +175,7 @@ export class TaskManager {
        */
       setPauseCheckpoint: async (manifest) => {
         const task = this.tasks.get(id);
-        if (!task || task.state !== TASK_STATES.PAUSED) return false;
+        if (!task || task.state !== TASK_STATES.PAUSED || task.generation !== generation) return false;
         task.checkpoint = manifest;
         try {
           await this.adapter.save(id, manifest);
@@ -205,6 +232,9 @@ export class TaskManager {
     if (wasRunning) {
       task.controller.abort();
     }
+    // 结束态保留记录供 UI 核对，但不再持有 controller / 断点引用（避免长任务与大数据常驻）。
+    task.controller = null;
+    task.checkpoint = null;
     try {
       await this.adapter.remove(id);
     } catch (err) {
@@ -221,6 +251,8 @@ export class TaskManager {
   async resume(id) {
     const task = this.tasks.get(id);
     if (!task || task.state !== TASK_STATES.PAUSED || !task.resumable) return null;
+    // 续传也是新一代：旧执行体的在途回调不得写进本次续传的断点。
+    task.generation = (task.generation || 0) + 1;
     const manifest = await this.adapter.load(id);
     return manifest;
   }
@@ -233,6 +265,8 @@ export class TaskManager {
     const task = this.tasks.get(id);
     if (!task) return;
     task.state = TASK_STATES.DONE;
+    task.controller = null;
+    task.checkpoint = null;
     try {
       await this.adapter.remove(id);
     } catch (err) {
@@ -248,6 +282,8 @@ export class TaskManager {
     const task = this.tasks.get(id);
     if (!task) return;
     task.state = TASK_STATES.FAILED;
+    task.controller = null;
+    task.checkpoint = null;
     if (!keepCheckpoint) {
       try {
         await this.adapter.remove(id);
@@ -259,7 +295,7 @@ export class TaskManager {
 
   /**
    * @param {string} id
-   * @returns {{ state, label, receivedBytes, totalBytes, resumable, checkpoint }|null}
+   * @returns {{ state, label, receivedBytes, totalBytes, resumable, generation, checkpoint }|null}
    */
   get(id) {
     const task = this.tasks.get(id);
@@ -270,6 +306,7 @@ export class TaskManager {
       receivedBytes: task.receivedBytes,
       totalBytes: task.totalBytes,
       resumable: task.resumable,
+      generation: task.generation,
       checkpoint: task.checkpoint,
     };
   }

@@ -139,6 +139,11 @@ let quotaTimer = null;
 let onVisibilityChange = null;
 /** 体检模态的 Vue 挂载句柄；fire-and-forget 拿到后留存，供 disposeMain 回收。 */
 let inspectMountHandle = null;
+/** 红队修复：长生命周期订阅的退订函数集中留存，供 disposeMain 统一释放。 */
+let unsubscribeExportQueue = null;
+let unsubscribeNativeExportWatch = null;
+let unsubscribeLogger = null;
+let unsubscribeLocaleChange = null;
 
 /**
  * 教程浮层必须直接挂到 `document.body`。
@@ -171,7 +176,13 @@ function ensureConverterModal() {
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape' && overlay.style.display !== 'none') overlay.style.display = 'none';
   });
-  if (!initialized) { initialized = true; main(app); }
+  if (!initialized) {
+    // initialized 只在 main() 成功后由 main 结尾置位；失败重置以便重试（红队修复）。
+    main(app).catch((err) => {
+      initialized = false;
+      logger.error(`[init] main 初始化失败，可重试: ${err?.message || err}`);
+    });
+  }
   return overlay;
 }
 
@@ -429,9 +440,9 @@ async function main(root) {
       view.setPackages(state.packages);
       syncToStore();
     } catch (err) {
+      // 红队修复：读取失败不再清空包列表；保留上次成功的列表并顶部告警，避免误删视图数据。
       logger.warn(t('log.workspaceReadFailed', { msg: err.message }));
-      state.packages = [];
-      view.setPackages([]);
+      view.toast(t('log.workspaceReadFailed', { msg: err.message }));
       syncToStore();
     }
     void refreshStorageQuota();
@@ -684,16 +695,23 @@ async function main(root) {
       label: t('taskq.labelImport', { n: list.length }),
     });
     let imported = 0;
+    let failed = 0;
     for (const file of list) {
       const name = remote ? uniqueRemoteName(file.name, used) : file.name;
       used.add(name);
       const id = `pkg-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-      await saveFile({
+      // 红队修复：saveFile 在存储不可用时返回 null；此前无视为成功，导致计数虚报。
+      const saved = await saveFile({
         id, name, size: file.size, blob: file, role: 'source',
         origin: remote ? ORIGINS.LAN : ORIGINS.UPLOAD,
         metadata: { importedAt: Date.now(), ...(remote ? { remote: true } : {}) },
       });
-      act.update((imported / Math.max(1, list.length)) * 100, name);
+      if (!saved) {
+        failed += 1;
+        logger.warn(t('log.workspaceReadFailed', { msg: `${name}: saveFile 返回 null` }));
+        continue;
+      }
+      act.update(((imported + failed) / Math.max(1, list.length)) * 100, name);
       logger.info(t(remote ? 'log.received' : 'log.imported', { name }));
       imported += 1;
     }
@@ -707,7 +725,8 @@ async function main(root) {
       view.setActivePackage(newest.id, { exclusive: true });
     }
     act.done();
-    view.toast(t(remote ? 'toast.receivedCount' : 'toast.importedCount', { n: list.length }));
+    view.toast(t(remote ? 'toast.receivedCount' : 'toast.importedCount', { n: imported }));
+    if (failed) view.toast(t('toast.privateUploadFailed'));
   }
 
   /** 局域网发送源：导入区当前勾选的包（控制器拿到的已是可 slice 的 File）。 */
@@ -745,6 +764,11 @@ async function main(root) {
   async function ensureAssetListGuide() {
     try { if (localStorage.getItem('stpt.assetListGuideSeen') === '1') return; } catch { /* 隐私模式 */ }
     await new Promise((resolve) => {
+      // 红队修复：view.openModal 不支持 onClose；Escape / × 关闭原生 dialog 时
+      // 既不走按钮 onClick 也不走 onCancel，Promise 会悬挂。注册一次性 close 兜底 settle。
+      const dlg = typeof document !== 'undefined' ? document.getElementById('confirm-dialog') : null;
+      const settle = () => { dlg?.removeEventListener('close', settle); resolve(); };
+      dlg?.addEventListener('close', settle);
       view.openModal(
         t('assetList.guideTitle'),
         t('assetList.guideDesc'),
@@ -752,7 +776,7 @@ async function main(root) {
         [{ label: t('modal.confirm'), primary: true, onClick: () => {
           try { localStorage.setItem('stpt.assetListGuideSeen', '1'); } catch { /* 隐私模式 */ }
           view.closeModal();
-          resolve();
+          settle();
         } }],
       );
     });
@@ -1273,6 +1297,18 @@ async function main(root) {
       for (let i = 0; i < targets.length; i += 1) {
         if (restoreCancelRequested) {
           logger.warn(t('taskq.abortedToast'));
+          // 红队修复：取消时剩余未处理的包计为 skipped，避免报告只覆盖已完成部分、进度误报 100%。
+          for (let j = i; j < targets.length; j += 1) {
+            results.push({
+              id: targets[j].id,
+              name: targets[j].name,
+              status: 'skipped',
+              message: t('lan.err.cancelled'),
+              note: '',
+            });
+          }
+          record.done = i;
+          persistRestoreProgress(record);
           break;
         }
         const pkg = targets[i];
@@ -1326,8 +1362,18 @@ async function main(root) {
     }
     const okCount = results.filter((r) => r.status === 'ok').length;
     const failed = results.filter((r) => r.status === 'failed').length;
-    view.setProgress(failed ? 0 : 100, failed ? t('progress.restoreFailed') : t('progress.restoreDone'));
-    if (!failed) view.toast(t('toast.restoreDone'));
+    const skippedCount = results.filter((r) => r.status === 'skipped').length;
+    // 红队修复：取消后不得报 100%「恢复完成」；按已完成数/总数如实呈现。
+    const cancelled = restoreCancelRequested || skippedCount > 0;
+    if (cancelled) {
+      // 用现成 i18n key（queue.restoreAborted / queue.restoreSummary），避免裸 key 文案。
+      const doneMsg = t('queue.restoreAborted', { done: okCount, total: targets.length });
+      view.setProgress(Math.round((okCount / Math.max(1, targets.length)) * 100), t('queue.restoreSummary', { done: okCount, total: targets.length }));
+      view.toast(doneMsg);
+    } else {
+      view.setProgress(failed ? 0 : 100, failed ? t('progress.restoreFailed') : t('progress.restoreDone'));
+      if (!failed) view.toast(t('toast.restoreDone'));
+    }
     view.showRestoreReport(results, {
       onKeepPartial: () => { persistRestoreProgress({ ...record, finishedAt: Date.now() }); },
       onDiscardPartial: async () => {
@@ -1395,7 +1441,14 @@ async function main(root) {
       view.confirmTraffic(() => resolve(true), {
         enabled: true,
         onCancel: () => resolve(false),
-        onNever: () => { settings.trafficPrompt = false; saveSettings(settings); },
+        onNever: () => {
+          settings.trafficPrompt = false;
+          saveSettings(settings);
+          // 红队修复：onNever 单独触发（未按继续/取消就关闭弹窗）时兜底 settle 为 false。
+          // onNever 与 onConfirm 在同一同步点击栈内顺序触发（见 openTrafficModal），
+          // 故延迟到微任务；正常「不再显示 + 继续」由 resolve(true) 先行 settle，不受影响。
+          queueMicrotask(() => resolve(false));
+        },
       });
     });
   }
@@ -1495,13 +1548,19 @@ async function main(root) {
    */
   async function commitPulledPack({ id, name, blob, opfsName, opfsDir, size, fromNativeUi, pullStart, autoFlow = false }) {
     const storeStart = performance.now();
-    await saveFile({
+    // 红队修复：saveFile 在存储不可用时返回 null；此前无视为入库成功，进度与提示均虚报。
+    const saved = await saveFile({
       id, name, size, blob: opfsName ? null : namedBlob(blob, name),
       opfsName, opfsDir,
       layout: hostLayoutCode(host.platform), role: 'source',
       origin: ORIGINS.HOST_EXPORT,
       metadata: { fetchedAt: Date.now(), ...(autoFlow ? { autoFlow: 'pull' } : {}) },
     });
+    if (!saved) {
+      logger.error(t('log.hostFetchFailed', { msg: `${name}: saveFile 返回 null` }));
+      view.toast(t('toast.privateUploadFailed'));
+      throw new Error(t('log.hostFetchFailed', { msg: 'saveFile returned null' }));
+    }
     logger.info(t('log.packStored', {
       target: opfsName ? `OPFS ${opfsDir}/${opfsName}` : 'IndexedDB',
       ms: Math.round(performance.now() - storeStart),
@@ -2021,7 +2080,9 @@ async function main(root) {
     if (!hit.current) {
       const wasPaused = hit.job.status === 'paused';
       hit.job.status = 'aborted';
-      taskQueue.splice(hit.index, 1);
+      // 红队修复：finished 任务的 index 属于 queueFinished，不能拿去 splice taskQueue（会误删在途任务）。
+      if (hit.finished) queueFinished.splice(hit.index, 1);
+      else taskQueue.splice(hit.index, 1);
       if (wasPaused) await conversionRunner?.abort?.();
       hit.job.resolve?.({ status: 'aborted' });
       syncQueue();
@@ -2119,7 +2180,9 @@ async function main(root) {
     const code = targetCodeOf(target);
     const limit = splitLimitOf(splitMb);
     const plan = view.getMergedPlan(packages);
-    const compression = Number(view.getState().compression) || 5;
+    // 红队修复：0 是合法压缩级别（不压缩），不能用 || 5 吞掉；仅非有限数回退默认。
+    const rawCompression = Number(view.getState().compression);
+    const compression = Number.isFinite(rawCompression) ? rawCompression : 5;
     const blobs = [];
     const reports = [];
     try {
@@ -2300,6 +2363,8 @@ async function main(root) {
       input.type = 'file';
       input.accept = '.json,application/json';
       input.addEventListener('change', () => resolve(input.files?.[0] || null), { once: true });
+      // 红队修复：用户取消文件选择时不触发 change，Promise 会悬挂；cancel 事件兜底 resolve(null)。
+      input.addEventListener('cancel', () => resolve(null), { once: true });
       input.click();
     });
   }
@@ -2948,18 +3013,18 @@ async function main(root) {
     if (!list.length) return;
     view.openExtensionManager(list);
   });
-  exportQueue.subscribe(() => view.setPendingExports(exportQueue.items));
+  unsubscribeExportQueue = exportQueue.subscribe(() => view.setPendingExports(exportQueue.items));
   view.setPendingExports(exportQueue.items);
   if (pendingResume) view.setTask({ state: 'paused', label: pendingResume.name || '' });
 
   // 宿主原生导出优先：在途的插件拉取立即让路（可取消的只有插件自己的请求）。
-  watchNativeExportStart(() => {
+  unsubscribeNativeExportWatch = watchNativeExportStart(() => {
     if (!activePullAbort) return;
     activePullAbort.abort();
     if (!hostToast(t('toast.hostExportBusy'))) view.toast(t('toast.hostExportBusy'));
   });
 
-  logger.subscribe((entry) => {
+  unsubscribeLogger = logger.subscribe((entry) => {
     // 透传完整 entry，保留 detail / id / timeMs，导出后仍可精确溯源。第三参数对旧视图向后兼容（可选）。
     view.pushLog(entry.level, entry.message, { id: entry.id, timeMs: entry.timeMs, detail: entry.detail });
   });
@@ -2981,7 +3046,7 @@ async function main(root) {
   root.querySelector('#btn-locale')?.addEventListener('click', () => {
     setLocale(getLocale() === 'zh-CN' ? 'en-US' : 'zh-CN');
   });
-  onLocaleChange(() => { applyI18n(root); view.renderAll(); });
+  unsubscribeLocaleChange = onLocaleChange(() => { applyI18n(root); view.renderAll(); });
   try { view.setLibraryExport(probeChatStore().present); } catch { /* 外部库可选 */ }
 
   root.querySelector('#file-input')?.addEventListener('change', async (event) => {
@@ -2990,14 +3055,14 @@ async function main(root) {
     await importFiles(files);
   });
 
-  for (const target of [root, root.querySelector('#chart-card')]) {
-    target?.addEventListener('dragover', (event) => event.preventDefault());
-    target?.addEventListener('drop', async (event) => {
-      event.preventDefault();
-      const files = [...(event.dataTransfer?.files || [])].filter((f) => f.name.toLowerCase().endsWith('.zip'));
-      if (files.length) await importFiles(files);
-    });
-  }
+  // 红队修复：#chart-card 是 root 的后代，drop 会冒泡到 root；同时注册两处会把同一批文件导入两次。
+  // 只保留 root 监听，覆盖整页投放（含图表卡片）。
+  root?.addEventListener('dragover', (event) => event.preventDefault());
+  root?.addEventListener('drop', async (event) => {
+    event.preventDefault();
+    const files = [...(event.dataTransfer?.files || [])].filter((f) => f.name.toLowerCase().endsWith('.zip'));
+    if (files.length) await importFiles(files);
+  });
 
   lanPanel = mountLanTransferPanel({
     view,
@@ -3067,6 +3132,8 @@ async function main(root) {
   }
   view.setProgress(0, t('progress.ready'));
   logger.info(t('log.workbenchReady', { host: host.isPlugin ? t('header.plugin', { host: HOST_LABEL[host.platform] || t('host.fallback') }) : t('header.web') }));
+  // main() 全程无异常跑到这里才算初始化成功；此前置位会让失败态无法重试（红队修复）。
+  initialized = true;
 }
 
 /* 单页常驻下不会被调用，供 HMR / 测试 / 未来卸载路径使用：清理全部长生命周期资源。
@@ -3081,6 +3148,15 @@ export function disposeMain() {
   try { stopHostDomWatch?.(); } catch { /* 忽略 */ }
   try { inspectMountHandle?.unmount?.(); inspectMountHandle = null; } catch { /* 忽略 */ }
   try { disposeSettingsPanel?.(); } catch { /* 忽略 */ }
+  // 红队修复：释放长生命周期订阅，避免 HMR / 卸载后回调仍持有旧 view 引用。
+  try { unsubscribeExportQueue?.(); } catch { /* 忽略 */ }
+  try { unsubscribeNativeExportWatch?.(); } catch { /* 忽略 */ }
+  try { unsubscribeLogger?.(); } catch { /* 忽略 */ }
+  try { unsubscribeLocaleChange?.(); } catch { /* 忽略 */ }
+  unsubscribeExportQueue = null;
+  unsubscribeNativeExportWatch = null;
+  unsubscribeLogger = null;
+  unsubscribeLocaleChange = null;
 }
 
 /**
@@ -3132,9 +3208,15 @@ function bootstrap() {
   const app = document.getElementById('app');
   if (!app) return;
   app.classList.add('app-standalone');
-  if (!app.hasChildNodes()) app.innerHTML = trustedStaticMarkup(getWorkbenchHtml({ isStandalone: true }));
+  if (app.childElementCount === 0) app.innerHTML = trustedStaticMarkup(getWorkbenchHtml({ isStandalone: true }));
   applyI18n(app);
-  if (!initialized) { initialized = true; main(app); }
+  if (!initialized) {
+    // initialized 只在 main() 成功后由 main 结尾置位；失败重置以便重试（红队修复）。
+    main(app).catch((err) => {
+      initialized = false;
+      logger.error(`[init] main 初始化失败，可重试: ${err?.message || err}`);
+    });
+  }
 }
 
 if (typeof document !== 'undefined') {

@@ -111,7 +111,7 @@ export async function openDb() {
         db.createObjectStore(STORES.PREFERENCES, { keyPath: 'key' });
       }
 
-      // v1 → v2：为存量记录补 origin/group/createdAt
+      // v1 → v2：为存量记录补 origin/createdAt（group 读取侧已用 `val.group || null` 兜底）
       if (event.oldVersion < 2) {
         const store = event.target.transaction.objectStore(STORES.FILES);
         const cursorReq = store.openCursor();
@@ -119,11 +119,18 @@ export async function openDb() {
           const cursor = ev.target.result;
           if (!cursor) return;
           const record = cursor.value;
+          let changed = false;
           if (!record.origin) {
             record.origin = migrateRoleToOrigin(record);
-            if (!record.createdAt) record.createdAt = Date.now();
-            cursor.update(record);
+            changed = true;
           }
+          // createdAt 独立判定：即便记录已有 origin，缺 createdAt 也要补齐，
+          // 否则 listStoredFiles 按 createdAt 倒序时该记录会排到末尾。
+          if (!record.createdAt) {
+            record.createdAt = Date.now();
+            changed = true;
+          }
+          if (changed) cursor.update(record);
           cursor.continue();
         };
       }
@@ -154,7 +161,18 @@ export async function openDb() {
       if (blockedTimer) return;
       blockedTimer = setTimeout(() => {
         blockedTimer = null;
-        try { request.onerror = null; request.onsuccess = null; } catch { /* 忽略 */ }
+        // 超时后尽力「关闭」这次打开请求：清掉回调避免迟到事件重复 settle，
+        // 若 request.result 已可用（旧连接被释放）则顺手 close，防连接泄漏。
+        // 注意 IndexedDB 的 open request 没有 cancel()；dbInstance 仍未赋值，
+        // 所以这里只做本地清理，不污染单例。状态复位由上层走内存降级路径完成。
+        try {
+          request.onerror = null;
+          request.onsuccess = null;
+          request.onblocked = null;
+          if (request.result && typeof request.result.close === 'function') request.result.close();
+        } catch (err) {
+          console.warn('[db] blocked 超时清理打开请求时出错（忽略）:', err);
+        }
         reject(new DOMException('IndexedDB 版本升级被阻塞超时（其他标签页占用旧连接）', 'TimeoutError'));
       }, 10_000);
     };
@@ -180,9 +198,26 @@ async function runTransaction(storeName, mode, operation) {
     const tx = db.transaction(storeName, mode);
     const store = tx.objectStore(storeName);
     const request = operation(store);
+    let result;
 
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
+    // request.onsuccess 只代表「单次操作执行完」，不等于「事务已提交」。
+    // 配额超限（QuotaExceededError）等错误发生在提交阶段：若在 onsuccess 里 resolve，
+    // 上层会误判写入成功（假成功）。改为记录结果、等 tx.oncomplete 才兑现，
+    // 并在 tx.onerror / tx.onabort 时 reject，暴露真实落盘结果。
+    request.onsuccess = () => { result = request.result; };
+    request.onerror = () => { /* 由 tx.onerror / tx.onabort 统一 reject，避免重复 settle */ };
+
+    if (tx && typeof tx.addEventListener === 'function') {
+      // 真实 IDBTransaction：以事务完成为准，保留返回 request.result 的语义（oncomplete 里取）
+      tx.oncomplete = () => resolve(result);
+      tx.onerror = () => reject(tx.error || request.error);
+      tx.onabort = () => reject(tx.error || request.error || new Error('IndexedDB 事务被中止'));
+    } else {
+      // 极简事务桩（无事件系统，如单测的 fake transaction）不会派发 complete，
+      // 退回「请求成功即兑现」，避免此类桩下 Promise 永不 settle。真实环境不走此分支。
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    }
   });
 }
 
@@ -383,17 +418,25 @@ export async function getStorageUsage() {
 
 /**
  * 查询浏览器存储配额（用量看板配额条）
- * @returns {Promise<{ usage: number, quota: number }>}
+ *
+ * 读不到时返回 { available:false, usage:null, quota:null }，**绝不返回 0**——
+ * 0 是「用量为零」的假数据，会误导配额条显示成空/满。调用方应以 available 判定，
+ * 不可用时在界面显示「未提供」（G-34：读不到显示未提供，禁假 0）。
+ * @returns {Promise<{ available: boolean, usage: number|null, quota: number|null }>}
  */
 export async function getStorageQuota() {
   if (typeof navigator === 'undefined' || !navigator.storage || !navigator.storage.estimate) {
-    return { usage: 0, quota: 0 };
+    return { available: false, usage: null, quota: null };
   }
   try {
-    const { usage = 0, quota = 0 } = await navigator.storage.estimate();
-    return { usage, quota };
-  } catch {
-    return { usage: 0, quota: 0 };
+    const { usage, quota } = await navigator.storage.estimate();
+    const available = typeof usage === 'number' && typeof quota === 'number';
+    return available
+      ? { available: true, usage, quota }
+      : { available: false, usage: null, quota: null };
+  } catch (err) {
+    console.warn('[db] 读取存储配额失败（按未提供处理）:', err);
+    return { available: false, usage: null, quota: null };
   }
 }
 
@@ -484,7 +527,9 @@ export async function clearStoredFiles() {
     const tx = db.transaction([STORES.FILES], 'readwrite');
     tx.objectStore(STORES.FILES).clear();
     tx.oncomplete = () => {
-      opfsClearDir('packages').catch(() => {}).finally(resolve);
+      opfsClearDir('packages').catch((err) => {
+        console.warn('[db] 清空 OPFS packages 目录失败（IndexedDB 记录已清空）:', err);
+      }).finally(resolve);
     };
     tx.onerror = () => reject(tx.error);
   });
@@ -503,7 +548,9 @@ export async function clearAll() {
     tx.objectStore(STORES.FILES).clear();
     tx.objectStore(STORES.WORKSPACE).clear();
     tx.oncomplete = () => {
-      opfsClearDir('packages').catch(() => {}).finally(resolve);
+      opfsClearDir('packages').catch((err) => {
+        console.warn('[db] 清空 OPFS packages 目录失败（IndexedDB 记录已清空）:', err);
+      }).finally(resolve);
     };
     tx.onerror = () => reject(tx.error);
   });

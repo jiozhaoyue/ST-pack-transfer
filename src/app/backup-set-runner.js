@@ -42,6 +42,22 @@ const decode = (bytes) => new TextDecoder().decode(bytes);
 const encode = (text) => new TextEncoder().encode(text);
 const jsonBytes = (value) => encode(JSON.stringify(value));
 
+/**
+ * 快照按时间排序（数值感知）。ts 基础形状 `YYYYMMDD-HHMMSS`，同秒冲突追加 `-N`。
+ * 纯字典序会把 `-10` 排在 `-2` 前面 ⇒ 保留策略误把更新的 `-10` 当旧快照删掉。
+ */
+function compareSnapshotsByTs(a, b) {
+  const parse = (snap) => {
+    const s = String(snap?.ts || '');
+    const m = /^(\d{8}-\d{6})-(\d+)$/.exec(s);
+    return m ? { base: m[1], seq: Number(m[2]) || 0 } : { base: s, seq: 0 };
+  };
+  const pa = parse(a);
+  const pb = parse(b);
+  if (pa.base !== pb.base) return pa.base.localeCompare(pb.base);
+  return pa.seq - pb.seq;
+}
+
 async function ensurePath(target, path) {
   if (typeof target.ensureCollection !== 'function') return true;
   const result = await target.ensureCollection(path);
@@ -216,7 +232,7 @@ export async function uploadBackupSet({
       size: plainSnapshot.length,
       createdAt: new Date().toISOString(),
     },
-  ].sort((a, b) => String(a.ts).localeCompare(String(b.ts)));
+  ].sort(compareSnapshotsByTs);
 
   const pruned = [];
   while (snapshots.length > keep) {

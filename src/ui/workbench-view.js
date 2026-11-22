@@ -546,6 +546,7 @@ function toast(msg){
     } catch { /* 宿主 toastr 异常时回退 */ }
   }
   const el=document.getElementById('toast');
+  if(!el) return; /* 红队修复：无 toast 容器时静默跳过，避免解引用报错 */
   el.textContent=msg; el.classList.add('show');
   clearTimeout(el._t); el._t=setTimeout(()=>el.classList.remove('show'),2400);
 }
@@ -2399,14 +2400,14 @@ function pkgCard(p, opts){
   const estHostMb = realUncompressedMbOf(p);
   const estHostHtml = estHostMb ? '<span class="pkg-est-host" title="'+t('pkg.estHostTitle')+'"><i class="fa-solid fa-hard-drive"></i> '+t('pkg.estHost',{size:fmtMB(estHostMb)})+'</span>' : '';
     return '<div class="pkg-card'+(isActive?' is-active':'')+(p.unrecognized?' unrecognized':'')+(p.zone==='export'?' is-export':'')+'"'
-      +(isPending?' data-pending="'+escapeHtml(pendingId)+'"':' data-pkg="'+p.id+'"')
+      +(isPending?' data-pending="'+escapeHtml(pendingId)+'"':' data-pkg="'+escapeHtml(p.id)+'"')
       +' data-mobile="'+(isMobile?'1':'0')+'" title="'+t('zones.cardDisplayTip')+'">'
     +(isPending
         /* 待导出项不可勾选：用与 .pkg-check 等宽的透明占位保持与真实卡完全对齐，
            但仍复用既有 .pkg-check 尺寸规则，不再新建 .pkg-check-spacer 素材。 */
         ? '<span class="pkg-check-slot" aria-hidden="true"></span>'
         /* 2026-11-20 批次3：包卡勾选框包 <label>，使探针 ancestor-label 命中区 ≥28px。 */
-        : '<label class="pkg-check-hit"><input class="pkg-check" type="checkbox" data-pkgcheck="'+p.id+'"'+(state.selectedPkgs.has(p.id)?' checked':'')+' title="'+t('zones.checkboxActionTip')+'" aria-label="'+t('zones.checkboxActionTip')+'"></label>')
+        : '<label class="pkg-check-hit"><input class="pkg-check" type="checkbox" data-pkgcheck="'+escapeHtml(p.id)+'"'+(state.selectedPkgs.has(p.id)?' checked':'')+' title="'+t('zones.checkboxActionTip')+'" aria-label="'+t('zones.checkboxActionTip')+'"></label>')
     +icon
     +'<div class="pkg-info">'
     +'<div class="pkg-name"><span class="pkg-name-txt" data-fullname="'+encodeURIComponent(p.name)+'" title="'+escapeHtml(p.name)+'">'+escapeHtml(p.name)+'</span></div>'
@@ -2415,8 +2416,8 @@ function pkgCard(p, opts){
     +(isPending
         ? '<div class="pkg-actions">'+opts.pendingActions+'</div>'
         : (p.zone==='export'?'':'<div class="pkg-actions">'
-            +'<button data-pkgact="delete" data-id="'+p.id+'" title="'+t('pkg.delete')+'">'+svg('archive','tree-ico')+'</button>'
-            +'<button data-pkgact="inspect" data-id="'+p.id+'" title="'+t('inspect.button')+'">'+svg('clip','tree-ico')+'</button>'
+            +'<button data-pkgact="delete" data-id="'+escapeHtml(p.id)+'" title="'+t('pkg.delete')+'">'+svg('archive','tree-ico')+'</button>'
+            +'<button data-pkgact="inspect" data-id="'+escapeHtml(p.id)+'" title="'+t('inspect.button')+'">'+svg('clip','tree-ico')+'</button>'
           +'</div>'))
     +'</div>';
 }
@@ -2426,8 +2427,10 @@ function renderZones(){
   });
   const imp=state.packages.filter(p=>p.zone==='import').length;
   const exp=state.packages.filter(p=>p.zone==='export').length;
-  document.getElementById('count-import').textContent=imp;
-  document.getElementById('count-export').textContent=exp;
+  const cImp=document.getElementById('count-import');
+  if(cImp) cImp.textContent=imp;
+  const cExp=document.getElementById('count-export');
+  if(cExp) cExp.textContent=exp;
 
   const body=document.getElementById('zone-body');
   if(!body) return;
@@ -2765,6 +2768,8 @@ async function loadGitTarget(name, { force = false } = {}){
   g.cloudCommits=[]; g.cloudBranches=[]; g.cloudReadOff=false; g.hostLocalOnly=false;
   g.cloudState='off'; g.cloudReason=''; g.cloudNeedLogin=false;
   renderGitViz();
+  /* 红队修复：整段异步加载包 try/catch/finally，异常时也要复位 g.loading，避免面板永久转圈。 */
+  try {
   const item=(state.extInstalled||[]).find((x)=>String(x?.id||x?.folder||x?.name||'')===name);
   const isGlobal=String(item?.sourceType||'')==='global';
   const install=(loadSettings().gitInstalls||[]).find((r)=>r.name===name)||null;
@@ -2899,6 +2904,14 @@ async function loadGitTarget(name, { force = false } = {}){
   if(g.selectedSha && !g.commits.some((c)=>c.sha===g.selectedSha)) g.selectedSha='';
   g.loading=false;
   renderGitViz();
+  } catch (err) {
+    /* 网络/解析异常不得让 g.loading 永久为 true。 */
+    g.loading=false;
+    g.error=reasonText(err?.reason || err?.message || String(err||'unknown'));
+    renderGitViz();
+  } finally {
+    g.loading=false;
+  }
 }
 async function loadGitCommitDiff(sha){
   const g=state.gitViz;
@@ -2917,7 +2930,17 @@ async function loadGitCommitDiff(sha){
   g.diffLoading=true; g.diff=null; g.diffError='';
   renderGitViz();
   const acc=parsed.ok?accountForRepo(parsed):null;
-  const res=parsed.ok?await gitRemote().commitDetail(parsed, sha, acc):{ok:false,reason:'unsupported'};
+  let res;
+  try {
+    res=parsed.ok?await gitRemote().commitDetail(parsed, sha, acc):{ok:false,reason:'unsupported'};
+  } catch (err) {
+    /* 红队修复：裸 await 抛错时复位 diffLoading 并给错误反馈，避免面板永久转圈。 */
+    g.diffLoading=false;
+    g.diffError=reasonText(err?.reason || err?.message || 'http');
+    toast(t('extmgr.preflightFailed',{reason:g.diffError}));
+    renderGitViz();
+    return;
+  }
   g.diffLoading=false;
   if(res.ok) g.diff={sha,files:res.files};
   else g.diffError=reasonText(res.reason||'http');
@@ -3250,11 +3273,19 @@ async function completeOAuthFromUrl(){
   if(!pending || pending.state!==cb.state || Date.now()-Number(pending.ts||0)>15*60*1000){
     clearPending(); clearUrl(); toast(t('extmgr.oauthExpired')); return;
   }
-  const res=await exchangeOAuthCode({
-    site:pending.site, baseUrl:pending.baseUrl, clientId:pending.clientId,
-    clientSecret:pending.clientSecret, code:cb.code, redirectUri:pending.redirectUri,
-    codeVerifier:pending.verifier, proxyUrl:pending.proxyUrl,
-  });
+  let res;
+  try {
+    res=await exchangeOAuthCode({
+      site:pending.site, baseUrl:pending.baseUrl, clientId:pending.clientId,
+      clientSecret:pending.clientSecret, code:cb.code, redirectUri:pending.redirectUri,
+      codeVerifier:pending.verifier, proxyUrl:pending.proxyUrl,
+    });
+  } catch (err) {
+    /* 红队修复：裸 await 抛错时清掉待处理标记并给错误反馈。 */
+    clearPending(); clearUrl();
+    toast(t('extmgr.oauthFailed',{reason:err?.message||String(err||'unknown')}));
+    return;
+  }
   clearPending(); clearUrl();
   if(!res.ok){ toast(t('extmgr.oauthFailed',{reason:res.detail||res.error})); return; }
   const provider=oauthProvider(pending.site, pending.baseUrl);
@@ -3337,7 +3368,17 @@ async function preflightExtEntry(entry, { silent = false } = {}){
   if(!entry || !entry.parsed?.ok) return;
   const acc=accountForRepo(entry.parsed);
   entry.busy=true;
-  const res=await gitRemote().repoInfo(entry.parsed, acc);
+  let res;
+  try {
+    res=await gitRemote().repoInfo(entry.parsed, acc);
+  } catch (err) {
+    /* 红队修复：裸 await 抛错复位 busy 并提示，避免条目永久 busy。 */
+    entry.busy=false;
+    entry.note=t('extmgr.preflightFailed',{reason:err?.message||String(err||'unknown')});
+    entry.noteKind='warn';
+    toast(t('extmgr.preflightFailed',{reason:err?.message||String(err||'unknown')}));
+    return;
+  }
   entry.busy=false;
   if(res.ok){
     entry.info=res.info;
@@ -3366,7 +3407,18 @@ async function listEntryBranches(i){
   const entry=state.extEntries[i]; if(!entry||!entry.parsed?.ok) return;
   const acc=accountForRepo(entry.parsed);
   entry.busy=true; renderExtensionView();
-  const res=await gitRemote().listBranches(entry.parsed, acc);
+  let res;
+  try {
+    res=await gitRemote().listBranches(entry.parsed, acc);
+  } catch (err) {
+    /* 红队修复：裸 await 抛错复位 busy 并提示。 */
+    entry.busy=false;
+    entry.note=t('extmgr.preflightFailed',{reason:err?.message||String(err||'unknown')});
+    entry.noteKind='warn';
+    toast(t('extmgr.preflightFailed',{reason:err?.message||String(err||'unknown')}));
+    renderExtensionView();
+    return;
+  }
   entry.busy=false;
   if(res.ok && res.branches.length){
     entry.branches=res.branches;
@@ -3423,7 +3475,14 @@ async function testAllAccounts(){
   if(!list.length){ toast(t('extmgr.accountNone')); return; }
   const results=[];
   for(const acc of list){
-    const res=await gitRemote().testAccount(acc);
+    let res;
+    try {
+      res=await gitRemote().testAccount(acc);
+    } catch (err) {
+      /* 红队修复：单个账号测试抛错不得中断整轮，如实记录失败项。 */
+      res={ok:false,reason:err?.message||String(err||'unknown')};
+      toast(t('extmgr.preflightFailed',{reason:res.reason}));
+    }
     results.push({label:acc.label,ok:res.ok,login:res.login||'',reason:res.reason||''});
   }
   state.extAccountTests=results;
@@ -3809,7 +3868,14 @@ function bindAccounts(body){
     btn.addEventListener('click',async()=>{
       const acc=gitAccountList().find((a)=>a.id===btn.dataset.acctest);
       if(!acc) return;
-      const res=await gitRemote().testAccount(acc);
+      let res;
+      try {
+        res=await gitRemote().testAccount(acc);
+      } catch (err) {
+        /* 红队修复：裸 await 抛错给错误反馈，不静默失败。 */
+        toast(t('extmgr.preflightFailed',{reason:err?.message||String(err||'unknown')}));
+        return;
+      }
       state.extAccountTests=[{label:acc.label,ok:res.ok,login:res.login||'',reason:res.reason||''}];
       renderExtensionView();
     });
@@ -3821,7 +3887,12 @@ async function preflightAll(){
      在站点不可达时要等 160s，界面会像卡死。 */
   const list=state.extEntries.slice(0,20);
   if(!list.length) return;
-  await Promise.all(list.map((entry)=>preflightExtEntry(entry,{silent:true})));
+  try {
+    await Promise.all(list.map((entry)=>preflightExtEntry(entry,{silent:true})));
+  } catch (err) {
+    /* 红队修复：批量预检整体抛错不静默，给错误反馈。 */
+    toast(t('extmgr.preflightFailed',{reason:err?.message||String(err||'unknown')}));
+  }
   refreshInstallArea();
 }
 /**
@@ -4141,33 +4212,39 @@ async function scanSingleExtensionVersion(name) {
 /* 更新检查：并行快速扫描全部扩展，并在日志中输出详细分级信息 */
 async function checkExtUpdates(){
   state.extUpdate = { busy: true, rows: [], note: '' };
-  state.extScanningBusy = true;
+  /* 红队修复：不可在 scanRemoteVersionsParallel 之前先置 extScanningBusy=true，
+     否则其 :3957 busy 守卫会直接 return，扫描根本不执行。busy 由扫描函数自行置位/复位。 */
   state.extLastScanAt = Date.now();
   saveExtScanCache({ lastScanAt: state.extLastScanAt, results: state.extScanResults });
   renderExtensionView();
-  await scanRemoteVersionsParallel(true);
-  state.extLastScanAt = Date.now();
-  saveExtScanCache({ lastScanAt: state.extLastScanAt, results: state.extScanResults });
-  const installed = installedRowRecords();
-  const rows = [];
-  for (const rec of installed) {
-    const res = state.extScanResults[rec.name];
-    if (res) {
-      const url = installedRemoteUrlOf(rec.name) || state.extRemoteUrls[rec.name]?.url || '';
-      rows.push({
-        name: rec.name,
-        url,
-        ref: '',
-        localVersion: res.localVersion || rec.version || '',
-        remoteVersion: res.remoteVersion || '',
-        status: res.status || 'unknown',
-        reason: res.reason || '',
-      });
+  try {
+    await scanRemoteVersionsParallel(true);
+    state.extLastScanAt = Date.now();
+    saveExtScanCache({ lastScanAt: state.extLastScanAt, results: state.extScanResults });
+    const installed = installedRowRecords();
+    const rows = [];
+    for (const rec of installed) {
+      const res = state.extScanResults[rec.name];
+      if (res) {
+        const url = installedRemoteUrlOf(rec.name) || state.extRemoteUrls[rec.name]?.url || '';
+        rows.push({
+          name: rec.name,
+          url,
+          ref: '',
+          localVersion: res.localVersion || rec.version || '',
+          remoteVersion: res.remoteVersion || '',
+          status: res.status || 'unknown',
+          reason: res.reason || '',
+        });
+      }
     }
+    state.extUpdate = { busy: false, rows, note: '' };
+    if (state.extTab === 'host') renderExtensionView();
+  } finally {
+    /* 异常路径同样复位，避免 busy 卡死。 */
+    state.extUpdate.busy = false;
+    state.extScanningBusy = false;
   }
-  state.extUpdate = { busy: false, rows, note: '' };
-  state.extScanningBusy = false;
-  if (state.extTab === 'host') renderExtensionView();
 }
 /** 宿主的原生浮层优先：有 toastr 就用它的可点击通知，没有才退回本插件 toast。 */
 function nativeToast(msg,opts){
@@ -4382,11 +4459,15 @@ function serverPluginBlockHtml(){
 }
 /** 页脚服务端扩展区的事件绑定（每次 syncExtInstallBlock 重渲染后重挂）。 */
 function bindServerPluginArea(root){
-  root.addEventListener('toggle',()=>{},true);
+  /* 红队修复：root 级监听只绑一次，避免 syncExtInstallBlock 重渲染后 click 重复触发多次更新。
+     details 每次重渲染都是新节点，其 toggle 仍需逐次绑定，故放在守卫之前。 */
   const details=root.querySelector('[data-extserver]');
   details?.addEventListener('toggle',()=>{
     state.extServerOpen=details.open;
   });
+  if(root.dataset.serverAreaBound) return;
+  root.dataset.serverAreaBound='1';
+  root.addEventListener('toggle',()=>{},true);
   root.addEventListener('click',async(e)=>{
     const upd=e.target.closest('[data-srvupd]');
     const del=e.target.closest('[data-srvdel]');
@@ -5443,6 +5524,7 @@ async function renderExtInstalled(body){
     const bRemove=body.querySelector('#extmgr-batch-remove');
     const bPack=body.querySelector('#extmgr-batch-pack');
     const bPrune=body.querySelector('#extmgr-batch-prune');
+    const bToManifest=body.querySelector('#extmgr-batch-to-manifest');
     const bAssetList=body.querySelector('#extmgr-export-assetlist');
     const bAssetListPkg=body.querySelector('#extmgr-export-assetlist-pkg');
     /* 安装按钮在页脚安装面板里（不在 body 内），全局查找 */
@@ -5452,6 +5534,7 @@ async function renderExtInstalled(body){
     if(bRemove) bRemove.disabled=n===0;
     if(bPack) bPack.disabled=n===0;
     if(bPrune) bPrune.disabled=n===0;
+    if(bToManifest) bToManifest.disabled=n===0;
     if(bAssetList) bAssetList.disabled=n===0;
     if(bAssetListPkg) bAssetListPkg.disabled=!selectedPkg;
     if(bInstall) bInstall.disabled=n===0;
@@ -5505,6 +5588,20 @@ async function renderExtInstalled(body){
       {label:t('extmgr.batchPruneConfirm'),danger:true,onClick:()=>{
         closeModal();
         void pruneSelectedFromPackage(state.extSelectedPackageId, names);
+      }},
+    ]);
+  });
+
+  /* 红队修复：批量「转成清单」此前渲染了按钮却无点击绑定（死按钮）。
+     复用已实现的 pruneSelectedFromPackage(...,{keepManifest:true})：删实体、留清单。 */
+  body.querySelector('#extmgr-batch-to-manifest')?.addEventListener('click',()=>{
+    const names=selectedNames();
+    if(!names.length){ toast(t('extmgr.selectNoneHint')); return; }
+    openModal(t('extmgr.toManifest'), t('extmgr.toManifestDesc',{name:names.join(', ')}), [], [
+      {label:t('modal.cancel'),onClick:closeModal},
+      {label:t('extmgr.toManifestConfirm'),primary:true,onClick:()=>{
+        closeModal();
+        void pruneSelectedFromPackage(state.extSelectedPackageId, names, { keepManifest:true });
       }},
     ]);
   });
@@ -6381,6 +6478,7 @@ async function cloudRefresh() {
   C.busy = true;
   C.status = t('cloud.loading');
   renderCloud();
+  try {
   const prefix = activeCloudConfig().prefix || '';
   const res = await target.list(prefix);
   C.busy = false;
@@ -6438,6 +6536,14 @@ async function cloudRefresh() {
     ? t('cloud.error', { msg: res.message || res.code })
     : (C.list.length ? t('cloud.loaded', { n: C.list.length }) : '');
   renderCloud();
+  } catch (err) {
+    /* 红队修复：云端列表抛错不静默，复位 busy 并提示。 */
+    C.status = cloudErrorText(err?.code || err?.message);
+    toast(C.status);
+  } finally {
+    C.busy = false;
+    renderCloud();
+  }
 }
 function cloudErrorText(code) {
   if (code === 'passphrase-required') return t('cloud.needPassphrase');
@@ -6464,6 +6570,7 @@ async function cloudDownload(key) {
   C.busy = true;
   C.status = t('cloud.loading');
   renderCloud();
+  try {
   const runner = createTransferRunner({
     target,
     chunkSize: DEFAULT_CHUNK_SIZE,
@@ -6513,6 +6620,15 @@ async function cloudDownload(key) {
   C.status = t('cloud.downloaded', { name });
   act?.done(t('cloud.downloaded', { name }));
   renderCloud();
+  } catch (err) {
+    /* 红队修复：下载/解密抛错不静默，复位 busy 并提示。 */
+    C.status = cloudErrorText(err?.code || err?.message);
+    act?.fail(C.status);
+    toast(C.status);
+  } finally {
+    C.busy = false;
+    renderCloud();
+  }
 }
 async function cloudRestoreSnapshot(key) {
   const C = state.cloud;
@@ -6755,9 +6871,11 @@ function renderLog(){
   const levels=state.logLevels;
   const list=state.log.filter(l=>levels.has(l.level));
   const emptyText=levels.size?t('log.empty'):t('log.none');
-  lines.innerHTML=list.map(l=>'<div class="log-line '+String(l.level||'').toLowerCase()+'"><span class="t">['+escapeHtml(l.time)+']</span> <span class="lv">['+escapeHtml(l.level)+']</span> '+escapeHtml(l.msg)+'</div>').join('') || '<div class="log-line">'+emptyText+'</div>';
+  /* 红队修复：日志容器可能未挂载，逐处判空后再解引用。 */
+  if(lines) lines.innerHTML=list.map(l=>'<div class="log-line '+String(l.level||'').toLowerCase()+'"><span class="t">['+escapeHtml(l.time)+']</span> <span class="lv">['+escapeHtml(l.level)+']</span> '+escapeHtml(l.msg)+'</div>').join('') || '<div class="log-line">'+emptyText+'</div>';
   const last=state.log[state.log.length-1];
-  document.getElementById('log-latest').textContent=last?last.msg:t('log.empty');
+  const latestEl=document.getElementById('log-latest');
+  if(latestEl) latestEl.textContent=last?last.msg:t('log.empty');
   /* 类型按钮直接带条数（该类型总条数，不随筛选变化），并标出当前是否显示该类。 */
   const counts={DEBUG:0,INFO:0,WARN:0,ERROR:0,SUCCESS:0};
   state.log.forEach(l=>{ if(counts[l.level]!==undefined) counts[l.level]++; });
@@ -7245,7 +7363,7 @@ function enterTutorialMode(){
   state.pendingExports=[];
   state.task=null;
   state.prefMode=false; state.prefDraft=null; state.prefSnapshot=null;
-  state.delta=false; state.mergeMode=false;
+  state.delta='overwrite'; state.mergeMode=false;
   state.transfer.open=false;
   state.filter='all'; state.sort='time-desc';
   state.log=[];
@@ -7539,9 +7657,12 @@ function showFullName(el){
 let pendingProgress = null;
 let progressRaf = 0;
 function applyProgress(pct, label){
-  document.getElementById('progress-fill').style.width=Math.max(0,Math.min(100,pct))+'%';
-  document.getElementById('progress-pct').textContent=Math.round(pct)+'%';
-  if(label) document.getElementById('progress-label').textContent=label;
+  /* 红队修复：进度节点在某些视图缺失，逐处判空后再解引用。 */
+  const fill=document.getElementById('progress-fill');
+  if(fill) fill.style.width=Math.max(0,Math.min(100,pct))+'%';
+  const pctEl=document.getElementById('progress-pct');
+  if(pctEl) pctEl.textContent=Math.round(pct)+'%';
+  if(label){ const lb=document.getElementById('progress-label'); if(lb) lb.textContent=label; }
   try { actions.onProgress?.(Math.max(0,Math.min(100,Number(pct)||0))); } catch { /* 队列进度非关键 */ }
 }
 function setProgress(pct,label){
@@ -7858,8 +7979,8 @@ function bind(){
     const del=e.target.closest('[data-cloud-del]');
     if(del) cloudDelete(del.dataset.cloudDel);
   });
-  document.getElementById('lan-answer-input').addEventListener('input',(e)=>{ state.lan.send.answer=e.target.value; });
-  document.getElementById('lan-offer-input').addEventListener('input',(e)=>{ state.lan.recv.offer=e.target.value; });
+  document.getElementById('lan-answer-input')?.addEventListener('input',(e)=>{ state.lan.send.answer=e.target.value; });
+  document.getElementById('lan-offer-input')?.addEventListener('input',(e)=>{ state.lan.recv.offer=e.target.value; });
 
   document.getElementById('zone-tabs').addEventListener('click',e=>{
     const b=e.target.closest('.zone-tab'); if(!b) return;
@@ -8079,7 +8200,8 @@ function bind(){
       const scope=scopeFromEl(t); if(!scope) return;
       const id=t.dataset.node, key=treeKey(scope,id);
       const row=t.closest('.tree-row');
-      state.expanded[key]=state.expanded[key]!==undefined ? !state.expanded[key] : !row.classList.contains('expanded');
+      /* 红队修复：节点可能不在 .tree-row 内，判空后再读 classList。 */
+      state.expanded[key]=state.expanded[key]!==undefined ? !state.expanded[key] : !row?.classList.contains('expanded');
       renderChart(); return;
     }
     const priv=e.target.closest('[data-privfiles]');
@@ -8381,9 +8503,20 @@ function bind(){
     renderLog();
   });
   document.getElementById('log-export').addEventListener('click',exportLog);
-  document.getElementById('log-copy').addEventListener('click',()=>{
+  document.getElementById('log-copy').addEventListener('click',async()=>{
     const content = typeof logger.exportText === 'function' ? logger.exportText() : logText();
-    navigator.clipboard?.writeText(content).then(()=>toast(t('toast.logCopied'))).catch(()=>toast(t('toast.copyFailed')));
+    /* 红队修复：避免 navigator.clipboard?.writeText(...).then(...).catch(...) 可选链短路
+       导致「无剪贴板 API」时静默无反馈；显式判定 + try/catch + 失败 toast。 */
+    if(!navigator.clipboard || typeof navigator.clipboard.writeText!=='function'){
+      toast(t('toast.copyFailed'));
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(content);
+      toast(t('toast.logCopied'));
+    } catch {
+      toast(t('toast.copyFailed'));
+    }
   });
 
   document.getElementById('tutorial-skip').addEventListener('click',hideTutorialOverlay);

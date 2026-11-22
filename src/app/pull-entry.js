@@ -90,11 +90,12 @@ export async function beginNativePull({
   }
 
   const selection = readSelection();
-  closeNativeUi();
+  // 忙态检查必须在关面板之前：忙时保留原生面板原样，避免「关了面板却没拉取」的半途状态。
   if (isBusy()) {
     notifyBusy();
     return { busy: true };
   }
+  closeNativeUi();
   await pull(selection);
   return { pulled: true };
 }

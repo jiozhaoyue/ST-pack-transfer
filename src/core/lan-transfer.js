@@ -509,6 +509,11 @@ export function createPeerQueueManager({ now = () => Date.now() } = {}) {
       if (s === PEER_CONN_STATES.DISCONNECTED || s === PEER_CONN_STATES.FAILED) {
         currentSending = null;
         currentReceiving = null;
+        // 断链时把在途发送任务退回队列：nextSend 只认 queued，
+        // 否则 currentSending 被清空后任务永久停在 active，重连后再也调度不到。
+        for (const task of sendQueue) {
+          if (task.status === 'active') task.status = 'queued';
+        }
       }
       return this.getState();
     },
@@ -542,9 +547,11 @@ export function createPeerQueueManager({ now = () => Date.now() } = {}) {
       return null;
     },
 
-    /** 调度下一个发送任务：需连接就绪、无正在发送任务、且拥有发言令牌。 */
+    /** 调度下一个发送任务：需连接就绪、持有发言令牌、且无正在发送任务。 */
     nextSend() {
       if (connState !== PEER_CONN_STATES.CONNECTED) return null;
+      // 交替调度：令牌在对端时本端不得抢发，否则双方同时占信道冲突。
+      if (turn !== 'self') return null;
       if (currentSending) return null;
       const next = sendQueue.find((t) => t.status === 'queued');
       if (!next) return null;

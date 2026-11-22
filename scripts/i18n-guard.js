@@ -1,8 +1,9 @@
 /**
  * i18n 守卫：UI 文案必须来自 `src/i18n/locales/**`。
  *
- * 扫描正式工作台 UI 文件，跳过注释，禁止字符串/模板字面量出现中文字符。
- * 技术性日志/宿主适配层（host-bridge / chat-store / core）不在本守卫范围。
+ * 扫描全部正式 UI 文件（index.js + src/ui/*.js + src/ui/vue/*.vue），跳过注释，
+ * 禁止字符串/模板字面量出现中文字符。注释豁免与 `// i18n-guard:allow` 行豁免均保留。
+ * 面向排障的技术消息文件纳入清单以约束新增 UI 文案，但按 spec 定案豁免其中文技术串。
  */
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -12,14 +13,49 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 export const SCAN_FILES = Object.freeze([
   'index.js',
+  'src/ui/chart-prefs.js',
+  'src/ui/chat-store-bridge.js',
+  'src/ui/chat-store-inject.js',
+  'src/ui/escape.js',
+  'src/ui/export-queue.js',
+  'src/ui/fetch-bounds.js',
+  'src/ui/git-icons.js',
+  'src/ui/git-remote.js',
+  'src/ui/host-bridge.js',
+  'src/ui/host-icons.js',
+  'src/ui/inspect-view.js',
+  'src/ui/issue-report.js',
+  'src/ui/lan-transfer-panel.js',
+  'src/ui/migration-controller.js',
+  'src/ui/plugin-data.js',
+  'src/ui/private-files-store.js',
+  'src/ui/qr.js',
+  'src/ui/settings-panel.js',
+  'src/ui/settings-store.js',
+  'src/ui/storage-inspector-browser.js',
+  'src/ui/workbench-session.js',
   'src/ui/workbench-template.js',
   'src/ui/workbench-view.js',
-  'src/ui/settings-panel.js',
-  'src/ui/lan-transfer-panel.js',
-  'src/ui/export-queue.js',
-  'src/ui/qr.js',
   'src/ui/vue/InspectModal.vue',
 ]);
+
+/**
+ * 技术消息文件：错误串 / 诊断串面向排障，不进 locale。
+ * 依据 `.trellis/spec/frontend/i18n-and-settings.md` 2026-10-27 定案。
+ * 这些文件仍在 SCAN_FILES 内以约束新增 UI 文案，只豁免其中的中文技术串。
+ */
+const TECHNICAL_MESSAGE_FILES = new Set([
+  'src/ui/host-bridge.js',
+  'src/ui/chat-store-bridge.js',
+  'src/ui/chat-store-inject.js',
+  'src/ui/fetch-bounds.js',
+  'src/ui/issue-report.js',
+  'src/ui/migration-controller.js',
+  'src/ui/workbench-session.js',
+]);
+
+/** `logger.*(...)` 调用中的中文属技术日志，同样豁免（spec 技术消息不进 locale）。 */
+const TECHNICAL_LOG_CALL = /\blogger\.(?:error|warn|info|debug|log)\s*\(/;
 
 const CJK = /[一-鿿]/;
 
@@ -124,6 +160,24 @@ export function stripVueNonText(source) {
     .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, blank);
 }
 
+/** `// i18n-guard:allow` 行豁免标记：紧邻该行的中文字面量放行（注释豁免机制的显式扩展）。 */
+const ALLOW_MARKER = /i18n-guard:\s*allow/;
+
+/**
+ * 判定某条违规是否应豁免：
+ * 1. 技术消息文件整文件豁免（spec 定案：中文错误串面向排障，不进 locale）；
+ * 2. `logger.*(...)` 调用行属技术日志，豁免；
+ * 3. 该行或上一行带 `i18n-guard:allow` 注释标记，豁免。
+ */
+function isExempt(rel, sourceLines, item) {
+  if (TECHNICAL_MESSAGE_FILES.has(rel)) return true;
+  const line = sourceLines[item.line - 1] || '';
+  if (TECHNICAL_LOG_CALL.test(line)) return true;
+  const prev = sourceLines[item.line - 2] || '';
+  if (ALLOW_MARKER.test(line) || ALLOW_MARKER.test(prev)) return true;
+  return false;
+}
+
 export async function checkI18n(files = SCAN_FILES) {
   const violations = [];
   for (const rel of files) {
@@ -137,7 +191,9 @@ export async function checkI18n(files = SCAN_FILES) {
       });
       continue;
     }
+    const sourceLines = source.split('\n');
     for (const item of findCjkLiterals(source)) {
+      if (isExempt(rel, sourceLines, item)) continue;
       violations.push({ file: rel, line: item.line, text: item.text });
     }
   }
