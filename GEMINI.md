@@ -17,12 +17,12 @@
 
 项目完整工程规则见同目录 `AGENTS.md`（本文件只承载上述铁律 0，避免依赖符号链接或 `@` 引用）。
 
-<!-- TAVERN-RULES:START v3.5.0 -->
+<!-- TAVERN-RULES:START v3.6.0 -->
 <!-- 本块由 tavern-harness/scripts/modules/rules_sync.py 自动生成，请勿手动编辑 -->
-<!-- 真源: tavern-harness · registry/rules.json · 类别 dev · v3.5.0 -->
-<!-- 同步时间: 2026-11-22T07:03:54Z -->
-<!-- 内容哈希: sha256:899c689d77c21b409d3f25a4b75c92677a86cfc16de1cbf8547b73db41a5a5a9（仅覆盖规则正文，不含头部与项目覆盖） -->
-# 统一开发规则（v3.5.0 · 酒馆开发）
+<!-- 真源: tavern-harness · registry/rules.json · 类别 dev · v3.6.0 -->
+<!-- 同步时间: 2026-11-22T07:36:36Z -->
+<!-- 内容哈希: sha256:e40e42bb533bf34123439fbe44f34a5000e36f5d060aeb4b5035b53673bbab2f（仅覆盖规则正文，不含头部与项目覆盖） -->
+# 统一开发规则（v3.6.0 · 酒馆开发）
 
 > 本块由 tavern-harness 生成，请勿手改正文。
 > 规范全文在 `.trellis/spec/`；项目特例写文末「项目覆盖」。
@@ -88,10 +88,11 @@
 - **D-14** 同一作者/仓库只允许一个安装 URL；禁本地链接，一律 remote link；私有仓提示需登录。（来源 ST-pack-transfer/iron-rules#32）
 - **D-15** 主人说「基石」= ST-Delegation-of-authority 仓（Authority 后端，D:/Repo/Tavern-repo/Myfork/ST-Delegation-of-authority）；禁止猜成 tavern-harness/Harness-repo；向基石贡献走其上游 issue+PR。（来源 ST-pack-transfer 2026-11-22 主人明令）
 - **D-16** 全宿主恢复事实：ST 无整包恢复端点、纯前端插件无法恢复、原生增量仅 Luker+PT 支持、插件层四宿主全无增量恢复；所有未实现能力必须全盘写入文档，禁止只留在代码里。（来源 ST-pack-transfer 2026-11-22 审计主人明令）
-- **D-17** 发现即修复到底，禁止遗留（行为+输出双层面）：①行为层——发现的问题必须当场修复闭环，任何未完成项、任何停止都不被允许，一律当场完成或当场派发实施工作流闭环；②输出层——汇报/文档/档案/提交信息严禁出现「遗留、待办、未完成、待裁定、TBD、暂停、挂起、后续再」及近似语义字眼，跨阶段工程只能表述为「下一阶段实施（已规划/已派发）」；③修复引入回归必须修到全量全绿才算完成。（来源 ST-pack-transfer 2026-11-22 主人明令，永久遵守）
+- **D-17** 发现即修复到底，禁止遗留（行为+输出双层面，唯一定义=全部干完）：①「没有遗留」的唯一标准是把任务清单全部干完，直到客观上没有任何事情可推进为止——核心工程（如增量恢复接线与后端联动）必须当场实施，严禁标「下一阶段/已规划」收尾；②行为层——任何未完成项、任何停止都不被允许，一律当场完成或当场派发实施工作流闭环；③输出层——严禁出现「遗留、待办、未完成、待裁定、TBD、暂停、挂起、后续再、下一阶段再做」及近似语义字眼；④修复引入回归必须修到全量全绿。（来源 ST-pack-transfer 2026-11-22 主人明令，永久遵守）
 - **D-18** CI 部署策略：所有 action 每一次推送都重跑重部署并留下记录（Pages 部署 cancel-in-progress 必须为 false）；只有 release（v* tag）时才打 tag、分发 offline HTML、清理历史并置 active deployment。（来源 ST-pack-transfer 2026-11-22 主人明令）
 - **D-19** GitHub 流程被动汇报，禁止主动查：所有 workflow 结束时必须把运行结论写回仓库（.github/run-report/，commit 带 [skip ci] 防递归），本地 git pull 被动收到；日常严禁 gh run list/主动查询 GitHub 运行状态（主人明确下令的一次性全域体检除外）。（来源 ST-pack-transfer 2026-11-22 主人明令）
 - **D-20** 一切工作走 CreateWorkflow 工作流：任何修复/勘察/文档/铁律落地一律 CreateWorkflow 派发执行；主代理只协调、派发、汇总、仲裁、进度勘察；只有主人明确说「主代理干」时主代理才亲自动手；禁裸 Agent/普通子代理/主代理默认亲干。（来源 ST-pack-transfer 2026-11-22 主人明令）
+- **D-21** 铁律 hook 注入频率：zcode 环境每 3 条用户消息插入一次铁律（原 5 改 3），会话启动强制注入不变；注入源唯一 .trellis/spec/guides/iron-rules.md，新铁律必须同步写入该文件才会被注入。（来源 ST-pack-transfer 2026-11-22 主人明令）
 
 ## 规范入口
 

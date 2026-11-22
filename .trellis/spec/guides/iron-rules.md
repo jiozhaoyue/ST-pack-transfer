@@ -94,3 +94,12 @@
     - **禁止看板中转**：zcode 环境禁止任何 swarm board / 消息板式的子代理通信；任务只由主代理派发、结果只回主代理。
     - **规则变更全层同步**：主人下达新铁律时，必须同一次工作内同步落到 ①`.zcode` 全局 `AGENTS.md` ②本文件 ③项目 `AGENTS.md`；只改一层视为未完成。
     - 判据：`npm run verify:rules` 退出码 0 + 人工复核本文件与 `C:\Users\<user>\.zcode\AGENTS.md` 的第 12 节一致。
+
+46. **基石绑定与禁遗留终极定义 + CI 策略 + 被动汇报 + 一切工作走工作流（2026-11-22 主人明令，永久遵守）**：
+    - **基石**：主人说「基石」即指 `D:/Repo/Tavern-repo/Myfork/ST-Delegation-of-authority`（Authority 后端仓）；严禁猜成 tavern-harness / Harness-repo；贡献走其上游 issue+PR。
+    - **恢复事实**：ST 无整包恢复端点；纯前端插件无法恢复（必须宿主服务端端点）；原生增量仅 Luker+PT 支持；未实现能力必须全盘写入公开文档，禁止只留在代码里。
+    - **禁遗留（唯一定义=全部干完）**：任务清单必须全部干完，直到客观上没有任何事情可推进为止——核心工程（增量恢复接线/后端联动）必须当场派 CreateWorkflow 实施，禁止「下一阶段/已规划」收尾；汇报/文档/档案严禁出现「遗留、待办、未完成、待裁定、TBD、暂停、挂起、后续再」及近似字眼；修复回归必须修到全量全绿。
+    - **CI 策略**：所有 action 每次推送都重跑重部署留记录（cancel-in-progress=false）；只有 release（v* tag）才打 tag / 分发 offline HTML / 清历史置 active。
+    - **被动汇报**：所有 workflow 结束写回 `.github/run-report/log.md`（commit 带 `[skip ci]` 防递归），本地 pull 被动收到；日常严禁主动 `gh run list` 查 GitHub 状态（主人明令的一次性全域体检除外）。
+    - **一切工作走 CreateWorkflow**：任何修复/勘察/文档/铁律落地一律 CreateWorkflow 派发；主代理只协调/派发/汇总/仲裁/进度勘察；**只有主人明确说「主代理干」才亲自动手**；禁裸 Agent/普通子代理；子代理模型唯一 hy4。
+    - **hook 注入频率**：铁律 hook 每 3 条用户消息插入一次（`.claude/hooks/user-prompt-submit.py` 的 `INJECT_EVERY = 3`），会话启动强制注入不变；本文件是唯一注入源，新铁律必须同步写入本文件才会被注入。

@@ -31,7 +31,7 @@ def _project_dir(hook_input: dict) -> Path:
     return Path(cwd or ".")
 
 
-INJECT_EVERY = 5
+INJECT_EVERY = 3  # 2026-11-22 主人明令：铁律注入频率每 3 条用户消息一次（原 5 改 3，D-21）
 
 
 def _rules_text(project_dir: Path) -> str:
