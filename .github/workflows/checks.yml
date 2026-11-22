@@ -74,3 +74,36 @@ jobs:
 
       - name: Build (sanity)
         run: npm run build -- --base=./
+
+  # D-19 铁律：workflow 结束写回仓库被动汇报（[skip ci] 防递归），本地 git pull 被动收到。
+  # job 级单独给 contents: write，不改文件级 contents: read。
+  report-back:
+    needs: [guard]
+    if: always()
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Append run report
+        env:
+          RESULT: ${{ needs.guard.result }}
+          RUN_ID: ${{ github.run_id }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -e
+          mkdir -p .github/run-report
+          line="$(date -u '+%Y-%m-%dT%H:%M:%SZ') | checks | ${RESULT} | ${RUN_ID} | ${SHA:0:7}"
+          echo "${line}" >> .github/run-report/log.md
+          tail -n 200 .github/run-report/log.md > .github/run-report/log.tmp
+          mv .github/run-report/log.tmp .github/run-report/log.md
+
+      - name: Commit and push report
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/run-report/log.md
+          git commit -m "chore(ci): run report [skip ci]" || exit 0
+          git push origin HEAD:main || true

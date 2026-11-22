@@ -1,7 +1,7 @@
 {
   "version": 1,
   "files": {
-    "docs/DEVELOPER-GUIDE.md": "3461d806cc6d6a0a491eb8c8472d2c71e0d72be9269ad6286a1cec631aca3581",
+    "docs/DEVELOPER-GUIDE.md": "491597ef5be74e901a5048120a6cb98930a9271084fc1f88e5bbf15640839d1f",
     "docs/HANDOFF-2026-11-21-quality-pass.md": "a7776f26a24c91e1fcf74d3bd82e56a770e6482ea03109790cf69c8943a4913d",
     "docs/HANDOFF-2026-11-21.md": "0a44fb5ffc7d874be138aca3f83a1032c39b612eb20295af47c15e1a442896bd",
     "docs/HANDOFF-2026-11-22.md": "ad05ef47eb0647aa1e9644900825983eed91f60553f24f1269ba74e017e4d446",
@@ -183,7 +183,7 @@
       "zh": "docs/DEVELOPER-GUIDE.md",
       "en": null,
       "translation": "pending",
-      "sourceHash": "3461d806cc6d6a0a491eb8c8472d2c71e0d72be9269ad6286a1cec631aca3581",
+      "sourceHash": "491597ef5be74e901a5048120a6cb98930a9271084fc1f88e5bbf15640839d1f",
       "translationHash": null
     }
   ],
