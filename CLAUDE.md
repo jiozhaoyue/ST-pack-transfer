@@ -100,12 +100,12 @@ npm run gen-fixtures              # 重新生成测试固件 fixtures/
 
 本项目用 Trellis 管理任务。当前任务 `python ./.trellis/scripts/task.py current`；分层规范 `.trellis/spec/backend/`（core）与 `.trellis/spec/frontend/`（ui）。更全的项目规则与统一开发规则见 [AGENTS.md](./AGENTS.md)。
 
-<!-- TAVERN-RULES:START v3.2.0 -->
+<!-- TAVERN-RULES:START v3.3.0 -->
 <!-- 本块由 tavern-harness/scripts/modules/rules_sync.py 自动生成，请勿手动编辑 -->
-<!-- 真源: tavern-harness · registry/rules.json · 类别 dev · v3.2.0 -->
-<!-- 同步时间: 2026-11-22T06:50:31Z -->
-<!-- 内容哈希: sha256:27e3c6889d7e6aaaee9e414e06d62797dfd08eba49bc4d47206fdbe4d403e116（仅覆盖规则正文，不含头部与项目覆盖） -->
-# 统一开发规则（v3.2.0 · 酒馆开发）
+<!-- 真源: tavern-harness · registry/rules.json · 类别 dev · v3.3.0 -->
+<!-- 同步时间: 2026-11-22T06:53:44Z -->
+<!-- 内容哈希: sha256:146b8fa6a6a7bd2089331692d71abd86e95f7a80a328eb4439866a48d0a0d335（仅覆盖规则正文，不含头部与项目覆盖） -->
+# 统一开发规则（v3.3.0 · 酒馆开发）
 
 > 本块由 tavern-harness 生成，请勿手改正文。
 > 规范全文在 `.trellis/spec/`；项目特例写文末「项目覆盖」。
@@ -172,6 +172,7 @@ npm run gen-fixtures              # 重新生成测试固件 fixtures/
 - **D-15** 主人说「基石」= ST-Delegation-of-authority 仓（Authority 后端，D:/Repo/Tavern-repo/Myfork/ST-Delegation-of-authority）；禁止猜成 tavern-harness/Harness-repo；向基石贡献走其上游 issue+PR。（来源 ST-pack-transfer 2026-11-22 主人明令）
 - **D-16** 全宿主恢复事实：ST 无整包恢复端点、纯前端插件无法恢复、原生增量仅 Luker+PT 支持、插件层四宿主全无增量恢复；所有未实现能力必须全盘写入文档，禁止只留在代码里。（来源 ST-pack-transfer 2026-11-22 审计主人明令）
 - **D-17** 发现即修复到底，禁止遗留：审计/挖掘发现的问题必须当场修复闭环，严禁标「遗留/待裁定」结案；测试断言旧行为的对齐、死文件归档、守卫误报、基线刷新一律当场处理；修复引入回归必须修到全量全绿才算完成。（来源 ST-pack-transfer 2026-11-22 质量会战主人明令）
+- **D-18** CI 部署策略：所有 action 每一次推送都重跑重部署并留下记录（Pages 部署 cancel-in-progress 必须为 false）；只有 release（v* tag）时才打 tag、分发 offline HTML、清理历史并置 active deployment。（来源 ST-pack-transfer 2026-11-22 主人明令）
 
 ## 规范入口
 
