@@ -1,23 +1,21 @@
 name: Deploy to GitHub Pages
 
-# 仅在正式版本 tag（v*）或手动触发时部署，杜绝日常开发 push 污染线上 Pages。
-# Release 产物（offline 单文件 HTML）由独立的 release.yml 负责，本工作流只管 Pages。
-# 2026-11-19 用户裁定：tag 与 Release 同时发，offline HTML 走 Release asset，不再入库。
+# 2026-11-22 用户裁定：每一次推送都重部署 Pages 并留下 deployment 记录（文档站/插件页
+# 随每次 push 即刻上线，死链修复不用等发版）；只有 release（v* tag）时才清历史并置
+# 两条 active deployment、分发 offline HTML（release.yml 负责）、打 tag。
 on:
   push:
-    tags:
-      - 'v*'
   workflow_dispatch:
 
 permissions:
   contents: read
   pages: write
   id-token: write
-  deployments: write   # 本体 + 文档站两条 active deployment / 清理历史
+  deployments: write   # 每次推送留 deployment 记录；release(tag) 时清历史置 active
 
 concurrency:
   group: "pages"
-  cancel-in-progress: true
+  cancel-in-progress: false   # 每次推送的部署都必须完整跑完留下记录，不许取消
 
 jobs:
   # 构建 + 清历史：独立 job，不绑定 github-pages environment，删除旧 deployment 不影响发布 job。
@@ -49,9 +47,10 @@ jobs:
             sleep 30
           done
 
-      # 零历史：清掉两个环境的旧 deployment。每次发布后全仓只剩本次的两条 active。
-      # 两个不同 environment（github-pages 本体 / github-pages-docs 文档站）才能各有 1 条 active。
+      # 清历史置 active 只在 release（v* tag）执行（2026-11-22 用户裁定）；
+      # 日常 push 部署只追加 deployment 记录，不清历史。
       - name: Clear old deployments
+        if: startsWith(github.ref, 'refs/tags/v')
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -129,9 +128,10 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@v4
 
-      # 本体 + 文档站各 1 条 active deployment。deploy-pages 已在 github-pages 建了一条（无描述），
-      # 这里补上 app 描述/URL；再在独立 environment github-pages-docs 建文档站一条并置 success。
+      # 本体 + 文档站各 1 条 active deployment——只在 release（v* tag）执行（2026-11-22 用户裁定）。
+      # 日常 push 部署到此为止：deploy-pages 的 deployment 记录已留下，不动历史。
       - name: Publish two active deployments
+        if: startsWith(github.ref, 'refs/tags/v')
         env:
           GH_TOKEN: ${{ github.token }}
           PAGE_URL: ${{ steps.deployment.outputs.page_url }}
