@@ -202,4 +202,6 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add .github/run-report/log.md
           git commit -m "chore(ci): run report [skip ci]" || exit 0
-          git push origin HEAD:main || true
+          # 并发 workflow 同时 push log.md 时后者会被远端前进拒绝；拉取重整再推，最多 3 次。
+          # push 成功即 break；全部失败才放弃（|| true 保 job 不红，不掩盖成功路径）。
+          for i in 1 2 3; do git pull --rebase origin main && git push origin HEAD:main && break || { sleep $((i*10)); }; done || true
