@@ -8,7 +8,7 @@ import { confirmDialog } from '../src/ui/host-bridge.js';
  * - 宿主提供 `SillyTavern.getContext().Popup.show.confirm`（官方文档 API）时走原生弹窗，
  *   返回值与 `POPUP_RESULT.AFFIRMATIVE` 比对；
  * - 宿主不可用 / 缺 POPUP_RESULT / 调用抛错，一律**静默降级**为 `window.confirm`；
- * - 两者都不可用（纯 Node）时不阻断调用方。
+ * - 两者都不可用（纯 Node）时默认拒绝：无确认能力即不授权，不放行破坏性操作。
  */
 
 const g = globalThis;
@@ -106,9 +106,9 @@ describe('confirmDialog 宿主原生确认适配器', () => {
     expect(hostUsed).toBe(false);
   });
 
-  it('宿主与 window 均不可用时不阻断调用方（纯 Node 路径）', async () => {
+  it('纯 Node 路径默认拒绝：无确认手段时不放行破坏性操作', async () => {
     delete g.window;
-    await expect(confirmDialog('x')).resolves.toBe(true);
+    await expect(confirmDialog('x')).resolves.toBe(false);
   });
 
   it('宿主 getContext 抛错（脚本未就绪）时静默降级', async () => {

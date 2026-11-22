@@ -147,15 +147,17 @@ describe('gitMode 纯函数契约', () => {
     expect(isGitEntry('')).toBe(false);
   });
 
-  it('isGitMinimalKept 保留集恰为 config/HEAD/index/refs/heads/**', () => {
+  it('isGitMinimalKept 保留集恰为 config/HEAD/index/refs/heads/** + packed-refs', () => {
     expect(isGitMinimalKept('.git/config')).toBe(true);
     expect(isGitMinimalKept('.git/HEAD')).toBe(true);
     expect(isGitMinimalKept('.git/index')).toBe(true);
     expect(isGitMinimalKept('.git/refs/heads/main')).toBe(true);
     expect(isGitMinimalKept('.git/refs/heads/feat/nested-ok')).toBe(true);
+    // packed-refs 属分支指针载体（git gc 后 refs/heads 可被打包进 packed-refs），
+    // 丢失会让接收方失去在线更新能力，必须随 minimal 保留（2026-11-22 修复裁定）。
+    expect(isGitMinimalKept('.git/packed-refs')).toBe(true);
     // 对象存储、小头、remote 引用一律不保留
     expect(isGitMinimalKept('.git/objects/pack/x.pack')).toBe(false);
-    expect(isGitMinimalKept('.git/packed-refs')).toBe(false);
     expect(isGitMinimalKept('.git/description')).toBe(false);
     expect(isGitMinimalKept('.git/refs/remotes/origin/main')).toBe(false);
     expect(isGitMinimalKept('.git/logs/HEAD')).toBe(false);
@@ -258,15 +260,18 @@ describe('gitMode=strip', () => {
 });
 
 describe('gitMode=minimal', () => {
+  // packed-refs 属分支指针载体（git gc 后 refs/heads 可被打包进 packed-refs），
+  // 丢失会让接收方失去在线更新能力，必须随 minimal 保留（2026-11-22 修复裁定）。
   const EXPECTED_MINIMAL = [
     `${EXT_ROOT}/.git/HEAD`,
     `${EXT_ROOT}/.git/config`,
     `${EXT_ROOT}/.git/index`,
     `${EXT_ROOT}/.git/objects/.keep`,
+    `${EXT_ROOT}/.git/packed-refs`,
     `${EXT_ROOT}/.git/refs/heads/${BRANCH}`,
   ].sort();
 
-  it('保留集恰好为 config/HEAD/index/refs/heads/<br> + 合成的 objects/.keep', async () => {
+  it('保留集恰好为 config/HEAD/index/packed-refs/refs/heads/<br> + 合成的 objects/.keep', async () => {
     const { files } = await runConvert(allEntries(), TARGETS.ST, {
       extensionMode: 'full',
       gitMode: GIT_MODES.MINIMAL,

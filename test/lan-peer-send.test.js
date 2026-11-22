@@ -24,9 +24,30 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { installMinimalDom } from './helpers/minimal-dom.js';
 import { mountLanTransferPanel } from '../src/ui/lan-transfer-panel.js';
+import { probeDirectCapability } from '../src/core/lan-transfer.js';
 import { t } from '../src/i18n/index.js';
 
 let uninstall = null;
+let prevRTCPeerConnection = null;
+
+/**
+ * 注入「可直连」能力：peerSend 入口的 capability 来自 mountLanTransferPanel 内部
+ * 无参调用 probeDirectCapability()（src/ui/lan-transfer-panel.js:287），后者读全局
+ * RTCPeerConnection 与 window.isSecureContext。Node 测试环境两者皆缺 ⇒ direct=false
+ * ⇒ peerSend 在入口提前 return、不入队。这里补桩使 capability={{direct:true, reason:''}}。
+ */
+function installDirectCapability() {
+  prevRTCPeerConnection = globalThis.RTCPeerConnection;
+  globalThis.RTCPeerConnection = class RTCPeerConnectionStub {};
+  globalThis.window.isSecureContext = true;
+  /* 自检：确保注入真正生效，而非靠「测试恰好没进门禁」蒙混。 */
+  expect(probeDirectCapability()).toEqual({ direct: true, reason: '' });
+}
+
+/** 切到「非安全上下文」：保留 RTC 桩，仅把 isSecureContext 置 false。 */
+function setInsecureContext() {
+  globalThis.window.isSecureContext = false;
+}
 
 /** 真实 view 的最小子集：state 合并语义与 workbench-view 的 setLan 一致。 */
 function makeView() {
@@ -54,11 +75,14 @@ function peerQueue(view) {
 
 beforeEach(() => {
   uninstall = installMinimalDom();
+  installDirectCapability();
 });
 
 afterEach(() => {
   if (uninstall) uninstall();
   uninstall = null;
+  globalThis.RTCPeerConnection = prevRTCPeerConnection;
+  prevRTCPeerConnection = null;
 });
 
 describe('peerSend', () => {
@@ -143,5 +167,27 @@ describe('peerSend', () => {
 
     expect(peerQueue(view)).toHaveLength(0);
     expect(view.toasts).toContain(t('lan.toast.selectPacksToSend'));
+  });
+
+  it('非安全上下文（direct:false）时入队零个并提示原因', async () => {
+    setInsecureContext();
+    /* 自检：确认门禁前提成立——direct 必须为 false，且 reason 是安全上下文提示。 */
+    const cap = probeDirectCapability();
+    expect(cap.direct).toBe(false);
+    /* reason 来自 lan-transfer.js:469 的硬编码文案（非 i18n key）。 */
+    expect(cap.reason).toBe('当前地址不是安全上下文');
+
+    const view = makeView();
+    const files = [new File([new Uint8Array(64)], 'should-not-queue.zip')];
+    const getSendTargets = async () => files;
+    const panel = mountLanTransferPanel({ view, getSendTargets });
+
+    await expect(panel.peerSend()).resolves.toBeUndefined();
+
+    /* 门禁行为：即便有目标，也不得入队；toast 是能力原因，而非「已入队」。 */
+    expect(peerQueue(view)).toHaveLength(0);
+    expect(view.toasts).toContain(cap.reason);
+    expect(view.toasts).not.toContain(t('lan.toast.tasksQueued', { n: files.length }));
+    expect(view.toasts).not.toContain(t('lan.toast.selectPacksToSend'));
   });
 });

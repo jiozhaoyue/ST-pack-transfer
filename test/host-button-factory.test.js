@@ -104,6 +104,13 @@ function installDom({ anchors = [], row = null, blocks = [], extensionsSettings 
 
 const byId = (created, id) => created.find((el) => el.id === id) || null;
 
+/** 新契约：多锚点场景按钮 id 为 `st-pack-transfer-native-btn-{i}`（i 为锚点序号），
+ *  判重走锚点兄弟位的 `dataset.stZipInjected`；故按「幂等标记 + id 前缀」匹配，
+ *  不写死固定 id / 序号（单锚点场景实际为 `st-pack-transfer-native-btn-0`）。 */
+const byPullBtns = (created, prefix = 'st-pack-transfer-native-btn-') =>
+  created.filter((el) => el.dataset?.stZipInjected === '1'
+    && typeof el.id === 'string' && el.id.startsWith(prefix));
+
 describe('makeHostButton 契约（经 mountNativeBackupButton 注入）', () => {
   let anchor;
 
@@ -123,8 +130,10 @@ describe('makeHostButton 契约（经 mountNativeBackupButton 注入）', () => 
 
     mountNativeBackupButton(() => {});
 
-    const btn = byId(created, 'st-pack-transfer-native-btn');
-    expect(btn).not.toBeNull();
+    const btns = byPullBtns(created);
+    expect(btns).toHaveLength(1);
+    const btn = btns[0];
+    expect(btn.id).toBe('st-pack-transfer-native-btn-0');
     expect(btn.className).toBe('menu_button menu_button_icon');
     expect(btn.dataset.stZipInjected).toBe('1');
     expect(btn.title).toBe('从宿主拉取数据包（按原生界面的类目勾选）');
@@ -135,7 +144,9 @@ describe('makeHostButton 契约（经 mountNativeBackupButton 注入）', () => 
 
     mountNativeBackupButton(() => {});
 
-    const btn = byId(created, 'st-pack-transfer-native-btn');
+    const btns = byPullBtns(created);
+    expect(btns).toHaveLength(1);
+    const btn = btns[0];
     expect(btn.children.map((c) => c.tagName)).toEqual(['I', 'SPAN']);
     expect(btn.children[0].className).toBe('fa-fw fa-solid fa-right-left');
     expect(btn.children[1].textContent).toBe('从宿主拉取');
@@ -147,7 +158,9 @@ describe('makeHostButton 契约（经 mountNativeBackupButton 注入）', () => 
 
     mountNativeBackupButton(() => { opened += 1; });
     clickEffects = { prevented: 0, stopped: 0 };
-    byId(created, 'st-pack-transfer-native-btn').click();
+    const btns = byPullBtns(created);
+    expect(btns).toHaveLength(1);
+    btns[0].click();
 
     expect(clickEffects.prevented).toBe(1);
     expect(clickEffects.stopped).toBe(1);
@@ -159,8 +172,12 @@ describe('makeHostButton 契约（经 mountNativeBackupButton 注入）', () => 
 
     mountNativeBackupButton(() => {});
 
-    expect(byId(created, 'st-pack-transfer-native-btn')).not.toBeNull();
+    // 只注入「从宿主拉取」一个入口：pull 前缀按钮恰好一个，
+    // 且不存在旧固定 id 或 quick-fetch 形态的「一键拉取」入口。
+    expect(byPullBtns(created)).toHaveLength(1);
+    expect(byId(created, 'st-pack-transfer-native-btn')).toBeNull();
     expect(byId(created, 'st-pack-transfer-native-btn-quick-fetch')).toBeNull();
+    expect(created.filter((el) => String(el.textContent || '').includes('一键拉取'))).toHaveLength(0);
   });
 });
 
