@@ -14,10 +14,17 @@ import enUS from '../src/i18n/locales/en-US.js';
 describe('F5 · hostRestoreCapability 静态能力判据', () => {
   it('① luker 可用，st / tt / pt 不可用且各带原因 key', () => {
     expect(hostRestoreCapability('luker')).toEqual({ supported: true, reasonKey: '' });
+    // tt/pt 的 reasonKey 指向增量包宿主原生导入指引（ttDelta/ptDelta，增量恢复实施裁定）；
+    // st 保持通用原因键。
+    const expectedKeys = {
+      st: 'restore.unsupported.st',
+      tt: 'restore.unsupported.ttDelta',
+      pt: 'restore.unsupported.ptDelta',
+    };
     for (const host of ['st', 'tt', 'pt']) {
       const cap = hostRestoreCapability(host);
       expect(cap.supported).toBe(false);
-      expect(cap.reasonKey).toBe(`restore.unsupported.${host}`);
+      expect(cap.reasonKey).toBe(expectedKeys[host]);
     }
   });
 
@@ -27,9 +34,13 @@ describe('F5 · hostRestoreCapability 静态能力判据', () => {
     expect(cap.reasonKey).toBeTruthy();
   });
 
-  it('③ 中英 i18n 均定义三条不支持原因', () => {
-    for (const host of ['st', 'tt', 'pt']) {
-      const key = `restore.unsupported.${host}`;
+  it('③ 中英 i18n 均定义不支持原因（st 三键 + tt/pt 增量指引键）', () => {
+    const keys = [
+      'restore.unsupported.st',
+      'restore.unsupported.ttDelta',
+      'restore.unsupported.ptDelta',
+    ];
+    for (const key of keys) {
       expect(typeof zhCN[key]).toBe('string');
       expect(zhCN[key].length).toBeGreaterThan(0);
       expect(typeof enUS[key]).toBe('string');
